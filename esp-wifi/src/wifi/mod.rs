@@ -3,7 +3,7 @@
 pub(crate) mod os_adapter;
 pub(crate) mod state;
 
-use alloc::vec::Vec;
+use alloc::collections::vec_deque::VecDeque;
 use core::{
     cell::{RefCell, RefMut},
     fmt::Debug,
@@ -1029,11 +1029,11 @@ const DATA_FRAME_SIZE: usize = MTU + ETHERNET_FRAME_HEADER_SIZE;
 const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
 const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
 
-pub(crate) static DATA_QUEUE_RX_AP: Mutex<RefCell<Vec<EspWifiPacketBuffer>>> =
-    Mutex::new(RefCell::new(Vec::new()));
+pub(crate) static DATA_QUEUE_RX_AP: Mutex<RefCell<VecDeque<EspWifiPacketBuffer>>> =
+    Mutex::new(RefCell::new(VecDeque::new()));
 
-pub(crate) static DATA_QUEUE_RX_STA: Mutex<RefCell<Vec<EspWifiPacketBuffer>>> =
-    Mutex::new(RefCell::new(Vec::new()));
+pub(crate) static DATA_QUEUE_RX_STA: Mutex<RefCell<VecDeque<EspWifiPacketBuffer>>> =
+    Mutex::new(RefCell::new(VecDeque::new()));
 
 /// Common errors.
 #[derive(Debug, Clone, Copy)]
@@ -1606,7 +1606,7 @@ unsafe extern "C" fn recv_cb_sta(
     if critical_section::with(|cs| {
         let mut queue = DATA_QUEUE_RX_STA.borrow_ref_mut(cs);
         if queue.len() < RX_QUEUE_SIZE {
-            queue.push(packet);
+            queue.push_back(packet);
             true
         } else {
             false
@@ -1636,7 +1636,7 @@ unsafe extern "C" fn recv_cb_ap(
     if critical_section::with(|cs| {
         let mut queue = DATA_QUEUE_RX_AP.borrow_ref_mut(cs);
         if queue.len() < RX_QUEUE_SIZE {
-            queue.push(packet);
+            queue.push_back(packet);
             true
         } else {
             false
@@ -1990,7 +1990,7 @@ mod sealed {
 
         fn wrap_config(config: Self::Config) -> Configuration;
 
-        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, Vec<EspWifiPacketBuffer>>;
+        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, VecDeque<EspWifiPacketBuffer>>;
 
         fn can_send(self) -> bool {
             WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE
@@ -2056,7 +2056,7 @@ mod sealed {
             Configuration::Client(config)
         }
 
-        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, Vec<EspWifiPacketBuffer>> {
+        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, VecDeque<EspWifiPacketBuffer>> {
             DATA_QUEUE_RX_STA.borrow_ref_mut(cs)
         }
 
@@ -2095,7 +2095,7 @@ mod sealed {
             Configuration::AccessPoint(config)
         }
 
-        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, Vec<EspWifiPacketBuffer>> {
+        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, VecDeque<EspWifiPacketBuffer>> {
             DATA_QUEUE_RX_AP.borrow_ref_mut(cs)
         }
 
@@ -2711,7 +2711,7 @@ impl<MODE: Sealed> WifiRxToken<MODE> {
             let mut queue = self.mode.data_queue_rx(cs);
 
             unwrap!(
-                queue.pop(),
+                queue.pop_front(),
                 "unreachable: transmit()/receive() ensures there is a packet to process"
             )
         });

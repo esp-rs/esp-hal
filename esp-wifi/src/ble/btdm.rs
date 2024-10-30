@@ -74,7 +74,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
 
     critical_section::with(|cs| {
         let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        queue.push(packet);
+        queue.push_back(packet);
     });
 
     super::dump_packet_info(data);

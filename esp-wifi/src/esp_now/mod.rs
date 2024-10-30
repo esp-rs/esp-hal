@@ -9,7 +9,7 @@
 //!
 //! For more information see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::{cell::RefCell, fmt::Debug, marker::PhantomData};
 
 use critical_section::Mutex;
@@ -32,7 +32,8 @@ pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
 pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
 
 // Stores received packets until dequeued by the user
-static RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedData>>> = Mutex::new(RefCell::new(Vec::new()));
+static RECEIVE_QUEUE: Mutex<RefCell<VecDeque<ReceivedData>>> =
+    Mutex::new(RefCell::new(VecDeque::new()));
 
 /// This atomic behaves like a guard, so we need strict memory ordering when
 /// operating it.
@@ -545,7 +546,7 @@ impl EspNowReceiver<'_> {
     pub fn receive(&self) -> Option<ReceivedData> {
         critical_section::with(|cs| {
             let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-            queue.pop()
+            queue.pop_front()
         })
     }
 }
@@ -840,10 +841,10 @@ unsafe extern "C" fn rcv_cb(
         let data = Box::from(slice);
 
         if queue.len() >= RECEIVE_QUEUE_SIZE {
-            queue.pop();
+            queue.pop_front();
         }
 
-        queue.push(ReceivedData { data, info });
+        queue.push_back(ReceivedData { data, info });
 
         #[cfg(feature = "async")]
         asynch::ESP_NOW_RX_WAKER.wake();

@@ -1285,7 +1285,7 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
         data[2] = len as u8;
         data[3..][..len].copy_from_slice(payload);
 
-        queue.push(ReceivedPacket {
+        queue.push_back(ReceivedPacket {
             data: Box::from(&data[..len + 3]),
         });
 
@@ -1314,7 +1314,7 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
         data[0] = 0x02; // ACL
         data[1..][..data_slice.len()].copy_from_slice(data_slice);
 
-        queue.push(ReceivedPacket {
+        queue.push_back(ReceivedPacket {
             data: Box::from(&data[..data_slice.len() + 1]),
         });
 

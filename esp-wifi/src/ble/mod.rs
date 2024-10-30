@@ -6,7 +6,7 @@ pub(crate) mod btdm;
 #[cfg(any(esp32c2, esp32c6, esp32h2))]
 pub(crate) mod npl;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
 use core::{cell::RefCell, mem::MaybeUninit};
 
 pub(crate) use ble::{ble_init, send_hci};
@@ -33,7 +33,8 @@ pub(crate) unsafe extern "C" fn free(ptr: *mut crate::binary::c_types::c_void) {
 }
 
 // Stores received packets until the the BLE stack dequeues them
-static BT_RECEIVE_QUEUE: Mutex<RefCell<Vec<ReceivedPacket>>> = Mutex::new(RefCell::new(Vec::new()));
+static BT_RECEIVE_QUEUE: Mutex<RefCell<VecDeque<ReceivedPacket>>> =
+    Mutex::new(RefCell::new(VecDeque::new()));
 
 static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
 
@@ -128,7 +129,7 @@ pub(crate) fn read_next(data: &mut [u8]) -> usize {
     critical_section::with(|cs| {
         let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
-        match queue.pop() {
+        match queue.pop_front() {
             Some(packet) => {
                 data[..packet.data.len()].copy_from_slice(&packet.data[..packet.data.len()]);
                 packet.data.len()
@@ -145,7 +146,7 @@ pub fn read_hci(data: &mut [u8]) -> usize {
         if hci_read_data.is_empty() {
             let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
 
-            if let Some(packet) = queue.pop() {
+            if let Some(packet) = queue.pop_front() {
                 hci_read_data.extend_from_slice(&packet.data);
             }
         }
