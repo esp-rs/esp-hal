@@ -97,7 +97,9 @@ async fn main(spawner: Spawner) {
 
     let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
-    let mut uart0 = Uart::new_async_with_config(peripherals.UART0, config, rx_pin, tx_pin).unwrap();
+    let mut uart0 = Uart::new_with_config(peripherals.UART0, config, rx_pin, tx_pin)
+        .unwrap()
+        .into_async();
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
 
     let (rx, tx) = uart0.split();

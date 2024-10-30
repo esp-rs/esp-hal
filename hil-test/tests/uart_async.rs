@@ -26,7 +26,7 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(io);
 
-        let uart = Uart::new_async(peripherals.UART0, rx, tx).unwrap();
+        let uart = Uart::new(peripherals.UART0, rx, tx).unwrap().into_async();
 
         Context { uart }
     }
