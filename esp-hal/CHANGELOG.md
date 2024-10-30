@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2S Parallel output driver for ESP32. (#2348, #2436)
 - Add an option to configure `WDT` action (#2330)
 - `DmaDescriptor` is now `Send` (#2456)
+- `into_async` and `into_blocking` functions for most peripherals (#2430)
+- API mode type parameter (currently always `Blocking`) to `master::Spi` and `slave::Spi` (#2430)
 
 ### Changed
 
@@ -39,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interrupt listen/unlisten/clear functions now accept any type that converts into `EnumSet` (i.e. single interrupt flags). (#2442)
 - SPI interrupt listening is now only available in Blocking mode. The `set_interrupt_handler` is available via `InterruptConfigurable` (#2442)
 - Allow users to create DMA `Preparation`s (#2455) 
+- The `rmt::asynch::RxChannelAsync` and `rmt::asynch::TxChannelAsync` traits have been moved to `rmt` (#2430)
 
 ### Fixed
 
@@ -64,6 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the pin type parameters from `parl_io::{RxOneBit, RxTwoBits, RxFourBits, RxEightBits, RxSixteenBits}` (#2388)
 - Removed the pin type parameters from `lcd_cam::lcd::i8080::{TxEightBits, TxSixteenBits}` (#2388)
 - Removed the pin type parameters from `lcd_cam::cam::{RxEightBits, RxSixteenBits}` (#2388)
+- Most of the async-specific constructors (`new_async`, `new_async_no_transceiver`) have been removed. (#2430)
+- The `configure_for_async` DMA functions have been removed (#2430)
 
 ## [0.21.1]
 

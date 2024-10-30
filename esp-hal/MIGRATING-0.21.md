@@ -23,6 +23,41 @@ For example:
  }
 ```
 
+## Removed `async`-specific constructors
+
+The following async-specific constuctors have been removed:
+
+- `configure_for_async` DMA channel constructors
+- `TwaiConfiguration::new_async` and `TwaiConfiguration::new_async_no_transceiver`
+- `I2c::new_async`
+- `LcdCam::new_async`
+- `UsbSerialJtag::new_async`
+- `Rsa::new_async`
+- `Rmt::new_async`
+- `Uart::new_async`, `Uart::new_async_with_config`
+- `UartRx::new_async`, `UartRx::new_async_with_config`
+- `UartTx::new_async`, `UartTx::new_async_with_config`
+
+You can use the blocking counterparts, then call `into_async` on the returned peripheral instead.
+
+```diff
+-let mut config = twai::TwaiConfiguration::new_async(
++let mut config = twai::TwaiConfiguration::new(
+     peripherals.TWAI0,
+     loopback_pin.peripheral_input(),
+     loopback_pin,
+     twai::BaudRate::B1000K,
+     TwaiMode::SelfTest,
+-);
++).into_async();
+```
+
+Some drivers were implicitly configured to the asyncness of the DMA channel used to construct them.
+This is no longer the case, and the following drivers will always be created in blocking mode:
+
+- `I2s`
+- `master::SpiDma` and `master::SpiDmaBus`
+
 ## Peripheral types are now optional
 
 You no longer have to specify the peripheral instance in the driver's type for the following
