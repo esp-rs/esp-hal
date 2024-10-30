@@ -50,11 +50,12 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
+//! # use esp_hal::timer::timg::MwdtStage;
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut wdt = timg0.wdt;
 //!
-//! wdt.set_timeout(0, 5_000.millis());
+//! wdt.set_timeout(MwdtStage::Stage0, 5_000.millis());
 //! wdt.enable();
 //!
 //! loop {

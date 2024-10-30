@@ -26,6 +26,7 @@
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::rtc_cntl::Rtc;
 //! # use esp_hal::rtc_cntl::Rwdt;
+//! # use esp_hal::rtc_cntl::RwdtStage;
 //! # use crate::esp_hal::InterruptConfigurable;
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 //! let mut delay = Delay::new();
@@ -33,7 +34,7 @@
 //! let mut rtc = Rtc::new(peripherals.LPWR);
 //!
 //! rtc.set_interrupt_handler(interrupt_handler);
-//! rtc.rwdt.set_timeout(0, 2000.millis());
+//! rtc.rwdt.set_timeout(RwdtStage::Stage0, 2000.millis());
 //! rtc.rwdt.listen();
 //!
 //! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
@@ -44,6 +45,7 @@
 //!
 //! # use critical_section::Mutex;
 //! # use esp_hal::rtc_cntl::Rwdt;
+//! # use esp_hal::rtc_cntl::RwdtStage;
 //!
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 //!
@@ -59,7 +61,7 @@
 //!
 //!         // esp_println::println!("Restarting in 5 seconds...");
 //!
-//!         rwdt.set_timeout(0, 5000u64.millis());
+//!         rwdt.set_timeout(RwdtStage::Stage0, 5000u64.millis());
 //!         rwdt.unlisten();
 //!     });
 //! }
