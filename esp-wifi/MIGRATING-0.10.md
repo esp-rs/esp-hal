@@ -11,7 +11,7 @@ rustflags = [
 ]
 ```
 
-## ESP-NOW: Use `get_data` to access the received payload
+## ESP-NOW: Use `data` to access the received payload
 
 Previously `data` and `len` were public - use the previously already existing `data()` function.
 
