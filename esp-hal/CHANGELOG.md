@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed `SpiDma` functions: `dma_transfer` to `transfer`, `dma_write` to `write`, `dma_read` to `read`. (#2373)
 - Peripheral type erasure for UART (#2381)
 - Changed listening for UART events (#2406)
+- Circular DMA transfers now correctly error, `available` returns `Result<usize,DmaError>` now (#2409)
 
 ### Fixed
 

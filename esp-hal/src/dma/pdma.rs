@@ -90,6 +90,11 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
 }
 
 impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> TxRegisterAccess for SpiDmaTxChannelImpl<C> {
+    fn set_auto_write_back(&self, enable: bool) {
+        // there is no `auto_wrback` for SPI
+        assert!(!enable);
+    }
+
     fn last_dscr_address(&self) -> usize {
         let spi = self.0.register_block();
         spi.out_eof_des_addr().read().dma_out_eof_des_addr().bits() as usize
@@ -507,6 +512,13 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
 }
 
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> TxRegisterAccess for I2sDmaTxChannelImpl<C> {
+    fn set_auto_write_back(&self, enable: bool) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.out_auto_wrback().bit(enable));
+    }
+
     fn last_dscr_address(&self) -> usize {
         let reg_block = self.0.register_block();
         reg_block
