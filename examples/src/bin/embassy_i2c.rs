@@ -31,7 +31,7 @@ async fn main(_spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let i2c0 = I2c::new_async(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 400.kHz());
+    let i2c0 = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 400.kHz()).into_async();
 
     let mut lis3dh = Lis3dh::new_i2c(i2c0, SlaveAddr::Alternate).await.unwrap();
     lis3dh.set_range(Range::G8).await.unwrap();
