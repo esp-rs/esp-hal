@@ -1423,7 +1423,7 @@ where
         // already enough to make this a no-go. (i.e. one needs to mute the ROM
         // code via efuse / strapping pin AND use a silent bootloader)
         //
-        // Ideally this should be configurable once we have a solution for https://github.com/esp-rs/esp-hal/issues/1111
+        // TODO: make this configurable
         // see https://github.com/espressif/esp-idf/blob/5f4249357372f209fdd57288265741aaba21a2b1/components/esp_driver_uart/src/uart.c#L179
         if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
             return;
