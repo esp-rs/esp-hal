@@ -1027,17 +1027,6 @@ where
             phantom: PhantomData,
         }
     }
-
-    /// Convert the configuration into an async configuration.
-    fn into_async(self) -> TwaiConfiguration<'d, Async, T> {
-        let mut this = TwaiConfiguration {
-            twai: self.twai,
-            phantom: PhantomData,
-            mode: self.mode,
-        };
-        this.internal_set_interrupt_handler(this.twai.async_handler());
-        this
-    }
 }
 
 impl<'d> TwaiConfiguration<'d, Blocking> {
@@ -1101,35 +1090,15 @@ where
     ) -> Self {
         Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode)
     }
-}
 
-impl<'d> TwaiConfiguration<'d, Async> {
-    /// Create a new instance of [TwaiConfiguration]
-    ///
-    /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new_async<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = impl Instance> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        Self::new_async_typed(peripheral.map_into(), rx_pin, tx_pin, baud_rate, mode)
-    }
-
-    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
-    /// directly
-    ///
-    /// You don't need a transceiver by following the description in the
-    /// `twai.rs` example
-    pub fn new_async_no_transceiver<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = impl Instance> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        Self::new_async_no_transceiver_typed(peripheral.map_into(), rx_pin, tx_pin, baud_rate, mode)
+    /// Convert the configuration into an async configuration.
+    pub fn into_async(mut self) -> TwaiConfiguration<'d, Async, T> {
+        self.set_interrupt_handler(self.twai.async_handler());
+        TwaiConfiguration {
+            twai: self.twai,
+            phantom: PhantomData,
+            mode: self.mode,
+        }
     }
 }
 
@@ -1137,33 +1106,20 @@ impl<'d, T> TwaiConfiguration<'d, Async, T>
 where
     T: Instance,
 {
-    /// Create a new instance of [TwaiConfiguration] in async mode
-    ///
-    /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new_async_typed<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        TwaiConfiguration::new_typed(peripheral, rx_pin, tx_pin, baud_rate, mode).into_async()
-    }
+    /// Convert the configuration into a blocking configuration.
+    pub fn into_blocking(self) -> TwaiConfiguration<'d, Blocking, T> {
+        use crate::{interrupt, Cpu};
 
-    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
-    /// directly in async mode
-    ///
-    /// You don't need a transceiver by following the description in the
-    /// `twai.rs` example
-    pub fn new_async_no_transceiver_typed<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        TwaiConfiguration::new_no_transceiver_typed(peripheral, rx_pin, tx_pin, baud_rate, mode)
-            .into_async()
+        interrupt::disable(Cpu::ProCpu, self.twai.interrupt());
+        #[cfg(multi_core)]
+        interrupt::disable(Cpu::AppCpu, self.twai.interrupt());
+
+        // Re-create in  blocking mode
+        TwaiConfiguration {
+            twai: self.twai,
+            phantom: PhantomData,
+            mode: self.mode,
+        }
     }
 }
 
