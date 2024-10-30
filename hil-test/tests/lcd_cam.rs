@@ -86,7 +86,7 @@ mod tests {
         let (d0_in, d0_out) = split_pin(ctx.io.pins.gpio11);
         let (d1_in, d1_out) = split_pin(ctx.io.pins.gpio9);
         let (d2_in, d2_out) = split_pin(ctx.io.pins.gpio8);
-        let (d3_in, d3_out) = split_pin(ctx.io.pins.gpio10);
+        let (d3_in, d3_out) = split_pin(ctx.io.pins.gpio47);
         let (d4_in, d4_out) = split_pin(ctx.io.pins.gpio12);
         let (d5_in, d5_out) = split_pin(ctx.io.pins.gpio18);
         let (d6_in, d6_out) = split_pin(ctx.io.pins.gpio17);
