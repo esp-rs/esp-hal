@@ -151,6 +151,12 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
 }
 
 impl<C: GdmaChannel> TxRegisterAccess for ChannelTxImpl<C> {
+    fn set_auto_write_back(&self, enable: bool) {
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| w.out_auto_wrback().bit(enable));
+    }
+
     fn last_dscr_address(&self) -> usize {
         self.ch()
             .out_eof_des_addr()

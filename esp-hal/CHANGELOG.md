@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-
 - A new config option `PLACE_SWITCH_TABLES_IN_RAM` to improve performance (especially for interrupts) at the cost of slightly more RAM usage (#2331)
 - A new config option `PLACE_ANON_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
 - Add burst transfer support to DMA buffers (#2336)
@@ -22,8 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
 - `Cpu::COUNT` and `Cpu::current()` (#2411)
 - `UartInterrupt` and related functions (#2406)
-- `Cpu::COUNT` and `Cpu::current()` (#?)
 - I2S Parallel output driver for esp32. (#2348)
+- Add an option to configure `WDT` action (#2330)
 
 ### Changed
 
@@ -35,11 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed `SpiDma` functions: `dma_transfer` to `transfer`, `dma_write` to `write`, `dma_read` to `read`. (#2373)
 - Peripheral type erasure for UART (#2381)
 - Changed listening for UART events (#2406)
+- Circular DMA transfers now correctly error, `available` returns `Result<usize,DmaError>` now (#2409)
 
 ### Fixed
 
 - Fix conflict between `RtcClock::get_xtal_freq` and `Rtc::disable_rom_message_printing` (#2360)
 - Fixed an issue where interrupts enabled before `esp_hal::init` were disabled. This issue caused the executor created by `#[esp_hal_embassy::main]` to behave incorrectly in multi-core applications. (#2377)
+- Fixed `TWAI::transmit_async`: bus-off state is not reached when CANH and CANL are shorted. (#2421)
 
 ### Removed
 

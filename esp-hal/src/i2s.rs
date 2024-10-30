@@ -64,7 +64,7 @@
 //! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
 //!
 //! loop {
-//!     let avail = transfer.available();
+//!     let avail = transfer.available().unwrap();
 //!
 //!     if avail > 0 {
 //!         let mut rcv = [0u8; 5000];
@@ -1545,6 +1545,9 @@ mod private {
 
         fn reset_rx(&self) {
             let i2s = self.register_block();
+
+            i2s.rx_conf().modify(|_, w| w.rx_start().clear_bit());
+
             i2s.rx_conf().modify(|_, w| {
                 w.rx_reset().set_bit();
                 w.rx_fifo_reset().set_bit()
@@ -1954,7 +1957,7 @@ pub mod asynch {
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
             loop {
-                self.state.update(&self.i2s_tx.tx_channel);
+                self.state.update(&self.i2s_tx.tx_channel)?;
                 let res = self.state.available;
 
                 if res != 0 {
@@ -2077,7 +2080,7 @@ pub mod asynch {
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
             loop {
-                self.state.update();
+                self.state.update()?;
 
                 let res = self.state.available;
 

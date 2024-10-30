@@ -68,7 +68,7 @@ fn main() -> ! {
     println!("Started transfer");
 
     loop {
-        let avail = transfer.available();
+        let avail = transfer.available().unwrap();
 
         if avail > 0 {
             let mut rcv = [0u8; 5000];

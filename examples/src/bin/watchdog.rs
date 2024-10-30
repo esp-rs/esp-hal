@@ -9,7 +9,11 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, prelude::*, timer::timg::TimerGroup};
+use esp_hal::{
+    delay::Delay,
+    prelude::*,
+    timer::timg::{MwdtStage, TimerGroup},
+};
 use esp_println::println;
 
 #[entry]
@@ -21,7 +25,7 @@ fn main() -> ! {
     let timg0 = TimerGroup::new_async(peripherals.TIMG0);
     let mut wdt0 = timg0.wdt;
     wdt0.enable();
-    wdt0.set_timeout(2u64.secs());
+    wdt0.set_timeout(MwdtStage::Stage0, 2u64.secs());
 
     loop {
         wdt0.feed();
