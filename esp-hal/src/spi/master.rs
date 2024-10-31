@@ -903,14 +903,14 @@ mod dma {
 
         /// Listen for the given interrupts
         #[cfg(gdma)]
-        pub fn listen(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-            self.spi.listen(interrupts);
+        pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi.enable_listen(interrupts.into(), true);
         }
 
         /// Unlisten the given interrupts
         #[cfg(gdma)]
-        pub fn unlisten(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-            self.spi.unlisten(interrupts);
+        pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi.enable_listen(interrupts.into(), false);
         }
 
         /// Gets asserted interrupts
@@ -921,8 +921,8 @@ mod dma {
 
         /// Resets asserted interrupts
         #[cfg(gdma)]
-        pub fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-            self.spi.clear_interrupts(interrupts);
+        pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi.clear_interrupts(interrupts.into());
         }
 
         fn is_done(&self) -> bool {
@@ -1489,14 +1489,14 @@ mod dma {
 
         /// Listen for the given interrupts
         #[cfg(gdma)]
-        pub fn listen(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-            self.spi_dma.listen(interrupts);
+        pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi_dma.listen(interrupts.into());
         }
 
         /// Unlisten the given interrupts
         #[cfg(gdma)]
-        pub fn unlisten(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-            self.spi_dma.unlisten(interrupts);
+        pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi_dma.unlisten(interrupts.into());
         }
 
         /// Gets asserted interrupts
@@ -1507,8 +1507,8 @@ mod dma {
 
         /// Resets asserted interrupts
         #[cfg(gdma)]
-        pub fn clear_interrupts(&mut self, interrupts: EnumSet<SpiInterrupt>) {
-            self.spi_dma.clear_interrupts(interrupts);
+        pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi_dma.clear_interrupts(interrupts.into());
         }
 
         /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
@@ -2444,18 +2444,6 @@ pub trait Instance: private::Sealed + PeripheralMarker + Into<AnySpi> + 'static 
             }
             w
         });
-    }
-
-    /// Listen for the given interrupts
-    #[cfg(gdma)]
-    fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-        self.enable_listen(interrupts.into(), true);
-    }
-
-    /// Unlisten the given interrupts
-    #[cfg(gdma)]
-    fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-        self.enable_listen(interrupts.into(), false);
     }
 
     /// Gets asserted interrupts

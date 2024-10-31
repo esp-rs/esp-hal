@@ -1125,13 +1125,13 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     }
 
     /// Listen for the given interrupts
-    pub fn listen(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_listen(interrupts, true);
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), true);
     }
 
     /// Unlisten the given interrupts
-    pub fn unlisten(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_listen(interrupts, false);
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), false);
     }
 
     /// Gets asserted interrupts
@@ -1140,8 +1140,8 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     }
 
     /// Resets asserted interrupts
-    pub fn clear_interrupts(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_clear_interrupts(interrupts);
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_clear_interrupts(interrupts.into());
     }
 }
 
@@ -1200,13 +1200,13 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     }
 
     /// Listen for the given interrupts
-    pub fn listen(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_listen(interrupts, true);
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), true);
     }
 
     /// Unlisten the given interrupts
-    pub fn unlisten(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_listen(interrupts, false);
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), false);
     }
 
     /// Gets asserted interrupts
@@ -1215,8 +1215,8 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     }
 
     /// Resets asserted interrupts
-    pub fn clear_interrupts(&mut self, interrupts: EnumSet<ParlIoInterrupt>) {
-        internal_clear_interrupts(interrupts);
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_clear_interrupts(interrupts.into());
     }
 }
 
