@@ -339,7 +339,7 @@ impl<'d> RxClkInPin<'d> {
         Self { pin, sample_edge }
     }
 }
-impl<'d> RxClkPin for RxClkInPin<'d> {
+impl RxClkPin for RxClkInPin<'_> {
     fn configure(&mut self) {
         let pcr = unsafe { &*crate::peripherals::PCR::PTR };
         pcr.parl_clk_rx_conf()
@@ -376,12 +376,12 @@ where
     }
 }
 
-impl<'d, P> TxPins for TxPinConfigWithValidPin<'d, P> where
+impl<P> TxPins for TxPinConfigWithValidPin<'_, P> where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins
 {
 }
 
-impl<'d, P> ConfigurePins for TxPinConfigWithValidPin<'d, P>
+impl<P> ConfigurePins for TxPinConfigWithValidPin<'_, P>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
 {
@@ -570,12 +570,12 @@ where
     }
 }
 
-impl<'d, P> RxPins for RxPinConfigWithValidPin<'d, P> where
+impl<P> RxPins for RxPinConfigWithValidPin<'_, P> where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins
 {
 }
 
-impl<'d, P> ConfigurePins for RxPinConfigWithValidPin<'d, P>
+impl<P> ConfigurePins for RxPinConfigWithValidPin<'_, P>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
 {
@@ -832,7 +832,7 @@ where
     phantom: PhantomData<DM>,
 }
 
-impl<'d, DM> core::fmt::Debug for ParlIoTx<'d, DM>
+impl<DM> core::fmt::Debug for ParlIoTx<'_, DM>
 where
     DM: Mode,
 {
@@ -911,7 +911,7 @@ where
     phantom: PhantomData<DM>,
 }
 
-impl<'d, DM> core::fmt::Debug for ParlIoRx<'d, DM>
+impl<DM> core::fmt::Debug for ParlIoRx<'_, DM>
 where
     DM: Mode,
 {
@@ -1040,7 +1040,7 @@ where
     }
 }
 
-impl<'d> ParlIoFullDuplex<'d, Blocking> {
+impl ParlIoFullDuplex<'_, Blocking> {
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1070,9 +1070,9 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for ParlIoFullDuplex<'d, Blocking> {}
+impl crate::private::Sealed for ParlIoFullDuplex<'_, Blocking> {}
 
-impl<'d> InterruptConfigurable for ParlIoFullDuplex<'d, Blocking> {
+impl InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoFullDuplex::set_interrupt_handler(self, handler);
     }
@@ -1115,7 +1115,7 @@ where
     }
 }
 
-impl<'d> ParlIoTxOnly<'d, Blocking> {
+impl ParlIoTxOnly<'_, Blocking> {
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1145,9 +1145,9 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for ParlIoTxOnly<'d, Blocking> {}
+impl crate::private::Sealed for ParlIoTxOnly<'_, Blocking> {}
 
-impl<'d> InterruptConfigurable for ParlIoTxOnly<'d, Blocking> {
+impl InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoTxOnly::set_interrupt_handler(self, handler);
     }
@@ -1190,7 +1190,7 @@ where
     }
 }
 
-impl<'d> ParlIoRxOnly<'d, Blocking> {
+impl ParlIoRxOnly<'_, Blocking> {
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1220,9 +1220,9 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for ParlIoRxOnly<'d, Blocking> {}
+impl crate::private::Sealed for ParlIoRxOnly<'_, Blocking> {}
 
-impl<'d> InterruptConfigurable for ParlIoRxOnly<'d, Blocking> {
+impl InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoRxOnly::set_interrupt_handler(self, handler);
     }
@@ -1261,7 +1261,7 @@ fn internal_init(frequency: HertzU32) -> Result<(), Error> {
     Ok(())
 }
 
-impl<'d, DM> ParlIoTx<'d, DM>
+impl<DM> ParlIoTx<'_, DM>
 where
     DM: Mode,
 {
@@ -1316,7 +1316,7 @@ where
     }
 }
 
-impl<'d, DM> DmaSupport for ParlIoTx<'d, DM>
+impl<DM> DmaSupport for ParlIoTx<'_, DM>
 where
     DM: Mode,
 {
@@ -1405,7 +1405,7 @@ where
     }
 }
 
-impl<'d, DM> DmaSupport for ParlIoRx<'d, DM>
+impl<DM> DmaSupport for ParlIoRx<'_, DM>
 where
     DM: Mode,
 {
@@ -1546,11 +1546,11 @@ pub mod asynch {
         }
     }
 
-    impl<'d> ParlIoTx<'d, crate::Async> {
+    impl ParlIoTx<'_, crate::Async> {
         /// Perform a DMA write.
         ///
         /// The maximum amount of data to be sent is 32736 bytes.
-        pub async fn write_dma_async<'t, TXBUF>(&mut self, words: &'t TXBUF) -> Result<(), Error>
+        pub async fn write_dma_async<TXBUF>(&mut self, words: &TXBUF) -> Result<(), Error>
         where
             TXBUF: ReadBuffer,
         {
@@ -1568,7 +1568,7 @@ pub mod asynch {
         }
     }
 
-    impl<'d> ParlIoRx<'d, crate::Async> {
+    impl ParlIoRx<'_, crate::Async> {
         /// Perform a DMA write.
         ///
         /// The maximum amount of data to be sent is 32736 bytes.

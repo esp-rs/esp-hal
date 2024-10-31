@@ -202,12 +202,12 @@ where
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> private::Sealed for GpioEtmEventChannelRising<'d, PIN, C> where
+impl<PIN, const C: u8> private::Sealed for GpioEtmEventChannelRising<'_, PIN, C> where
     PIN: super::Pin
 {
 }
 
-impl<'d, PIN, const C: u8> crate::etm::EtmEvent for GpioEtmEventChannelRising<'d, PIN, C>
+impl<PIN, const C: u8> crate::etm::EtmEvent for GpioEtmEventChannelRising<'_, PIN, C>
 where
     PIN: super::Pin,
 {
@@ -225,12 +225,12 @@ where
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> private::Sealed for GpioEtmEventChannelFalling<'d, PIN, C> where
+impl<PIN, const C: u8> private::Sealed for GpioEtmEventChannelFalling<'_, PIN, C> where
     PIN: super::Pin
 {
 }
 
-impl<'d, PIN, const C: u8> crate::etm::EtmEvent for GpioEtmEventChannelFalling<'d, PIN, C>
+impl<PIN, const C: u8> crate::etm::EtmEvent for GpioEtmEventChannelFalling<'_, PIN, C>
 where
     PIN: super::Pin,
 {
@@ -248,12 +248,9 @@ where
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> private::Sealed for GpioEtmEventChannelAny<'d, PIN, C> where
-    PIN: super::Pin
-{
-}
+impl<PIN, const C: u8> private::Sealed for GpioEtmEventChannelAny<'_, PIN, C> where PIN: super::Pin {}
 
-impl<'d, PIN, const C: u8> crate::etm::EtmEvent for GpioEtmEventChannelAny<'d, PIN, C>
+impl<PIN, const C: u8> crate::etm::EtmEvent for GpioEtmEventChannelAny<'_, PIN, C>
 where
     PIN: super::Pin,
 {
@@ -372,9 +369,9 @@ where
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> private::Sealed for GpioEtmTaskSet<'d, PIN, C> where PIN: super::Pin {}
+impl<PIN, const C: u8> private::Sealed for GpioEtmTaskSet<'_, PIN, C> where PIN: super::Pin {}
 
-impl<'d, PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskSet<'d, PIN, C>
+impl<PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskSet<'_, PIN, C>
 where
     PIN: super::Pin,
 {
@@ -389,9 +386,9 @@ pub struct GpioEtmTaskClear<'d, PIN, const C: u8> {
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> private::Sealed for GpioEtmTaskClear<'d, PIN, C> where PIN: super::Pin {}
+impl<PIN, const C: u8> private::Sealed for GpioEtmTaskClear<'_, PIN, C> where PIN: super::Pin {}
 
-impl<'d, PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskClear<'d, PIN, C>
+impl<PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskClear<'_, PIN, C>
 where
     PIN: super::Pin,
 {
@@ -406,9 +403,9 @@ pub struct GpioEtmTaskToggle<'d, PIN, const C: u8> {
     _pin: PeripheralRef<'d, PIN>,
 }
 
-impl<'d, PIN, const C: u8> private::Sealed for GpioEtmTaskToggle<'d, PIN, C> where PIN: super::Pin {}
+impl<PIN, const C: u8> private::Sealed for GpioEtmTaskToggle<'_, PIN, C> where PIN: super::Pin {}
 
-impl<'d, PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskToggle<'d, PIN, C>
+impl<PIN, const C: u8> crate::etm::EtmTask for GpioEtmTaskToggle<'_, PIN, C>
 where
     PIN: super::Pin,
 {

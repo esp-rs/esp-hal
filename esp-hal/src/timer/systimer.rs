@@ -1176,13 +1176,13 @@ pub mod etm {
         }
     }
 
-    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::private::Sealed
-        for SysTimerEtmEvent<'a, 'd, M, DM, COMP, UNIT>
+    impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::private::Sealed
+        for SysTimerEtmEvent<'_, '_, M, DM, COMP, UNIT>
     {
     }
 
-    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::etm::EtmEvent
-        for SysTimerEtmEvent<'a, 'd, M, DM, COMP, UNIT>
+    impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::etm::EtmEvent
+        for SysTimerEtmEvent<'_, '_, M, DM, COMP, UNIT>
     {
         fn id(&self) -> u8 {
             50 + self.alarm.comparator.channel()
