@@ -934,6 +934,9 @@ mod dma {
         /// Interrupts are not enabled at the peripheral level here.
         fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
             let interrupt = self.spi.interrupt();
+            for core in crate::Cpu::other() {
+                crate::interrupt::disable(core, interrupt);
+            }
             unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
             unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
         }

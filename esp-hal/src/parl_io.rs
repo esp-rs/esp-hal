@@ -52,7 +52,7 @@ use crate::{
     gpio::interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
-    peripherals::{self, PARL_IO},
+    peripherals::{self, Interrupt, PARL_IO},
     system::PeripheralClockControl,
     Blocking,
     InterruptConfigurable,
@@ -923,42 +923,52 @@ where
 fn internal_set_interrupt_handler(handler: InterruptHandler) {
     #[cfg(esp32c6)]
     {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::PARL_IO);
+        }
+        internal_listen(EnumSet::all(), false);
+        internal_clear_interrupts(EnumSet::all());
         unsafe { PARL_IO::steal() }.bind_parl_io_interrupt(handler.handler());
 
-        crate::interrupt::enable(crate::peripherals::Interrupt::PARL_IO, handler.priority())
-            .unwrap();
+        unwrap!(crate::interrupt::enable(
+            Interrupt::PARL_IO,
+            handler.priority()
+        ));
     }
     #[cfg(esp32h2)]
     {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
+            crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
+        }
+        internal_listen(EnumSet::all(), false);
+        internal_clear_interrupts(EnumSet::all());
         unsafe { PARL_IO::steal() }.bind_parl_io_tx_interrupt(handler.handler());
         unsafe { PARL_IO::steal() }.bind_parl_io_rx_interrupt(handler.handler());
 
-        crate::interrupt::enable(
-            crate::peripherals::Interrupt::PARL_IO_TX,
+        unwrap!(crate::interrupt::enable(
+            Interrupt::PARL_IO_TX,
             handler.priority(),
-        )
-        .unwrap();
-        crate::interrupt::enable(
-            crate::peripherals::Interrupt::PARL_IO_RX,
+        ));
+        unwrap!(crate::interrupt::enable(
+            Interrupt::PARL_IO_RX,
             handler.priority(),
-        )
-        .unwrap();
+        ));
     }
 }
 
 fn internal_listen(interrupts: EnumSet<ParlIoInterrupt>, enable: bool) {
     let parl_io = unsafe { PARL_IO::steal() };
-    for interrupt in interrupts {
-        match interrupt {
-            ParlIoInterrupt::TxFifoReEmpty => parl_io
-                .int_ena()
-                .modify(|_, w| w.tx_fifo_rempty().bit(enable)),
-            ParlIoInterrupt::RxFifoWOvf => parl_io
-                .int_ena()
-                .modify(|_, w| w.rx_fifo_wovf().bit(enable)),
-            ParlIoInterrupt::TxEof => parl_io.int_ena().write(|w| w.tx_eof().bit(enable)),
+    parl_io.int_ena().write(|w| {
+        for interrupt in interrupts {
+            match interrupt {
+                ParlIoInterrupt::TxFifoReEmpty => w.tx_fifo_rempty().bit(enable),
+                ParlIoInterrupt::RxFifoWOvf => w.rx_fifo_wovf().bit(enable),
+                ParlIoInterrupt::TxEof => w.tx_eof().bit(enable),
+            };
         }
-    }
+        w
+    });
 }
 
 fn internal_interrupts() -> EnumSet<ParlIoInterrupt> {
@@ -980,17 +990,16 @@ fn internal_interrupts() -> EnumSet<ParlIoInterrupt> {
 
 fn internal_clear_interrupts(interrupts: EnumSet<ParlIoInterrupt>) {
     let parl_io = unsafe { PARL_IO::steal() };
-    for interrupt in interrupts {
-        match interrupt {
-            ParlIoInterrupt::TxFifoReEmpty => parl_io
-                .int_clr()
-                .write(|w| w.tx_fifo_rempty().clear_bit_by_one()),
-            ParlIoInterrupt::RxFifoWOvf => parl_io
-                .int_clr()
-                .write(|w| w.rx_fifo_wovf().clear_bit_by_one()),
-            ParlIoInterrupt::TxEof => parl_io.int_clr().write(|w| w.tx_eof().clear_bit_by_one()),
+    parl_io.int_clr().write(|w| {
+        for interrupt in interrupts {
+            match interrupt {
+                ParlIoInterrupt::TxFifoReEmpty => w.tx_fifo_rempty().clear_bit_by_one(),
+                ParlIoInterrupt::RxFifoWOvf => w.rx_fifo_wovf().clear_bit_by_one(),
+                ParlIoInterrupt::TxEof => w.tx_eof().clear_bit_by_one(),
+            };
         }
-    }
+        w
+    });
 }
 
 /// Parallel IO in full duplex mode

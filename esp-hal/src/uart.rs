@@ -1218,65 +1218,23 @@ where
     }
 
     /// Listen for the given interrupts
-    fn enable_listen(&mut self, interrupts: EnumSet<UartInterrupt>, enable: bool) {
-        let reg_block = self.register_block();
-
-        reg_block.int_ena().modify(|_, w| {
-            for interrupt in interrupts {
-                match interrupt {
-                    UartInterrupt::AtCmd => w.at_cmd_char_det().bit(enable),
-                    UartInterrupt::TxDone => w.tx_done().bit(enable),
-                    UartInterrupt::RxFifoFull => w.rxfifo_full().bit(enable),
-                };
-            }
-            w
-        });
-    }
-
-    /// Listen for the given interrupts
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
-        self.enable_listen(interrupts.into(), true);
+        self.tx.uart.info().enable_listen(interrupts.into(), true)
     }
 
     /// Unlisten the given interrupts
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
-        self.enable_listen(interrupts.into(), false);
+        self.tx.uart.info().enable_listen(interrupts.into(), false)
     }
 
     /// Gets asserted interrupts
     pub fn interrupts(&mut self) -> EnumSet<UartInterrupt> {
-        let mut res = EnumSet::new();
-        let reg_block = self.register_block();
-
-        let ints = reg_block.int_raw().read();
-
-        if ints.at_cmd_char_det().bit_is_set() {
-            res.insert(UartInterrupt::AtCmd);
-        }
-        if ints.tx_done().bit_is_set() {
-            res.insert(UartInterrupt::TxDone);
-        }
-        if ints.rxfifo_full().bit_is_set() {
-            res.insert(UartInterrupt::RxFifoFull);
-        }
-
-        res
+        self.tx.uart.info().interrupts()
     }
 
     /// Resets asserted interrupts
     pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
-        let reg_block = self.register_block();
-
-        reg_block.int_clr().write(|w| {
-            for interrupt in interrupts {
-                match interrupt {
-                    UartInterrupt::AtCmd => w.at_cmd_char_det().clear_bit_by_one(),
-                    UartInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
-                    UartInterrupt::RxFifoFull => w.rxfifo_full().clear_bit_by_one(),
-                };
-            }
-            w
-        });
+        self.tx.uart.info().clear_interrupts(interrupts)
     }
 
     /// Write a byte out over the UART
@@ -2448,6 +2406,8 @@ impl Info {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, self.interrupt);
         }
+        self.enable_listen(EnumSet::all(), false);
+        self.clear_interrupts(EnumSet::all());
         unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
         unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
     }
@@ -2520,6 +2480,56 @@ impl Info {
     /// Returns the register block for this UART instance.
     pub fn register_block(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
+    }
+
+    /// Listen for the given interrupts
+    fn enable_listen(&self, interrupts: EnumSet<UartInterrupt>, enable: bool) {
+        let reg_block = self.register_block();
+
+        reg_block.int_ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    UartInterrupt::AtCmd => w.at_cmd_char_det().bit(enable),
+                    UartInterrupt::TxDone => w.tx_done().bit(enable),
+                    UartInterrupt::RxFifoFull => w.rxfifo_full().bit(enable),
+                };
+            }
+            w
+        });
+    }
+
+    fn interrupts(&self) -> EnumSet<UartInterrupt> {
+        let mut res = EnumSet::new();
+        let reg_block = self.register_block();
+
+        let ints = reg_block.int_raw().read();
+
+        if ints.at_cmd_char_det().bit_is_set() {
+            res.insert(UartInterrupt::AtCmd);
+        }
+        if ints.tx_done().bit_is_set() {
+            res.insert(UartInterrupt::TxDone);
+        }
+        if ints.rxfifo_full().bit_is_set() {
+            res.insert(UartInterrupt::RxFifoFull);
+        }
+
+        res
+    }
+
+    fn clear_interrupts(&self, interrupts: EnumSet<UartInterrupt>) {
+        let reg_block = self.register_block();
+
+        reg_block.int_clr().write(|w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    UartInterrupt::AtCmd => w.at_cmd_char_det().clear_bit_by_one(),
+                    UartInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
+                    UartInterrupt::RxFifoFull => w.rxfifo_full().clear_bit_by_one(),
+                };
+            }
+            w
+        });
     }
 }
 

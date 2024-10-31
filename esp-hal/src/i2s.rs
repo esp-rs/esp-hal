@@ -790,7 +790,7 @@ mod private {
         },
         interrupt::InterruptHandler,
         peripheral::{Peripheral, PeripheralRef},
-        peripherals::I2S0,
+        peripherals::{Interrupt, I2S0},
         private,
         Mode,
     };
@@ -1615,9 +1615,14 @@ mod private {
 
     impl RegisterAccessPrivate for I2S0 {
         fn set_interrupt_handler(&self, handler: InterruptHandler) {
+            for core in crate::Cpu::other() {
+                crate::interrupt::disable(core, Interrupt::I2S0);
+            }
             unsafe { crate::peripherals::I2S0::steal() }.bind_i2s0_interrupt(handler.handler());
-            crate::interrupt::enable(crate::peripherals::Interrupt::I2S0, handler.priority())
-                .unwrap();
+            unwrap!(crate::interrupt::enable(
+                Interrupt::I2S0,
+                handler.priority()
+            ));
         }
     }
 
@@ -1715,9 +1720,14 @@ mod private {
     #[cfg(i2s1)]
     impl RegisterAccessPrivate for I2S1 {
         fn set_interrupt_handler(&self, handler: InterruptHandler) {
+            for core in crate::Cpu::other() {
+                crate::interrupt::disable(core, Interrupt::I2S1);
+            }
             unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
-            crate::interrupt::enable(crate::peripherals::Interrupt::I2S1, handler.priority())
-                .unwrap();
+            unwrap!(crate::interrupt::enable(
+                Interrupt::I2S1,
+                handler.priority()
+            ));
         }
     }
 

@@ -434,23 +434,18 @@ impl crate::private::Sealed for Rtc<'_> {}
 
 impl InterruptConfigurable for Rtc<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            interrupt::bind_interrupt(
-                #[cfg(any(esp32c6, esp32h2))]
-                Interrupt::LP_WDT,
-                #[cfg(not(any(esp32c6, esp32h2)))]
-                Interrupt::RTC_CORE,
-                handler.handler(),
-            );
-            interrupt::enable(
-                #[cfg(any(esp32c6, esp32h2))]
-                Interrupt::LP_WDT,
-                #[cfg(not(any(esp32c6, esp32h2)))]
-                Interrupt::RTC_CORE,
-                handler.priority(),
-            )
-            .unwrap();
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c6, esp32h2))] {
+                let interrupt = Interrupt::LP_WDT;
+            } else {
+                let interrupt = Interrupt::RTC_CORE;
+            }
         }
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
+        }
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 }
 
