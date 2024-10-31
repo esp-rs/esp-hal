@@ -62,7 +62,6 @@ use core::{
 use embassy_sync::waitqueue::AtomicWaker;
 use embedded_hal::i2c::Operation as EhalOperation;
 use fugit::HertzU32;
-use procmacros::handler;
 
 use crate::{
     clock::Clocks,
@@ -70,7 +69,11 @@ use crate::{
     gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::i2c0::{RegisterBlock, COMD},
+    peripherals::{
+        i2c0::{RegisterBlock, COMD},
+        Interrupt,
+    },
+    private,
     system::PeripheralClockControl,
     Async,
     Blocking,
@@ -308,10 +311,10 @@ impl<'d, T, DM: Mode> I2c<'d, DM, T>
 where
     T: Instance,
 {
-    fn new_internal<SDA: PeripheralOutput, SCL: PeripheralOutput>(
+    fn new_internal(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        scl: impl Peripheral<P = impl PeripheralOutput> + 'd,
         frequency: HertzU32,
     ) -> Self {
         crate::into_ref!(i2c);
@@ -327,34 +330,21 @@ where
         PeripheralClockControl::reset(i2c.i2c.peripheral());
         PeripheralClockControl::enable(i2c.i2c.peripheral());
 
-        // TODO: implement with_pins et. al.
-        // avoid SCL/SDA going low during configuration
-        scl.set_output_high(true, crate::private::Internal);
-        sda.set_output_high(true, crate::private::Internal);
+        let i2c = i2c.with_sda(sda).with_scl(scl);
 
-        scl.set_to_open_drain_output(crate::private::Internal);
-        scl.enable_input(true, crate::private::Internal);
-        scl.pull_direction(Pull::Up, crate::private::Internal);
-
-        i2c.i2c.scl_input_signal().connect_to(&mut scl);
-        i2c.i2c.scl_output_signal().connect_to(&mut scl);
-
-        sda.set_to_open_drain_output(crate::private::Internal);
-        sda.enable_input(true, crate::private::Internal);
-        sda.pull_direction(Pull::Up, crate::private::Internal);
-
-        i2c.i2c.sda_input_signal().connect_to(&mut sda);
-        i2c.i2c.sda_output_signal().connect_to(&mut sda);
-
-        i2c.i2c.setup(frequency, None);
+        i2c.info().setup(frequency, None);
         i2c
+    }
+
+    fn info(&self) -> &Info {
+        self.i2c.info()
     }
 
     fn internal_recover(&self) {
         PeripheralClockControl::reset(self.i2c.peripheral());
         PeripheralClockControl::enable(self.i2c.peripheral());
 
-        self.i2c.setup(self.frequency, self.timeout);
+        self.info().setup(self.frequency, self.timeout);
     }
 
     /// Set the I2C timeout.
@@ -362,7 +352,7 @@ where
     // timeout, and just what exactly is a timeout in this context?
     pub fn with_timeout(mut self, timeout: Option<u32>) -> Self {
         self.timeout = timeout;
-        self.i2c.setup(self.frequency, self.timeout);
+        self.info().setup(self.frequency, self.timeout);
         self
     }
 
@@ -381,15 +371,15 @@ where
             let next_op = op_iter.peek().map(|v| v.kind());
             let kind = op.kind();
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
             match op {
                 Operation::Write(buffer) => {
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
-                    self.i2c
+                    self.info()
                         .write_operation(
                             address,
                             buffer,
@@ -404,7 +394,7 @@ where
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     // - will_continue is true if there is another read operation next
-                    self.i2c
+                    self.info()
                         .read_operation(
                             address,
                             buffer,
@@ -422,16 +412,50 @@ where
 
         Ok(())
     }
+
+    fn with_sda(self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        let info = self.info();
+        let input = info.sda_input;
+        let output = info.sda_output;
+        self.with_pin(sda, input, output)
+    }
+
+    fn with_scl(self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        let info = self.info();
+        let input = info.scl_input;
+        let output = info.scl_output;
+        self.with_pin(scl, input, output)
+    }
+
+    fn with_pin(
+        self,
+        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        input: InputSignal,
+        output: OutputSignal,
+    ) -> Self {
+        crate::into_mapped_ref!(pin);
+        // avoid the pin going low during configuration
+        pin.set_output_high(true, private::Internal);
+
+        pin.set_to_open_drain_output(private::Internal);
+        pin.enable_input(true, private::Internal);
+        pin.pull_direction(Pull::Up, private::Internal);
+
+        input.connect_to(&mut pin);
+        output.connect_to(&mut pin);
+
+        self
+    }
 }
 
 impl<'d> I2c<'d, Blocking> {
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new<SDA: PeripheralOutput, SCL: PeripheralOutput>(
+    pub fn new(
         i2c: impl Peripheral<P = impl Instance> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        scl: impl Peripheral<P = impl PeripheralOutput> + 'd,
         frequency: HertzU32,
     ) -> Self {
         Self::new_typed(i2c.map_into(), sda, scl, frequency)
@@ -445,10 +469,10 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_typed<SDA: PeripheralOutput, SCL: PeripheralOutput>(
+    pub fn new_typed(
         i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = SDA> + 'd,
-        scl: impl Peripheral<P = SCL> + 'd,
+        sda: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        scl: impl Peripheral<P = impl PeripheralOutput> + 'd,
         frequency: HertzU32,
     ) -> Self {
         Self::new_internal(i2c, sda, scl, frequency)
@@ -458,7 +482,7 @@ where
 
     /// Configures the I2C peripheral to operate in asynchronous mode.
     pub fn into_async(mut self) -> I2c<'d, Async, T> {
-        self.set_interrupt_handler(self.i2c.async_handler());
+        self.set_interrupt_handler(self.info().async_handler);
 
         I2c {
             i2c: self.i2c,
@@ -473,11 +497,11 @@ where
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
 
-            self.i2c
+            self.info()
                 .read_operation(
                     address,
                     chunk,
@@ -497,11 +521,11 @@ where
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
 
-            self.i2c
+            self.info()
                 .write_operation(
                     address,
                     chunk,
@@ -528,11 +552,11 @@ where
 
         for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
 
-            self.i2c
+            self.info()
                 .write_operation(
                     address,
                     chunk,
@@ -545,11 +569,11 @@ where
 
         for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
 
-            self.i2c
+            self.info()
                 .read_operation(
                     address,
                     chunk,
@@ -591,26 +615,21 @@ where
     }
 }
 
-impl<T> crate::private::Sealed for I2c<'_, Blocking, T> where T: Instance {}
+impl<T> private::Sealed for I2c<'_, Blocking, T> where T: Instance {}
 
 impl<T> InterruptConfigurable for I2c<'_, Blocking, T>
 where
     T: Instance,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        let interrupt = self.info().interrupt;
         for core in Cpu::other() {
-            crate::interrupt::disable(core, self.i2c.interrupt());
+            crate::interrupt::disable(core, interrupt);
         }
-        unsafe { crate::interrupt::bind_interrupt(self.i2c.interrupt(), handler.handler()) };
-        unwrap!(crate::interrupt::enable(
-            self.i2c.interrupt(),
-            handler.priority()
-        ));
+        unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
     }
 }
-
-const NUM_I2C: usize = 1 + cfg!(i2c1) as usize;
-static WAKERS: [AtomicWaker; NUM_I2C] = [const { AtomicWaker::new() }; NUM_I2C];
 
 #[cfg_attr(esp32, allow(dead_code))]
 pub(crate) enum Event {
@@ -622,21 +641,16 @@ pub(crate) enum Event {
 
 #[cfg(not(esp32))]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct I2cFuture<'a, T>
-where
-    T: Instance,
-{
+struct I2cFuture<'a> {
     event: Event,
-    instance: &'a T,
+    info: &'a Info,
+    state: &'a State,
 }
 
 #[cfg(not(esp32))]
-impl<'a, T> I2cFuture<'a, T>
-where
-    T: Instance,
-{
-    pub fn new(event: Event, instance: &'a T) -> Self {
-        instance.register_block().int_ena().modify(|_, w| {
+impl<'a> I2cFuture<'a> {
+    pub fn new(event: Event, instance: &'a impl Instance) -> Self {
+        instance.info().register_block().int_ena().modify(|_, w| {
             let w = match event {
                 Event::EndDetect => w.end_detect().set_bit(),
                 Event::TxComplete => w.trans_complete().set_bit(),
@@ -655,11 +669,15 @@ where
             w
         });
 
-        Self { event, instance }
+        Self {
+            event,
+            state: instance.state(),
+            info: instance.info(),
+        }
     }
 
     fn event_bit_is_clear(&self) -> bool {
-        let r = self.instance.register_block().int_ena().read();
+        let r = self.info.register_block().int_ena().read();
 
         match self.event {
             Event::EndDetect => r.end_detect().bit_is_clear(),
@@ -670,7 +688,7 @@ where
     }
 
     fn check_error(&self) -> Result<(), Error> {
-        let r = self.instance.register_block().int_raw().read();
+        let r = self.info.register_block().int_raw().read();
 
         if r.arbitration_lost().bit_is_set() {
             return Err(Error::ArbitrationLost);
@@ -693,7 +711,7 @@ where
         #[cfg(not(esp32))]
         if r.trans_complete().bit_is_set()
             && self
-                .instance
+                .info
                 .register_block()
                 .sr()
                 .read()
@@ -708,14 +726,11 @@ where
 }
 
 #[cfg(not(esp32))]
-impl<'a, T> core::future::Future for I2cFuture<'a, T>
-where
-    T: Instance,
-{
+impl core::future::Future for I2cFuture<'_> {
     type Output = Result<(), Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        WAKERS[self.instance.i2c_number()].register(ctx.waker());
+        self.state.waker.register(ctx.waker());
 
         let error = self.check_error();
 
@@ -737,7 +752,7 @@ where
 {
     /// Configure the I2C peripheral to operate in blocking mode.
     pub fn into_blocking(self) -> I2c<'d, Blocking, T> {
-        crate::interrupt::disable(Cpu::current(), self.i2c.interrupt());
+        crate::interrupt::disable(Cpu::current(), self.info().interrupt);
 
         I2c {
             i2c: self.i2c,
@@ -756,7 +771,7 @@ where
         self.wait_for_completion(false).await?;
 
         for byte in buffer.iter_mut() {
-            *byte = read_fifo(self.i2c.register_block());
+            *byte = read_fifo(self.info().register_block());
         }
 
         Ok(())
@@ -764,7 +779,7 @@ where
 
     #[cfg(not(any(esp32, esp32s2)))]
     async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
-        self.i2c.read_all_from_fifo(buffer)
+        self.info().read_all_from_fifo(buffer)
     }
 
     #[cfg(any(esp32, esp32s2))]
@@ -774,8 +789,8 @@ where
         }
 
         for b in bytes {
-            write_fifo(self.i2c.register_block(), *b);
-            self.i2c.check_errors()?;
+            write_fifo(self.info().register_block(), *b);
+            self.info().check_errors()?;
         }
 
         Ok(())
@@ -785,11 +800,11 @@ where
     async fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
         let mut index = start_index;
         loop {
-            self.i2c.check_errors()?;
+            self.info().check_errors()?;
 
             I2cFuture::new(Event::TxFifoWatermark, &*self.i2c).await?;
 
-            self.i2c
+            self.info()
                 .register_block()
                 .int_clr()
                 .write(|w| w.txfifo_wm().clear_bit_by_one());
@@ -800,14 +815,14 @@ where
                 break Ok(());
             }
 
-            write_fifo(self.i2c.register_block(), bytes[index]);
+            write_fifo(self.info().register_block(), bytes[index]);
             index += 1;
         }
     }
 
     #[cfg(not(esp32))]
     async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-        self.i2c.check_errors()?;
+        self.info().check_errors()?;
 
         if end_only {
             I2cFuture::new(Event::EndDetect, &*self.i2c).await?;
@@ -823,7 +838,7 @@ where
                 embassy_futures::select::Either::Second(res) => res?,
             }
         }
-        self.i2c.check_all_commands_done()?;
+        self.info().check_all_commands_done()?;
 
         Ok(())
     }
@@ -835,9 +850,9 @@ where
 
         let mut tout = MAX_ITERATIONS / 10; // adjust the timeout because we are yielding in the loop
         loop {
-            let interrupts = self.i2c.register_block().int_raw().read();
+            let interrupts = self.info().register_block().int_raw().read();
 
-            self.i2c.check_errors()?;
+            self.info().check_errors()?;
 
             // Handle completion cases
             // A full transmission was completed (either a STOP condition or END was
@@ -855,7 +870,7 @@ where
 
             embassy_futures::yield_now().await;
         }
-        self.i2c.check_all_commands_done()?;
+        self.info().check_all_commands_done()?;
         Ok(())
     }
 
@@ -885,18 +900,20 @@ where
         }
 
         // Reset FIFO and command list
-        self.i2c.reset_fifo();
-        self.i2c.reset_command_list();
+        self.info().reset_fifo();
+        self.info().reset_command_list();
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
         }
-        self.i2c.setup_write(address, bytes, start, cmd_iterator)?;
+        self.i2c
+            .info()
+            .setup_write(address, bytes, start, cmd_iterator)?;
         add_cmd(
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
-        let index = self.i2c.fill_tx_fifo(bytes);
-        self.i2c.start_transmission();
+        let index = self.info().fill_tx_fifo(bytes);
+        self.info().start_transmission();
 
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo(index, bytes).await?;
@@ -933,18 +950,19 @@ where
         }
 
         // Reset FIFO and command list
-        self.i2c.reset_fifo();
-        self.i2c.reset_command_list();
+        self.info().reset_fifo();
+        self.info().reset_command_list();
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
         }
         self.i2c
+            .info()
             .setup_read(address, buffer, start, will_continue, cmd_iterator)?;
         add_cmd(
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
-        self.i2c.start_transmission();
+        self.info().start_transmission();
         self.read_all_from_fifo(buffer).await?;
         self.wait_for_completion(!stop).await?;
         Ok(())
@@ -955,9 +973,9 @@ where
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
 
             self.write_operation(
                 address,
@@ -977,9 +995,9 @@ where
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
 
             self.read_operation(
                 address,
@@ -1007,9 +1025,9 @@ where
         let read_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
 
             self.write_operation(
                 address,
@@ -1023,9 +1041,9 @@ where
 
         for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
 
             self.read_operation(
                 address,
@@ -1084,9 +1102,9 @@ where
             let next_op = op_iter.peek().map(|v| v.kind());
             let kind = op.kind();
             // Clear all I2C interrupts
-            self.i2c.clear_all_interrupts();
+            self.info().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.i2c.register_block().comd_iter();
+            let cmd_iterator = &mut self.info().register_block().comd_iter();
             match op {
                 Operation::Write(buffer) => {
                     // execute a write operation:
@@ -1139,63 +1157,180 @@ where
     }
 }
 
-fn handler(regs: &RegisterBlock) {
+fn async_handler(info: &Info, state: &State) {
+    let regs = info.register_block();
     regs.int_ena().modify(|_, w| {
         w.end_detect().clear_bit();
         w.trans_complete().clear_bit();
         w.arbitration_lost().clear_bit();
-        w.time_out().clear_bit()
+        w.time_out().clear_bit();
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        w.txfifo_wm().clear_bit();
+
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                w.ack_err().clear_bit()
+            } else {
+                w.nack().clear_bit()
+            }
+        }
     });
 
-    #[cfg(not(any(esp32, esp32s2)))]
-    regs.int_ena().modify(|_, w| w.txfifo_wm().clear_bit());
-
-    #[cfg(not(esp32))]
-    regs.int_ena().modify(|_, w| w.nack().clear_bit());
-
-    #[cfg(esp32)]
-    regs.int_ena().modify(|_, w| w.ack_err().clear_bit());
+    state.waker.wake();
 }
 
-#[handler]
-pub(super) fn i2c0_handler() {
-    let regs = unsafe { crate::peripherals::I2C0::steal() };
-    handler(regs.register_block());
-
-    WAKERS[0].wake();
+/// Sets the filter with a supplied threshold in clock cycles for which a
+/// pulse must be present to pass the filter
+fn set_filter(
+    register_block: &RegisterBlock,
+    sda_threshold: Option<u8>,
+    scl_threshold: Option<u8>,
+) {
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32, esp32s2))] {
+            register_block.sda_filter_cfg().modify(|_, w| {
+                if let Some(threshold) = sda_threshold {
+                    unsafe { w.sda_filter_thres().bits(threshold) };
+                }
+                w.sda_filter_en().bit(sda_threshold.is_some())
+            });
+            register_block.scl_filter_cfg().modify(|_, w| {
+                if let Some(threshold) = scl_threshold {
+                    unsafe { w.scl_filter_thres().bits(threshold) };
+                }
+                w.scl_filter_en().bit(scl_threshold.is_some())
+            });
+        } else {
+            register_block.filter_cfg().modify(|_, w| {
+                if let Some(threshold) = sda_threshold {
+                    unsafe { w.sda_filter_thres().bits(threshold) };
+                }
+                if let Some(threshold) = scl_threshold {
+                    unsafe { w.scl_filter_thres().bits(threshold) };
+                }
+                w.sda_filter_en().bit(sda_threshold.is_some());
+                w.scl_filter_en().bit(scl_threshold.is_some())
+            });
+        }
+    }
 }
 
-#[cfg(i2c1)]
-#[handler]
-pub(super) fn i2c1_handler() {
-    let regs = unsafe { crate::peripherals::I2C1::steal() };
-    handler(regs.register_block());
+#[allow(clippy::too_many_arguments, unused)]
+/// Configures the clock and timing parameters for the I2C peripheral.
+fn configure_clock(
+    register_block: &RegisterBlock,
+    sclk_div: u32,
+    scl_low_period: u32,
+    scl_high_period: u32,
+    scl_wait_high_period: u32,
+    sda_hold_time: u32,
+    sda_sample_time: u32,
+    scl_rstart_setup_time: u32,
+    scl_stop_setup_time: u32,
+    scl_start_hold_time: u32,
+    scl_stop_hold_time: u32,
+    time_out_value: u32,
+    time_out_en: bool,
+) {
+    unsafe {
+        // divider
+        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+        register_block.clk_conf().modify(|_, w| {
+            w.sclk_sel().clear_bit();
+            w.sclk_div_num().bits((sclk_div - 1) as u8)
+        });
 
-    WAKERS[1].wake();
+        // scl period
+        register_block
+            .scl_low_period()
+            .write(|w| w.scl_low_period().bits(scl_low_period as u16));
+
+        register_block.scl_high_period().write(|w| {
+            #[cfg(not(esp32))] // ESP32 does not have a wait_high field
+            w.scl_wait_high_period()
+                .bits(scl_wait_high_period.try_into().unwrap());
+            w.scl_high_period().bits(scl_high_period as u16)
+        });
+
+        // sda sample
+        register_block
+            .sda_hold()
+            .write(|w| w.time().bits(sda_hold_time as u16));
+        register_block
+            .sda_sample()
+            .write(|w| w.time().bits(sda_sample_time as u16));
+
+        // setup
+        register_block
+            .scl_rstart_setup()
+            .write(|w| w.time().bits(scl_rstart_setup_time as u16));
+        register_block
+            .scl_stop_setup()
+            .write(|w| w.time().bits(scl_stop_setup_time as u16));
+
+        // hold
+        register_block
+            .scl_start_hold()
+            .write(|w| w.time().bits(scl_start_hold_time as u16));
+        register_block
+            .scl_stop_hold()
+            .write(|w| w.time().bits(scl_stop_hold_time as u16));
+
+        // The ESP32 variant does not have an enable flag for the
+        // timeout mechanism
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                // timeout
+                register_block
+                    .to()
+                    .write(|w| w.time_out().bits(time_out_value));
+            } else {
+                // timeout
+                // FIXME: Enable timout for other chips!
+                #[allow(clippy::useless_conversion)]
+                register_block
+                    .to()
+                    .write(|w| w.time_out_en().bit(time_out_en)
+                    .time_out_value()
+                    .bits(time_out_value.try_into().unwrap())
+                );
+            }
+        }
+    }
 }
 
-/// I2C Peripheral Instance
-#[doc(hidden)]
-pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'static {
-    /// Returns the interrupt associated with this I2C peripheral.
-    fn interrupt(&self) -> crate::peripherals::Interrupt;
+/// Peripheral data describing a particular I2C instance.
+pub struct Info {
+    /// Pointer to the register block for this I2C instance.
+    ///
+    /// Use [Self::register_block] to access the register block.
+    pub register_block: *const RegisterBlock,
 
-    fn async_handler(&self) -> InterruptHandler;
+    /// Interrupt handler for the asynchronous operations of this I2C instance.
+    pub async_handler: InterruptHandler,
 
-    /// Returns the SCL output signal for this I2C peripheral.
-    fn scl_output_signal(&self) -> OutputSignal;
-    /// Returns the SCL input signal for this I2C peripheral.
-    fn scl_input_signal(&self) -> InputSignal;
-    /// Returns the SDA output signal for this I2C peripheral.
-    fn sda_output_signal(&self) -> OutputSignal;
-    /// Returns the SDA input signal for this I2C peripheral.
-    fn sda_input_signal(&self) -> InputSignal;
+    /// Interrupt for this I2C instance.
+    pub interrupt: Interrupt,
 
-    /// Returns a reference to the register block of the I2C peripheral.
-    fn register_block(&self) -> &RegisterBlock;
+    /// SCL output signal.
+    pub scl_output: OutputSignal,
 
-    /// Returns the I2C peripheral's index number.
-    fn i2c_number(&self) -> usize;
+    /// SCL input signal.
+    pub scl_input: InputSignal,
+
+    /// SDA output signal.
+    pub sda_output: OutputSignal,
+
+    /// SDA input signal.
+    pub sda_input: InputSignal,
+}
+
+impl Info {
+    /// Returns the register block for this I2C instance.
+    pub fn register_block(&self) -> &RegisterBlock {
+        unsafe { &*self.register_block }
+    }
 
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
@@ -1220,7 +1355,7 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'st
 
         // Configure filter
         // FIXME if we ever change this we need to adapt `set_frequency` for ESP32
-        self.set_filter(Some(7), Some(7));
+        set_filter(self.register_block(), Some(7), Some(7));
 
         // Configure frequency
         let clocks = Clocks::get();
@@ -1268,36 +1403,6 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'st
         // Confirm that all commands that were configured were actually executed
         for cmd in self.register_block().comd_iter() {
             cmd.reset();
-        }
-    }
-
-    /// Sets the filter with a supplied threshold in clock cycles for which a
-    /// pulse must be present to pass the filter
-    fn set_filter(&self, sda_threshold: Option<u8>, scl_threshold: Option<u8>) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let sda_register = &self.register_block().sda_filter_cfg();
-                let scl_register = &self.register_block().scl_filter_cfg();
-            } else {
-                let sda_register = &self.register_block().filter_cfg();
-                let scl_register = &self.register_block().filter_cfg();
-            }
-        }
-
-        match sda_threshold {
-            Some(threshold) => {
-                sda_register.modify(|_, w| unsafe { w.sda_filter_thres().bits(threshold) });
-                sda_register.modify(|_, w| w.sda_filter_en().set_bit());
-            }
-            None => sda_register.modify(|_, w| w.sda_filter_en().clear_bit()),
-        }
-
-        match scl_threshold {
-            Some(threshold) => {
-                scl_register.modify(|_, w| unsafe { w.scl_filter_thres().bits(threshold) });
-                scl_register.modify(|_, w| w.scl_filter_en().set_bit());
-            }
-            None => scl_register.modify(|_, w| w.scl_filter_en().clear_bit()),
         }
     }
 
@@ -1358,7 +1463,8 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'st
         let scl_start_hold_time = hold;
         let scl_stop_hold_time = hold;
 
-        self.configure_clock(
+        configure_clock(
+            self.register_block(),
             0,
             scl_low_period,
             scl_high_period,
@@ -1411,7 +1517,8 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'st
         let scl_stop_hold_time = hold;
         let time_out_en = true;
 
-        self.configure_clock(
+        configure_clock(
+            self.register_block(),
             0,
             scl_low_period,
             scl_high_period,
@@ -1484,7 +1591,8 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'st
         let scl_stop_hold_time = hold - 1;
         let time_out_en = true;
 
-        self.configure_clock(
+        configure_clock(
+            self.register_block(),
             clkm_div,
             scl_low_period,
             scl_high_period,
@@ -1498,91 +1606,6 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'st
             time_out_value,
             time_out_en,
         );
-    }
-
-    #[allow(clippy::too_many_arguments, unused)]
-    /// Configures the clock and timing parameters for the I2C peripheral.
-    fn configure_clock(
-        &self,
-        sclk_div: u32,
-        scl_low_period: u32,
-        scl_high_period: u32,
-        scl_wait_high_period: u32,
-        sda_hold_time: u32,
-        sda_sample_time: u32,
-        scl_rstart_setup_time: u32,
-        scl_stop_setup_time: u32,
-        scl_start_hold_time: u32,
-        scl_stop_hold_time: u32,
-        time_out_value: u32,
-        time_out_en: bool,
-    ) {
-        let register_block = self.register_block();
-        unsafe {
-            // divider
-            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-            register_block.clk_conf().modify(|_, w| {
-                w.sclk_sel().clear_bit();
-                w.sclk_div_num().bits((sclk_div - 1) as u8)
-            });
-
-            // scl period
-            register_block
-                .scl_low_period()
-                .write(|w| w.scl_low_period().bits(scl_low_period as u16));
-
-            register_block.scl_high_period().write(|w| {
-                #[cfg(not(esp32))] // ESP32 does not have a wait_high field
-                w.scl_wait_high_period()
-                    .bits(scl_wait_high_period.try_into().unwrap());
-                w.scl_high_period().bits(scl_high_period as u16)
-            });
-
-            // sda sample
-            register_block
-                .sda_hold()
-                .write(|w| w.time().bits(sda_hold_time as u16));
-            register_block
-                .sda_sample()
-                .write(|w| w.time().bits(sda_sample_time as u16));
-
-            // setup
-            register_block
-                .scl_rstart_setup()
-                .write(|w| w.time().bits(scl_rstart_setup_time as u16));
-            register_block
-                .scl_stop_setup()
-                .write(|w| w.time().bits(scl_stop_setup_time as u16));
-
-            // hold
-            register_block
-                .scl_start_hold()
-                .write(|w| w.time().bits(scl_start_hold_time as u16));
-            register_block
-                .scl_stop_hold()
-                .write(|w| w.time().bits(scl_stop_hold_time as u16));
-
-            // The ESP32 variant does not have an enable flag for the
-            // timeout mechanism
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    // timeout
-                    register_block
-                        .to()
-                        .write(|w| w.time_out().bits(time_out_value));
-                } else {
-                    // timeout
-                    // FIXME: Enable timout for other chips!
-                    #[allow(clippy::useless_conversion)]
-                    register_block
-                        .to()
-                        .write(|w| w.time_out_en().bit(time_out_en)
-                        .time_out_value()
-                        .bits(time_out_value.try_into().unwrap())
-                    );
-                }
-            }
-        }
     }
 
     /// Configures the I2C peripheral for a write operation.
@@ -2135,6 +2158,39 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'st
     }
 }
 
+impl PartialEq for Info {
+    fn eq(&self, other: &Self) -> bool {
+        self.register_block == other.register_block
+    }
+}
+
+unsafe impl Sync for Info {}
+
+/// Peripheral state for an I2C instance.
+pub struct State {
+    /// Waker for the asynchronous operations.
+    pub waker: AtomicWaker,
+}
+
+/// I2C Peripheral Instance
+#[doc(hidden)]
+pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'static {
+    /// Returns the peripheral data and state describing this instance.
+    fn parts(&self) -> (&Info, &State);
+
+    /// Returns the peripheral data describing this instance.
+    #[inline(always)]
+    fn info(&self) -> &Info {
+        self.parts().0
+    }
+
+    /// Returns the peripheral state for this instance.
+    #[inline(always)]
+    fn state(&self) -> &State {
+        self.parts().1
+    }
+}
+
 /// Adds a command to the I2C command sequence.
 fn add_cmd<'a, I>(cmd_iterator: &mut I, command: Command) -> Result<(), Error>
 where
@@ -2204,105 +2260,38 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
     }
 }
 
-impl PeripheralMarker for crate::peripherals::I2C0 {
-    #[inline(always)]
-    fn peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::I2cExt0
-    }
+macro_rules! instance {
+    ($inst:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
+        impl Instance for crate::peripherals::$inst {
+            fn parts(&self) -> (&Info, &State) {
+                #[crate::macros::handler]
+                pub(super) fn irq_handler() {
+                    async_handler(&PERIPHERAL, &STATE);
+                }
+
+                static STATE: State = State {
+                    waker: AtomicWaker::new(),
+                };
+
+                static PERIPHERAL: Info = Info {
+                    register_block: crate::peripherals::$inst::ptr(),
+                    async_handler: irq_handler,
+                    interrupt: Interrupt::$interrupt,
+                    scl_output: OutputSignal::$scl,
+                    scl_input: InputSignal::$scl,
+                    sda_output: OutputSignal::$sda,
+                    sda_input: InputSignal::$sda,
+                };
+                (&PERIPHERAL, &STATE)
+            }
+        }
+    };
 }
 
-impl Instance for crate::peripherals::I2C0 {
-    #[inline(always)]
-    fn async_handler(&self) -> InterruptHandler {
-        i2c0_handler
-    }
-
-    #[inline(always)]
-    fn scl_output_signal(&self) -> OutputSignal {
-        OutputSignal::I2CEXT0_SCL
-    }
-
-    #[inline(always)]
-    fn scl_input_signal(&self) -> InputSignal {
-        InputSignal::I2CEXT0_SCL
-    }
-
-    #[inline(always)]
-    fn sda_output_signal(&self) -> OutputSignal {
-        OutputSignal::I2CEXT0_SDA
-    }
-
-    #[inline(always)]
-    fn sda_input_signal(&self) -> InputSignal {
-        InputSignal::I2CEXT0_SDA
-    }
-
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn i2c_number(&self) -> usize {
-        0
-    }
-
-    #[inline(always)]
-    fn interrupt(&self) -> crate::peripherals::Interrupt {
-        crate::peripherals::Interrupt::I2C_EXT0
-    }
-}
-
+#[cfg(i2c0)]
+instance!(I2C0, I2CEXT0_SCL, I2CEXT0_SDA, I2C_EXT0);
 #[cfg(i2c1)]
-impl PeripheralMarker for crate::peripherals::I2C1 {
-    #[inline(always)]
-    fn peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::I2cExt1
-    }
-}
-
-#[cfg(i2c1)]
-impl Instance for crate::peripherals::I2C1 {
-    #[inline(always)]
-    fn async_handler(&self) -> InterruptHandler {
-        i2c1_handler
-    }
-
-    #[inline(always)]
-    fn scl_output_signal(&self) -> OutputSignal {
-        OutputSignal::I2CEXT1_SCL
-    }
-
-    #[inline(always)]
-    fn scl_input_signal(&self) -> InputSignal {
-        InputSignal::I2CEXT1_SCL
-    }
-
-    #[inline(always)]
-    fn sda_output_signal(&self) -> OutputSignal {
-        OutputSignal::I2CEXT1_SDA
-    }
-
-    #[inline(always)]
-    fn sda_input_signal(&self) -> InputSignal {
-        InputSignal::I2CEXT1_SDA
-    }
-
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn i2c_number(&self) -> usize {
-        1
-    }
-
-    #[inline(always)]
-    fn interrupt(&self) -> crate::peripherals::Interrupt {
-        crate::peripherals::Interrupt::I2C_EXT1
-    }
-}
+instance!(I2C1, I2CEXT1_SCL, I2CEXT1_SDA, I2C_EXT1);
 
 crate::any_peripheral! {
     /// Represents any I2C peripheral.
@@ -2321,14 +2310,7 @@ impl Instance for AnyI2c {
             #[cfg(i2c1)]
             AnyI2cInner::I2c1(i2c) => i2c,
         } {
-            fn interrupt(&self) -> crate::peripherals::Interrupt;
-            fn async_handler(&self) -> InterruptHandler;
-            fn scl_output_signal(&self) -> OutputSignal;
-            fn scl_input_signal(&self) -> InputSignal;
-            fn sda_output_signal(&self) -> OutputSignal;
-            fn sda_input_signal(&self) -> InputSignal;
-            fn register_block(&self) -> &RegisterBlock;
-            fn i2c_number(&self) -> usize;
+            fn parts(&self) -> (&Info, &State);
         }
     }
 }
