@@ -91,8 +91,10 @@ use crate::binary::{
         esp_err_t,
         esp_interface_t_ESP_IF_WIFI_AP,
         esp_interface_t_ESP_IF_WIFI_STA,
+        esp_supplicant_deinit,
         esp_supplicant_init,
         esp_wifi_connect,
+        esp_wifi_deinit_internal,
         esp_wifi_disconnect,
         esp_wifi_get_mode,
         esp_wifi_init_internal,
@@ -118,6 +120,8 @@ use crate::binary::{
         wifi_config_t,
         wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
         wifi_country_t,
+        wifi_csi_acquire_config_t,
+        wifi_csi_config_t,
         wifi_init_config_t,
         wifi_interface_t,
         wifi_interface_t_WIFI_IF_AP,
@@ -342,9 +346,11 @@ impl Default for ClientConfiguration {
 }
 
 #[allow(clippy::type_complexity)]
+#[cfg(csi_enable)]
 static CSI_CB: Mutex<RefCell<Option<fn(crate::binary::include::wifi_csi_info_t)>>> =
     Mutex::new(RefCell::new(None));
 
+#[cfg(csi_enable)]
 unsafe extern "C" fn promiscuous_csi_rx_cb(
     _ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
@@ -360,7 +366,7 @@ unsafe extern "C" fn promiscuous_csi_rx_cb(
 #[derive(Clone, PartialEq, Eq)]
 // https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
 /// Channel state information(CSI) configuration
-#[cfg(not(esp32c6))]
+#[cfg(all(not(esp32c6), csi_enable))]
 pub struct CsiConfig {
     /// Enable to receive legacy long training field(lltf) data.
     pub lltf_en: bool,
@@ -387,7 +393,7 @@ pub struct CsiConfig {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-#[cfg(esp32c6)]
+#[cfg(all(esp32c6, csi_enable))]
 // See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
 pub struct CsiConfig {
     /// Enable to acquire CSI.
@@ -418,6 +424,7 @@ pub struct CsiConfig {
     pub reserved: u32,
 }
 
+#[cfg(csi_enable)]
 impl Default for CsiConfig {
     #[cfg(not(esp32c6))]
     fn default() -> Self {
@@ -453,11 +460,12 @@ impl Default for CsiConfig {
     }
 }
 
-impl From<CsiConfig> for crate::include::wifi_csi_config_t {
+#[cfg(csi_enable)]
+impl From<CsiConfig> for wifi_csi_config_t {
     fn from(config: CsiConfig) -> Self {
         #[cfg(not(esp32c6))]
         {
-            crate::include::wifi_csi_config_t {
+            wifi_csi_config_t {
                 lltf_en: config.lltf_en,
                 htltf_en: config.htltf_en,
                 stbc_htltf2_en: config.stbc_htltf2_en,
@@ -470,9 +478,9 @@ impl From<CsiConfig> for crate::include::wifi_csi_config_t {
         }
         #[cfg(esp32c6)]
         {
-            crate::include::wifi_csi_acquire_config_t {
+            wifi_csi_acquire_config_t {
                 _bitfield_align_1: [0; 0],
-                _bitfield_1: crate::include::wifi_csi_acquire_config_t::new_bitfield_1(
+                _bitfield_1: wifi_csi_acquire_config_t::new_bitfield_1(
                     config.enable,
                     config.acquire_csi_legacy,
                     config.acquire_csi_ht20,
@@ -491,11 +499,12 @@ impl From<CsiConfig> for crate::include::wifi_csi_config_t {
     }
 }
 
+#[cfg(csi_enable)]
 impl CsiConfig {
     /// Set CSI data configuration
     pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
         // let conf = self.clone().into();
-        let conf: crate::include::wifi_csi_config_t = self.clone().into();
+        let conf: wifi_csi_config_t = self.clone().into();
 
         unsafe {
             esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
@@ -2728,15 +2737,12 @@ impl<'d> WifiController<'d> {
     }
 
     /// Set CSI configuration and register the receiving callback.
+    #[cfg(csi_enable)]
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
         cb: fn(crate::binary::include::wifi_csi_info_t),
     ) -> Result<(), WifiError> {
-        if !crate::CONFIG.csi_enable {
-            panic!("CSI is not enabled in the configuration");
-        }
-
         csi.apply_config()?;
         csi.set_receive_cb(cb)?;
         csi.set_csi(true)?;

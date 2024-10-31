@@ -370,15 +370,12 @@ impl EspNowManager<'_> {
     }
 
     /// Set CSI configuration and register the receiving callback.
+    #[cfg(csi_enable)]
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
         cb: fn(crate::binary::include::wifi_csi_info_t),
     ) -> Result<(), WifiError> {
-        if !crate::CONFIG.csi_enable {
-            panic!("CSI is not enabled in the configuration");
-        }
-
         csi.apply_config()?;
         csi.set_receive_cb(cb)?;
         csi.set_csi(true)?;
