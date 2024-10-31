@@ -716,7 +716,17 @@ where
             while self.rx_fifo_count() == 0 {
                 // Block until we received at least one byte
             }
-            *byte = fifo.read().rxfifo_rd_byte().bits();
+
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
+                    xtensa_lx::interrupt::free(|_| {
+                        *byte = fifo.read().rxfifo_rd_byte().bits();
+                    });
+                } else {
+                    *byte = fifo.read().rxfifo_rd_byte().bits();
+                }
+            }
         }
 
         Ok(())
