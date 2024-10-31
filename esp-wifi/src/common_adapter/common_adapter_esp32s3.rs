@@ -147,6 +147,8 @@ fn phy_digital_regs_store() {
 
 pub(crate) unsafe fn phy_enable_clock() {
     trace!("phy_enable_clock");
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
     let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
     radio_clocks.enable(RadioPeripherals::Phy);
     trace!("phy_enable_clock done!");
@@ -155,6 +157,8 @@ pub(crate) unsafe fn phy_enable_clock() {
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
     trace!("phy_disable_clock");
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
     let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
     radio_clocks.disable(RadioPeripherals::Phy);
     trace!("phy_disable_clock done!");

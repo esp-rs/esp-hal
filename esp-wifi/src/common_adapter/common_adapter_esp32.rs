@@ -122,6 +122,8 @@ pub(crate) unsafe fn phy_enable_clock() {
 
     let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
+        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+        // value) into `init`
         let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
         radio_clocks.enable(RadioPeripherals::Phy);
     }
@@ -133,6 +135,8 @@ pub(crate) unsafe fn phy_disable_clock() {
 
     let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::SeqCst);
     if count == 1 {
+        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+        // value) into `init`
         let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
         radio_clocks.disable(RadioPeripherals::Phy);
     }

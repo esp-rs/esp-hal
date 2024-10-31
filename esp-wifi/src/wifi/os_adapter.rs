@@ -1040,6 +1040,8 @@ pub unsafe extern "C" fn phy_update_country_info(
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
     let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
     radio_clocks.reset_mac();
 }
@@ -1059,6 +1061,8 @@ pub unsafe extern "C" fn wifi_reset_mac() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
     let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
     radio_clocks.enable(RadioPeripherals::Wifi);
 }
@@ -1078,6 +1082,8 @@ pub unsafe extern "C" fn wifi_clock_enable() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
     let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
     radio_clocks.disable(RadioPeripherals::Wifi);
 }
