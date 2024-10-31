@@ -211,7 +211,7 @@ pub mod asynch {
         }
     }
 
-    impl<'d> Transport for BleConnector<'d> {
+    impl Transport for BleConnector<'_> {
         /// Read a complete HCI packet into the rx buffer
         async fn read<'a>(
             &self,

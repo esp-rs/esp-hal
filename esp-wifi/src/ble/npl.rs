@@ -1009,6 +1009,7 @@ pub(crate) fn ble_init() {
         (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
 
         // turn on logging
+        #[allow(static_mut_refs)]
         #[cfg(all(feature = "sys-logs", esp32c2))]
         {
             extern "C" {

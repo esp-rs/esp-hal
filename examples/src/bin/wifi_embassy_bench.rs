@@ -13,6 +13,7 @@
 //% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6
 
+#![allow(static_mut_refs)]
 #![no_std]
 #![no_main]
 

@@ -305,7 +305,7 @@ impl<'a> Ieee802154<'a> {
     }
 }
 
-impl<'a> Drop for Ieee802154<'a> {
+impl Drop for Ieee802154<'_> {
     fn drop(&mut self) {
         self.clear_tx_done_callback();
         self.clear_tx_done_callback_fn();
