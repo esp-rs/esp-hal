@@ -275,9 +275,9 @@ impl<'d> Rmt<'d, crate::Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for Rmt<'d, crate::Blocking> {}
+impl crate::private::Sealed for Rmt<'_, crate::Blocking> {}
 
-impl<'d> InterruptConfigurable for Rmt<'d, crate::Blocking> {
+impl InterruptConfigurable for Rmt<'_, crate::Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.internal_set_interrupt_handler(handler);
     }
@@ -448,7 +448,7 @@ where
     data: &'a [T],
 }
 
-impl<'a, C, T: Into<u32> + Copy> SingleShotTxTransaction<'a, C, T>
+impl<C, T: Into<u32> + Copy> SingleShotTxTransaction<'_, C, T>
 where
     C: TxChannel,
 {
@@ -1045,7 +1045,7 @@ where
     data: &'a mut [T],
 }
 
-impl<'a, C, T: From<u32> + Copy> RxTransaction<'a, C, T>
+impl<C, T: From<u32> + Copy> RxTransaction<'_, C, T>
 where
     C: RxChannel,
 {
@@ -1163,7 +1163,7 @@ pub mod asynch {
         /// Start transmitting the given pulse code sequence.
         /// The length of sequence cannot exceed the size of the allocated RMT
         /// RAM.
-        async fn transmit<'a, T: Into<u32> + Copy>(&mut self, data: &'a [T]) -> Result<(), Error>
+        async fn transmit<T: Into<u32> + Copy>(&mut self, data: &[T]) -> Result<(), Error>
         where
             Self: Sized,
         {
@@ -1226,7 +1226,7 @@ pub mod asynch {
         /// Start receiving a pulse code sequence.
         /// The length of sequence cannot exceed the size of the allocated RMT
         /// RAM.
-        async fn receive<'a, T: From<u32> + Copy>(&mut self, data: &'a mut [T]) -> Result<(), Error>
+        async fn receive<T: From<u32> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
         where
             Self: Sized,
         {

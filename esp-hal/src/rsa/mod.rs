@@ -56,9 +56,9 @@ impl<'d> Rsa<'d, crate::Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for Rsa<'d, crate::Blocking> {}
+impl crate::private::Sealed for Rsa<'_, crate::Blocking> {}
 
-impl<'d> InterruptConfigurable for Rsa<'d, crate::Blocking> {
+impl InterruptConfigurable for Rsa<'_, crate::Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.internal_set_interrupt_handler(handler);
     }
@@ -435,7 +435,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T, Async>
+    impl<T: RsaMode, const N: usize> RsaModularExponentiation<'_, '_, T, Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -454,7 +454,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T, Async>
+    impl<T: RsaMode, const N: usize> RsaModularMultiplication<'_, '_, T, Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -483,12 +483,12 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T, Async>
+    impl<T: RsaMode + Multi, const N: usize> RsaMultiplication<'_, '_, T, Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
         /// Asynchronously performs an RSA multiplication operation.
-        pub async fn multiplication<'b, const O: usize>(
+        pub async fn multiplication<const O: usize>(
             &mut self,
             operand_b: &T::InputType,
             outbuf: &mut T::OutputType,

@@ -1444,7 +1444,7 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-impl<'d, DM, T> embedded_hal_02::can::Can for Twai<'d, DM, T>
+impl<DM, T> embedded_hal_02::can::Can for Twai<'_, DM, T>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1468,7 +1468,7 @@ where
     }
 }
 
-impl<'d, DM, T> embedded_can::nb::Can for Twai<'d, DM, T>
+impl<DM, T> embedded_can::nb::Can for Twai<'_, DM, T>
 where
     T: Instance,
     DM: crate::Mode,

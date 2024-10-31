@@ -106,7 +106,7 @@ pub struct UsbSerialJtagRx<'d, M> {
     phantom: PhantomData<(&'d mut USB_DEVICE, M)>,
 }
 
-impl<'d, M> UsbSerialJtagTx<'d, M>
+impl<M> UsbSerialJtagTx<'_, M>
 where
     M: Mode,
 {
@@ -183,7 +183,7 @@ where
     }
 }
 
-impl<'d, M> UsbSerialJtagRx<'d, M>
+impl<M> UsbSerialJtagRx<'_, M>
 where
     M: Mode,
 {
@@ -265,9 +265,9 @@ impl<'d> UsbSerialJtag<'d, Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for UsbSerialJtag<'d, Blocking> {}
+impl crate::private::Sealed for UsbSerialJtag<'_, Blocking> {}
 
-impl<'d> InterruptConfigurable for UsbSerialJtag<'d, Blocking> {
+impl InterruptConfigurable for UsbSerialJtag<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.inner_set_interrupt_handler(handler);
     }
@@ -670,7 +670,7 @@ mod asynch {
         phantom: PhantomData<&'d mut USB_DEVICE>,
     }
 
-    impl<'d> UsbSerialJtagWriteFuture<'d> {
+    impl UsbSerialJtagWriteFuture<'_> {
         pub fn new() -> Self {
             // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
             // interrupt
@@ -692,7 +692,7 @@ mod asynch {
         }
     }
 
-    impl<'d> core::future::Future for UsbSerialJtagWriteFuture<'d> {
+    impl core::future::Future for UsbSerialJtagWriteFuture<'_> {
         type Output = ();
 
         fn poll(
@@ -713,7 +713,7 @@ mod asynch {
         phantom: PhantomData<&'d mut USB_DEVICE>,
     }
 
-    impl<'d> UsbSerialJtagReadFuture<'d> {
+    impl UsbSerialJtagReadFuture<'_> {
         pub fn new() -> Self {
             // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_OUT_RECV_PKT
             // interrupt
@@ -735,7 +735,7 @@ mod asynch {
         }
     }
 
-    impl<'d> core::future::Future for UsbSerialJtagReadFuture<'d> {
+    impl core::future::Future for UsbSerialJtagReadFuture<'_> {
         type Output = ();
 
         fn poll(
