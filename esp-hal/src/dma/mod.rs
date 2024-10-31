@@ -2104,18 +2104,18 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     #[cfg(pdma)]
     fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
-}
-
-#[doc(hidden)]
-pub trait RxRegisterAccess: RegisterAccess {
-    #[cfg(gdma)]
-    fn set_mem2mem_mode(&self, value: bool);
 
     /// Configure the channel.
     fn configure(&self, burst_mode: bool, priority: DmaPriority) {
         self.set_burst_mode(burst_mode);
         self.set_priority(priority);
     }
+}
+
+#[doc(hidden)]
+pub trait RxRegisterAccess: RegisterAccess {
+    #[cfg(gdma)]
+    fn set_mem2mem_mode(&self, value: bool);
 }
 
 #[doc(hidden)]
@@ -2125,12 +2125,6 @@ pub trait TxRegisterAccess: RegisterAccess {
 
     /// Outlink descriptor address when EOF occurs of Tx channel.
     fn last_dscr_address(&self) -> usize;
-
-    /// Configure the channel.
-    fn configure(&self, burst_mode: bool, priority: DmaPriority) {
-        self.set_burst_mode(burst_mode);
-        self.set_priority(priority);
-    }
 }
 
 #[doc(hidden)]
