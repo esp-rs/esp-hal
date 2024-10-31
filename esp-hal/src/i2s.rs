@@ -328,15 +328,15 @@ where
     }
 
     /// Listen for the given interrupts
-    pub fn listen(&mut self, interrupts: EnumSet<I2sInterrupt>) {
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
-        self.i2s_tx.i2s.listen(interrupts);
+        self.i2s_tx.i2s.enable_listen(interrupts.into(), true);
     }
 
     /// Unlisten the given interrupts
-    pub fn unlisten(&mut self, interrupts: EnumSet<I2sInterrupt>) {
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
-        self.i2s_tx.i2s.unlisten(interrupts);
+        self.i2s_tx.i2s.enable_listen(interrupts.into(), false);
     }
 
     /// Gets asserted interrupts
@@ -346,9 +346,9 @@ where
     }
 
     /// Resets asserted interrupts
-    pub fn clear_interrupts(&mut self, interrupts: EnumSet<I2sInterrupt>) {
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
-        self.i2s_tx.i2s.clear_interrupts(interrupts);
+        self.i2s_tx.i2s.clear_interrupts(interrupts.into());
     }
 }
 
@@ -912,14 +912,6 @@ mod private {
                 }
                 w
             });
-        }
-
-        fn listen(&self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
-            self.enable_listen(interrupts.into(), true);
-        }
-
-        fn unlisten(&self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
-            self.enable_listen(interrupts.into(), false);
         }
 
         fn interrupts(&self) -> EnumSet<I2sInterrupt> {

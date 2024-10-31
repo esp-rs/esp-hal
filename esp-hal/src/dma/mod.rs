@@ -2129,8 +2129,8 @@ where
     }
 
     /// Listen for the given interrupts
-    pub fn listen(&mut self, interrupts: EnumSet<DmaInterrupt>) {
-        for interrupt in interrupts {
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<DmaInterrupt>>) {
+        for interrupt in interrupts.into() {
             match interrupt {
                 DmaInterrupt::RxDone => self.rx.listen_in(DmaRxInterrupt::Done),
                 DmaInterrupt::TxDone => self.tx.listen_out(DmaTxInterrupt::Done),
@@ -2139,8 +2139,8 @@ where
     }
 
     /// Unlisten the given interrupts
-    pub fn unlisten(&mut self, interrupts: EnumSet<DmaInterrupt>) {
-        for interrupt in interrupts {
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<DmaInterrupt>>) {
+        for interrupt in interrupts.into() {
             match interrupt {
                 DmaInterrupt::RxDone => self.rx.unlisten_in(DmaRxInterrupt::Done),
                 DmaInterrupt::TxDone => self.tx.unlisten_out(DmaTxInterrupt::Done),
@@ -2161,8 +2161,8 @@ where
     }
 
     /// Resets asserted interrupts
-    pub fn clear_interrupts(&mut self, interrupts: EnumSet<DmaInterrupt>) {
-        for interrupt in interrupts {
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<DmaInterrupt>>) {
+        for interrupt in interrupts.into() {
             match interrupt {
                 DmaInterrupt::RxDone => self.rx.clear_in(DmaRxInterrupt::Done),
                 DmaInterrupt::TxDone => self.tx.clear_out(DmaTxInterrupt::Done),
