@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed listening for UART events (#2406)
 - Circular DMA transfers now correctly error, `available` returns `Result<usize,DmaError>` now (#2409)
 - Interrupt listen/unlisten/clear functions now accept any type that converts into `EnumSet` (i.e. single interrupt flags). (#2442)
+- SPI interrupt listening is now only available in Blocking mode. The `set_interrupt_handler` is available via `InterruptConfigurable` (#2442)
 
 ### Fixed
 

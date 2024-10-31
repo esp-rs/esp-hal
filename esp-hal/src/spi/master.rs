@@ -812,6 +812,7 @@ mod dma {
             Rx,
             Tx,
         },
+        Blocking,
         InterruptConfigurable,
         Mode,
     };
@@ -858,6 +859,46 @@ mod dma {
         }
     }
 
+    impl<'d, T> InterruptConfigurable for SpiDma<'d, Blocking, T>
+    where
+        T: InstanceDma,
+    {
+        /// Sets the interrupt handler
+        ///
+        /// Interrupts are not enabled at the peripheral level here.
+        fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+            let interrupt = self.spi.interrupt();
+            unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
+            unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+        }
+    }
+
+    #[cfg(gdma)]
+    impl<'d, T> SpiDma<'d, Blocking, T>
+    where
+        T: InstanceDma,
+    {
+        /// Listen for the given interrupts
+        pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi.enable_listen(interrupts.into(), true);
+        }
+
+        /// Unlisten the given interrupts
+        pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi.enable_listen(interrupts.into(), false);
+        }
+
+        /// Gets asserted interrupts
+        pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
+            self.spi.interrupts()
+        }
+
+        /// Resets asserted interrupts
+        pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi.clear_interrupts(interrupts.into());
+        }
+    }
+
     impl<'d, M, T> SpiDma<'d, M, T>
     where
         T: InstanceDma,
@@ -892,37 +933,6 @@ mod dma {
                 tx_transfer_in_progress: false,
                 rx_transfer_in_progress: false,
             }
-        }
-
-        /// Sets the interrupt handler
-        ///
-        /// Interrupts are not enabled at the peripheral level here.
-        pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-            self.spi.set_interrupt_handler(handler);
-        }
-
-        /// Listen for the given interrupts
-        #[cfg(gdma)]
-        pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-            self.spi.enable_listen(interrupts.into(), true);
-        }
-
-        /// Unlisten the given interrupts
-        #[cfg(gdma)]
-        pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-            self.spi.enable_listen(interrupts.into(), false);
-        }
-
-        /// Gets asserted interrupts
-        #[cfg(gdma)]
-        pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
-            self.spi.interrupts()
-        }
-
-        /// Resets asserted interrupts
-        #[cfg(gdma)]
-        pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-            self.spi.clear_interrupts(interrupts.into());
         }
 
         fn is_done(&self) -> bool {
@@ -1069,17 +1079,6 @@ mod dma {
         T: InstanceDma,
         M: Mode,
     {
-    }
-
-    impl<'d, M, T> InterruptConfigurable for SpiDma<'d, M, T>
-    where
-        T: InstanceDma,
-        M: Mode,
-    {
-        /// Configures the interrupt handler for the DMA-enabled SPI instance.
-        fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-            SpiDma::set_interrupt_handler(self, handler);
-        }
     }
 
     impl<'d, M, T> SpiDma<'d, M, T>
@@ -1480,51 +1479,47 @@ mod dma {
             self.spi_dma.wait_for_idle();
         }
 
-        /// Sets the interrupt handler
-        ///
-        /// Interrupts are not enabled at the peripheral level here.
-        pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-            self.spi_dma.set_interrupt_handler(handler);
-        }
-
-        /// Listen for the given interrupts
-        #[cfg(gdma)]
-        pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-            self.spi_dma.listen(interrupts.into());
-        }
-
-        /// Unlisten the given interrupts
-        #[cfg(gdma)]
-        pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-            self.spi_dma.unlisten(interrupts.into());
-        }
-
-        /// Gets asserted interrupts
-        #[cfg(gdma)]
-        pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
-            self.spi_dma.interrupts()
-        }
-
-        /// Resets asserted interrupts
-        #[cfg(gdma)]
-        pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-            self.spi_dma.clear_interrupts(interrupts.into());
-        }
-
         /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
         pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
             self.spi_dma.change_bus_frequency(frequency);
         }
     }
 
-    impl<'d, M, T> InterruptConfigurable for SpiDmaBus<'d, M, T>
+    impl<'d, T> InterruptConfigurable for SpiDmaBus<'d, Blocking, T>
     where
         T: InstanceDma,
-        M: Mode,
     {
-        /// Configures the interrupt handler for the DMA-enabled SPI instance.
-        fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-            SpiDma::set_interrupt_handler(&mut self.spi_dma, handler);
+        /// Sets the interrupt handler
+        ///
+        /// Interrupts are not enabled at the peripheral level here.
+        fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+            self.spi_dma.set_interrupt_handler(handler);
+        }
+    }
+
+    #[cfg(gdma)]
+    impl<'d, T> SpiDmaBus<'d, Blocking, T>
+    where
+        T: InstanceDma,
+    {
+        /// Listen for the given interrupts
+        pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi_dma.listen(interrupts.into());
+        }
+
+        /// Unlisten the given interrupts
+        pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi_dma.unlisten(interrupts.into());
+        }
+
+        /// Gets asserted interrupts
+        pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
+            self.spi_dma.interrupts()
+        }
+
+        /// Resets asserted interrupts
+        pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
+            self.spi_dma.clear_interrupts(interrupts.into());
         }
     }
 
@@ -2203,6 +2198,8 @@ pub trait Instance: private::Sealed + PeripheralMarker + Into<AnySpi> + 'static 
     fn sio3_output_signal(&self) -> Option<OutputSignal>;
     fn sio3_input_signal(&self) -> Option<InputSignal>;
 
+    fn interrupt(&self) -> crate::peripherals::Interrupt;
+
     #[inline(always)]
     fn enable_peripheral(&self) {
         PeripheralClockControl::enable(self.peripheral());
@@ -2427,9 +2424,6 @@ pub trait Instance: private::Sealed + PeripheralMarker + Into<AnySpi> + 'static 
             .clock()
             .write(|w| unsafe { w.bits(reg_val) });
     }
-
-    /// Set the interrupt handler
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler);
 
     /// Enable or disable listening for the given interrupts.
     #[cfg(gdma)]
@@ -2868,9 +2862,8 @@ macro_rules! spi_instance {
                 }
 
                 #[inline(always)]
-                fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-                    self.[<bind_spi $num _interrupt>](handler.handler());
-                    crate::interrupt::enable(crate::peripherals::Interrupt::[<SPI $num>], handler.priority()).unwrap();
+                fn interrupt(&self) -> crate::peripherals::Interrupt {
+                    crate::peripherals::Interrupt::[<SPI $num>]
                 }
 
                 #[inline(always)]
@@ -2986,15 +2979,8 @@ impl Instance for super::AnySpi {
             fn sio2_input_signal(&self) -> Option<InputSignal>;
             fn sio3_output_signal(&self) -> Option<OutputSignal>;
             fn sio3_input_signal(&self) -> Option<InputSignal>;
-        }
-    }
-    delegate::delegate! {
-        to match &mut self.0 {
-            super::AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi3)]
-            super::AnySpiInner::Spi3(spi) => spi,
-        } {
-            fn set_interrupt_handler(&mut self, handler: InterruptHandler);
+
+            fn interrupt(&self) -> crate::peripherals::Interrupt;
         }
     }
 }
