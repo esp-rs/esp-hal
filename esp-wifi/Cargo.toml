@@ -39,6 +39,7 @@ libm = "0.2.8"
 cfg-if = "1.0.0"
 portable-atomic = { version = "1.9.0", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
+rand_core           = "0.6.4"
 
 bt-hci = { version = "0.1.1", optional = true }
 esp-config = { version = "0.1.0", path = "../esp-config" }

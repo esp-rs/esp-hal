@@ -104,6 +104,7 @@ use esp_hal::timer::systimer::Alarm;
 use fugit::MegahertzU32;
 use hal::{
     clock::Clocks,
+    rng::{Rng, Trng},
     system::RadioClockController,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
 };
@@ -278,7 +279,7 @@ impl<'d> Drop for EspWifiController<'d> {
     fn drop(&mut self) {
         if crate::flags::ESP_WIFI_INITIALIZED.load(Ordering::Acquire) {
             // safety: no other driver can be using this if this is callable
-            unsafe { deinit_unchecked() };
+            unsafe { deinit_unchecked().ok() };
         }
     }
 }
@@ -287,7 +288,7 @@ impl<'d> Drop for EspWifiController<'d> {
 ///
 /// This trait is meant to be used only for the `init` function.
 /// Calling `timers()` multiple times may panic.
-pub trait EspWifiTimerSource {
+pub trait EspWifiTimerSource: private::Sealed {
     /// Returns the timer source.
     fn timer(self) -> TimeBase;
 }
@@ -317,7 +318,7 @@ impl IntoAnyTimer for AnyTimer {}
 
 impl<T> EspWifiTimerSource for T
 where
-    T: IntoAnyTimer,
+    T: IntoAnyTimer + private::Sealed,
 {
     fn timer(self) -> TimeBase {
         TimeBase::new(self.into()).timer()
@@ -329,6 +330,29 @@ impl EspWifiTimerSource for TimeBase {
         self
     }
 }
+
+impl private::Sealed for TimeBase {}
+impl<T, DM> private::Sealed for TimgTimer<T, DM>
+where
+    DM: esp_hal::Mode,
+    Self: Into<AnyTimer>,
+{
+}
+#[cfg(not(feature = "esp32"))]
+impl<T, DM, COMP, UNIT> private::Sealed for Alarm<'_, T, DM, COMP, UNIT>
+where
+    DM: esp_hal::Mode,
+    Self: Into<AnyTimer>,
+{
+}
+
+/// A marker trait for suitable Rng sources for esp-wifi
+pub trait EspWifiRngSource: rand_core::RngCore + private::Sealed {}
+
+impl EspWifiRngSource for Rng {}
+impl private::Sealed for Rng {}
+impl EspWifiRngSource for Trng<'_> {}
+impl private::Sealed for Trng<'_> {}
 
 /// Initialize for using WiFi and or BLE.
 ///
@@ -361,7 +385,7 @@ impl EspWifiTimerSource for TimeBase {
 /// ```
 pub fn init<'d, T: EspWifiTimerSource>(
     timer: impl Peripheral<P = T> + 'd,
-    _rng: hal::rng::Rng,
+    _rng: impl EspWifiRngSource,
     _radio_clocks: impl Peripheral<P = hal::peripherals::RADIO_CLK> + 'd,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
@@ -402,7 +426,7 @@ pub fn init<'d, T: EspWifiTimerSource>(
 /// The user must ensure that any use of the radio via the WIFI/BLE/ESP-NOW
 /// drivers are complete, else undefined behavour may occur within those
 /// drivers.
-pub unsafe fn deinit_unchecked() {
+pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     // Disable coexistence
     #[cfg(coex)]
     {
@@ -416,12 +440,14 @@ pub unsafe fn deinit_unchecked() {
     // we have to check this in the case where a user calls `deinit_unchecked`
     // directly.
     if controller.wifi() {
+        #[cfg(feature = "wifi")]
         crate::wifi::wifi_deinit()?;
         crate::flags::WIFI.store(0, Ordering::Release);
     }
 
     if controller.ble() {
-        crate::blue::ble_deinit();
+        #[cfg(feature = "ble")]
+        crate::ble::ble_deinit();
         crate::flags::BLE.store(false, Ordering::Release);
     }
 
@@ -431,6 +457,12 @@ pub unsafe fn deinit_unchecked() {
     critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take());
 
     crate::flags::ESP_WIFI_INITIALIZED.store(false, Ordering::Release);
+
+    Ok(())
+}
+
+pub(crate) mod private {
+    pub trait Sealed {}
 }
 
 #[derive(Debug, Clone, Copy)]
