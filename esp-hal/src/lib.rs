@@ -191,7 +191,7 @@ pub mod hmac;
 pub mod i2c;
 #[cfg(any(i2s0, i2s1))]
 pub mod i2s;
-#[cfg(all(esp32, any(i2s0, i2s1)))]
+#[cfg(esp32)]
 pub mod i2s_parallel;
 #[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub mod interrupt;

@@ -128,12 +128,12 @@ pub enum I2sInterrupt {
 }
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
-const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
+pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
 
 #[cfg(any(esp32c3, esp32c6, esp32h2))]
-const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
+pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
 
-const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
+pub(crate) const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
 
 /// Data types that the I2S peripheral can work with.
 pub trait AcceptedWord: crate::private::Sealed {}
