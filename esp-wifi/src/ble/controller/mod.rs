@@ -97,7 +97,7 @@ pub(crate) mod asynch {
     use embassy_sync::waitqueue::AtomicWaker;
 
     use super::*;
-    use crate::ble::ble::have_hci_read_data;
+    use crate::ble::have_hci_read_data;
 
     static HCI_WAKER: AtomicWaker = AtomicWaker::new();
 

@@ -93,6 +93,8 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
+use core::marker::PhantomData;
+
 use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 use esp_hal as hal;
@@ -233,7 +235,7 @@ type TimeBase = PeriodicTimer<'static, AnyTimer>;
 pub(crate) mod flags {
     use portable_atomic::{AtomicBool, AtomicUsize};
 
-    pub(crate) static INITD: AtomicBool = AtomicBool::new(false);
+    pub(crate) static ESP_WIFI_INITIALIZED: AtomicBool = AtomicBool::new(false);
     pub(crate) static WIFI: AtomicUsize = AtomicUsize::new(0);
     pub(crate) static BLE: AtomicBool = AtomicBool::new(false);
 }
@@ -257,20 +259,26 @@ impl<'d> EspWifiController<'d> {
 
     /// De-initialize the radio
     pub fn deinit(self) -> Result<(), InitializationError> {
-        if crate::flags::INITD.load(Ordering::Acquire) {
+        if crate::flags::ESP_WIFI_INITIALIZED.load(Ordering::Acquire) {
             // safety: no other driver can be using this if this is callable
             unsafe { deinit_unchecked() }
         } else {
             Ok(())
         }
     }
+
+    pub(crate) unsafe fn conjure() -> Self {
+        Self {
+            _inner: PhantomData,
+        }
+    }
 }
 
 impl<'d> Drop for EspWifiController<'d> {
     fn drop(&mut self) {
-        if crate::flags::INITD.load(Ordering::Acquire) {
+        if crate::flags::ESP_WIFI_INITIALIZED.load(Ordering::Acquire) {
             // safety: no other driver can be using this if this is callable
-            unsafe { deinit_unchecked().ok() };
+            unsafe { deinit_unchecked() };
         }
     }
 }
@@ -378,7 +386,7 @@ pub fn init<'d, T: EspWifiTimerSource>(
         error => return Err(InitializationError::General(error)),
     }
 
-    crate::flags::INITD.store(true, Ordering::Release);
+    crate::flags::ESP_WIFI_INITIALIZED.store(true, Ordering::Release);
 
     Ok(EspWifiController {
         _inner: PhantomData,
@@ -402,14 +410,27 @@ pub unsafe fn deinit_unchecked() {
         unsafe { crate::wifi::os_adapter::coex_deinit() };
     }
 
+    let controller = unsafe { EspWifiController::conjure() };
+
+    // Peripheral drivers should already take care of shutting these down
+    // we have to check this in the case where a user calls `deinit_unchecked`
+    // directly.
+    if controller.wifi() {
+        crate::wifi::wifi_deinit()?;
+        crate::flags::WIFI.store(0, Ordering::Release);
+    }
+
+    if controller.ble() {
+        crate::blue::ble_deinit();
+        crate::flags::BLE.store(false, Ordering::Release);
+    }
+
     shutdown_timer_isr();
     crate::preempt::delete_all_tasks();
 
     critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take());
 
-    deinit_radio_clock_control();
-
-    crate::flags::INITD.store(false, Ordering::Release);
+    crate::flags::ESP_WIFI_INITIALIZED.store(false, Ordering::Release);
 }
 
 #[derive(Debug, Clone, Copy)]

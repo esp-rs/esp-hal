@@ -9,7 +9,7 @@ pub(crate) mod npl;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
 use core::{cell::RefCell, mem::MaybeUninit};
 
-pub(crate) use ble::{ble_init, send_hci};
+pub(crate) use ble::{ble_deinit, ble_init, send_hci};
 use critical_section::Mutex;
 
 #[cfg(any(esp32, esp32c3, esp32s3))]
