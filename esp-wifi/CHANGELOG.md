@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `esp_wifi::init` no longer requires `EspWifiInitFor`, and now returns `EspWifiController`, see the migration guide for more details (#2301)
 - No need to add `rom_functions.x` manually anymore (#2374)
 - esp-now: Data is now private in `ReceivedData` - use `data()`(#2396)
 
