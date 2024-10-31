@@ -840,10 +840,15 @@ where
     }
 
     fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(self.twai.interrupt(), handler.handler());
-            crate::interrupt::enable(self.twai.interrupt(), handler.priority()).unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, self.twai.interrupt());
         }
+        unsafe { crate::interrupt::bind_interrupt(self.twai.interrupt(), handler.handler()) };
+
+        unwrap!(crate::interrupt::enable(
+            self.twai.interrupt(),
+            handler.priority()
+        ));
     }
 
     /// Set the bitrate of the bus.
@@ -1110,9 +1115,7 @@ where
     pub fn into_blocking(self) -> TwaiConfiguration<'d, Blocking, T> {
         use crate::{interrupt, Cpu};
 
-        interrupt::disable(Cpu::ProCpu, self.twai.interrupt());
-        #[cfg(multi_core)]
-        interrupt::disable(Cpu::AppCpu, self.twai.interrupt());
+        interrupt::disable(Cpu::current(), self.twai.interrupt());
 
         // Re-create in  blocking mode
         TwaiConfiguration {

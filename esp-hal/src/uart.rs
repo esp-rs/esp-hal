@@ -2445,14 +2445,15 @@ pub mod lp_uart {
 
 impl Info {
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, self.interrupt);
+        }
         unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
         unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
     }
 
     fn disable_interrupts(&self) {
-        crate::interrupt::disable(crate::Cpu::ProCpu, self.interrupt);
-        #[cfg(multi_core)]
-        crate::interrupt::disable(crate::Cpu::AppCpu, self.interrupt);
+        crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
     }
 }
 

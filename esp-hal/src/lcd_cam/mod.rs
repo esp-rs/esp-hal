@@ -68,19 +68,21 @@ impl crate::private::Sealed for LcdCam<'_, Blocking> {}
 // in a similar way to the gpio::IO
 impl InterruptConfigurable for LcdCam<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(Interrupt::LCD_CAM, handler.handler());
-            crate::interrupt::enable(Interrupt::LCD_CAM, handler.priority()).unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::LCD_CAM);
         }
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::LCD_CAM, handler.handler()) };
+        unwrap!(crate::interrupt::enable(
+            Interrupt::LCD_CAM,
+            handler.priority()
+        ));
     }
 }
 
 impl<'d> LcdCam<'d, Async> {
     /// Reconfigures the peripheral for blocking operation.
     pub fn into_blocking(self) -> LcdCam<'d, Blocking> {
-        crate::interrupt::disable(Cpu::ProCpu, Interrupt::LCD_CAM);
-        #[cfg(multi_core)]
-        crate::interrupt::disable(Cpu::AppCpu, Interrupt::LCD_CAM);
+        crate::interrupt::disable(Cpu::current(), Interrupt::LCD_CAM);
         LcdCam {
             lcd: Lcd {
                 lcd_cam: self.lcd.lcd_cam,

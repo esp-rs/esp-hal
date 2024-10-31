@@ -72,6 +72,9 @@ impl crate::private::Sealed for Rsa<'_, Blocking> {}
 
 impl InterruptConfigurable for Rsa<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::RSA);
+        }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::RSA, handler.handler()) };
         unwrap!(crate::interrupt::enable(Interrupt::RSA, handler.priority()));
     }
@@ -80,9 +83,7 @@ impl InterruptConfigurable for Rsa<'_, Blocking> {
 impl<'d> Rsa<'d, Async> {
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Rsa<'d, Blocking> {
-        crate::interrupt::disable(Cpu::ProCpu, Interrupt::RSA);
-        #[cfg(multi_core)]
-        crate::interrupt::disable(Cpu::AppCpu, Interrupt::RSA);
+        crate::interrupt::disable(Cpu::current(), Interrupt::RSA);
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,

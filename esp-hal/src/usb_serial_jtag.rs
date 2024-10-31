@@ -296,10 +296,14 @@ impl crate::private::Sealed for UsbSerialJtag<'_, Blocking> {}
 
 impl InterruptConfigurable for UsbSerialJtag<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(Interrupt::USB_DEVICE, handler.handler());
-            crate::interrupt::enable(Interrupt::USB_DEVICE, handler.priority()).unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::USB_DEVICE);
         }
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::USB_DEVICE, handler.handler()) };
+        unwrap!(crate::interrupt::enable(
+            Interrupt::USB_DEVICE,
+            handler.priority()
+        ));
     }
 }
 
@@ -765,9 +769,7 @@ impl<'d> UsbSerialJtag<'d, Async> {
     /// Reconfigure the USB Serial JTAG peripheral to operate in blocking
     /// mode.
     pub fn into_blocking(self) -> UsbSerialJtag<'d, Blocking> {
-        crate::interrupt::disable(Cpu::ProCpu, Interrupt::USB_DEVICE);
-        #[cfg(multi_core)]
-        crate::interrupt::disable(Cpu::AppCpu, Interrupt::USB_DEVICE);
+        crate::interrupt::disable(Cpu::current(), Interrupt::USB_DEVICE);
         UsbSerialJtag {
             rx: UsbSerialJtagRx {
                 peripheral: self.rx.peripheral,

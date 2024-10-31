@@ -2177,9 +2177,14 @@ where
     where
         C: DmaChannel,
     {
+        self.unlisten(EnumSet::all());
+        self.clear_interrupts(EnumSet::all());
         for interrupt in C::interrupts(self).iter().copied() {
+            for core in crate::Cpu::other() {
+                crate::interrupt::disable(core, interrupt);
+            }
             unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-            crate::interrupt::enable(interrupt, handler.priority()).unwrap();
+            unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
         }
     }
 
@@ -2250,9 +2255,7 @@ where
     /// Converts an async channel to a blocking channel.
     pub fn into_blocking(self) -> Channel<'d, C, Blocking> {
         for interrupt in C::interrupts(&self).iter().copied() {
-            crate::interrupt::disable(Cpu::ProCpu, interrupt);
-            #[cfg(multi_core)]
-            crate::interrupt::disable(Cpu::AppCpu, interrupt);
+            crate::interrupt::disable(Cpu::current(), interrupt);
         }
 
         Channel {

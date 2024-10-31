@@ -598,6 +598,9 @@ where
     T: Instance,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        for core in Cpu::other() {
+            crate::interrupt::disable(core, self.i2c.interrupt());
+        }
         unsafe { crate::interrupt::bind_interrupt(self.i2c.interrupt(), handler.handler()) };
         unwrap!(crate::interrupt::enable(
             self.i2c.interrupt(),
@@ -734,9 +737,7 @@ where
 {
     /// Configure the I2C peripheral to operate in blocking mode.
     pub fn into_blocking(self) -> I2c<'d, Blocking, T> {
-        crate::interrupt::disable(Cpu::ProCpu, self.i2c.interrupt());
-        #[cfg(multi_core)]
-        crate::interrupt::disable(Cpu::AppCpu, self.i2c.interrupt());
+        crate::interrupt::disable(Cpu::current(), self.i2c.interrupt());
 
         I2c {
             i2c: self.i2c,

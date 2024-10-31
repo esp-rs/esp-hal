@@ -282,6 +282,9 @@ impl crate::private::Sealed for Rmt<'_, Blocking> {}
 
 impl InterruptConfigurable for Rmt<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::RMT);
+        }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::RMT, handler.handler()) };
         unwrap!(crate::interrupt::enable(Interrupt::RMT, handler.priority()));
     }
