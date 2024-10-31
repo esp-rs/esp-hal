@@ -3,7 +3,6 @@ use portable_atomic::{AtomicU32, Ordering};
 use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
 use crate::{
     binary::include::*,
-    common_adapter::RADIO_CLOCKS,
     hal::system::{RadioClockController, RadioPeripherals},
 };
 
@@ -13,11 +12,11 @@ static mut SOC_PHY_DIG_REGS_MEM: [u8; SOC_PHY_DIG_REGS_MEM_SIZE] = [0u8; SOC_PHY
 static mut G_IS_PHY_CALIBRATED: bool = false;
 static mut G_PHY_DIGITAL_REGS_MEM: *mut u32 = core::ptr::null_mut();
 static mut S_IS_PHY_REG_STORED: bool = false;
-static mut PHY_ACCESS_REF: AtomicU32 = AtomicU32::new(0);
+static PHY_ACCESS_REF: AtomicU32 = AtomicU32::new(0);
 
 pub(crate) fn phy_mem_init() {
     unsafe {
-        G_PHY_DIGITAL_REGS_MEM = SOC_PHY_DIG_REGS_MEM.as_ptr() as *mut u32;
+        G_PHY_DIGITAL_REGS_MEM = core::ptr::addr_of_mut!(SOC_PHY_DIG_REGS_MEM).cast();
     }
 }
 
@@ -148,20 +147,20 @@ fn phy_digital_regs_store() {
 
 pub(crate) unsafe fn phy_enable_clock() {
     trace!("phy_enable_clock");
-    critical_section::with(|_| {
-        unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Phy);
-    });
-
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.enable(RadioPeripherals::Phy);
     trace!("phy_enable_clock done!");
 }
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
     trace!("phy_disable_clock");
-    critical_section::with(|_| {
-        unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Phy);
-    });
-
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.disable(RadioPeripherals::Phy);
     trace!("phy_disable_clock done!");
 }
 

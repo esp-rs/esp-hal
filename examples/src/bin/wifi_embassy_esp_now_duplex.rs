@@ -117,7 +117,7 @@ async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender<'static>>
 async fn listener(manager: &'static EspNowManager<'static>, mut receiver: EspNowReceiver<'static>) {
     loop {
         let r = receiver.receive_async().await;
-        println!("Received {:?}", r.get_data());
+        println!("Received {:?}", r.data());
         if r.info.dst_address == BROADCAST_ADDRESS {
             if !manager.peer_exists(&r.info.src_address) {
                 manager

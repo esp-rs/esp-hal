@@ -9,6 +9,7 @@
 //!
 //! For more information see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
 
+use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::{cell::RefCell, fmt::Debug, marker::PhantomData};
 
 use critical_section::Mutex;
@@ -17,11 +18,12 @@ use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::{
     binary::include::*,
-    compat::queue::SimpleQueue,
     hal::peripheral::{Peripheral, PeripheralRef},
     wifi::{Protocol, RxControlInfo},
     EspWifiInitialization,
 };
+
+const RECEIVE_QUEUE_SIZE: usize = 10;
 
 /// Maximum payload length
 pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
@@ -29,8 +31,10 @@ pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
 /// Broadcast address
 pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
 
-static RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedData, 10>>> =
-    Mutex::new(RefCell::new(SimpleQueue::new()));
+// Stores received packets until dequeued by the user
+static RECEIVE_QUEUE: Mutex<RefCell<VecDeque<ReceivedData>>> =
+    Mutex::new(RefCell::new(VecDeque::new()));
+
 /// This atomic behaves like a guard, so we need strict memory ordering when
 /// operating it.
 ///
@@ -231,30 +235,30 @@ pub struct ReceiveInfo {
 
 /// Stores information about the received data, including the packet content and
 /// associated information.
-#[derive(Clone, Copy)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone)]
 pub struct ReceivedData {
-    /// The length of the received data.
-    pub len: u8,
-
-    /// The buffer containing the received data.
-    pub data: [u8; 256],
-
-    /// Information about a received packet.
+    data: Box<[u8]>,
     pub info: ReceiveInfo,
 }
 
 impl ReceivedData {
     /// Returns the received payload.
-    pub fn get_data(&self) -> &[u8] {
-        &self.data[..self.len as usize]
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for ReceivedData {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "ReceivedData {}, Info {}", &self.data[..], &self.info,)
     }
 }
 
 impl Debug for ReceivedData {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ReceivedData")
-            .field("data", &self.get_data())
+            .field("data", &self.data())
             .field("info", &self.info)
             .finish()
     }
@@ -277,7 +281,7 @@ pub struct EspNowManager<'d> {
     _rc: EspNowRc<'d>,
 }
 
-impl<'d> EspNowManager<'d> {
+impl EspNowManager<'_> {
     /// Set the wifi protocol.
     ///
     /// This will set the wifi protocol to the desired protocol
@@ -476,7 +480,7 @@ pub struct EspNowSender<'d> {
     _rc: EspNowRc<'d>,
 }
 
-impl<'d> EspNowSender<'d> {
+impl EspNowSender<'_> {
     /// Send data to peer
     ///
     /// The peer needs to be added to the peer list first.
@@ -506,7 +510,7 @@ impl<'d> EspNowSender<'d> {
 #[must_use]
 pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender<'s>>);
 
-impl<'s> SendWaiter<'s> {
+impl SendWaiter<'_> {
     /// Wait for the previous sending to complete, i.e. the send callback is
     /// invoked with status of the sending.
     pub fn wait(self) -> Result<(), EspNowError> {
@@ -523,7 +527,7 @@ impl<'s> SendWaiter<'s> {
     }
 }
 
-impl<'s> Drop for SendWaiter<'s> {
+impl Drop for SendWaiter<'_> {
     /// wait for the send to complete to prevent the lock on `EspNowSender` get
     /// unlocked before a callback is invoked.
     fn drop(&mut self) {
@@ -537,12 +541,12 @@ pub struct EspNowReceiver<'d> {
     _rc: EspNowRc<'d>,
 }
 
-impl<'d> EspNowReceiver<'d> {
+impl EspNowReceiver<'_> {
     /// Receives data from the ESP-NOW queue.
     pub fn receive(&self) -> Option<ReceivedData> {
         critical_section::with(|cs| {
             let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-            queue.dequeue()
+            queue.pop_front()
         })
     }
 }
@@ -554,7 +558,7 @@ struct EspNowRc<'d> {
     inner: PhantomData<EspNow<'d>>,
 }
 
-impl<'d> EspNowRc<'d> {
+impl EspNowRc<'_> {
     fn new() -> Result<Self, EspNowError> {
         static ESP_NOW_RC: AtomicU8 = AtomicU8::new(0);
         // The reference counter is not 0, which means there is another instance of
@@ -570,7 +574,7 @@ impl<'d> EspNowRc<'d> {
     }
 }
 
-impl<'d> Clone for EspNowRc<'d> {
+impl Clone for EspNowRc<'_> {
     fn clone(&self) -> Self {
         self.rc.fetch_add(1, Ordering::Release);
         Self {
@@ -580,7 +584,7 @@ impl<'d> Clone for EspNowRc<'d> {
     }
 }
 
-impl<'d> Drop for EspNowRc<'d> {
+impl Drop for EspNowRc<'_> {
     fn drop(&mut self) {
         if self.rc.fetch_sub(1, Ordering::AcqRel) == 1 {
             unsafe {
@@ -834,18 +838,13 @@ unsafe extern "C" fn rcv_cb(
     let slice = core::slice::from_raw_parts(data, data_len as usize);
     critical_section::with(|cs| {
         let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-        let mut data = [0u8; 256];
-        data[..slice.len()].copy_from_slice(slice);
+        let data = Box::from(slice);
 
-        if queue.is_full() {
-            queue.dequeue();
+        if queue.len() >= RECEIVE_QUEUE_SIZE {
+            queue.pop_front();
         }
 
-        unwrap!(queue.enqueue(ReceivedData {
-            len: slice.len() as u8,
-            data,
-            info,
-        }));
+        queue.push_back(ReceivedData { data, info });
 
         #[cfg(feature = "async")]
         asynch::ESP_NOW_RX_WAKER.wake();
@@ -866,7 +865,7 @@ mod asynch {
     pub(super) static ESP_NOW_TX_WAKER: AtomicWaker = AtomicWaker::new();
     pub(super) static ESP_NOW_RX_WAKER: AtomicWaker = AtomicWaker::new();
 
-    impl<'d> EspNowReceiver<'d> {
+    impl EspNowReceiver<'_> {
         /// This function takes mutable reference to self because the
         /// implementation of `ReceiveFuture` is not logically thread
         /// safe.
@@ -875,7 +874,7 @@ mod asynch {
         }
     }
 
-    impl<'d> EspNowSender<'d> {
+    impl EspNowSender<'_> {
         /// Sends data asynchronously to a peer (using its MAC) using ESP-NOW.
         pub fn send_async<'s, 'r>(
             &'s mut self,
@@ -891,7 +890,7 @@ mod asynch {
         }
     }
 
-    impl<'d> EspNow<'d> {
+    impl EspNow<'_> {
         /// This function takes mutable reference to self because the
         /// implementation of `ReceiveFuture` is not logically thread
         /// safe.
@@ -920,7 +919,7 @@ mod asynch {
         sent: bool,
     }
 
-    impl<'s, 'r> core::future::Future for SendFuture<'s, 'r> {
+    impl core::future::Future for SendFuture<'_, '_> {
         type Output = Result<(), EspNowError>;
 
         fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -953,7 +952,7 @@ mod asynch {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
 
-    impl<'r> core::future::Future for ReceiveFuture<'r> {
+    impl core::future::Future for ReceiveFuture<'_> {
         type Output = ReceivedData;
 
         fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -961,7 +960,7 @@ mod asynch {
 
             if let Some(data) = critical_section::with(|cs| {
                 let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-                queue.dequeue()
+                queue.pop_front()
             }) {
                 Poll::Ready(data)
             } else {

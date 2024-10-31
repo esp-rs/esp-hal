@@ -93,12 +93,7 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
-use common_adapter::{
-    chip_specific::phy_mem_init,
-    deinit_radio_clock_control,
-    init_radio_clock_control,
-    RADIO_CLOCKS,
-};
+use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 use esp_hal as hal;
 #[cfg(not(feature = "esp32"))]
@@ -118,7 +113,6 @@ use crate::{
     wifi::WifiError,
 };
 use crate::{
-    common_adapter::init_rng,
     tasks::init_tasks,
     timer::{setup_timer_isr, shutdown_timer_isr},
 };
@@ -389,8 +383,8 @@ impl EspWifiTimerSource for TimeBase {
 pub fn init(
     init_for: EspWifiInitFor,
     timer: impl EspWifiTimerSource,
-    rng: hal::rng::Rng,
-    radio_clocks: hal::peripherals::RADIO_CLK,
+    _rng: hal::rng::Rng,
+    _radio_clocks: hal::peripherals::RADIO_CLK,
 ) -> Result<EspWifiInitialization, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
     const MIN_CLOCK: u32 = 80;
@@ -402,8 +396,6 @@ pub fn init(
     info!("esp-wifi configuration {:?}", crate::CONFIG);
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
     phy_mem_init();
-    init_radio_clock_control(radio_clocks);
-    init_rng(rng);
     init_tasks();
     setup_timer_isr(timer.timer())?;
 
@@ -501,8 +493,7 @@ pub unsafe fn deinit_unchecked(
     let timer = critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take())
         .ok_or(InitializationError::TimerUnavailable)?;
 
-    let radio_clocks =
-        deinit_radio_clock_control().ok_or(InitializationError::RadioClockUnavailable)?;
+    let radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
 
     Ok((timer, radio_clocks))
 }
@@ -548,7 +539,6 @@ pub fn wifi_set_log_verbose() {
 }
 
 fn init_clocks() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).init_clocks();
-    }
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.init_clocks();
 }

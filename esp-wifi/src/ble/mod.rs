@@ -6,9 +6,11 @@ pub(crate) mod btdm;
 #[cfg(any(esp32c2, esp32c6, esp32h2))]
 pub(crate) mod npl;
 
-use core::mem::MaybeUninit;
+use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
+use core::{cell::RefCell, mem::MaybeUninit};
 
-pub(crate) use ble::{ble_init, read_hci, read_next, send_hci};
+pub(crate) use ble::{ble_init, send_hci};
+use critical_section::Mutex;
 
 #[cfg(any(esp32, esp32c3, esp32s3))]
 use self::btdm as ble;
@@ -29,6 +31,10 @@ pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::binary
 pub(crate) unsafe extern "C" fn free(ptr: *mut crate::binary::c_types::c_void) {
     crate::compat::malloc::free(ptr.cast())
 }
+
+// Stores received packets until the the BLE stack dequeues them
+static BT_RECEIVE_QUEUE: Mutex<RefCell<VecDeque<ReceivedPacket>>> =
+    Mutex::new(RefCell::new(VecDeque::new()));
 
 static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
 
@@ -95,4 +101,67 @@ impl HciOutCollector {
     fn packet(&self) -> &[u8] {
         &self.data[0..self.index]
     }
+}
+
+static BLE_HCI_READ_DATA: Mutex<RefCell<Vec<u8>>> = Mutex::new(RefCell::new(Vec::new()));
+
+#[derive(Debug, Clone)]
+pub struct ReceivedPacket {
+    pub data: Box<[u8]>,
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for ReceivedPacket {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "ReceivedPacket {}", &self.data[..])
+    }
+}
+
+#[cfg(feature = "async")]
+pub fn have_hci_read_data() -> bool {
+    critical_section::with(|cs| {
+        let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        let hci_read_data = BLE_HCI_READ_DATA.borrow_ref(cs);
+        !queue.is_empty() || !hci_read_data.is_empty()
+    })
+}
+
+pub(crate) fn read_next(data: &mut [u8]) -> usize {
+    critical_section::with(|cs| {
+        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+
+        match queue.pop_front() {
+            Some(packet) => {
+                data[..packet.data.len()].copy_from_slice(&packet.data[..packet.data.len()]);
+                packet.data.len()
+            }
+            None => 0,
+        }
+    })
+}
+
+pub fn read_hci(data: &mut [u8]) -> usize {
+    critical_section::with(|cs| {
+        let mut hci_read_data = BLE_HCI_READ_DATA.borrow_ref_mut(cs);
+
+        if hci_read_data.is_empty() {
+            let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+
+            if let Some(packet) = queue.pop_front() {
+                hci_read_data.extend_from_slice(&packet.data);
+            }
+        }
+
+        let l = usize::min(hci_read_data.len(), data.len());
+        data[..l].copy_from_slice(&hci_read_data[..l]);
+        hci_read_data.drain(..l);
+        l
+    })
+}
+
+fn dump_packet_info(_buffer: &[u8]) {
+    #[cfg(feature = "dump-packets")]
+    critical_section::with(|_cs| {
+        info!("@HCIFRAME {:?}", _buffer);
+    });
 }

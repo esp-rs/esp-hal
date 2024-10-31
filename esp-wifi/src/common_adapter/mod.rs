@@ -1,7 +1,7 @@
 use core::ptr::addr_of;
 
 use esp_wifi_sys::include::timeval;
-use hal::{macros::ram, rng::Rng};
+use hal::macros::ram;
 
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
@@ -26,22 +26,6 @@ pub(crate) mod chip_specific;
 #[cfg_attr(esp32s3, path = "phy_init_data_esp32s3.rs")]
 #[cfg_attr(esp32s2, path = "phy_init_data_esp32s2.rs")]
 pub(crate) mod phy_init_data;
-
-pub(crate) static mut RANDOM_GENERATOR: Option<Rng> = None;
-
-pub(crate) static mut RADIO_CLOCKS: Option<hal::peripherals::RADIO_CLK> = None;
-
-pub(crate) fn init_rng(rng: Rng) {
-    unsafe { RANDOM_GENERATOR = Some(rng) };
-}
-
-pub(crate) fn init_radio_clock_control(rcc: hal::peripherals::RADIO_CLK) {
-    unsafe { RADIO_CLOCKS = Some(rcc) };
-}
-
-pub(crate) fn deinit_radio_clock_control() -> Option<hal::peripherals::RADIO_CLK> {
-    unsafe { RADIO_CLOCKS.take() }
-}
 
 /// **************************************************************************
 /// Name: esp_semphr_create
@@ -131,11 +115,9 @@ pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void
 pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
     trace!("random");
 
-    if let Some(ref mut rng) = RANDOM_GENERATOR {
-        rng.random()
-    } else {
-        0
-    }
+    // stealing RNG is safe since we own it (passed into `init`)
+    let mut rng = esp_hal::rng::Rng::new(unsafe { esp_hal::peripherals::RNG::steal() });
+    rng.random()
 }
 
 /// **************************************************************************
@@ -308,11 +290,11 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
     trace!("esp_fill_random");
     let dst = core::slice::from_raw_parts_mut(dst, len as usize);
 
-    if let Some(ref mut rng) = RANDOM_GENERATOR {
-        for chunk in dst.chunks_mut(4) {
-            let bytes = rng.random().to_le_bytes();
-            chunk.copy_from_slice(&bytes[..chunk.len()]);
-        }
+    // stealing RNG is safe since we own it (passed into `init`)
+    let mut rng = esp_hal::rng::Rng::new(unsafe { esp_hal::peripherals::RNG::steal() });
+    for chunk in dst.chunks_mut(4) {
+        let bytes = rng.random().to_le_bytes();
+        chunk.copy_from_slice(&bytes[..chunk.len()]);
     }
 }
 
