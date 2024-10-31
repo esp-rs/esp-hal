@@ -625,6 +625,7 @@ impl Instance for I2S0 {
         );
 
         // signals for 8bit and 16bit both start at an offset of 8 for I2S0
+        // https://github.com/espressif/esp-idf/blob/9106c43accd9f5e75379f62f12597677213f5023/components/esp_lcd/i80/esp_lcd_panel_io_i2s.c#L701
         match i + 8 {
             0 => OutputSignal::I2S0O_DATA_0,
             1 => OutputSignal::I2S0O_DATA_1,
@@ -670,8 +671,9 @@ impl Instance for I2S1 {
             bits
         );
 
-        // Because of... reasons... the 16-bit values for i2s1 appear on d8...d23
-        match i + bits as usize - 8 {
+        // signals for 8bit and 16bit both start at an offset of 8 for I2S1
+        // https://github.com/espressif/esp-idf/blob/9106c43accd9f5e75379f62f12597677213f5023/components/esp_lcd/i80/esp_lcd_panel_io_i2s.c#L701
+        match i + 8 {
             0 => OutputSignal::I2S1O_DATA_0,
             1 => OutputSignal::I2S1O_DATA_1,
             2 => OutputSignal::I2S1O_DATA_2,
