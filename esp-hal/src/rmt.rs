@@ -87,6 +87,7 @@ use core::{
 };
 
 use embassy_sync::waitqueue::AtomicWaker;
+use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 
 use crate::{
@@ -1245,120 +1246,114 @@ pub trait RxChannelAsync: RxChannelInternal<Async> {
 #[cfg(not(any(esp32, esp32s2)))]
 #[handler]
 fn async_interrupt_handler() {
-    use crate::Async;
+    let Some(channel) = chip_specific::pending_interrupt_for_channel() else {
+        return;
+    };
+    match channel {
+        0 => Channel::<Async, 0>::unlisten_interrupt(Event::End | Event::Error),
+        1 => Channel::<Async, 1>::unlisten_interrupt(Event::End | Event::Error),
+        2 => Channel::<Async, 2>::unlisten_interrupt(Event::End | Event::Error),
+        3 => Channel::<Async, 3>::unlisten_interrupt(Event::End | Event::Error),
 
-    if let Some(channel) = chip_specific::pending_interrupt_for_channel() {
-        match channel {
-            0 => {
-                Channel::<Async, 0>::unlisten_interrupt(Event::End);
-                Channel::<Async, 0>::unlisten_interrupt(Event::Error);
-            }
-            1 => {
-                Channel::<Async, 1>::unlisten_interrupt(Event::End);
-                Channel::<Async, 1>::unlisten_interrupt(Event::Error);
-            }
-            2 => {
-                Channel::<Async, 2>::unlisten_interrupt(Event::End);
-                Channel::<Async, 2>::unlisten_interrupt(Event::Error);
-            }
-            3 => {
-                Channel::<Async, 3>::unlisten_interrupt(Event::End);
-                Channel::<Async, 3>::unlisten_interrupt(Event::Error);
-            }
+        #[cfg(any(esp32, esp32s3))]
+        4 => Channel::<Async, 4>::unlisten_interrupt(Event::End | Event::Error),
+        #[cfg(any(esp32, esp32s3))]
+        5 => Channel::<Async, 5>::unlisten_interrupt(Event::End | Event::Error),
+        #[cfg(any(esp32, esp32s3))]
+        6 => Channel::<Async, 6>::unlisten_interrupt(Event::End | Event::Error),
+        #[cfg(any(esp32, esp32s3))]
+        7 => Channel::<Async, 7>::unlisten_interrupt(Event::End | Event::Error),
 
-            #[cfg(any(esp32, esp32s3))]
-            4 => {
-                Channel::<Async, 4>::unlisten_interrupt(Event::End);
-                Channel::<Async, 4>::unlisten_interrupt(Event::Error);
-            }
-            #[cfg(any(esp32, esp32s3))]
-            5 => {
-                Channel::<Async, 5>::unlisten_interrupt(Event::End);
-                Channel::<Async, 5>::unlisten_interrupt(Event::Error);
-            }
-            #[cfg(any(esp32, esp32s3))]
-            6 => {
-                Channel::<Async, 6>::unlisten_interrupt(Event::End);
-                Channel::<Async, 6>::unlisten_interrupt(Event::Error);
-            }
-            #[cfg(any(esp32, esp32s3))]
-            7 => {
-                Channel::<Async, 7>::unlisten_interrupt(Event::End);
-                Channel::<Async, 7>::unlisten_interrupt(Event::Error);
-            }
-
-            _ => unreachable!(),
-        }
-
-        WAKER[channel].wake();
+        _ => unreachable!(),
     }
+
+    WAKER[channel].wake();
 }
 
 #[cfg(any(esp32, esp32s2))]
 #[handler]
 fn async_interrupt_handler() {
-    if let Some(channel) = chip_specific::pending_interrupt_for_channel() {
-        match channel {
-            0 => {
-                <Channel<Async, 0> as TxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 0> as TxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-                <Channel<Async, 0> as RxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 0> as RxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-            }
-            1 => {
-                <Channel<Async, 1> as TxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 1> as TxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-                <Channel<Async, 1> as RxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 1> as RxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-            }
-            2 => {
-                <Channel<Async, 2> as TxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 2> as TxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-                <Channel<Async, 2> as RxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 2> as RxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-            }
-            3 => {
-                <Channel<Async, 3> as TxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 3> as TxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-                <Channel<Async, 3> as RxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 3> as RxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-            }
-            #[cfg(esp32)]
-            4 => {
-                <Channel<Async, 4> as TxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 4> as TxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-                <Channel<Async, 4> as RxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 4> as RxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-            }
-            #[cfg(any(esp32, esp32s3))]
-            5 => {
-                <Channel<Async, 5> as TxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 5> as TxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-                <Channel<Async, 5> as RxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 5> as RxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-            }
-            #[cfg(any(esp32, esp32s3))]
-            6 => {
-                <Channel<Async, 6> as TxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 6> as TxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-                <Channel<Async, 6> as RxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 6> as RxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-            }
-            #[cfg(any(esp32, esp32s3))]
-            7 => {
-                <Channel<Async, 7> as TxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 7> as TxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-                <Channel<Async, 7> as RxChannelInternal<Async>>::unlisten_interrupt(Event::End);
-                <Channel<Async, 7> as RxChannelInternal<Async>>::unlisten_interrupt(Event::Error);
-            }
-
-            _ => unreachable!(),
+    let Some(channel) = chip_specific::pending_interrupt_for_channel() else {
+        return;
+    };
+    match channel {
+        0 => {
+            <Channel<Async, 0> as TxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+            <Channel<Async, 0> as RxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+        }
+        1 => {
+            <Channel<Async, 1> as TxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+            <Channel<Async, 1> as RxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+        }
+        2 => {
+            <Channel<Async, 2> as TxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+            <Channel<Async, 2> as RxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+        }
+        3 => {
+            <Channel<Async, 3> as TxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+            <Channel<Async, 3> as RxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+        }
+        #[cfg(esp32)]
+        4 => {
+            <Channel<Async, 4> as TxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+            <Channel<Async, 4> as RxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+        }
+        #[cfg(any(esp32, esp32s3))]
+        5 => {
+            <Channel<Async, 5> as TxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+            <Channel<Async, 5> as RxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+        }
+        #[cfg(any(esp32, esp32s3))]
+        6 => {
+            <Channel<Async, 6> as TxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+            <Channel<Async, 6> as RxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+        }
+        #[cfg(any(esp32, esp32s3))]
+        7 => {
+            <Channel<Async, 7> as TxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
+            <Channel<Async, 7> as RxChannelInternal<Async>>::unlisten_interrupt(
+                Event::End | Event::Error,
+            );
         }
 
-        WAKER[channel].wake();
+        _ => unreachable!(),
     }
+
+    WAKER[channel].wake();
 }
 
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum Event {
     Error,
@@ -1443,14 +1438,14 @@ where
 
     fn stop();
 
-    fn enable_listen_interrupt(event: Event, enable: bool);
+    fn enable_listen_interrupt(event: EnumSet<Event>, enable: bool);
 
-    fn listen_interrupt(event: Event) {
-        Self::enable_listen_interrupt(event, true);
+    fn listen_interrupt(event: impl Into<EnumSet<Event>>) {
+        Self::enable_listen_interrupt(event.into(), true);
     }
 
-    fn unlisten_interrupt(event: Event) {
-        Self::enable_listen_interrupt(event, false);
+    fn unlisten_interrupt(event: impl Into<EnumSet<Event>>) {
+        Self::enable_listen_interrupt(event.into(), false);
     }
 }
 
@@ -1497,14 +1492,14 @@ where
 
     fn set_idle_threshold(value: u16);
 
-    fn enable_listen_interrupt(event: Event, enable: bool);
+    fn enable_listen_interrupt(event: EnumSet<Event>, enable: bool);
 
-    fn listen_interrupt(event: Event) {
-        Self::enable_listen_interrupt(event, true);
+    fn listen_interrupt(event: impl Into<EnumSet<Event>>) {
+        Self::enable_listen_interrupt(event.into(), true);
     }
 
-    fn unlisten_interrupt(event: Event) {
-        Self::enable_listen_interrupt(event, false);
+    fn unlisten_interrupt(event: impl Into<EnumSet<Event>>) {
+        Self::enable_listen_interrupt(event.into(), false);
     }
 }
 
@@ -1734,19 +1729,15 @@ mod chip_specific {
                         Self::update();
                     }
 
-                    fn enable_listen_interrupt(event: $crate::rmt::Event, enable: bool) {
+                    fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         rmt.int_ena().modify(|_, w| {
-                            match event {
-                                $crate::rmt::Event::Error => {
-                                    w.[< ch $ch_num _tx_err >]().bit(enable);
-                                }
-                                $crate::rmt::Event::End => {
-                                    w.[< ch $ch_num _tx_end >]().bit(enable);
-                                }
-                                $crate::rmt::Event::Threshold => {
-                                    w.[< ch $ch_num _tx_thr_event >]().bit(enable);
-                                }
+                            for event in events {
+                                match event {
+                                    $crate::rmt::Event::Error => w.[< ch $ch_num _tx_err >]().bit(enable),
+                                    $crate::rmt::Event::End => w.[< ch $ch_num _tx_end >]().bit(enable),
+                                    $crate::rmt::Event::Threshold => w.[< ch $ch_num _tx_thr_event >]().bit(enable),
+                                };
                             }
                             w
                         });
@@ -1854,19 +1845,15 @@ mod chip_specific {
                         rmt.[< ch $ch_num _rx_conf0 >]().modify(|_, w| unsafe { w.idle_thres().bits(value) });
                     }
 
-                    fn enable_listen_interrupt(event: $crate::rmt::Event, enable: bool) {
+                    fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         rmt.int_ena().modify(|_, w| {
-                            match event {
-                                $crate::rmt::Event::Error => {
-                                    w.[< ch $ch_num _rx_err >]().bit(enable);
-                                }
-                                $crate::rmt::Event::End => {
-                                    w.[< ch $ch_num _rx_end >]().bit(enable);
-                                }
-                                $crate::rmt::Event::Threshold => {
-                                    w.[< ch $ch_num _rx_thr_event >]().bit(enable);
-                                }
+                            for event in events {
+                                match event {
+                                    $crate::rmt::Event::Error => w.[< ch $ch_num _rx_err >]().bit(enable),
+                                    $crate::rmt::Event::End => w.[< ch $ch_num _rx_end >]().bit(enable),
+                                    $crate::rmt::Event::Threshold => w.[< ch $ch_num _rx_thr_event >]().bit(enable),
+                                };
                             }
                             w
                         });
@@ -2082,30 +2069,18 @@ mod chip_specific {
                         }
                     }
 
-                    fn enable_listen_interrupt(event: $crate::rmt::Event, enable: bool) {
+                    fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         rmt.int_ena().modify(|_,w| {
-                            match event {
-                                $crate::rmt::Event::Error => {
-                                    w.[< ch $ch_num _err >]().bit(enable)
-                                }
-                                $crate::rmt::Event::End => {
-                                    w.[< ch $ch_num _tx_end >]().bit(enable)
-                                }
-                                $crate::rmt::Event::Threshold => {
-                                    w.[< ch $ch_num _tx_thr_event >]().bit(enable)
-                                }
-                            };
+                            for event in events {
+                                match event {
+                                    $crate::rmt::Event::Error => w.[< ch $ch_num _err >]().bit(enable),
+                                    $crate::rmt::Event::End => w.[< ch $ch_num _tx_end >]().bit(enable),
+                                    $crate::rmt::Event::Threshold => w.[< ch $ch_num _tx_thr_event >]().bit(enable),
+                                };
+                            }
                             w
                         });
-                    }
-
-                    fn listen_interrupt(event: $crate::rmt::Event) {
-                        Self::enable_listen_interrupt(event, true)
-                    }
-
-                    fn unlisten_interrupt(event: $crate::rmt::Event) {
-                        Self::enable_listen_interrupt(event, false)
                     }
                 }
             }
@@ -2215,30 +2190,18 @@ mod chip_specific {
                         rmt.[< ch $ch_num conf0 >]().modify(|_, w| unsafe { w.idle_thres().bits(value) });
                     }
 
-                    fn enable_listen_interrupt(event: $crate::rmt::Event, enable: bool) {
+                    fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         rmt.int_ena().modify(|_, w| {
-                            match event {
-                                $crate::rmt::Event::Error => {
-                                    w.[< ch $ch_num _err >]().bit(enable)
-                                }
-                                $crate::rmt::Event::End => {
-                                    w.[< ch $ch_num _rx_end >]().bit(enable)
-                                }
-                                $crate::rmt::Event::Threshold => {
-                                    w.[< ch $ch_num _tx_thr_event >]().bit(enable)
-                                }
-                            };
+                            for event in events {
+                                match event {
+                                    $crate::rmt::Event::Error => w.[< ch $ch_num _err >]().bit(enable),
+                                    $crate::rmt::Event::End => w.[< ch $ch_num _rx_end >]().bit(enable),
+                                    $crate::rmt::Event::Threshold => w.[< ch $ch_num _tx_thr_event >]().bit(enable),
+                                };
+                            }
                             w
                         });
-                    }
-
-                    fn listen_interrupt(event: $crate::rmt::Event) {
-                        Self::enable_listen_interrupt(event, true)
-                    }
-
-                    fn unlisten_interrupt(event: $crate::rmt::Event) {
-                        Self::enable_listen_interrupt(event, false)
                     }
                 }
             }
