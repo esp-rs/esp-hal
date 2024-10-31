@@ -226,11 +226,11 @@ where
     }
 }
 
-impl<P> From<Flex<'_, P>> for InputSignal
+impl<P> From<Flex<'static, P>> for InputSignal
 where
     P: InputPin,
 {
-    fn from(input: Flex<'_, P>) -> Self {
+    fn from(input: Flex<'static, P>) -> Self {
         Self::new(input.degrade())
     }
 }
@@ -361,11 +361,11 @@ where
     }
 }
 
-impl<P> From<Flex<'_, P>> for OutputSignal
+impl<P> From<Flex<'static, P>> for OutputSignal
 where
     P: OutputPin,
 {
-    fn from(input: Flex<'_, P>) -> Self {
+    fn from(input: Flex<'static, P>) -> Self {
         Self::new(input.degrade())
     }
 }
