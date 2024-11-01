@@ -7,7 +7,7 @@
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -185,12 +185,12 @@ async fn connection(mut controller: WifiController<'static>) {
             });
             controller.set_configuration(&client_config).unwrap();
             println!("Starting wifi");
-            controller.start().await.unwrap();
+            controller.start_async().await.unwrap();
             println!("Wifi started!");
         }
         println!("About to connect...");
 
-        match controller.connect().await {
+        match controller.connect_async().await {
             Ok(_) => println!("Wifi connected!"),
             Err(e) => {
                 println!("Failed to connect to wifi: {e:?}");
