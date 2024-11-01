@@ -19,7 +19,7 @@ use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 use crate::{
     binary::include::*,
     hal::peripheral::{Peripheral, PeripheralRef},
-    wifi::{Protocol, RxControlInfo},
+    wifi::{Protocol, RxControlInfo, WifiError},
     EspWifiController,
 };
 
@@ -113,6 +113,14 @@ pub enum EspNowError {
     SendFailed,
     /// Attempt to create `EspNow` instance twice.
     DuplicateInstance,
+    /// Initialization error
+    Initialization(WifiError),
+}
+
+impl From<WifiError> for EspNowError {
+    fn from(f: WifiError) -> Self {
+        Self::Initialization(f)
+    }
 }
 
 /// Holds the count of peers in an ESP-NOW communication context.
@@ -655,8 +663,7 @@ impl<'d> EspNow<'d> {
         if !inited.wifi() {
             // if wifi isn't already enabled, and we try to coexist - panic
             assert!(device.is_some());
-            unwrap!(crate::wifi::wifi_init()); // TODO should we return an error
-                                               // here?
+            crate::wifi::wifi_init()?;
         }
 
         let espnow_rc = EspNowRc::new()?;
