@@ -6,7 +6,6 @@
 //! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
-//! When using USB-SERIAL-JTAG you have to activate the feature `phy-enable-usb` in the esp-wifi crate.
 
 //% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6

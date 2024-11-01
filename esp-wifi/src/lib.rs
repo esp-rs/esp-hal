@@ -48,19 +48,12 @@
 //! Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in
 //! your application you are not using this CPU timer.
 //!
-//! ## USB-SERIAL-JTAG
-//!
-//! When using USB-SERIAL-JTAG (for example by selecting `jtag-serial` in [`esp-println`](https://crates.io/crates/esp-println)) you have to activate the feature `phy-enable-usb`.
-//!
-//! Don't use this feature if you are _not_ using USB-SERIAL-JTAG as it might
-//! reduce WiFi performance.
-//!
 //! # Features flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
 //! (and thus, `coex`) is not available on ESP32-S2.
 //!
-//! When using the `dump-packets` feature you can use the extcap in
+//! When using the `dump_packets` config you can use the extcap in
 //! `extras/esp-wifishark` to analyze the frames in Wireshark.
 //! For more information see
 //! [extras/esp-wifishark/README.md](../extras/esp-wifishark/README.md)

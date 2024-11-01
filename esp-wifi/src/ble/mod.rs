@@ -159,7 +159,7 @@ pub fn read_hci(data: &mut [u8]) -> usize {
 }
 
 fn dump_packet_info(_buffer: &[u8]) {
-    #[cfg(feature = "dump-packets")]
+    #[cfg(dump_packets)]
     critical_section::with(|_cs| {
         info!("@HCIFRAME {:?}", _buffer);
     });

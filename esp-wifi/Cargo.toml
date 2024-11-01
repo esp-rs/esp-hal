@@ -107,9 +107,6 @@ coex = []
 ## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)
 sys-logs = ["esp-wifi-sys/sys-logs"]
 
-## Dumps packet info at log level info
-dump-packets = [] # config
-
 ## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
 
@@ -121,9 +118,6 @@ wifi = ["dep:enumset"]
 
 ## Enable BLE support
 ble = ["esp-hal/bluetooth"]
-
-## See USB-SERIAL-JTAG below
-phy-enable-usb = [] # config
 
 ## Enable minimum modem sleep. Only affects STA mode
 ps-min-modem = [] # config
@@ -179,8 +173,6 @@ features = [
   "wifi",
   "ble",
   "coex",
-  "async",
-  "embassy-net",
   "esp-hal/default",
 ]
 default-target = "riscv32imc-unknown-none-elf"

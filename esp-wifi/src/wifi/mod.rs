@@ -3170,7 +3170,7 @@ impl WifiController<'_> {
 }
 
 fn dump_packet_info(_buffer: &[u8]) {
-    #[cfg(feature = "dump-packets")]
+    #[cfg(dump_packets)]
     {
         info!("@WIFIFRAME {:?}", _buffer);
     }
