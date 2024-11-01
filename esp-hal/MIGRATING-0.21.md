@@ -227,3 +227,6 @@ The previous signal function have been replaced by `split`. This change affects 
 -let output_signal = gpioN.into_peripheral_output();
 +let (input_signal, output_signal) = gpioN.split();
 ```
+
+`into_peripheral_output`, `split` (for output pins only) and `peripheral_input` have been added to
+the GPIO drivers (`Input`, `Output`, `OutputOpenDrain` and `Flex`) instead.

@@ -1526,14 +1526,6 @@ where
         Self { pin }
     }
 
-    /// Split the pin into an input and output signal.
-    ///
-    /// Peripheral signals allow connecting peripherals together without using
-    /// external hardware.
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
-        self.pin.degrade_pin(private::Internal).split()
-    }
-
     /// Returns a peripheral [input][interconnect::InputSignal] connected to
     /// this pin.
     ///
@@ -1541,16 +1533,6 @@ where
     #[inline]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.degrade_pin(private::Internal).split().0
-    }
-
-    /// Turns the pin object into a peripheral
-    /// [output][interconnect::OutputSignal].
-    ///
-    /// The output signal can be passed to peripherals in place of an output
-    /// pin.
-    #[inline]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
-        self.split().1
     }
 }
 
@@ -1701,16 +1683,29 @@ where
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
         self.pin.set_drive_strength(strength, private::Internal);
     }
-}
 
-impl<P> Flex<'_, P>
-where
-    P: InputPin + OutputPin,
-{
     /// Set the GPIO to open-drain mode.
     pub fn set_as_open_drain(&mut self, pull: Pull) {
         self.pin.set_to_open_drain_output(private::Internal);
         self.pin.pull_direction(pull, private::Internal);
+    }
+
+    /// Split the pin into an input and output signal.
+    ///
+    /// Peripheral signals allow connecting peripherals together without using
+    /// external hardware.
+    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+        self.pin.degrade_pin(private::Internal).split()
+    }
+
+    /// Turns the pin object into a peripheral
+    /// [output][interconnect::OutputSignal].
+    ///
+    /// The output signal can be passed to peripherals in place of an output
+    /// pin.
+    #[inline]
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+        self.split().1
     }
 }
 
