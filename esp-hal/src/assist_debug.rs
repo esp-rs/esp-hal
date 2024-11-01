@@ -47,9 +47,9 @@ impl<'d> DebugAssist<'d> {
     }
 }
 
-impl<'d> crate::private::Sealed for DebugAssist<'d> {}
+impl crate::private::Sealed for DebugAssist<'_> {}
 
-impl<'d> InterruptConfigurable for DebugAssist<'d> {
+impl InterruptConfigurable for DebugAssist<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         unsafe {
             crate::interrupt::bind_interrupt(
@@ -66,7 +66,7 @@ impl<'d> InterruptConfigurable for DebugAssist<'d> {
 }
 
 #[cfg(assist_debug_sp_monitor)]
-impl<'d> DebugAssist<'d> {
+impl DebugAssist<'_> {
     /// Enable SP monitoring on main core. When the SP exceeds the
     /// `lower_bound` or `upper_bound` threshold, the module will record the PC
     /// pointer and generate an interrupt.
@@ -228,7 +228,7 @@ impl<'d> DebugAssist<'d> {
 }
 
 #[cfg(assist_debug_region_monitor)]
-impl<'d> DebugAssist<'d> {
+impl DebugAssist<'_> {
     /// Enable region monitoring of read/write performed by the main CPU in a
     /// certain memory region0. Whenever the bus reads or writes in the
     /// specified memory region, an interrupt will be triggered. Two memory

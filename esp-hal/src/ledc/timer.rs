@@ -306,7 +306,7 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
 }
 
 /// Timer HW implementation for LowSpeed timers
-impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
+impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
     /// Get the current source timer frequency from the HW
     fn get_freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|source| match source {

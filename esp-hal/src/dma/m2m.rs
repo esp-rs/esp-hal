@@ -157,7 +157,7 @@ where
     }
 }
 
-impl<'d, MODE> DmaSupport for Mem2Mem<'d, MODE>
+impl<MODE> DmaSupport for Mem2Mem<'_, MODE>
 where
     MODE: Mode,
 {

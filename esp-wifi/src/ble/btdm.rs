@@ -368,6 +368,7 @@ pub(crate) fn ble_init() {
     unsafe {
         (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
         // turn on logging
+        #[allow(static_mut_refs)]
         #[cfg(feature = "sys-logs")]
         {
             extern "C" {

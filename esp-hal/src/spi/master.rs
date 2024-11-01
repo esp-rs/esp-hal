@@ -448,7 +448,7 @@ where
     }
 }
 
-impl<'d, T> Spi<'d, T>
+impl<T> Spi<'_, T>
 where
     T: Instance,
 {
@@ -845,7 +845,7 @@ mod dma {
     {
     }
 
-    impl<'d, M, T> core::fmt::Debug for SpiDma<'d, M, T>
+    impl<M, T> core::fmt::Debug for SpiDma<'_, M, T>
     where
         T: InstanceDma,
         M: Mode,
@@ -859,7 +859,7 @@ mod dma {
         }
     }
 
-    impl<'d, T> InterruptConfigurable for SpiDma<'d, Blocking, T>
+    impl<T> InterruptConfigurable for SpiDma<'_, Blocking, T>
     where
         T: InstanceDma,
     {
@@ -874,7 +874,7 @@ mod dma {
     }
 
     #[cfg(gdma)]
-    impl<'d, T> SpiDma<'d, Blocking, T>
+    impl<T> SpiDma<'_, Blocking, T>
     where
         T: InstanceDma,
     {
@@ -1074,7 +1074,7 @@ mod dma {
         }
     }
 
-    impl<'d, M, T> crate::private::Sealed for SpiDma<'d, M, T>
+    impl<M, T> crate::private::Sealed for SpiDma<'_, M, T>
     where
         T: InstanceDma,
         M: Mode,
@@ -1162,7 +1162,7 @@ mod dma {
         }
     }
 
-    impl<'d, M, T, Buf> Drop for SpiDmaTransfer<'d, M, Buf, T>
+    impl<M, T, Buf> Drop for SpiDmaTransfer<'_, M, Buf, T>
     where
         T: InstanceDma,
         M: Mode,
@@ -1180,7 +1180,7 @@ mod dma {
         }
     }
 
-    impl<'d, T, Buf> SpiDmaTransfer<'d, crate::Async, Buf, T>
+    impl<T, Buf> SpiDmaTransfer<'_, crate::Async, Buf, T>
     where
         T: InstanceDma,
     {
@@ -1485,7 +1485,7 @@ mod dma {
         }
     }
 
-    impl<'d, T> InterruptConfigurable for SpiDmaBus<'d, Blocking, T>
+    impl<T> InterruptConfigurable for SpiDmaBus<'_, Blocking, T>
     where
         T: InstanceDma,
     {
@@ -1498,7 +1498,7 @@ mod dma {
     }
 
     #[cfg(gdma)]
-    impl<'d, T> SpiDmaBus<'d, Blocking, T>
+    impl<T> SpiDmaBus<'_, Blocking, T>
     where
         T: InstanceDma,
     {
@@ -1523,14 +1523,14 @@ mod dma {
         }
     }
 
-    impl<'d, M, T> crate::private::Sealed for SpiDmaBus<'d, M, T>
+    impl<M, T> crate::private::Sealed for SpiDmaBus<'_, M, T>
     where
         T: InstanceDma,
         M: Mode,
     {
     }
 
-    impl<'d, M, T> SpiDmaBus<'d, M, T>
+    impl<M, T> SpiDmaBus<'_, M, T>
     where
         T: InstanceDma,
         M: Mode,
@@ -1630,7 +1630,7 @@ mod dma {
         }
     }
 
-    impl<'d, M, T> SpiDmaBus<'d, M, T>
+    impl<M, T> SpiDmaBus<'_, M, T>
     where
         T: InstanceDma,
         M: Mode,
@@ -1699,7 +1699,7 @@ mod dma {
         }
     }
 
-    impl<'d, T> embedded_hal_02::blocking::spi::Transfer<u8> for SpiDmaBus<'d, crate::Blocking, T>
+    impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for SpiDmaBus<'_, crate::Blocking, T>
     where
         T: InstanceDma,
     {
@@ -1711,7 +1711,7 @@ mod dma {
         }
     }
 
-    impl<'d, T> embedded_hal_02::blocking::spi::Write<u8> for SpiDmaBus<'d, crate::Blocking, T>
+    impl<T> embedded_hal_02::blocking::spi::Write<u8> for SpiDmaBus<'_, crate::Blocking, T>
     where
         T: InstanceDma,
     {
@@ -1770,7 +1770,7 @@ mod dma {
             }
         }
 
-        impl<'d, T> SpiDmaBus<'d, crate::Async, T>
+        impl<T> SpiDmaBus<'_, crate::Async, T>
         where
             T: InstanceDma,
         {
@@ -1884,7 +1884,7 @@ mod dma {
             }
         }
 
-        impl<'d, T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'d, crate::Async, T>
+        impl<T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, crate::Async, T>
         where
             T: InstanceDma,
         {
@@ -1916,7 +1916,7 @@ mod dma {
 
         use super::*;
 
-        impl<'d, M, T> ErrorType for SpiDmaBus<'d, M, T>
+        impl<M, T> ErrorType for SpiDmaBus<'_, M, T>
         where
             T: InstanceDma,
             M: Mode,
@@ -1924,7 +1924,7 @@ mod dma {
             type Error = Error;
         }
 
-        impl<'d, M, T> SpiBus for SpiDmaBus<'d, M, T>
+        impl<M, T> SpiBus for SpiDmaBus<'_, M, T>
         where
             T: InstanceDma,
             M: Mode,

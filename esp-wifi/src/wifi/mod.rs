@@ -3271,7 +3271,7 @@ mod asynch {
     use super::*;
 
     // TODO assumes STA mode only
-    impl<'d> WifiController<'d> {
+    impl WifiController<'_> {
         /// Async version of [`crate::wifi::WifiController`]'s `scan_n` method
         pub async fn scan_n<const N: usize>(
             &mut self,

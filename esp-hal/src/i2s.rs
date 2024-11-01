@@ -314,7 +314,7 @@ where
     }
 }
 
-impl<'d, DmaMode, T> I2s<'d, DmaMode, T>
+impl<DmaMode, T> I2s<'_, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -352,14 +352,14 @@ where
     }
 }
 
-impl<'d, DmaMode, I> crate::private::Sealed for I2s<'d, DmaMode, I>
+impl<DmaMode, I> crate::private::Sealed for I2s<'_, DmaMode, I>
 where
     I: RegisterAccess,
     DmaMode: Mode,
 {
 }
 
-impl<'d, DmaMode, I> InterruptConfigurable for I2s<'d, DmaMode, I>
+impl<DmaMode, I> InterruptConfigurable for I2s<'_, DmaMode, I>
 where
     I: RegisterAccess,
     DmaMode: Mode,
@@ -453,7 +453,7 @@ where
     phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, DmaMode, T> core::fmt::Debug for I2sTx<'d, DmaMode, T>
+impl<DmaMode, T> core::fmt::Debug for I2sTx<'_, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -463,7 +463,7 @@ where
     }
 }
 
-impl<'d, DmaMode, T> DmaSupport for I2sTx<'d, DmaMode, T>
+impl<DmaMode, T> DmaSupport for I2sTx<'_, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -493,7 +493,7 @@ where
     }
 }
 
-impl<'d, DmaMode, T> I2sTx<'d, DmaMode, T>
+impl<DmaMode, T> I2sTx<'_, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -586,7 +586,7 @@ where
     phantom: PhantomData<DmaMode>,
 }
 
-impl<'d, DmaMode, T> core::fmt::Debug for I2sRx<'d, DmaMode, T>
+impl<DmaMode, T> core::fmt::Debug for I2sRx<'_, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -596,7 +596,7 @@ where
     }
 }
 
-impl<'d, DmaMode, T> DmaSupport for I2sRx<'d, DmaMode, T>
+impl<DmaMode, T> DmaSupport for I2sRx<'_, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -626,7 +626,7 @@ where
     }
 }
 
-impl<'d, DmaMode, T> I2sRx<'d, DmaMode, T>
+impl<DmaMode, T> I2sRx<'_, DmaMode, T>
 where
     T: RegisterAccess,
     DmaMode: Mode,
@@ -1941,7 +1941,7 @@ pub mod asynch {
         _buffer: BUFFER,
     }
 
-    impl<'d, T, BUFFER> I2sWriteDmaTransferAsync<'d, BUFFER, T>
+    impl<T, BUFFER> I2sWriteDmaTransferAsync<'_, BUFFER, T>
     where
         T: RegisterAccess,
     {
@@ -2064,7 +2064,7 @@ pub mod asynch {
         _buffer: BUFFER,
     }
 
-    impl<'d, T, BUFFER> I2sReadDmaTransferAsync<'d, BUFFER, T>
+    impl<T, BUFFER> I2sReadDmaTransferAsync<'_, BUFFER, T>
     where
         T: RegisterAccess,
     {

@@ -1232,7 +1232,7 @@ mod asynch {
         }
     }
 
-    impl<'a, T> core::future::Future for TimerFuture<'a, T>
+    impl<T> core::future::Future for TimerFuture<'_, T>
     where
         T: Instance,
     {
@@ -1250,7 +1250,7 @@ mod asynch {
         }
     }
 
-    impl<'a, T> Drop for TimerFuture<'a, T>
+    impl<T> Drop for TimerFuture<'_, T>
     where
         T: Instance,
     {

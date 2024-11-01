@@ -368,13 +368,13 @@ pub trait Unit {
 #[derive(Debug)]
 pub struct SpecificUnit<'d, const CHANNEL: u8>(PhantomData<&'d ()>);
 
-impl<'d, const CHANNEL: u8> SpecificUnit<'d, CHANNEL> {
+impl<const CHANNEL: u8> SpecificUnit<'_, CHANNEL> {
     fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<'d, const CHANNEL: u8> Unit for SpecificUnit<'d, CHANNEL> {
+impl<const CHANNEL: u8> Unit for SpecificUnit<'_, CHANNEL> {
     fn channel(&self) -> u8 {
         CHANNEL
     }
@@ -384,7 +384,7 @@ impl<'d, const CHANNEL: u8> Unit for SpecificUnit<'d, CHANNEL> {
 #[derive(Debug)]
 pub struct AnyUnit<'d>(PhantomData<&'d ()>, u8);
 
-impl<'d> Unit for AnyUnit<'d> {
+impl Unit for AnyUnit<'_> {
     fn channel(&self) -> u8 {
         self.1
     }
@@ -598,13 +598,13 @@ pub trait Comparator {
 #[derive(Debug)]
 pub struct SpecificComparator<'d, const CHANNEL: u8>(PhantomData<&'d ()>);
 
-impl<'d, const CHANNEL: u8> SpecificComparator<'d, CHANNEL> {
+impl<const CHANNEL: u8> SpecificComparator<'_, CHANNEL> {
     fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<'d, const CHANNEL: u8> Comparator for SpecificComparator<'d, CHANNEL> {
+impl<const CHANNEL: u8> Comparator for SpecificComparator<'_, CHANNEL> {
     fn channel(&self) -> u8 {
         CHANNEL
     }
@@ -614,7 +614,7 @@ impl<'d, const CHANNEL: u8> Comparator for SpecificComparator<'d, CHANNEL> {
 #[derive(Debug)]
 pub struct AnyComparator<'d>(PhantomData<&'d ()>, u8);
 
-impl<'d> Comparator for AnyComparator<'d> {
+impl Comparator for AnyComparator<'_> {
     fn channel(&self) -> u8 {
         self.1
     }
@@ -737,7 +737,7 @@ where
     _pd: PhantomData<(MODE, DM)>,
 }
 
-impl<'d, T, DM, COMP: Comparator, UNIT: Unit> Debug for Alarm<'d, T, DM, COMP, UNIT>
+impl<T, DM, COMP: Comparator, UNIT: Unit> Debug for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: Mode,
 {
@@ -771,9 +771,7 @@ impl<'d, T, COMP: Comparator, UNIT: Unit> Alarm<'d, T, Async, COMP, UNIT> {
     }
 }
 
-impl<'d, T, COMP: Comparator, UNIT: Unit> InterruptConfigurable
-    for Alarm<'d, T, Blocking, COMP, UNIT>
-{
+impl<T, COMP: Comparator, UNIT: Unit> InterruptConfigurable for Alarm<'_, T, Blocking, COMP, UNIT> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.comparator.set_interrupt_handler(handler)
     }
@@ -851,14 +849,12 @@ where
     }
 }
 
-impl<'d, T, DM, COMP: Comparator, UNIT: Unit> crate::private::Sealed
-    for Alarm<'d, T, DM, COMP, UNIT>
-where
-    DM: Mode,
+impl<T, DM, COMP: Comparator, UNIT: Unit> crate::private::Sealed for Alarm<'_, T, DM, COMP, UNIT> where
+    DM: Mode
 {
 }
 
-impl<'d, T, DM, COMP: Comparator, UNIT: Unit> super::Timer for Alarm<'d, T, DM, COMP, UNIT>
+impl<T, DM, COMP: Comparator, UNIT: Unit> super::Timer for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: Mode,
 {
@@ -996,7 +992,7 @@ where
     }
 }
 
-impl<'d, T, DM, COMP: Comparator, UNIT: Unit> Peripheral for Alarm<'d, T, DM, COMP, UNIT>
+impl<T, DM, COMP: Comparator, UNIT: Unit> Peripheral for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: Mode,
 {
@@ -1063,7 +1059,7 @@ mod asynch {
         }
     }
 
-    impl<'a, COMP: Comparator, UNIT: Unit> core::future::Future for AlarmFuture<'a, COMP, UNIT> {
+    impl<COMP: Comparator, UNIT: Unit> core::future::Future for AlarmFuture<'_, COMP, UNIT> {
         type Output = ();
 
         fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -1077,8 +1073,8 @@ mod asynch {
         }
     }
 
-    impl<'d, COMP: Comparator, UNIT: Unit> embedded_hal_async::delay::DelayNs
-        for Alarm<'d, Target, crate::Async, COMP, UNIT>
+    impl<COMP: Comparator, UNIT: Unit> embedded_hal_async::delay::DelayNs
+        for Alarm<'_, Target, crate::Async, COMP, UNIT>
     {
         async fn delay_ns(&mut self, nanos: u32) {
             self.set_target(
@@ -1180,13 +1176,13 @@ pub mod etm {
         }
     }
 
-    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::private::Sealed
-        for SysTimerEtmEvent<'a, 'd, M, DM, COMP, UNIT>
+    impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::private::Sealed
+        for SysTimerEtmEvent<'_, '_, M, DM, COMP, UNIT>
     {
     }
 
-    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::etm::EtmEvent
-        for SysTimerEtmEvent<'a, 'd, M, DM, COMP, UNIT>
+    impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::etm::EtmEvent
+        for SysTimerEtmEvent<'_, '_, M, DM, COMP, UNIT>
     {
         fn id(&self) -> u8 {
             50 + self.alarm.comparator.channel()
