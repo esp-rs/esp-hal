@@ -1109,7 +1109,7 @@ where
     pub fn set_at_cmd(&mut self, config: AtCmdConfig) {
         let register_block = self.register_block();
 
-        #[cfg(not(any(esp32, esp32p4, esp32s2)))] // FIXME? 
+        #[cfg(not(any(esp32, esp32p4, esp32s2)))] // FIXME?
         register_block
             .clk_conf()
             .modify(|_, w| w.sclk_en().clear_bit());
@@ -2615,6 +2615,10 @@ impl_instance!(UART0, Uart0, U0TXD, U0RXD, U0CTS, U0RTS);
 impl_instance!(UART1, Uart1, U1TXD, U1RXD, U1CTS, U1RTS);
 #[cfg(uart2)]
 impl_instance!(UART2, Uart2, U2TXD, U2RXD, U2CTS, U2RTS);
+#[cfg(uart3)]
+impl_instance!(UART3, Uart3, U3TXD, U3RXD, U3CTS, U3RTS);
+#[cfg(uart4)]
+impl_instance!(UART4, Uart4, U4TXD, U4RXD, U4CTS, U4RTS);
 
 crate::any_peripheral! {
     /// Any UART peripheral.
@@ -2625,6 +2629,10 @@ crate::any_peripheral! {
         Uart1(crate::peripherals::UART1),
         #[cfg(uart2)]
         Uart2(crate::peripherals::UART2),
+        #[cfg(uart3)]
+        Uart3(crate::peripherals::UART3),
+        #[cfg(uart4)]
+        Uart4(crate::peripherals::UART4),
     }
 }
 
@@ -2638,6 +2646,10 @@ impl Instance for AnyUart {
             AnyUartInner::Uart1(uart) => uart.parts(),
             #[cfg(uart2)]
             AnyUartInner::Uart2(uart) => uart.parts(),
+            #[cfg(uart3)]
+            AnyUartInner::Uart3(uart) => uart.parts(),
+            #[cfg(uart4)]
+            AnyUartInner::Uart4(uart) => uart.parts(),
         }
     }
 }

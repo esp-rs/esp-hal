@@ -173,7 +173,6 @@ pub mod assist_debug;
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
 pub mod config;
-pub mod debugger;
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;
 #[cfg(any(gdma, pdma))]
@@ -223,11 +222,8 @@ pub mod rtc_cntl;
 pub mod sha;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
-#[doc(hidden)]
-pub mod sync;
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod system;
-#[cfg(any(systimer, timg0, timg1))]
 pub mod time;
 #[cfg(any(systimer, timg0, timg1))]
 pub mod timer;
@@ -431,7 +427,6 @@ fn raw_core() -> usize {
 }
 
 /// Default (unhandled) interrupt handler
-#[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub const DEFAULT_INTERRUPT_HANDLER: interrupt::InterruptHandler = interrupt::InterruptHandler::new(
     unsafe { core::mem::transmute::<*const (), extern "C" fn()>(EspDefaultHandler as *const ()) },
     crate::interrupt::Priority::min(),
@@ -439,7 +434,6 @@ pub const DEFAULT_INTERRUPT_HANDLER: interrupt::InterruptHandler = interrupt::In
 
 /// Trait implemented by drivers which allow the user to set an
 /// [interrupt::InterruptHandler]
-#[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub trait InterruptConfigurable: private::Sealed {
     /// Set the interrupt handler
     ///
@@ -480,6 +474,7 @@ unsafe extern "C" fn stack_chk_fail() {
 }
 
 use crate::{
+    clock::{Clocks, CpuClock},
     config::{WatchdogConfig, WatchdogStatus},
     peripherals::Peripherals,
 };

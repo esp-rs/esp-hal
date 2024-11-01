@@ -97,6 +97,7 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
+    "gdma", # FIXME
     "clic",
     "timg_timer1",
     "very_large_intr_status",
