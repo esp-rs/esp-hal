@@ -1705,9 +1705,9 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
         };
 
         cfg_if::cfg_if! {
-            if #[cfg(feature = "ps-min-modem")] {
+            if #[cfg(modem_powersaving = "min")] {
                 let ps_mode = include::wifi_ps_type_t_WIFI_PS_MIN_MODEM;
-            } else if #[cfg(feature = "ps-max-modem")] {
+            } else if #[cfg(modem_powersaving = "max")] {
                 let ps_mode = include::wifi_ps_type_t_WIFI_PS_MAX_MODEM;
             } else if #[cfg(coex)] {
                 let ps_mode = include::wifi_ps_type_t_WIFI_PS_MIN_MODEM;

@@ -6,7 +6,7 @@
 //! - does BLE advertising (you cannot connect to it - it's just not implemented in the example)
 //!
 //! Note: On ESP32-C2 and ESP32-C3 you need a wifi-heap size of 70000, on ESP32-C6 you need 80000 and a tx_queue_size of 10
-//! 
+//!
 
 //% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils esp-wifi/ble esp-wifi/coex
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6

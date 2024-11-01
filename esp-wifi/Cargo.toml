@@ -107,26 +107,29 @@ coex = []
 ## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)
 sys-logs = ["esp-wifi-sys/sys-logs"]
 
+## Enable support for `defmt`
+defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt"]
+
+## Enable support for the `log` crate
+log = ["dep:log", "esp-hal/log", "esp-wifi-sys/log"]
+
+## Enable WiFi support
+wifi = ["dep:enumset"]
+
+## Enable sniffer mode support
+sniffer = ["wifi"]
+
+## Enable BLE support
+ble = ["esp-hal/bluetooth"]
+
+## Enable esp-now support
+esp-now = ["wifi"]
+
 ## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
 
 ## Provide utilities for smoltcp initialization. Adds smoltcp dependency
 utils = ["smoltcp"]
-
-## Enable WiFi support
-wifi = ["dep:enumset"]
-
-## Enable BLE support
-ble = ["esp-hal/bluetooth"]
-
-## Enable minimum modem sleep. Only affects STA mode
-ps-min-modem = [] # config
-
-## Enable maximum modem sleep. Only affects STA mode
-ps-max-modem = [] # config
-
-## Enable esp-now support
-esp-now = ["wifi"]
 
 ## IPv6 support. Includes utils feature
 ipv6 = ["wifi", "utils", "smoltcp?/proto-ipv6"]
@@ -155,15 +158,6 @@ dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
 ## Convenience to enable "ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"
 wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
 
-## Enable support for `defmt`
-defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt"]
-
-## Enable support for the `log` crate
-log = ["dep:log", "esp-hal/log", "esp-wifi-sys/log"]
-
-## Enable sniffer mode support
-sniffer = ["wifi"]
-
 # Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde", "heapless/serde"]
 
@@ -176,3 +170,6 @@ features = [
   "esp-hal/default",
 ]
 default-target = "riscv32imc-unknown-none-elf"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(modem_powersaving, values("max", "min", "none"))'] }

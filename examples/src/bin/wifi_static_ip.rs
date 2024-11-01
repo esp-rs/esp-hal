@@ -5,7 +5,7 @@
 //! - might be necessary to configure your WiFi access point accordingly
 //! - uses the given static IP
 //! - responds with some HTML content when connecting to port 8080
-//! 
+//!
 
 //% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
