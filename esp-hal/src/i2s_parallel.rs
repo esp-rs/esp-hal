@@ -41,7 +41,6 @@ use core::{
 };
 
 use fugit::HertzU32;
-use private::{calculate_clock, I2sClockDividers, TxPins};
 
 use crate::{
     dma::{
@@ -51,6 +50,7 @@ use crate::{
         DmaChannelConvert,
         DmaEligible,
         DmaError,
+        DmaPeripheral,
         DmaTxBuffer,
         PeripheralMarker,
         Tx,
@@ -61,9 +61,17 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
+    private,
     system::PeripheralClockControl,
+    Async,
     Mode,
 };
+
+#[doc(hidden)]
+pub trait TxPins<'d> {
+    fn bus_width(&self) -> u8;
+    fn configure(&mut self, instance: impl Peripheral<P = impl Instance>);
+}
 
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
@@ -106,17 +114,17 @@ impl<'d> TxSixteenBits<'d> {
     }
 }
 
-impl<'d> TxPins for TxSixteenBits<'d> {
-    fn bits(&self) -> u8 {
-        16
+impl<'d> TxPins<'d> for TxSixteenBits<'d> {
+    fn bus_width(&self) -> u8 {
+        self.pins.len() as u8
     }
 
-    fn configure<I: Instance>(&mut self, instance: &PeripheralRef<'_, I>) {
-        use crate::private::Internal;
-        let bits: u8 = self.bits();
+    fn configure(&mut self, instance: impl Peripheral<P = impl Instance>) {
+        crate::into_ref!(instance);
+        let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(Internal);
-            pin.connect_peripheral_to_output(instance.data_out_signal(i, bits), Internal);
+            pin.set_to_push_pull_output(private::Internal);
+            pin.connect_peripheral_to_output(instance.data_out_signal(i, bits), private::Internal);
         }
     }
 }
@@ -140,14 +148,7 @@ impl<'d> TxEightBits<'d> {
         pin_6: impl Peripheral<P = impl PeripheralOutput> + 'd,
         pin_7: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self {
-        crate::into_mapped_ref!(pin_0);
-        crate::into_mapped_ref!(pin_1);
-        crate::into_mapped_ref!(pin_2);
-        crate::into_mapped_ref!(pin_3);
-        crate::into_mapped_ref!(pin_4);
-        crate::into_mapped_ref!(pin_5);
-        crate::into_mapped_ref!(pin_6);
-        crate::into_mapped_ref!(pin_7);
+        crate::into_mapped_ref!(pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7);
 
         Self {
             pins: [pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7],
@@ -155,40 +156,66 @@ impl<'d> TxEightBits<'d> {
     }
 }
 
-impl<'d> TxPins for TxEightBits<'d> {
-    fn bits(&self) -> u8 {
-        8
+impl<'d> TxPins<'d> for TxEightBits<'d> {
+    fn bus_width(&self) -> u8 {
+        self.pins.len() as u8
     }
 
-    fn configure<I: Instance>(&mut self, instance: &PeripheralRef<'_, I>) {
-        use crate::private::Internal;
-        let bits: u8 = self.bits();
+    fn configure(&mut self, instance: impl Peripheral<P = impl Instance>) {
+        crate::into_ref!(instance);
+        let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(Internal);
-            pin.connect_peripheral_to_output(instance.data_out_signal(i, bits), Internal);
+            pin.set_to_push_pull_output(private::Internal);
+            pin.connect_peripheral_to_output(instance.data_out_signal(i, bits), private::Internal);
         }
     }
 }
 
 /// I2S Parallel Interface
-pub struct I2sParallel<'d, I: Instance, DM: Mode> {
+pub struct I2sParallel<'d, DM, I = AnyI2s>
+where
+    DM: Mode,
+    I: Instance,
+{
     instance: PeripheralRef<'d, I>,
-    tx_channel: ChannelTx<'d, <I as DmaEligible>::Dma>,
+    tx_channel: ChannelTx<'d, I::Dma>,
     mode: PhantomData<DM>,
 }
 
-impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
+impl<'d, DM> I2sParallel<'d, DM>
+where
+    DM: Mode,
+{
     /// Create a new I2S Parallel Interface
-    pub fn new<P, CH, CLK: PeripheralOutput>(
+    pub fn new<CH>(
+        i2s: impl Peripheral<P = impl Instance> + 'd,
+        channel: Channel<'d, CH, DM>,
+        frequency: impl Into<fugit::HertzU32>,
+        pins: impl TxPins<'d>,
+        clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
+    ) -> Self
+    where
+        CH: DmaChannelConvert<<AnyI2s as DmaEligible>::Dma>,
+    {
+        Self::new_typed(i2s.map_into(), channel, frequency, pins, clock_pin)
+    }
+}
+
+impl<'d, I, DM> I2sParallel<'d, DM, I>
+where
+    I: Instance,
+    DM: Mode,
+{
+    /// Create a new I2S Parallel Interface
+    pub fn new_typed<CH>(
         i2s: impl Peripheral<P = I> + 'd,
         channel: Channel<'d, CH, DM>,
         frequency: impl Into<fugit::HertzU32>,
-        mut pins: P,
-        clock_pin: impl Peripheral<P = CLK> + 'd,
+        mut pins: impl TxPins<'d>,
+        clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
         CH: DmaChannelConvert<I::Dma>,
-        P: TxPins,
     {
         crate::into_ref!(i2s);
         crate::into_mapped_ref!(clock_pin);
@@ -196,15 +223,15 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
         channel.runtime_ensure_compatible(&i2s);
         let channel = channel.degrade();
 
-        PeripheralClockControl::reset(i2s.get_peripheral());
-        PeripheralClockControl::enable(i2s.get_peripheral());
+        PeripheralClockControl::reset(i2s.peripheral());
+        PeripheralClockControl::enable(i2s.peripheral());
         // configure the I2S peripheral for parallel mode
-        i2s.setup(frequency, pins.bits());
+        i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
-        clock_pin.set_to_push_pull_output(crate::private::Internal);
-        clock_pin.connect_peripheral_to_output(i2s.ws_signal(), crate::private::Internal);
+        clock_pin.set_to_push_pull_output(private::Internal);
+        clock_pin.connect_peripheral_to_output(i2s.ws_signal(), private::Internal);
 
-        pins.configure(&i2s);
+        pins.configure(i2s.reborrow());
         Self {
             instance: i2s,
             tx_channel: channel.tx,
@@ -216,12 +243,12 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
     pub fn send<BUF: DmaTxBuffer>(
         mut self,
         mut data: BUF,
-    ) -> Result<I2sParallelTransfer<'d, I, BUF, DM>, (DmaError, Self, BUF)> {
+    ) -> Result<I2sParallelTransfer<'d, BUF, DM, I>, (DmaError, Self, BUF)> {
         self.instance.tx_reset();
         self.instance.tx_fifo_reset();
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(self.instance.get_dma_peripheral(), &mut data)
+                .prepare_transfer(self.instance.dma_peripheral(), &mut data)
         }
         .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {
@@ -238,17 +265,17 @@ impl<'d, I: Instance, DM: Mode> I2sParallel<'d, I, DM> {
 
 /// Represents an ongoing (or potentially finished) transfer using the i2s
 /// parallel interface
-pub struct I2sParallelTransfer<'d, I, BUF, DM>
+pub struct I2sParallelTransfer<'d, BUF, DM, I = AnyI2s>
 where
     I: Instance,
     BUF: DmaTxBuffer,
     DM: Mode,
 {
-    i2s: ManuallyDrop<I2sParallel<'d, I, DM>>,
+    i2s: ManuallyDrop<I2sParallel<'d, DM, I>>,
     buf_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, I, BUF, DM> I2sParallelTransfer<'d, I, BUF, DM>
+impl<'d, I, BUF, DM> I2sParallelTransfer<'d, BUF, DM, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
@@ -260,7 +287,7 @@ where
     }
 
     /// Wait for the transfer to finish
-    pub fn wait(mut self) -> (I2sParallel<'d, I, DM>, BUF) {
+    pub fn wait(mut self) -> (I2sParallel<'d, DM, I>, BUF) {
         self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
         let view = unsafe { ManuallyDrop::take(&mut self.buf_view) };
@@ -273,7 +300,7 @@ where
     }
 }
 
-impl<'d, I, BUF> I2sParallelTransfer<'d, I, BUF, crate::Async>
+impl<'d, I, BUF> I2sParallelTransfer<'d, BUF, Async, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
@@ -284,7 +311,7 @@ where
     }
 }
 
-impl<'d, I, BUF, DM> Deref for I2sParallelTransfer<'d, I, BUF, DM>
+impl<'d, I, BUF, DM> Deref for I2sParallelTransfer<'d, BUF, DM, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
@@ -297,7 +324,7 @@ where
     }
 }
 
-impl<'d, I, BUF, DM> DerefMut for I2sParallelTransfer<'d, I, BUF, DM>
+impl<'d, I, BUF, DM> DerefMut for I2sParallelTransfer<'d, BUF, DM, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
@@ -308,7 +335,7 @@ where
     }
 }
 
-impl<'d, I, BUF, DM> Drop for I2sParallelTransfer<'d, I, BUF, DM>
+impl<'d, I, BUF, DM> Drop for I2sParallelTransfer<'d, BUF, DM, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
@@ -327,108 +354,83 @@ where
     }
 }
 
-mod private {
-    use fugit::HertzU32;
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct I2sClockDividers {
+    pub mclk_divider: u32,
+    pub bclk_divider: u32,
+    pub denominator: u32,
+    pub numerator: u32,
+}
 
-    use crate::peripheral::PeripheralRef;
+fn calculate_clock(sample_rate: impl Into<fugit::HertzU32>, data_bits: u8) -> I2sClockDividers {
+    // this loosely corresponds to `i2s_std_calculate_clock` and
+    // `i2s_ll_tx_set_mclk` in esp-idf
+    //
+    // main difference is we are using fixed-point arithmetic here
+    // plus adjusted for parallel interface clocking
 
-    pub trait TxPins {
-        fn bits(&self) -> u8;
-        fn configure<I: super::Instance>(&mut self, instance: &PeripheralRef<'_, I>);
-    }
+    let sclk = crate::soc::constants::I2S_SCLK; // for now it's fixed 160MHz and 96MHz (just H2)
 
-    #[derive(Debug)]
-    pub struct I2sClockDividers {
-        pub mclk_divider: u32,
-        pub bclk_divider: u32,
-        pub denominator: u32,
-        pub numerator: u32,
-    }
+    let rate_hz: HertzU32 = sample_rate.into();
+    let rate = rate_hz.raw();
 
-    #[cfg(any(esp32, esp32s2))]
-    const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
+    let mclk = rate * 2;
+    let bclk_divider: u32 = if data_bits == 8 { 2 } else { 1 };
+    let mut mclk_divider = sclk / mclk;
 
-    const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
+    let mut ma: u32;
+    let mut mb: u32;
+    let mut denominator: u32 = 0;
+    let mut numerator: u32 = 0;
 
-    pub fn calculate_clock(
-        sample_rate: impl Into<fugit::HertzU32>,
-        data_bits: u8,
-    ) -> I2sClockDividers {
-        // this loosely corresponds to `i2s_std_calculate_clock` and
-        // `i2s_ll_tx_set_mclk` in esp-idf
-        //
-        // main difference is we are using fixed-point arithmetic here
-        // plus adjusted for parallel interface clocking
+    let freq_diff = sclk.abs_diff(mclk * mclk_divider);
 
-        let sclk = crate::soc::constants::I2S_SCLK; // for now it's fixed 160MHz and 96MHz (just H2)
+    if freq_diff != 0 {
+        let decimal = freq_diff as u64 * 10000 / mclk as u64;
+        // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
+        // 126.0
+        if decimal > 1250000 / 126 {
+            mclk_divider += 1;
+        } else {
+            let mut min: u32 = !0;
 
-        let rate_hz: HertzU32 = sample_rate.into();
-        let rate = rate_hz.raw();
+            for a in 2..=crate::i2s::I2S_LL_MCLK_DIVIDER_MAX {
+                let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
+                ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
+                mb = (mclk as u64 * (b / 10000)) as u32;
 
-        let mclk = rate * 2;
-        let bclk_divider: u32 = if data_bits == 8 { 2 } else { 1 };
-        let mut mclk_divider = sclk / mclk;
+                if ma == mb {
+                    denominator = a as u32;
+                    numerator = (b / 10000) as u32;
+                    break;
+                }
 
-        let mut ma: u32;
-        let mut mb: u32;
-        let mut denominator: u32 = 0;
-        let mut numerator: u32 = 0;
-
-        let freq_diff = sclk.abs_diff(mclk * mclk_divider);
-
-        if freq_diff != 0 {
-            let decimal = freq_diff as u64 * 10000 / mclk as u64;
-            // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
-            // 126.0
-            if decimal > 1250000 / 126 {
-                mclk_divider += 1;
-            } else {
-                let mut min: u32 = !0;
-
-                for a in 2..=I2S_LL_MCLK_DIVIDER_MAX {
-                    let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
-                    ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
-                    mb = (mclk as u64 * (b / 10000)) as u32;
-
-                    if ma == mb {
-                        denominator = a as u32;
-                        numerator = (b / 10000) as u32;
-                        break;
-                    }
-
-                    if mb.abs_diff(ma) < min {
-                        denominator = a as u32;
-                        numerator = b as u32;
-                        min = mb.abs_diff(ma);
-                    }
+                if mb.abs_diff(ma) < min {
+                    denominator = a as u32;
+                    numerator = b as u32;
+                    min = mb.abs_diff(ma);
                 }
             }
         }
+    }
 
-        I2sClockDividers {
-            mclk_divider,
-            bclk_divider,
-            denominator,
-            numerator,
-        }
+    I2sClockDividers {
+        mclk_divider,
+        bclk_divider,
+        denominator,
+        numerator,
     }
 }
 
-#[allow(missing_docs)]
-pub trait RegBlock: PeripheralMarker + DmaEligible {
-    fn register_block(&self) -> &'static RegisterBlock;
-}
-
-#[allow(missing_docs)]
-pub trait Signals {
-    fn get_peripheral(&self) -> crate::system::Peripheral;
-    fn get_dma_peripheral(&self) -> crate::dma::DmaPeripheral;
+#[doc(hidden)]
+pub trait Instance:
+    Peripheral<P = Self> + PeripheralMarker + DmaEligible + Into<AnyI2s> + 'static
+{
+    fn register_block(&self) -> &RegisterBlock;
     fn ws_signal(&self) -> OutputSignal;
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
-}
 
-#[allow(missing_docs)]
-pub trait Instance: Signals + RegBlock {
     fn rx_reset(&self) {
         let r = self.register_block();
         r.conf().modify(|_, w| w.rx_reset().set_bit());
@@ -607,32 +609,24 @@ pub trait Instance: Signals + RegBlock {
     }
 }
 
-impl RegBlock for I2S0 {
-    fn register_block(&self) -> &'static RegisterBlock {
+impl Instance for I2S0 {
+    fn register_block(&self) -> &RegisterBlock {
         unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
-    }
-}
-
-impl Signals for I2S0 {
-    fn get_peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::I2s0
-    }
-
-    fn get_dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        crate::dma::DmaPeripheral::I2s0
     }
 
     fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S0O_WS
     }
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal {
+        assert!(
+            bits == 8 || bits == 16,
+            "Number of bits must be 8 or 16, got {}",
+            bits
+        );
+
         // signals for 8bit and 16bit both start at an offset of 8 for I2S0
-        let offset = match bits {
-            8 => 8,
-            16 => 8,
-            _ => panic!("Invalid number of bits"),
-        };
-        match i + offset {
+        // https://github.com/espressif/esp-idf/blob/9106c43accd9f5e75379f62f12597677213f5023/components/esp_lcd/i80/esp_lcd_panel_io_i2s.c#L701
+        match i + 8 {
             0 => OutputSignal::I2S0O_DATA_0,
             1 => OutputSignal::I2S0O_DATA_1,
             2 => OutputSignal::I2S0O_DATA_2,
@@ -657,32 +651,29 @@ impl Signals for I2S0 {
             21 => OutputSignal::I2S0O_DATA_21,
             22 => OutputSignal::I2S0O_DATA_22,
             23 => OutputSignal::I2S0O_DATA_23,
-            _ => panic!("Invalid I2S0 Dout pin"),
+            other => panic!("Invalid I2S0 Dout pin {}", other),
         }
     }
 }
-impl Instance for I2S0 {}
 
-impl RegBlock for I2S1 {
-    fn register_block(&self) -> &'static RegisterBlock {
+impl Instance for I2S1 {
+    fn register_block(&self) -> &RegisterBlock {
         unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
-    }
-}
-impl Signals for I2S1 {
-    fn get_peripheral(&self) -> crate::system::Peripheral {
-        crate::system::Peripheral::I2s1
-    }
-    fn get_dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        crate::dma::DmaPeripheral::I2s1
     }
 
     fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S1O_WS
     }
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal {
-        // Because of... reasons... the 16-bit values for i2s1 appear on d8...d23
-        let offset = if bits == 16 { 8 } else { 0 };
-        match i + offset {
+        assert!(
+            bits == 8 || bits == 16,
+            "Number of bits must be 8 or 16, got {}",
+            bits
+        );
+
+        // signals for 8bit and 16bit both start at an offset of 8 for I2S1
+        // https://github.com/espressif/esp-idf/blob/9106c43accd9f5e75379f62f12597677213f5023/components/esp_lcd/i80/esp_lcd_panel_io_i2s.c#L701
+        match i + 8 {
             0 => OutputSignal::I2S1O_DATA_0,
             1 => OutputSignal::I2S1O_DATA_1,
             2 => OutputSignal::I2S1O_DATA_2,
@@ -707,8 +698,39 @@ impl Signals for I2S1 {
             21 => OutputSignal::I2S1O_DATA_21,
             22 => OutputSignal::I2S1O_DATA_22,
             23 => OutputSignal::I2S1O_DATA_23,
-            _ => panic!("Invalid I2S1 Dout pin"),
+            other => panic!("Invalid I2S1 Dout pin {}", other),
         }
     }
 }
-impl Instance for I2S1 {}
+
+crate::any_peripheral! {
+    /// Any SPI peripheral.
+    pub peripheral AnyI2s {
+        I2s0(crate::peripherals::I2S0),
+        I2s1(crate::peripherals::I2S1),
+    }
+}
+
+impl DmaEligible for AnyI2s {
+    type Dma = crate::dma::AnyI2sDmaChannel;
+
+    fn dma_peripheral(&self) -> DmaPeripheral {
+        match &self.0 {
+            AnyI2sInner::I2s0(_) => DmaPeripheral::I2s0,
+            AnyI2sInner::I2s1(_) => DmaPeripheral::I2s1,
+        }
+    }
+}
+
+impl Instance for AnyI2s {
+    delegate::delegate! {
+        to match &self.0 {
+            AnyI2sInner::I2s0(i2s) => i2s,
+            AnyI2sInner::I2s1(i2s) => i2s,
+        } {
+            fn register_block(&self) -> &RegisterBlock;
+            fn ws_signal(&self) -> OutputSignal;
+            fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal ;
+        }
+    }
+}
