@@ -117,7 +117,6 @@ impl defmt::Format for ReceivedPacket {
     }
 }
 
-#[cfg(feature = "async")]
 pub fn have_hci_read_data() -> bool {
     critical_section::with(|cs| {
         let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);

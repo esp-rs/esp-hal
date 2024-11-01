@@ -824,7 +824,6 @@ unsafe extern "C" fn send_cb(_mac_addr: *const u8, status: esp_now_send_status_t
 
         ESP_NOW_SEND_CB_INVOKED.store(true, Ordering::Release);
 
-        #[cfg(feature = "async")]
         asynch::ESP_NOW_TX_WAKER.wake();
     })
 }
@@ -871,15 +870,12 @@ unsafe extern "C" fn rcv_cb(
 
         queue.push_back(ReceivedData { data, info });
 
-        #[cfg(feature = "async")]
         asynch::ESP_NOW_RX_WAKER.wake();
     });
 }
 
-#[cfg(feature = "async")]
 pub use asynch::SendFuture;
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::task::{Context, Poll};
 

@@ -1623,7 +1623,6 @@ unsafe extern "C" fn recv_cb_sta(
             false
         }
     }) {
-        #[cfg(feature = "embassy-net")]
         embassy::STA_RECEIVE_WAKER.wake();
         include::ESP_OK as esp_err_t
     } else {
@@ -1653,7 +1652,6 @@ unsafe extern "C" fn recv_cb_ap(
             false
         }
     }) {
-        #[cfg(feature = "embassy-net")]
         embassy::AP_RECEIVE_WAKER.wake();
         include::ESP_OK as esp_err_t
     } else {
@@ -1683,7 +1681,6 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
 
     decrement_inflight_counter();
 
-    #[cfg(feature = "embassy-net")]
     embassy::TRANSMIT_WAKER.wake();
 }
 
@@ -2041,18 +2038,14 @@ mod sealed {
 
         fn interface(self) -> wifi_interface_t;
 
-        #[cfg(feature = "embassy-net")]
         fn register_transmit_waker(self, cx: &mut core::task::Context) {
             embassy::TRANSMIT_WAKER.register(cx.waker())
         }
 
-        #[cfg(feature = "embassy-net")]
         fn register_receive_waker(self, cx: &mut core::task::Context);
 
-        #[cfg(feature = "embassy-net")]
         fn register_link_state_waker(self, cx: &mut core::task::Context);
 
-        #[cfg(feature = "embassy-net")]
         fn link_state(self) -> embassy_net_driver::LinkState;
     }
 
@@ -2075,17 +2068,14 @@ mod sealed {
             wifi_interface_t_WIFI_IF_STA
         }
 
-        #[cfg(feature = "embassy-net")]
         fn register_receive_waker(self, cx: &mut core::task::Context) {
             embassy::STA_RECEIVE_WAKER.register(cx.waker());
         }
 
-        #[cfg(feature = "embassy-net")]
         fn register_link_state_waker(self, cx: &mut core::task::Context) {
             embassy::STA_LINK_STATE_WAKER.register(cx.waker());
         }
 
-        #[cfg(feature = "embassy-net")]
         fn link_state(self) -> embassy_net_driver::LinkState {
             if matches!(get_sta_state(), WifiState::StaConnected) {
                 embassy_net_driver::LinkState::Up
@@ -2114,17 +2104,14 @@ mod sealed {
             wifi_interface_t_WIFI_IF_AP
         }
 
-        #[cfg(feature = "embassy-net")]
         fn register_receive_waker(self, cx: &mut core::task::Context) {
             embassy::AP_RECEIVE_WAKER.register(cx.waker());
         }
 
-        #[cfg(feature = "embassy-net")]
         fn register_link_state_waker(self, cx: &mut core::task::Context) {
             embassy::AP_LINK_STATE_WAKER.register(cx.waker());
         }
 
-        #[cfg(feature = "embassy-net")]
         fn link_state(self) -> embassy_net_driver::LinkState {
             if matches!(get_ap_state(), WifiState::ApStarted) {
                 embassy_net_driver::LinkState::Up
@@ -2684,6 +2671,33 @@ impl<'d> WifiController<'d> {
 
         Ok(scanned)
     }
+
+    /// A blocking wifi network scan with default scanning options.
+    pub fn scan_n<const N: usize>(
+        &mut self,
+    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+        self.scan_with_config_sync(Default::default())
+    }
+
+    /// Starts the WiFi controller.
+    pub fn start(&mut self) -> Result<(), WifiError> {
+        crate::wifi::wifi_start()
+    }
+
+    /// Stops the WiFi controller.
+    pub fn stop(&mut self) -> Result<(), WifiError> {
+        self.stop_impl()
+    }
+
+    /// Connects the WiFi controller to a network.
+    pub fn connect(&mut self) -> Result<(), WifiError> {
+        self.connect_impl()
+    }
+
+    /// Disconnects the WiFi controller from a network.
+    pub fn disconnect(&mut self) -> Result<(), WifiError> {
+        self.disconnect_impl()
+    }
 }
 
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
@@ -3155,36 +3169,6 @@ impl WifiController<'_> {
     }
 }
 
-#[cfg(not(feature = "async"))]
-impl WifiController<'_> {
-    /// A blocking wifi network scan with default scanning options.
-    pub fn scan_n<const N: usize>(
-        &mut self,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-        self.scan_with_config_sync(Default::default())
-    }
-
-    /// Starts the WiFi controller.
-    pub fn start(&mut self) -> Result<(), WifiError> {
-        crate::wifi::wifi_start()
-    }
-
-    /// Stops the WiFi controller.
-    pub fn stop(&mut self) -> Result<(), WifiError> {
-        self.stop_impl()
-    }
-
-    /// Connects the WiFi controller to a network.
-    pub fn connect(&mut self) -> Result<(), WifiError> {
-        self.connect_impl()
-    }
-
-    /// Disconnects the WiFi controller from a network.
-    pub fn disconnect(&mut self) -> Result<(), WifiError> {
-        self.disconnect_impl()
-    }
-}
-
 fn dump_packet_info(_buffer: &[u8]) {
     #[cfg(feature = "dump-packets")]
     {
@@ -3208,7 +3192,6 @@ macro_rules! esp_wifi_result {
     }};
 }
 
-#[cfg(feature = "embassy-net")]
 pub(crate) mod embassy {
     use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
     use embassy_sync::waitqueue::AtomicWaker;
@@ -3289,7 +3272,6 @@ pub(crate) mod embassy {
     }
 }
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::task::Poll;
 
@@ -3300,14 +3282,14 @@ mod asynch {
     // TODO assumes STA mode only
     impl WifiController<'_> {
         /// Async version of [`crate::wifi::WifiController`]'s `scan_n` method
-        pub async fn scan_n<const N: usize>(
+        pub async fn scan_n_async<const N: usize>(
             &mut self,
         ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-            self.scan_with_config(Default::default()).await
+            self.scan_with_config_async(Default::default()).await
         }
 
         /// An async wifi network scan with caller-provided scanning options.
-        pub async fn scan_with_config<const N: usize>(
+        pub async fn scan_with_config_async<const N: usize>(
             &mut self,
             config: ScanConfig<'_>,
         ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
@@ -3327,7 +3309,7 @@ mod asynch {
         }
 
         /// Async version of [`crate::wifi::WifiController`]'s `start` method
-        pub async fn start(&mut self) -> Result<(), WifiError> {
+        pub async fn start_async(&mut self) -> Result<(), WifiError> {
             let mode = WifiMode::try_from(&self.config)?;
 
             let mut events = enumset::enum_set! {};
@@ -3348,7 +3330,7 @@ mod asynch {
         }
 
         /// Async version of [`crate::wifi::WifiController`]'s `stop` method
-        pub async fn stop(&mut self) -> Result<(), WifiError> {
+        pub async fn stop_async(&mut self) -> Result<(), WifiError> {
             let mode = WifiMode::try_from(&self.config)?;
 
             let mut events = enumset::enum_set! {};
@@ -3372,7 +3354,7 @@ mod asynch {
         }
 
         /// Async version of [`crate::wifi::WifiController`]'s `connect` method
-        pub async fn connect(&mut self) -> Result<(), WifiError> {
+        pub async fn connect_async(&mut self) -> Result<(), WifiError> {
             Self::clear_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected);
 
             let err = crate::wifi::WifiController::connect_impl(self).err();
@@ -3389,7 +3371,7 @@ mod asynch {
 
         /// Async version of [`crate::wifi::WifiController`]'s `Disconnect`
         /// method
-        pub async fn disconnect(&mut self) -> Result<(), WifiError> {
+        pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
             // If not connected, this will do nothing.
             // It will also wait forever for a `StaDisconnected` event that will never come.
             // Return early instead of hanging.

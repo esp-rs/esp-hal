@@ -1298,7 +1298,6 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
 
     r_ble_hci_trans_buf_free(cmd);
 
-    #[cfg(feature = "async")]
     crate::ble::controller::asynch::hci_read_data_available();
 
     0
@@ -1327,7 +1326,6 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
 
     r_os_mbuf_free_chain(om as *mut _);
 
-    #[cfg(feature = "async")]
     crate::ble::controller::asynch::hci_read_data_available();
 
     0

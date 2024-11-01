@@ -25,7 +25,7 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
 critical-section = "1.1.3"
 enumset = { version = "1.1.5", default-features = false, optional = true }
 embedded-io = { version = "0.6.1", default-features = false }
-embedded-io-async = { version = "0.6.1", optional = true }
+embedded-io-async = { version = "0.6.1" }
 fugit = "0.3.7"
 heapless = { version = "0.8.0", default-features = false, features = [
   "portable-atomic",
@@ -33,8 +33,8 @@ heapless = { version = "0.8.0", default-features = false, features = [
 num-derive = { version = "0.4.2" }
 num-traits = { version = "0.2.19", default-features = false }
 esp-wifi-sys = { version = "0.6.0", git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a3e2ed64e9095f120bbcebe6287ddf62760774db"}
-embassy-sync = { version = "0.6.0", optional = true }
-embassy-net-driver = { version = "0.2.0", optional = true }
+embassy-sync = { version = "0.6.0" }
+embassy-net-driver = { version = "0.2.0" }
 libm = "0.2.8"
 cfg-if = "1.0.0"
 portable-atomic = { version = "1.9.0", default-features = false }
@@ -101,16 +101,6 @@ esp32s3 = [
   "xtensa-lx-rt/float-save-restore",
 ]
 
-## Enable Async support
-async = [
-  "dep:embassy-sync",
-  "dep:embedded-io-async",
-  "dep:bt-hci",
-]
-
-## Enable `embassy-net` support
-embassy-net = ["dep:embassy-net-driver", "async"]
-
 ## Enable WiFi-BLE coexistence support
 coex = []
 
@@ -118,7 +108,7 @@ coex = []
 sys-logs = ["esp-wifi-sys/sys-logs"]
 
 ## Dumps packet info at log level info
-dump-packets = []
+dump-packets = [] # config
 
 ## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
@@ -133,13 +123,13 @@ wifi = ["dep:enumset"]
 ble = ["esp-hal/bluetooth"]
 
 ## See USB-SERIAL-JTAG below
-phy-enable-usb = []
+phy-enable-usb = [] # config
 
 ## Enable minimum modem sleep. Only affects STA mode
-ps-min-modem = []
+ps-min-modem = [] # config
 
 ## Enable maximum modem sleep. Only affects STA mode
-ps-max-modem = []
+ps-max-modem = [] # config
 
 ## Enable esp-now support
 esp-now = ["wifi"]
