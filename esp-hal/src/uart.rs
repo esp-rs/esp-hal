@@ -128,6 +128,7 @@
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
+use embassy_embedded_hal::SetConfig;
 use embassy_sync::waitqueue::AtomicWaker;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
@@ -509,6 +510,45 @@ pub struct UartRx<'d, M, T = AnyUart> {
     phantom: PhantomData<M>,
 }
 
+impl<M, T> SetConfig for Uart<'_, M, T>
+where
+    T: Instance,
+    M: Mode,
+{
+    type Config = Config;
+    type ConfigError = Error;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+impl<M, T> SetConfig for UartRx<'_, M, T>
+where
+    T: Instance,
+    M: Mode,
+{
+    type Config = Config;
+    type ConfigError = Error;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+impl<M, T> SetConfig for UartTx<'_, M, T>
+where
+    T: Instance,
+    M: Mode,
+{
+    type Config = Config;
+    type ConfigError = Error;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
 impl<'d, M, T> UartTx<'d, M, T>
 where
     T: Instance,
@@ -521,6 +561,14 @@ where
         rts.connect_peripheral_to_output(self.uart.info().rts_signal, Internal);
 
         self
+    }
+
+    /// Change the configuration.
+    ///
+    /// Note that this also changes the configuration of the RX half.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), Error> {
+        self.uart.info().apply_config(config)?;
+        Ok(())
     }
 
     /// Writes bytes
@@ -721,6 +769,14 @@ where
         cts.connect_input_to_peripheral(self.uart.info().cts_signal, Internal);
 
         self
+    }
+
+    /// Change the configuration.
+    ///
+    /// Note that this also changes the configuration of the TX half.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), Error> {
+        self.uart.info().apply_config(config)?;
+        Ok(())
     }
 
     /// Fill a buffer with received bytes
@@ -1137,18 +1193,10 @@ where
         self.rx.read_byte()
     }
 
-    /// Change the number of stop bits
-    pub fn change_stop_bits(&mut self, stop_bits: StopBits) -> &mut Self {
-        self.tx.uart.info().change_stop_bits(stop_bits);
-
-        self
-    }
-
-    /// Modify UART baud rate and reset TX/RX fifo.
-    pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource) {
-        self.tx.uart.info().change_baud(baudrate, clock_source);
-        self.tx.uart.info().txfifo_reset();
-        self.tx.uart.info().rxfifo_reset();
+    /// Change the configuration.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), Error> {
+        self.rx.apply_config(config)?;
+        Ok(())
     }
 
     #[inline(always)]
@@ -1172,7 +1220,7 @@ where
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
 
-        self.rx.uart.info().apply_config(config)?;
+        self.rx.uart.info().apply_config(&config)?;
 
         // Setting err_wr_mask stops uart from storing data when data is wrong according
         // to reference manual
@@ -2239,7 +2287,7 @@ impl Info {
         crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
     }
 
-    fn apply_config(&self, config: Config) -> Result<(), Error> {
+    fn apply_config(&self, config: &Config) -> Result<(), Error> {
         self.set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
         self.set_rx_timeout(config.rx_timeout, config.symbol_length())?;
         self.change_baud(config.baudrate, config.clock_source);
