@@ -230,3 +230,17 @@ The previous signal function have been replaced by `split`. This change affects 
 
 `into_peripheral_output`, `split` (for output pins only) and `peripheral_input` have been added to
 the GPIO drivers (`Input`, `Output`, `OutputOpenDrain` and `Flex`) instead.
+
+## Changes to peripheral configuration
+
+### The `uart::config` module has been removed
+
+The module's contents have been moved into `uart`.
+
+```diff
+-use esp_hal::uart::config::Config;
++use esp_hal::uart::Config;
+```
+
+If you work with multiple configurable peripherals, you may want to import the `uart` module and
+refer to the `Config` struct as `uart::Config`.

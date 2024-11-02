@@ -55,7 +55,7 @@
 //! ### Sending and Receiving Data
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::{Config, Uart};
 //! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
@@ -72,7 +72,7 @@
 //! ### Splitting the UART into RX and TX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{config::Config, Uart};
+//! # use esp_hal::uart::{Config, Uart};
 //! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
@@ -132,7 +132,6 @@ use embassy_sync::waitqueue::AtomicWaker;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
-use self::config::Config;
 use crate::{
     clock::Clocks,
     dma::PeripheralMarker,
@@ -221,224 +220,220 @@ pub enum ClockSource {
     RefTick,
 }
 
+// see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L61>
+const UART_FULL_THRESH_DEFAULT: u16 = 120;
+// see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L63>
+const UART_TOUT_THRESH_DEFAULT: u8 = 10;
+
+/// Number of data bits
+///
+/// This enum represents the various configurations for the number of data
+/// bits used in UART communication. The number of data bits defines the
+/// length of each transmitted or received data frame.
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum DataBits {
+    /// 5 data bits per frame.
+    DataBits5 = 0,
+    /// 6 data bits per frame.
+    DataBits6 = 1,
+    /// 7 data bits per frame.
+    DataBits7 = 2,
+    /// 8 data bits per frame (most common).
+    DataBits8 = 3,
+}
+
+/// Parity check
+///
+/// Parity is a form of error detection in UART communication, used to
+/// ensure that the data has not been corrupted during transmission. The
+/// parity bit is added to the data bits to make the number of 1-bits
+/// either even or odd.
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Parity {
+    /// No parity bit is used (most common).
+    ParityNone,
+    /// Even parity: the parity bit is set to make the total number of
+    /// 1-bits even.
+    ParityEven,
+    /// Odd parity: the parity bit is set to make the total number of 1-bits
+    /// odd.
+    ParityOdd,
+}
+
+/// Number of stop bits
+///
+/// The stop bit(s) signal the end of a data packet in UART communication.
+/// This enum defines the possible configurations for the number of stop
+/// bits.
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum StopBits {
+    /// 1 stop bit.
+    STOP1   = 1,
+    /// 1.5 stop bits.
+    STOP1P5 = 2,
+    /// 2 stop bits.
+    STOP2   = 3,
+}
+
 /// UART Configuration
-pub mod config {
+#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    /// The baud rate (speed) of the UART communication in bits per second
+    /// (bps).
+    pub baudrate: u32,
+    /// Number of data bits in each frame (5, 6, 7, or 8 bits).
+    pub data_bits: DataBits,
+    /// Parity setting (None, Even, or Odd).
+    pub parity: Parity,
+    /// Number of stop bits in each frame (1, 1.5, or 2 bits).
+    pub stop_bits: StopBits,
+    /// Clock source used by the UART peripheral.
+    pub clock_source: ClockSource,
+    /// Threshold level at which the RX FIFO is considered full.
+    pub rx_fifo_full_threshold: u16,
+    /// Optional timeout value for RX operations.
+    pub rx_timeout: Option<u8>,
+}
 
-    // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L61>
-    const UART_FULL_THRESH_DEFAULT: u16 = 120;
-    // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L63>
-    const UART_TOUT_THRESH_DEFAULT: u8 = 10;
-
-    /// Number of data bits
-    ///
-    /// This enum represents the various configurations for the number of data
-    /// bits used in UART communication. The number of data bits defines the
-    /// length of each transmitted or received data frame.
-    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    pub enum DataBits {
-        /// 5 data bits per frame.
-        DataBits5 = 0,
-        /// 6 data bits per frame.
-        DataBits6 = 1,
-        /// 7 data bits per frame.
-        DataBits7 = 2,
-        /// 8 data bits per frame (most common).
-        DataBits8 = 3,
+impl Config {
+    /// Sets the baud rate for the UART configuration.
+    pub fn baudrate(mut self, baudrate: u32) -> Self {
+        self.baudrate = baudrate;
+        self
     }
 
-    /// Parity check
-    ///
-    /// Parity is a form of error detection in UART communication, used to
-    /// ensure that the data has not been corrupted during transmission. The
-    /// parity bit is added to the data bits to make the number of 1-bits
-    /// either even or odd.
-    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    pub enum Parity {
-        /// No parity bit is used (most common).
-        ParityNone,
-        /// Even parity: the parity bit is set to make the total number of
-        /// 1-bits even.
-        ParityEven,
-        /// Odd parity: the parity bit is set to make the total number of 1-bits
-        /// odd.
-        ParityOdd,
+    /// Configures the UART to use no parity check.
+    pub fn parity_none(mut self) -> Self {
+        self.parity = Parity::ParityNone;
+        self
     }
 
-    /// Number of stop bits
-    ///
-    /// The stop bit(s) signal the end of a data packet in UART communication.
-    /// This enum defines the possible configurations for the number of stop
-    /// bits.
-    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    pub enum StopBits {
-        /// 1 stop bit.
-        STOP1   = 1,
-        /// 1.5 stop bits.
-        STOP1P5 = 2,
-        /// 2 stop bits.
-        STOP2   = 3,
+    /// Configures the UART to use even parity check.
+    pub fn parity_even(mut self) -> Self {
+        self.parity = Parity::ParityEven;
+        self
     }
 
-    /// UART Configuration
-    #[derive(Debug, Copy, Clone)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    pub struct Config {
-        /// The baud rate (speed) of the UART communication in bits per second
-        /// (bps).
-        pub baudrate: u32,
-        /// Number of data bits in each frame (5, 6, 7, or 8 bits).
-        pub data_bits: DataBits,
-        /// Parity setting (None, Even, or Odd).
-        pub parity: Parity,
-        /// Number of stop bits in each frame (1, 1.5, or 2 bits).
-        pub stop_bits: StopBits,
-        /// Clock source used by the UART peripheral.
-        pub clock_source: super::ClockSource,
-        /// Threshold level at which the RX FIFO is considered full.
-        pub rx_fifo_full_threshold: u16,
-        /// Optional timeout value for RX operations.
-        pub rx_timeout: Option<u8>,
+    /// Configures the UART to use odd parity check.
+    pub fn parity_odd(mut self) -> Self {
+        self.parity = Parity::ParityOdd;
+        self
     }
 
-    impl Config {
-        /// Sets the baud rate for the UART configuration.
-        pub fn baudrate(mut self, baudrate: u32) -> Self {
-            self.baudrate = baudrate;
-            self
-        }
-
-        /// Configures the UART to use no parity check.
-        pub fn parity_none(mut self) -> Self {
-            self.parity = Parity::ParityNone;
-            self
-        }
-
-        /// Configures the UART to use even parity check.
-        pub fn parity_even(mut self) -> Self {
-            self.parity = Parity::ParityEven;
-            self
-        }
-
-        /// Configures the UART to use odd parity check.
-        pub fn parity_odd(mut self) -> Self {
-            self.parity = Parity::ParityOdd;
-            self
-        }
-
-        /// Sets the number of data bits for the UART configuration.
-        pub fn data_bits(mut self, data_bits: DataBits) -> Self {
-            self.data_bits = data_bits;
-            self
-        }
-
-        /// Sets the number of stop bits for the UART configuration.
-        pub fn stop_bits(mut self, stop_bits: StopBits) -> Self {
-            self.stop_bits = stop_bits;
-            self
-        }
-
-        /// Sets the clock source for the UART configuration.
-        pub fn clock_source(mut self, source: super::ClockSource) -> Self {
-            self.clock_source = source;
-            self
-        }
-
-        /// Calculates the total symbol length in bits based on the configured
-        /// data bits, parity, and stop bits.
-        pub fn symbol_length(&self) -> u8 {
-            let mut length: u8 = 1; // start bit
-            length += match self.data_bits {
-                DataBits::DataBits5 => 5,
-                DataBits::DataBits6 => 6,
-                DataBits::DataBits7 => 7,
-                DataBits::DataBits8 => 8,
-            };
-            length += match self.parity {
-                Parity::ParityNone => 0,
-                _ => 1,
-            };
-            length += match self.stop_bits {
-                StopBits::STOP1 => 1,
-                _ => 2, // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
-            };
-            length
-        }
-
-        /// Sets the RX FIFO full threshold for the UART configuration.
-        pub fn rx_fifo_full_threshold(mut self, threshold: u16) -> Self {
-            self.rx_fifo_full_threshold = threshold;
-            self
-        }
-
-        /// Sets the RX timeout for the UART configuration.
-        pub fn rx_timeout(mut self, timeout: Option<u8>) -> Self {
-            self.rx_timeout = timeout;
-            self
-        }
+    /// Sets the number of data bits for the UART configuration.
+    pub fn data_bits(mut self, data_bits: DataBits) -> Self {
+        self.data_bits = data_bits;
+        self
     }
 
-    impl Default for Config {
-        fn default() -> Config {
-            Config {
-                baudrate: 115_200,
-                data_bits: DataBits::DataBits8,
-                parity: Parity::ParityNone,
-                stop_bits: StopBits::STOP1,
-                clock_source: {
-                    cfg_if::cfg_if! {
-                        if #[cfg(any(esp32c6, esp32h2, lp_uart))] {
-                            super::ClockSource::Xtal
-                        } else {
-                            super::ClockSource::Apb
-                        }
+    /// Sets the number of stop bits for the UART configuration.
+    pub fn stop_bits(mut self, stop_bits: StopBits) -> Self {
+        self.stop_bits = stop_bits;
+        self
+    }
+
+    /// Sets the clock source for the UART configuration.
+    pub fn clock_source(mut self, source: ClockSource) -> Self {
+        self.clock_source = source;
+        self
+    }
+
+    /// Calculates the total symbol length in bits based on the configured
+    /// data bits, parity, and stop bits.
+    pub fn symbol_length(&self) -> u8 {
+        let mut length: u8 = 1; // start bit
+        length += match self.data_bits {
+            DataBits::DataBits5 => 5,
+            DataBits::DataBits6 => 6,
+            DataBits::DataBits7 => 7,
+            DataBits::DataBits8 => 8,
+        };
+        length += match self.parity {
+            Parity::ParityNone => 0,
+            _ => 1,
+        };
+        length += match self.stop_bits {
+            StopBits::STOP1 => 1,
+            _ => 2, // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
+        };
+        length
+    }
+
+    /// Sets the RX FIFO full threshold for the UART configuration.
+    pub fn rx_fifo_full_threshold(mut self, threshold: u16) -> Self {
+        self.rx_fifo_full_threshold = threshold;
+        self
+    }
+
+    /// Sets the RX timeout for the UART configuration.
+    pub fn rx_timeout(mut self, timeout: Option<u8>) -> Self {
+        self.rx_timeout = timeout;
+        self
+    }
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            baudrate: 115_200,
+            data_bits: DataBits::DataBits8,
+            parity: Parity::ParityNone,
+            stop_bits: StopBits::STOP1,
+            clock_source: {
+                cfg_if::cfg_if! {
+                    if #[cfg(any(esp32c6, esp32h2, lp_uart))] {
+                        ClockSource::Xtal
+                    } else {
+                        ClockSource::Apb
                     }
-                },
-                rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-                rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
-            }
+                }
+            },
+            rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
+            rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
         }
     }
+}
 
-    /// Configuration for the AT-CMD detection functionality
-    pub struct AtCmdConfig {
-        /// Optional idle time before the AT command detection begins, in clock
-        /// cycles.
-        pub pre_idle_count: Option<u16>,
-        /// Optional idle time after the AT command detection ends, in clock
-        /// cycles.
-        pub post_idle_count: Option<u16>,
-        /// Optional timeout between characters in the AT command, in clock
-        /// cycles.
-        pub gap_timeout: Option<u16>,
-        /// The character that triggers the AT command detection.
-        pub cmd_char: u8,
-        /// Optional number of characters to detect as part of the AT command.
-        pub char_num: Option<u8>,
-    }
+/// Configuration for the AT-CMD detection functionality
+pub struct AtCmdConfig {
+    /// Optional idle time before the AT command detection begins, in clock
+    /// cycles.
+    pub pre_idle_count: Option<u16>,
+    /// Optional idle time after the AT command detection ends, in clock
+    /// cycles.
+    pub post_idle_count: Option<u16>,
+    /// Optional timeout between characters in the AT command, in clock
+    /// cycles.
+    pub gap_timeout: Option<u16>,
+    /// The character that triggers the AT command detection.
+    pub cmd_char: u8,
+    /// Optional number of characters to detect as part of the AT command.
+    pub char_num: Option<u8>,
+}
 
-    impl AtCmdConfig {
-        /// Creates a new `AtCmdConfig` with the specified configuration.
-        ///
-        /// This function sets up the AT command detection parameters, including
-        /// pre- and post-idle times, a gap timeout, the triggering command
-        /// character, and the number of characters to detect.
-        pub fn new(
-            pre_idle_count: Option<u16>,
-            post_idle_count: Option<u16>,
-            gap_timeout: Option<u16>,
-            cmd_char: u8,
-            char_num: Option<u8>,
-        ) -> AtCmdConfig {
-            Self {
-                pre_idle_count,
-                post_idle_count,
-                gap_timeout,
-                cmd_char,
-                char_num,
-            }
+impl AtCmdConfig {
+    /// Creates a new `AtCmdConfig` with the specified configuration.
+    ///
+    /// This function sets up the AT command detection parameters, including
+    /// pre- and post-idle times, a gap timeout, the triggering command
+    /// character, and the number of characters to detect.
+    pub fn new(
+        pre_idle_count: Option<u16>,
+        post_idle_count: Option<u16>,
+        gap_timeout: Option<u16>,
+        cmd_char: u8,
+        char_num: Option<u8>,
+    ) -> AtCmdConfig {
+        Self {
+            pre_idle_count,
+            post_idle_count,
+            gap_timeout,
+            cmd_char,
+            char_num,
         }
     }
 }
@@ -485,7 +480,6 @@ where
                 uart: unsafe { self.uart.clone_unchecked() },
                 phantom: PhantomData,
                 at_cmd_config: None,
-                rx_timeout_config: None,
                 #[cfg(not(esp32))]
                 symbol_len: config.symbol_length(),
             },
@@ -516,8 +510,7 @@ pub struct UartTx<'d, M, T = AnyUart> {
 pub struct UartRx<'d, M, T = AnyUart> {
     uart: PeripheralRef<'d, T>,
     phantom: PhantomData<M>,
-    at_cmd_config: Option<config::AtCmdConfig>,
-    rx_timeout_config: Option<u8>,
+    at_cmd_config: Option<AtCmdConfig>,
     #[cfg(not(esp32))]
     symbol_len: u8,
 }
@@ -927,7 +920,6 @@ where
         reg_en.modify(|_, w| w.rx_tout_en().bit(timeout.is_some()));
 
         sync_regs(register_block);
-        self.rx_timeout_config = timeout;
 
         Ok(())
     }
@@ -1015,7 +1007,6 @@ where
             uart: self.uart,
             phantom: PhantomData,
             at_cmd_config: self.at_cmd_config,
-            rx_timeout_config: self.rx_timeout_config,
             #[cfg(not(esp32))]
             symbol_len: self.symbol_len,
         }
@@ -1040,7 +1031,6 @@ where
             uart: self.uart,
             phantom: PhantomData,
             at_cmd_config: self.at_cmd_config,
-            rx_timeout_config: self.rx_timeout_config,
             #[cfg(not(esp32))]
             symbol_len: self.symbol_len,
         }
@@ -1176,7 +1166,7 @@ where
     }
 
     /// Configures the AT-CMD detection settings
-    pub fn set_at_cmd(&mut self, config: config::AtCmdConfig) {
+    pub fn set_at_cmd(&mut self, config: AtCmdConfig) {
         let register_block = self.register_block();
 
         #[cfg(not(any(esp32, esp32s2)))]
@@ -1253,17 +1243,17 @@ where
     }
 
     /// Change the number of stop bits
-    pub fn change_stop_bits(&mut self, stop_bits: config::StopBits) -> &mut Self {
+    pub fn change_stop_bits(&mut self, stop_bits: StopBits) -> &mut Self {
         #[cfg(esp32)]
         {
             // workaround for hardware issue, when UART stop bit set as 2-bit mode.
-            if stop_bits == config::StopBits::STOP2 {
+            if stop_bits == StopBits::STOP2 {
                 self.register_block()
                     .rs485_conf()
-                    .modify(|_, w| w.dl1_en().bit(stop_bits == config::StopBits::STOP2));
+                    .modify(|_, w| w.dl1_en().bit(stop_bits == StopBits::STOP2));
 
                 self.register_block().conf0().modify(|_, w| {
-                    if stop_bits == config::StopBits::STOP2 {
+                    if stop_bits == StopBits::STOP2 {
                         unsafe { w.stop_bit_num().bits(1) }
                     } else {
                         unsafe { w.stop_bit_num().bits(stop_bits as u8) }
@@ -1280,7 +1270,7 @@ where
         self
     }
 
-    fn change_data_bits(&mut self, data_bits: config::DataBits) -> &mut Self {
+    fn change_data_bits(&mut self, data_bits: DataBits) -> &mut Self {
         self.register_block()
             .conf0()
             .modify(|_, w| unsafe { w.bit_num().bits(data_bits as u8) });
@@ -1288,11 +1278,11 @@ where
         self
     }
 
-    fn change_parity(&mut self, parity: config::Parity) -> &mut Self {
+    fn change_parity(&mut self, parity: Parity) -> &mut Self {
         self.register_block().conf0().modify(|_, w| match parity {
-            config::Parity::ParityNone => w.parity_en().clear_bit(),
-            config::Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
-            config::Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
+            Parity::ParityNone => w.parity_en().clear_bit(),
+            Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
+            Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
         });
 
         self
@@ -2094,7 +2084,15 @@ where
             if self.at_cmd_config.is_some() {
                 events |= RxEvent::CmdCharDetected;
             }
-            if self.rx_timeout_config.is_some() {
+
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32c6, esp32h2))] {
+                    let reg_en = self.uart.info().register_block().tout_conf();
+                } else {
+                    let reg_en = self.uart.info().register_block().conf1();
+                }
+            };
+            if reg_en.read().rx_tout_en().bit_is_set() {
                 events |= RxEvent::FifoTout;
             }
 
@@ -2213,7 +2211,7 @@ pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
         peripherals::{LP_CLKRST, LP_UART},
-        uart::config::{self, Config},
+        uart::{Config, DataBits, Parity, StopBits},
     };
     /// LP-UART driver
     ///
@@ -2355,23 +2353,23 @@ pub mod lp_uart {
             self.rxfifo_reset();
         }
 
-        fn change_parity(&mut self, parity: config::Parity) -> &mut Self {
-            if parity != config::Parity::ParityNone {
+        fn change_parity(&mut self, parity: Parity) -> &mut Self {
+            if parity != Parity::ParityNone {
                 self.uart
                     .conf0()
                     .modify(|_, w| w.parity().bit((parity as u8 & 0x1) != 0));
             }
 
             self.uart.conf0().modify(|_, w| match parity {
-                config::Parity::ParityNone => w.parity_en().clear_bit(),
-                config::Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
-                config::Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
+                Parity::ParityNone => w.parity_en().clear_bit(),
+                Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
+                Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
             });
 
             self
         }
 
-        fn change_data_bits(&mut self, data_bits: config::DataBits) -> &mut Self {
+        fn change_data_bits(&mut self, data_bits: DataBits) -> &mut Self {
             self.uart
                 .conf0()
                 .modify(|_, w| unsafe { w.bit_num().bits(data_bits as u8) });
@@ -2381,7 +2379,7 @@ pub mod lp_uart {
             self
         }
 
-        fn change_stop_bits(&mut self, stop_bits: config::StopBits) -> &mut Self {
+        fn change_stop_bits(&mut self, stop_bits: StopBits) -> &mut Self {
             self.uart
                 .conf0()
                 .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });

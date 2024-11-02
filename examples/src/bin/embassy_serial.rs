@@ -15,12 +15,7 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::Io,
     timer::timg::TimerGroup,
-    uart::{
-        config::{AtCmdConfig, Config},
-        Uart,
-        UartRx,
-        UartTx,
-    },
+    uart::{AtCmdConfig, Config, Uart, UartRx, UartTx},
     Async,
 };
 use static_cell::StaticCell;

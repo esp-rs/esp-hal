@@ -22,7 +22,7 @@ use esp_hal::{
     },
     lp_core::{LpCore, LpCoreWakeupSource},
     prelude::*,
-    uart::{config::Config, lp_uart::LpUart, Uart},
+    uart::{lp_uart::LpUart, Config, Uart},
 };
 use esp_println::println;
 
