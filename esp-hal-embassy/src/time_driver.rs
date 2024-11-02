@@ -100,25 +100,26 @@ impl Driver for EmbassyTimer {
     unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
         critical_section::with(|cs| {
             for (i, alarm) in self.alarms.borrow(cs).iter().enumerate() {
-                if !alarm.allocated.get() {
-                    let mut timer = TIMERS.borrow_ref_mut(cs);
-                    // `allocate_alarm` may be called before `esp_hal_embassy::init()`, so
-                    // we need to check if we have timers.
-                    if let Some(timer) = &mut *timer {
-                        // If we do, bind the interrupt handler to the timer.
-                        // This ensures that alarms allocated after init are correctly bound to the
-                        // core that created the executor.
-                        let timer = unwrap!(
-                            timer.get_mut(i),
-                            "There are not enough timers to allocate a new alarm. Call `esp_hal_embassy::init()` with the correct number of timers."
-                        );
-                        timer.set_interrupt_handler(HANDLERS[i]);
-                    }
-
-                    // set alarm so it is not overwritten
-                    alarm.allocated.set(true);
-                    return Some(AlarmHandle::new(i as u8));
+                if alarm.allocated.get() {
+                    continue;
                 }
+                let mut timer = TIMERS.borrow_ref_mut(cs);
+                // `allocate_alarm` may be called before `esp_hal_embassy::init()`, so
+                // we need to check if we have timers.
+                if let Some(timer) = &mut *timer {
+                    // If we do, bind the interrupt handler to the timer.
+                    // This ensures that alarms allocated after init are correctly bound to the
+                    // core that created the executor.
+                    let timer = unwrap!(
+                        timer.get_mut(i),
+                        "There are not enough timers to allocate a new alarm. Call `esp_hal_embassy::init()` with the correct number of timers."
+                    );
+                    timer.set_interrupt_handler(HANDLERS[i]);
+                }
+
+                // set alarm so it is not overwritten
+                alarm.allocated.set(true);
+                return Some(AlarmHandle::new(i as u8));
             }
             None
         })
