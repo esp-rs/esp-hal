@@ -479,7 +479,6 @@ where
             rx: UartRx {
                 uart: unsafe { self.uart.clone_unchecked() },
                 phantom: PhantomData,
-                at_cmd_config: None,
                 #[cfg(not(esp32))]
                 symbol_len: config.symbol_length(),
             },
@@ -510,7 +509,6 @@ pub struct UartTx<'d, M, T = AnyUart> {
 pub struct UartRx<'d, M, T = AnyUart> {
     uart: PeripheralRef<'d, T>,
     phantom: PhantomData<M>,
-    at_cmd_config: Option<AtCmdConfig>,
     #[cfg(not(esp32))]
     symbol_len: u8,
 }
@@ -1006,7 +1004,6 @@ where
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
-            at_cmd_config: self.at_cmd_config,
             #[cfg(not(esp32))]
             symbol_len: self.symbol_len,
         }
@@ -1030,7 +1027,6 @@ where
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
-            at_cmd_config: self.at_cmd_config,
             #[cfg(not(esp32))]
             symbol_len: self.symbol_len,
         }
@@ -1203,8 +1199,6 @@ where
             .modify(|_, w| w.sclk_en().set_bit());
 
         self.sync_regs();
-
-        self.rx.at_cmd_config = Some(config);
     }
 
     /// Listen for the given interrupts
@@ -2081,15 +2075,16 @@ where
                 | RxEvent::GlitchDetected
                 | RxEvent::ParityError;
 
-            if self.at_cmd_config.is_some() {
+            let register_block = self.uart.info().register_block();
+            if register_block.at_cmd_char().read().char_num().bits() > 0 {
                 events |= RxEvent::CmdCharDetected;
             }
 
             cfg_if::cfg_if! {
                 if #[cfg(any(esp32c6, esp32h2))] {
-                    let reg_en = self.uart.info().register_block().tout_conf();
+                    let reg_en = register_block.tout_conf();
                 } else {
-                    let reg_en = self.uart.info().register_block().conf1();
+                    let reg_en = register_block.conf1();
                 }
             };
             if reg_en.read().rx_tout_en().bit_is_set() {
