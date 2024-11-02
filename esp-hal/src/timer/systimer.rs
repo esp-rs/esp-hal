@@ -311,50 +311,30 @@ pub trait Unit {
         }
     }
 
-    /// Update the value returned by [Self::poll_count] to be the current value
-    /// of the counter.
-    ///
-    /// This can be used to read the current value of the timer.
-    fn update(&self) {
-        let systimer = unsafe { SYSTIMER::steal() };
-        systimer
-            .unit_op(self.channel() as _)
-            .write(|w| w.update().set_bit());
-    }
-
-    /// Return the count value at the time of the last call to [Self::update].
-    ///
-    /// Returns None if the update isn't ready to read if update has never been
-    /// called.
-    fn poll_count(&self) -> Option<u64> {
-        let systimer = unsafe { SYSTIMER::steal() };
-        if systimer
-            .unit_op(self.channel() as _)
-            .read()
-            .value_valid()
-            .bit_is_set()
-        {
-            let unit_value = systimer.unit_value(self.channel() as _);
-
-            let lo = unit_value.lo().read().bits();
-            let hi = unit_value.hi().read().bits();
-
-            Some(((hi as u64) << 32) | lo as u64)
-        } else {
-            None
-        }
-    }
-
     /// Convenience method to call [Self::update] and [Self::poll_count].
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
-        self.update();
-        loop {
-            if let Some(count) = self.poll_count() {
-                break count;
-            }
-        }
+        // TODO: this is not safe to call from multiple cores. One core's update may
+        // invalidate the other's reading.
+        let systimer = unsafe { SYSTIMER::steal() };
+        systimer
+            .unit_op(self.channel() as _)
+            .write(|w| w.update().set_bit());
+
+        while !systimer
+            .unit_op(self.channel() as _)
+            .read()
+            .value_valid()
+            .bit_is_set()
+        {}
+
+        let unit_value = systimer.unit_value(self.channel() as _);
+
+        let lo = unit_value.lo().read().bits();
+        let hi = unit_value.hi().read().bits();
+
+        ((hi as u64) << 32) | lo as u64
     }
 }
 
