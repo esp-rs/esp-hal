@@ -49,48 +49,20 @@ impl EmbassyTimer {
             );
         }
 
-        static HANDLERS: [InterruptHandler; MAX_SUPPORTED_ALARM_COUNT] = [
-            handler0, handler1, handler2, handler3, handler4, handler5, handler6,
-        ];
-
         critical_section::with(|cs| {
             timers.iter_mut().enumerate().for_each(|(n, timer)| {
                 timer.enable_interrupt(false);
                 timer.stop();
-                timer.set_interrupt_handler(HANDLERS[n]);
+
+                if DRIVER.alarms.borrow(cs)[n].allocated.get() {
+                    // FIXME: we should track which core allocated an alarm and bind the interrupt
+                    // to that core.
+                    timer.set_interrupt_handler(HANDLERS[n]);
+                }
             });
 
             TIMERS.replace(cs, Some(timers));
         });
-
-        #[handler(priority = Priority::max())]
-        fn handler0() {
-            DRIVER.on_interrupt(0);
-        }
-        #[handler(priority = Priority::max())]
-        fn handler1() {
-            DRIVER.on_interrupt(1);
-        }
-        #[handler(priority = Priority::max())]
-        fn handler2() {
-            DRIVER.on_interrupt(2);
-        }
-        #[handler(priority = Priority::max())]
-        fn handler3() {
-            DRIVER.on_interrupt(3);
-        }
-        #[handler(priority = Priority::max())]
-        fn handler4() {
-            DRIVER.on_interrupt(4);
-        }
-        #[handler(priority = Priority::max())]
-        fn handler5() {
-            DRIVER.on_interrupt(5);
-        }
-        #[handler(priority = Priority::max())]
-        fn handler6() {
-            DRIVER.on_interrupt(6);
-        }
     }
 
     fn on_interrupt(&self, id: usize) {
@@ -129,6 +101,20 @@ impl Driver for EmbassyTimer {
         critical_section::with(|cs| {
             for (i, alarm) in self.alarms.borrow(cs).iter().enumerate() {
                 if !alarm.allocated.get() {
+                    let mut timer = TIMERS.borrow_ref_mut(cs);
+                    // `allocate_alarm` may be called before `esp_hal_embassy::init()`, so
+                    // we need to check if we have timers.
+                    if let Some(timer) = &mut *timer {
+                        // If we do, bind the interrupt handler to the timer.
+                        // This ensures that alarms allocated after init are correctly bound to the
+                        // core that created the executor.
+                        let timer = unwrap!(
+                            timer.get_mut(i),
+                            "There are not enough timers to allocate a new alarm. Call `esp_hal_embassy::init()` with the correct number of timers."
+                        );
+                        timer.set_interrupt_handler(HANDLERS[i]);
+                    }
+
                     // set alarm so it is not overwritten
                     alarm.allocated.set(true);
                     return Some(AlarmHandle::new(i as u8));
@@ -171,4 +157,37 @@ impl Driver for EmbassyTimer {
 
         true
     }
+}
+
+static HANDLERS: [InterruptHandler; MAX_SUPPORTED_ALARM_COUNT] = [
+    handler0, handler1, handler2, handler3, handler4, handler5, handler6,
+];
+
+#[handler(priority = Priority::max())]
+fn handler0() {
+    DRIVER.on_interrupt(0);
+}
+#[handler(priority = Priority::max())]
+fn handler1() {
+    DRIVER.on_interrupt(1);
+}
+#[handler(priority = Priority::max())]
+fn handler2() {
+    DRIVER.on_interrupt(2);
+}
+#[handler(priority = Priority::max())]
+fn handler3() {
+    DRIVER.on_interrupt(3);
+}
+#[handler(priority = Priority::max())]
+fn handler4() {
+    DRIVER.on_interrupt(4);
+}
+#[handler(priority = Priority::max())]
+fn handler5() {
+    DRIVER.on_interrupt(5);
+}
+#[handler(priority = Priority::max())]
+fn handler6() {
+    DRIVER.on_interrupt(6);
 }
