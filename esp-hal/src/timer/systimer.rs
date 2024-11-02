@@ -72,11 +72,9 @@ use core::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
     ptr::addr_of_mut,
-    sync::atomic::Ordering,
 };
 
 use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
-use portable_atomic::AtomicBool;
 
 use super::{Error, Timer as _};
 use crate::{
@@ -228,11 +226,8 @@ pub trait Unit {
     /// Returns the unit number.
     fn channel(&self) -> u8;
 
-    /// Returns the flag that indicates if the counter is updating.
-    ///
-    /// This flag is used to ensure that multiple cores, as well as multiple
-    /// contexts can access the counter in a consistent manner.
-    fn updating_flag(&self) -> &AtomicBool;
+    /// Returns the critical section used to prevent inconsistent counter reads.
+    fn lock(&self) -> &'static Lock;
 
     #[cfg(not(esp32s2))]
     /// Configures when this counter can run.
@@ -315,45 +310,25 @@ pub trait Unit {
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
-        // The flag exists to ensure that we only update if the unit is not being
-        // accessed. If we always updated, we could end up wrecking another
-        // core's reading. There are two modes of failure:
-        // - on single core, an update in an interrupt handler races with readin lo and
-        //   hi.
-        // - on multicore, the other core can start an update after we already stopped
-        //   looping for valid.
-
-        // Perf impact:
-        // - ESP32 has no systimer, no impact
-        // - ESP32-S3 and P4 have atomic instructions, no multicore critical section
-        //   should be needed.
-        // - Other chips are single core, the atomic swap chould acquire a single-core
-        //   critical section which should be cheap enough.
-        let flag = self.updating_flag();
+        let read_lock = self.lock();
         let channel = self.channel() as usize;
-        let was_updating = flag.swap(true, Ordering::Acquire);
 
         let systimer = unsafe { SYSTIMER::steal() };
 
-        if !was_updating {
+        // FIXME: this is fairly expensive. Can we do better by using just an
+        // interrupt-free context?
+        lock(read_lock, || {
             systimer.unit_op(channel).write(|w| w.update().set_bit());
-        }
 
-        while !systimer.unit_op(channel).read().value_valid().bit_is_set() {}
+            while !systimer.unit_op(channel).read().value_valid().bit_is_set() {}
 
-        let unit_value = systimer.unit_value(channel);
+            let unit_value = systimer.unit_value(channel);
 
-        let lo = unit_value.lo().read().bits();
-        let hi = unit_value.hi().read().bits();
+            let lo = unit_value.lo().read().bits();
+            let hi = unit_value.hi().read().bits();
 
-        // Only the updating context will restore that flag to false. The worst impact
-        // of this should be multi-core chips reading a slightly out of date
-        // counter value if both cores access the same unit at close the same time.
-        if !was_updating {
-            flag.store(false, Ordering::Release);
-        }
-
-        ((hi as u64) << 32) | lo as u64
+            ((hi as u64) << 32) | lo as u64
+        })
     }
 }
 
@@ -368,14 +343,14 @@ impl<const CHANNEL: u8> SpecificUnit<'_, CHANNEL> {
 }
 
 const CHANNEL_COUNT: usize = 1 + cfg!(not(esp32s2)) as usize;
-static UPDATING: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
+static LOCKS: [Lock; CHANNEL_COUNT] = [const { Lock::new() }; CHANNEL_COUNT];
 impl<const CHANNEL: u8> Unit for SpecificUnit<'_, CHANNEL> {
     fn channel(&self) -> u8 {
         CHANNEL
     }
 
-    fn updating_flag(&self) -> &'static AtomicBool {
-        &UPDATING[CHANNEL as usize]
+    fn lock(&self) -> &'static Lock {
+        &LOCKS[CHANNEL as usize]
     }
 }
 
@@ -388,8 +363,8 @@ impl Unit for AnyUnit<'_> {
         self.1
     }
 
-    fn updating_flag(&self) -> &'static AtomicBool {
-        &UPDATING[self.1 as usize]
+    fn lock(&self) -> &'static Lock {
+        &LOCKS[self.1 as usize]
     }
 }
 
