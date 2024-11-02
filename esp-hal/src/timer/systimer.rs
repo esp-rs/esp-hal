@@ -325,7 +325,7 @@ pub trait Unit {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         systimer
             .unit_op(self.channel() as _)
-            .modify(|_, w| w.update().set_bit());
+            .write(|w| w.update().set_bit());
     }
 
     /// Return the count value at the time of the last call to [Self::update].
