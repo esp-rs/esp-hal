@@ -311,7 +311,7 @@ pub trait Unit {
         }
     }
 
-    /// Convenience method to call [Self::update] and [Self::poll_count].
+    /// Reads the current counter value.
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
