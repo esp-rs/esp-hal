@@ -72,9 +72,11 @@ use core::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
     ptr::addr_of_mut,
+    sync::atomic::Ordering,
 };
 
 use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
+use portable_atomic::AtomicBool;
 
 use super::{Error, Timer as _};
 use crate::{
@@ -226,6 +228,12 @@ pub trait Unit {
     /// Returns the unit number.
     fn channel(&self) -> u8;
 
+    /// Returns the flag that indicates if the counter is updating.
+    ///
+    /// This flag is used to ensure that multiple cores, as well as multiple
+    /// contexts can access the counter in a consistent manner.
+    fn updating_flag(&self) -> &AtomicBool;
+
     #[cfg(not(esp32s2))]
     /// Configures when this counter can run.
     /// It can be configured to stall or continue running when CPU stalls
@@ -307,24 +315,43 @@ pub trait Unit {
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
-        // TODO: this is not safe to call from multiple cores. One core's update may
-        // invalidate the other's reading.
+        // The flag exists to ensure that we only update if the unit is not being
+        // accessed. If we always updated, we could end up wrecking another
+        // core's reading. There are two modes of failure:
+        // - on single core, an update in an interrupt handler races with readin lo and
+        //   hi.
+        // - on multicore, the other core can start an update after we already stopped
+        //   looping for valid.
+
+        // Perf impact:
+        // - ESP32 has no systimer, no impact
+        // - ESP32-S3 and P4 have atomic instructions, no multicore critical section
+        //   should be needed.
+        // - Other chips are single core, the atomic swap chould acquire a single-core
+        //   critical section which should be cheap enough.
+        let flag = self.updating_flag();
+        let channel = self.channel() as usize;
+        let was_updating = flag.swap(true, Ordering::Acquire);
+
         let systimer = unsafe { SYSTIMER::steal() };
-        systimer
-            .unit_op(self.channel() as _)
-            .write(|w| w.update().set_bit());
 
-        while !systimer
-            .unit_op(self.channel() as _)
-            .read()
-            .value_valid()
-            .bit_is_set()
-        {}
+        if !was_updating {
+            systimer.unit_op(channel).write(|w| w.update().set_bit());
+        }
 
-        let unit_value = systimer.unit_value(self.channel() as _);
+        while !systimer.unit_op(channel).read().value_valid().bit_is_set() {}
+
+        let unit_value = systimer.unit_value(channel);
 
         let lo = unit_value.lo().read().bits();
         let hi = unit_value.hi().read().bits();
+
+        // Only the updating context will restore that flag to false. The worst impact
+        // of this should be multi-core chips reading a slightly out of date
+        // counter value if both cores access the same unit at close the same time.
+        if !was_updating {
+            flag.store(false, Ordering::Release);
+        }
 
         ((hi as u64) << 32) | lo as u64
     }
@@ -340,9 +367,15 @@ impl<const CHANNEL: u8> SpecificUnit<'_, CHANNEL> {
     }
 }
 
+const CHANNEL_COUNT: usize = 3;
+static UPDATING: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
 impl<const CHANNEL: u8> Unit for SpecificUnit<'_, CHANNEL> {
     fn channel(&self) -> u8 {
         CHANNEL
+    }
+
+    fn updating_flag(&self) -> &'static AtomicBool {
+        &UPDATING[CHANNEL as usize]
     }
 }
 
@@ -353,6 +386,10 @@ pub struct AnyUnit<'d>(PhantomData<&'d ()>, u8);
 impl Unit for AnyUnit<'_> {
     fn channel(&self) -> u8 {
         self.1
+    }
+
+    fn updating_flag(&self) -> &'static AtomicBool {
+        &UPDATING[self.1 as usize]
     }
 }
 
