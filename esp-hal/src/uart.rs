@@ -827,97 +827,6 @@ where
         fifo_cnt
     }
 
-    /// Configures the RX-FIFO threshold
-    ///
-    /// # Errors
-    /// `Err(Error::InvalidArgument)` if provided value exceeds maximum value
-    /// for SOC :
-    /// - `esp32` **0x7F**
-    /// - `esp32c6`, `esp32h2` **0xFF**
-    /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
-    /// - `esp32s3` **0x3FF**
-    fn set_rx_fifo_full_threshold(&mut self, threshold: u16) -> Result<(), Error> {
-        #[cfg(esp32)]
-        const MAX_THRHD: u16 = 0x7F;
-        #[cfg(any(esp32c6, esp32h2))]
-        const MAX_THRHD: u16 = 0xFF;
-        #[cfg(any(esp32c3, esp32c2, esp32s2))]
-        const MAX_THRHD: u16 = 0x1FF;
-        #[cfg(esp32s3)]
-        const MAX_THRHD: u16 = 0x3FF;
-
-        if threshold > MAX_THRHD {
-            return Err(Error::InvalidArgument);
-        }
-
-        self.register_block()
-            .conf1()
-            .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold as _) });
-
-        Ok(())
-    }
-
-    /// Configures the Receive Timeout detection setting
-    ///
-    /// # Arguments
-    /// `timeout` - the number of symbols ("bytes") to wait for before
-    /// triggering a timeout. Pass None to disable the timeout.
-    ///
-    ///  # Errors
-    /// `Err(Error::InvalidArgument)` if the provided value exceeds the maximum
-    /// value for SOC :
-    /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
-    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
-    ///   value you pass times the symbol size must be <= **0x3FF**
-    fn set_rx_timeout(&mut self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), Error> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                const MAX_THRHD: u8 = 0x7F; // 7 bits
-            } else {
-                const MAX_THRHD: u16 = 0x3FF; // 10 bits
-            }
-        }
-
-        let register_block = self.register_block();
-
-        if let Some(timeout) = timeout {
-            // the esp32 counts directly in number of symbols (symbol len fixed to 8)
-            #[cfg(esp32)]
-            let timeout_reg = timeout;
-            // all other count in bits, so we need to multiply by the symbol len.
-            #[cfg(not(esp32))]
-            let timeout_reg = timeout as u16 * _symbol_len as u16;
-
-            if timeout_reg > MAX_THRHD {
-                return Err(Error::InvalidArgument);
-            }
-
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    let reg_thrhd = register_block.conf1();
-                } else if #[cfg(any(esp32c6, esp32h2))] {
-                    let reg_thrhd = register_block.tout_conf();
-                } else {
-                    let reg_thrhd = register_block.mem_conf();
-                }
-            }
-            reg_thrhd.modify(|_, w| unsafe { w.rx_tout_thrhd().bits(timeout_reg) });
-        }
-
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c6, esp32h2))] {
-                let reg_en = register_block.tout_conf();
-            } else {
-                let reg_en = register_block.conf1();
-            }
-        }
-        reg_en.modify(|_, w| w.rx_tout_en().bit(timeout.is_some()));
-
-        sync_regs(register_block);
-
-        Ok(())
-    }
-
     /// Disables all RX-related interrupts for this UART instance.
     ///
     /// This function clears and disables the `receive FIFO full` interrupt,
@@ -1230,172 +1139,28 @@ where
 
     /// Change the number of stop bits
     pub fn change_stop_bits(&mut self, stop_bits: StopBits) -> &mut Self {
-        #[cfg(esp32)]
-        {
-            // workaround for hardware issue, when UART stop bit set as 2-bit mode.
-            if stop_bits == StopBits::STOP2 {
-                self.register_block()
-                    .rs485_conf()
-                    .modify(|_, w| w.dl1_en().bit(stop_bits == StopBits::STOP2));
-
-                self.register_block().conf0().modify(|_, w| {
-                    if stop_bits == StopBits::STOP2 {
-                        unsafe { w.stop_bit_num().bits(1) }
-                    } else {
-                        unsafe { w.stop_bit_num().bits(stop_bits as u8) }
-                    }
-                });
-            }
-        }
-
-        #[cfg(not(esp32))]
-        self.register_block()
-            .conf0()
-            .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+        self.tx.uart.info().change_stop_bits(stop_bits);
 
         self
     }
 
     fn change_data_bits(&mut self, data_bits: DataBits) -> &mut Self {
-        self.register_block()
-            .conf0()
-            .modify(|_, w| unsafe { w.bit_num().bits(data_bits as u8) });
+        self.tx.uart.info().change_data_bits(data_bits);
 
         self
     }
 
     fn change_parity(&mut self, parity: Parity) -> &mut Self {
-        self.register_block().conf0().modify(|_, w| match parity {
-            Parity::ParityNone => w.parity_en().clear_bit(),
-            Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
-            Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
-        });
+        self.tx.uart.info().change_parity(parity);
 
         self
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
-        let clocks = Clocks::get();
-        let clk = match clock_source {
-            ClockSource::Apb => clocks.apb_clock.to_Hz(),
-            ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
-        };
-
-        if clock_source == ClockSource::RcFast {
-            unsafe { crate::peripherals::RTC_CNTL::steal() }
-                .clk_conf()
-                .modify(|_, w| w.dig_clk8m_en().variant(true));
-            // esp_rom_delay_us(SOC_DELAY_RC_FAST_DIGI_SWITCH);
-            crate::rom::ets_delay_us(5);
-        }
-
-        let max_div = 0b1111_1111_1111 - 1;
-        let clk_div = clk.div_ceil(max_div * baudrate);
-        self.register_block().clk_conf().write(|w| unsafe {
-            w.sclk_sel().bits(match clock_source {
-                ClockSource::Apb => 1,
-                ClockSource::RcFast => 2,
-                ClockSource::Xtal => 3,
-            });
-            w.sclk_div_a().bits(0);
-            w.sclk_div_b().bits(0);
-            w.sclk_div_num().bits(clk_div as u8 - 1);
-            w.rx_sclk_en().bit(true);
-            w.tx_sclk_en().bit(true)
-        });
-
-        let divider = (clk << 4) / (baudrate * clk_div);
-        let divider_integer = (divider >> 4) as u16;
-        let divider_frag = (divider & 0xf) as u8;
-        self.register_block()
-            .clkdiv()
-            .write(|w| unsafe { w.clkdiv().bits(divider_integer).frag().bits(divider_frag) });
-    }
-
-    #[cfg(any(esp32c6, esp32h2))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
-        let clocks = Clocks::get();
-        let clk = match clock_source {
-            ClockSource::Apb => clocks.apb_clock.to_Hz(),
-            ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
-        };
-
-        let max_div = 0b1111_1111_1111 - 1;
-        let clk_div = clk.div_ceil(max_div * baudrate);
-
-        // UART clocks are configured via PCR
-        let pcr = unsafe { crate::peripherals::PCR::steal() };
-
-        if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
-            pcr.uart0_conf()
-                .modify(|_, w| w.uart0_rst_en().clear_bit().uart0_clk_en().set_bit());
-
-            pcr.uart0_sclk_conf().modify(|_, w| unsafe {
-                w.uart0_sclk_div_a().bits(0);
-                w.uart0_sclk_div_b().bits(0);
-                w.uart0_sclk_div_num().bits(clk_div as u8 - 1);
-                w.uart0_sclk_sel().bits(match clock_source {
-                    ClockSource::Apb => 1,
-                    ClockSource::RcFast => 2,
-                    ClockSource::Xtal => 3,
-                });
-                w.uart0_sclk_en().set_bit()
-            });
-        } else {
-            pcr.uart1_conf()
-                .modify(|_, w| w.uart1_rst_en().clear_bit().uart1_clk_en().set_bit());
-
-            pcr.uart1_sclk_conf().modify(|_, w| unsafe {
-                w.uart1_sclk_div_a().bits(0);
-                w.uart1_sclk_div_b().bits(0);
-                w.uart1_sclk_div_num().bits(clk_div as u8 - 1);
-                w.uart1_sclk_sel().bits(match clock_source {
-                    ClockSource::Apb => 1,
-                    ClockSource::RcFast => 2,
-                    ClockSource::Xtal => 3,
-                });
-                w.uart1_sclk_en().set_bit()
-            });
-        }
-
-        let clk = clk / clk_div;
-        let divider = clk / baudrate;
-        let divider = divider as u16;
-
-        self.register_block()
-            .clkdiv()
-            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
-
-        self.sync_regs();
-    }
-
-    #[cfg(any(esp32, esp32s2))]
-    fn change_baud_internal(&self, baudrate: u32, clock_source: ClockSource) {
-        let clk = match clock_source {
-            ClockSource::Apb => Clocks::get().apb_clock.to_Hz(),
-            // ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
-            ClockSource::RefTick => crate::soc::constants::REF_TICK.to_Hz(),
-        };
-
-        self.register_block()
-            .conf0()
-            .modify(|_, w| w.tick_ref_always_on().bit(clock_source == ClockSource::Apb));
-
-        let divider = clk / baudrate;
-
-        self.register_block()
-            .clkdiv()
-            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
-    }
-
     /// Modify UART baud rate and reset TX/RX fifo.
     pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource) {
-        self.change_baud_internal(baudrate, clock_source);
-        self.txfifo_reset();
-        self.rxfifo_reset();
+        self.tx.uart.info().change_baud(baudrate, clock_source);
+        self.tx.uart.info().txfifo_reset();
+        self.tx.uart.info().rxfifo_reset();
     }
 
     #[inline(always)]
@@ -1419,14 +1184,7 @@ where
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
 
-        self.rx
-            .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        self.rx
-            .set_rx_timeout(config.rx_timeout, config.symbol_length())?;
-        self.change_baud_internal(config.baudrate, config.clock_source);
-        self.change_data_bits(config.data_bits);
-        self.change_parity(config.parity);
-        self.change_stop_bits(config.stop_bits);
+        self.rx.uart.info().apply_config(config)?;
 
         // Setting err_wr_mask stops uart from storing data when data is wrong according
         // to reference manual
@@ -1434,9 +1192,6 @@ where
             .conf0()
             .modify(|_, w| w.err_wr_mask().set_bit());
 
-        // Reset Tx/Rx FIFOs
-        self.rxfifo_reset();
-        self.txfifo_reset();
         crate::rom::ets_delay_us(15);
 
         // Make sure we are starting in a "clean state" - previous operations might have
@@ -1478,26 +1233,6 @@ where
         rst_core(self.register_block(), true);
         PeripheralClockControl::reset(self.tx.uart.peripheral());
         rst_core(self.register_block(), false);
-    }
-
-    fn rxfifo_reset(&mut self) {
-        fn rxfifo_rst(reg_block: &RegisterBlock, enable: bool) {
-            reg_block.conf0().modify(|_, w| w.rxfifo_rst().bit(enable));
-            sync_regs(reg_block);
-        }
-
-        rxfifo_rst(self.register_block(), true);
-        rxfifo_rst(self.register_block(), false);
-    }
-
-    fn txfifo_reset(&mut self) {
-        fn txfifo_rst(reg_block: &RegisterBlock, enable: bool) {
-            reg_block.conf0().modify(|_, w| w.txfifo_rst().bit(enable));
-            sync_regs(reg_block);
-        }
-
-        txfifo_rst(self.register_block(), true);
-        txfifo_rst(self.register_block(), false);
     }
 }
 
@@ -2387,22 +2122,6 @@ pub mod lp_uart {
     }
 }
 
-impl Info {
-    fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
-            crate::interrupt::disable(core, self.interrupt);
-        }
-        self.enable_listen(EnumSet::all(), false);
-        self.clear_interrupts(EnumSet::all());
-        unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
-        unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
-    }
-
-    fn disable_interrupts(&self) {
-        crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
-    }
-}
-
 /// UART Peripheral Instance
 pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 'static {
     /// Returns the peripheral data and state describing this UART instance.
@@ -2516,6 +2235,302 @@ impl Info {
             }
             w
         });
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, self.interrupt);
+        }
+        self.enable_listen(EnumSet::all(), false);
+        self.clear_interrupts(EnumSet::all());
+        unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
+        unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
+    }
+
+    fn disable_interrupts(&self) {
+        crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
+    }
+
+    fn apply_config(&self, config: Config) -> Result<(), Error> {
+        self.set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
+        self.set_rx_timeout(config.rx_timeout, config.symbol_length())?;
+        self.change_baud(config.baudrate, config.clock_source);
+        self.change_data_bits(config.data_bits);
+        self.change_parity(config.parity);
+        self.change_stop_bits(config.stop_bits);
+
+        // Reset Tx/Rx FIFOs
+        self.rxfifo_reset();
+        self.txfifo_reset();
+
+        Ok(())
+    }
+
+    /// Configures the RX-FIFO threshold
+    ///
+    /// # Errors
+    /// `Err(Error::InvalidArgument)` if provided value exceeds maximum value
+    /// for SOC :
+    /// - `esp32` **0x7F**
+    /// - `esp32c6`, `esp32h2` **0xFF**
+    /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
+    /// - `esp32s3` **0x3FF**
+    fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), Error> {
+        #[cfg(esp32)]
+        const MAX_THRHD: u16 = 0x7F;
+        #[cfg(any(esp32c6, esp32h2))]
+        const MAX_THRHD: u16 = 0xFF;
+        #[cfg(any(esp32c3, esp32c2, esp32s2))]
+        const MAX_THRHD: u16 = 0x1FF;
+        #[cfg(esp32s3)]
+        const MAX_THRHD: u16 = 0x3FF;
+
+        if threshold > MAX_THRHD {
+            return Err(Error::InvalidArgument);
+        }
+
+        self.register_block()
+            .conf1()
+            .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold as _) });
+
+        Ok(())
+    }
+
+    /// Configures the Receive Timeout detection setting
+    ///
+    /// # Arguments
+    /// `timeout` - the number of symbols ("bytes") to wait for before
+    /// triggering a timeout. Pass None to disable the timeout.
+    ///
+    ///  # Errors
+    /// `Err(Error::InvalidArgument)` if the provided value exceeds the maximum
+    /// value for SOC :
+    /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
+    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
+    ///   value you pass times the symbol size must be <= **0x3FF**
+    fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), Error> {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                const MAX_THRHD: u8 = 0x7F; // 7 bits
+            } else {
+                const MAX_THRHD: u16 = 0x3FF; // 10 bits
+            }
+        }
+
+        let register_block = self.register_block();
+
+        if let Some(timeout) = timeout {
+            // the esp32 counts directly in number of symbols (symbol len fixed to 8)
+            #[cfg(esp32)]
+            let timeout_reg = timeout;
+            // all other count in bits, so we need to multiply by the symbol len.
+            #[cfg(not(esp32))]
+            let timeout_reg = timeout as u16 * _symbol_len as u16;
+
+            if timeout_reg > MAX_THRHD {
+                return Err(Error::InvalidArgument);
+            }
+
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    let reg_thrhd = register_block.conf1();
+                } else if #[cfg(any(esp32c6, esp32h2))] {
+                    let reg_thrhd = register_block.tout_conf();
+                } else {
+                    let reg_thrhd = register_block.mem_conf();
+                }
+            }
+            reg_thrhd.modify(|_, w| unsafe { w.rx_tout_thrhd().bits(timeout_reg) });
+        }
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c6, esp32h2))] {
+                let reg_en = register_block.tout_conf();
+            } else {
+                let reg_en = register_block.conf1();
+            }
+        }
+        reg_en.modify(|_, w| w.rx_tout_en().bit(timeout.is_some()));
+
+        sync_regs(register_block);
+
+        Ok(())
+    }
+
+    #[cfg(any(esp32c2, esp32c3, esp32s3))]
+    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+        let clocks = Clocks::get();
+        let clk = match clock_source {
+            ClockSource::Apb => clocks.apb_clock.to_Hz(),
+            ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
+            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
+        };
+
+        if clock_source == ClockSource::RcFast {
+            unsafe { crate::peripherals::RTC_CNTL::steal() }
+                .clk_conf()
+                .modify(|_, w| w.dig_clk8m_en().variant(true));
+            // esp_rom_delay_us(SOC_DELAY_RC_FAST_DIGI_SWITCH);
+            crate::rom::ets_delay_us(5);
+        }
+
+        let max_div = 0b1111_1111_1111 - 1;
+        let clk_div = clk.div_ceil(max_div * baudrate);
+        self.register_block().clk_conf().write(|w| unsafe {
+            w.sclk_sel().bits(match clock_source {
+                ClockSource::Apb => 1,
+                ClockSource::RcFast => 2,
+                ClockSource::Xtal => 3,
+            });
+            w.sclk_div_a().bits(0);
+            w.sclk_div_b().bits(0);
+            w.sclk_div_num().bits(clk_div as u8 - 1);
+            w.rx_sclk_en().bit(true);
+            w.tx_sclk_en().bit(true)
+        });
+
+        let divider = (clk << 4) / (baudrate * clk_div);
+        let divider_integer = (divider >> 4) as u16;
+        let divider_frag = (divider & 0xf) as u8;
+        self.register_block()
+            .clkdiv()
+            .write(|w| unsafe { w.clkdiv().bits(divider_integer).frag().bits(divider_frag) });
+    }
+
+    #[cfg(any(esp32c6, esp32h2))]
+    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+        let clocks = Clocks::get();
+        let clk = match clock_source {
+            ClockSource::Apb => clocks.apb_clock.to_Hz(),
+            ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
+            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
+        };
+
+        let max_div = 0b1111_1111_1111 - 1;
+        let clk_div = clk.div_ceil(max_div * baudrate);
+
+        // UART clocks are configured via PCR
+        let pcr = unsafe { crate::peripherals::PCR::steal() };
+
+        if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
+            pcr.uart0_conf()
+                .modify(|_, w| w.uart0_rst_en().clear_bit().uart0_clk_en().set_bit());
+
+            pcr.uart0_sclk_conf().modify(|_, w| unsafe {
+                w.uart0_sclk_div_a().bits(0);
+                w.uart0_sclk_div_b().bits(0);
+                w.uart0_sclk_div_num().bits(clk_div as u8 - 1);
+                w.uart0_sclk_sel().bits(match clock_source {
+                    ClockSource::Apb => 1,
+                    ClockSource::RcFast => 2,
+                    ClockSource::Xtal => 3,
+                });
+                w.uart0_sclk_en().set_bit()
+            });
+        } else {
+            pcr.uart1_conf()
+                .modify(|_, w| w.uart1_rst_en().clear_bit().uart1_clk_en().set_bit());
+
+            pcr.uart1_sclk_conf().modify(|_, w| unsafe {
+                w.uart1_sclk_div_a().bits(0);
+                w.uart1_sclk_div_b().bits(0);
+                w.uart1_sclk_div_num().bits(clk_div as u8 - 1);
+                w.uart1_sclk_sel().bits(match clock_source {
+                    ClockSource::Apb => 1,
+                    ClockSource::RcFast => 2,
+                    ClockSource::Xtal => 3,
+                });
+                w.uart1_sclk_en().set_bit()
+            });
+        }
+
+        let clk = clk / clk_div;
+        let divider = clk / baudrate;
+        let divider = divider as u16;
+
+        self.register_block()
+            .clkdiv()
+            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
+
+        self.sync_regs();
+    }
+
+    #[cfg(any(esp32, esp32s2))]
+    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+        let clk = match clock_source {
+            ClockSource::Apb => Clocks::get().apb_clock.to_Hz(),
+            // ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
+            ClockSource::RefTick => crate::soc::constants::REF_TICK.to_Hz(),
+        };
+
+        self.register_block()
+            .conf0()
+            .modify(|_, w| w.tick_ref_always_on().bit(clock_source == ClockSource::Apb));
+
+        let divider = clk / baudrate;
+
+        self.register_block()
+            .clkdiv()
+            .write(|w| unsafe { w.clkdiv().bits(divider).frag().bits(0) });
+    }
+
+    fn change_data_bits(&self, data_bits: DataBits) {
+        self.register_block()
+            .conf0()
+            .modify(|_, w| unsafe { w.bit_num().bits(data_bits as u8) });
+    }
+
+    fn change_parity(&self, parity: Parity) {
+        self.register_block().conf0().modify(|_, w| match parity {
+            Parity::ParityNone => w.parity_en().clear_bit(),
+            Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
+            Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
+        });
+    }
+
+    fn change_stop_bits(&self, stop_bits: StopBits) {
+        #[cfg(esp32)]
+        {
+            // workaround for hardware issue, when UART stop bit set as 2-bit mode.
+            if stop_bits == StopBits::STOP2 {
+                self.register_block()
+                    .rs485_conf()
+                    .modify(|_, w| w.dl1_en().bit(stop_bits == StopBits::STOP2));
+
+                self.register_block().conf0().modify(|_, w| {
+                    if stop_bits == StopBits::STOP2 {
+                        unsafe { w.stop_bit_num().bits(1) }
+                    } else {
+                        unsafe { w.stop_bit_num().bits(stop_bits as u8) }
+                    }
+                });
+            }
+        }
+
+        #[cfg(not(esp32))]
+        self.register_block()
+            .conf0()
+            .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+    }
+
+    fn rxfifo_reset(&self) {
+        fn rxfifo_rst(reg_block: &RegisterBlock, enable: bool) {
+            reg_block.conf0().modify(|_, w| w.rxfifo_rst().bit(enable));
+            sync_regs(reg_block);
+        }
+
+        rxfifo_rst(self.register_block(), true);
+        rxfifo_rst(self.register_block(), false);
+    }
+
+    fn txfifo_reset(&self) {
+        fn txfifo_rst(reg_block: &RegisterBlock, enable: bool) {
+            reg_block.conf0().modify(|_, w| w.txfifo_rst().bit(enable));
+            sync_regs(reg_block);
+        }
+
+        txfifo_rst(self.register_block(), true);
+        txfifo_rst(self.register_block(), false);
     }
 }
 
