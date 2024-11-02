@@ -170,13 +170,7 @@ impl<'d> SystemTimer<'d> {
         // an older time stamp
 
         let unit = unsafe { SpecificUnit::<'_, 0>::conjure() };
-
-        unit.update();
-        loop {
-            if let Some(value) = unit.poll_count() {
-                break value;
-            }
-        }
+        unit.read_count()
     }
 }
 
@@ -322,7 +316,7 @@ pub trait Unit {
     ///
     /// This can be used to read the current value of the timer.
     fn update(&self) {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
+        let systimer = unsafe { SYSTIMER::steal() };
         systimer
             .unit_op(self.channel() as _)
             .write(|w| w.update().set_bit());
@@ -333,7 +327,7 @@ pub trait Unit {
     /// Returns None if the update isn't ready to read if update has never been
     /// called.
     fn poll_count(&self) -> Option<u64> {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
+        let systimer = unsafe { SYSTIMER::steal() };
         if systimer
             .unit_op(self.channel() as _)
             .read()
@@ -891,13 +885,7 @@ where
         // This should be safe to access from multiple contexts; worst case
         // scenario the second accessor ends up reading an older time stamp.
 
-        self.unit.update();
-
-        let ticks = loop {
-            if let Some(value) = self.unit.poll_count() {
-                break value;
-            }
-        };
+        let ticks = self.unit.read_count();
 
         let us = ticks / (SystemTimer::ticks_per_second() / 1_000_000);
 
@@ -929,11 +917,6 @@ where
         } else {
             // Target mode
 
-            self.unit.update();
-            while self.unit.poll_count().is_none() {
-                // Wait for value registers to update
-            }
-
             // The counters/comparators are 52-bits wide (except on ESP32-S2,
             // which is 64-bits), so we must ensure that the provided value
             // is not too wide:
@@ -942,7 +925,7 @@ where
                 return Err(Error::InvalidTimeout);
             }
 
-            let v = self.unit.poll_count().unwrap();
+            let v = self.unit.read_count();
             let t = v + ticks;
 
             self.comparator.set_target(t);
