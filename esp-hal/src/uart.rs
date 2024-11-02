@@ -1144,18 +1144,6 @@ where
         self
     }
 
-    fn change_data_bits(&mut self, data_bits: DataBits) -> &mut Self {
-        self.tx.uart.info().change_data_bits(data_bits);
-
-        self
-    }
-
-    fn change_parity(&mut self, parity: Parity) -> &mut Self {
-        self.tx.uart.info().change_parity(parity);
-
-        self
-    }
-
     /// Modify UART baud rate and reset TX/RX fifo.
     pub fn change_baud(&mut self, baudrate: u32, clock_source: ClockSource) {
         self.tx.uart.info().change_baud(baudrate, clock_source);
