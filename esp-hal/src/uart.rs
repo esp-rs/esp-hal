@@ -1096,10 +1096,6 @@ where
         self.tx.uart.info().register_block()
     }
 
-    fn sync_regs(&self) {
-        sync_regs(self.register_block());
-    }
-
     /// Split the UART into a transmitter and receiver
     ///
     /// This is particularly useful when having two tasks correlating to
@@ -1155,7 +1151,7 @@ where
             .clk_conf()
             .modify(|_, w| w.sclk_en().set_bit());
 
-        self.sync_regs();
+        sync_regs(register_block);
     }
 
     /// Listen for the given interrupts
@@ -1240,7 +1236,7 @@ where
     }
 
     fn is_instance(&self, other: impl Instance) -> bool {
-        self.tx.uart.info() == other.info()
+        self.tx.uart.info().is_instance(other)
     }
 
     #[inline(always)]
@@ -2388,7 +2384,7 @@ impl Info {
         }
         reg_en.modify(|_, w| w.rx_tout_en().bit(timeout.is_some()));
 
-        sync_regs(register_block);
+        self.sync_regs();
 
         Ok(())
     }
@@ -2431,6 +2427,14 @@ impl Info {
         self.register_block()
             .clkdiv()
             .write(|w| unsafe { w.clkdiv().bits(divider_integer).frag().bits(divider_frag) });
+    }
+
+    fn is_instance(&self, other: impl Instance) -> bool {
+        self == other.info()
+    }
+
+    fn sync_regs(&self) {
+        sync_regs(self.register_block());
     }
 
     #[cfg(any(esp32c6, esp32h2))]

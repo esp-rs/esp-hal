@@ -9,7 +9,7 @@ use embedded_hal_02::serial::{Read, Write};
 use esp_hal::{
     gpio::Io,
     prelude::*,
-    uart::{ClockSource, Uart},
+    uart::{self, ClockSource, Uart},
     Blocking,
 };
 use hil_test as _;
@@ -91,8 +91,14 @@ mod tests {
         ];
 
         let mut byte_to_write = 0xA5;
-        for (baud, clock_source) in &configs {
-            ctx.uart.change_baud(*baud, *clock_source);
+        for (baudrate, clock_source) in configs {
+            ctx.uart
+                .apply_config(&uart::Config {
+                    baudrate,
+                    clock_source,
+                    ..Default::default()
+                })
+                .unwrap();
             ctx.uart.write(byte_to_write).ok();
             let read = block!(ctx.uart.read());
             assert_eq!(read, Ok(byte_to_write));
