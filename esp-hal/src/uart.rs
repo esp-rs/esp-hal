@@ -1570,19 +1570,20 @@ pub(crate) enum RxEvent {
 /// is dropped it disables the interrupt again. The future returns the event
 /// that was initially passed, when it resolves.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct UartRxFuture<'d> {
+struct UartRxFuture {
     events: EnumSet<RxEvent>,
-    uart: &'d Info,
-    state: &'d State,
+    uart: &'static Info,
+    state: &'static State,
     registered: bool,
 }
 
-impl<'d> UartRxFuture<'d> {
-    pub fn new(uart: &'d Info, state: &'d State, events: impl Into<EnumSet<RxEvent>>) -> Self {
+impl UartRxFuture {
+    fn new(uart: impl Peripheral<P = impl Instance>, events: impl Into<EnumSet<RxEvent>>) -> Self {
+        crate::into_ref!(uart);
         Self {
             events: events.into(),
-            uart,
-            state,
+            uart: uart.info(),
+            state: uart.state(),
             registered: false,
         }
     }
@@ -1626,7 +1627,7 @@ impl<'d> UartRxFuture<'d> {
     }
 }
 
-impl core::future::Future for UartRxFuture<'_> {
+impl core::future::Future for UartRxFuture {
     type Output = EnumSet<RxEvent>;
 
     fn poll(
@@ -1647,7 +1648,7 @@ impl core::future::Future for UartRxFuture<'_> {
     }
 }
 
-impl Drop for UartRxFuture<'_> {
+impl Drop for UartRxFuture {
     fn drop(&mut self) {
         // Although the isr disables the interrupt that occurred directly, we need to
         // disable the other interrupts (= the ones that did not occur), as
@@ -1657,18 +1658,19 @@ impl Drop for UartRxFuture<'_> {
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct UartTxFuture<'d> {
+struct UartTxFuture {
     events: EnumSet<TxEvent>,
-    uart: &'d Info,
-    state: &'d State,
+    uart: &'static Info,
+    state: &'static State,
     registered: bool,
 }
-impl<'d> UartTxFuture<'d> {
-    pub fn new(uart: &'d Info, state: &'d State, events: impl Into<EnumSet<TxEvent>>) -> Self {
+impl UartTxFuture {
+    fn new(uart: impl Peripheral<P = impl Instance>, events: impl Into<EnumSet<TxEvent>>) -> Self {
+        crate::into_ref!(uart);
         Self {
             events: events.into(),
-            uart,
-            state,
+            uart: uart.info(),
+            state: uart.state(),
             registered: false,
         }
     }
@@ -1698,7 +1700,7 @@ impl<'d> UartTxFuture<'d> {
     }
 }
 
-impl core::future::Future for UartTxFuture<'_> {
+impl core::future::Future for UartTxFuture {
     type Output = ();
 
     fn poll(
@@ -1719,7 +1721,7 @@ impl core::future::Future for UartTxFuture<'_> {
     }
 }
 
-impl Drop for UartTxFuture<'_> {
+impl Drop for UartTxFuture {
     fn drop(&mut self) {
         // Although the isr disables the interrupt that occurred directly, we need to
         // disable the other interrupts (= the ones that did not occur), as
@@ -1749,7 +1751,7 @@ where
     }
 }
 
-impl<'d, T> UartTx<'d, Async, T>
+impl<T> UartTx<'_, Async, T>
 where
     T: Instance,
 {
@@ -1778,7 +1780,7 @@ where
             }
 
             offset = next_offset;
-            UartTxFuture::new(self.uart.info(), self.uart.state(), TxEvent::TxFiFoEmpty).await;
+            UartTxFuture::new(self.uart.reborrow(), TxEvent::TxFiFoEmpty).await;
         }
 
         Ok(count)
@@ -1792,14 +1794,14 @@ where
     pub async fn flush_async(&mut self) -> Result<(), Error> {
         let count = self.tx_fifo_count();
         if count > 0 {
-            UartTxFuture::new(self.uart.info(), self.uart.state(), TxEvent::TxDone).await;
+            UartTxFuture::new(self.uart.reborrow(), TxEvent::TxDone).await;
         }
 
         Ok(())
     }
 }
 
-impl<'d, T> UartRx<'d, Async, T>
+impl<T> UartRx<'_, Async, T>
 where
     T: Instance,
 {
@@ -1851,8 +1853,7 @@ where
                 events |= RxEvent::FifoTout;
             }
 
-            let events_happened =
-                UartRxFuture::new(self.uart.info(), self.uart.state(), events).await;
+            let events_happened = UartRxFuture::new(self.uart.reborrow(), events).await;
             // always drain the fifo, if an error has occurred the data is lost
             let read_bytes = self.drain_fifo(buf);
             // check error events
@@ -2157,17 +2158,17 @@ pub mod lp_uart {
 /// UART Peripheral Instance
 pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 'static {
     /// Returns the peripheral data and state describing this UART instance.
-    fn parts(&self) -> (&Info, &State);
+    fn parts(&self) -> (&'static Info, &'static State);
 
     /// Returns the peripheral data describing this UART instance.
     #[inline(always)]
-    fn info(&self) -> &Info {
+    fn info(&self) -> &'static Info {
         self.parts().0
     }
 
     /// Returns the peripheral state for this UART instance.
     #[inline(always)]
-    fn state(&self) -> &State {
+    fn state(&self) -> &'static State {
         self.parts().1
     }
 }
@@ -2585,7 +2586,7 @@ unsafe impl Sync for Info {}
 macro_rules! impl_instance {
     ($inst:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst {
-            fn parts(&self) -> (&Info, &State) {
+            fn parts(&self) -> (&'static Info, &'static State) {
                 #[crate::macros::handler]
                 pub(super) fn irq_handler() {
                     intr_handler(&PERIPHERAL, &STATE);
@@ -2632,7 +2633,7 @@ crate::any_peripheral! {
 
 impl Instance for AnyUart {
     #[inline]
-    fn parts(&self) -> (&Info, &State) {
+    fn parts(&self) -> (&'static Info, &'static State) {
         match &self.0 {
             #[cfg(uart0)]
             AnyUartInner::Uart0(uart) => uart.parts(),
