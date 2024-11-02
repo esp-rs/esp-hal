@@ -1082,11 +1082,9 @@ mod dma {
             tx_buffer: &mut TX,
         ) -> Result<(), Error> {
             let bytes_to_read = rx_buffer.length();
-            if bytes_to_read > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
-            }
             let bytes_to_write = tx_buffer.length();
-            if bytes_to_write > MAX_DMA_SIZE {
+
+            if bytes_to_read > MAX_DMA_SIZE || bytes_to_write > MAX_DMA_SIZE {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
 
@@ -1149,8 +1147,7 @@ mod dma {
             // 1 seems to stop after transmitting the current byte which is somewhat less
             // impolite.
             if self.tx_transfer_in_progress || self.rx_transfer_in_progress {
-                self.driver().configure_datalen(1, 1);
-                self.driver().update();
+                self.dma_driver().abort_transfer();
 
                 // We need to stop the DMA transfer, too.
                 if self.tx_transfer_in_progress {
@@ -1294,7 +1291,7 @@ mod dma {
         /// transfer is in progress. Moving the buffers is allowed.
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         unsafe fn start_dma_write(&mut self, buffer: &mut impl DmaTxBuffer) -> Result<(), Error> {
-            self.start_transfer_dma(true, &mut EmptyBuf, buffer)
+            self.start_dma_transfer(&mut EmptyBuf, buffer)
         }
 
         /// Perform a DMA write.
@@ -1322,7 +1319,7 @@ mod dma {
         /// transfer is in progress. Moving the buffers is allowed.
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         unsafe fn start_dma_read(&mut self, buffer: &mut impl DmaRxBuffer) -> Result<(), Error> {
-            self.start_transfer_dma(false, buffer, &mut EmptyBuf)
+            self.start_dma_transfer(buffer, &mut EmptyBuf)
         }
 
         /// Perform a DMA read.
@@ -1374,13 +1371,7 @@ mod dma {
                 Err(e) => Err((e, self, rx_buffer, tx_buffer)),
             }
         }
-    }
 
-    impl<'d, M, T> SpiDma<'d, M, T>
-    where
-        T: Instance,
-        M: Mode,
-    {
         /// # Safety:
         ///
         /// The caller must ensure that the buffers are not accessed while the
@@ -1395,9 +1386,6 @@ mod dma {
             buffer: &mut impl DmaRxBuffer,
         ) -> Result<(), Error> {
             let bytes_to_read = buffer.length();
-            if bytes_to_read > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
-            }
 
             self.driver().setup_half_duplex(
                 false,
@@ -1447,9 +1435,6 @@ mod dma {
             buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
             let bytes_to_write = buffer.length();
-            if bytes_to_write > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
-            }
 
             #[cfg(all(esp32, spi_address_workaround))]
             {
@@ -2187,6 +2172,11 @@ struct DmaDriver {
 }
 
 impl DmaDriver {
+    fn abort_transfer(&self) {
+        self.info.configure_datalen(1, 1);
+        self.info.update();
+    }
+
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
         &self,
@@ -2214,7 +2204,7 @@ impl DmaDriver {
             .user()
             .modify(|_, w| w.usr_miso().bit(rx_len > 0).usr_mosi().bit(tx_len > 0));
 
-        self.info.enable_dma();
+        self.enable_dma();
 
         if rx_len > 0 {
             rx.prepare_transfer(self.dma_peripheral, rx_buffer)
@@ -2240,11 +2230,75 @@ impl DmaDriver {
         }
 
         #[cfg(gdma)]
-        self.info.reset_dma();
+        self.reset_dma();
 
         self.info.start_operation();
 
         Ok(())
+    }
+
+    fn enable_dma(&self) {
+        #[cfg(gdma)]
+        {
+            // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
+            let reg_block = self.info.register_block();
+            reg_block.dma_conf().modify(|_, w| {
+                w.dma_tx_ena().set_bit();
+                w.dma_rx_ena().set_bit()
+            });
+        }
+        #[cfg(pdma)]
+        self.reset_dma();
+    }
+
+    fn reset_dma(&self) {
+        fn set_reset_bit(reg_block: &RegisterBlock, bit: bool) {
+            #[cfg(pdma)]
+            reg_block.dma_conf().modify(|_, w| {
+                w.out_rst().bit(bit);
+                w.in_rst().bit(bit);
+                w.ahbm_fifo_rst().bit(bit);
+                w.ahbm_rst().bit(bit)
+            });
+            #[cfg(gdma)]
+            reg_block.dma_conf().modify(|_, w| {
+                w.rx_afifo_rst().bit(bit);
+                w.buf_afifo_rst().bit(bit);
+                w.dma_afifo_rst().bit(bit)
+            });
+        }
+        let reg_block = self.info.register_block();
+        set_reset_bit(reg_block, true);
+        set_reset_bit(reg_block, false);
+        self.clear_dma_interrupts();
+    }
+
+    #[cfg(gdma)]
+    fn clear_dma_interrupts(&self) {
+        let reg_block = self.info.register_block();
+        reg_block.dma_int_clr().write(|w| {
+            w.dma_infifo_full_err().clear_bit_by_one();
+            w.dma_outfifo_empty_err().clear_bit_by_one();
+            w.trans_done().clear_bit_by_one();
+            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+        });
+    }
+
+    #[cfg(pdma)]
+    fn clear_dma_interrupts(&self) {
+        let reg_block = self.info.register_block();
+        reg_block.dma_int_clr().write(|w| {
+            w.inlink_dscr_empty().clear_bit_by_one();
+            w.outlink_dscr_error().clear_bit_by_one();
+            w.inlink_dscr_error().clear_bit_by_one();
+            w.in_done().clear_bit_by_one();
+            w.in_err_eof().clear_bit_by_one();
+            w.in_suc_eof().clear_bit_by_one();
+            w.out_done().clear_bit_by_one();
+            w.out_eof().clear_bit_by_one();
+            w.out_total_eof().clear_bit_by_one()
+        });
     }
 }
 
@@ -2883,70 +2937,6 @@ impl Info {
             }
 
         }
-    }
-
-    fn enable_dma(&self) {
-        #[cfg(gdma)]
-        {
-            // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
-            let reg_block = self.register_block();
-            reg_block.dma_conf().modify(|_, w| {
-                w.dma_tx_ena().set_bit();
-                w.dma_rx_ena().set_bit()
-            });
-        }
-        #[cfg(pdma)]
-        self.reset_dma();
-    }
-
-    fn reset_dma(&self) {
-        fn set_reset_bit(reg_block: &RegisterBlock, bit: bool) {
-            #[cfg(pdma)]
-            reg_block.dma_conf().modify(|_, w| {
-                w.out_rst().bit(bit);
-                w.in_rst().bit(bit);
-                w.ahbm_fifo_rst().bit(bit);
-                w.ahbm_rst().bit(bit)
-            });
-            #[cfg(gdma)]
-            reg_block.dma_conf().modify(|_, w| {
-                w.rx_afifo_rst().bit(bit);
-                w.buf_afifo_rst().bit(bit);
-                w.dma_afifo_rst().bit(bit)
-            });
-        }
-        let reg_block = self.register_block();
-        set_reset_bit(reg_block, true);
-        set_reset_bit(reg_block, false);
-        self.clear_dma_interrupts();
-    }
-
-    #[cfg(gdma)]
-    fn clear_dma_interrupts(&self) {
-        let reg_block = self.register_block();
-        reg_block.dma_int_clr().write(|w| {
-            w.dma_infifo_full_err().clear_bit_by_one();
-            w.dma_outfifo_empty_err().clear_bit_by_one();
-            w.trans_done().clear_bit_by_one();
-            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
-            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
-        });
-    }
-
-    #[cfg(pdma)]
-    fn clear_dma_interrupts(&self) {
-        let reg_block = self.register_block();
-        reg_block.dma_int_clr().write(|w| {
-            w.inlink_dscr_empty().clear_bit_by_one();
-            w.outlink_dscr_error().clear_bit_by_one();
-            w.inlink_dscr_error().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_suc_eof().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_eof().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one()
-        });
     }
 }
 
