@@ -23,7 +23,34 @@ pub struct Preparation {
     /// but RX transfers require all descriptors to have buffer pointers and
     /// sizes that are a multiple of 4 (word aligned).
     pub(super) is_burstable: bool,
-    // alignment, check_owner, etc.
+
+    /// Configures the "check owner" feature of the DMA channel.
+    ///
+    /// Most DMA channels allow software to configure whether the hardware
+    /// checks that [DmaDescriptor::owner] is set to [Owner::Dma] before
+    /// consuming the descriptor. If this check fails, the channel stops
+    /// operating and fires
+    /// [DmaRxInterrupt::DescriptorError]/[DmaTxInterrupt::DescriptorError].
+    ///
+    /// This field allows buffer implementation to configure this behaviour.
+    /// - `Some(true)`: DMA channel must check the owner bit.
+    /// - `Some(false)`: DMA channel must NOT check the owner bit.
+    /// - `None`: DMA channel should check the owner bit if it is supported.
+    ///
+    /// Some buffer implementations may require that the DMA channel performs
+    /// this check before consuming the descriptor to ensure correct
+    /// behaviour. e.g. To prevent wrap-around in a circular transfer.
+    ///
+    /// Some buffer implementations may require that the DMA channel does NOT
+    /// perform this check as the ownership bit will not be set before the
+    /// channel tries to consume the descriptor.
+    ///
+    /// Most implementations won't have any such requirements and will work
+    /// correctly regardless of whether the DMA channel checks or not.
+    ///
+    /// Note: If the DMA channel doesn't support the provided option,
+    /// preparation will fail.
+    pub(super) check_owner: Option<bool>,
 }
 
 /// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
@@ -303,6 +330,7 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
             block_size: self.block_size,
             // This is TX, the DMA channel is free to do a burst transfer.
             is_burstable: true,
+            check_owner: None,
         }
     }
 
@@ -453,6 +481,7 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
             // In the future, it could either enforce the alignment or calculate if the alignment
             // requirements happen to be met.
             is_burstable: false,
+            check_owner: None,
         }
     }
 
@@ -580,6 +609,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
 
             // This is TX, the DMA channel is free to do a burst transfer.
             is_burstable: true,
+            check_owner: None,
         }
     }
 
@@ -611,6 +641,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             // DmaRxTxBuf doesn't currently enforce the alignment requirements required for
             // bursting.
             is_burstable: false,
+            check_owner: None,
         }
     }
 
@@ -751,6 +782,12 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
             // DmaRxStreamBuf doesn't currently enforce the alignment requirements required for
             // bursting.
             is_burstable: false,
+
+            // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
+            // implementation doesn't rely on the DMA checking for descriptor ownership.
+            // No descriptor is added back to the end of the stream before it's ready for the DMA
+            // to consume it.
+            check_owner: None,
         }
     }
 
@@ -958,6 +995,10 @@ unsafe impl DmaTxBuffer for EmptyBuf {
 
             // This is TX, the DMA channel is free to do a burst transfer.
             is_burstable: true,
+
+            // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
+            // channel does *NOT* check for ownership, otherwise the channel will return an error.
+            check_owner: Some(false),
         }
     }
 
@@ -985,6 +1026,10 @@ unsafe impl DmaRxBuffer for EmptyBuf {
 
             // As much as bursting is meaningless here, the descriptor does meet the requirements.
             is_burstable: true,
+
+            // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
+            // channel does *NOT* check for ownership, otherwise the channel will return an error.
+            check_owner: Some(false),
         }
     }
 

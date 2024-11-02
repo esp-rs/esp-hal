@@ -84,6 +84,12 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
             .modify(|_, w| w.outlink_restart().set_bit());
     }
 
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        if check_owner == Some(true) {
+            panic!("SPI DMA does not support checking descriptor ownership");
+        }
+    }
+
     fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {
         self.0.is_compatible_with(peripheral)
     }
@@ -220,6 +226,12 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         let spi = self.0.register_block();
         spi.dma_in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
+    }
+
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        if check_owner == Some(true) {
+            panic!("SPI DMA does not support checking descriptor ownership");
+        }
     }
 
     fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {
@@ -506,6 +518,13 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
             .modify(|_, w| w.outlink_restart().set_bit());
     }
 
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
+    }
+
     fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {
         self.0.is_compatible_with(peripheral)
     }
@@ -653,6 +672,13 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
         reg_block
             .in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
+    }
+
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
     }
 
     fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {

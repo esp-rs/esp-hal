@@ -142,6 +142,12 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
             .modify(|_, w| w.outlink_restart().set_bit());
     }
 
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        self.ch()
+            .out_conf1()
+            .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
+    }
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.ch()
@@ -325,6 +331,12 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
         self.ch()
             .in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
+    }
+
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        self.ch()
+            .in_conf1()
+            .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
     #[cfg(esp32s3)]
