@@ -226,9 +226,6 @@ pub trait Unit {
     /// Returns the unit number.
     fn channel(&self) -> u8;
 
-    /// Returns the critical section used to prevent inconsistent counter reads.
-    fn lock(&self) -> &'static Lock;
-
     #[cfg(not(esp32s2))]
     /// Configures when this counter can run.
     /// It can be configured to stall or continue running when CPU stalls
@@ -310,25 +307,28 @@ pub trait Unit {
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
-        let read_lock = self.lock();
         let channel = self.channel() as usize;
-
         let systimer = unsafe { SYSTIMER::steal() };
 
-        // FIXME: this is fairly expensive. Can we do better by using just an
-        // interrupt-free context?
-        lock(read_lock, || {
-            systimer.unit_op(channel).write(|w| w.update().set_bit());
+        systimer.unit_op(channel).write(|w| w.update().set_bit());
+        while !systimer.unit_op(channel).read().value_valid().bit_is_set() {}
 
-            while !systimer.unit_op(channel).read().value_valid().bit_is_set() {}
-
-            let unit_value = systimer.unit_value(channel);
-
-            let lo = unit_value.lo().read().bits();
+        // Read LO, HI, then LO again, check that LO returns the same value.
+        // This accounts for the case when an interrupt may happen between reading
+        // HI and LO values (or the other core updates the counter mid-read), and this
+        // function may get called from the ISR. In this case, the repeated read
+        // will return consistent values.
+        let unit_value = systimer.unit_value(channel);
+        let mut lo_prev = unit_value.lo().read().bits();
+        loop {
+            let lo = lo_prev;
             let hi = unit_value.hi().read().bits();
+            lo_prev = unit_value.lo().read().bits();
 
-            ((hi as u64) << 32) | lo as u64
-        })
+            if lo == lo_prev {
+                return ((hi as u64) << 32) | lo as u64;
+            }
+        }
     }
 }
 
@@ -342,15 +342,9 @@ impl<const CHANNEL: u8> SpecificUnit<'_, CHANNEL> {
     }
 }
 
-const CHANNEL_COUNT: usize = 1 + cfg!(not(esp32s2)) as usize;
-static LOCKS: [Lock; CHANNEL_COUNT] = [const { Lock::new() }; CHANNEL_COUNT];
 impl<const CHANNEL: u8> Unit for SpecificUnit<'_, CHANNEL> {
     fn channel(&self) -> u8 {
         CHANNEL
-    }
-
-    fn lock(&self) -> &'static Lock {
-        &LOCKS[CHANNEL as usize]
     }
 }
 
@@ -361,10 +355,6 @@ pub struct AnyUnit<'d>(PhantomData<&'d ()>, u8);
 impl Unit for AnyUnit<'_> {
     fn channel(&self) -> u8 {
         self.1
-    }
-
-    fn lock(&self) -> &'static Lock {
-        &LOCKS[self.1 as usize]
     }
 }
 
