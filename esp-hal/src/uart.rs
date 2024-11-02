@@ -479,8 +479,6 @@ where
             rx: UartRx {
                 uart: unsafe { self.uart.clone_unchecked() },
                 phantom: PhantomData,
-                #[cfg(not(esp32))]
-                symbol_len: config.symbol_length(),
             },
             tx: UartTx {
                 uart: self.uart,
@@ -509,8 +507,6 @@ pub struct UartTx<'d, M, T = AnyUart> {
 pub struct UartRx<'d, M, T = AnyUart> {
     uart: PeripheralRef<'d, T>,
     phantom: PhantomData<M>,
-    #[cfg(not(esp32))]
-    symbol_len: u8,
 }
 
 impl<'d, M, T> UartTx<'d, M, T>
@@ -873,7 +869,7 @@ where
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
     ///   value you pass times the symbol size must be <= **0x3FF**
-    fn set_rx_timeout(&mut self, timeout: Option<u8>) -> Result<(), Error> {
+    fn set_rx_timeout(&mut self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), Error> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 const MAX_THRHD: u8 = 0x7F; // 7 bits
@@ -890,7 +886,7 @@ where
             let timeout_reg = timeout;
             // all other count in bits, so we need to multiply by the symbol len.
             #[cfg(not(esp32))]
-            let timeout_reg = timeout as u16 * self.symbol_len as u16;
+            let timeout_reg = timeout as u16 * _symbol_len as u16;
 
             if timeout_reg > MAX_THRHD {
                 return Err(Error::InvalidArgument);
@@ -1004,8 +1000,6 @@ where
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
-            #[cfg(not(esp32))]
-            symbol_len: self.symbol_len,
         }
     }
 }
@@ -1027,8 +1021,6 @@ where
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
-            #[cfg(not(esp32))]
-            symbol_len: self.symbol_len,
         }
     }
 }
@@ -1429,7 +1421,8 @@ where
 
         self.rx
             .set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        self.rx.set_rx_timeout(config.rx_timeout)?;
+        self.rx
+            .set_rx_timeout(config.rx_timeout, config.symbol_length())?;
         self.change_baud_internal(config.baudrate, config.clock_source);
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
