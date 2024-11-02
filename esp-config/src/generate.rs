@@ -1,102 +1,262 @@
-use core::fmt::Write;
-use std::{collections::HashMap, env, fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    env,
+    fmt::{self, Write as _},
+    fs,
+    path::PathBuf,
+};
 
 const DOC_TABLE_HEADER: &str = r#"
 | Name | Description | Default value |
 |------|-------------|---------------|
 "#;
-const CHOSEN_TABLE_HEADER: &str = r#"
+
+const SELECTED_TABLE_HEADER: &str = r#"
 | Name | Selected value |
 |------|----------------|
 "#;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ParseError(String);
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Value {
-    SignedInteger(isize),
-    UnsignedInteger(usize),
-    Bool(bool),
-    String(String),
+/// Configuration errors.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Error {
+    /// Parse errors.
+    Parse(String),
+    /// Validation errors.
+    Validation(String),
 }
 
-impl Value {
-    fn parse_in_place(&mut self, s: &str) -> Result<(), ParseError> {
-        *self = match self {
-            Value::Bool(_) => match s.to_lowercase().as_ref() {
-                "false" | "no" | "n" | "f" => Value::Bool(false),
-                "true" | "yes" | "y" | "t" => Value::Bool(true),
-                _ => return Err(ParseError(format!("Invalid boolean value: {}", s))),
-            },
-            Value::SignedInteger(_) => Value::SignedInteger(
-                match s.as_bytes() {
-                    [b'0', b'x', ..] => isize::from_str_radix(&s[2..], 16),
-                    [b'0', b'o', ..] => isize::from_str_radix(&s[2..], 8),
-                    [b'0', b'b', ..] => isize::from_str_radix(&s[2..], 2),
-                    _ => isize::from_str_radix(&s, 10),
-                }
-                .map_err(|_| ParseError(format!("Invalid signed numerical value: {}", s)))?,
-            ),
-            Value::UnsignedInteger(_) => Value::UnsignedInteger(
-                match s.as_bytes() {
-                    [b'0', b'x', ..] => usize::from_str_radix(&s[2..], 16),
-                    [b'0', b'o', ..] => usize::from_str_radix(&s[2..], 8),
-                    [b'0', b'b', ..] => usize::from_str_radix(&s[2..], 2),
-                    _ => usize::from_str_radix(&s, 10),
-                }
-                .map_err(|_| ParseError(format!("Invalid unsigned numerical value: {}", s)))?,
-            ),
-            Value::String(_) => Value::String(String::from(s)),
-        };
-        Ok(())
+impl Error {
+    /// Convenience function for creating parse errors.
+    pub fn parse<S>(message: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::Parse(message.into())
     }
 
-    fn as_string(&self) -> String {
+    /// Convenience function for creating validation errors.
+    pub fn validation<S>(message: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::Validation(message.into())
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Bool(value) => String::from(if *value { "true" } else { "false" }),
-            Value::SignedInteger(value) => format!("{}", value),
-            Value::UnsignedInteger(value) => format!("{}", value),
-            Value::String(value) => value.clone(),
+            Error::Parse(message) => write!(f, "{message}"),
+            Error::Validation(message) => write!(f, "{message}"),
         }
     }
 }
 
-/// Generate and parse config from a prefix, and array of key, default,
-/// description tuples.
-///
-/// This function will parse any `SCREAMING_SNAKE_CASE` environment variables
-/// that match the given prefix. It will then attempt to parse the [`Value`].
-/// Once the config has been parsed, this function will emit `snake_case` cfg's
-/// _without_ the prefix which can be used in the dependant crate. After that,
-/// it will create a markdown table in the `OUT_DIR` under the name
-/// `{prefix}_config_table.md` where prefix has also been converted
-/// to `snake_case`. This can be included in crate documentation to outline the
-/// available configuration options for the crate.
-///
-/// Passing a value of true for the `emit_md_tables` argument will create and
-/// write markdown files of the available configuration and selected
-/// configuration which can be included in documentation.
-///
-/// Unknown keys with the supplied prefix will cause this function to panic.
+/// Supported configuration value types.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Value {
+    /// Booleans.
+    Bool(bool),
+    /// Integers.
+    Integer(i128),
+    /// Strings.
+    String(String),
+}
+
+// TODO: Do we want to handle negative values for non-decimal values?
+impl Value {
+    fn parse_in_place(&mut self, s: &str) -> Result<(), Error> {
+        *self = match self {
+            Value::Bool(_) => match s {
+                "true" => Value::Bool(true),
+                "false" => Value::Bool(false),
+                _ => {
+                    return Err(Error::parse(format!(
+                        "Expected 'true' or 'false', found: '{s}'"
+                    )))
+                }
+            },
+            Value::Integer(_) => {
+                let inner = match s.as_bytes() {
+                    [b'0', b'x', ..] => i128::from_str_radix(&s[2..], 16),
+                    [b'0', b'o', ..] => i128::from_str_radix(&s[2..], 8),
+                    [b'0', b'b', ..] => i128::from_str_radix(&s[2..], 2),
+                    _ => i128::from_str_radix(&s, 10),
+                }
+                .map_err(|_| Error::parse(format!("Expected valid intger value, found: '{s}'")))?;
+
+                Value::Integer(inner)
+            }
+            Value::String(_) => Value::String(s.into()),
+        };
+
+        Ok(())
+    }
+
+    /// Convert the value to a [bool].
+    pub fn as_bool(&self) -> bool {
+        match self {
+            Value::Bool(value) => *value,
+            _ => panic!("attempted to convert non-bool value to a bool"),
+        }
+    }
+
+    /// Convert the value to an [i128].
+    pub fn as_integer(&self) -> i128 {
+        match self {
+            Value::Integer(value) => *value,
+            _ => panic!("attempted to convert non-integer value to an integer"),
+        }
+    }
+
+    /// Convert the value to a [String].
+    pub fn as_string(&self) -> String {
+        match self {
+            Value::String(value) => value.to_owned(),
+            _ => panic!("attempted to convert non-string value to a string"),
+        }
+    }
+
+    /// Is the value a bool?
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Value::Bool(_))
+    }
+
+    /// Is the value an integer?
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Value::Integer(_))
+    }
+
+    /// Is the value a string?
+    pub fn is_string(&self) -> bool {
+        matches!(self, Value::String(_))
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Bool(b) => write!(f, "{b}"),
+            Value::Integer(i) => write!(f, "{i}"),
+            Value::String(s) => write!(f, "{s}"),
+        }
+    }
+}
+
+/// Configuration value validation functions.
+pub enum Validator {
+    /// Only allow negative integers, i.e. any values less than 0.
+    NegativeInteger,
+    /// Only allow non-negative integers, i.e. any values greater than or equal
+    /// to 0.
+    NonNegativeInteger,
+    /// Only allow positive integers, i.e. any values greater than to 0.
+    PositiveInteger,
+    /// A custom validation function to run against any supported value type.
+    Custom(Box<dyn Fn(&Value) -> Result<(), Error>>),
+}
+
+impl Validator {
+    fn validate(&self, value: &Value) -> Result<(), Error> {
+        match self {
+            Validator::NegativeInteger => negative_integer(value)?,
+            Validator::NonNegativeInteger => non_negative_integer(value)?,
+            Validator::PositiveInteger => positive_integer(value)?,
+            Validator::Custom(validator_fn) => validator_fn(value)?,
+        }
+
+        Ok(())
+    }
+}
+
+fn negative_integer(value: &Value) -> Result<(), Error> {
+    if !value.is_integer() {
+        return Err(Error::validation(
+            "Validator::NegativeInteger can only be used with integer values",
+        ));
+    } else if value.as_integer() >= 0 {
+        return Err(Error::validation(format!(
+            "Expected negative integer, found '{}'",
+            value.as_integer()
+        )));
+    }
+
+    Ok(())
+}
+
+fn non_negative_integer(value: &Value) -> Result<(), Error> {
+    if !value.is_integer() {
+        return Err(Error::validation(
+            "Validator::NonNegativeInteger can only be used with integer values",
+        ));
+    } else if value.as_integer() < 0 {
+        return Err(Error::validation(format!(
+            "Expected non-negative integer, found '{}'",
+            value.as_integer()
+        )));
+    }
+
+    Ok(())
+}
+
+fn positive_integer(value: &Value) -> Result<(), Error> {
+    if !value.is_integer() {
+        return Err(Error::validation(
+            "Validator::PositiveInteger can only be used with integer values",
+        ));
+    } else if value.as_integer() <= 0 {
+        return Err(Error::validation(format!(
+            "Expected positive integer, found '{}'",
+            value.as_integer()
+        )));
+    }
+
+    Ok(())
+}
+
+/// TODO: Document me!
 pub fn generate_config(
     prefix: &str,
-    config: &[(&str, Value, &str)],
+    config: &[(&str, &str, Value, Option<Validator>)],
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
-    // only rebuild if build.rs changed. Otherwise Cargo will rebuild if any
+    // Only rebuild if `build.rs` changed. Otherwise, Cargo will rebuild if any
     // other file changed.
     println!("cargo:rerun-if-changed=build.rs");
+
     #[cfg(not(test))]
     env_change_work_around();
 
-    // ensure that the prefix is `SCREAMING_SNAKE_CASE`
-    let prefix = format!("{}_", screaming_snake_case(prefix));
     let mut doc_table = String::from(DOC_TABLE_HEADER);
-    let mut selected_config = String::from(CHOSEN_TABLE_HEADER);
+    let mut selected_config = String::from(SELECTED_TABLE_HEADER);
+
+    // Ensure that the prefix is `SCREAMING_SNAKE_CASE`:
+    let prefix = screaming_snake_case(prefix);
+
+    // Build a lookup table for any provided validators; we must prefix the
+    // name of the config and transform it to SCREAMING_SNAKE_CASE so that
+    // it matches the keys in the hash table produced by `create_config`.
+    let config_validators = config
+        .iter()
+        .flat_map(|(name, _description, _default, validator)| {
+            if let Some(validator) = validator {
+                let name = format!("{prefix}_{}", screaming_snake_case(name));
+                Some((name, validator))
+            } else {
+                None
+            }
+        })
+        .collect::<HashMap<_, _>>();
 
     let mut configs = create_config(&prefix, config, &mut doc_table);
     capture_from_env(&prefix, &mut configs);
+
+    for (name, value) in configs.iter() {
+        if let Some(validator) = config_validators.get(name) {
+            validator.validate(value).unwrap();
+        }
+    }
+
     emit_configuration(&prefix, &configs, &mut selected_config);
 
     if emit_md_tables {
@@ -118,8 +278,7 @@ fn env_change_work_around() {
     // target
     while !out_dir.ends_with("target") {
         if !out_dir.pop() {
-            // We ran out of directories...
-            return;
+            return; // We ran out of directories...
         }
     }
     out_dir.pop();
@@ -141,44 +300,42 @@ fn env_change_work_around() {
     }
 }
 
-fn emit_configuration(
+fn create_config(
     prefix: &str,
-    configs: &HashMap<String, Value>,
-    selected_config: &mut String,
-) {
-    // emit cfgs and set envs
-    for (name, value) in configs.into_iter() {
-        let cfg_name = snake_case(name.trim_start_matches(prefix));
-        println!("cargo:rustc-check-cfg=cfg({cfg_name})");
-        match value {
-            Value::Bool(true) => {
-                println!("cargo:rustc-cfg={cfg_name}")
-            }
-            _ => {}
-        }
+    config: &[(&str, &str, Value, Option<Validator>)],
+    doc_table: &mut String,
+) -> HashMap<String, Value> {
+    let mut configs = HashMap::new();
 
-        let value = value.as_string();
-        // values that haven't been seen will be output here with the default value
-        println!("cargo:rustc-env={}={}", name, value);
+    for (name, description, default, _validator) in config {
+        let name = format!("{prefix}_{}", screaming_snake_case(name));
+        configs.insert(name.clone(), default.clone());
 
-        writeln!(selected_config, "|**{name}**|{value}|").unwrap();
+        // Write documentation table line:
+        let default = default.to_string();
+        writeln!(doc_table, "|**{name}**|{description}|{default}|").unwrap();
+
+        // Rebuild if config environment variable changed:
+        println!("cargo:rerun-if-env-changed={name}");
     }
+
+    configs
 }
 
 fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
     let mut unknown = Vec::new();
     let mut failed = Vec::new();
 
-    // Try and capture input from the environment
+    // Try and capture input from the environment:
     for (var, value) in env::vars() {
-        if let Some(_) = var.strip_prefix(prefix) {
+        if var.strip_prefix(prefix).is_some() {
             let Some(cfg) = configs.get_mut(&var) else {
                 unknown.push(var);
                 continue;
             };
 
             if let Err(e) = cfg.parse_in_place(&value) {
-                failed.push(format!("{}: {e:?}", var));
+                failed.push(format!("{var}: {e}"));
             }
         }
     }
@@ -192,61 +349,54 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
     }
 }
 
-fn create_config(
+fn emit_configuration(
     prefix: &str,
-    config: &[(&str, Value, &str)],
-    doc_table: &mut String,
-) -> HashMap<String, Value> {
-    // Generate the template for the config
-    let mut configs = HashMap::new();
-    for (name, default, desc) in config {
-        let name = format!("{prefix}{}", screaming_snake_case(&name));
-        configs.insert(name.clone(), default.clone());
+    configs: &HashMap<String, Value>,
+    selected_config: &mut String,
+) {
+    for (name, value) in configs.iter() {
+        let cfg_name = snake_case(name.trim_start_matches(&format!("{prefix}_")));
+        println!("cargo:rustc-check-cfg=cfg({cfg_name})");
 
-        // write doc table line
-        let default = default.as_string();
-        writeln!(doc_table, "|**{name}**|{desc}|{default}|").unwrap();
+        if let Value::Bool(true) = value {
+            println!("cargo:rustc-cfg={cfg_name}");
+        }
 
-        // Rebuild if config envvar changed.
-        println!("cargo:rerun-if-env-changed={name}");
+        let value = value.to_string();
+
+        // Values that haven't been seen will be output here with the default value:
+        println!("cargo:rustc-env={}={}", name, value);
+        writeln!(selected_config, "|**{name}**|{value}|").unwrap();
     }
-
-    configs
 }
 
 fn write_config_tables(prefix: &str, doc_table: String, selected_config: String) {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+
     let out_file = out_dir
-        .join(format!("{prefix}config_table.md"))
-        .to_string_lossy()
+        .join(format!("{prefix}_config_table.md"))
+        .display()
         .to_string();
     fs::write(out_file, doc_table).unwrap();
 
-    let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let out_file = out_dir
-        .join(format!("{prefix}selected_config.md"))
-        .to_string_lossy()
+        .join(format!("{prefix}_selected_config.md"))
+        .display()
         .to_string();
     fs::write(out_file, selected_config).unwrap();
 }
 
-// Converts a symbol name like
-// "PLACE-spi_DRIVER-IN_ram"
-// to
-// "place_spi_driver_in_ram"
 fn snake_case(name: &str) -> String {
     let mut name = name.replace("-", "_");
     name.make_ascii_lowercase();
+
     name
 }
 
-// Converts a symbol name like
-// "PLACE-spi_DRIVER-IN_ram"
-// to
-// "PLACE_SPI_DRIVER_IN_RAM"
 fn screaming_snake_case(name: &str) -> String {
     let mut name = name.replace("-", "_");
     name.make_ascii_uppercase();
+
     name
 }
 
@@ -257,32 +407,24 @@ mod test {
     #[test]
     fn value_number_formats() {
         const INPUTS: &[&str] = &["0xAA", "0o252", "0b0000000010101010", "170"];
-        let mut v = Value::SignedInteger(0);
+        let mut v = Value::Integer(0);
 
         for input in INPUTS {
             v.parse_in_place(input).unwrap();
             // no matter the input format, the output format should be decimal
-            assert_eq!(v.as_string(), "170");
+            assert_eq!(format!("{v}"), "170");
         }
     }
 
     #[test]
     fn value_bool_inputs() {
-        const TRUE_INPUTS: &[&str] = &["true", "y", "yes"];
-        const FALSE_INPUTS: &[&str] = &["false", "n", "no"];
         let mut v = Value::Bool(false);
 
-        for input in TRUE_INPUTS {
-            v.parse_in_place(input).unwrap();
-            // no matter the input variant, the output format should be "true"
-            assert_eq!(v.as_string(), "true");
-        }
+        v.parse_in_place("true").unwrap();
+        assert_eq!(format!("{v}"), "true");
 
-        for input in FALSE_INPUTS {
-            v.parse_in_place(input).unwrap();
-            // no matter the input variant, the output format should be "false"
-            assert_eq!(v.as_string(), "false");
-        }
+        v.parse_in_place("false").unwrap();
+        assert_eq!(format!("{v}"), "false");
     }
 
     #[test]
@@ -298,13 +440,18 @@ mod test {
                 let configs = generate_config(
                     "esp-test",
                     &[
-                        ("number", Value::UnsignedInteger(999), "NA"),
-                        ("number_signed", Value::SignedInteger(-777), "NA"),
-                        ("string", Value::String("Demo".to_owned()), "NA"),
-                        ("bool", Value::Bool(false), "NA"),
-                        ("number_default", Value::UnsignedInteger(999), "NA"),
-                        ("string_default", Value::String("Demo".to_owned()), "NA"),
-                        ("bool_default", Value::Bool(false), "NA"),
+                        ("number", "NA", Value::Integer(999), None),
+                        ("number_signed", "NA", Value::Integer(-777), None),
+                        ("string", "NA", Value::String("Demo".to_owned()), None),
+                        ("bool", "NA", Value::Bool(false), None),
+                        ("number_default", "NA", Value::Integer(999), None),
+                        (
+                            "string_default",
+                            "NA",
+                            Value::String("Demo".to_owned()),
+                            None,
+                        ),
+                        ("bool_default", "NA", Value::Bool(false), None),
                     ],
                     false,
                 );
@@ -312,14 +459,14 @@ mod test {
                 // some values have changed
                 assert_eq!(
                     match configs.get("ESP_TEST_NUMBER").unwrap() {
-                        Value::UnsignedInteger(num) => *num,
+                        Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     0xaa
                 );
                 assert_eq!(
                     match configs.get("ESP_TEST_NUMBER_SIGNED").unwrap() {
-                        Value::SignedInteger(num) => *num,
+                        Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     -999
@@ -342,7 +489,7 @@ mod test {
                 // the rest are the defaults
                 assert_eq!(
                     match configs.get("ESP_TEST_NUMBER_DEFAULT").unwrap() {
-                        Value::UnsignedInteger(num) => *num,
+                        Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     999
@@ -366,6 +513,107 @@ mod test {
     }
 
     #[test]
+    fn builtin_validation_passes() {
+        temp_env::with_vars(
+            [
+                ("ESP_TEST_POSITIVE_NUMBER", Some("7")),
+                ("ESP_TEST_NEGATIVE_NUMBER", Some("-1")),
+                ("ESP_TEST_NON_NEGATIVE_NUMBER", Some("0")),
+            ],
+            || {
+                generate_config(
+                    "esp-test",
+                    &[
+                        (
+                            "positive_number",
+                            "NA",
+                            Value::Integer(-1),
+                            Some(Validator::PositiveInteger),
+                        ),
+                        (
+                            "negative_number",
+                            "NA",
+                            Value::Integer(1),
+                            Some(Validator::NegativeInteger),
+                        ),
+                        (
+                            "non_negative_number",
+                            "NA",
+                            Value::Integer(-1),
+                            Some(Validator::NonNegativeInteger),
+                        ),
+                    ],
+                    false,
+                )
+            },
+        );
+    }
+
+    #[test]
+    fn custom_validation_passes() {
+        temp_env::with_vars([("ESP_TEST_NUMBER", Some("13"))], || {
+            generate_config(
+                "esp-test",
+                &[(
+                    "number",
+                    "NA",
+                    Value::Integer(-1),
+                    Some(Validator::Custom(Box::new(|value| {
+                        let range = 10..20;
+                        if !value.is_integer() || !range.contains(&value.as_integer()) {
+                            Err(Error::validation("value does not fall within range"))
+                        } else {
+                            Ok(())
+                        }
+                    }))),
+                )],
+                false,
+            )
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn builtin_validation_bails() {
+        temp_env::with_vars([("ESP_TEST_POSITIVE_NUMBER", Some("-99"))], || {
+            generate_config(
+                "esp-test",
+                &[(
+                    "positive_number",
+                    "NA",
+                    Value::Integer(-1),
+                    Some(Validator::PositiveInteger),
+                )],
+                false,
+            )
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn custom_validation_bails() {
+        temp_env::with_vars([("ESP_TEST_NUMBER", Some("37"))], || {
+            generate_config(
+                "esp-test",
+                &[(
+                    "number",
+                    "NA",
+                    Value::Integer(-1),
+                    Some(Validator::Custom(Box::new(|value| {
+                        let range = 10..20;
+                        if !value.is_integer() || !range.contains(&value.as_integer()) {
+                            Err(Error::validation("value does not fall within range"))
+                        } else {
+                            Ok(())
+                        }
+                    }))),
+                )],
+                false,
+            )
+        });
+    }
+
+    #[test]
     #[should_panic]
     fn env_unknown_bails() {
         temp_env::with_vars(
@@ -376,7 +624,7 @@ mod test {
             || {
                 generate_config(
                     "esp-test",
-                    &[("number", Value::UnsignedInteger(999), "NA")],
+                    &[("number", "NA", Value::Integer(999), None)],
                     false,
                 );
             },
@@ -389,7 +637,7 @@ mod test {
         temp_env::with_vars([("ESP_TEST_NUMBER", Some("Hello world"))], || {
             generate_config(
                 "esp-test",
-                &[("number", Value::UnsignedInteger(999), "NA")],
+                &[("number", "NA", Value::Integer(999), None)],
                 false,
             );
         });
