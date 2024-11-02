@@ -242,37 +242,29 @@ pub trait Unit {
                     _ => unreachable!(),
                 },
                 UnitConfig::DisabledIfCpuIsStalled(cpu) => match self.channel() {
-                    0 => w
-                        .timer_unit0_work_en()
-                        .set_bit()
-                        .timer_unit0_core0_stall_en()
-                        .bit(cpu == Cpu::ProCpu)
-                        .timer_unit0_core1_stall_en()
-                        .bit(cpu != Cpu::ProCpu),
-                    1 => w
-                        .timer_unit1_work_en()
-                        .set_bit()
-                        .timer_unit1_core0_stall_en()
-                        .bit(cpu == Cpu::ProCpu)
-                        .timer_unit1_core1_stall_en()
-                        .bit(cpu != Cpu::ProCpu),
+                    0 => {
+                        w.timer_unit0_work_en().set_bit();
+                        w.timer_unit0_core0_stall_en().bit(cpu == Cpu::ProCpu);
+                        w.timer_unit0_core1_stall_en().bit(cpu != Cpu::ProCpu)
+                    }
+                    1 => {
+                        w.timer_unit1_work_en().set_bit();
+                        w.timer_unit1_core0_stall_en().bit(cpu == Cpu::ProCpu);
+                        w.timer_unit1_core1_stall_en().bit(cpu != Cpu::ProCpu)
+                    }
                     _ => unreachable!(),
                 },
                 UnitConfig::Enabled => match self.channel() {
-                    0 => w
-                        .timer_unit0_work_en()
-                        .set_bit()
-                        .timer_unit0_core0_stall_en()
-                        .clear_bit()
-                        .timer_unit0_core1_stall_en()
-                        .clear_bit(),
-                    1 => w
-                        .timer_unit1_work_en()
-                        .set_bit()
-                        .timer_unit1_core0_stall_en()
-                        .clear_bit()
-                        .timer_unit1_core1_stall_en()
-                        .clear_bit(),
+                    0 => {
+                        w.timer_unit0_work_en().set_bit();
+                        w.timer_unit0_core0_stall_en().clear_bit();
+                        w.timer_unit0_core1_stall_en().clear_bit()
+                    }
+                    1 => {
+                        w.timer_unit1_work_en().set_bit();
+                        w.timer_unit1_core0_stall_en().clear_bit();
+                        w.timer_unit1_core1_stall_en().clear_bit()
+                    }
                     _ => unreachable!(),
                 },
             });
