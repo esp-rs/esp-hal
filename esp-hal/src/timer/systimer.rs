@@ -367,7 +367,7 @@ impl<const CHANNEL: u8> SpecificUnit<'_, CHANNEL> {
     }
 }
 
-const CHANNEL_COUNT: usize = 3;
+const CHANNEL_COUNT: usize = 1 + cfg!(not(esp32s2)) as usize;
 static UPDATING: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
 impl<const CHANNEL: u8> Unit for SpecificUnit<'_, CHANNEL> {
     fn channel(&self) -> u8 {
