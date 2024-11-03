@@ -351,6 +351,11 @@ impl DmaDescriptor {
     }
 }
 
+// The pointers in the descriptor can be Sent.
+// Marking this Send also allows DmaBuffer implementations to automatically be
+// Send (where the compiler sees fit).
+unsafe impl Send for DmaDescriptor {}
+
 use enumset::{EnumSet, EnumSetType};
 
 pub use self::buffers::*;
