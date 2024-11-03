@@ -868,6 +868,26 @@ pub unsafe extern "C" fn event_post(
     trace!("EVENT: {:?}", event);
     critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).insert(event));
 
+    // Call event handlers.
+    macro_rules! handle {
+        ($ty:ident) => {{
+            use crate::wifi::event::{$ty, WifiEventData};
+            assert_eq!(event_data_size, size_of::<$ty>(), "wrong size event data");
+            critical_section::with(|cs| {
+                if let Some(handler) = &mut *$ty::get_handler().borrow_ref_mut(cs) {
+                    // Safety: `event_id` should match the corresponding event data.
+                    handler(unsafe { &*event_data.cast() })
+                }
+            });
+        }};
+    }
+    match event {
+        WifiEvent::ApProbereqrecved => handle!(wifi_event_ap_probe_req_rx_t),
+        WifiEvent::ApStaconnected => handle!(wifi_event_ap_staconnected_t),
+        WifiEvent::ApStadisconnected => handle!(wifi_event_ap_stadisconnected_t),
+        _ => (),
+    }
+
     super::state::update_state(event);
 
     #[cfg(feature = "async")]

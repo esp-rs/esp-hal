@@ -1,5 +1,6 @@
 //! WiFi
 
+pub mod event;
 pub(crate) mod os_adapter;
 pub(crate) mod state;
 

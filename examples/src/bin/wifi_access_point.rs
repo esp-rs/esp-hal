@@ -14,6 +14,10 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+
+use alloc::boxed::Box;
+
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -27,6 +31,7 @@ use esp_println::{print, println};
 use esp_wifi::{
     init,
     wifi::{
+        event::{self, WifiEventData},
         utils::create_network_interface,
         AccessPointConfiguration,
         Configuration,
@@ -57,6 +62,37 @@ fn main() -> ! {
         peripherals.RADIO_CLK,
     )
     .unwrap();
+
+    let mut connections = 0u32;
+    event::wifi_event_ap_staconnected_t::update_handler(|mut prev| {
+        Box::leak(Box::new(move |event| {
+            connections += 1;
+            esp_println::println!("connected {}, mac: {:?}", connections, event.mac);
+            if let Some(prev) = &mut prev {
+                prev(event)
+            };
+        }))
+    });
+    event::wifi_event_ap_staconnected_t::update_handler(|mut prev| {
+        Box::leak(Box::new(move |event| {
+            esp_println::println!("connected aid: {}", event.aid);
+            if let Some(prev) = &mut prev {
+                prev(event)
+            };
+        }))
+    });
+    event::wifi_event_ap_stadisconnected_t::update_handler(|mut prev| {
+        Box::leak(Box::new(move |event| {
+            if let Some(prev) = &mut prev {
+                prev(event)
+            };
+            esp_println::println!(
+                "disconnected mac: {:?}, reason: {:?}",
+                event.mac,
+                event.reason
+            );
+        }))
+    });
 
     let mut wifi = peripherals.WIFI;
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
