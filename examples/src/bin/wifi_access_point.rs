@@ -64,28 +64,22 @@ fn main() -> ! {
     .unwrap();
 
     let mut connections = 0u32;
-    event::wifi_event_ap_staconnected_t::update_handler(|mut prev| {
+    event::wifi_event_ap_staconnected_t::update_handler(|prev| {
         Box::leak(Box::new(move |event| {
             connections += 1;
             esp_println::println!("connected {}, mac: {:?}", connections, event.mac);
-            if let Some(prev) = &mut prev {
-                prev(event)
-            };
+            prev(event);
         }))
     });
-    event::wifi_event_ap_staconnected_t::update_handler(|mut prev| {
+    event::wifi_event_ap_staconnected_t::update_handler(|prev| {
         Box::leak(Box::new(move |event| {
             esp_println::println!("connected aid: {}", event.aid);
-            if let Some(prev) = &mut prev {
-                prev(event)
-            };
+            prev(event)
         }))
     });
-    event::wifi_event_ap_stadisconnected_t::update_handler(|mut prev| {
+    event::wifi_event_ap_stadisconnected_t::update_handler(|prev| {
         Box::leak(Box::new(move |event| {
-            if let Some(prev) = &mut prev {
-                prev(event)
-            };
+            prev(event);
             esp_println::println!(
                 "disconnected mac: {:?}, reason: {:?}",
                 event.mac,

@@ -871,7 +871,7 @@ pub unsafe extern "C" fn event_post(
     // Call event handlers.
     macro_rules! handle {
         ($ty:ident) => {{
-            use crate::wifi::event::{$ty, WifiEventData};
+            use crate::wifi::event::{sealed::Sealed, $ty};
             assert_eq!(event_data_size, size_of::<$ty>(), "wrong size event data");
             critical_section::with(|cs| {
                 if let Some(handler) = &mut *$ty::get_handler().borrow_ref_mut(cs) {
