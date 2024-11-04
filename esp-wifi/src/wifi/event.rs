@@ -78,3 +78,14 @@ macro_rules! impl_wifi_event_data {
 impl_wifi_event_data!(esp_wifi_sys::include::wifi_event_ap_probe_req_rx_t);
 impl_wifi_event_data!(esp_wifi_sys::include::wifi_event_ap_staconnected_t);
 impl_wifi_event_data!(esp_wifi_sys::include::wifi_event_ap_stadisconnected_t);
+
+/// Handle the given event using the registered event handlers.
+pub fn handle<E: WifiEventData>(event_data: &E, event_data_size: usize) {
+    debug_assert_eq!(event_data_size, size_of::<E>(), "wrong size event data");
+    critical_section::with(|cs| {
+        if let Some(handler) = &mut *E::get_handler().borrow_ref_mut(cs) {
+            // Safety: `event_id` should match the corresponding event data.
+            handler(event_data)
+        }
+    });
+}
