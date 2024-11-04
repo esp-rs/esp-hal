@@ -899,14 +899,6 @@ mod dma {
         }
     }
 
-    #[cfg(all(esp32, spi_address_workaround))]
-    unsafe impl<'d, M, T> Send for SpiDma<'d, M, T>
-    where
-        T: Instance,
-        M: Mode,
-    {
-    }
-
     impl<M, T> core::fmt::Debug for SpiDma<'_, M, T>
     where
         T: Instance,
