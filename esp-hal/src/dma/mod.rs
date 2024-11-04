@@ -19,7 +19,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::gpio::Io;
-//! # use esp_hal::spi::{master::Spi, SpiMode};
+//! # use esp_hal::spi::{master::{Config, Spi}, SpiMode};
 //! # use esp_hal::dma::{Dma, DmaPriority};
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
@@ -30,10 +30,13 @@
 //! let mosi = io.pins.gpio4;
 //! let cs = io.pins.gpio5;
 //!
-//! let mut spi = Spi::new(
+//! let mut spi = Spi::new_with_config(
 //!     peripherals.SPI2,
-//!     100.kHz(),
-//!     SpiMode::Mode0,
+//!     Config {
+//!         frequency: 100.kHz(),
+//!         mode: SpiMode::Mode0,
+//!         ..Config::default()
+//!     },
 //! )
 //! .with_sck(sclk)
 //! .with_mosi(mosi)

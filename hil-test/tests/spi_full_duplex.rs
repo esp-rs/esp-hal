@@ -17,7 +17,7 @@ use esp_hal::{
     gpio::{Io, Level, NoPin},
     peripheral::Peripheral,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::master::{Config, Spi},
     Blocking,
 };
 #[cfg(pcnt)]
@@ -76,10 +76,16 @@ mod tests {
         let (mosi_loopback_pcnt, mosi) = mosi.split();
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
-        let spi = Spi::new(peripherals.SPI2, 10000.kHz(), SpiMode::Mode0)
-            .with_sck(sclk)
-            .with_miso(unsafe { mosi.clone_unchecked() })
-            .with_mosi(mosi);
+        let spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 10.MHz(),
+                ..Config::default()
+            },
+        )
+        .with_sck(sclk)
+        .with_miso(unsafe { mosi.clone_unchecked() })
+        .with_mosi(mosi);
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
@@ -491,7 +497,10 @@ mod tests {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         // This means that without working cancellation, the test case should
         // fail.
-        ctx.spi.change_bus_frequency(80.kHz());
+        ctx.spi.apply_config(&Config {
+            frequency: 80.kHz(),
+            ..Config::default()
+        });
 
         // Set up a large buffer that would trigger a timeout
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
@@ -514,7 +523,10 @@ mod tests {
     #[timeout(3)]
     fn can_transmit_after_cancel(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
-        ctx.spi.change_bus_frequency(80.kHz());
+        ctx.spi.apply_config(&Config {
+            frequency: 80.kHz(),
+            ..Config::default()
+        });
 
         // Set up a large buffer that would trigger a timeout
         let mut dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
@@ -532,7 +544,10 @@ mod tests {
         transfer.cancel();
         (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
 
-        spi.change_bus_frequency(10000.kHz());
+        spi.apply_config(&Config {
+            frequency: 10.MHz(),
+            ..Config::default()
+        });
 
         let transfer = spi
             .transfer(dma_rx_buf, dma_tx_buf)

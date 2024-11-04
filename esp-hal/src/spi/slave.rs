@@ -31,7 +31,8 @@
 //! let cs = io.pins.gpio3;
 //!
 //! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-//! dma_buffers!(32000); let mut spi = Spi::new(
+//! dma_buffers!(32000);
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     sclk,
 //!     mosi,

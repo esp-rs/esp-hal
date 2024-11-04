@@ -35,7 +35,7 @@ use esp_hal::{
     gpio::Io,
     prelude::*,
     spi::{
-        master::{Address, Command, Spi},
+        master::{Address, Command, Config, Spi},
         SpiDataMode,
         SpiMode,
     },
@@ -79,14 +79,21 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_sck(sclk)
-        .with_mosi(mosi)
-        .with_miso(miso)
-        .with_sio2(sio2)
-        .with_sio3(sio3)
-        .with_cs(cs)
-        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+    let mut spi = Spi::new_with_config(
+        peripherals.SPI2,
+        Config {
+            frequency: 100.kHz(),
+            mode: SpiMode::Mode0,
+            ..Config::default()
+        },
+    )
+    .with_sck(sclk)
+    .with_mosi(mosi)
+    .with_miso(miso)
+    .with_sio2(sio2)
+    .with_sio3(sio3)
+    .with_cs(cs)
+    .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
     let delay = Delay::new();
 

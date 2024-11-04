@@ -29,7 +29,10 @@ use esp_hal::{
     gpio::Io,
     peripheral::Peripheral,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::{
+        master::{Config, Spi},
+        SpiMode,
+    },
 };
 extern crate alloc;
 use log::*;
@@ -90,12 +93,19 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     // Need to set miso first so that mosi can overwrite the
     // output connection (because we are using the same pin to loop back)
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_sck(sclk)
-        .with_miso(miso)
-        .with_mosi(mosi)
-        .with_cs(cs)
-        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+    let mut spi = Spi::new_with_config(
+        peripherals.SPI2,
+        Config {
+            frequency: 100.kHz(),
+            mode: SpiMode::Mode0,
+            ..Config::default()
+        },
+    )
+    .with_sck(sclk)
+    .with_miso(miso)
+    .with_mosi(mosi)
+    .with_cs(cs)
+    .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
     delay.delay_millis(100); // delay to let the above messages display
 

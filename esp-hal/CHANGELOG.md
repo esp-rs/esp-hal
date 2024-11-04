@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `{Uart, UartRx, UartTx}` now implement `embassy_embedded_hal::SetConfig` (#2449)
 - GPIO ETM tasks and events now accept `InputSignal` and `OutputSignal` (#2427)
 - `spi::master::Config` and `{Spi, SpiDma, SpiDmaBus}::apply_config` (#2448)
+- `embassy_embedded_hal::SetConfig` is now implemented for `{Spi, SpiDma, SpiDmaBus}` (#2448)
 
 ### Changed
 

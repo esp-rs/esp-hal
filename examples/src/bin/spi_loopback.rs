@@ -21,7 +21,10 @@ use esp_hal::{
     gpio::Io,
     peripheral::Peripheral,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::{
+        master::{Config, Spi},
+        SpiMode,
+    },
 };
 use esp_println::println;
 
@@ -36,11 +39,18 @@ fn main() -> ! {
 
     let miso = unsafe { miso_mosi.clone_unchecked() };
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_sck(sclk)
-        .with_mosi(miso_mosi)
-        .with_miso(miso)
-        .with_cs(cs);
+    let mut spi = Spi::new_with_config(
+        peripherals.SPI2,
+        Config {
+            frequency: 100.kHz(),
+            mode: SpiMode::Mode0,
+            ..Config::default()
+        },
+    )
+    .with_sck(sclk)
+    .with_mosi(miso_mosi)
+    .with_miso(miso)
+    .with_cs(cs);
 
     let delay = Delay::new();
 

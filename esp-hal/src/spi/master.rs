@@ -24,8 +24,9 @@
 //! ### Shared SPI access
 //!
 //! If you have multiple devices on the same SPI bus that each have their own CS
-//! line, you may want to have a look at the implementations provided by
-//! [`embedded-hal-bus`] and [`embassy-embedded-hal`].
+//! line (and optionally, configuration), you may want to have a look at the
+//! implementations provided by [`embedded-hal-bus`] and
+//! [`embassy-embedded-hal`].
 //!
 //! ## Usage
 //!
@@ -38,7 +39,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::spi::SpiMode;
-//! # use esp_hal::spi::master::Spi;
+//! # use esp_hal::spi::master::{Config, Spi};
 //! # use esp_hal::gpio::Io;
 //! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! let sclk = io.pins.gpio0;
@@ -46,10 +47,13 @@
 //! let mosi = io.pins.gpio1;
 //! let cs = io.pins.gpio5;
 //!
-//! let mut spi = Spi::new(
+//! let mut spi = Spi::new_with_config(
 //!     peripherals.SPI2,
-//!     100.kHz(),
-//!     SpiMode::Mode0,
+//!     Config {
+//!         frequency: 100.kHz(),
+//!         mode: SpiMode::Mode0,
+//!         ..Config::default()
+//!     },
 //! )
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
@@ -61,9 +65,10 @@
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: https://docs.embassy.dev/embassy-embedded-hal/git/default/shared_bus/index.html
 
-use core::marker::PhantomData;
+use core::{convert::Infallible, marker::PhantomData};
 
 pub use dma::*;
+use embassy_embedded_hal::SetConfig;
 #[cfg(gdma)]
 use enumset::EnumSet;
 #[cfg(gdma)]
@@ -677,6 +682,20 @@ where
     }
 }
 
+impl<M, T> SetConfig for Spi<'_, M, T>
+where
+    T: Instance,
+    M: Mode,
+{
+    type Config = Config;
+    type ConfigError = Infallible;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config);
+        Ok(())
+    }
+}
+
 impl<'d, M, T> Spi<'d, M, T>
 where
     T: QspiInstance,
@@ -1201,6 +1220,20 @@ mod dma {
             dma_tx_buf: DmaTxBuf,
         ) -> SpiDmaBus<'d, M, T> {
             SpiDmaBus::new(self, dma_rx_buf, dma_tx_buf)
+        }
+    }
+
+    impl<M, T> SetConfig for SpiDma<'_, M, T>
+    where
+        T: Instance,
+        M: Mode,
+    {
+        type Config = Config;
+        type ConfigError = Infallible;
+
+        fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+            self.apply_config(config);
+            Ok(())
         }
     }
 
@@ -1763,6 +1796,20 @@ mod dma {
 
             self.wait_for_idle();
 
+            Ok(())
+        }
+    }
+
+    impl<M, T> SetConfig for SpiDmaBus<'_, M, T>
+    where
+        T: Instance,
+        M: Mode,
+    {
+        type Config = Config;
+        type ConfigError = Infallible;
+
+        fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+            self.apply_config(config);
             Ok(())
         }
     }

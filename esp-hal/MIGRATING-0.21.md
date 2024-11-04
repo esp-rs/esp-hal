@@ -262,3 +262,17 @@ refer to the `Config` struct as `uart::Config`.
   - bit order: MSB first
   - mode: SPI mode 0
 - There are new constructors (`new_with_config`, `new_typed_with_config`) and a new `apply_config` method to apply custom configuration.
+
+```diff
+-use esp_hal::spi::{master::Spi, SpiMode};
++use esp_hal::spi::{master::{Config, Spi}, SpiMode};
+-Spi::new(SPI2, 100.kHz(), SpiMode::Mode1);
++Spi::new_with_config(
++    SPI2,
++    Config {
++        frequency: 100.kHz(),
++        mode: SpiMode::Mode0,
++        ..Config::default()
++    },
++)
+```

@@ -14,7 +14,7 @@ use esp_hal::{
     interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
     spi::{
-        master::{Spi, SpiDma},
+        master::{Config, Spi, SpiDma},
         SpiMode,
     },
     timer::AnyTimer,
@@ -94,14 +94,28 @@ mod test {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_dma(dma_channel1.configure(false, DmaPriority::Priority0))
-            .with_buffers(dma_rx_buf, dma_tx_buf)
-            .into_async();
+        let mut spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        )
+        .with_dma(dma_channel1.configure(false, DmaPriority::Priority0))
+        .with_buffers(dma_rx_buf, dma_tx_buf)
+        .into_async();
 
-        let spi2 = Spi::new(peripherals.SPI3, 100.kHz(), SpiMode::Mode0)
-            .with_dma(dma_channel2.configure(false, DmaPriority::Priority0))
-            .into_async();
+        let spi2 = Spi::new_with_config(
+            peripherals.SPI3,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        )
+        .with_dma(dma_channel2.configure(false, DmaPriority::Priority0))
+        .into_async();
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -156,14 +170,21 @@ mod test {
             let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
             let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-            let mut spi = Spi::new(peripherals.spi, 100.kHz(), SpiMode::Mode0)
-                .with_dma(
-                    peripherals
-                        .dma_channel
-                        .configure(false, DmaPriority::Priority0),
-                )
-                .with_buffers(dma_rx_buf, dma_tx_buf)
-                .into_async();
+            let mut spi = Spi::new_with_config(
+                peripherals.spi,
+                Config {
+                    frequency: 100.kHz(),
+                    mode: SpiMode::Mode0,
+                    ..Config::default()
+                },
+            )
+            .with_dma(
+                peripherals
+                    .dma_channel
+                    .configure(false, DmaPriority::Priority0),
+            )
+            .with_buffers(dma_rx_buf, dma_tx_buf)
+            .into_async();
 
             let send_buffer = mk_static!([u8; BUFFER_SIZE], [0u8; BUFFER_SIZE]);
             loop {
