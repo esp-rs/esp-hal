@@ -1434,6 +1434,3 @@ impl Instance for AnyI2c {
         }
     }
 }
-
-#[cfg(lp_i2c0)]
-pub mod lp_i2c;

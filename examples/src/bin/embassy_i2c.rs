@@ -19,7 +19,7 @@
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{gpio::Io, i2c::master::I2c, prelude::*, timer::timg::TimerGroup};
+use esp_hal::{gpio::Io, i2c::master::I2c, timer::timg::TimerGroup};
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 
 #[esp_hal_embassy::main]

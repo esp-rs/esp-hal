@@ -6,3 +6,6 @@
 //! (SDA) and serial clock line (SCL), pulled up by resistors.
 
 pub mod master;
+
+#[cfg(lp_i2c0)]
+pub mod lp_i2c;
