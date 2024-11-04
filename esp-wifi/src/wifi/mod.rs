@@ -69,7 +69,7 @@ use crate::{
         macros::ram,
         peripheral::{Peripheral, PeripheralRef},
     },
-    EspWifiInitialization,
+    EspWifiController,
 };
 
 const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
@@ -90,8 +90,10 @@ use crate::binary::{
         esp_err_t,
         esp_interface_t_ESP_IF_WIFI_AP,
         esp_interface_t_ESP_IF_WIFI_STA,
+        esp_supplicant_deinit,
         esp_supplicant_init,
         esp_wifi_connect,
+        esp_wifi_deinit_internal,
         esp_wifi_disconnect,
         esp_wifi_get_mode,
         esp_wifi_init_internal,
@@ -281,7 +283,7 @@ pub struct AccessPointConfiguration {
 impl Default for AccessPointConfiguration {
     fn default() -> Self {
         Self {
-            ssid: "iot-device".try_into().unwrap(),
+            ssid: unwrap!("iot-device".try_into()),
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
@@ -1587,8 +1589,17 @@ pub(crate) fn wifi_init() -> Result<(), WifiError> {
             chip_specific::g_misc_nvs = addr_of!(NVS_STRUCT) as u32;
         }
 
+        crate::flags::WIFI.fetch_add(1, Ordering::SeqCst);
+
         Ok(())
     }
+}
+
+pub(crate) fn wifi_deinit() -> Result<(), crate::InitializationError> {
+    esp_wifi_result!(unsafe { esp_wifi_stop() })?;
+    esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+    esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
+    Ok(())
 }
 
 unsafe extern "C" fn recv_cb_sta(
@@ -1654,11 +1665,11 @@ unsafe extern "C" fn recv_cb_ap(
 pub(crate) static WIFI_TX_INFLIGHT: AtomicUsize = AtomicUsize::new(0);
 
 fn decrement_inflight_counter() {
-    WIFI_TX_INFLIGHT
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+    unwrap!(
+        WIFI_TX_INFLIGHT.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
             Some(x.saturating_sub(1))
         })
-        .unwrap();
+    );
 }
 
 #[ram]
@@ -1878,7 +1889,7 @@ pub(crate) fn wifi_start_scan(
 ///
 /// If you want to use AP-STA mode, use `[new_ap_sta]`.
 pub fn new_with_config<'d, MODE: WifiDeviceMode>(
-    inited: &EspWifiInitialization,
+    inited: &'d EspWifiController<'d>,
     device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     config: MODE::Config,
 ) -> Result<(WifiDevice<'d, MODE>, WifiController<'d>), WifiError> {
@@ -1896,8 +1907,8 @@ pub fn new_with_config<'d, MODE: WifiDeviceMode>(
 /// This function will panic if the mode is [`WifiMode::ApSta`].
 /// If you want to use AP-STA mode, use `[new_ap_sta]`.
 pub fn new_with_mode<'d, MODE: WifiDeviceMode>(
-    inited: &EspWifiInitialization,
-    device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
+    inited: &'d EspWifiController<'d>,
+    device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     _mode: MODE,
 ) -> Result<(WifiDevice<'d, MODE>, WifiController<'d>), WifiError> {
     new_with_config(inited, device, <MODE as Sealed>::Config::default())
@@ -1908,7 +1919,7 @@ pub fn new_with_mode<'d, MODE: WifiDeviceMode>(
 ///
 /// Returns a tuple of `(AP device, STA device, controller)`.
 pub fn new_ap_sta<'d>(
-    inited: &EspWifiInitialization,
+    inited: &'d EspWifiController<'d>,
     device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
 ) -> Result<
     (
@@ -1925,7 +1936,7 @@ pub fn new_ap_sta<'d>(
 ///
 /// Returns a tuple of `(AP device, STA device, controller)`.
 pub fn new_ap_sta_with_config<'d>(
-    inited: &EspWifiInitialization,
+    inited: &'d EspWifiController<'d>,
     device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     sta_config: crate::wifi::ClientConfiguration,
     ap_config: crate::wifi::AccessPointConfiguration,
@@ -2448,8 +2459,9 @@ impl Sniffer {
     pub(crate) fn new() -> Self {
         // This shouldn't fail, since the way this is created, means that wifi will
         // always be initialized.
-        esp_wifi_result!(unsafe { esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb)) })
-            .unwrap();
+        unwrap!(esp_wifi_result!(unsafe {
+            esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
+        }));
         Self {
             promiscuous_mode_enabled: AtomicBool::new(false),
         }
@@ -2493,14 +2505,29 @@ pub struct WifiController<'d> {
     sniffer_taken: AtomicBool,
 }
 
+impl<'d> Drop for WifiController<'d> {
+    fn drop(&mut self) {
+        if unwrap!(
+            crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+                Some(x.saturating_sub(1))
+            })
+        ) == 0
+        {
+            if let Err(e) = crate::wifi::wifi_deinit() {
+                warn!("Failed to cleanly deinit wifi: {:?}", e);
+            }
+        }
+    }
+}
+
 impl<'d> WifiController<'d> {
     pub(crate) fn new_with_config(
-        inited: &EspWifiInitialization,
+        inited: &'d EspWifiController<'d>,
         _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
         config: Configuration,
     ) -> Result<Self, WifiError> {
-        if !inited.is_wifi() {
-            return Err(WifiError::NotInitialized);
+        if !inited.wifi() {
+            crate::wifi::wifi_init()?;
         }
 
         // We set up the controller with the default config because we need to call

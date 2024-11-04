@@ -34,6 +34,7 @@ unsafe extern "C" fn strcat(destination: *mut u8, source: *const u8) -> *const u
 unsafe extern "C" fn strcmp(str1: *const i8, str2: *const i8) -> i32 {
     trace!("strcmp {:?} {:?}", str1, str2);
 
+    // TODO: unwrap!() when defmt supports it
     let s1 = core::ffi::CStr::from_ptr(str1).to_str().unwrap();
     let s2 = core::ffi::CStr::from_ptr(str2).to_str().unwrap();
 
@@ -146,7 +147,7 @@ unsafe extern "C" fn strdup(str: *const i8) -> *const u8 {
 
     unsafe {
         let s = core::ffi::CStr::from_ptr(str);
-        let s = s.to_str().unwrap();
+        let s = s.to_str().unwrap(); // TODO when defmt supports it
 
         let p = malloc(s.len() + 1);
         core::ptr::copy_nonoverlapping(str, p as *mut i8, s.len() + 1);

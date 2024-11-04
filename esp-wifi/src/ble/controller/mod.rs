@@ -3,7 +3,7 @@ use embedded_io::{Error, ErrorType, Read, Write};
 use super::{read_hci, read_next, send_hci};
 use crate::{
     hal::peripheral::{Peripheral, PeripheralRef},
-    EspWifiInitialization,
+    EspWifiController,
 };
 
 /// A blocking HCI connector
@@ -11,14 +11,18 @@ pub struct BleConnector<'d> {
     _device: PeripheralRef<'d, crate::hal::peripherals::BT>,
 }
 
+impl<'d> Drop for BleConnector<'d> {
+    fn drop(&mut self) {
+        crate::ble::ble_deinit();
+    }
+}
+
 impl<'d> BleConnector<'d> {
     pub fn new(
-        init: &EspWifiInitialization,
+        _init: &'d EspWifiController<'d>,
         device: impl Peripheral<P = crate::hal::peripherals::BT> + 'd,
     ) -> BleConnector<'d> {
-        if !init.is_ble() {
-            panic!("Not initialized for BLE use");
-        }
+        crate::ble::ble_init();
 
         Self {
             _device: device.into_ref(),
@@ -80,7 +84,7 @@ impl Write for BleConnector<'_> {
 
 /// Async Interface
 #[cfg(feature = "async")]
-pub mod asynch {
+pub(crate) mod asynch {
     use core::task::Poll;
 
     use bt_hci::{
@@ -91,43 +95,14 @@ pub mod asynch {
         WriteHci,
     };
     use embassy_sync::waitqueue::AtomicWaker;
-    use embedded_io::ErrorType;
 
-    use super::{read_hci, send_hci, BleConnectorError};
-    use crate::{
-        ble::have_hci_read_data,
-        hal::peripheral::{Peripheral, PeripheralRef},
-        EspWifiInitialization,
-    };
+    use super::*;
+    use crate::ble::have_hci_read_data;
 
     static HCI_WAKER: AtomicWaker = AtomicWaker::new();
 
     pub(crate) fn hci_read_data_available() {
         HCI_WAKER.wake();
-    }
-
-    /// Async HCI connector
-    pub struct BleConnector<'d> {
-        _device: PeripheralRef<'d, crate::hal::peripherals::BT>,
-    }
-
-    impl<'d> BleConnector<'d> {
-        pub fn new(
-            init: &EspWifiInitialization,
-            device: impl Peripheral<P = crate::hal::peripherals::BT> + 'd,
-        ) -> BleConnector<'d> {
-            if !init.is_ble() {
-                panic!("Not initialized for BLE use");
-            }
-
-            Self {
-                _device: device.into_ref(),
-            }
-        }
-    }
-
-    impl ErrorType for BleConnector<'_> {
-        type Error = BleConnectorError;
     }
 
     impl embedded_io_async::Read for BleConnector<'_> {
