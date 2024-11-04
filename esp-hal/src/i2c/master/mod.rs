@@ -295,10 +295,7 @@ where
         while let Some(op) = op_iter.next() {
             let next_op = op_iter.peek().map(|v| v.kind());
             let kind = op.kind();
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
             match op {
                 Operation::Write(buffer) => {
                     // execute a write operation:
@@ -310,7 +307,6 @@ where
                             buffer,
                             !matches!(last_op, Some(OpKind::Write)),
                             next_op.is_none(),
-                            cmd_iterator,
                         )
                         .inspect_err(|_| self.internal_recover())?;
                 }
@@ -326,7 +322,6 @@ where
                             !matches!(last_op, Some(OpKind::Read)),
                             next_op.is_none(),
                             matches!(next_op, Some(OpKind::Read)),
-                            cmd_iterator,
                         )
                         .inspect_err(|_| self.internal_recover())?;
                 }
@@ -442,11 +437,6 @@ where
     pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
-
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
-
             self.driver()
                 .read_operation_blocking(
                     address,
@@ -454,7 +444,6 @@ where
                     idx == 0,
                     idx == chunk_count - 1,
                     idx < chunk_count - 1,
-                    cmd_iterator,
                 )
                 .inspect_err(|_| self.internal_recover())?;
         }
@@ -466,19 +455,8 @@ where
     pub fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
-
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
-
             self.driver()
-                .write_operation_blocking(
-                    address,
-                    chunk,
-                    idx == 0,
-                    idx == chunk_count - 1,
-                    cmd_iterator,
-                )
+                .write_operation_blocking(address, chunk, idx == 0, idx == chunk_count - 1)
                 .inspect_err(|_| self.internal_recover())?;
         }
 
@@ -497,28 +475,17 @@ where
         let read_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
 
         for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
-
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
-
             self.driver()
                 .write_operation_blocking(
                     address,
                     chunk,
                     idx == 0,
                     idx == write_count - 1 && read_count == 0,
-                    cmd_iterator,
                 )
                 .inspect_err(|_| self.internal_recover())?;
         }
 
         for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
-
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
-
             self.driver()
                 .read_operation_blocking(
                     address,
@@ -526,7 +493,6 @@ where
                     idx == 0,
                     idx == read_count - 1,
                     idx < read_count - 1,
-                    cmd_iterator,
                 )
                 .inspect_err(|_| self.internal_recover())?;
         }
@@ -597,19 +563,8 @@ where
     pub async fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
-
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
-
             self.driver()
-                .write_operation(
-                    address,
-                    chunk,
-                    idx == 0,
-                    idx == chunk_count - 1,
-                    cmd_iterator,
-                )
+                .write_operation(address, chunk, idx == 0, idx == chunk_count - 1)
                 .await?;
         }
 
@@ -620,11 +575,6 @@ where
     pub async fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
-
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
-
             self.driver()
                 .read_operation(
                     address,
@@ -632,7 +582,6 @@ where
                     idx == 0,
                     idx == chunk_count - 1,
                     idx < chunk_count - 1,
-                    cmd_iterator,
                 )
                 .await?;
         }
@@ -651,28 +600,17 @@ where
         let write_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
         let read_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
-
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
-
             self.driver()
                 .write_operation(
                     address,
                     chunk,
                     idx == 0,
                     idx == write_count - 1 && read_count == 0,
-                    cmd_iterator,
                 )
                 .await?;
         }
 
         for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
-
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
-
             self.driver()
                 .read_operation(
                     address,
@@ -680,7 +618,6 @@ where
                     idx == 0,
                     idx == read_count - 1,
                     idx < read_count - 1,
-                    cmd_iterator,
                 )
                 .await?;
         }
@@ -730,10 +667,7 @@ where
         while let Some(op) = op_iter.next() {
             let next_op = op_iter.peek().map(|v| v.kind());
             let kind = op.kind();
-            // Clear all I2C interrupts
-            self.driver().clear_all_interrupts();
 
-            let cmd_iterator = &mut self.driver().info.register_block().comd_iter();
             match op {
                 Operation::Write(buffer) => {
                     // execute a write operation:
@@ -745,7 +679,6 @@ where
                             buffer,
                             !matches!(last_op, Some(OpKind::Write)),
                             next_op.is_none(),
-                            cmd_iterator,
                         )
                         .await?;
                 }
@@ -761,7 +694,6 @@ where
                             !matches!(last_op, Some(OpKind::Read)),
                             next_op.is_none(),
                             matches!(next_op, Some(OpKind::Read)),
-                            cmd_iterator,
                         )
                         .await?;
                 }
@@ -1144,21 +1076,21 @@ impl Driver<'_> {
     ///   condition and sending the address.
     /// - `stop` indicates whether the operation should end with a STOP
     ///   condition.
-    /// - `cmd_iterator` is an iterator over the command registers.
-    fn write_operation_blocking<'a>(
+    fn write_operation_blocking(
         &self,
         address: u8,
         bytes: &[u8],
         start: bool,
         stop: bool,
-        cmd_iterator: &mut impl Iterator<Item = &'a COMD>,
     ) -> Result<(), Error> {
+        self.clear_all_interrupts();
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
         if bytes.is_empty() && !start && !stop {
             return Ok(());
         }
 
+        let cmd_iterator = &mut self.info.register_block().comd_iter();
         let index = self.start_write_operation(address, bytes, start, stop, cmd_iterator)?;
 
         // Fill the FIFO with the remaining bytes:
@@ -1174,14 +1106,12 @@ impl Driver<'_> {
     ///   condition and sending the address.
     /// - `stop` indicates whether the operation should end with a STOP
     ///   condition.
-    /// - `cmd_iterator` is an iterator over the command registers.
-    async fn write_operation<'a>(
+    async fn write_operation(
         &self,
         address: u8,
         bytes: &[u8],
         start: bool,
         stop: bool,
-        cmd_iterator: &mut impl Iterator<Item = &'a COMD>,
     ) -> Result<(), Error> {
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -1189,6 +1119,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
+        let cmd_iterator = &mut self.info.register_block().comd_iter();
         let index = self.start_write_operation(address, bytes, start, stop, cmd_iterator)?;
 
         // Fill the FIFO with the remaining bytes:
@@ -1206,22 +1137,22 @@ impl Driver<'_> {
     ///   condition.
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
-    /// - `cmd_iterator` is an iterator over the command registers.
-    fn read_operation_blocking<'a>(
+    fn read_operation_blocking(
         &self,
         address: u8,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
         will_continue: bool,
-        cmd_iterator: &mut impl Iterator<Item = &'a COMD>,
     ) -> Result<(), Error> {
+        self.clear_all_interrupts();
         // Short circuit for zero length reads as that would be an invalid operation
         // read lengths in the TRM (at least for ESP32-S3) are 1-255
         if buffer.is_empty() {
             return Ok(());
         }
 
+        let cmd_iterator = &mut self.info.register_block().comd_iter();
         self.start_read_operation(address, buffer, start, stop, will_continue, cmd_iterator)?;
         self.read_all_from_fifo_blocking(buffer)?;
         self.wait_for_completion_blocking(!stop)?;
@@ -1237,15 +1168,13 @@ impl Driver<'_> {
     ///   condition.
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
-    /// - `cmd_iterator` is an iterator over the command registers.
-    async fn read_operation<'a>(
+    async fn read_operation(
         &self,
         address: u8,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
         will_continue: bool,
-        cmd_iterator: &mut impl Iterator<Item = &'a COMD>,
     ) -> Result<(), Error> {
         // Short circuit for zero length reads as that would be an invalid operation
         // read lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -1253,6 +1182,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
+        let cmd_iterator = &mut self.info.register_block().comd_iter();
         self.start_read_operation(address, buffer, start, stop, will_continue, cmd_iterator)?;
         self.read_all_from_fifo(buffer).await?;
         self.wait_for_completion(!stop).await?;
