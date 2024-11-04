@@ -18,11 +18,13 @@ use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 #[cfg(not(coex))]
 use crate::config::PowerSaveMode;
+#[cfg(csi_enable)]
+use crate::wifi::CsiConfig;
 use crate::{
     binary::include::*,
     hal::peripheral::{Peripheral, PeripheralRef},
-    wifi::{CsiConfig, Protocol, RxControlInfo, WifiError},
-    EspWifiInitialization,
+    wifi::{Protocol, RxControlInfo, WifiError},
+    EspWifiController,
 };
 
 const RECEIVE_QUEUE_SIZE: usize = 10;

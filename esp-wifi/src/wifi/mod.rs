@@ -83,6 +83,15 @@ pub mod utils;
 #[cfg(coex)]
 use include::{coex_adapter_funcs_t, coex_pre_init, esp_coex_adapter_register};
 
+#[cfg(all(csi_enable, esp32c6))]
+use crate::binary::include::wifi_csi_acquire_config_t;
+#[cfg(csi_enable)]
+use crate::binary::include::{
+    esp_wifi_set_csi,
+    esp_wifi_set_csi_config,
+    esp_wifi_set_csi_rx_cb,
+    wifi_csi_config_t,
+};
 use crate::binary::{
     c_types,
     include::{
@@ -104,9 +113,6 @@ use crate::binary::{
         esp_wifi_scan_start,
         esp_wifi_set_config,
         esp_wifi_set_country,
-        esp_wifi_set_csi,
-        esp_wifi_set_csi_config,
-        esp_wifi_set_csi_rx_cb,
         esp_wifi_set_mode,
         esp_wifi_set_protocol,
         esp_wifi_set_tx_done_cb,
@@ -120,8 +126,6 @@ use crate::binary::{
         wifi_config_t,
         wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
         wifi_country_t,
-        wifi_csi_acquire_config_t,
-        wifi_csi_config_t,
         wifi_init_config_t,
         wifi_interface_t,
         wifi_interface_t_WIFI_IF_AP,
