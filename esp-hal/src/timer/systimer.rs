@@ -170,13 +170,7 @@ impl<'d> SystemTimer<'d> {
         // an older time stamp
 
         let unit = unsafe { SpecificUnit::<'_, 0>::conjure() };
-
-        unit.update();
-        loop {
-            if let Some(value) = unit.poll_count() {
-                break value;
-            }
-        }
+        unit.read_count()
     }
 }
 
@@ -248,37 +242,29 @@ pub trait Unit {
                     _ => unreachable!(),
                 },
                 UnitConfig::DisabledIfCpuIsStalled(cpu) => match self.channel() {
-                    0 => w
-                        .timer_unit0_work_en()
-                        .set_bit()
-                        .timer_unit0_core0_stall_en()
-                        .bit(cpu == Cpu::ProCpu)
-                        .timer_unit0_core1_stall_en()
-                        .bit(cpu != Cpu::ProCpu),
-                    1 => w
-                        .timer_unit1_work_en()
-                        .set_bit()
-                        .timer_unit1_core0_stall_en()
-                        .bit(cpu == Cpu::ProCpu)
-                        .timer_unit1_core1_stall_en()
-                        .bit(cpu != Cpu::ProCpu),
+                    0 => {
+                        w.timer_unit0_work_en().set_bit();
+                        w.timer_unit0_core0_stall_en().bit(cpu == Cpu::ProCpu);
+                        w.timer_unit0_core1_stall_en().bit(cpu != Cpu::ProCpu)
+                    }
+                    1 => {
+                        w.timer_unit1_work_en().set_bit();
+                        w.timer_unit1_core0_stall_en().bit(cpu == Cpu::ProCpu);
+                        w.timer_unit1_core1_stall_en().bit(cpu != Cpu::ProCpu)
+                    }
                     _ => unreachable!(),
                 },
                 UnitConfig::Enabled => match self.channel() {
-                    0 => w
-                        .timer_unit0_work_en()
-                        .set_bit()
-                        .timer_unit0_core0_stall_en()
-                        .clear_bit()
-                        .timer_unit0_core1_stall_en()
-                        .clear_bit(),
-                    1 => w
-                        .timer_unit1_work_en()
-                        .set_bit()
-                        .timer_unit1_core0_stall_en()
-                        .clear_bit()
-                        .timer_unit1_core1_stall_en()
-                        .clear_bit(),
+                    0 => {
+                        w.timer_unit0_work_en().set_bit();
+                        w.timer_unit0_core0_stall_en().clear_bit();
+                        w.timer_unit0_core1_stall_en().clear_bit()
+                    }
+                    1 => {
+                        w.timer_unit1_work_en().set_bit();
+                        w.timer_unit1_core0_stall_en().clear_bit();
+                        w.timer_unit1_core1_stall_en().clear_bit()
+                    }
                     _ => unreachable!(),
                 },
             });
@@ -317,48 +303,30 @@ pub trait Unit {
         }
     }
 
-    /// Update the value returned by [Self::poll_count] to be the current value
-    /// of the counter.
-    ///
-    /// This can be used to read the current value of the timer.
-    fn update(&self) {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
-        systimer
-            .unit_op(self.channel() as _)
-            .modify(|_, w| w.update().set_bit());
-    }
-
-    /// Return the count value at the time of the last call to [Self::update].
-    ///
-    /// Returns None if the update isn't ready to read if update has never been
-    /// called.
-    fn poll_count(&self) -> Option<u64> {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
-        if systimer
-            .unit_op(self.channel() as _)
-            .read()
-            .value_valid()
-            .bit_is_set()
-        {
-            let unit_value = systimer.unit_value(self.channel() as _);
-
-            let lo = unit_value.lo().read().bits();
-            let hi = unit_value.hi().read().bits();
-
-            Some(((hi as u64) << 32) | lo as u64)
-        } else {
-            None
-        }
-    }
-
-    /// Convenience method to call [Self::update] and [Self::poll_count].
+    /// Reads the current counter value.
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
-        self.update();
+        let channel = self.channel() as usize;
+        let systimer = unsafe { SYSTIMER::steal() };
+
+        systimer.unit_op(channel).write(|w| w.update().set_bit());
+        while !systimer.unit_op(channel).read().value_valid().bit_is_set() {}
+
+        // Read LO, HI, then LO again, check that LO returns the same value.
+        // This accounts for the case when an interrupt may happen between reading
+        // HI and LO values (or the other core updates the counter mid-read), and this
+        // function may get called from the ISR. In this case, the repeated read
+        // will return consistent values.
+        let unit_value = systimer.unit_value(channel);
+        let mut lo_prev = unit_value.lo().read().bits();
         loop {
-            if let Some(count) = self.poll_count() {
-                break count;
+            let lo = lo_prev;
+            let hi = unit_value.hi().read().bits();
+            lo_prev = unit_value.lo().read().bits();
+
+            if lo == lo_prev {
+                return ((hi as u64) << 32) | lo as u64;
             }
         }
     }
@@ -895,13 +863,7 @@ where
         // This should be safe to access from multiple contexts; worst case
         // scenario the second accessor ends up reading an older time stamp.
 
-        self.unit.update();
-
-        let ticks = loop {
-            if let Some(value) = self.unit.poll_count() {
-                break value;
-            }
-        };
+        let ticks = self.unit.read_count();
 
         let us = ticks / (SystemTimer::ticks_per_second() / 1_000_000);
 
@@ -933,11 +895,6 @@ where
         } else {
             // Target mode
 
-            self.unit.update();
-            while self.unit.poll_count().is_none() {
-                // Wait for value registers to update
-            }
-
             // The counters/comparators are 52-bits wide (except on ESP32-S2,
             // which is 64-bits), so we must ensure that the provided value
             // is not too wide:
@@ -946,7 +903,7 @@ where
                 return Err(Error::InvalidTimeout);
             }
 
-            let v = self.unit.poll_count().unwrap();
+            let v = self.unit.read_count();
             let t = v + ticks;
 
             self.comparator.set_target(t);

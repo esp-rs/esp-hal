@@ -17,7 +17,7 @@ use esp_hal::{
         master::{Spi, SpiDma},
         SpiMode,
     },
-    timer::{timg::TimerGroup, AnyTimer},
+    timer::AnyTimer,
     Async,
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -60,11 +60,25 @@ mod test {
     #[timeout(3)]
     async fn dma_does_not_lock_up_when_used_in_different_executors() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init([AnyTimer::from(timg0.timer0), AnyTimer::from(timg0.timer1)]);
-
         let dma = Dma::new(peripherals.DMA);
+
+        cfg_if::cfg_if! {
+            if #[cfg(systimer)] {
+                use esp_hal::timer::systimer::{SystemTimer, Target};
+                let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+                esp_hal_embassy::init([
+                    AnyTimer::from(systimer.alarm0),
+                    AnyTimer::from(systimer.alarm1),
+                ]);
+            } else {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new(peripherals.TIMG0);
+                esp_hal_embassy::init([
+                    AnyTimer::from(timg0.timer0),
+                    AnyTimer::from(timg0.timer1),
+                ]);
+            }
+        }
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
@@ -164,8 +178,23 @@ mod test {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let dma = Dma::new(peripherals.DMA);
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init(timg0.timer0);
+        cfg_if::cfg_if! {
+            if #[cfg(systimer)] {
+                use esp_hal::timer::systimer::{SystemTimer, Target};
+                let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+                esp_hal_embassy::init([
+                    AnyTimer::from(systimer.alarm0),
+                    AnyTimer::from(systimer.alarm1),
+                ]);
+            } else {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new(peripherals.TIMG0);
+                esp_hal_embassy::init([
+                    AnyTimer::from(timg0.timer0),
+                    AnyTimer::from(timg0.timer1),
+                ]);
+            }
+        }
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
