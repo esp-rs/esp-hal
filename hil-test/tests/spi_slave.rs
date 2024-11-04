@@ -11,7 +11,10 @@
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{interconnect::InputSignal, Io, Level, Output},
+    gpio::{
+        interconnect::{InputSignal, OutputSignal},
+        Io,
+    },
     spi::{slave::Spi, SpiMode},
     Blocking,
 };
@@ -32,19 +35,32 @@ struct Context {
 }
 
 struct BitbangSpi {
-    sclk: Output<'static>,
-    mosi: Output<'static>,
+    sclk: OutputSignal,
+    mosi: OutputSignal,
     miso: InputSignal,
-    cs: Output<'static>,
+    cs: OutputSignal,
 }
 
 impl BitbangSpi {
     fn new(
-        sclk: Output<'static>,
-        mosi: Output<'static>,
-        miso: InputSignal,
-        cs: Output<'static>,
+        mut sclk: OutputSignal,
+        mut mosi: OutputSignal,
+        mut miso: InputSignal,
+        mut cs: OutputSignal,
     ) -> Self {
+        // TODO remove this (#2273)
+        // FIXME: devise a public API for signals
+        miso.enable_input(true, unsafe { esp_hal::Internal::conjure() });
+
+        mosi.set_output_high(false, unsafe { esp_hal::Internal::conjure() });
+        mosi.enable_output(true, unsafe { esp_hal::Internal::conjure() });
+
+        cs.set_output_high(true, unsafe { esp_hal::Internal::conjure() });
+        cs.enable_output(true, unsafe { esp_hal::Internal::conjure() });
+
+        sclk.set_output_high(false, unsafe { esp_hal::Internal::conjure() });
+        sclk.enable_output(true, unsafe { esp_hal::Internal::conjure() });
+
         Self {
             sclk,
             mosi,
@@ -54,22 +70,29 @@ impl BitbangSpi {
     }
 
     fn assert_cs(&mut self) {
-        self.sclk.set_level(Level::Low);
-        self.cs.set_level(Level::Low);
+        self.sclk
+            .set_output_high(false, unsafe { esp_hal::Internal::conjure() });
+        self.cs
+            .set_output_high(false, unsafe { esp_hal::Internal::conjure() });
     }
 
     fn deassert_cs(&mut self) {
-        self.sclk.set_level(Level::Low);
-        self.cs.set_level(Level::High);
+        self.sclk
+            .set_output_high(false, unsafe { esp_hal::Internal::conjure() });
+        self.cs
+            .set_output_high(true, unsafe { esp_hal::Internal::conjure() });
     }
 
     // Mode 1, so sampled on the rising edge and set on the falling edge.
     fn shift_bit(&mut self, bit: bool) -> bool {
-        self.mosi.set_level(Level::from(bit));
-        self.sclk.set_level(Level::High);
+        self.mosi
+            .set_output_high(bit, unsafe { esp_hal::Internal::conjure() });
+        self.sclk
+            .set_output_high(true, unsafe { esp_hal::Internal::conjure() });
 
         let miso = self.miso.get_level().into();
-        self.sclk.set_level(Level::Low);
+        self.sclk
+            .set_output_high(false, unsafe { esp_hal::Internal::conjure() });
 
         miso
     }
@@ -105,7 +128,7 @@ mod tests {
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let (mosi_pin, miso_pin) = hil_test::i2c_pins!(io);
-        let (sclk_pin, sclk_gpio) = hil_test::common_test_pins!(io);
+        let (sclk_pin, _) = hil_test::common_test_pins!(io);
         let cs_pin = hil_test::unconnected_pin!(io);
 
         let dma = Dma::new(peripherals.DMA);
@@ -118,30 +141,22 @@ mod tests {
             }
         }
 
-        let cs = cs_pin.peripheral_input();
-        let mosi = mosi_pin.peripheral_input();
-        let mut miso = miso_pin.peripheral_input();
-        let sclk_signal = sclk_pin.peripheral_input();
-
-        let mosi_gpio = Output::new(mosi_pin, Level::Low);
-        let cs_gpio = Output::new(cs_pin, Level::High);
-        let sclk_gpio = Output::new(sclk_gpio, Level::Low);
-
-        let spi = Spi::new(
-            peripherals.SPI2,
-            sclk_signal,
-            mosi,
-            miso_pin,
-            cs,
-            SpiMode::Mode1,
-        );
-
-        miso.enable_input(true, unsafe { esp_hal::Internal::conjure() });
+        let (cs, cs_pin) = cs_pin.split();
+        let (mosi, mosi_pin) = mosi_pin.split();
+        let (miso, miso_pin) = miso_pin.split();
+        let (sclk_signal, sclk_pin) = sclk_pin.split();
 
         Context {
-            spi,
+            spi: Spi::new(
+                peripherals.SPI2,
+                sclk_signal,
+                mosi,
+                miso_pin,
+                cs,
+                SpiMode::Mode1,
+            ),
+            bitbang_spi: BitbangSpi::new(sclk_pin, mosi_pin, miso, cs_pin),
             dma_channel,
-            bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso, cs_gpio),
         }
     }
 

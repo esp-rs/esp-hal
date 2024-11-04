@@ -62,7 +62,7 @@ mod tests {
 
         let dma_channel = dma.channel0;
 
-        let mosi_loopback = mosi.peripheral_input();
+        let (mosi_loopback, mosi) = mosi.split();
 
         let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
             .with_sck(sclk)

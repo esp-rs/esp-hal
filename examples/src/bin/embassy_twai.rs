@@ -94,11 +94,11 @@ async fn main(spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let tx_pin = io.pins.gpio2;
-    // let rx_pin = io.pins.gpio0; // Uncomment if you want to use an external transceiver.
-
     // Without an external transceiver, we only need a single line between the two MCUs.
-    let rx_pin = tx_pin.peripheral_input(); // Comment this line if you want to use an external transceiver.
+    let (rx_pin, tx_pin) = io.pins.gpio2.split();
+    // Use these if you want to use an external transceiver:
+    // let tx_pin = io.pins.gpio2;
+    // let rx_pin = io.pins.gpio0;
 
     // The speed of the bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;

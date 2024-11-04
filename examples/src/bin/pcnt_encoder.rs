@@ -49,18 +49,22 @@ fn main() -> ! {
 
     println!("setup channel 0");
     let ch0 = &u0.channel0;
+
     let pin_a = Input::new(io.pins.gpio4, Pull::Up);
     let pin_b = Input::new(io.pins.gpio5, Pull::Up);
 
-    ch0.set_ctrl_signal(pin_a.peripheral_input());
-    ch0.set_edge_signal(pin_b.peripheral_input());
+    let (input_a, _) = pin_a.split();
+    let (input_b, _) = pin_b.split();
+
+    ch0.set_ctrl_signal(input_a.clone());
+    ch0.set_edge_signal(input_b.clone());
     ch0.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
     ch0.set_input_mode(channel::EdgeMode::Increment, channel::EdgeMode::Decrement);
 
     println!("setup channel 1");
     let ch1 = &u0.channel1;
-    ch1.set_ctrl_signal(pin_b.peripheral_input());
-    ch1.set_edge_signal(pin_a.peripheral_input());
+    ch1.set_ctrl_signal(input_b);
+    ch1.set_edge_signal(input_a);
     ch1.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
     ch1.set_input_mode(channel::EdgeMode::Decrement, channel::EdgeMode::Increment);
 

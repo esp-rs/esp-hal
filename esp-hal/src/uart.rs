@@ -98,12 +98,12 @@
 //!
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
-//! let rx = io.pins.gpio2.peripheral_input().inverted();
-//! let tx = io.pins.gpio1.into_peripheral_output().inverted();
+//! let (rx, _) = io.pins.gpio2.split();
+//! let (_, tx) = io.pins.gpio1.split();
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
-//!     rx,
-//!     tx,
+//!     rx.inverted(),
+//!     tx.inverted(),
 //! ).unwrap();
 //! # }
 //! ```

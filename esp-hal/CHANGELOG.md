@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DmaDescriptor` is now `Send` (#2456)
 - `into_async` and `into_blocking` functions for most peripherals (#2430)
 - API mode type parameter (currently always `Blocking`) to `master::Spi` and `slave::Spi` (#2430)
+- `gpio::{GpioPin, AnyPin, Flex, Output, OutputOpenDrain}::split()` to obtain peripheral interconnect signals. (#2418)
+- `gpio::Input::{split(), into_peripheral_output()}` when used with output pins. (#2418)
+- `gpio::Output::peripheral_input()` (#2418)
 
 ### Changed
 
@@ -42,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI interrupt listening is now only available in Blocking mode. The `set_interrupt_handler` is available via `InterruptConfigurable` (#2442)
 - Allow users to create DMA `Preparation`s (#2455) 
 - The `rmt::asynch::RxChannelAsync` and `rmt::asynch::TxChannelAsync` traits have been moved to `rmt` (#2430)
+- Calling `AnyPin::output_signals` on an input-only pin (ESP32 GPIO 34-39) will now result in a panic. (#2418)
 
 ### Fixed
 
