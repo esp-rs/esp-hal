@@ -7,11 +7,12 @@ use crate::soc::is_slice_in_psram;
 
 /// Holds all the information needed to configure a DMA channel for a transfer.
 pub struct Preparation {
-    pub(super) start: *mut DmaDescriptor,
+    /// The descriptor the DMA will start from.
+    pub start: *mut DmaDescriptor,
 
-    /// block size for PSRAM transfers
+    /// Block size for PSRAM transfers
     #[cfg_attr(not(esp32s3), allow(dead_code))]
-    pub(super) block_size: Option<DmaBufBlkSize>,
+    pub block_size: Option<DmaBufBlkSize>,
 
     /// Specifies whether descriptor linked list specified in `start` conforms
     /// to the alignment requirements required to enable burst transfers.
@@ -22,7 +23,7 @@ pub struct Preparation {
     /// There are no additional alignment requirements for TX burst transfers,
     /// but RX transfers require all descriptors to have buffer pointers and
     /// sizes that are a multiple of 4 (word aligned).
-    pub(super) is_burstable: bool,
+    pub is_burstable: bool,
 
     /// Configures the "check owner" feature of the DMA channel.
     ///
@@ -50,7 +51,7 @@ pub struct Preparation {
     ///
     /// Note: If the DMA channel doesn't support the provided option,
     /// preparation will fail.
-    pub(super) check_owner: Option<bool>,
+    pub check_owner: Option<bool>,
 }
 
 /// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
