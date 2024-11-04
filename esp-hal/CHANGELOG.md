@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART configuration types have been moved to `esp_hal::uart` (#2449)
 - `spi::master::Spi::new()` no longer takes `frequency` and `mode` as a parameter. (#2448)
 - Peripheral interconnections via GPIO pins now use the GPIO matrix. (#2419)
+- `I2c` SCL timeout is now defined in bus clock cycles. (#2437)
 
 ### Fixed
 

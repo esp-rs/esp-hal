@@ -283,7 +283,7 @@ refer to the `Config` struct as `uart::Config`.
 - The `new` and `new_typed` constructor no longer takes `frequency` and pins.
 - The default configuration is now:
   - bus frequency: 100 kHz
-  - timeout: `None`
+  - timeout: about 10 bus clock cycles
 - There are new constructors (`new_with_config`, `new_typed_with_config`) and a new `apply_config` method to apply custom configuration.
 - Pins can now be configured using `with_sda` and `with_scl`
 

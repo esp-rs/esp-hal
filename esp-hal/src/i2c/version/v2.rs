@@ -40,8 +40,6 @@ impl Driver<'_> {
         let sda_sample = half_cycle / 2 - 1;
         let setup = half_cycle;
         let hold = half_cycle;
-        // default we set the timeout value to 10 bus cycles
-        let time_out_value = timeout.unwrap_or(half_cycle * 20);
 
         // scl period
         let scl_low_period = scl_low - 1;
@@ -56,7 +54,6 @@ impl Driver<'_> {
         // hold
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold;
-        let time_out_en = true;
 
         configure_clock(
             self.info.register_block(),
@@ -70,8 +67,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            time_out_value,
-            time_out_en,
+            timeout.map(|to_bus| (to_bus * 2 * half_cycle).min(0xFF_FFFF)),
         );
     }
 

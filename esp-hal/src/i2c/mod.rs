@@ -213,9 +213,20 @@ pub struct Config {
     /// The I2C clock frequency.
     pub frequency: HertzU32,
 
-    /// The I2C timeout.
-    // TODO: explain this function better - what's the unit, what happens on
-    // timeout, and just what exactly is a timeout in this context?
+    /// I2C SCL timeout period.
+    ///
+    /// When the level of SCL remains unchanged for more than `timeout` bus
+    /// clock cycles, the bus goes to idle state.
+    ///
+    /// The default value is about 10 bus clock cycles.
+    #[doc = ""]
+    #[cfg_attr(
+        not(esp32),
+        doc = "Note that the effective timeout may be longer than the value configured here."
+    )]
+    #[cfg_attr(not(esp32), doc = "Configuring `None` disables timeout control.")]
+    #[cfg_attr(esp32, doc = "Configuring `None` equals to the maximum timeout value.")]
+    // TODO: when supporting interrupts, document that SCL = high also triggers an interrupt.
     pub timeout: Option<u32>,
 }
 
@@ -224,7 +235,7 @@ impl Default for Config {
         use fugit::RateExtU32;
         Config {
             frequency: 100.kHz(),
-            timeout: None,
+            timeout: Some(10),
         }
     }
 }
@@ -799,8 +810,7 @@ fn configure_clock(
     scl_stop_setup_time: u32,
     scl_start_hold_time: u32,
     scl_stop_hold_time: u32,
-    time_out_value: u32,
-    time_out_en: bool,
+    timeout: Option<u32>,
 ) {
     unsafe {
         // divider
@@ -850,19 +860,15 @@ fn configure_clock(
         // timeout mechanism
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                // timeout
                 register_block
                     .to()
-                    .write(|w| w.time_out().bits(time_out_value));
+                    .write(|w| w.time_out().bits(unwrap!(timeout)));
             } else {
-                // timeout
-                // FIXME: Enable timout for other chips!
-                #[allow(clippy::useless_conversion)]
                 register_block
                     .to()
-                    .write(|w| w.time_out_en().bit(time_out_en)
+                    .write(|w| w.time_out_en().bit(timeout.is_some())
                     .time_out_value()
-                    .bits(time_out_value.try_into().unwrap())
+                    .bits(timeout.unwrap_or(1) as _)
                 );
             }
         }

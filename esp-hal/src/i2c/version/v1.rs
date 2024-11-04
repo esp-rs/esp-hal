@@ -131,8 +131,9 @@ impl Driver<'_> {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        // default we set the timeout value to 10 bus cycles
-        let time_out_value = timeout.unwrap_or(half_cycle * 20);
+        let timeout = timeout.map_or(Some(0xF_FFFF), |to_bus| {
+            Some((to_bus * 2 * half_cycle).min(0xF_FFFF))
+        });
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -185,8 +186,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            time_out_value,
-            true,
+            timeout,
         );
     }
 

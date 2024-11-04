@@ -163,14 +163,6 @@ impl Driver<'_> {
         let setup = half_cycle;
         let hold = half_cycle;
 
-        let time_out_value = if let Some(timeout) = timeout {
-            timeout
-        } else {
-            // default we set the timeout value to about 10 bus cycles
-            // log(20*half_cycle)/log(2) = log(half_cycle)/log(2) +  log(20)/log(2)
-            (4 * 8 - (5 * half_cycle).leading_zeros()) + 2
-        };
-
         // According to the Technical Reference Manual, the following timings must be
         // subtracted by 1. However, according to the practical measurement and
         // some hardware behaviour, if wait_high_period and scl_high minus one.
@@ -190,7 +182,6 @@ impl Driver<'_> {
         // hold
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold - 1;
-        let time_out_en = true;
 
         configure_clock(
             self.info.register_block(),
@@ -204,8 +195,13 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            time_out_value,
-            time_out_en,
+            timeout.map(|to_bus| {
+                let to_peri = (to_bus * 2 * half_cycle).max(1);
+                let log2 = to_peri.ilog2();
+                // Round up so that we don't shorten timeouts.
+                let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
+                raw.min(0x1F)
+            }),
         );
     }
 
