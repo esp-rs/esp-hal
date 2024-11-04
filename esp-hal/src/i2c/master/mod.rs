@@ -301,29 +301,37 @@ where
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
-                    self.driver()
-                        .write_operation_blocking(
-                            address,
-                            buffer,
-                            !matches!(last_op, Some(OpKind::Write)),
-                            next_op.is_none(),
-                        )
-                        .inspect_err(|_| self.internal_recover())?;
+                    let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
+                    for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+                        let last_chunk = idx == chunk_count - 1;
+                        self.driver()
+                            .write_operation_blocking(
+                                address,
+                                chunk,
+                                idx == 0 && !matches!(last_op, Some(OpKind::Write)),
+                                last_chunk && next_op.is_none(),
+                            )
+                            .inspect_err(|_| self.internal_recover())?;
+                    }
                 }
                 Operation::Read(buffer) => {
                     // execute a read operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     // - will_continue is true if there is another read operation next
-                    self.driver()
-                        .read_operation_blocking(
-                            address,
-                            buffer,
-                            !matches!(last_op, Some(OpKind::Read)),
-                            next_op.is_none(),
-                            matches!(next_op, Some(OpKind::Read)),
-                        )
-                        .inspect_err(|_| self.internal_recover())?;
+                    let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
+                    for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+                        let last_chunk = idx == chunk_count - 1;
+                        self.driver()
+                            .read_operation_blocking(
+                                address,
+                                chunk,
+                                idx == 0 && !matches!(last_op, Some(OpKind::Read)),
+                                last_chunk && next_op.is_none(),
+                                matches!(next_op, Some(OpKind::Read)) || !last_chunk,
+                            )
+                            .inspect_err(|_| self.internal_recover())?;
+                    }
                 }
             }
 
@@ -673,29 +681,37 @@ where
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
-                    self.driver()
-                        .write_operation(
-                            address,
-                            buffer,
-                            !matches!(last_op, Some(OpKind::Write)),
-                            next_op.is_none(),
-                        )
-                        .await?;
+                    let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
+                    for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+                        let last_chunk = idx == chunk_count - 1;
+                        self.driver()
+                            .write_operation(
+                                address,
+                                chunk,
+                                idx == 0 && !matches!(last_op, Some(OpKind::Write)),
+                                last_chunk && next_op.is_none(),
+                            )
+                            .await?;
+                    }
                 }
                 Operation::Read(buffer) => {
                     // execute a read operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     // - will_continue is true if there is another read operation next
-                    self.driver()
-                        .read_operation(
-                            address,
-                            buffer,
-                            !matches!(last_op, Some(OpKind::Read)),
-                            next_op.is_none(),
-                            matches!(next_op, Some(OpKind::Read)),
-                        )
-                        .await?;
+                    let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
+                    for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+                        let last_chunk = idx == chunk_count - 1;
+                        self.driver()
+                            .read_operation(
+                                address,
+                                chunk,
+                                idx == 0 && !matches!(last_op, Some(OpKind::Read)),
+                                last_chunk && next_op.is_none(),
+                                matches!(next_op, Some(OpKind::Read)) || !last_chunk,
+                            )
+                            .await?;
+                    }
                 }
             }
 
@@ -1090,8 +1106,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let cmd_iterator = &mut self.info.register_block().comd_iter();
-        let index = self.start_write_operation(address, bytes, start, stop, cmd_iterator)?;
+        let index = self.start_write_operation(address, bytes, start, stop)?;
 
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo_blocking(index, bytes)?;
@@ -1119,8 +1134,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let cmd_iterator = &mut self.info.register_block().comd_iter();
-        let index = self.start_write_operation(address, bytes, start, stop, cmd_iterator)?;
+        let index = self.start_write_operation(address, bytes, start, stop)?;
 
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo(index, bytes).await?;
@@ -1152,8 +1166,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let cmd_iterator = &mut self.info.register_block().comd_iter();
-        self.start_read_operation(address, buffer, start, stop, will_continue, cmd_iterator)?;
+        self.start_read_operation(address, buffer, start, stop, will_continue)?;
         self.read_all_from_fifo_blocking(buffer)?;
         self.wait_for_completion_blocking(!stop)?;
         Ok(())
@@ -1182,25 +1195,24 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let cmd_iterator = &mut self.info.register_block().comd_iter();
-        self.start_read_operation(address, buffer, start, stop, will_continue, cmd_iterator)?;
+        self.start_read_operation(address, buffer, start, stop, will_continue)?;
         self.read_all_from_fifo(buffer).await?;
         self.wait_for_completion(!stop).await?;
         Ok(())
     }
 
-    fn start_read_operation<'a>(
+    fn start_read_operation(
         &self,
         address: u8,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
         will_continue: bool,
-        cmd_iterator: &mut impl Iterator<Item = &'a COMD>,
     ) -> Result<(), Error> {
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
+        let cmd_iterator = &mut self.info.register_block().comd_iter();
 
         if start {
             self.add_cmd(cmd_iterator, Command::Start)?;
@@ -1217,17 +1229,17 @@ impl Driver<'_> {
         Ok(())
     }
 
-    fn start_write_operation<'a>(
+    fn start_write_operation(
         &self,
         address: u8,
         bytes: &[u8],
         start: bool,
         stop: bool,
-        cmd_iterator: &mut impl Iterator<Item = &'a COMD>,
     ) -> Result<usize, Error> {
         // Reset FIFO and command list
         self.reset_fifo();
         self.reset_command_list();
+        let cmd_iterator = &mut self.info.register_block().comd_iter();
 
         if start {
             self.add_cmd(cmd_iterator, Command::Start)?;
