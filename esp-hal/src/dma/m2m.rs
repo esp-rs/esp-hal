@@ -129,7 +129,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
     }
 }
 
-impl<'d, M> Mem2Mem<'d, M>
+impl<M> Mem2Mem<'_, M>
 where
     M: Mode,
 {
