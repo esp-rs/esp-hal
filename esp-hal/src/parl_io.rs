@@ -54,6 +54,7 @@ use crate::{
     peripheral::{self, Peripheral},
     peripherals::{self, Interrupt, PARL_IO},
     system::PeripheralClockControl,
+    Async,
     Blocking,
     InterruptConfigurable,
     Mode,
@@ -1017,12 +1018,9 @@ where
     pub rx: RxCreatorFullDuplex<'d, DM>,
 }
 
-impl<'d, DM> ParlIoFullDuplex<'d, DM>
-where
-    DM: Mode,
-{
+impl<'d> ParlIoFullDuplex<'d, Blocking> {
     /// Create a new instance of [ParlIoFullDuplex]
-    pub fn new<CH>(
+    pub fn new<CH, DM>(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
         dma_channel: Channel<'d, CH, DM>,
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -1030,8 +1028,11 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
+        DM: Mode,
         CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
+        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
     {
+        let dma_channel = Channel::<'d, CH, Blocking>::from(dma_channel);
         internal_init(frequency)?;
 
         Ok(Self {
@@ -1047,9 +1048,29 @@ where
             },
         })
     }
-}
 
-impl ParlIoFullDuplex<'_, Blocking> {
+    /// Convert to an async version.
+    pub fn into_async(self) -> ParlIoFullDuplex<'d, Async> {
+        let channel = Channel {
+            tx: self.tx.tx_channel,
+            rx: self.rx.rx_channel,
+            phantom: PhantomData::<Blocking>,
+        };
+        let channel = channel.into_async();
+        ParlIoFullDuplex {
+            tx: TxCreatorFullDuplex {
+                tx_channel: channel.tx,
+                descriptors: self.tx.descriptors,
+                phantom: PhantomData,
+            },
+            rx: RxCreatorFullDuplex {
+                rx_channel: channel.rx,
+                descriptors: self.rx.descriptors,
+                phantom: PhantomData,
+            },
+        }
+    }
+
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1084,6 +1105,30 @@ impl crate::private::Sealed for ParlIoFullDuplex<'_, Blocking> {}
 impl InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoFullDuplex::set_interrupt_handler(self, handler);
+    }
+}
+
+impl<'d> ParlIoFullDuplex<'d, Async> {
+    /// Convert to a blocking version.
+    pub fn into_blocking(self) -> ParlIoFullDuplex<'d, Blocking> {
+        let channel = Channel {
+            tx: self.tx.tx_channel,
+            rx: self.rx.rx_channel,
+            phantom: PhantomData::<Async>,
+        };
+        let channel = channel.into_blocking();
+        ParlIoFullDuplex {
+            tx: TxCreatorFullDuplex {
+                tx_channel: channel.tx,
+                descriptors: self.tx.descriptors,
+                phantom: PhantomData,
+            },
+            rx: RxCreatorFullDuplex {
+                rx_channel: channel.rx,
+                descriptors: self.rx.descriptors,
+                phantom: PhantomData,
+            },
+        }
     }
 }
 

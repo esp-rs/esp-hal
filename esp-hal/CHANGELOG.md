@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2S Parallel output driver for ESP32. (#2348, #2436)
 - Add an option to configure `WDT` action (#2330)
 - `DmaDescriptor` is now `Send` (#2456)
-- `into_async` and `into_blocking` functions for most peripherals (#2430)
+- `into_async` and `into_blocking` functions for most peripherals (#2430, #2461)
 - API mode type parameter (currently always `Blocking`) to `master::Spi` and `slave::Spi` (#2430)
 - `gpio::{GpioPin, AnyPin, Flex, Output, OutputOpenDrain}::split()` to obtain peripheral interconnect signals. (#2418)
 - `gpio::Input::{split(), into_peripheral_output()}` when used with output pins. (#2418)
@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Circular DMA transfers now correctly error, `available` returns `Result<usize,DmaError>` now (#2409)
 - Interrupt listen/unlisten/clear functions now accept any type that converts into `EnumSet` (i.e. single interrupt flags). (#2442)
 - SPI interrupt listening is now only available in Blocking mode. The `set_interrupt_handler` is available via `InterruptConfigurable` (#2442)
-- Allow users to create DMA `Preparation`s (#2455) 
+- Allow users to create DMA `Preparation`s (#2455)
 - The `rmt::asynch::RxChannelAsync` and `rmt::asynch::TxChannelAsync` traits have been moved to `rmt` (#2430)
 - Calling `AnyPin::output_signals` on an input-only pin (ESP32 GPIO 34-39) will now result in a panic. (#2418)
 
