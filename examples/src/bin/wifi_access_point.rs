@@ -27,7 +27,7 @@ use esp_println::{print, println};
 use esp_wifi::{
     init,
     wifi::{
-        event::{self, WifiEventData},
+        event::{self, EventExt},
         utils::create_network_interface,
         AccessPointConfiguration,
         Configuration,
@@ -60,28 +60,22 @@ fn main() -> ! {
     .unwrap();
 
     let mut connections = 0u32;
-    event::wifi_event_ap_staconnected_t::update_handler_leak(|prev| {
-        move |event| {
-            connections += 1;
-            esp_println::println!("connected {}, mac: {:?}", connections, event.mac);
-            prev(event);
-        }
+    event::wifi_event_ap_staconnected_t::update_handler(move |prev, event| {
+        connections += 1;
+        esp_println::println!("connected {}, mac: {:?}", connections, event.mac);
+        prev(event);
     });
-    event::wifi_event_ap_staconnected_t::update_handler_leak(|prev| {
-        move |event| {
-            esp_println::println!("connected aid: {}", event.aid);
-            prev(event)
-        }
+    event::wifi_event_ap_staconnected_t::update_handler(|prev, event| {
+        esp_println::println!("connected aid: {}", event.aid);
+        prev(event)
     });
-    event::wifi_event_ap_stadisconnected_t::update_handler_leak(|prev| {
-        move |event| {
-            prev(event);
-            esp_println::println!(
-                "disconnected mac: {:?}, reason: {:?}",
-                event.mac,
-                event.reason
-            );
-        }
+    event::wifi_event_ap_stadisconnected_t::update_handler(|prev, event| {
+        prev(event);
+        esp_println::println!(
+            "disconnected mac: {:?}, reason: {:?}",
+            event.mac,
+            event.reason
+        );
     });
 
     let mut wifi = peripherals.WIFI;
