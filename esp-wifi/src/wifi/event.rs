@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use core::cell::RefCell;
 
 use critical_section::Mutex;
@@ -57,6 +58,15 @@ pub trait WifiEventData: sealed::Sealed + Sized + 'static {
         critical_section::with(|_cs| {
             let handler = Self::take_handler();
             Self::replace_handler(f(handler));
+        });
+    }
+    /// Same as [`update_handler`] but leaks the handler internally.
+    fn update_handler_leak<F: FnMut(&Self) + Sync + Send + 'static>(
+        f: impl FnOnce(&'static mut Handler<Self>) -> F,
+    ) {
+        critical_section::with(|_cs| {
+            let handler = Self::take_handler();
+            Self::replace_handler(Box::leak(Box::new(f(handler))));
         });
     }
 }
