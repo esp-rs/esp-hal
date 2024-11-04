@@ -1,39 +1,49 @@
-//! # General Purpose I/Os (GPIO)
+//! # General Purpose Input/Output (GPIO)
 //!
 //! ## Overview
 //!
 //! Each pin can be used as a general-purpose I/O, or be connected to one or
 //! more internal peripheral signals.
+#![cfg_attr(
+    soc_etm,
+    doc = "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
+)]
+#![doc = ""]
+//! ## Working with pins
 //!
-//! ## Configuration
+//! Before use, the GPIO module must be initialized by creating an instance of
+//! the [`Io`] struct. This struct provides access to the pins on the chip.
 //!
-//! This driver supports various operations on GPIO pins, including setting the
-//! pin mode, direction, and manipulating the pin state (setting high/low,
-//! toggling). It provides an interface to interact with GPIO pins on ESP chips,
-//! allowing developers to control and read the state of the pins.
+//! The [`Io`] struct can also be used to configure the interrupt handler for
+//! GPIO interrupts. For more information, see the
+//! [`Io::set_interrupt_handler`].
 //!
-//! ## Usage
+//! The pins are accessible via [`Io::pins`]. These pins can then be passed to
+//! peripherals (such as SPI, UART, I2C, etc.), to pin drivers or can be
+//! [`GpioPin::split`] into peripheral signals.
 //!
-//! This module also implements a number of traits from [embedded-hal] to
-//! provide a common interface for GPIO pins.
+//! Each pin is a different type initially. Internally, `esp-hal` will often
+//! erase their types automatically, but they can also be converted into
+//! [`AnyPin`] manually by calling [`Pin::degrade`].
 //!
-//! To get access to the pins, you first need to convert them into a HAL
-//! designed struct from the pac struct `GPIO` and `IO_MUX` using [`Io::new`].
+//! Pin drivers can be created using [`Flex::new`], [`Input::new`],
+//! [`Output::new`] and [`OutputOpenDrain::new`]. If you need the pin drivers to
+//! carry the type of the pin, you can use the [`Flex::new_typed`],
+//! [`Input::new_typed`], [`Output::new_typed`], and
+//! [`OutputOpenDrain::new_typed`] functions.
 //!
-//! ### Pin Types
+//! ## GPIO interconnect
 //!
-//! - [Input] pins can be used as digital inputs.
-//! - [Output] and [OutputOpenDrain] pins can be used as digital outputs.
-//! - [Flex] pin is a pin that can be used as an input and output pin.
-//! - [AnyPin] is a type-erased GPIO pin with support for inverted signalling.
-//! - [NoPin] is a useful for cases where peripheral driver requires a pin, but
-//!   real pin cannot be used.
+//! Sometimes you may want to connect peripherals together without using
+//! external hardware. The [`interconnect`] module provides tools to achieve
+//! this using GPIO pins.
 //!
-//! ### GPIO interconnect
-//!
-//! Each GPIO can be connected to one output signal and any number of input
-//! signals. This allows connections inside of the MCU without allocating and
-//! connecting multiple pins for loopback functionality.
+//! To obtain peripheral signals, use the [`GpioPin::split`] method to split a
+//! pin into an input and output signal. Alternatively, you may use
+//! [`Flex::split`], [`Flex::into_peripheral_output`],
+//! [`Flex::peripheral_input`], and similar methods to split a pin driver into
+//! an input and output signal. You can then pass these signals to the
+//! peripheral drivers similar to how you would pass a pin.
 //!
 //! ## Examples
 //!
@@ -49,14 +59,14 @@
 //! 
 //! ### Blink an LED
 //!
-//! See the [Blinky] section of the crate documentation.
+//! See the [Blinky][crate#blinky] section of the crate documentation.
 //!
-//! ### Inverting a signal using `AnyPin`
+//! ### Inverting peripheral signals
+//!
 //! See the [Inverting TX and RX Pins] example of the UART documentation.
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
-//! [Blinky]: ../index.html#blinky
-//! [Inverting TX and RX Pins]: ../uart/index.html#inverting-tx-and-rx-pins
+//! [Inverting TX and RX Pins]: crate::uart#inverting-rx-and-tx-pins
 
 use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
@@ -217,9 +227,14 @@ pub enum DriveStrength {
 ///
 /// GPIO pins can be configured for various functions, such as GPIO
 /// or being directly connected to a peripheral's signal like UART, SPI, etc.
-/// The `AlternateFunction` enum allows to select one of several functions that
+/// The `AlternateFunction` enum allows selecting one of several functions that
 /// a pin can perform, rather than using it as a general-purpose input or
 /// output.
+///
+/// The different variants correspond to different functionality depending on
+/// the chip and the specific pin. For more information, refer to your chip's
+#[doc = crate::trm_markdown_link!()]
+/// .
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AlternateFunction {

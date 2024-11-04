@@ -501,7 +501,7 @@ enum InputConnectionInner {
     Constant(Level),
 }
 
-/// A type-erased peripheral input signal connection.
+/// A peripheral input signal connection.
 ///
 /// This is mainly intended for internal use, but it can be used to connect
 /// peripherals within the MCU without external hardware.
@@ -613,7 +613,7 @@ enum OutputConnectionInner {
     Constant(Level),
 }
 
-/// A type-erased peripheral (input and) output signal connection.
+/// A peripheral (input and) output signal connection.
 ///
 /// This is mainly intended for internal use, but it can be used to connect
 /// peripherals within the MCU without external hardware.

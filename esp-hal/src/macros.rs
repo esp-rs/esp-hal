@@ -27,6 +27,14 @@ macro_rules! before_snippet {
 }
 
 #[doc(hidden)]
+#[macro_export]
+macro_rules! trm_markdown_link {
+    () => {
+        concat!("[Technical Reference Manual](", $crate::trm_link!(), ")")
+    };
+}
+
+#[doc(hidden)]
 /// Shorthand to define enums with From implementations.
 #[macro_export]
 macro_rules! any_enum {
