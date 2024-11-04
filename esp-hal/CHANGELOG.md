@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UartInterrupt` and related functions (#2406)
 - I2S Parallel output driver for ESP32. (#2348, #2436)
 - Add an option to configure `WDT` action (#2330)
+- `DmaDescriptor` is now `Send` (#2456)
 
 ### Changed
 
