@@ -31,7 +31,7 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::i2c::I2c;
+//! # use esp_hal::i2c::{Config, I2c};
 //! # use esp_hal::gpio::Io;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
