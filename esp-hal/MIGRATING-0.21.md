@@ -301,3 +301,13 @@ refer to the `Config` struct as `uart::Config`.
 +.with_sda(sda)
 +.with_scl(scl);
 ```
+
+### The calculation of I2C timeout has changed
+
+Previously, I2C timeouts were counted in increments of I2C peripheral clock cycles. This meant that
+the configure value meant different lengths of time depending on the device. With this update, the
+I2C configuration now expects the timeout value in number of bus clock cycles, which is consistent
+between devices.
+
+ESP32 and ESP32-S2 use an exact number of clock cycles for its timeout. Other MCUs, however, use
+the `2^timeout` value internally, and the HAL rounds up the timeout to the next appropriate value.
