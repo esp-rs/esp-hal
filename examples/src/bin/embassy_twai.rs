@@ -103,17 +103,18 @@ async fn main(spawner: Spawner) {
     // The speed of the bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
 
-    // !!! Use `new_async` when using a transceiver. `new_async_no_transceiver` sets TX to open-drain
+    // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
 
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
-    let mut twai_config = twai::TwaiConfiguration::new_async_no_transceiver(
+    let mut twai_config = twai::TwaiConfiguration::new_no_transceiver(
         peripherals.TWAI0,
         rx_pin,
         tx_pin,
         TWAI_BAUDRATE,
         TwaiMode::Normal,
-    );
+    )
+    .into_async();
 
     // Partially filter the incoming messages to reduce overhead of receiving
     // undesired messages. Note that due to how the hardware filters messages,

@@ -60,7 +60,9 @@ async fn main(_spawner: Spawner) {
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);
     let mut parallel = I2sParallel::new(
         i2s,
-        dma_channel.configure_for_async(false, DmaPriority::Priority0),
+        dma_channel
+            .configure(false, DmaPriority::Priority0)
+            .into_async(),
         1.MHz(),
         pins,
         clock,

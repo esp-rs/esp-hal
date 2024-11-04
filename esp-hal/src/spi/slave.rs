@@ -70,6 +70,8 @@
 //!
 //! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
 
+use core::marker::PhantomData;
+
 use super::{Error, SpiMode};
 use crate::{
     dma::{DescriptorChain, DmaChannelConvert, DmaEligible, PeripheralMarker, Rx, Tx},
@@ -83,6 +85,7 @@ use crate::{
     private,
     spi::AnySpi,
     system::PeripheralClockControl,
+    Blocking,
 };
 
 const MAX_DMA_SIZE: usize = 32768 - 32;
@@ -90,13 +93,14 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 /// SPI peripheral driver.
 ///
 /// See the [module-level documentation][self] for more details.
-pub struct Spi<'d, T = AnySpi> {
+pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     #[allow(dead_code)]
     data_mode: SpiMode,
+    _mode: PhantomData<M>,
 }
 
-impl<'d> Spi<'d> {
+impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new<
         SCK: PeripheralInput,
@@ -110,12 +114,12 @@ impl<'d> Spi<'d> {
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
-    ) -> Spi<'d> {
+    ) -> Spi<'d, Blocking> {
         Self::new_typed(spi.map_into(), sclk, mosi, miso, cs, mode)
     }
 }
 
-impl<'d, T> Spi<'d, T>
+impl<'d, M, T> Spi<'d, M, T>
 where
     T: Instance,
 {
@@ -132,7 +136,7 @@ where
         miso: impl Peripheral<P = MISO> + 'd,
         cs: impl Peripheral<P = CS> + 'd,
         mode: SpiMode,
-    ) -> Spi<'d, T> {
+    ) -> Spi<'d, M, T> {
         crate::into_mapped_ref!(sclk, mosi, miso, cs);
 
         let this = Self::new_internal(spi, mode);
@@ -153,12 +157,13 @@ where
         this
     }
 
-    pub(crate) fn new_internal(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, T> {
+    pub(crate) fn new_internal(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, M, T> {
         crate::into_ref!(spi);
 
         let mut spi = Spi {
             spi,
             data_mode: mode,
+            _mode: PhantomData,
         };
 
         PeripheralClockControl::reset(spi.spi.peripheral());
@@ -193,36 +198,38 @@ pub mod dma {
         Mode,
     };
 
-    impl<'d, T> Spi<'d, T>
+    impl<'d, M, T> Spi<'d, M, T>
     where
         T: InstanceDma,
+        M: Mode,
     {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-        pub fn with_dma<CH, DmaMode>(
+        pub fn with_dma<CH, DM>(
             mut self,
-            channel: Channel<'d, CH, DmaMode>,
+            channel: Channel<'d, CH, DM>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, DmaMode, T>
+        ) -> SpiDma<'d, M, T>
         where
             CH: DmaChannelConvert<T::Dma>,
-            DmaMode: Mode,
+            DM: Mode,
+            Channel<'d, CH, M>: From<Channel<'d, CH, DM>>,
         {
             self.spi.set_data_mode(self.data_mode, true);
-            SpiDma::new(self.spi, channel, rx_descriptors, tx_descriptors)
+            SpiDma::new(self.spi, channel.into(), rx_descriptors, tx_descriptors)
         }
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, DmaMode, T = AnySpi>
+    pub struct SpiDma<'d, M, T = AnySpi>
     where
         T: InstanceDma,
-        DmaMode: Mode,
+        M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, T::Dma, DmaMode>,
+        pub(crate) channel: Channel<'d, T::Dma, M>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }

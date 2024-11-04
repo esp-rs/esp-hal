@@ -92,7 +92,8 @@ mod tests {
         let pio = ParlIoTxOnly::new(
             ctx.parl_io,
             ctx.dma_channel
-                .configure_for_async(false, DmaPriority::Priority0),
+                .configure(false, DmaPriority::Priority0)
+                .into_async(),
             tx_descriptors,
             10.MHz(),
         )
@@ -159,7 +160,8 @@ mod tests {
         let pio = ParlIoTxOnly::new(
             ctx.parl_io,
             ctx.dma_channel
-                .configure_for_async(false, DmaPriority::Priority0),
+                .configure(false, DmaPriority::Priority0)
+                .into_async(),
             tx_descriptors,
             10.MHz(),
         )

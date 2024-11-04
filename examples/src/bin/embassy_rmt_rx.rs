@@ -15,7 +15,7 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::{Io, Level, Output},
     prelude::*,
-    rmt::{asynch::RxChannelAsync, PulseCode, Rmt, RxChannelConfig, RxChannelCreatorAsync},
+    rmt::{PulseCode, Rmt, RxChannelAsync, RxChannelConfig, RxChannelCreatorAsync},
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
@@ -54,7 +54,7 @@ async fn main(spawner: Spawner) {
         }
     };
 
-    let rmt = Rmt::new_async(peripherals.RMT, freq).unwrap();
+    let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
     let rx_config = RxChannelConfig {
         clk_divider: 255,
         idle_threshold: 10000,

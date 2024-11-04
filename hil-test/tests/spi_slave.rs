@@ -13,6 +13,7 @@ use esp_hal::{
     dma_buffers,
     gpio::{interconnect::InputSignal, Io, Level, Output},
     spi::{slave::Spi, SpiMode},
+    Blocking,
 };
 use hil_test as _;
 
@@ -25,7 +26,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static>,
+    spi: Spi<'static, Blocking>,
     dma_channel: DmaChannelCreator,
     bitbang_spi: BitbangSpi,
 }

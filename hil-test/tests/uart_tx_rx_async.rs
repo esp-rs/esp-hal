@@ -31,8 +31,8 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(io);
 
-        let tx = UartTx::new_async(peripherals.UART0, tx).unwrap();
-        let rx = UartRx::new_async(peripherals.UART1, rx).unwrap();
+        let tx = UartTx::new(peripherals.UART0, tx).unwrap().into_async();
+        let rx = UartRx::new(peripherals.UART1, rx).unwrap().into_async();
 
         Context { rx, tx }
     }

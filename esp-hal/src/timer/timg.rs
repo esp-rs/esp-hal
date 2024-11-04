@@ -553,10 +553,11 @@ where
             _ => unreachable!(),
         };
 
-        unsafe {
-            interrupt::bind_interrupt(interrupt, handler.handler());
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
         }
-        interrupt::enable(interrupt, handler.priority()).unwrap();
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 
     fn is_interrupt_set(&self) -> bool {

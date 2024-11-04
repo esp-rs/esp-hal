@@ -374,6 +374,21 @@ impl Cpu {
     pub fn current() -> Self {
         get_core()
     }
+
+    /// Returns an iterator over the "other" cores.
+    #[inline(always)]
+    pub fn other() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                match get_core() {
+                    Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
+                    Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
+                }
+            } else {
+                [].into_iter()
+            }
+        }
+    }
 }
 
 /// Which core the application is currently executing on

@@ -1,2 +1,3 @@
 [alias]
 xtask = "run --package xtask --"
+xfmt = "xtask fmt-packages"

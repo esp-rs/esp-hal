@@ -26,7 +26,7 @@
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::ASSIST_DEBUG,
+    peripherals::{Interrupt, ASSIST_DEBUG},
     InterruptConfigurable,
 };
 
@@ -51,17 +51,14 @@ impl crate::private::Sealed for DebugAssist<'_> {}
 
 impl InterruptConfigurable for DebugAssist<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(
-                crate::peripherals::Interrupt::ASSIST_DEBUG,
-                handler.handler(),
-            );
-            crate::interrupt::enable(
-                crate::peripherals::Interrupt::ASSIST_DEBUG,
-                handler.priority(),
-            )
-            .unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::ASSIST_DEBUG);
         }
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::ASSIST_DEBUG, handler.handler()) };
+        unwrap!(crate::interrupt::enable(
+            Interrupt::ASSIST_DEBUG,
+            handler.priority()
+        ));
     }
 }
 

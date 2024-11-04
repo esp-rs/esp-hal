@@ -61,6 +61,8 @@
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: https://docs.embassy.dev/embassy-embedded-hal/git/default/shared_bus/index.html
 
+use core::marker::PhantomData;
+
 pub use dma::*;
 #[cfg(gdma)]
 use enumset::EnumSet;
@@ -73,7 +75,16 @@ use procmacros::ram;
 use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
 use crate::{
     clock::Clocks,
-    dma::{DmaChannelConvert, DmaEligible, DmaRxBuffer, DmaTxBuffer, PeripheralMarker, Rx, Tx},
+    dma::{
+        Channel,
+        DmaChannelConvert,
+        DmaEligible,
+        DmaRxBuffer,
+        DmaTxBuffer,
+        PeripheralMarker,
+        Rx,
+        Tx,
+    },
     gpio::{
         interconnect::{OutputConnection, PeripheralOutput},
         InputSignal,
@@ -86,6 +97,8 @@ use crate::{
     private,
     spi::AnySpi,
     system::PeripheralClockControl,
+    Async,
+    Blocking,
     Mode,
 };
 
@@ -423,12 +436,14 @@ impl Address {
 }
 
 /// SPI peripheral driver
-pub struct Spi<'d, T = AnySpi> {
+pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
+    _mode: PhantomData<M>,
 }
 
-impl<'d, T> Spi<'d, T>
+impl<'d, M, T> Spi<'d, M, T>
 where
+    M: Mode,
     T: InstanceDma,
 {
     /// Configures the SPI instance to use DMA with the specified channel.
@@ -436,19 +451,17 @@ where
     /// This method prepares the SPI instance for DMA transfers using SPI
     /// and returns an instance of `SpiDma` that supports DMA
     /// operations.
-    pub fn with_dma<CH, DmaMode>(
-        self,
-        channel: crate::dma::Channel<'d, CH, DmaMode>,
-    ) -> SpiDma<'d, DmaMode, T>
+    pub fn with_dma<CH, DM>(self, channel: Channel<'d, CH, DM>) -> SpiDma<'d, M, T>
     where
         CH: DmaChannelConvert<T::Dma>,
-        DmaMode: Mode,
+        DM: Mode,
+        Channel<'d, CH, M>: From<Channel<'d, CH, DM>>,
     {
-        SpiDma::new(self.spi, channel)
+        SpiDma::new(self.spi, channel.into())
     }
 }
 
-impl<T> Spi<'_, T>
+impl<M, T> Spi<'_, M, T>
 where
     T: Instance,
 {
@@ -484,18 +497,36 @@ where
     }
 }
 
-impl<'d> Spi<'d> {
+impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new(
         spi: impl Peripheral<P = impl Instance> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-    ) -> Spi<'d> {
+    ) -> Spi<'d, Blocking> {
         Self::new_typed(spi.map_into(), frequency, mode)
+    }
+
+    /// Converts the SPI instance into async mode.
+    pub fn into_async(self) -> Spi<'d, Async> {
+        Spi {
+            spi: self.spi,
+            _mode: PhantomData,
+        }
     }
 }
 
-impl<'d, T> Spi<'d, T>
+impl<'d> Spi<'d, Async> {
+    /// Converts the SPI instance into blocking mode.
+    pub fn into_blocking(self) -> Spi<'d, Blocking> {
+        Spi {
+            spi: self.spi,
+            _mode: PhantomData,
+        }
+    }
+}
+
+impl<'d, M, T> Spi<'d, M, T>
 where
     T: Instance,
 {
@@ -504,10 +535,13 @@ where
         spi: impl Peripheral<P = T> + 'd,
         frequency: HertzU32,
         mode: SpiMode,
-    ) -> Spi<'d, T> {
+    ) -> Spi<'d, M, T> {
         crate::into_ref!(spi);
 
-        let mut spi = Spi { spi };
+        let mut spi = Spi {
+            spi,
+            _mode: PhantomData,
+        };
         spi.spi.reset_peripheral();
         spi.spi.enable_peripheral();
         spi.spi.setup(frequency);
@@ -616,7 +650,7 @@ where
     }
 }
 
-impl<'d, T> Spi<'d, T>
+impl<'d, M, T> Spi<'d, M, T>
 where
     T: QspiInstance,
 {
@@ -663,7 +697,7 @@ where
     }
 }
 
-impl<T> Spi<'_, T>
+impl<M, T> Spi<'_, M, T>
 where
     T: Instance,
 {
@@ -754,7 +788,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, T>
+impl<M, T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, M, T>
 where
     T: Instance,
 {
@@ -769,7 +803,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, T>
+impl<M, T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, M, T>
 where
     T: Instance,
 {
@@ -780,7 +814,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, T>
+impl<M, T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, M, T>
 where
     T: Instance,
 {
@@ -812,9 +846,7 @@ mod dma {
             Rx,
             Tx,
         },
-        Blocking,
         InterruptConfigurable,
-        Mode,
     };
 
     /// A DMA capable SPI instance.
@@ -835,6 +867,40 @@ mod dma {
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
         address_buffer: DmaTxBuf,
+    }
+
+    impl<'d, T> SpiDma<'d, Blocking, T>
+    where
+        T: InstanceDma,
+    {
+        /// Converts the SPI instance into async mode.
+        pub fn into_async(self) -> SpiDma<'d, Async, T> {
+            SpiDma {
+                spi: self.spi,
+                channel: self.channel.into_async(),
+                tx_transfer_in_progress: self.tx_transfer_in_progress,
+                rx_transfer_in_progress: self.rx_transfer_in_progress,
+                #[cfg(all(esp32, spi_address_workaround))]
+                address_buffer: self.address_buffer,
+            }
+        }
+    }
+
+    impl<'d, T> SpiDma<'d, Async, T>
+    where
+        T: InstanceDma,
+    {
+        /// Converts the SPI instance into async mode.
+        pub fn into_blocking(self) -> SpiDma<'d, Blocking, T> {
+            SpiDma {
+                spi: self.spi,
+                channel: self.channel.into_blocking(),
+                tx_transfer_in_progress: self.tx_transfer_in_progress,
+                rx_transfer_in_progress: self.rx_transfer_in_progress,
+                #[cfg(all(esp32, spi_address_workaround))]
+                address_buffer: self.address_buffer,
+            }
+        }
     }
 
     #[cfg(all(esp32, spi_address_workaround))]
@@ -868,6 +934,9 @@ mod dma {
         /// Interrupts are not enabled at the peripheral level here.
         fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
             let interrupt = self.spi.interrupt();
+            for core in crate::Cpu::other() {
+                crate::interrupt::disable(core, interrupt);
+            }
             unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
             unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
         }
@@ -1180,7 +1249,7 @@ mod dma {
         }
     }
 
-    impl<T, Buf> SpiDmaTransfer<'_, crate::Async, Buf, T>
+    impl<T, Buf> SpiDmaTransfer<'_, Async, Buf, T>
     where
         T: InstanceDma,
     {
@@ -1460,6 +1529,34 @@ mod dma {
         tx_buf: DmaTxBuf,
     }
 
+    impl<'d, T> SpiDmaBus<'d, Blocking, T>
+    where
+        T: InstanceDma,
+    {
+        /// Converts the SPI instance into async mode.
+        pub fn into_async(self) -> SpiDmaBus<'d, Async, T> {
+            SpiDmaBus {
+                spi_dma: self.spi_dma.into_async(),
+                rx_buf: self.rx_buf,
+                tx_buf: self.tx_buf,
+            }
+        }
+    }
+
+    impl<'d, T> SpiDmaBus<'d, Async, T>
+    where
+        T: InstanceDma,
+    {
+        /// Converts the SPI instance into async mode.
+        pub fn into_blocking(self) -> SpiDmaBus<'d, Blocking, T> {
+            SpiDmaBus {
+                spi_dma: self.spi_dma.into_blocking(),
+                rx_buf: self.rx_buf,
+                tx_buf: self.tx_buf,
+            }
+        }
+    }
+
     impl<'d, M, T> SpiDmaBus<'d, M, T>
     where
         T: InstanceDma,
@@ -1699,7 +1796,7 @@ mod dma {
         }
     }
 
-    impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for SpiDmaBus<'_, crate::Blocking, T>
+    impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for SpiDmaBus<'_, Blocking, T>
     where
         T: InstanceDma,
     {
@@ -1711,7 +1808,7 @@ mod dma {
         }
     }
 
-    impl<T> embedded_hal_02::blocking::spi::Write<u8> for SpiDmaBus<'_, crate::Blocking, T>
+    impl<T> embedded_hal_02::blocking::spi::Write<u8> for SpiDmaBus<'_, Blocking, T>
     where
         T: InstanceDma,
     {
@@ -1731,6 +1828,7 @@ mod dma {
         };
 
         use super::*;
+        use crate::Async;
 
         struct DropGuard<I, F: FnOnce(I)> {
             inner: ManuallyDrop<I>,
@@ -1770,7 +1868,7 @@ mod dma {
             }
         }
 
-        impl<T> SpiDmaBus<'_, crate::Async, T>
+        impl<T> SpiDmaBus<'_, Async, T>
         where
             T: InstanceDma,
         {
@@ -1884,7 +1982,7 @@ mod dma {
             }
         }
 
-        impl<T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, crate::Async, T>
+        impl<T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, Async, T>
         where
             T: InstanceDma,
         {
@@ -1959,11 +2057,11 @@ mod ehal1 {
 
     use super::*;
 
-    impl<T> embedded_hal::spi::ErrorType for Spi<'_, T> {
+    impl<M, T> embedded_hal::spi::ErrorType for Spi<'_, M, T> {
         type Error = Error;
     }
 
-    impl<T> FullDuplex for Spi<'_, T>
+    impl<M, T> FullDuplex for Spi<'_, M, T>
     where
         T: Instance,
     {
@@ -1976,7 +2074,7 @@ mod ehal1 {
         }
     }
 
-    impl<T> SpiBus for Spi<'_, T>
+    impl<M, T> SpiBus for Spi<'_, M, T>
     where
         T: Instance,
     {

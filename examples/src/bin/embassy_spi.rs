@@ -63,8 +63,9 @@ async fn main(_spawner: Spawner) {
         .with_mosi(mosi)
         .with_miso(miso)
         .with_cs(cs)
-        .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
-        .with_buffers(dma_rx_buf, dma_tx_buf);
+        .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+        .with_buffers(dma_rx_buf, dma_tx_buf)
+        .into_async();
 
     let send_buffer = [0, 1, 2, 3, 4, 5, 6, 7];
     loop {

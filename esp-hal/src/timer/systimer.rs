@@ -549,6 +549,10 @@ pub trait Comparator {
             _ => unreachable!(),
         };
 
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
+        }
+
         #[cfg(not(esp32s2))]
         unsafe {
             interrupt::bind_interrupt(interrupt, handler.handler());
