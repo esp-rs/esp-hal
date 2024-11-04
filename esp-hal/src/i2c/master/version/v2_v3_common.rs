@@ -3,7 +3,7 @@ use core::{
     task::{Context, Poll},
 };
 
-use crate::i2c::*;
+use crate::i2c::master::*;
 
 pub enum Event {
     EndDetect,

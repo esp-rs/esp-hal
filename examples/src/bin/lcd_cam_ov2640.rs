@@ -29,8 +29,7 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_rx_stream_buffer,
     gpio::Io,
-    i2c,
-    i2c::I2c,
+    i2c::{self, master::I2c},
     lcd_cam::{
         cam::{Camera, RxEightBits},
         LcdCam,
@@ -172,17 +171,17 @@ pub struct Sccb<'d, T> {
 
 impl<'d, T> Sccb<'d, T>
 where
-    T: i2c::Instance,
+    T: i2c::master::Instance,
 {
     pub fn new(i2c: I2c<'d, Blocking, T>) -> Self {
         Self { i2c }
     }
 
-    pub fn probe(&mut self, address: u8) -> Result<(), i2c::Error> {
+    pub fn probe(&mut self, address: u8) -> Result<(), i2c::master::Error> {
         self.i2c.write(address, &[])
     }
 
-    pub fn read(&mut self, address: u8, reg: u8) -> Result<u8, i2c::Error> {
+    pub fn read(&mut self, address: u8, reg: u8) -> Result<u8, i2c::master::Error> {
         self.i2c.write(address, &[reg])?;
 
         let mut bytes = [0u8; 1];
@@ -190,7 +189,7 @@ where
         Ok(bytes[0])
     }
 
-    pub fn write(&mut self, address: u8, reg: u8, data: u8) -> Result<(), i2c::Error> {
+    pub fn write(&mut self, address: u8, reg: u8, data: u8) -> Result<(), i2c::master::Error> {
         self.i2c.write(address, &[reg, data])
     }
 }

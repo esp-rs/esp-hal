@@ -88,7 +88,9 @@ the peripheral instance has been moved to the last generic parameter position.
 let spi: Spi<'static, FullDuplexMode, SPI2> = Spi::new_typed(peripherals.SPI2, 1.MHz(), SpiMode::Mode0);
 ```
 
-## I2C constructor changes
+## I2C changes
+
+The I2C master driver and related types have been moved to `esp_hal::i2c::master`.
 
 The `with_timeout` constructors have been removed in favour of `set_timeout` or `with_timeout`.
 
@@ -97,64 +99,56 @@ The `with_timeout` constructors have been removed in favour of `set_timeout` or 
 +let i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz()).with_timeout(timeout);
 ```
 
-## Changes to half-duplex SPI
+### I2C drivers can now be configured using `i2c::master::Config`
 
-The `HalfDuplexMode` and `FullDuplexMode` type parameters have been removed from SPI master and slave
-drivers. It is now possible to execute half-duplex and full-duplex operations on the same SPI bus.
-
-### Driver construction
-
-- The `Spi::new_half_duplex` constructor has been removed. Use `new` (or `new_typed`) instead.
-- The `with_pins` methods have been removed. Use the individual `with_*` functions instead.
-- The `with_mosi` and `with_miso` functions now take input-output peripheral signals to support half-duplex mode.
-  > TODO(danielb): this means they are currently only usable with GPIO pins, but upcoming GPIO changes should allow using any output signal.
+- The old methods to change configuration have been removed.
+- The `new` and `new_typed` constructor no longer takes `frequency` and pins.
+- The default configuration is now:
+  - bus frequency: 100 kHz
+  - timeout: about 10 bus clock cycles
+- There are new constructors (`new_with_config`, `new_typed_with_config`) and a new `apply_config` method to apply custom configuration.
+- Pins can now be configured using `with_sda` and `with_scl`
 
 ```diff
-- let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
--     .with_pins(sck, mosi, miso, sio2, sio3, cs);
-+ let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-+     .with_sck(sck)
-+     .with_cs(cs)
-+     .with_mosi(mosi)
-+     .with_miso(miso)
-+     .with_sio2(sio2)
-+     .with_sio3(sio3);
+-use esp_hal::i2c::I2c;
++use esp_hal::i2c::master::{Config, I2c};
+-I2c::new(I2C0, sda, scl, 100.kHz());
++I2c::new_with_config(
++    I2C0,
++    Config {
++        frequency: 400.kHz(),
++        ..Config::default()
++    },
++)
++.with_sda(sda)
++.with_scl(scl);
 ```
 
-### Transfer functions
+### The calculation of I2C timeout has changed
 
-The `Spi<'_, SPI, HalfDuplexMode>::read` and `Spi<'_, SPI, HalfDuplexMode>::write` functions have been replaced by
-`half_duplex_read` and `half_duplex_write`.
+Previously, I2C timeouts were counted in increments of I2C peripheral clock cycles. This meant that
+the configure value meant different lengths of time depending on the device. With this update, the
+I2C configuration now expects the timeout value in number of bus clock cycles, which is consistent
+between devices.
+
+ESP32 and ESP32-S2 use an exact number of clock cycles for its timeout. Other MCUs, however, use
+the `2^timeout` value internally, and the HAL rounds up the timeout to the next appropriate value.
+
+## UART changes
+
+### The `uart::config` module has been removed
+
+The module's contents have been moved into `uart`.
 
 ```diff
- let mut data = [0u8; 2];
- let transfer = spi
--    .read(
-+    .half_duplex_read(
-         SpiDataMode::Single,
-         Command::Command8(0x90, SpiDataMode::Single),
-         Address::Address24(0x000000, SpiDataMode::Single),
-         0,
-         &mut data,
-     )
-     .unwrap();
-
- let transfer = spi
--    .write(
-+    .half_duplex_write(
-         SpiDataMode::Quad,
-         Command::Command8(write as u16, command_data_mode),
-         Address::Address24(
-             write as u32 | (write as u32) << 8 | (write as u32) << 16,
-             SpiDataMode::Quad,
-         ),
-         0,
-         dma_tx_buf,
-     )
-     .unwrap();
+-use esp_hal::uart::config::Config;
++use esp_hal::uart::Config;
 ```
 
-## UART event listening
+If you work with multiple configurable peripherals, you may want to import the `uart` module and
+refer to the `Config` struct as `uart::Config`.
+
+### UART event listening
 
 The following functions have been removed:
 
@@ -194,6 +188,89 @@ You can now listen/unlisten multiple interrupt bits at once:
 -uart0.listen_at_cmd();
 -uart0.listen_rx_fifo_full();
 +uart0.listen(UartInterrupt::AtCmd | UartConterrupt::RxFifoFull);
+```
+
+## SPI changes
+
+### SPI drivers can now be configured using `spi::master::Config`
+
+- The old methods to change configuration have been removed.
+- The `new` and `new_typed` constructor no longer takes `frequency` and `mode`.
+- The default configuration is now:
+  - bus frequency: 1 MHz
+  - bit order: MSB first
+  - mode: SPI mode 0
+- There are new constructors (`new_with_config`, `new_typed_with_config`) and a new `apply_config` method to apply custom configuration.
+
+```diff
+-use esp_hal::spi::{master::Spi, SpiMode};
++use esp_hal::spi::{master::{Config, Spi}, SpiMode};
+-Spi::new(SPI2, 100.kHz(), SpiMode::Mode1);
++Spi::new_with_config(
++    SPI2,
++    Config {
++        frequency: 100.kHz(),
++        mode: SpiMode::Mode0,
++        ..Config::default()
++    },
++)
+```
+
+### Half-duplex SPI type signature
+
+The `HalfDuplexMode` and `FullDuplexMode` type parameters have been removed from SPI master and slave
+drivers. It is now possible to execute half-duplex and full-duplex operations on the same SPI bus.
+
+### Half-duplex SPI driver construction
+
+- The `Spi::new_half_duplex` constructor has been removed. Use `new` (or `new_typed`) instead.
+- The `with_pins` methods have been removed. Use the individual `with_*` functions instead.
+- The `with_mosi` and `with_miso` functions now take input-output peripheral signals to support half-duplex mode.
+  > TODO(danielb): this means they are currently only usable with GPIO pins, but upcoming GPIO changes should allow using any output signal.
+
+```diff
+- let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
+-     .with_pins(sck, mosi, miso, sio2, sio3, cs);
++ let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
++     .with_sck(sck)
++     .with_cs(cs)
++     .with_mosi(mosi)
++     .with_miso(miso)
++     .with_sio2(sio2)
++     .with_sio3(sio3);
+```
+
+### Half-duplex SPI transfer functions
+
+The `Spi<'_, SPI, HalfDuplexMode>::read` and `Spi<'_, SPI, HalfDuplexMode>::write` functions have been replaced by
+`half_duplex_read` and `half_duplex_write`.
+
+```diff
+ let mut data = [0u8; 2];
+ let transfer = spi
+-    .read(
++    .half_duplex_read(
+         SpiDataMode::Single,
+         Command::Command8(0x90, SpiDataMode::Single),
+         Address::Address24(0x000000, SpiDataMode::Single),
+         0,
+         &mut data,
+     )
+     .unwrap();
+
+ let transfer = spi
+-    .write(
++    .half_duplex_write(
+         SpiDataMode::Quad,
+         Command::Command8(write as u16, command_data_mode),
+         Address::Address24(
+             write as u32 | (write as u32) << 8 | (write as u32) << 16,
+             SpiDataMode::Quad,
+         ),
+         0,
+         dma_tx_buf,
+     )
+     .unwrap();
 ```
 
 ## Circular DMA transfer's `available` returns `Result<usize, DmaError>` now
@@ -238,76 +315,3 @@ the GPIO drivers (`Input`, `Output`, `OutputOpenDrain` and `Flex`) instead.
   (e.g. `use esp_hal::gpio::etm::Event as GpioEtmEvent`).
 - The old task and event types have been replaced by `Task` and `Event`.
 - GPIO tasks and events are no longer generic.
-
-## Changes to peripheral configuration
-
-### The `uart::config` module has been removed
-
-The module's contents have been moved into `uart`.
-
-```diff
--use esp_hal::uart::config::Config;
-+use esp_hal::uart::Config;
-```
-
-If you work with multiple configurable peripherals, you may want to import the `uart` module and
-refer to the `Config` struct as `uart::Config`.
-
-### SPI drivers can now be configured using `spi::master::Config`
-
-- The old methods to change configuration have been removed.
-- The `new` and `new_typed` constructor no longer takes `frequency` and `mode`.
-- The default configuration is now:
-  - bus frequency: 1 MHz
-  - bit order: MSB first
-  - mode: SPI mode 0
-- There are new constructors (`new_with_config`, `new_typed_with_config`) and a new `apply_config` method to apply custom configuration.
-
-```diff
--use esp_hal::spi::{master::Spi, SpiMode};
-+use esp_hal::spi::{master::{Config, Spi}, SpiMode};
--Spi::new(SPI2, 100.kHz(), SpiMode::Mode1);
-+Spi::new_with_config(
-+    SPI2,
-+    Config {
-+        frequency: 100.kHz(),
-+        mode: SpiMode::Mode0,
-+        ..Config::default()
-+    },
-+)
-```
-
-### I2C drivers can now be configured using `i2c::Config`
-
-- The old methods to change configuration have been removed.
-- The `new` and `new_typed` constructor no longer takes `frequency` and pins.
-- The default configuration is now:
-  - bus frequency: 100 kHz
-  - timeout: about 10 bus clock cycles
-- There are new constructors (`new_with_config`, `new_typed_with_config`) and a new `apply_config` method to apply custom configuration.
-- Pins can now be configured using `with_sda` and `with_scl`
-
-```diff
--use esp_hal::i2c::I2c;
-+use esp_hal::i2c::{Config, I2c};
--I2c::new(I2C0, sda, scl, 100.kHz());
-+I2c::new_with_config(
-+    I2C0,
-+    Config {
-+        frequency: 400.kHz(),
-+        ..Config::default()
-+    },
-+)
-+.with_sda(sda)
-+.with_scl(scl);
-```
-
-### The calculation of I2C timeout has changed
-
-Previously, I2C timeouts were counted in increments of I2C peripheral clock cycles. This meant that
-the configure value meant different lengths of time depending on the device. With this update, the
-I2C configuration now expects the timeout value in number of bus clock cycles, which is consistent
-between devices.
-
-ESP32 and ESP32-S2 use an exact number of clock cycles for its timeout. Other MCUs, however, use
-the `2^timeout` value internally, and the HAL rounds up the timeout to the next appropriate value.

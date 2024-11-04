@@ -1,5 +1,5 @@
 //! ESP32-specific implementation
-use crate::i2c::*;
+use crate::i2c::master::*;
 
 pub(crate) const I2C_CHUNK_SIZE: usize = 32;
 pub(crate) const I2C_LL_INTR_MASK: u32 = 0x3ffff;

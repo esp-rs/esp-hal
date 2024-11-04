@@ -22,7 +22,7 @@ use embedded_graphics::{
     text::{Alignment, Text},
 };
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, gpio::Io, i2c::I2c, prelude::*};
+use esp_hal::{delay::Delay, gpio::Io, i2c::master::I2c, prelude::*};
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
 #[entry]

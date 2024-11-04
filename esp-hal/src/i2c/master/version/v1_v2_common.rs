@@ -1,4 +1,4 @@
-use crate::i2c::*;
+use crate::i2c::master::*;
 
 fn assert_read_length(len: usize) {
     if len <= 32 {

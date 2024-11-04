@@ -1,7 +1,7 @@
 use embedded_hal::i2c::Operation;
 
 use crate::{
-    i2c::{I2c, Instance},
+    i2c::master::{I2c, Instance},
     Async,
 };
 

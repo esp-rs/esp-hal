@@ -7,7 +7,7 @@
 
 use esp_hal::{
     gpio::Io,
-    i2c::{I2c, Operation},
+    i2c::master::{I2c, Operation},
     Async,
     Blocking,
 };

@@ -1,4 +1,4 @@
-use crate::i2c::{version::v2_v3_common::*, *};
+use crate::i2c::master::{version::v2_v3_common::*, *};
 
 pub(crate) const I2C_CHUNK_SIZE: usize = 254;
 pub(crate) const I2C_LL_INTR_MASK: u32 = 0x3ffff;

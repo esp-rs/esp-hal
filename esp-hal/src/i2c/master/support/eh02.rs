@@ -1,5 +1,5 @@
 use crate::{
-    i2c::{Error, I2c, Instance},
+    i2c::master::{Error, I2c, Instance},
     Blocking,
 };
 
