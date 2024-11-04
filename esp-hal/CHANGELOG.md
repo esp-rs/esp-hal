@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `{Uart, UartRx, UartTx}::apply_config()` (#2449)
 - `{Uart, UartRx, UartTx}` now implement `embassy_embedded_hal::SetConfig` (#2449)
 - GPIO ETM tasks and events now accept `InputSignal` and `OutputSignal` (#2427)
+- `spi::master::Config` and `{Spi, SpiDma, SpiDmaBus}::apply_config` (#2448)
 
 ### Changed
 
@@ -50,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `rmt::asynch::RxChannelAsync` and `rmt::asynch::TxChannelAsync` traits have been moved to `rmt` (#2430)
 - Calling `AnyPin::output_signals` on an input-only pin (ESP32 GPIO 34-39) will now result in a panic. (#2418)
 - UART configuration types have been moved to `esp_hal::uart` (#2449)
+- `spi::master::Spi::new()` no longer takes `frequency` and `mode` as a parameter. (#2448)
 
 ### Fixed
 
@@ -85,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `SysTimerEtm` prefix has been removed from `timer::systimer::etm` types (#2427)
 - The `GpioEtmEventRising`, `GpioEtmEventFalling`, `GpioEtmEventAny` types have been replaced with `Event` (#2427)
 - The `TaskSet`, `TaskClear`, `TaskToggle` types have been replaced with `Task` (#2427)
+- `{Spi, SpiDma, SpiDmaBus}` configuration methods (#2448)
 
 ## [0.21.1]
 

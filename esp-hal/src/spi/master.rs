@@ -435,6 +435,35 @@ impl Address {
     }
 }
 
+/// SPI peripheral configuration
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    /// SPI clock frequency
+    pub frequency: HertzU32,
+
+    /// SPI mode
+    pub mode: SpiMode,
+
+    /// Bit order of the read data.
+    pub read_bit_order: SpiBitOrder,
+
+    /// Bit order of the written data.
+    pub write_bit_order: SpiBitOrder,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        use fugit::RateExtU32;
+        Config {
+            frequency: 1_u32.MHz(),
+            mode: SpiMode::Mode0,
+            read_bit_order: SpiBitOrder::MSBFirst,
+            write_bit_order: SpiBitOrder::MSBFirst,
+        }
+    }
+}
+
 /// SPI peripheral driver
 pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
@@ -503,12 +532,16 @@ where
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new(
+    pub fn new(spi: impl Peripheral<P = impl Instance> + 'd) -> Spi<'d, Blocking> {
+        Self::new_with_config(spi, Config::default())
+    }
+
+    /// Constructs an SPI instance in 8bit dataframe mode.
+    pub fn new_with_config(
         spi: impl Peripheral<P = impl Instance> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
+        config: Config,
     ) -> Spi<'d, Blocking> {
-        Self::new_typed(spi.map_into(), frequency, mode)
+        Self::new_typed_with_config(spi.map_into(), config)
     }
 
     /// Converts the SPI instance into async mode.
@@ -535,14 +568,18 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_typed(
+    pub fn new_typed(spi: impl Peripheral<P = T> + 'd) -> Spi<'d, M, T> {
+        Self::new_typed_with_config(spi, Config::default())
+    }
+
+    /// Constructs an SPI instance in 8bit dataframe mode.
+    pub fn new_typed_with_config(
         spi: impl Peripheral<P = T> + 'd,
-        frequency: HertzU32,
-        mode: SpiMode,
+        config: Config,
     ) -> Spi<'d, M, T> {
         crate::into_ref!(spi);
 
-        let this = Spi {
+        let mut this = Spi {
             spi,
             _mode: PhantomData,
         };
@@ -550,9 +587,8 @@ where
         PeripheralClockControl::enable(this.spi.peripheral());
         PeripheralClockControl::reset(this.spi.peripheral());
 
-        this.driver().setup(frequency);
         this.driver().init();
-        this.driver().set_data_mode(mode);
+        this.apply_config(&config);
 
         let this = this
             .with_mosi(NoPin)
@@ -635,20 +671,9 @@ where
         self
     }
 
-    /// Change the bus frequency of the SPI instance in half-duplex mode.
-    ///
-    /// This method allows you to update the bus frequency for the SPI
-    /// communication after the instance has been created.
-    pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
-        self.driver().ch_bus_freq(frequency);
-    }
-
-    /// Set the bit order for the SPI instance.
-    ///
-    /// The default is MSB first for both read and write.
-    pub fn with_bit_order(self, read_order: SpiBitOrder, write_order: SpiBitOrder) -> Self {
-        self.driver().set_bit_order(read_order, write_order);
-        self
+    /// Change the bus configuration.
+    pub fn apply_config(&mut self, config: &Config) {
+        self.driver().apply_config(config);
     }
 }
 
@@ -863,6 +888,13 @@ mod dma {
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
         address_buffer: DmaTxBuf,
+    }
+
+    impl<M, T> crate::private::Sealed for SpiDma<'_, M, T>
+    where
+        T: Instance,
+        M: Mode,
+    {
     }
 
     impl<'d, T> SpiDma<'d, Blocking, T>
@@ -1152,23 +1184,10 @@ mod dma {
                 }
             }
         }
-    }
 
-    impl<M, T> crate::private::Sealed for SpiDma<'_, M, T>
-    where
-        T: Instance,
-        M: Mode,
-    {
-    }
-
-    impl<'d, M, T> SpiDma<'d, M, T>
-    where
-        T: Instance,
-        M: Mode,
-    {
-        /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
-        pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
-            self.driver().ch_bus_freq(frequency);
+        /// Change the bus configuration.
+        pub fn apply_config(&mut self, config: &Config) {
+            self.driver().apply_config(config);
         }
 
         /// Configures the DMA buffers for the SPI instance.
@@ -1487,6 +1506,13 @@ mod dma {
         tx_buf: DmaTxBuf,
     }
 
+    impl<M, T> crate::private::Sealed for SpiDmaBus<'_, M, T>
+    where
+        T: Instance,
+        M: Mode,
+    {
+    }
+
     impl<'d, T> SpiDmaBus<'d, Blocking, T>
     where
         T: Instance,
@@ -1529,15 +1555,6 @@ mod dma {
                 tx_buf,
             }
         }
-
-        fn wait_for_idle(&mut self) {
-            self.spi_dma.wait_for_idle();
-        }
-
-        /// Changes the SPI bus frequency for the DMA-enabled SPI instance.
-        pub fn change_bus_frequency(&mut self, frequency: HertzU32) {
-            self.spi_dma.change_bus_frequency(frequency);
-        }
     }
 
     impl<T> InterruptConfigurable for SpiDmaBus<'_, Blocking, T>
@@ -1578,18 +1595,20 @@ mod dma {
         }
     }
 
-    impl<M, T> crate::private::Sealed for SpiDmaBus<'_, M, T>
-    where
-        T: Instance,
-        M: Mode,
-    {
-    }
-
     impl<M, T> SpiDmaBus<'_, M, T>
     where
         T: Instance,
         M: Mode,
     {
+        fn wait_for_idle(&mut self) {
+            self.spi_dma.wait_for_idle();
+        }
+
+        /// Change the bus configuration.
+        pub fn apply_config(&mut self, config: &Config) {
+            self.spi_dma.apply_config(config);
+        }
+
         /// Reads data from the SPI bus using DMA.
         pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
             self.wait_for_idle();
@@ -1683,13 +1702,7 @@ mod dma {
 
             Ok(())
         }
-    }
 
-    impl<M, T> SpiDmaBus<'_, M, T>
-    where
-        T: Instance,
-        M: Mode,
-    {
         /// Half-duplex read.
         pub fn half_duplex_read(
             &mut self,
@@ -2558,6 +2571,12 @@ impl Info {
             }
             w
         });
+    }
+
+    fn apply_config(&self, config: &Config) {
+        self.ch_bus_freq(config.frequency);
+        self.set_bit_order(config.read_bit_order, config.write_bit_order);
+        self.set_data_mode(config.mode);
     }
 
     fn set_data_mode(&self, data_mode: SpiMode) {
