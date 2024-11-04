@@ -31,7 +31,10 @@ async fn main(_spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 400.kHz()).into_async();
+    let mut i2c = I2c::new(peripherals.I2C0, 400.kHz())
+        .with_sda(io.pins.gpio4)
+        .with_scl(io.pins.gpio5)
+        .into_async();
 
     loop {
         let mut data = [0u8; 22];

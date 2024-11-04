@@ -39,10 +39,10 @@
 //! // and standard I2C clock speed.
 //! let mut i2c = I2c::new(
 //!     peripherals.I2C0,
-//!     io.pins.gpio1,
-//!     io.pins.gpio2,
 //!     100.kHz(),
-//! );
+//! )
+//! .with_sda(io.pins.gpio1)
+//! .with_scl(io.pins.gpio2);
 //!
 //! loop {
 //!     let mut data = [0u8; 22];
@@ -217,31 +217,6 @@ impl<'d, T, DM: Mode> I2c<'d, DM, T>
 where
     T: Instance,
 {
-    fn new_internal(
-        i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        scl: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        frequency: HertzU32,
-    ) -> Self {
-        crate::into_ref!(i2c);
-        crate::into_mapped_ref!(sda, scl);
-
-        let i2c = I2c {
-            i2c,
-            phantom: PhantomData,
-            frequency,
-            timeout: None,
-        };
-
-        PeripheralClockControl::reset(i2c.i2c.peripheral());
-        PeripheralClockControl::enable(i2c.i2c.peripheral());
-
-        let i2c = i2c.with_sda(sda).with_scl(scl);
-
-        i2c.driver().setup(frequency, None);
-        i2c
-    }
-
     fn driver(&self) -> Driver<'_> {
         Driver {
             info: self.i2c.info(),
@@ -322,14 +297,16 @@ where
         Ok(())
     }
 
-    fn with_sda(self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    /// Connect a pin to the I2C SDA signal.
+    pub fn with_sda(self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
         self.with_pin(sda, input, output)
     }
 
-    fn with_scl(self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    /// Connect a pin to the I2C SCL signal.
+    pub fn with_scl(self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
@@ -361,13 +338,8 @@ impl<'d> I2c<'d, Blocking> {
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new(
-        i2c: impl Peripheral<P = impl Instance> + 'd,
-        sda: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        scl: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        frequency: HertzU32,
-    ) -> Self {
-        Self::new_typed(i2c.map_into(), sda, scl, frequency)
+    pub fn new(i2c: impl Peripheral<P = impl Instance> + 'd, frequency: HertzU32) -> Self {
+        Self::new_typed(i2c.map_into(), frequency)
     }
 }
 
@@ -378,13 +350,21 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_typed(
-        i2c: impl Peripheral<P = T> + 'd,
-        sda: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        scl: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        frequency: HertzU32,
-    ) -> Self {
-        Self::new_internal(i2c, sda, scl, frequency)
+    pub fn new_typed(i2c: impl Peripheral<P = T> + 'd, frequency: HertzU32) -> Self {
+        crate::into_ref!(i2c);
+
+        let i2c = I2c {
+            i2c,
+            phantom: PhantomData,
+            frequency,
+            timeout: None,
+        };
+
+        PeripheralClockControl::reset(i2c.i2c.peripheral());
+        PeripheralClockControl::enable(i2c.i2c.peripheral());
+
+        i2c.driver().setup(frequency, None);
+        i2c
     }
 
     // TODO: missing interrupt APIs

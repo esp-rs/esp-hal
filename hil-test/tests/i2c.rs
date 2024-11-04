@@ -40,7 +40,9 @@ mod tests {
 
         // Create a new peripheral object with the described wiring and standard
         // I2C clock speed:
-        let i2c = I2c::new(peripherals.I2C0, sda, scl, 100.kHz());
+        let i2c = I2c::new(peripherals.I2C0, 100.kHz())
+            .with_sda(sda)
+            .with_scl(scl);
 
         Context { i2c }
     }
