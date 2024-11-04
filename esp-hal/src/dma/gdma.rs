@@ -393,7 +393,7 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
     #[cfg(esp32p4)]
     fn set_link_addr(&self, address: u32) {
         unsafe { &*crate::peripherals::AHB_DMA::PTR }
-            .in_link_addr_ch((self.0.number() as usize))
+            .in_link_addr_ch(self.0.number() as usize)
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 

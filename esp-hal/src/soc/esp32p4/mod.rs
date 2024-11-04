@@ -31,4 +31,6 @@ pub(crate) mod constants {
     pub const SOC_DRAM_LOW: usize = 0x4000_0000;
     /// End address of the system's DRAM (high range).
     pub const SOC_DRAM_HIGH: usize = 0x4C00_0000;
+    /// RC FAST Clock value (Hertz).
+    pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
 }

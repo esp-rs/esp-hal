@@ -141,7 +141,7 @@ use crate::{
 
 const UART_FIFO_SIZE: u16 = 128;
 
-#[cfg(not(any(esp32, esp32p4, esp32s2)))]
+#[cfg(not(any(esp32, esp32s2)))]
 use crate::soc::constants::RC_FAST_CLK;
 #[cfg(any(esp32, esp32s2))]
 use crate::soc::constants::REF_TICK;
@@ -200,7 +200,7 @@ pub enum ClockSource {
     /// APB_CLK clock source (default for UART on all the chips except of
     /// esp32c6 and esp32h2)
     Apb,
-    #[cfg(not(any(esp32, esp32p4, esp32s2)))]
+    #[cfg(not(any(esp32, esp32s2)))]
     /// RC_FAST_CLK clock source (17.5 MHz)
     RcFast,
     #[cfg(not(any(esp32, esp32s2)))]
@@ -730,10 +730,10 @@ where
 
 #[inline(always)]
 fn sync_regs(_register_block: &RegisterBlock) {
-    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
+    #[cfg(any(esp32c3, esp32c6, esp32p4, esp32h2, esp32s3))]
     {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c6, esp32h2))] {
+            if #[cfg(any(esp32c6, esp32p4, esp32h2))] {
                 let update_reg = _register_block.reg_update();
             } else {
                 let update_reg = _register_block.id();
