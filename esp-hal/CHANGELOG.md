@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPIO ETM tasks and events now accept `InputSignal` and `OutputSignal` (#2427)
 - `spi::master::Config` and `{Spi, SpiDma, SpiDmaBus}::apply_config` (#2448)
 - `embassy_embedded_hal::SetConfig` is now implemented for `{Spi, SpiDma, SpiDmaBus}` (#2448)
+- `I2c::{apply_config(), with_sda(), with_scl()}` (#2437)
+- `I2c` now implements `embassy_embedded_hal::SetConfig` (#2437)
 
 ### Changed
 
@@ -90,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `GpioEtmEventRising`, `GpioEtmEventFalling`, `GpioEtmEventAny` types have been replaced with `Event` (#2427)
 - The `TaskSet`, `TaskClear`, `TaskToggle` types have been replaced with `Task` (#2427)
 - `{Spi, SpiDma, SpiDmaBus}` configuration methods (#2448)
+- `I2c::new()` no longer takes `frequency` and pins as parameters. (#2437)
 
 ## [0.21.1]
 

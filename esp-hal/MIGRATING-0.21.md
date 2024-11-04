@@ -276,3 +276,28 @@ refer to the `Config` struct as `uart::Config`.
 +    },
 +)
 ```
+
+### I2C drivers can now be configured using `i2c::Config`
+
+- The old methods to change configuration have been removed.
+- The `new` and `new_typed` constructor no longer takes `frequency` and pins.
+- The default configuration is now:
+  - bus frequency: 100 kHz
+  - timeout: `None`
+- There are new constructors (`new_with_config`, `new_typed_with_config`) and a new `apply_config` method to apply custom configuration.
+- Pins can now be configured using `with_sda` and `with_scl`
+
+```diff
+-use esp_hal::i2c::I2c;
++use esp_hal::i2c::{Config, I2c};
+-I2c::new(I2C0, sda, scl, 100.kHz());
++I2c::new_with_config(
++    I2C0,
++    Config {
++        frequency: 400.kHz(),
++        ..Config::default()
++    },
++)
++.with_sda(sda)
++.with_scl(scl);
+```

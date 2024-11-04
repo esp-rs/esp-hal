@@ -31,7 +31,7 @@ async fn main(_spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let i2c0 = I2c::new(peripherals.I2C0, 400.kHz())
+    let i2c0 = I2c::new(peripherals.I2C0)
         .with_sda(io.pins.gpio4)
         .with_scl(io.pins.gpio5)
         .into_async();

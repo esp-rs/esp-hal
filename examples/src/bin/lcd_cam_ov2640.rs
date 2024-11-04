@@ -80,7 +80,7 @@ fn main() -> ! {
 
     delay.delay_millis(500u32);
 
-    let i2c = I2c::new(peripherals.I2C0, 100u32.kHz())
+    let i2c = I2c::new(peripherals.I2C0)
         .with_sda(cam_siod)
         .with_scl(cam_sioc);
 
