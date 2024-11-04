@@ -84,7 +84,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `TimerEtm` prefix has been removed from `timer::timg::etm` types (#2427)
 - The `SysTimerEtm` prefix has been removed from `timer::systimer::etm` types (#2427)
 - The `GpioEtmEventRising`, `GpioEtmEventFalling`, `GpioEtmEventAny` types have been replaced with `Event` (#2427)
-- The `TaskSet`, `TaskClear`, `TaskToggle` types have been replaced with `Event` (#2427)
 - The `TaskSet`, `TaskClear`, `TaskToggle` types have been replaced with `Task` (#2427)
 
 ## [0.21.1]
