@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Feature `have-strchr` is removed
+
 ## 0.10.1 - 2024-10-10
 
 ### Changed

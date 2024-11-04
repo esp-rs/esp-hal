@@ -180,9 +180,6 @@ log = ["dep:log", "esp-hal/log", "esp-wifi-sys/log"]
 ## Enable sniffer mode support
 sniffer = ["wifi"]
 
-# Don't include `strchr` - not shown in docs
-have-strchr = []
-
 # Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde", "heapless/serde"]
 
