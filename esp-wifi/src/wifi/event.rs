@@ -17,8 +17,8 @@ pub(crate) mod sealed {
 pub type Handler<T> = dyn FnMut(&T) + Sync + Send;
 
 fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
-    fn nop<'a, T>(_: &'a T) {}
-    Box::new(nop)
+    fn drop_ref<T>(_: &T) {}
+    Box::new(drop_ref)
 }
 
 /// Extension trait for setting handlers for an event.
