@@ -29,15 +29,15 @@ fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
 /// Register a new event handler like:
 /// ```
 /// # use esp_wifi::wifi::event::{self, *};
-/// # fn new_handler(_: &wifi_event_ap_stadisconnected_t) {}
-/// event::wifi_event_ap_stadisconnected_t::update_handler(|prev, event| {
+/// # fn new_handler(_: &ApStaconnected) {}
+/// event::ApStaconnected::update_handler(|prev, event| {
 ///     prev(event);
 ///     new_handler(event);
 /// })
 /// ```
 // Implemented like this instead of free functions because the syntax would be
 // ```
-// event::update_handler::<event::wifi_event_ap_stadisconnected_t, _>(...)
+// event::update_handler::<event::ApStaconnected, _>(...)
 // ```
 pub trait EventExt: sealed::Event + Sized + 'static {
     /// Get the handler for this event, replacing it with the default handler.
