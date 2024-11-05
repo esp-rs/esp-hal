@@ -65,7 +65,7 @@
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: https://docs.embassy.dev/embassy-embedded-hal/git/default/shared_bus/index.html
 
-use core::{convert::Infallible, marker::PhantomData};
+use core::marker::PhantomData;
 
 pub use dma::*;
 use embassy_embedded_hal::SetConfig;
@@ -469,6 +469,11 @@ impl Default for Config {
     }
 }
 
+/// Configuration errors.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ConfigError {}
+
 /// SPI peripheral driver
 pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
@@ -677,8 +682,8 @@ where
     }
 
     /// Change the bus configuration.
-    pub fn apply_config(&mut self, config: &Config) {
-        self.driver().apply_config(config);
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.driver().apply_config(config)
     }
 }
 
@@ -688,11 +693,10 @@ where
     M: Mode,
 {
     type Config = Config;
-    type ConfigError = Infallible;
+    type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config);
-        Ok(())
+        self.apply_config(config)
     }
 }
 
@@ -1205,8 +1209,8 @@ mod dma {
         }
 
         /// Change the bus configuration.
-        pub fn apply_config(&mut self, config: &Config) {
-            self.driver().apply_config(config);
+        pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+            self.driver().apply_config(config)
         }
 
         /// Configures the DMA buffers for the SPI instance.
@@ -1229,11 +1233,10 @@ mod dma {
         M: Mode,
     {
         type Config = Config;
-        type ConfigError = Infallible;
+        type ConfigError = ConfigError;
 
         fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-            self.apply_config(config);
-            Ok(())
+            self.apply_config(config)
         }
     }
 
@@ -1638,8 +1641,8 @@ mod dma {
         }
 
         /// Change the bus configuration.
-        pub fn apply_config(&mut self, config: &Config) {
-            self.spi_dma.apply_config(config);
+        pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+            self.spi_dma.apply_config(config)
         }
 
         /// Reads data from the SPI bus using DMA.
@@ -1806,11 +1809,10 @@ mod dma {
         M: Mode,
     {
         type Config = Config;
-        type ConfigError = Infallible;
+        type ConfigError = ConfigError;
 
         fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-            self.apply_config(config);
-            Ok(())
+            self.apply_config(config)
         }
     }
 
@@ -2620,10 +2622,11 @@ impl Info {
         });
     }
 
-    fn apply_config(&self, config: &Config) {
+    fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
         self.ch_bus_freq(config.frequency);
         self.set_bit_order(config.read_bit_order, config.write_bit_order);
         self.set_data_mode(config.mode);
+        Ok(())
     }
 
     fn set_data_mode(&self, data_mode: SpiMode) {
