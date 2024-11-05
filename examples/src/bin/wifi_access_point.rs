@@ -51,6 +51,27 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
+    // Set event handlers for wifi before init to avoid missing any.
+    let mut connections = 0u32;
+    _ = event::ApStart::replace_handler(|_| esp_println::println!("ap start event"));
+    event::ApStaconnected::update_handler(move |prev, event| {
+        connections += 1;
+        esp_println::println!("connected {}, mac: {:?}", connections, event.0.mac);
+        prev(event);
+    });
+    event::ApStaconnected::update_handler(|prev, event| {
+        esp_println::println!("connected aid: {}", event.0.aid);
+        prev(event)
+    });
+    event::ApStadisconnected::update_handler(|prev, event| {
+        prev(event);
+        esp_println::println!(
+            "disconnected mac: {:?}, reason: {:?}",
+            event.0.mac,
+            event.0.reason
+        );
+    });
+
     let init = init(
         EspWifiInitFor::Wifi,
         timg0.timer0,
@@ -58,25 +79,6 @@ fn main() -> ! {
         peripherals.RADIO_CLK,
     )
     .unwrap();
-
-    let mut connections = 0u32;
-    event::wifi_event_ap_staconnected_t::update_handler(move |prev, event| {
-        connections += 1;
-        esp_println::println!("connected {}, mac: {:?}", connections, event.mac);
-        prev(event);
-    });
-    event::wifi_event_ap_staconnected_t::update_handler(|prev, event| {
-        esp_println::println!("connected aid: {}", event.aid);
-        prev(event)
-    });
-    event::wifi_event_ap_stadisconnected_t::update_handler(|prev, event| {
-        prev(event);
-        esp_println::println!(
-            "disconnected mac: {:?}, reason: {:?}",
-            event.mac,
-            event.reason
-        );
-    });
 
     let mut wifi = peripherals.WIFI;
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
