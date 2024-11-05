@@ -2335,8 +2335,9 @@ impl Info {
     /// `Err(Error::InvalidArgument)` if the provided value exceeds the maximum
     /// value for SOC :
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
-    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, `esp32p4`, `esp32s2`, `esp32s3`: The
-    ///   value you pass times the symbol size must be <= **0x3FF**
+    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, `esp32p4`, `esp32s2`,
+    ///   `esp32s3`: The value you pass times the symbol size must be <=
+    ///   **0x3FF**
     fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), Error> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -2392,7 +2393,7 @@ impl Info {
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
+            ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
         };
 
         if clock_source == ClockSource::RcFast {
@@ -2440,7 +2441,7 @@ impl Info {
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
+            ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
         };
 
         let max_div = 0b1111_1111_1111 - 1;
@@ -2551,7 +2552,7 @@ impl Info {
         let clk = match clock_source {
             ClockSource::Apb => Clocks::get().apb_clock.to_Hz(),
             // ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
-            ClockSource::RefTick => crate::soc::constants::REF_TICK.to_Hz(),
+            ClockSource::RefTick => REF_TICK.to_Hz(),
         };
 
         self.register_block()

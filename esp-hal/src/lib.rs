@@ -141,6 +141,7 @@
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![deny(missing_docs, rust_2018_idioms)]
 #![no_std]
+#![cfg_attr(esp32p4, allow(unused))] // TODO: Remove when all required modules are implemented for `esp32p4`.
 
 // MUST be the first module
 mod fmt;
