@@ -1421,7 +1421,7 @@ where
         }
 
         let last = PulseCode::from(Into::<u32>::into(*data.last().unwrap()));
-        if !(continuous || last.length2 != 0 || last.length1 != 0) {
+        if !continuous && last.length2 != 0 && last.length1 != 0 {
             return Err(Error::EndMarkerMissing);
         }
 
