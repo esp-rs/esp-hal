@@ -59,7 +59,7 @@ fn main() -> ! {
     data[data.len() - 1] = PulseCode::default();
 
     loop {
-        let transaction = channel.transmit(&data);
+        let transaction = channel.transmit(&data).unwrap();
         channel = transaction.wait().unwrap();
         delay.delay_millis(500);
     }

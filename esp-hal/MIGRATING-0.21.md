@@ -350,3 +350,13 @@ If you were using an 16-bit bus, you don't need to change anything, `set_byte_or
 
 If you were sharing the bus between an 8-bit and 16-bit device, you will have to call the corresponding method when
 you switch between devices. Be sure to read the documentation of the new methods.
+
+
+## `rmt::Channel::transmit` is now returns `Result`
+
+When trying to send a one-shot transmission will fail if it doesn't end with an end-marker.
+
+```diff
+-        let transaction = channel.transmit(&data);
++        let transaction = channel.transmit(&data).unwrap();
+```

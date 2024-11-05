@@ -87,7 +87,7 @@ use core::{
 };
 
 use embassy_sync::waitqueue::AtomicWaker;
-use enumset::{EnumSet, EnumSetType};
+use enumset::{EnumSet, EnumSetType, __internal::EnumSetTypeRepr};
 use fugit::HertzU32;
 
 use crate::{
@@ -114,6 +114,8 @@ pub enum Error {
     InvalidArgument,
     /// An error occurred during transmission
     TransmissionError,
+    /// No transmission end marker found
+    EndMarkerMissing,
 }
 
 /// Convenience representation of a pulse code entry.
@@ -984,16 +986,19 @@ pub trait TxChannel: TxChannelInternal<Blocking> {
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit<T: Into<u32> + Copy>(self, data: &[T]) -> SingleShotTxTransaction<'_, Self, T>
+    fn transmit<T: Into<u32> + Copy>(
+        self,
+        data: &[T],
+    ) -> Result<SingleShotTxTransaction<'_, Self, T>, Error>
     where
         Self: Sized,
     {
-        let index = Self::send_raw(data, false, 0);
-        SingleShotTxTransaction {
+        let index = Self::send_raw(data, false, 0)?;
+        Ok(SingleShotTxTransaction {
             channel: self,
             index,
             data,
-        }
+        })
     }
 
     /// Start transmitting the given pulse code continuously.
@@ -1025,7 +1030,7 @@ pub trait TxChannel: TxChannelInternal<Blocking> {
             return Err(Error::Overflow);
         }
 
-        let _index = Self::send_raw(data, true, loopcount);
+        let _index = Self::send_raw(data, true, loopcount)?;
         Ok(ContinuousTxTransaction { channel: self })
     }
 }
@@ -1156,7 +1161,7 @@ pub trait TxChannelAsync: TxChannelInternal<Async> {
         Self::clear_interrupts();
         Self::listen_interrupt(Event::End);
         Self::listen_interrupt(Event::Error);
-        Self::send_raw(data, false, 0);
+        Self::send_raw(data, false, 0)?;
 
         RmtTxFuture::new(self).await;
 
@@ -1404,8 +1409,21 @@ where
 
     fn is_loopcount_interrupt_set() -> bool;
 
-    fn send_raw<T: Into<u32> + Copy>(data: &[T], continuous: bool, repeat: u16) -> usize {
+    fn send_raw<T: Into<u32> + Copy>(
+        data: &[T],
+        continuous: bool,
+        repeat: u16,
+    ) -> Result<usize, Error> {
         Self::clear_interrupts();
+
+        if data.is_empty() {
+            return Err(Error::InvalidArgument);
+        }
+
+        let last = PulseCode::from(Into::<u32>::into(*data.last().unwrap()));
+        if !(continuous || last.length2.is_empty() || last.length1.is_empty()) {
+            return Err(Error::EndMarkerMissing);
+        }
 
         let ptr = (constants::RMT_RAM_START
             + Self::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
@@ -1430,9 +1448,9 @@ where
         Self::update();
 
         if data.len() >= constants::RMT_CHANNEL_RAM_SIZE {
-            constants::RMT_CHANNEL_RAM_SIZE
+            Ok(constants::RMT_CHANNEL_RAM_SIZE)
         } else {
-            data.len()
+            Ok(data.len())
         }
     }
 
