@@ -4,8 +4,8 @@
 //! of the configuration change the output signal.
 //!
 //! The following wiring is assumed:
-//! - TX => GPIO4
-//! - RX => GPIO5
+//! - TX => GPIO4 (GPIO21 - `esp32p4`)
+//! - RX => GPIO5 (GPIO22 - `esp32p4`)
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32p4 esp32s2 esp32s3
 

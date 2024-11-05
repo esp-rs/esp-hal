@@ -58,6 +58,7 @@ jobs:
             { soc: "esp32c3", target: "riscv32imc-unknown-none-elf", toolchain: "stable" },
             { soc: "esp32c6", target: "riscv32imac-unknown-none-elf", toolchain: "stable" },
             { soc: "esp32h2", target: "riscv32imac-unknown-none-elf", toolchain: "stable" },
+            { soc: "esp32p4", target: "riscv32imafc-unknown-none-elf", toolchain: "stable" },
             # Xtensa devices:
             { soc: "esp32", target: "xtensa-esp32-none-elf", toolchain: "esp" },
             { soc: "esp32s2", target: "xtensa-esp32s2-none-elf", toolchain: "esp" },
@@ -73,7 +74,7 @@ jobs:
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: stable
           components: rust-src
 
@@ -134,6 +135,7 @@ jobs:
           cargo xtask build-package --features=esp32c3,ci --target=riscv32imc-unknown-none-elf   esp-hal
           cargo xtask build-package --features=esp32c6,ci --target=riscv32imac-unknown-none-elf  esp-hal
           cargo xtask build-package --features=esp32h2,ci --target=riscv32imac-unknown-none-elf  esp-hal
+          cargo xtask build-package --features=esp32p4,ci --target=riscv32imafc-unknown-none-elf  esp-hal
 
       - name: msrv RISCV (esp-wifi)
         run: |
