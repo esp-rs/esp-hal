@@ -15,11 +15,7 @@ use esp_hal::{
     delay::Delay,
     gpio::Io,
     prelude::*,
-    uart::{
-        config::{AtCmdConfig, Config},
-        Uart,
-        UartInterrupt,
-    },
+    uart::{AtCmdConfig, Config, Uart, UartInterrupt},
     Blocking,
 };
 

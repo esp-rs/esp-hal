@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gpio::{GpioPin, AnyPin, Flex, Output, OutputOpenDrain}::split()` to obtain peripheral interconnect signals. (#2418)
 - `gpio::Input::{split(), into_peripheral_output()}` when used with output pins. (#2418)
 - `gpio::Output::peripheral_input()` (#2418)
+- `{Uart, UartRx, UartTx}::apply_config()` (#2449)
+- `{Uart, UartRx, UartTx}` now implement `embassy_embedded_hal::SetConfig` (#2449)
 
 ### Changed
 
@@ -46,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow users to create DMA `Preparation`s (#2455)
 - The `rmt::asynch::RxChannelAsync` and `rmt::asynch::TxChannelAsync` traits have been moved to `rmt` (#2430)
 - Calling `AnyPin::output_signals` on an input-only pin (ESP32 GPIO 34-39) will now result in a panic. (#2418)
+- UART configuration types have been moved to `esp_hal::uart` (#2449)
 
 ### Fixed
 
@@ -74,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the pin type parameters from `lcd_cam::cam::{RxEightBits, RxSixteenBits}` (#2388)
 - Most of the async-specific constructors (`new_async`, `new_async_no_transceiver`) have been removed. (#2430)
 - The `configure_for_async` DMA functions have been removed (#2430)
+- The `Uart::{change_baud, change_stop_bits}` functions have been removed (#2449)
 
 ## [0.21.1]
 
