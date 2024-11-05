@@ -87,7 +87,7 @@ use core::{
 };
 
 use embassy_sync::waitqueue::AtomicWaker;
-use enumset::{EnumSet, EnumSetType, __internal::EnumSetTypeRepr};
+use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 
 use crate::{
@@ -1421,7 +1421,7 @@ where
         }
 
         let last = PulseCode::from(Into::<u32>::into(*data.last().unwrap()));
-        if !(continuous || last.length2.is_empty() || last.length1.is_empty()) {
+        if !(continuous || last.length2 != 0 || last.length1 != 0) {
             return Err(Error::EndMarkerMissing);
         }
 
