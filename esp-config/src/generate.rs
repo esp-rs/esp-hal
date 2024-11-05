@@ -3,6 +3,7 @@ use std::{
     env,
     fmt::{self, Write as _},
     fs,
+    ops::Range,
     path::PathBuf,
 };
 
@@ -152,6 +153,8 @@ pub enum Validator {
     NonNegativeInteger,
     /// Only allow positive integers, i.e. any values greater than to 0.
     PositiveInteger,
+    /// Ensure that an integer value falls within the specified range.
+    IntegerInRange(Range<i128>),
     /// A custom validation function to run against any supported value type.
     Custom(Box<dyn Fn(&Value) -> Result<(), Error>>),
 }
@@ -162,6 +165,7 @@ impl Validator {
             Validator::NegativeInteger => negative_integer(value)?,
             Validator::NonNegativeInteger => non_negative_integer(value)?,
             Validator::PositiveInteger => positive_integer(value)?,
+            Validator::IntegerInRange(range) => integer_in_range(range, value)?,
             Validator::Custom(validator_fn) => validator_fn(value)?,
         }
 
@@ -214,7 +218,36 @@ fn positive_integer(value: &Value) -> Result<(), Error> {
     Ok(())
 }
 
-/// TODO: Document me!
+fn integer_in_range(range: &Range<i128>, value: &Value) -> Result<(), Error> {
+    if !value.is_integer() || !range.contains(&value.as_integer()) {
+        Err(Error::validation(format!(
+            "Value '{}' does not fall within range '{:?}'",
+            value, range
+        )))
+    } else {
+        Ok(())
+    }
+}
+
+/// Generate and parse config from a prefix, and an array tuples containing the
+/// name, description, default value, and an optional validator.
+///
+/// This function will parse any `SCREAMING_SNAKE_CASE` environment variables
+/// that match the given prefix. It will then attempt to parse the [`Value`] and
+/// run any validators which have been specified.
+///
+/// Once the config has been parsed, this function will emit `snake_case` cfg's
+/// _without_ the prefix which can be used in the dependant crate. After that,
+/// it will create a markdown table in the `OUT_DIR` under the name
+/// `{prefix}_config_table.md` where prefix has also been converted to
+/// `snake_case`. This can be included in crate documentation to outline the
+/// available configuration options for the crate.
+///
+/// Passing a value of true for the `emit_md_tables` argument will create and
+/// write markdown files of the available configuration and selected
+/// configuration which can be included in documentation.
+///
+/// Unknown keys with the supplied prefix will cause this function to panic.
 pub fn generate_config(
     prefix: &str,
     config: &[(&str, &str, Value, Option<Validator>)],
@@ -519,6 +552,7 @@ mod test {
                 ("ESP_TEST_POSITIVE_NUMBER", Some("7")),
                 ("ESP_TEST_NEGATIVE_NUMBER", Some("-1")),
                 ("ESP_TEST_NON_NEGATIVE_NUMBER", Some("0")),
+                ("ESP_TEST_RANGE", Some("9")),
             ],
             || {
                 generate_config(
@@ -541,6 +575,12 @@ mod test {
                             "NA",
                             Value::Integer(-1),
                             Some(Validator::NonNegativeInteger),
+                        ),
+                        (
+                            "range",
+                            "NA",
+                            Value::Integer(0),
+                            Some(Validator::IntegerInRange(5..10)),
                         ),
                     ],
                     false,
