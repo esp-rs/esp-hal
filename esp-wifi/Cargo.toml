@@ -170,6 +170,3 @@ features = [
   "esp-hal/default",
 ]
 default-target = "riscv32imc-unknown-none-elf"
-
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(modem_powersaving, values("max", "min", "none"))'] }

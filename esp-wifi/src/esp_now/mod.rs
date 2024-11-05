@@ -18,6 +18,7 @@ use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::{
     binary::include::*,
+    config::PowerSaveMode,
     hal::peripheral::{Peripheral, PeripheralRef},
     wifi::{Protocol, RxControlInfo, WifiError},
     EspWifiController,
@@ -333,6 +334,14 @@ impl EspNowManager<'_> {
         }
 
         Ok(())
+    }
+
+    /// Configures modem power saving
+    ///
+    /// This is ignored, and set to `PowerSaveMode::Minimum` when `coex` is
+    /// enabled.
+    pub fn set_power_saving(&self, ps: PowerSaveMode) -> Result<(), WifiError> {
+        crate::wifi::apply_power_saving(ps)
     }
 
     /// Set primary WiFi channel.
@@ -682,25 +691,6 @@ impl<'d> EspNow<'d> {
         check_error!({
             esp_wifi_set_inactive_time(wifi_interface_t_WIFI_IF_STA, crate::CONFIG.beacon_timeout)
         })?;
-        cfg_if::cfg_if! {
-            if #[cfg(modem_powersaving = "min")] {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
-                )})?;
-            } else if #[cfg(modem_powersaving = "max")] {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM
-                )})?;
-            } else if #[cfg(coex)] {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
-                )})?;
-            } else {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE
-                )})?;
-            }
-        };
         check_error!({ esp_now_init() })?;
         check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) })?;
         check_error!({ esp_now_register_send_cb(Some(send_cb)) })?;

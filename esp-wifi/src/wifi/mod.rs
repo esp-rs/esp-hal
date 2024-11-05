@@ -50,7 +50,6 @@ use esp_wifi_sys::include::{
     wifi_promiscuous_pkt_type_t,
 };
 use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
 #[doc(hidden)]
 pub(crate) use os_adapter::*;
 #[cfg(feature = "sniffer")]
@@ -64,6 +63,7 @@ pub use state::*;
 
 use crate::{
     common_adapter::*,
+    config::PowerSaveMode,
     esp_wifi_result,
     hal::{
         macros::ram,
@@ -105,7 +105,6 @@ use crate::binary::{
         esp_wifi_set_country,
         esp_wifi_set_mode,
         esp_wifi_set_protocol,
-        esp_wifi_set_ps,
         esp_wifi_set_tx_done_cb,
         esp_wifi_start,
         esp_wifi_stop,
@@ -1704,20 +1703,6 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
             ))?;
         };
 
-        cfg_if::cfg_if! {
-            if #[cfg(modem_powersaving = "min")] {
-                let ps_mode = include::wifi_ps_type_t_WIFI_PS_MIN_MODEM;
-            } else if #[cfg(modem_powersaving = "max")] {
-                let ps_mode = include::wifi_ps_type_t_WIFI_PS_MAX_MODEM;
-            } else if #[cfg(coex)] {
-                let ps_mode = include::wifi_ps_type_t_WIFI_PS_MIN_MODEM;
-            } else {
-                let ps_mode = include::wifi_ps_type_t_WIFI_PS_NONE;
-            }
-        };
-
-        esp_wifi_result!(esp_wifi_set_ps(ps_mode))?;
-
         let mut cntry_code = [0u8; 3];
         cntry_code[..crate::CONFIG.country_code.len()]
             .copy_from_slice(crate::CONFIG.country_code.as_bytes());
@@ -2606,6 +2591,14 @@ impl<'d> WifiController<'d> {
         Ok(())
     }
 
+    /// Configures modem power saving
+    ///
+    /// This is ignored, and set to `PowerSaveMode::Minimum` when `coex` is
+    /// enabled.
+    pub fn set_power_saving(&mut self, ps: PowerSaveMode) -> Result<(), WifiError> {
+        apply_power_saving(ps)
+    }
+
     /// Checks if Wi-Fi is enabled as a station.
     pub fn is_sta_enabled(&self) -> Result<bool, WifiError> {
         WifiMode::try_from(&self.config).map(|m| m.is_sta())
@@ -3180,8 +3173,9 @@ fn dump_packet_info(_buffer: &[u8]) {
 #[macro_export]
 macro_rules! esp_wifi_result {
     ($value:expr) => {{
+        use num_traits::FromPrimitive;
         let result = $value;
-        if result != include::ESP_OK as i32 {
+        if result != esp_wifi_sys::include::ESP_OK as i32 {
             warn!("{} returned an error: {}", stringify!($value), result);
             Err(WifiError::InternalError(unwrap!(FromPrimitive::from_i32(
                 result
@@ -3270,6 +3264,14 @@ pub(crate) mod embassy {
             HardwareAddress::Ethernet(self.mac_address())
         }
     }
+}
+
+pub(crate) fn apply_power_saving(mut ps: PowerSaveMode) -> Result<(), WifiError> {
+    if cfg!(coex) {
+        ps = PowerSaveMode::Minimum;
+    }
+    esp_wifi_result!(unsafe { esp_wifi_sys::include::esp_wifi_set_ps(ps.into()) })?;
+    Ok(())
 }
 
 mod asynch {

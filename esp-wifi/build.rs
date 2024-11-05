@@ -129,8 +129,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             ("scan_method", Value::UnsignedInteger(0), "0 = WIFI_FAST_SCAN, 1 = WIFI_ALL_CHANNEL_SCAN, defaults to 0"),
             ("dump_packets", Value::Bool(false), "Dump packets via an info log statement"),
             ("phy_enable_usb", Value::Bool(true), "Keeps USB running when using WiFi. This allows debugging and log messages via USB Serial JTAG. Turn off for best WiFi performance."),
-            ("modem_powersaving", Value::String("none".to_owned()), "Modem power saving. Possible values: \"max\", \"min\", \"none\". Defaults to \"none\" or \"min\" when coex is enabled."),
-            ("strchr_available", Value::Bool(false), "Enable to use a custom or third party strchr implementation"),
         ],
         true
     );
