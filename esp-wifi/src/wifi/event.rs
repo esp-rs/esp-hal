@@ -10,17 +10,19 @@ pub(crate) mod sealed {
 
     pub trait Event {
         /// Get the static reference to the handler for this event.
-        fn get_handler() -> &'static Mutex<RefCell<Option<Box<Handler<Self>>>>>;
+        fn handler() -> &'static Mutex<RefCell<Option<Box<Handler<Self>>>>>;
         /// # Safety
         /// `ptr` must be a valid for casting to this event's inner event data.
         unsafe fn from_raw_event_data(ptr: *mut crate::binary::c_types::c_void) -> Self;
     }
 }
 /// The type of handlers of events.
-pub type Handler<T> = dyn FnMut(&T) + Sync + Send;
+pub type Handler<T> = dyn FnMut(critical_section::CriticalSection<'_>, &T) + Sync + Send;
 
 fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
-    fn drop_ref<T>(_: &T) {}
+    fn drop_ref<T>(_: critical_section::CriticalSection<'_>, _: &T) {}
+    // perf: `drop_ref` is a ZST [function item](https://doc.rust-lang.org/reference/types/function-item.html)
+    // so this doesn't actually allocate.
     Box::new(drop_ref)
 }
 
@@ -29,9 +31,8 @@ fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
 /// Register a new event handler like:
 /// ```
 /// # use esp_wifi::wifi::event::{self, *};
-/// # fn new_handler(_: &ApStaconnected) {}
-/// event::ApStaconnected::update_handler(|prev, event| {
-///     prev(event);
+/// # fn new_handler(_: critical_section::CriticalSection<'_>, _: &ApStaconnected) {}
+/// event::ApStaconnected::update_handler(|_cs, event| {
 ///     new_handler(event);
 /// })
 /// ```
@@ -43,29 +44,44 @@ pub trait EventExt: sealed::Event + Sized + 'static {
     /// Get the handler for this event, replacing it with the default handler.
     fn take_handler() -> Box<Handler<Self>> {
         critical_section::with(|cs| {
-            Self::get_handler()
+            Self::handler()
                 .borrow_ref_mut(cs)
                 .take()
-                .unwrap_or(default_handler::<Self>())
+                .unwrap_or_else(default_handler::<Self>)
         })
     }
     /// Set the handler for this event, returning the old handler.
-    fn replace_handler<F: FnMut(&Self) + Sync + Send + 'static>(f: F) -> Box<Handler<Self>> {
+    fn replace_handler<
+        F: FnMut(critical_section::CriticalSection<'_>, &Self) + Sync + Send + 'static,
+    >(
+        f: F,
+    ) -> Box<Handler<Self>> {
         critical_section::with(|cs| {
-            Self::get_handler()
+            Self::handler()
                 .borrow_ref_mut(cs)
                 .replace(Box::new(f))
-                .unwrap_or(default_handler::<Self>())
+                .unwrap_or_else(default_handler::<Self>)
         })
     }
     /// Atomic combination of [`take_handler`] and [`replace_handler`]. Use this
-    /// to add a new handler while preserving the previous.
-    fn update_handler<F: FnMut(&mut Handler<Self>, &Self) + Sync + Send + 'static>(mut f: F) {
+    /// to add a new handler which runs after the previously registered
+    /// handlers.
+    fn update_handler<
+        F: FnMut(critical_section::CriticalSection<'_>, &Self) + Sync + Send + 'static,
+    >(
+        mut f: F,
+    ) {
         critical_section::with(move |cs| {
-            let mut handler: Box<Handler<Self>> = Self::take_handler();
-            Self::get_handler()
+            let mut handler: Box<Handler<Self>> = Self::handler()
                 .borrow_ref_mut(cs)
-                .replace(Box::new(move |event| f(&mut handler, event)));
+                .take()
+                .unwrap_or_else(default_handler::<Self>);
+            Self::handler().borrow_ref_mut(cs).replace(Box::new(
+                move |cs: critical_section::CriticalSection<'_>, event| {
+                    handler(cs, event);
+                    f(cs, event)
+                },
+            ));
         });
     }
 }
@@ -81,7 +97,7 @@ macro_rules! impl_wifi_event {
             unsafe fn from_raw_event_data(_: *mut crate::binary::c_types::c_void) -> Self {
                 Self
             }
-            fn get_handler() -> &'static Mutex<RefCell<Option<Box<Handler<Self>>>>> {
+            fn handler() -> &'static Mutex<RefCell<Option<Box<Handler<Self>>>>> {
                 static HANDLE: Mutex<RefCell<Option<Box<Handler<$newtype>>>>> =
                     Mutex::new(RefCell::new(None));
                 &HANDLE
@@ -98,7 +114,7 @@ macro_rules! impl_wifi_event {
             unsafe fn from_raw_event_data(ptr: *mut crate::binary::c_types::c_void) -> Self {
                 Self(unsafe { *ptr.cast() })
             }
-            fn get_handler() -> &'static Mutex<RefCell<Option<Box<Handler<Self>>>>> {
+            fn handler() -> &'static Mutex<RefCell<Option<Box<Handler<Self>>>>> {
                 static HANDLE: Mutex<RefCell<Option<Box<Handler<$newtype>>>>> =
                     Mutex::new(RefCell::new(None));
                 &HANDLE
@@ -156,8 +172,8 @@ impl_wifi_event!(StaNeighborRep, wifi_event_neighbor_report_t);
 /// Handle the given event using the registered event handlers.
 pub fn handle<Event: EventExt>(event_data: &Event) {
     critical_section::with(|cs| {
-        if let Some(handler) = &mut *Event::get_handler().borrow_ref_mut(cs) {
-            handler(event_data)
+        if let Some(handler) = &mut *Event::handler().borrow_ref_mut(cs) {
+            handler(cs, event_data)
         }
     });
 }
