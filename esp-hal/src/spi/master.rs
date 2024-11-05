@@ -598,7 +598,7 @@ where
         PeripheralClockControl::reset(this.spi.peripheral());
 
         this.driver().init();
-        this.apply_config(&config);
+        unwrap!(this.apply_config(&config)); // FIXME: update based on the resolution of https://github.com/esp-rs/esp-hal/issues/2416
 
         let this = this
             .with_mosi(NoPin)
