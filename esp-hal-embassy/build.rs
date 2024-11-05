@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // NOTE: update when adding new device support!
     // Ensure that exactly one chip has been specified:
     assert_unique_used_features!(
-        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
+        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32p4", "esp32s2", "esp32s3"
     );
 
     // NOTE: update when adding new device support!
@@ -23,6 +23,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "esp32c6"
     } else if cfg!(feature = "esp32h2") {
         "esp32h2"
+    } else if cfg!(feature = "esp32p4") {
+        "esp32p4"
     } else if cfg!(feature = "esp32s2") {
         "esp32s2"
     } else if cfg!(feature = "esp32s3") {

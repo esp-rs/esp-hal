@@ -752,7 +752,11 @@ mod clic {
         }
     }
 
-    /// Enable a CPU interrupt on current core
+    /// Enable a CPU interrupt
+    ///
+    /// # Safety
+    ///
+    /// Make sure there is an interrupt handler registered.
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as usize;
         let intr_cntrl = intr_cntrl(crate::get_core(), cpu_interrupt_number);
@@ -783,6 +787,8 @@ mod clic {
     }
 
     /// Set the priority level of an CPU interrupt
+    ///
+    /// # Safety
     ///
     /// Great care must be taken when using the `vectored` feature (enabled by
     /// default). Avoid changing the priority of interrupts 1 - 15 when

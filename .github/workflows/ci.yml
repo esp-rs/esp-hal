@@ -123,7 +123,7 @@ jobs:
           version: ${{ env.MSRV }}
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: ${{ env.MSRV }}
           components: rust-src
       - uses: Swatinem/rust-cache@v2

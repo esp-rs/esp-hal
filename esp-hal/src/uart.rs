@@ -2509,7 +2509,7 @@ impl Info {
             panic!("Division by zero in clock divider");
         }
 
-        let baud_div = ((clk << 4) / (baudrate * clk_divider)) as u32;
+        let baud_div = ((clk << 4) / (baudrate * clk_divider));
         let integer_div = (baud_div >> 4) as u16;
         let fractional_div = (baud_div & 0xF) as u8;
 
