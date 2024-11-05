@@ -414,6 +414,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
         &mut self,
         alternate: AlternateFunction,
         open_drain: bool,
+        input_enable: Option<bool>,
         _: private::Internal,
     ) {
         self.enable_output(true, private::Internal);
@@ -431,8 +432,8 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
 
         get_io_mux_reg(self.number()).modify(|_, w| unsafe {
             w.mcu_sel().bits(alternate as u8);
-            if open_drain {
-                w.fun_ie().set_bit();
+            if let Some(input_enable) = input_enable {
+                w.fun_ie().bit(input_enable);
             }
             w.fun_drv().bits(DriveStrength::I20mA as u8);
             w.slp_sel().clear_bit()
@@ -442,13 +443,13 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     /// Configure open-drain mode
     #[doc(hidden)]
     fn set_to_open_drain_output(&mut self, _: private::Internal) {
-        self.init_output(GPIO_FUNCTION, true, private::Internal);
+        self.init_output(GPIO_FUNCTION, true, Some(true), private::Internal);
     }
 
     /// Configure output mode
     #[doc(hidden)]
     fn set_to_push_pull_output(&mut self, _: private::Internal) {
-        self.init_output(GPIO_FUNCTION, false, private::Internal);
+        self.init_output(GPIO_FUNCTION, false, None, private::Internal);
     }
 
     /// Set the pin's level to high or low
@@ -1816,10 +1817,17 @@ pub(crate) mod internal {
             &mut self,
             alternate: AlternateFunction,
             open_drain: bool,
+            input_enable: Option<bool>,
             _: private::Internal,
         ) {
             handle_gpio_output!(&mut self.0, target, {
-                OutputPin::init_output(target, alternate, open_drain, private::Internal)
+                OutputPin::init_output(
+                    target,
+                    alternate,
+                    open_drain,
+                    input_enable,
+                    private::Internal,
+                )
             })
         }
 
