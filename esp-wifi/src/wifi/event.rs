@@ -74,6 +74,7 @@ impl<T: sealed::Event + 'static> EventExt for T {}
 macro_rules! impl_wifi_event {
     // no data
     ($newtype:ident) => {
+        /// See [`WifiEvent`].
         #[derive(Copy, Clone)]
         pub struct $newtype;
         impl sealed::Event for $newtype {
@@ -90,6 +91,7 @@ macro_rules! impl_wifi_event {
     // data
     ($newtype:ident, $data:ident) => {
         pub use esp_wifi_sys::include::$data;
+        /// See [`WifiEvent`].
         #[derive(Copy, Clone)]
         pub struct $newtype(pub $data);
         impl sealed::Event for $newtype {
