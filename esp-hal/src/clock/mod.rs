@@ -15,13 +15,20 @@
 //! ## Configuration
 //!
 //! During HAL initialization, specify a CPU clock speed to configure the
-//! desired clock frequencies. The CPU clock is responsible for defining the
-//! speed at which the central processing unit (CPU) operates.
+//! desired clock frequencies.
 //!
+//! The `CPU clock` is responsible for defining the speed at which the central
+//! processing unit (CPU) operates. This driver provides predefined options for
+//! different CPU clock speeds, such as
+#![cfg_attr(not(esp32h2), doc = "* 80MHz")]
+#![cfg_attr(esp32h2, doc = "* 96MHz")]
+#![cfg_attr(esp32c2, doc = "* 120MHz")]
+#![cfg_attr(not(any(esp32c2, esp32h2)), doc = "* 160MHz")]
+#![cfg_attr(xtensa, doc = "* 240MHz")]
 //! ### Frozen Clock Frequencies
 //!
 //! Once the clock configuration is applied, the clock frequencies become
-//! frozen and cannot be changed. The `Clocks` struct is returned as part of
+//! `frozen` and cannot be changed. The `Clocks` struct is returned as part of
 //! the `System` struct, providing read-only access to the configured clock
 //! frequencies.
 //!
@@ -85,7 +92,6 @@ pub trait Clock {
     }
 }
 
-// TODO: Properly update to included supported frequencies for ESP32-P4
 /// CPU clock speed
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

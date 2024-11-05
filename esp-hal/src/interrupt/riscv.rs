@@ -977,9 +977,8 @@ mod plic {
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
         riscv::interrupt::disable();
-
-        (&*crate::peripherals::PLIC_MX::PTR)
-            .mxint_thresh()
+        let plic = &*crate::peripherals::PLIC_MX::PTR;
+        plic.mxint_thresh()
             .write(|w| w.cpu_mxint_thresh().bits(stored_prio as u8));
     }
 }
