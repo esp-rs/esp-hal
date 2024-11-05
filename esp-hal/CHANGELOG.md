@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gpio::Output::peripheral_input()` (#2418)
 - `{Uart, UartRx, UartTx}::apply_config()` (#2449)
 - `{Uart, UartRx, UartTx}` now implement `embassy_embedded_hal::SetConfig` (#2449)
+- GPIO ETM tasks and events now accept `InputSignal` and `OutputSignal` (#2427)
 
 ### Changed
 
@@ -78,6 +79,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Most of the async-specific constructors (`new_async`, `new_async_no_transceiver`) have been removed. (#2430)
 - The `configure_for_async` DMA functions have been removed (#2430)
 - The `Uart::{change_baud, change_stop_bits}` functions have been removed (#2449)
+- `gpio::{Input, Output, OutputOpenDrain, Flex, GpioPin}::{peripheral_input, into_peripheral_output}` have been removed. (#2418)
+- The `GpioEtm` prefix has been removed from `gpio::etm` types (#2427)
+- The `TimerEtm` prefix has been removed from `timer::timg::etm` types (#2427)
+- The `SysTimerEtm` prefix has been removed from `timer::systimer::etm` types (#2427)
+- The `GpioEtmEventRising`, `GpioEtmEventFalling`, `GpioEtmEventAny` types have been replaced with `Event` (#2427)
+- The `TaskSet`, `TaskClear`, `TaskToggle` types have been replaced with `Task` (#2427)
 
 ## [0.21.1]
 

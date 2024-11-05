@@ -12,7 +12,7 @@ use esp_backtrace as _;
 use esp_hal::{
     etm::Etm,
     gpio::{
-        etm::{GpioEtmChannels, GpioEtmInputConfig, GpioEtmOutputConfig},
+        etm::{Channels, InputConfig, OutputConfig},
         Io,
         Level,
         Output,
@@ -26,16 +26,17 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
     let mut led = Output::new(io.pins.gpio1, Level::Low);
     let button = io.pins.gpio9;
 
     led.set_high();
 
     // setup ETM
-    let gpio_ext = GpioEtmChannels::new(peripherals.GPIO_SD);
+    let gpio_ext = Channels::new(peripherals.GPIO_SD);
     let led_task = gpio_ext.channel0_task.toggle(
-        &mut led,
-        GpioEtmOutputConfig {
+        led,
+        OutputConfig {
             open_drain: false,
             pull: Pull::None,
             initial_state: Level::Low,
@@ -43,7 +44,7 @@ fn main() -> ! {
     );
     let button_event = gpio_ext
         .channel0_event
-        .falling_edge(button, GpioEtmInputConfig { pull: Pull::Down });
+        .falling_edge(button, InputConfig { pull: Pull::Down });
 
     let etm = Etm::new(peripherals.SOC_ETM);
     let channel0 = etm.channel0;

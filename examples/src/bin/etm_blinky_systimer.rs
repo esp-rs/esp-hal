@@ -12,13 +12,13 @@ use esp_backtrace as _;
 use esp_hal::{
     etm::Etm,
     gpio::{
-        etm::{GpioEtmChannels, GpioEtmOutputConfig},
+        etm::{Channels, OutputConfig},
         Io,
         Level,
         Pull,
     },
     prelude::*,
-    timer::systimer::{etm::SysTimerEtmEvent, Periodic, SystemTimer},
+    timer::systimer::{etm::Event, Periodic, SystemTimer},
 };
 use fugit::ExtU32;
 
@@ -35,17 +35,17 @@ fn main() -> ! {
     let mut led = io.pins.gpio1;
 
     // setup ETM
-    let gpio_ext = GpioEtmChannels::new(peripherals.GPIO_SD);
+    let gpio_ext = Channels::new(peripherals.GPIO_SD);
     let led_task = gpio_ext.channel0_task.toggle(
         &mut led,
-        GpioEtmOutputConfig {
+        OutputConfig {
             open_drain: false,
             pull: Pull::None,
             initial_state: Level::High,
         },
     );
 
-    let timer_event = SysTimerEtmEvent::new(&mut alarm0);
+    let timer_event = Event::new(&mut alarm0);
 
     let etm = Etm::new(peripherals.SOC_ETM);
     let channel0 = etm.channel0;

@@ -1104,27 +1104,25 @@ pub mod etm {
     //! ## Example
     //! ```rust, no_run
     #![doc = crate::before_snippet!()]
-    //! # use esp_hal::timer::systimer::{etm::SysTimerEtmEvent, SystemTimer};
+    //! # use esp_hal::timer::systimer::{etm::Event, SystemTimer};
     //! # use fugit::ExtU32;
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let syst_alarms = syst.split();
     //! let mut alarm0 = syst_alarms.alarm0.into_periodic();
     //! alarm0.set_period(1u32.secs());
     //!
-    //! let timer_event = SysTimerEtmEvent::new(&mut alarm0);
+    //! let timer_event = Event::new(&mut alarm0);
     //! # }
     //! ```
 
     use super::*;
 
     /// An ETM controlled SYSTIMER event
-    pub struct SysTimerEtmEvent<'a, 'd, M, DM: crate::Mode, COMP, UNIT> {
+    pub struct Event<'a, 'd, M, DM: crate::Mode, COMP, UNIT> {
         alarm: &'a mut Alarm<'d, M, DM, COMP, UNIT>,
     }
 
-    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit>
-        SysTimerEtmEvent<'a, 'd, M, DM, COMP, UNIT>
-    {
+    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> Event<'a, 'd, M, DM, COMP, UNIT> {
         /// Creates an ETM event from the given [Alarm]
         pub fn new(alarm: &'a mut Alarm<'d, M, DM, COMP, UNIT>) -> Self {
             Self { alarm }
@@ -1138,12 +1136,12 @@ pub mod etm {
     }
 
     impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::private::Sealed
-        for SysTimerEtmEvent<'_, '_, M, DM, COMP, UNIT>
+        for Event<'_, '_, M, DM, COMP, UNIT>
     {
     }
 
     impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::etm::EtmEvent
-        for SysTimerEtmEvent<'_, '_, M, DM, COMP, UNIT>
+        for Event<'_, '_, M, DM, COMP, UNIT>
     {
         fn id(&self) -> u8 {
             50 + self.alarm.comparator.channel()

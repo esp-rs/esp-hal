@@ -60,6 +60,15 @@ pub struct InputSignal {
     is_inverted: bool,
 }
 
+impl<P> From<P> for InputSignal
+where
+    P: InputPin,
+{
+    fn from(input: P) -> Self {
+        Self::new(input.degrade())
+    }
+}
+
 impl Clone for InputSignal {
     fn clone(&self) -> Self {
         Self {
@@ -85,6 +94,11 @@ impl InputSignal {
             pin,
             is_inverted: false,
         }
+    }
+
+    /// Returns the GPIO number of the underlying pin.
+    pub fn number(&self) -> u8 {
+        self.pin.number()
     }
 
     /// Returns the current signal level.
@@ -120,9 +134,7 @@ impl InputSignal {
                 w.in_sel().bits(input)
             });
     }
-}
 
-impl InputSignal {
     /// Connect the pin to a peripheral input signal.
     ///
     /// Since there can only be one input signal connected to a peripheral at a
@@ -191,6 +203,15 @@ pub struct OutputSignal {
     is_inverted: bool,
 }
 
+impl<P> From<P> for OutputSignal
+where
+    P: OutputPin,
+{
+    fn from(input: P) -> Self {
+        Self::new(input.degrade())
+    }
+}
+
 impl Peripheral for OutputSignal {
     type P = Self;
 
@@ -210,6 +231,11 @@ impl OutputSignal {
             pin,
             is_inverted: false,
         }
+    }
+
+    /// Returns the GPIO number of the underlying pin.
+    pub fn number(&self) -> u8 {
+        self.pin.number()
     }
 
     /// Inverts the peripheral's output signal.
@@ -268,9 +294,7 @@ impl OutputSignal {
                 w.oen_inv_sel().bit(invert_enable)
             });
     }
-}
 
-impl OutputSignal {
     /// Connect the pin to a peripheral input signal.
     ///
     /// Since there can only be one signal connected to a peripheral input at a
@@ -434,9 +458,7 @@ where
     P: InputPin,
 {
     fn from(input: P) -> Self {
-        Self(InputConnectionInner::Input(InputSignal::new(
-            input.degrade(),
-        )))
+        Self(InputConnectionInner::Input(InputSignal::from(input)))
     }
 }
 
@@ -527,9 +549,7 @@ where
     P: OutputPin,
 {
     fn from(input: P) -> Self {
-        Self(OutputConnectionInner::Output(OutputSignal::new(
-            input.degrade(),
-        )))
+        Self(OutputConnectionInner::Output(OutputSignal::from(input)))
     }
 }
 
