@@ -140,6 +140,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
     system::PeripheralClockControl,
+    twai::filter::SingleStandardFilter,
     Async,
     Blocking,
     InterruptConfigurable,
@@ -752,6 +753,7 @@ impl BaudRate {
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
 pub struct TwaiConfiguration<'d, DM: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
+    filter: Option<(FilterType, [u8; 8])>,
     phantom: PhantomData<DM>,
     mode: TwaiMode,
 }
@@ -778,9 +780,15 @@ where
 
         let mut this = TwaiConfiguration {
             twai,
+            filter: None, // We'll immediately call `set_filter`
             phantom: PhantomData,
             mode,
         };
+
+        // Accept all messages by default.
+        this.set_filter(
+            const { SingleStandardFilter::new(b"xxxxxxxxxxx", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
+        );
 
         // Set RESET bit to 1
         this.twai
@@ -936,22 +944,30 @@ where
     /// You may use a `const {}` block to ensure that the filter is parsed
     /// during program compilation.
     ///
+    /// The filter is not applied to the peripheral until [`Self::start`] is
+    /// called.
+    ///
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.6)
     pub fn set_filter(&mut self, filter: impl Filter) {
-        // Set or clear the rx filter mode bit depending on the filter type.
-        let filter_mode_bit = filter.filter_type() == FilterType::Single;
-        self.twai
-            .register_block()
-            .mode()
-            .modify(|_, w| w.rx_filter_mode().bit(filter_mode_bit));
+        // Convert the filter into values for the registers and store them for later
+        // use.
+        self.filter = Some((filter.filter_type(), filter.to_registers()));
+    }
 
-        // Convert the filter into values for the registers and store them to the
-        // registers.
-        let registers = filter.to_registers();
+    fn apply_filter(&self) {
+        let Some((filter_type, registers)) = self.filter.as_ref() else {
+            return;
+        };
+
+        let register_block = self.twai.register_block();
+        // Set or clear the rx filter mode bit depending on the filter type.
+        register_block
+            .mode()
+            .modify(|_, w| w.rx_filter_mode().bit(*filter_type == FilterType::Single));
 
         // Copy the filter to the peripheral.
         unsafe {
-            copy_to_data_register(self.twai.register_block().data_0().as_ptr(), &registers);
+            copy_to_data_register(register_block.data_0().as_ptr(), registers);
         }
     }
 
@@ -980,6 +996,7 @@ where
     /// Put the peripheral into Operation Mode, allowing the transmission and
     /// reception of packets using the new object.
     pub fn start(self) -> Twai<'d, DM, T> {
+        self.apply_filter();
         self.set_mode(self.mode);
 
         // Clear the TEC and REC
@@ -1101,6 +1118,7 @@ where
         self.set_interrupt_handler(self.twai.async_handler());
         TwaiConfiguration {
             twai: self.twai,
+            filter: self.filter,
             phantom: PhantomData,
             mode: self.mode,
         }
@@ -1120,6 +1138,7 @@ where
         // Re-create in  blocking mode
         TwaiConfiguration {
             twai: self.twai,
+            filter: self.filter,
             phantom: PhantomData,
             mode: self.mode,
         }
@@ -1179,6 +1198,7 @@ where
 
         TwaiConfiguration {
             twai: self.twai,
+            filter: None, // filter already applied, no need to restore it
             phantom: PhantomData,
             mode,
         }
