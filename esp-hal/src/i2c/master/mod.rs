@@ -740,13 +740,7 @@ fn async_handler(info: &Info, state: &State) {
         #[cfg(not(any(esp32, esp32s2)))]
         w.txfifo_wm().clear_bit();
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                w.ack_err().clear_bit()
-            } else {
-                w.nack().clear_bit()
-            }
-        }
+        w.nack().clear_bit()
     });
 
     state.waker.wake();

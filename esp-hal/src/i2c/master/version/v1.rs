@@ -64,7 +64,7 @@ impl Driver<'_> {
 
         let retval = if interrupts.time_out().bit_is_set() {
             Error::TimeOut
-        } else if interrupts.ack_err().bit_is_set() {
+        } else if interrupts.nack().bit_is_set() {
             Error::AckCheckFailed
         } else if interrupts.arbitration_lost().bit_is_set() {
             Error::ArbitrationLost
