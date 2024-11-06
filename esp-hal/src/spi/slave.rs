@@ -144,16 +144,16 @@ where
 
         // TODO: with_pins et. al.
         sclk.enable_input(true, private::Internal);
-        this.spi.sclk_signal().connect_to(sclk);
+        this.spi.info().sclk.connect_to(sclk);
 
         mosi.enable_input(true, private::Internal);
-        this.spi.mosi_signal().connect_to(mosi);
+        this.spi.info().mosi.connect_to(mosi);
 
         miso.set_to_push_pull_output(private::Internal);
-        this.spi.miso_signal().connect_to(miso);
+        this.spi.info().miso.connect_to(miso);
 
         cs.enable_input(true, private::Internal);
-        this.spi.cs_signal().connect_to(cs);
+        this.spi.info().cs.connect_to(cs);
 
         this
     }
@@ -447,7 +447,7 @@ pub trait InstanceDma: Instance + DmaEligible {
         RX: Rx,
         TX: Tx,
     {
-        let reg_block = self.register_block();
+        let reg_block = self.info().register_block();
 
         self.enable_dma();
 
@@ -489,7 +489,7 @@ pub trait InstanceDma: Instance + DmaEligible {
     }
 
     fn enable_dma(&self) {
-        let reg_block = self.register_block();
+        let reg_block = self.info().register_block();
         #[cfg(gdma)]
         {
             reg_block.dma_conf().modify(|_, w| {
@@ -520,7 +520,7 @@ pub trait InstanceDma: Instance + DmaEligible {
     }
 
     fn clear_dma_interrupts(&self) {
-        let reg_block = self.register_block();
+        let reg_block = self.info().register_block();
 
         #[cfg(gdma)]
         reg_block.dma_int_clr().write(|w| {
@@ -578,16 +578,12 @@ impl InstanceDma for crate::peripherals::SPI3 {}
 
 #[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'static {
-    fn register_block(&self) -> &RegisterBlock;
-
-    fn sclk_signal(&self) -> InputSignal;
-    fn mosi_signal(&self) -> InputSignal;
-    fn miso_signal(&self) -> OutputSignal;
-    fn cs_signal(&self) -> InputSignal;
+    /// Returns the peripheral data describing this SPI instance.
+    fn info(&self) -> &'static Info;
 
     #[cfg(esp32)]
     fn prepare_length_and_lines(&self, rx_len: usize, tx_len: usize) {
-        let reg_block = self.register_block();
+        let reg_block = self.info().register_block();
 
         reg_block
             .slv_rdbuf_dlen()
@@ -605,7 +601,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
 
     /// Initialize for full-duplex 1 bit mode
     fn init(&mut self) {
-        let reg_block = self.register_block();
+        let reg_block = self.info().register_block();
 
         reg_block.clock().write(|w| unsafe { w.bits(0) });
         reg_block.user().write(|w| unsafe { w.bits(0) });
@@ -629,7 +625,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     }
 
     fn set_data_mode(&mut self, data_mode: SpiMode, dma: bool) -> &mut Self {
-        let reg_block = self.register_block();
+        let reg_block = self.info().register_block();
         #[cfg(esp32)]
         {
             reg_block.pin().modify(|_, w| {
@@ -704,7 +700,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     }
 
     fn is_bus_busy(&self) -> bool {
-        let reg_block = self.register_block();
+        let reg_block = self.info().register_block();
 
         #[cfg(pdma)]
         {
@@ -728,43 +724,69 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     // used in DMA mode.
     fn setup_for_flush(&self) {
         #[cfg(pdma)]
-        self.register_block()
+        self.info()
+            .register_block()
             .slave()
             .modify(|_, w| w.trans_done().clear_bit());
         #[cfg(gdma)]
-        self.register_block()
+        self.info()
+            .register_block()
             .dma_int_clr()
             .write(|w| w.trans_done().clear_bit_by_one());
     }
 }
+
+/// Peripheral data describing a particular SPI instance.
+#[non_exhaustive]
+pub struct Info {
+    /// Pointer to the register block for this SPI instance.
+    ///
+    /// Use [Self::register_block] to access the register block.
+    pub register_block: *const RegisterBlock,
+
+    /// SCLK signal.
+    pub sclk: InputSignal,
+
+    /// MOSI signal.
+    pub mosi: InputSignal,
+
+    /// MISO signal.
+    pub miso: OutputSignal,
+
+    /// Chip select signal.
+    pub cs: InputSignal,
+}
+
+impl Info {
+    /// Returns the register block for this SPI instance.
+    pub fn register_block(&self) -> &RegisterBlock {
+        unsafe { &*self.register_block }
+    }
+}
+
+impl PartialEq for Info {
+    fn eq(&self, other: &Self) -> bool {
+        self.register_block == other.register_block
+    }
+}
+
+unsafe impl Sync for Info {}
 
 macro_rules! spi_instance {
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
         paste::paste! {
             impl Instance for crate::peripherals::[<SPI $num>] {
                 #[inline(always)]
-                fn register_block(&self) -> &RegisterBlock {
-                    self
-                }
+                fn info(&self) -> &'static Info {
+                    static INFO: Info = Info {
+                        register_block: crate::peripherals::[<SPI $num>]::PTR,
+                        sclk: InputSignal::$sclk,
+                        mosi: InputSignal::$mosi,
+                        miso: OutputSignal::$miso,
+                        cs: InputSignal::$cs,
+                    };
 
-                #[inline(always)]
-                fn sclk_signal(&self) -> InputSignal {
-                    InputSignal::$sclk
-                }
-
-                #[inline(always)]
-                fn mosi_signal(&self) -> InputSignal {
-                    InputSignal::$mosi
-                }
-
-                #[inline(always)]
-                fn miso_signal(&self) -> OutputSignal {
-                    OutputSignal::$miso
-                }
-
-                #[inline(always)]
-                fn cs_signal(&self) -> InputSignal {
-                    InputSignal::$cs
+                    &INFO
                 }
             }
         }
@@ -792,11 +814,7 @@ impl Instance for super::AnySpi {
             #[cfg(spi3)]
             super::AnySpiInner::Spi3(spi) => spi,
         } {
-            fn register_block(&self) -> &RegisterBlock;
-            fn sclk_signal(&self) -> InputSignal;
-            fn mosi_signal(&self) -> InputSignal;
-            fn miso_signal(&self) -> OutputSignal;
-            fn cs_signal(&self) -> InputSignal;
+            fn info(&self) -> &'static Info;
         }
     }
 }
