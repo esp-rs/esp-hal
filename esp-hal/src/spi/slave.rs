@@ -738,107 +738,50 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     }
 }
 
-#[cfg(spi2)]
-impl Instance for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
+macro_rules! spi_instance {
+    ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
+        paste::paste! {
+            impl Instance for crate::peripherals::[<SPI $num>] {
+                #[inline(always)]
+                fn register_block(&self) -> &RegisterBlock {
+                    self
+                }
 
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::HSPICLK
-            } else {
-                InputSignal::FSPICLK
+                #[inline(always)]
+                fn sclk_signal(&self) -> InputSignal {
+                    InputSignal::$sclk
+                }
+
+                #[inline(always)]
+                fn mosi_signal(&self) -> InputSignal {
+                    InputSignal::$mosi
+                }
+
+                #[inline(always)]
+                fn miso_signal(&self) -> OutputSignal {
+                    OutputSignal::$miso
+                }
+
+                #[inline(always)]
+                fn cs_signal(&self) -> InputSignal {
+                    InputSignal::$cs
+                }
             }
         }
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::HSPID
-            } else {
-                InputSignal::FSPID
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                OutputSignal::HSPIQ
-            } else {
-                OutputSignal::FSPIQ
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::HSPICS0
-            } else {
-                InputSignal::FSPICS0
-            }
-        }
-    }
+    };
 }
 
-#[cfg(spi3)]
-impl Instance for crate::peripherals::SPI3 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::VSPICLK
-            } else {
-                InputSignal::SPI3_CLK
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::VSPID
-            } else {
-                InputSignal::SPI3_D
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                OutputSignal::VSPIQ
-            } else {
-                OutputSignal::SPI3_Q
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::VSPICS0
-            } else {
-                InputSignal::SPI3_CS0
-            }
-        }
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        #[cfg(spi2)]
+        spi_instance!(2, HSPICLK, HSPID, HSPIQ, HSPICS0);
+        #[cfg(spi3)]
+        spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0);
+    } else {
+        #[cfg(spi2)]
+        spi_instance!(2, FSPICLK, FSPID, FSPIQ, FSPICS0);
+        #[cfg(spi3)]
+        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0);
     }
 }
 
