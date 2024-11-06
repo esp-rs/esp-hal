@@ -1594,7 +1594,7 @@ pub trait DmaChannelExt: DmaChannel {
 }
 
 #[diagnostic::on_unimplemented(
-    message = "The DMA channel isn't suitable for this peripheral`",
+    message = "The DMA channel isn't suitable for this peripheral",
     label = "This DMA channel",
     note = "Not all channels are useable with all peripherals"
 )]
