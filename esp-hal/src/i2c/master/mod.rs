@@ -55,7 +55,7 @@
 mod support;
 mod version;
 
-use core::{convert::Infallible, marker::PhantomData};
+use core::marker::PhantomData;
 
 use embassy_embedded_hal::SetConfig;
 use embassy_sync::waitqueue::AtomicWaker;
@@ -103,6 +103,11 @@ pub enum Error {
     /// Zero length read or write operation.
     InvalidZeroLength,
 }
+
+/// I2C-specific configuration errors
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ConfigError {}
 
 #[derive(PartialEq)]
 // This enum is used to keep track of the last/next operation that was/will be
@@ -249,11 +254,10 @@ pub struct I2c<'d, DM: Mode, T = AnyI2c> {
 
 impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
     type Config = Config;
-    type ConfigError = Infallible;
+    type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config);
-        Ok(())
+        self.apply_config(config)
     }
 }
 
@@ -272,13 +276,16 @@ where
         PeripheralClockControl::reset(self.i2c.peripheral());
         PeripheralClockControl::enable(self.i2c.peripheral());
 
-        self.driver().setup(&self.config);
+        // It's okay to ignore the result, we've already validated the config
+        // either in `apply_config` or in `new_typed_with_config`.
+        _ = self.driver().setup(&self.config);
     }
 
     /// Applies a new configuration.
-    pub fn apply_config(&mut self, config: &Config) {
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.driver().setup(config)?;
         self.config = *config;
-        self.driver().setup(&self.config);
+        Ok(())
     }
 
     fn transaction_impl<'a>(
@@ -424,7 +431,7 @@ where
         PeripheralClockControl::reset(i2c.i2c.peripheral());
         PeripheralClockControl::enable(i2c.i2c.peripheral());
 
-        i2c.driver().setup(&i2c.config);
+        unwrap!(i2c.driver().setup(&i2c.config));
         i2c
     }
 
@@ -866,7 +873,7 @@ struct Driver<'a> {
 impl Driver<'_> {
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
-    fn setup(&self, config: &Config) {
+    fn setup(&self, config: &Config) -> Result<(), ConfigError> {
         self.info.register_block().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
@@ -893,6 +900,8 @@ impl Driver<'_> {
 
         // Reset entire peripheral (also resets fifo)
         self.reset();
+
+        Ok(())
     }
 
     /// Resets the I2C peripheral's command registers
