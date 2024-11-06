@@ -20,7 +20,7 @@ runs:
         big_target=$(echo "${{ matrix.device.target }}" | tr [:lower:] [:upper:] | tr '-' '_')
         # Set the *target specific* RUSTFLAGS for the current device:
         echo "CARGO_TARGET_${big_target}_RUSTFLAGS=-Dwarnings" >> $GITHUB_ENV
-        # Linting toolchain (stable cant build documentation)
+        # Linting toolchain (stable can't build documentation)
         if [ "${{ inputs.toolchain }}" == "nightly" ]; then
           echo "LINTING_TOOLCHAIN=+nightly" >> $GITHUB_ENV
         else
@@ -33,9 +33,11 @@ runs:
       run: cargo $LINTING_TOOLCHAIN xtask lint-packages --chips ${{ inputs.device }}
     - name: Check doc-tests
       shell: bash
+      if: ${{ !contains(fromJson('["esp32p4"]'), inputs.device) }} # TODO: Remove when `esp32p4` is added to all the packages
       run: cargo $LINTING_TOOLCHAIN xtask run-doc-test esp-hal ${{ inputs.device }}
     - name: Check documentation
       shell: bash
+      if: ${{ !contains(fromJson('["esp32p4"]'), inputs.device) }} # TODO: Remove when `esp32p4` is added to all the packages
       run: cargo $LINTING_TOOLCHAIN xtask build-documentation --packages esp-hal --chips ${{ inputs.device }}
     # Build all supported examples for the low-power core first (if present):
     - name: Build prerequisite examples (esp-lp-hal)
