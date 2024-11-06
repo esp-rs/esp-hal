@@ -395,7 +395,7 @@ fn calculate_clock(sample_rate: impl Into<fugit::HertzU32>, data_bits: u8) -> I2
         } else {
             let mut min: u32 = !0;
 
-            for a in 2..=crate::i2s::I2S_LL_MCLK_DIVIDER_MAX {
+            for a in 2..=crate::i2s::master::I2S_LL_MCLK_DIVIDER_MAX {
                 let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
                 ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
                 mb = (mclk as u64 * (b / 10000)) as u32;

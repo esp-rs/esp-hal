@@ -21,7 +21,7 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::Io,
-    i2s::{DataFormat, I2s, Standard},
+    i2s::master::{DataFormat, I2s, Standard},
     prelude::*,
 };
 use esp_println::println;

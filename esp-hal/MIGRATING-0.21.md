@@ -1,28 +1,5 @@
 # Migration Guide from 0.21.x to v0.22.x
 
-## Removed `i2s` traits
-
-The following traits have been removed:
-
-- `I2sWrite`
-- `I2sWriteDma`
-- `I2sRead`
-- `I2sReadDma`
-- `I2sWriteDmaAsync`
-- `I2sReadDmaAsync`
-
-You no longer have to import these to access their respective APIs. If you used these traits
-in your functions as generic parameters, you can use the `I2s` type directly instead.
-
-For example:
-
-```diff
--fn foo(i2s: &mut impl I2sWrite) {
-+fn foo(i2s: &mut I2s<'_, I2S0, Blocking>) {
-     // ...
- }
-```
-
 ## Removed `async`-specific constructors
 
 The following async-specific constuctors have been removed:
@@ -55,8 +32,8 @@ You can use the blocking counterparts, then call `into_async` on the returned pe
 Some drivers were implicitly configured to the asyncness of the DMA channel used to construct them.
 This is no longer the case, and the following drivers will always be created in blocking mode:
 
-- `I2s`
-- `master::SpiDma` and `master::SpiDmaBus`
+- `i2s::master::I2s`
+- `spi::master::SpiDma` and `spi::master::SpiDmaBus`
 
 ## Peripheral types are now optional
 
@@ -194,6 +171,38 @@ You can now listen/unlisten multiple interrupt bits at once:
 -uart0.listen_at_cmd();
 -uart0.listen_rx_fifo_full();
 +uart0.listen(UartInterrupt::AtCmd | UartConterrupt::RxFifoFull);
+```
+
+## I2S changes
+
+### The I2S driver has been moved to `i2s::master`
+
+```diff
+-use esp_hal::i2s::{DataFormat, I2s, Standard};
++use esp_hal::i2s::master::{DataFormat, I2s, Standard};
+```
+
+### Removed `i2s` traits
+
+The following traits have been removed:
+
+- `I2sWrite`
+- `I2sWriteDma`
+- `I2sRead`
+- `I2sReadDma`
+- `I2sWriteDmaAsync`
+- `I2sReadDmaAsync`
+
+You no longer have to import these to access their respective APIs. If you used these traits
+in your functions as generic parameters, you can use the `I2s` type directly instead.
+
+For example:
+
+```diff
+-fn foo(i2s: &mut impl I2sWrite) {
++fn foo(i2s: &mut I2s<'_, I2S0, Blocking>) {
+     // ...
+ }
 ```
 
 ## Circular DMA transfer's `available` returns `Result<usize, DmaError>` now
