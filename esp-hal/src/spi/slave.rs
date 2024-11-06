@@ -571,18 +571,18 @@ pub mod dma {
     }
 }
 
-#[doc(hidden)]
+/// SPI peripheral instance.
+pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'static {
+    /// Returns the peripheral data describing this SPI instance.
+    fn info(&self) -> &'static Info;
+}
+
+/// A marker for DMA-capable SPI peripheral instances.
 pub trait InstanceDma: Instance + DmaEligible {}
 
 impl InstanceDma for crate::peripherals::SPI2 {}
 #[cfg(spi3)]
 impl InstanceDma for crate::peripherals::SPI3 {}
-
-#[doc(hidden)]
-pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'static {
-    /// Returns the peripheral data describing this SPI instance.
-    fn info(&self) -> &'static Info;
-}
 
 /// Peripheral data describing a particular SPI instance.
 #[non_exhaustive]
