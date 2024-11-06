@@ -66,7 +66,6 @@ use procmacros::handler;
 
 use crate::{
     clock::Clocks,
-    dma::PeripheralMarker,
     gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -1176,7 +1175,9 @@ pub(super) fn i2c1_handler() {
 
 /// I2C Peripheral Instance
 #[doc(hidden)]
-pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'static {
+pub trait Instance: Peripheral<P = Self> + Into<AnyI2c> + 'static {
+    fn peripheral(&self) -> crate::system::Peripheral;
+
     /// Returns the interrupt associated with this I2C peripheral.
     fn interrupt(&self) -> crate::peripherals::Interrupt;
 
@@ -2204,14 +2205,12 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
     }
 }
 
-impl PeripheralMarker for crate::peripherals::I2C0 {
+impl Instance for crate::peripherals::I2C0 {
     #[inline(always)]
     fn peripheral(&self) -> crate::system::Peripheral {
         crate::system::Peripheral::I2cExt0
     }
-}
 
-impl Instance for crate::peripherals::I2C0 {
     #[inline(always)]
     fn async_handler(&self) -> InterruptHandler {
         i2c0_handler
@@ -2254,15 +2253,12 @@ impl Instance for crate::peripherals::I2C0 {
 }
 
 #[cfg(i2c1)]
-impl PeripheralMarker for crate::peripherals::I2C1 {
+impl Instance for crate::peripherals::I2C1 {
     #[inline(always)]
     fn peripheral(&self) -> crate::system::Peripheral {
         crate::system::Peripheral::I2cExt1
     }
-}
 
-#[cfg(i2c1)]
-impl Instance for crate::peripherals::I2C1 {
     #[inline(always)]
     fn async_handler(&self) -> InterruptHandler {
         i2c1_handler
@@ -2322,6 +2318,7 @@ impl Instance for AnyI2c {
             AnyI2cInner::I2c1(i2c) => i2c,
         } {
             fn interrupt(&self) -> crate::peripherals::Interrupt;
+            fn peripheral(&self) -> crate::system::Peripheral;
             fn async_handler(&self) -> InterruptHandler;
             fn scl_output_signal(&self) -> OutputSignal;
             fn scl_input_signal(&self) -> InputSignal;

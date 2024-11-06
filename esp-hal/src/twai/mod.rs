@@ -129,7 +129,6 @@ use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
 use crate::{
-    dma::PeripheralMarker,
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -1472,9 +1471,12 @@ where
 }
 
 /// TWAI peripheral instance.
-pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyTwai> + 'static {
+pub trait Instance: Peripheral<P = Self> + Into<AnyTwai> + 'static {
     /// The identifier number for this TWAI instance.
     fn number(&self) -> usize;
+
+    /// Returns the system peripheral marker for this instance.
+    fn peripheral(&self) -> crate::system::Peripheral;
 
     /// Input signal.
     fn input_signal(&self) -> InputSignal;
@@ -1660,6 +1662,10 @@ impl Instance for crate::peripherals::TWAI0 {
         0
     }
 
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Twai0
+    }
+
     fn input_signal(&self) -> InputSignal {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
@@ -1703,6 +1709,10 @@ impl Instance for crate::peripherals::TWAI0 {
 impl Instance for crate::peripherals::TWAI1 {
     fn number(&self) -> usize {
         1
+    }
+
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Twai1
     }
 
     fn input_signal(&self) -> InputSignal {
@@ -1751,6 +1761,7 @@ impl Instance for AnyTwai {
             AnyTwaiInner::Twai1(twai) => twai,
         } {
             fn number(&self) -> usize;
+            fn peripheral(&self) -> crate::system::Peripheral;
             fn input_signal(&self) -> InputSignal;
             fn output_signal(&self) -> OutputSignal;
             fn interrupt(&self) -> crate::peripherals::Interrupt;

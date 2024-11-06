@@ -210,10 +210,7 @@ mod peripheral_macros {
     /// Creates a new `Peripherals` struct and its associated methods.
     ///
     /// The macro has a few fields doing different things, in the form of
-    /// `[first] second <= third (fourth)`.
-    /// - The first field is the name of the `Peripherals` enum variant. This is
-    ///   optional and used to create `PeripheralMarker` implementations for
-    ///   DMA-eligible peripherals.
+    /// `second <= third (fourth)`.
     /// - The second field is the name of the peripheral, as it appears in the
     ///   `Peripherals` struct.
     /// - The third field is the name of the peripheral as it appears in the
@@ -226,7 +223,7 @@ mod peripheral_macros {
     macro_rules! peripherals {
         (
             $(
-                $([$enum_variant:ident])? $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
+                $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
             ), *$(,)?
         ) => {
 
@@ -234,7 +231,7 @@ mod peripheral_macros {
             mod peripherals {
                 pub use super::pac::*;
                 $(
-                    $crate::create_peripheral!($([$enum_variant])? $name <= $from_pac);
+                    $crate::create_peripheral!($name <= $from_pac);
                 )*
             }
 
@@ -327,7 +324,7 @@ mod peripheral_macros {
     #[macro_export]
     /// Macro to create a peripheral structure.
     macro_rules! create_peripheral {
-        ($([$enum_variant:ident])? $name:ident <= virtual) => {
+        ($name:ident <= virtual) => {
             #[derive(Debug)]
             #[allow(non_camel_case_types)]
             /// Represents a virtual peripheral with no associated hardware.
@@ -358,15 +355,6 @@ mod peripheral_macros {
             }
 
             impl $crate::private::Sealed for $name {}
-
-            $(
-                impl $crate::dma::PeripheralMarker for $crate::peripherals::$name {
-                    #[inline(always)]
-                    fn peripheral(&self) -> $crate::system::Peripheral {
-                        $crate::system::Peripheral::$enum_variant
-                    }
-                }
-            )?
         };
 
         ($([$enum_variant:ident])? $name:ident <= $base:ident) => {

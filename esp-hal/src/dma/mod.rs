@@ -949,12 +949,6 @@ macro_rules! impl_dma_eligible {
     };
 }
 
-/// Marker trait
-#[doc(hidden)]
-pub trait PeripheralMarker {
-    fn peripheral(&self) -> crate::system::Peripheral;
-}
-
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct DescriptorChain {

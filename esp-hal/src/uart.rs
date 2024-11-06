@@ -135,7 +135,6 @@ use portable_atomic::AtomicBool;
 
 use crate::{
     clock::Clocks,
-    dma::PeripheralMarker,
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -1211,7 +1210,7 @@ where
             }
         };
 
-        PeripheralClockControl::enable(self.tx.uart.peripheral());
+        PeripheralClockControl::enable(self.tx.uart.info().peripheral);
         self.uart_peripheral_reset();
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
@@ -1263,7 +1262,7 @@ where
         }
 
         rst_core(self.register_block(), true);
-        PeripheralClockControl::reset(self.tx.uart.peripheral());
+        PeripheralClockControl::reset(self.tx.uart.info().peripheral);
         rst_core(self.register_block(), false);
     }
 }
@@ -2156,7 +2155,7 @@ pub mod lp_uart {
 }
 
 /// UART Peripheral Instance
-pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 'static {
+pub trait Instance: Peripheral<P = Self> + Into<AnyUart> + 'static {
     /// Returns the peripheral data and state describing this UART instance.
     fn parts(&self) -> (&'static Info, &'static State);
 
@@ -2180,6 +2179,9 @@ pub struct Info {
     ///
     /// Use [Self::register_block] to access the register block.
     pub register_block: *const RegisterBlock,
+
+    /// The system peripheral marker.
+    pub peripheral: crate::system::Peripheral,
 
     /// Interrupt handler for the asynchronous operations of this UART instance.
     pub async_handler: InterruptHandler,
@@ -2586,7 +2588,7 @@ impl PartialEq for Info {
 unsafe impl Sync for Info {}
 
 macro_rules! impl_instance {
-    ($inst:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
+    ($inst:ident, $peri:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[crate::macros::handler]
@@ -2603,6 +2605,7 @@ macro_rules! impl_instance {
 
                 static PERIPHERAL: Info = Info {
                     register_block: crate::peripherals::$inst::ptr(),
+                    peripheral: crate::system::Peripheral::$peri,
                     async_handler: irq_handler,
                     interrupt: Interrupt::$inst,
                     tx_signal: OutputSignal::$txd,
@@ -2616,10 +2619,10 @@ macro_rules! impl_instance {
     };
 }
 
-impl_instance!(UART0, U0TXD, U0RXD, U0CTS, U0RTS);
-impl_instance!(UART1, U1TXD, U1RXD, U1CTS, U1RTS);
+impl_instance!(UART0, Uart0, U0TXD, U0RXD, U0CTS, U0RTS);
+impl_instance!(UART1, Uart1, U1TXD, U1RXD, U1CTS, U1RTS);
 #[cfg(uart2)]
-impl_instance!(UART2, U2TXD, U2RXD, U2CTS, U2RTS);
+impl_instance!(UART2, Uart2, U2TXD, U2RXD, U2CTS, U2RTS);
 
 crate::any_peripheral! {
     /// Any UART peripheral.

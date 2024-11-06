@@ -87,18 +87,6 @@ macro_rules! any_peripheral {
             $vis struct $name([< $name Inner >]);
             impl $crate::private::Sealed for $name {}
 
-            impl $crate::dma::PeripheralMarker for $name {
-                #[inline(always)]
-                fn peripheral(&self) -> $crate::system::Peripheral {
-                    match &self.0 {
-                        $(
-                            $(#[cfg($variant_meta)])*
-                            [<$name Inner>]::$variant(inner) => inner.peripheral(),
-                        )*
-                    }
-                }
-            }
-
             impl $crate::peripheral::Peripheral for $name {
                 type P = $name;
 

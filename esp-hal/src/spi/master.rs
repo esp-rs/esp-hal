@@ -80,16 +80,7 @@ use procmacros::ram;
 use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
 use crate::{
     clock::Clocks,
-    dma::{
-        Channel,
-        DmaChannelConvert,
-        DmaEligible,
-        DmaRxBuffer,
-        DmaTxBuffer,
-        PeripheralMarker,
-        Rx,
-        Tx,
-    },
+    dma::{Channel, DmaChannelConvert, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{interconnect::PeripheralOutput, InputSignal, NoPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -589,8 +580,8 @@ where
             _mode: PhantomData,
         };
 
-        PeripheralClockControl::enable(this.spi.peripheral());
-        PeripheralClockControl::reset(this.spi.peripheral());
+        PeripheralClockControl::enable(this.driver().peripheral);
+        PeripheralClockControl::reset(this.driver().peripheral);
 
         this.driver().init();
         unwrap!(this.apply_config(&config)); // FIXME: update based on the resolution of https://github.com/esp-rs/esp-hal/issues/2416
@@ -2154,9 +2145,7 @@ mod ehal1 {
 }
 
 /// SPI peripheral instance.
-pub trait Instance:
-    private::Sealed + PeripheralMarker + Into<AnySpi> + DmaEligible + 'static
-{
+pub trait Instance: private::Sealed + Into<AnySpi> + DmaEligible + 'static {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;
 }
@@ -2171,6 +2160,9 @@ pub struct Info {
     ///
     /// Use [Self::register_block] to access the register block.
     pub register_block: *const RegisterBlock,
+
+    /// The system peripheral marker.
+    pub peripheral: crate::system::Peripheral,
 
     /// Interrupt for this SPI instance.
     pub interrupt: crate::peripherals::Interrupt,
@@ -3005,6 +2997,7 @@ macro_rules! spi_instance {
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
                         register_block: crate::peripherals::[<SPI $num>]::PTR,
+                        peripheral: crate::system::Peripheral::[<Spi $num>],
                         interrupt: crate::peripherals::Interrupt::[<SPI $num>],
                         sclk: OutputSignal::$sclk,
                         mosi: OutputSignal::$mosi,

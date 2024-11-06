@@ -52,7 +52,6 @@ use crate::{
         DmaError,
         DmaPeripheral,
         DmaTxBuffer,
-        PeripheralMarker,
         Tx,
     },
     gpio::{
@@ -424,10 +423,9 @@ fn calculate_clock(sample_rate: impl Into<fugit::HertzU32>, data_bits: u8) -> I2
 }
 
 #[doc(hidden)]
-pub trait Instance:
-    Peripheral<P = Self> + PeripheralMarker + DmaEligible + Into<AnyI2s> + 'static
-{
+pub trait Instance: Peripheral<P = Self> + DmaEligible + Into<AnyI2s> + 'static {
     fn register_block(&self) -> &RegisterBlock;
+    fn peripheral(&self) -> crate::system::Peripheral;
     fn ws_signal(&self) -> OutputSignal;
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
 
@@ -614,6 +612,10 @@ impl Instance for I2S0 {
         unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
     }
 
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::I2s0
+    }
+
     fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S0O_WS
     }
@@ -659,6 +661,10 @@ impl Instance for I2S0 {
 impl Instance for I2S1 {
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
+    }
+
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::I2s1
     }
 
     fn ws_signal(&self) -> OutputSignal {
@@ -729,6 +735,7 @@ impl Instance for AnyI2s {
             AnyI2sInner::I2s1(i2s) => i2s,
         } {
             fn register_block(&self) -> &RegisterBlock;
+            fn peripheral(&self) -> crate::system::Peripheral;
             fn ws_signal(&self) -> OutputSignal;
             fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal ;
         }
