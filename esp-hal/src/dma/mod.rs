@@ -1593,6 +1593,11 @@ pub trait DmaChannelExt: DmaChannel {
     fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
 }
 
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel isn't suitable for this peripheral`",
+    label = "This DMA channel",
+    note = "Not all channels are useable with all peripherals"
+)]
 #[doc(hidden)]
 pub trait DmaChannelConvert<DEG: DmaChannel>: DmaChannel {
     fn degrade_rx(rx: Self::Rx) -> DEG::Rx;
