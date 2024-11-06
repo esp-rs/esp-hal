@@ -309,6 +309,9 @@ impl InputSignal {
     }
 }
 
+/// A limited, private version of [InputSignal] that allows bypassing the GPIO
+/// matrix. This is only usable when the GPIO pin connected to the signal is not
+/// split.
 struct DirectInputSignal {
     pin: AnyPin,
 }
@@ -449,6 +452,9 @@ impl OutputSignal {
     }
 }
 
+/// A limited, private version of [OutputSignal] that allows bypassing the GPIO
+/// matrix. This is only usable when the GPIO pin connected to the signal is not
+/// split.
 struct DirectOutputSignal {
     pin: AnyPin,
 }
