@@ -1309,7 +1309,6 @@ pub struct State {
 }
 
 /// I2C Peripheral Instance
-#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyI2c> + 'static {
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);
