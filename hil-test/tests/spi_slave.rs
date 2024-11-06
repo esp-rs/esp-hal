@@ -11,10 +11,8 @@
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{
-        interconnect::{InputSignal, OutputSignal},
-        Io,
-    },
+    gpio::{Input, Io, Level, Output, Pull},
+    peripheral::Peripheral,
     spi::{slave::Spi, SpiMode},
     Blocking,
 };
@@ -35,32 +33,19 @@ struct Context {
 }
 
 struct BitbangSpi {
-    sclk: OutputSignal,
-    mosi: OutputSignal,
-    miso: InputSignal,
-    cs: OutputSignal,
+    sclk: Output<'static>,
+    mosi: Output<'static>,
+    miso: Input<'static>,
+    cs: Output<'static>,
 }
 
 impl BitbangSpi {
     fn new(
-        mut sclk: OutputSignal,
-        mut mosi: OutputSignal,
-        mut miso: InputSignal,
-        mut cs: OutputSignal,
+        sclk: Output<'static>,
+        mosi: Output<'static>,
+        miso: Input<'static>,
+        cs: Output<'static>,
     ) -> Self {
-        // TODO remove this (#2273)
-        // FIXME: devise a public API for signals
-        miso.enable_input(true, unsafe { esp_hal::Internal::conjure() });
-
-        mosi.set_output_high(false, unsafe { esp_hal::Internal::conjure() });
-        mosi.enable_output(true, unsafe { esp_hal::Internal::conjure() });
-
-        cs.set_output_high(true, unsafe { esp_hal::Internal::conjure() });
-        cs.enable_output(true, unsafe { esp_hal::Internal::conjure() });
-
-        sclk.set_output_high(false, unsafe { esp_hal::Internal::conjure() });
-        sclk.enable_output(true, unsafe { esp_hal::Internal::conjure() });
-
         Self {
             sclk,
             mosi,
@@ -70,29 +55,22 @@ impl BitbangSpi {
     }
 
     fn assert_cs(&mut self) {
-        self.sclk
-            .set_output_high(false, unsafe { esp_hal::Internal::conjure() });
-        self.cs
-            .set_output_high(false, unsafe { esp_hal::Internal::conjure() });
+        self.sclk.set_level(Level::Low);
+        self.cs.set_level(Level::Low);
     }
 
     fn deassert_cs(&mut self) {
-        self.sclk
-            .set_output_high(false, unsafe { esp_hal::Internal::conjure() });
-        self.cs
-            .set_output_high(true, unsafe { esp_hal::Internal::conjure() });
+        self.sclk.set_level(Level::Low);
+        self.cs.set_level(Level::High);
     }
 
     // Mode 1, so sampled on the rising edge and set on the falling edge.
     fn shift_bit(&mut self, bit: bool) -> bool {
-        self.mosi
-            .set_output_high(bit, unsafe { esp_hal::Internal::conjure() });
-        self.sclk
-            .set_output_high(true, unsafe { esp_hal::Internal::conjure() });
+        self.mosi.set_level(Level::from(bit));
+        self.sclk.set_level(Level::High);
 
         let miso = self.miso.get_level().into();
-        self.sclk
-            .set_output_high(false, unsafe { esp_hal::Internal::conjure() });
+        self.sclk.set_level(Level::Low);
 
         miso
     }
@@ -141,21 +119,19 @@ mod tests {
             }
         }
 
-        let (cs, cs_pin) = cs_pin.split();
-        let (mosi, mosi_pin) = mosi_pin.split();
-        let (miso, miso_pin) = miso_pin.split();
-        let (sclk_signal, sclk_pin) = sclk_pin.split();
+        let mosi_gpio = Output::new(mosi_pin, Level::Low);
+        let cs_gpio = Output::new(cs_pin, Level::High);
+        let sclk_gpio = Output::new(sclk_pin, Level::Low);
+        let miso_gpio = Input::new(miso_pin, Pull::None);
+
+        let cs = cs_gpio.peripheral_input();
+        let sclk = sclk_gpio.peripheral_input();
+        let mosi = mosi_gpio.peripheral_input();
+        let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
 
         Context {
-            spi: Spi::new(
-                peripherals.SPI2,
-                sclk_signal,
-                mosi,
-                miso_pin,
-                cs,
-                SpiMode::Mode1,
-            ),
-            bitbang_spi: BitbangSpi::new(sclk_pin, mosi_pin, miso, cs_pin),
+            spi: Spi::new(peripherals.SPI2, sclk, mosi, miso, cs, SpiMode::Mode1),
+            bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso_gpio, cs_gpio),
             dma_channel,
         }
     }

@@ -806,13 +806,13 @@ where
             tx_pin.set_to_push_pull_output(crate::private::Internal);
             Pull::None
         };
-        tx_pin.connect_peripheral_to_output(this.twai.output_signal(), crate::private::Internal);
+        this.twai.output_signal().connect_to(tx_pin);
 
         // Setting up RX pin later allows us to use a single pin in tests.
         // `set_to_push_pull_output` disables input, here we re-enable it if rx_pin
         // uses the same GPIO.
         rx_pin.init_input(rx_pull, crate::private::Internal);
-        rx_pin.connect_input_to_peripheral(this.twai.input_signal(), crate::private::Internal);
+        this.twai.input_signal().connect_to(rx_pin);
 
         // Freeze REC by changing to LOM mode
         this.set_mode(TwaiMode::ListenOnly);

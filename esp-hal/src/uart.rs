@@ -460,7 +460,7 @@ where
     fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
         rx.init_input(Pull::Up, Internal);
-        rx.connect_input_to_peripheral(self.uart.info().rx_signal, Internal);
+        self.uart.info().rx_signal.connect_to(rx);
 
         self
     }
@@ -470,7 +470,7 @@ where
         // Make sure we don't cause an unexpected low pulse on the pin.
         tx.set_output_high(true, Internal);
         tx.set_to_push_pull_output(Internal);
-        tx.connect_peripheral_to_output(self.uart.info().tx_signal, Internal);
+        self.uart.info().tx_signal.connect_to(tx);
 
         self
     }
@@ -558,7 +558,7 @@ where
     pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(rts);
         rts.set_to_push_pull_output(Internal);
-        rts.connect_peripheral_to_output(self.uart.info().rts_signal, Internal);
+        self.uart.info().rts_signal.connect_to(rts);
 
         self
     }
@@ -766,7 +766,7 @@ where
     pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(cts);
         cts.init_input(Pull::None, Internal);
-        cts.connect_input_to_peripheral(self.uart.info().cts_signal, Internal);
+        self.uart.info().cts_signal.connect_to(cts);
 
         self
     }

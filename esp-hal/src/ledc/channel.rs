@@ -610,8 +610,7 @@ where
                 Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
             };
 
-            self.output_pin
-                .connect_peripheral_to_output(signal, crate::private::Internal);
+            signal.connect_to(&mut self.output_pin);
         } else {
             return Err(Error::Timer);
         }

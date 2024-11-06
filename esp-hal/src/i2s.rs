@@ -469,7 +469,7 @@ where
     pub fn with_mclk<P: PeripheralOutput>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
         crate::into_mapped_ref!(pin);
         pin.set_to_push_pull_output(crate::private::Internal);
-        pin.connect_peripheral_to_output(self.i2s_tx.i2s.mclk_signal(), crate::private::Internal);
+        self.i2s_tx.i2s.mclk_signal().connect_to(pin);
 
         self
     }
@@ -826,7 +826,7 @@ mod private {
         {
             crate::into_mapped_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(self.i2s.bclk_signal(), private::Internal);
+            self.i2s.bclk_signal().connect_to(pin);
 
             self
         }
@@ -837,7 +837,7 @@ mod private {
         {
             crate::into_mapped_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(self.i2s.ws_signal(), private::Internal);
+            self.i2s.ws_signal().connect_to(pin);
 
             self
         }
@@ -848,7 +848,7 @@ mod private {
         {
             crate::into_mapped_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(self.i2s.dout_signal(), private::Internal);
+            self.i2s.dout_signal().connect_to(pin);
 
             self
         }
@@ -885,7 +885,7 @@ mod private {
         {
             crate::into_mapped_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(self.i2s.bclk_rx_signal(), private::Internal);
+            self.i2s.bclk_rx_signal().connect_to(pin);
 
             self
         }
@@ -896,7 +896,7 @@ mod private {
         {
             crate::into_mapped_ref!(pin);
             pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(self.i2s.ws_rx_signal(), private::Internal);
+            self.i2s.ws_rx_signal().connect_to(pin);
 
             self
         }
@@ -907,7 +907,7 @@ mod private {
         {
             crate::into_mapped_ref!(pin);
             pin.init_input(crate::gpio::Pull::None, private::Internal);
-            pin.connect_input_to_peripheral(self.i2s.din_signal(), private::Internal);
+            self.i2s.din_signal().connect_to(pin);
 
             self
         }

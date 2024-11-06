@@ -1,39 +1,49 @@
-//! # General Purpose I/Os (GPIO)
+//! # General Purpose Input/Output (GPIO)
 //!
 //! ## Overview
 //!
 //! Each pin can be used as a general-purpose I/O, or be connected to one or
 //! more internal peripheral signals.
+#![cfg_attr(
+    soc_etm,
+    doc = "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
+)]
+#![doc = ""]
+//! ## Working with pins
 //!
-//! ## Configuration
+//! Before use, the GPIO module must be initialized by creating an instance of
+//! the [`Io`] struct. This struct provides access to the pins on the chip.
 //!
-//! This driver supports various operations on GPIO pins, including setting the
-//! pin mode, direction, and manipulating the pin state (setting high/low,
-//! toggling). It provides an interface to interact with GPIO pins on ESP chips,
-//! allowing developers to control and read the state of the pins.
+//! The [`Io`] struct can also be used to configure the interrupt handler for
+//! GPIO interrupts. For more information, see the
+//! [`Io::set_interrupt_handler`].
 //!
-//! ## Usage
+//! The pins are accessible via [`Io::pins`]. These pins can then be passed to
+//! peripherals (such as SPI, UART, I2C, etc.), to pin drivers or can be
+//! [`GpioPin::split`] into peripheral signals.
 //!
-//! This module also implements a number of traits from [embedded-hal] to
-//! provide a common interface for GPIO pins.
+//! Each pin is a different type initially. Internally, `esp-hal` will often
+//! erase their types automatically, but they can also be converted into
+//! [`AnyPin`] manually by calling [`Pin::degrade`].
 //!
-//! To get access to the pins, you first need to convert them into a HAL
-//! designed struct from the pac struct `GPIO` and `IO_MUX` using [`Io::new`].
+//! Pin drivers can be created using [`Flex::new`], [`Input::new`],
+//! [`Output::new`] and [`OutputOpenDrain::new`]. If you need the pin drivers to
+//! carry the type of the pin, you can use the [`Flex::new_typed`],
+//! [`Input::new_typed`], [`Output::new_typed`], and
+//! [`OutputOpenDrain::new_typed`] functions.
 //!
-//! ### Pin Types
+//! ## GPIO interconnect
 //!
-//! - [Input] pins can be used as digital inputs.
-//! - [Output] and [OutputOpenDrain] pins can be used as digital outputs.
-//! - [Flex] pin is a pin that can be used as an input and output pin.
-//! - [AnyPin] is a type-erased GPIO pin with support for inverted signalling.
-//! - [NoPin] is a useful for cases where peripheral driver requires a pin, but
-//!   real pin cannot be used.
+//! Sometimes you may want to connect peripherals together without using
+//! external hardware. The [`interconnect`] module provides tools to achieve
+//! this using GPIO pins.
 //!
-//! ### GPIO interconnect
-//!
-//! Each GPIO can be connected to one output signal and any number of input
-//! signals. This allows connections inside of the MCU without allocating and
-//! connecting multiple pins for loopback functionality.
+//! To obtain peripheral signals, use the [`GpioPin::split`] method to split a
+//! pin into an input and output signal. Alternatively, you may use
+//! [`Flex::split`], [`Flex::into_peripheral_output`],
+//! [`Flex::peripheral_input`], and similar methods to split a pin driver into
+//! an input and output signal. You can then pass these signals to the
+//! peripheral drivers similar to how you would pass a pin.
 //!
 //! ## Examples
 //!
@@ -49,14 +59,14 @@
 //! 
 //! ### Blink an LED
 //!
-//! See the [Blinky] section of the crate documentation.
+//! See the [Blinky][crate#blinky] section of the crate documentation.
 //!
-//! ### Inverting a signal using `AnyPin`
+//! ### Inverting peripheral signals
+//!
 //! See the [Inverting TX and RX Pins] example of the UART documentation.
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
-//! [Blinky]: ../index.html#blinky
-//! [Inverting TX and RX Pins]: ../uart/index.html#inverting-tx-and-rx-pins
+//! [Inverting TX and RX Pins]: crate::uart#inverting-rx-and-tx-pins
 
 use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
@@ -217,9 +227,13 @@ pub enum DriveStrength {
 ///
 /// GPIO pins can be configured for various functions, such as GPIO
 /// or being directly connected to a peripheral's signal like UART, SPI, etc.
-/// The `AlternateFunction` enum allows to select one of several functions that
+/// The `AlternateFunction` enum allows selecting one of several functions that
 /// a pin can perform, rather than using it as a general-purpose input or
 /// output.
+///
+/// The different variants correspond to different functionality depending on
+/// the chip and the specific pin. For more information, refer to your chip's
+#[doc = crate::trm_markdown_link!("iomuxgpio")]
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AlternateFunction {
@@ -384,12 +398,6 @@ pub trait InputPin: Pin + Into<AnyPin> + 'static {
         });
     }
 
-    /// Enable input in sleep mode for the pin
-    #[doc(hidden)]
-    fn enable_input_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| w.mcu_ie().bit(on));
-    }
-
     /// The current state of the input
     #[doc(hidden)]
     fn is_input_high(&self, _: private::Internal) -> bool {
@@ -405,6 +413,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
         &mut self,
         alternate: AlternateFunction,
         open_drain: bool,
+        input_enable: Option<bool>,
         _: private::Internal,
     ) {
         self.enable_output(true, private::Internal);
@@ -422,7 +431,9 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
 
         get_io_mux_reg(self.number()).modify(|_, w| unsafe {
             w.mcu_sel().bits(alternate as u8);
-            w.fun_ie().bit(open_drain);
+            if let Some(input_enable) = input_enable {
+                w.fun_ie().bit(input_enable);
+            }
             w.fun_drv().bits(DriveStrength::I20mA as u8);
             w.slp_sel().clear_bit()
         });
@@ -431,13 +442,13 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     /// Configure open-drain mode
     #[doc(hidden)]
     fn set_to_open_drain_output(&mut self, _: private::Internal) {
-        self.init_output(GPIO_FUNCTION, true, private::Internal);
+        self.init_output(GPIO_FUNCTION, true, Some(true), private::Internal);
     }
 
     /// Configure output mode
     #[doc(hidden)]
     fn set_to_push_pull_output(&mut self, _: private::Internal) {
-        self.init_output(GPIO_FUNCTION, false, private::Internal);
+        self.init_output(GPIO_FUNCTION, false, None, private::Internal);
     }
 
     /// Set the pin's level to high or low
@@ -459,12 +470,6 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
         unsafe { GPIO::steal() }
             .pin(self.number() as usize)
             .modify(|_, w| w.pad_driver().bit(on));
-    }
-
-    /// Enable/disable output in sleep mode
-    #[doc(hidden)]
-    fn enable_output_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| w.mcu_oe().bit(on));
     }
 
     /// Configure internal pull-up resistor in sleep mode
@@ -1115,9 +1120,9 @@ pub struct Output<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Output<'_, P> {}
 
-impl<P> Peripheral for Output<'_, P> {
-    type P = P;
-    unsafe fn clone_unchecked(&self) -> P {
+impl<'d, P> Peripheral for Output<'d, P> {
+    type P = Flex<'d, P>;
+    unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
     }
 }
@@ -1229,9 +1234,9 @@ pub struct Input<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Input<'_, P> {}
 
-impl<P> Peripheral for Input<'_, P> {
-    type P = P;
-    unsafe fn clone_unchecked(&self) -> P {
+impl<'d, P> Peripheral for Input<'d, P> {
+    type P = Flex<'d, P>;
+    unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
     }
 }
@@ -1350,9 +1355,9 @@ pub struct OutputOpenDrain<'d, P = AnyPin> {
 
 impl<P> private::Sealed for OutputOpenDrain<'_, P> {}
 
-impl<P> Peripheral for OutputOpenDrain<'_, P> {
-    type P = P;
-    unsafe fn clone_unchecked(&self) -> P {
+impl<'d, P> Peripheral for OutputOpenDrain<'d, P> {
+    type P = Flex<'d, P>;
+    unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
     }
 }
@@ -1498,10 +1503,12 @@ pub struct Flex<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Flex<'_, P> {}
 
-impl<P> Peripheral for Flex<'_, P> {
-    type P = P;
-    unsafe fn clone_unchecked(&self) -> P {
-        core::ptr::read(&*self.pin as *const _)
+impl<'d, P> Peripheral for Flex<'d, P> {
+    type P = Self;
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self {
+            pin: PeripheralRef::new(core::ptr::read(&*self.pin as *const P)),
+        }
     }
 }
 
@@ -1709,6 +1716,42 @@ where
     }
 }
 
+// Unfortunate implementation details responsible for:
+// - making pin drivers work with the peripheral signal system
+// - making the pin drivers work with the sleep API
+impl<P: Pin> Pin for Flex<'_, P> {
+    delegate::delegate! {
+        to self.pin {
+            fn number(&self) -> u8;
+            fn degrade_pin(&self, _internal: private::Internal) -> AnyPin;
+            fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, OutputSignal)];
+            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, InputSignal)];
+            fn gpio_bank(&self, _internal: private::Internal) -> GpioRegisterAccess;
+        }
+    }
+}
+impl<P: RtcPin> RtcPin for Flex<'_, P> {
+    delegate::delegate! {
+        to self.pin {
+            #[cfg(xtensa)]
+            fn rtc_number(&self) -> u8;
+            #[cfg(any(xtensa, esp32c6))]
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
+            fn rtcio_pad_hold(&mut self, enable: bool);
+            #[cfg(any(esp32c3, esp32c2, esp32c6))]
+            unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8);
+        }
+    }
+}
+impl<P: RtcPinWithResistors> RtcPinWithResistors for Flex<'_, P> {
+    delegate::delegate! {
+        to self.pin {
+            fn rtcio_pullup(&mut self, enable: bool);
+            fn rtcio_pulldown(&mut self, enable: bool);
+        }
+    }
+}
+
 pub(crate) mod internal {
     use super::*;
 
@@ -1773,10 +1816,17 @@ pub(crate) mod internal {
             &mut self,
             alternate: AlternateFunction,
             open_drain: bool,
+            input_enable: Option<bool>,
             _: private::Internal,
         ) {
             handle_gpio_output!(&mut self.0, target, {
-                OutputPin::init_output(target, alternate, open_drain, private::Internal)
+                OutputPin::init_output(
+                    target,
+                    alternate,
+                    open_drain,
+                    input_enable,
+                    private::Internal,
+                )
             })
         }
 
@@ -1807,12 +1857,6 @@ pub(crate) mod internal {
         fn enable_open_drain(&mut self, on: bool, _: private::Internal) {
             handle_gpio_output!(&mut self.0, target, {
                 OutputPin::enable_open_drain(target, on, private::Internal)
-            })
-        }
-
-        fn enable_output_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::enable_output_in_sleep_mode(target, on, private::Internal)
             })
         }
 

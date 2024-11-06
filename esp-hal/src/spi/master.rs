@@ -90,12 +90,7 @@ use crate::{
         Rx,
         Tx,
     },
-    gpio::{
-        interconnect::{OutputConnection, PeripheralOutput},
-        InputSignal,
-        NoPin,
-        OutputSignal,
-    },
+    gpio::{interconnect::PeripheralOutput, InputSignal, NoPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -608,20 +603,10 @@ where
 
         let is_qspi = this.driver().sio2_input.is_some();
         if is_qspi {
-            let mut signal = OutputConnection::from(NoPin);
-
-            signal
-                .connect_input_to_peripheral(unwrap!(this.driver().sio2_input), private::Internal);
-            signal.connect_peripheral_to_output(
-                unwrap!(this.driver().sio2_output),
-                private::Internal,
-            );
-            signal
-                .connect_input_to_peripheral(unwrap!(this.driver().sio3_input), private::Internal);
-            signal.connect_peripheral_to_output(
-                unwrap!(this.driver().sio3_output),
-                private::Internal,
-            );
+            unwrap!(this.driver().sio2_input).connect_to(NoPin);
+            unwrap!(this.driver().sio2_output).connect_to(NoPin);
+            unwrap!(this.driver().sio3_input).connect_to(NoPin);
+            unwrap!(this.driver().sio3_output).connect_to(NoPin);
         }
 
         this
@@ -634,10 +619,10 @@ where
     pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
         mosi.enable_output(true, private::Internal);
-        mosi.connect_peripheral_to_output(self.driver().mosi, private::Internal);
-
         mosi.enable_input(true, private::Internal);
-        mosi.connect_input_to_peripheral(self.driver().sio0_input, private::Internal);
+
+        self.driver().mosi.connect_to(&mut mosi);
+        self.driver().sio0_input.connect_to(&mut mosi);
 
         self
     }
@@ -649,10 +634,10 @@ where
     pub fn with_miso<MISO: PeripheralOutput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
         miso.enable_input(true, private::Internal);
-        miso.connect_input_to_peripheral(self.driver().miso, private::Internal);
-
         miso.enable_output(true, private::Internal);
-        miso.connect_peripheral_to_output(self.driver().sio1_output, private::Internal);
+
+        self.driver().miso.connect_to(&mut miso);
+        self.driver().sio1_output.connect_to(&mut miso);
 
         self
     }
@@ -664,7 +649,7 @@ where
     pub fn with_sck<SCK: PeripheralOutput>(self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_mapped_ref!(sclk);
         sclk.set_to_push_pull_output(private::Internal);
-        sclk.connect_peripheral_to_output(self.driver().sclk, private::Internal);
+        self.driver().sclk.connect_to(sclk);
 
         self
     }
@@ -676,7 +661,7 @@ where
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
         cs.set_to_push_pull_output(private::Internal);
-        cs.connect_peripheral_to_output(self.driver().cs, private::Internal);
+        self.driver().cs.connect_to(cs);
 
         self
     }
@@ -716,8 +701,8 @@ where
         sio2.enable_input(true, private::Internal);
         sio2.enable_output(true, private::Internal);
 
-        sio2.connect_input_to_peripheral(unwrap!(self.driver().sio2_input), private::Internal);
-        sio2.connect_peripheral_to_output(unwrap!(self.driver().sio2_output), private::Internal);
+        unwrap!(self.driver().sio2_input).connect_to(&mut sio2);
+        unwrap!(self.driver().sio2_output).connect_to(&mut sio2);
 
         self
     }
@@ -734,8 +719,8 @@ where
         sio3.enable_input(true, private::Internal);
         sio3.enable_output(true, private::Internal);
 
-        sio3.connect_input_to_peripheral(unwrap!(self.driver().sio3_input), private::Internal);
-        sio3.connect_peripheral_to_output(unwrap!(self.driver().sio3_output), private::Internal);
+        unwrap!(self.driver().sio3_input).connect_to(&mut sio3);
+        unwrap!(self.driver().sio3_output).connect_to(&mut sio3);
 
         self
     }

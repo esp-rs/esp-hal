@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calling `AnyPin::output_signals` on an input-only pin (ESP32 GPIO 34-39) will now result in a panic. (#2418)
 - UART configuration types have been moved to `esp_hal::uart` (#2449)
 - `spi::master::Spi::new()` no longer takes `frequency` and `mode` as a parameter. (#2448)
+- Peripheral interconnections via GPIO pins now use the GPIO matrix. (#2419)
 
 ### Fixed
 
