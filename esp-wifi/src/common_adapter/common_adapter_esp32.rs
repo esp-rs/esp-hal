@@ -155,7 +155,6 @@ pub(crate) unsafe fn phy_disable_clock() {
 ///   Register value
 ///
 /// *************************************************************************
-
 #[ram]
 #[no_mangle]
 unsafe extern "C" fn esp_dport_access_reg_read(reg: u32) -> u32 {
