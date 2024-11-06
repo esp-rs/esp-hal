@@ -32,6 +32,15 @@ macro_rules! trm_markdown_link {
     () => {
         concat!("[Technical Reference Manual](", $crate::trm_link!(), ")")
     };
+    ($anchor:literal) => {
+        concat!(
+            "[Technical Reference Manual](",
+            $crate::trm_link!(),
+            "#",
+            $anchor,
+            ")"
+        )
+    };
 }
 
 #[doc(hidden)]
