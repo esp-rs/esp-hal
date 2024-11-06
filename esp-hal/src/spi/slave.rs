@@ -75,7 +75,7 @@ use core::marker::PhantomData;
 
 use super::{Error, SpiMode};
 use crate::{
-    dma::{DescriptorChain, DmaChannelConvert, DmaEligible, PeripheralMarker, Rx, Tx},
+    dma::{DmaChannelConvert, DmaEligible, PeripheralMarker},
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -161,7 +161,7 @@ where
     pub(crate) fn new_internal(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, M, T> {
         crate::into_ref!(spi);
 
-        let mut spi = Spi {
+        let spi = Spi {
             spi,
             data_mode: mode,
             _mode: PhantomData,
@@ -170,8 +170,8 @@ where
         PeripheralClockControl::reset(spi.spi.peripheral());
         PeripheralClockControl::enable(spi.spi.peripheral());
 
-        spi.spi.init();
-        spi.spi.set_data_mode(mode, false);
+        spi.spi.info().init();
+        spi.spi.info().set_data_mode(mode, false);
 
         spi
     }
@@ -208,7 +208,7 @@ pub mod dma {
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
         pub fn with_dma<CH, DM>(
-            mut self,
+            self,
             channel: Channel<'d, CH, DM>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
@@ -218,7 +218,7 @@ pub mod dma {
             DM: Mode,
             Channel<'d, CH, M>: From<Channel<'d, CH, DM>>,
         {
-            self.spi.set_data_mode(self.data_mode, true);
+            self.spi.info().set_data_mode(self.data_mode, true);
             SpiDma::new(self.spi, channel.into(), rx_descriptors, tx_descriptors)
         }
     }
@@ -253,10 +253,10 @@ pub mod dma {
         fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
             while !((!is_tx || self.channel.tx.is_done())
                 && (!is_rx || self.channel.rx.is_done())
-                && !self.spi.is_bus_busy())
+                && !self.spi.info().is_bus_busy())
             {}
 
-            self.spi.flush().ok();
+            self.spi.info().flush().ok();
         }
 
         fn peripheral_dma_stop(&mut self) {
@@ -318,6 +318,14 @@ pub mod dma {
                 tx_chain: DescriptorChain::new(tx_descriptors),
             }
         }
+
+        fn driver(&self) -> DmaDriver {
+            DmaDriver {
+                info: self.spi.info(),
+                dma_peripheral: self.spi.dma_peripheral(),
+            }
+        }
+
         /// Register a buffer for a DMA write.
         ///
         /// This will return a [DmaTransferTx]. The maximum amount of data to be
@@ -338,7 +346,7 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
+                self.driver()
                     .start_transfer_dma(
                         &mut self.rx_chain,
                         &mut self.tx_chain,
@@ -373,7 +381,7 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
+                self.driver()
                     .start_transfer_dma(
                         &mut self.rx_chain,
                         &mut self.tx_chain,
@@ -412,7 +420,7 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
+                self.driver()
                     .start_transfer_dma(
                         &mut self.rx_chain,
                         &mut self.tx_chain,
@@ -427,150 +435,144 @@ pub mod dma {
             }
         }
     }
+
+    struct DmaDriver {
+        info: &'static Info,
+        dma_peripheral: crate::dma::DmaPeripheral,
+    }
+
+    impl DmaDriver {
+        #[allow(clippy::too_many_arguments)]
+        unsafe fn start_transfer_dma<RX, TX>(
+            &self,
+            rx_chain: &mut DescriptorChain,
+            tx_chain: &mut DescriptorChain,
+            read_buffer_ptr: *mut u8,
+            read_buffer_len: usize,
+            write_buffer_ptr: *const u8,
+            write_buffer_len: usize,
+            rx: &mut RX,
+            tx: &mut TX,
+        ) -> Result<(), Error>
+        where
+            RX: Rx,
+            TX: Tx,
+        {
+            self.enable_dma();
+
+            self.info.reset_spi();
+
+            if read_buffer_len > 0 {
+                rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
+                rx.prepare_transfer_without_start(self.dma_peripheral, rx_chain)?;
+            }
+
+            if write_buffer_len > 0 {
+                tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
+                tx.prepare_transfer_without_start(self.dma_peripheral, tx_chain)?;
+            }
+
+            #[cfg(esp32)]
+            self.info
+                .prepare_length_and_lines(read_buffer_len, write_buffer_len);
+
+            self.reset_dma_before_usr_cmd();
+
+            let reg_block = self.info.register_block();
+            #[cfg(not(esp32))]
+            reg_block
+                .dma_conf()
+                .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
+
+            self.clear_dma_interrupts();
+            self.info.setup_for_flush();
+            reg_block.cmd().modify(|_, w| w.usr().set_bit());
+
+            if read_buffer_len > 0 {
+                rx.start_transfer()?;
+            }
+
+            if write_buffer_len > 0 {
+                tx.start_transfer()?;
+            }
+
+            Ok(())
+        }
+
+        fn reset_dma_before_usr_cmd(&self) {
+            let reg_block = self.info.register_block();
+            #[cfg(gdma)]
+            reg_block.dma_conf().modify(|_, w| {
+                w.rx_afifo_rst().set_bit();
+                w.buf_afifo_rst().set_bit();
+                w.dma_afifo_rst().set_bit()
+            });
+
+            #[cfg(pdma)]
+            let _ = reg_block;
+        }
+
+        fn enable_dma(&self) {
+            let reg_block = self.info.register_block();
+            #[cfg(gdma)]
+            {
+                reg_block.dma_conf().modify(|_, w| {
+                    w.dma_tx_ena().set_bit();
+                    w.dma_rx_ena().set_bit();
+                    w.rx_eof_en().clear_bit()
+                });
+            }
+
+            #[cfg(pdma)]
+            {
+                fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
+                    reg_block.dma_conf().modify(|_, w| {
+                        w.in_rst().bit(bit);
+                        w.out_rst().bit(bit);
+                        w.ahbm_fifo_rst().bit(bit);
+                        w.ahbm_rst().bit(bit)
+                    });
+
+                    #[cfg(esp32s2)]
+                    reg_block
+                        .dma_conf()
+                        .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
+                }
+                set_rst_bit(reg_block, true);
+                set_rst_bit(reg_block, false);
+            }
+        }
+
+        fn clear_dma_interrupts(&self) {
+            let reg_block = self.info.register_block();
+
+            #[cfg(gdma)]
+            reg_block.dma_int_clr().write(|w| {
+                w.dma_infifo_full_err().clear_bit_by_one();
+                w.dma_outfifo_empty_err().clear_bit_by_one();
+                w.trans_done().clear_bit_by_one();
+                w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+            });
+
+            #[cfg(pdma)]
+            reg_block.dma_int_clr().write(|w| {
+                w.inlink_dscr_empty().clear_bit_by_one();
+                w.outlink_dscr_error().clear_bit_by_one();
+                w.inlink_dscr_error().clear_bit_by_one();
+                w.in_done().clear_bit_by_one();
+                w.in_err_eof().clear_bit_by_one();
+                w.in_suc_eof().clear_bit_by_one();
+                w.out_done().clear_bit_by_one();
+                w.out_eof().clear_bit_by_one();
+                w.out_total_eof().clear_bit_by_one()
+            });
+        }
+    }
 }
 
 #[doc(hidden)]
-pub trait InstanceDma: Instance + DmaEligible {
-    #[allow(clippy::too_many_arguments)]
-    unsafe fn start_transfer_dma<RX, TX>(
-        &mut self,
-        rx_chain: &mut DescriptorChain,
-        tx_chain: &mut DescriptorChain,
-        read_buffer_ptr: *mut u8,
-        read_buffer_len: usize,
-        write_buffer_ptr: *const u8,
-        write_buffer_len: usize,
-        rx: &mut RX,
-        tx: &mut TX,
-    ) -> Result<(), Error>
-    where
-        RX: Rx,
-        TX: Tx,
-    {
-        let reg_block = self.info().register_block();
-
-        self.enable_dma();
-
-        reset_spi(reg_block);
-
-        if read_buffer_len > 0 {
-            rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
-            rx.prepare_transfer_without_start(self.dma_peripheral(), rx_chain)?;
-        }
-
-        if write_buffer_len > 0 {
-            tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
-            tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain)?;
-        }
-
-        #[cfg(esp32)]
-        self.prepare_length_and_lines(read_buffer_len, write_buffer_len);
-
-        reset_dma_before_usr_cmd(reg_block);
-
-        #[cfg(not(esp32))]
-        reg_block
-            .dma_conf()
-            .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
-
-        self.clear_dma_interrupts();
-        self.setup_for_flush();
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
-
-        if read_buffer_len > 0 {
-            rx.start_transfer()?;
-        }
-
-        if write_buffer_len > 0 {
-            tx.start_transfer()?;
-        }
-
-        Ok(())
-    }
-
-    fn enable_dma(&self) {
-        let reg_block = self.info().register_block();
-        #[cfg(gdma)]
-        {
-            reg_block.dma_conf().modify(|_, w| {
-                w.dma_tx_ena().set_bit();
-                w.dma_rx_ena().set_bit();
-                w.rx_eof_en().clear_bit()
-            });
-        }
-
-        #[cfg(pdma)]
-        {
-            fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
-                reg_block.dma_conf().modify(|_, w| {
-                    w.in_rst().bit(bit);
-                    w.out_rst().bit(bit);
-                    w.ahbm_fifo_rst().bit(bit);
-                    w.ahbm_rst().bit(bit)
-                });
-
-                #[cfg(esp32s2)]
-                reg_block
-                    .dma_conf()
-                    .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
-            }
-            set_rst_bit(reg_block, true);
-            set_rst_bit(reg_block, false);
-        }
-    }
-
-    fn clear_dma_interrupts(&self) {
-        let reg_block = self.info().register_block();
-
-        #[cfg(gdma)]
-        reg_block.dma_int_clr().write(|w| {
-            w.dma_infifo_full_err().clear_bit_by_one();
-            w.dma_outfifo_empty_err().clear_bit_by_one();
-            w.trans_done().clear_bit_by_one();
-            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
-            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
-        });
-
-        #[cfg(pdma)]
-        reg_block.dma_int_clr().write(|w| {
-            w.inlink_dscr_empty().clear_bit_by_one();
-            w.outlink_dscr_error().clear_bit_by_one();
-            w.inlink_dscr_error().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_suc_eof().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_eof().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one()
-        });
-    }
-}
-
-fn reset_spi(reg_block: &RegisterBlock) {
-    #[cfg(esp32)]
-    {
-        reg_block.slave().modify(|_, w| w.sync_reset().set_bit());
-        reg_block.slave().modify(|_, w| w.sync_reset().clear_bit());
-    }
-
-    #[cfg(not(esp32))]
-    {
-        reg_block.slave().modify(|_, w| w.soft_reset().set_bit());
-        reg_block.slave().modify(|_, w| w.soft_reset().clear_bit());
-    }
-}
-
-fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
-    #[cfg(gdma)]
-    reg_block.dma_conf().modify(|_, w| {
-        w.rx_afifo_rst().set_bit();
-        w.buf_afifo_rst().set_bit();
-        w.dma_afifo_rst().set_bit()
-    });
-
-    #[cfg(pdma)]
-    let _ = reg_block;
-}
+pub trait InstanceDma: Instance + DmaEligible {}
 
 impl InstanceDma for crate::peripherals::SPI2 {}
 #[cfg(spi3)]
@@ -580,10 +582,54 @@ impl InstanceDma for crate::peripherals::SPI3 {}
 pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'static {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;
+}
+
+/// Peripheral data describing a particular SPI instance.
+#[non_exhaustive]
+pub struct Info {
+    /// Pointer to the register block for this SPI instance.
+    ///
+    /// Use [Self::register_block] to access the register block.
+    pub register_block: *const RegisterBlock,
+
+    /// SCLK signal.
+    pub sclk: InputSignal,
+
+    /// MOSI signal.
+    pub mosi: InputSignal,
+
+    /// MISO signal.
+    pub miso: OutputSignal,
+
+    /// Chip select signal.
+    pub cs: InputSignal,
+}
+
+impl Info {
+    /// Returns the register block for this SPI instance.
+    pub fn register_block(&self) -> &RegisterBlock {
+        unsafe { &*self.register_block }
+    }
+
+    fn reset_spi(&self) {
+        let reg_block = self.register_block();
+
+        #[cfg(esp32)]
+        {
+            reg_block.slave().modify(|_, w| w.sync_reset().set_bit());
+            reg_block.slave().modify(|_, w| w.sync_reset().clear_bit());
+        }
+
+        #[cfg(not(esp32))]
+        {
+            reg_block.slave().modify(|_, w| w.soft_reset().set_bit());
+            reg_block.slave().modify(|_, w| w.soft_reset().clear_bit());
+        }
+    }
 
     #[cfg(esp32)]
     fn prepare_length_and_lines(&self, rx_len: usize, tx_len: usize) {
-        let reg_block = self.info().register_block();
+        let reg_block = self.register_block();
 
         reg_block
             .slv_rdbuf_dlen()
@@ -600,8 +646,8 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     }
 
     /// Initialize for full-duplex 1 bit mode
-    fn init(&mut self) {
-        let reg_block = self.info().register_block();
+    fn init(&self) {
+        let reg_block = self.register_block();
 
         reg_block.clock().write(|w| unsafe { w.bits(0) });
         reg_block.user().write(|w| unsafe { w.bits(0) });
@@ -613,7 +659,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
 
             w.mode().set_bit()
         });
-        reset_spi(reg_block);
+        self.reset_spi();
 
         reg_block.user().modify(|_, w| {
             w.doutdin().set_bit();
@@ -624,8 +670,8 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
         reg_block.misc().write(|w| unsafe { w.bits(0) });
     }
 
-    fn set_data_mode(&mut self, data_mode: SpiMode, dma: bool) -> &mut Self {
-        let reg_block = self.info().register_block();
+    fn set_data_mode(&self, data_mode: SpiMode, dma: bool) {
+        let reg_block = self.register_block();
         #[cfg(esp32)]
         {
             reg_block.pin().modify(|_, w| {
@@ -695,12 +741,10 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
                     .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode3))
             });
         }
-
-        self
     }
 
     fn is_bus_busy(&self) -> bool {
-        let reg_block = self.info().register_block();
+        let reg_block = self.register_block();
 
         #[cfg(pdma)]
         {
@@ -713,7 +757,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
-    fn flush(&mut self) -> Result<(), Error> {
+    fn flush(&self) -> Result<(), Error> {
         while self.is_bus_busy() {
             // Wait for bus to be clear
         }
@@ -724,43 +768,13 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     // used in DMA mode.
     fn setup_for_flush(&self) {
         #[cfg(pdma)]
-        self.info()
-            .register_block()
+        self.register_block()
             .slave()
             .modify(|_, w| w.trans_done().clear_bit());
         #[cfg(gdma)]
-        self.info()
-            .register_block()
+        self.register_block()
             .dma_int_clr()
             .write(|w| w.trans_done().clear_bit_by_one());
-    }
-}
-
-/// Peripheral data describing a particular SPI instance.
-#[non_exhaustive]
-pub struct Info {
-    /// Pointer to the register block for this SPI instance.
-    ///
-    /// Use [Self::register_block] to access the register block.
-    pub register_block: *const RegisterBlock,
-
-    /// SCLK signal.
-    pub sclk: InputSignal,
-
-    /// MOSI signal.
-    pub mosi: InputSignal,
-
-    /// MISO signal.
-    pub miso: OutputSignal,
-
-    /// Chip select signal.
-    pub cs: InputSignal,
-}
-
-impl Info {
-    /// Returns the register block for this SPI instance.
-    pub fn register_block(&self) -> &RegisterBlock {
-        unsafe { &*self.register_block }
     }
 }
 
