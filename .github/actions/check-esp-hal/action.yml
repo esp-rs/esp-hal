@@ -29,6 +29,7 @@ runs:
     # Clippy and docs checks
     - name: Clippy
       shell: bash
+      if: ${{ !contains(fromJson('["esp32p4"]'), inputs.device) }} # TODO: Remove when `esp32p4` is added to all the packages
       run: cargo $LINTING_TOOLCHAIN xtask lint-packages --chips ${{ inputs.device }}
     - name: Check doc-tests
       shell: bash
