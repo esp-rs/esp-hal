@@ -33,3 +33,12 @@ rustflags = [
 Previously `data` and `len` were public - use the previously already existing `data()` function.
 
 Accessing `data` or `len` was never encouraged.
+
+## Async features have been removed and async functionality is always available
+
+The cost of this is that we need to rename the various `async` methods on `WifiController`.
+
+```diff
+- controller.start().await.unwrap();
++ controller.start_async().await.unwrap();
+```
