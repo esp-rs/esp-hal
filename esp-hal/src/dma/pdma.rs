@@ -31,7 +31,7 @@ pub trait PdmaChannel: crate::private::Sealed {
     fn register_block(&self) -> &Self::RegisterBlock;
     fn tx_waker(&self) -> &'static AtomicWaker;
     fn rx_waker(&self) -> &'static AtomicWaker;
-    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
 }
 
 #[doc(hidden)]
@@ -92,7 +92,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         }
     }
 
-    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
         self.0.is_compatible_with(peripheral)
     }
 }
@@ -236,7 +236,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         }
     }
 
-    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
         self.0.is_compatible_with(peripheral)
     }
 }
@@ -390,8 +390,8 @@ macro_rules! ImplSpiChannel {
                     &WAKER
                 }
 
-                fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {
-                    peripheral.peripheral() == crate::system::Peripheral::[<Spi $num>]
+                fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+                    peripheral == DmaPeripheral::[<Spi $num>]
                 }
             }
 
@@ -497,7 +497,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
             .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
         self.0.is_compatible_with(peripheral)
     }
 }
@@ -653,7 +653,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
             .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
         self.0.is_compatible_with(peripheral)
     }
 }
@@ -802,8 +802,8 @@ macro_rules! ImplI2sChannel {
                     static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
                     &WAKER
                 }
-                fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool {
-                    peripheral.peripheral() == crate::system::Peripheral::[<I2s $num>]
+                fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+                    peripheral == DmaPeripheral::[<I2s $num>]
                 }
             }
 
@@ -909,11 +909,13 @@ where
     C: DmaChannel,
 {
     /// Asserts that the channel is compatible with the given peripheral.
-    pub fn runtime_ensure_compatible(&self, peripheral: &PeripheralRef<'_, impl PeripheralMarker>) {
+    pub fn runtime_ensure_compatible(&self, peripheral: &PeripheralRef<'_, impl DmaEligible>) {
         assert!(
-            self.tx.tx_impl.is_compatible_with(&**peripheral),
+            self.tx
+                .tx_impl
+                .is_compatible_with(peripheral.dma_peripheral()),
             "This DMA channel is not compatible with {:?}",
-            peripheral.peripheral()
+            peripheral.dma_peripheral()
         );
     }
 }
@@ -963,7 +965,7 @@ impl PdmaChannel for AnySpiDmaChannelInner {
             fn register_block(&self) -> &SpiRegisterBlock;
             fn tx_waker(&self) -> &'static AtomicWaker;
             fn rx_waker(&self) -> &'static AtomicWaker;
-            fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
+            fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
         }
     }
 }
@@ -1017,7 +1019,7 @@ impl PdmaChannel for AnyI2sDmaChannelInner {
             fn register_block(&self) -> &I2sRegisterBlock;
             fn tx_waker(&self) -> &'static AtomicWaker;
             fn rx_waker(&self) -> &'static AtomicWaker;
-            fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
+            fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
         }
     }
 }

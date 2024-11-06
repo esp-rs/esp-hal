@@ -475,10 +475,7 @@ pub struct ChannelCreator<const N: u8> {}
 
 impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
     /// Asserts that the channel is compatible with the given peripheral.
-    pub fn runtime_ensure_compatible<P: PeripheralMarker + DmaEligible>(
-        &self,
-        _peripheral: &PeripheralRef<'_, P>,
-    ) {
+    pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &PeripheralRef<'_, P>) {
         // No runtime checks; GDMA channels are compatible with any peripheral
     }
 }

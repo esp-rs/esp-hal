@@ -2111,7 +2111,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
     #[cfg(pdma)]
-    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
 
     /// Configure the channel.
     fn configure(&self, burst_mode: bool, priority: DmaPriority) {
