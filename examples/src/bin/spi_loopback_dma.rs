@@ -25,7 +25,10 @@ use esp_hal::{
     dma_buffers,
     gpio::Io,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::{
+        master::{Config, Spi},
+        SpiMode,
+    },
 };
 use esp_println::println;
 
@@ -53,12 +56,19 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_sck(sclk)
-        .with_mosi(mosi)
-        .with_miso(miso)
-        .with_cs(cs)
-        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+    let mut spi = Spi::new_with_config(
+        peripherals.SPI2,
+        Config {
+            frequency: 100.kHz(),
+            mode: SpiMode::Mode0,
+            ..Config::default()
+        },
+    )
+    .with_sck(sclk)
+    .with_mosi(mosi)
+    .with_miso(miso)
+    .with_cs(cs)
+    .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
     let delay = Delay::new();
 

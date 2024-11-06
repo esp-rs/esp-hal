@@ -12,7 +12,7 @@ use esp_hal::{
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     prelude::*,
     spi::{
-        master::{Address, Command, Spi, SpiDma},
+        master::{Address, Command, Config, Spi, SpiDma},
         SpiDataMode,
         SpiMode,
     },
@@ -52,10 +52,17 @@ mod tests {
 
         let (mosi_loopback, mosi) = mosi.split();
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_sck(sclk)
-            .with_mosi(mosi)
-            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+        let spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        )
+        .with_sck(sclk)
+        .with_mosi(mosi)
+        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         Context {
             spi,

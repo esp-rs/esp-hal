@@ -11,7 +11,7 @@ use esp_hal::{
     gpio::{Io, Level, Output},
     prelude::*,
     spi::{
-        master::{Address, Command, Spi, SpiDma},
+        master::{Address, Command, Config, Spi, SpiDma},
         SpiDataMode,
         SpiMode,
     },
@@ -49,10 +49,17 @@ mod tests {
             }
         }
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_sck(sclk)
-            .with_miso(miso)
-            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+        let spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        )
+        .with_sck(sclk)
+        .with_miso(miso)
+        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         Context { spi, miso_mirror }
     }

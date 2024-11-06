@@ -13,7 +13,7 @@ use esp_hal::{
     gpio::{AnyPin, Input, Io, Level, Output, Pull},
     prelude::*,
     spi::{
-        master::{Address, Command, Spi, SpiDma},
+        master::{Address, Command, Config, Spi, SpiDma},
         SpiDataMode,
         SpiMode,
     },
@@ -40,7 +40,7 @@ cfg_if::cfg_if! {
 type SpiUnderTest = SpiDma<'static, Blocking>;
 
 struct Context {
-    spi: esp_hal::peripherals::SPI2,
+    spi: Spi<'static, Blocking>,
     #[cfg(pcnt)]
     pcnt: esp_hal::peripherals::PCNT,
     dma_channel: Channel<'static, DmaChannel0, Blocking>,
@@ -205,9 +205,17 @@ mod tests {
         }
 
         let dma_channel = dma_channel.configure(false, DmaPriority::Priority0);
+        let spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        );
 
         Context {
-            spi: peripherals.SPI2,
+            spi,
             #[cfg(pcnt)]
             pcnt: peripherals.PCNT,
             dma_channel,
@@ -225,9 +233,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_mosi(pin)
-            .with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_mosi(pin).with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b0001_0001);
     }
@@ -238,9 +244,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_miso(pin)
-            .with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_miso(pin).with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b0010_0010);
     }
@@ -251,9 +255,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_sio2(pin)
-            .with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio2(pin).with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b0100_0100);
     }
@@ -264,9 +266,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_sio3(pin)
-            .with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio3(pin).with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b1000_1000);
     }
@@ -277,9 +277,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_mosi(pin)
-            .with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_mosi(pin).with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0001_0001);
     }
@@ -290,9 +288,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_miso(pin)
-            .with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_miso(pin).with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0010_0010);
     }
@@ -303,9 +299,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_sio2(pin)
-            .with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio2(pin).with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0100_0100);
     }
@@ -316,9 +310,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_sio3(pin)
-            .with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio3(pin).with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b1000_1000);
     }
@@ -342,9 +334,7 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
-            .with_mosi(mosi)
-            .with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_mosi(mosi).with_dma(ctx.dma_channel);
 
         super::execute_write(unit0, unit1, spi, 0b0000_0001, false);
     }
@@ -374,7 +364,8 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+        let spi = ctx
+            .spi
             .with_mosi(mosi)
             .with_miso(gpio)
             .with_dma(ctx.dma_channel);
@@ -407,7 +398,8 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+        let spi = ctx
+            .spi
             .with_mosi(mosi)
             .with_sio2(gpio)
             .with_dma(ctx.dma_channel);
@@ -440,7 +432,8 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let spi = Spi::new(ctx.spi, 100.kHz(), SpiMode::Mode0)
+        let spi = ctx
+            .spi
             .with_mosi(mosi)
             .with_sio3(gpio)
             .with_dma(ctx.dma_channel);

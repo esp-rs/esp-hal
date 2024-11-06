@@ -252,3 +252,27 @@ The module's contents have been moved into `uart`.
 
 If you work with multiple configurable peripherals, you may want to import the `uart` module and
 refer to the `Config` struct as `uart::Config`.
+
+### SPI drivers can now be configured using `spi::master::Config`
+
+- The old methods to change configuration have been removed.
+- The `new` and `new_typed` constructor no longer takes `frequency` and `mode`.
+- The default configuration is now:
+  - bus frequency: 1 MHz
+  - bit order: MSB first
+  - mode: SPI mode 0
+- There are new constructors (`new_with_config`, `new_typed_with_config`) and a new `apply_config` method to apply custom configuration.
+
+```diff
+-use esp_hal::spi::{master::Spi, SpiMode};
++use esp_hal::spi::{master::{Config, Spi}, SpiMode};
+-Spi::new(SPI2, 100.kHz(), SpiMode::Mode1);
++Spi::new_with_config(
++    SPI2,
++    Config {
++        frequency: 100.kHz(),
++        mode: SpiMode::Mode0,
++        ..Config::default()
++    },
++)
+```
