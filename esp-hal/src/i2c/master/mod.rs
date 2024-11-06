@@ -826,6 +826,7 @@ fn configure_clock(
 }
 
 /// Peripheral data describing a particular I2C instance.
+#[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this I2C instance.
     ///
@@ -1301,6 +1302,7 @@ impl PartialEq for Info {
 unsafe impl Sync for Info {}
 
 /// Peripheral state for an I2C instance.
+#[non_exhaustive]
 pub struct State {
     /// Waker for the asynchronous operations.
     pub waker: AtomicWaker,
