@@ -2165,6 +2165,7 @@ pub trait Instance:
 pub trait QspiInstance: Instance {}
 
 /// Peripheral data describing a particular SPI instance.
+#[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this SPI instance.
     ///
