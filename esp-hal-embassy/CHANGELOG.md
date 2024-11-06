@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `ESP_HAL_EMBASSY_LOW_POWER_WAIT` configuration option. (#2329)
+- Add basic `esp32p4` support (#2466)
 
 ### Changed
 
