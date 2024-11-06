@@ -149,17 +149,10 @@ fn emit_configuration(
     // emit cfgs and set envs
     for (name, value) in configs.into_iter() {
         let cfg_name = snake_case(name.trim_start_matches(prefix));
+        println!("cargo:rustc-check-cfg=cfg({cfg_name})");
         match value {
-            Value::Bool(b) => {
-                println!("cargo:rustc-check-cfg=cfg({cfg_name})");
-                if *b {
-                    println!("cargo:rustc-cfg={cfg_name}")
-                }
-            }
-            Value::String(v) => {
-                // TODO we need to emit the other option else we'll get a lint warning...
-                println!("cargo:rustc-check-cfg=cfg({cfg_name}, values(\"{v}\"))");
-                println!("cargo:rustc-cfg={cfg_name}=\"{v}\"")
+            Value::Bool(true) => {
+                println!("cargo:rustc-cfg={cfg_name}")
             }
             _ => {}
         }
