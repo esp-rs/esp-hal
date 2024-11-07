@@ -16,12 +16,13 @@ The following paragraphs contain additional recommendations.
 ## Construction and Destruction of Drivers
 
 - Drivers should take peripherals via the `PeripheralRef` pattern - they don't consume peripherals directly.
-- If a driver requires pins, those pins should be configured using `fn with_pin_name(self, pin: impl Peripheral<P = InputConnection> + 'd) -> Self)` or `fn with_pin_name(self, pin: impl Peripheral<P = OutputConnection> + 'd) -> Self)`
-- If a driver supports multiple peripheral instances:
+- If a driver requires pins, those pins should be configured using `fn with_signal_name(self, pin: impl Peripheral<P = InputConnection> + 'd) -> Self)` or `fn with_signal_name(self, pin: impl Peripheral<P = OutputConnection> + 'd) -> Self)`
+- If a driver supports multiple peripheral instances (for example, I2C0 is one such instance):
   - The peripheral instance type should be positioned as the last type parameter of the driver type.
   - The peripheral instance type should default to a type that supports any of the peripheral instances.
   - The author is encouraged to use `crate::any_peripheral` to define the "any" peripheral instance type.
   - The driver should implement a `new` constructor that automatically converts the peripheral instance into the any type, and a `new_typed` that preserves the peripheral type.
+- If a driver only supports a single peripheral instance, no instance type parameter is necessary.
 - If a driver implements both blocking and async operations, or only implements blocking operations, but may support asynchronous ones in the future, the driver's type signature should include a `crate::Mode` type parameter.
 - By default, constructors should configure the driver for blocking mode. The driver should implement `into_async` (and a matching `into_blocking`) function that reconfigures the driver.
   - `into_async` should configure the driver and/or the associated DMA channels. This most often means enabling an interrupt handler.
@@ -36,7 +37,7 @@ The following paragraphs contain additional recommendations.
     - see [this example](https://github.com/esp-rs/esp-hal/blob/df2b7bd8472cc1d18db0d9441156575570f59bb3/esp-hal/src/spi/mod.rs#L15)
     - e.g. `#[cfg_attr(feature = "defmt", derive(defmt::Format))]`
 - Don't use `log::XXX!` macros directly - use the wrappers in `fmt.rs` (e.g. just `info!` instead of `log::info!` or importing `log::*`)!
-- Prefer implementing common ecosystem traits, like the ones in `embedded-hal` or `embassy-embedded-hal`.
+- Consider implementing common ecosystem traits, like the ones in `embedded-hal` or `embassy-embedded-hal`.
 
 ## API Surface
 
