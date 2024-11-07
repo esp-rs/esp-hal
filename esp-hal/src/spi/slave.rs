@@ -75,7 +75,7 @@ use core::marker::PhantomData;
 
 use super::{Error, SpiMode};
 use crate::{
-    dma::{DmaChannelConvert, DmaEligible, PeripheralMarker},
+    dma::{DmaChannelConvert, DmaEligible},
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -167,8 +167,8 @@ where
             _mode: PhantomData,
         };
 
-        PeripheralClockControl::reset(spi.spi.peripheral());
-        PeripheralClockControl::enable(spi.spi.peripheral());
+        PeripheralClockControl::reset(spi.spi.info().peripheral);
+        PeripheralClockControl::enable(spi.spi.info().peripheral);
 
         spi.spi.info().init();
         spi.spi.info().set_data_mode(mode, false);
@@ -572,7 +572,7 @@ pub mod dma {
 }
 
 /// SPI peripheral instance.
-pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'static {
+pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + 'static {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;
 }
@@ -591,6 +591,9 @@ pub struct Info {
     ///
     /// Use [Self::register_block] to access the register block.
     pub register_block: *const RegisterBlock,
+
+    /// System peripheral marker.
+    pub peripheral: crate::system::Peripheral,
 
     /// SCLK signal.
     pub sclk: InputSignal,
@@ -794,6 +797,7 @@ macro_rules! spi_instance {
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
                         register_block: crate::peripherals::[<SPI $num>]::PTR,
+                        peripheral: crate::system::Peripheral::[<Spi $num>],
                         sclk: InputSignal::$sclk,
                         mosi: InputSignal::$mosi,
                         miso: OutputSignal::$miso,

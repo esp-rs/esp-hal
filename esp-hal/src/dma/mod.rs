@@ -949,12 +949,6 @@ macro_rules! impl_dma_eligible {
     };
 }
 
-/// Marker trait
-#[doc(hidden)]
-pub trait PeripheralMarker {
-    fn peripheral(&self) -> crate::system::Peripheral;
-}
-
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct DescriptorChain {
@@ -2111,7 +2105,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
     #[cfg(pdma)]
-    fn is_compatible_with(&self, peripheral: &impl PeripheralMarker) -> bool;
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
 
     /// Configure the channel.
     fn configure(&self, burst_mode: bool, priority: DmaPriority) {

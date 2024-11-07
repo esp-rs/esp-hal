@@ -773,14 +773,7 @@ mod private {
     #[cfg(i2s1)]
     use crate::peripherals::{i2s1::RegisterBlock, I2S1};
     use crate::{
-        dma::{
-            ChannelRx,
-            ChannelTx,
-            DescriptorChain,
-            DmaDescriptor,
-            DmaEligible,
-            PeripheralMarker,
-        },
+        dma::{ChannelRx, ChannelTx, DescriptorChain, DmaDescriptor, DmaEligible},
         gpio::{
             interconnect::{PeripheralInput, PeripheralOutput},
             InputSignal,
@@ -911,10 +904,9 @@ mod private {
         }
     }
 
-    pub trait RegBlock:
-        Peripheral<P = Self> + PeripheralMarker + DmaEligible + Into<super::AnyI2s> + 'static
-    {
+    pub trait RegBlock: Peripheral<P = Self> + DmaEligible + Into<super::AnyI2s> + 'static {
         fn register_block(&self) -> &RegisterBlock;
+        fn peripheral(&self) -> crate::system::Peripheral;
     }
 
     pub trait Signals: RegBlock {
@@ -1609,6 +1601,10 @@ mod private {
         fn register_block(&self) -> &RegisterBlock {
             unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
         }
+
+        fn peripheral(&self) -> crate::system::Peripheral {
+            crate::system::Peripheral::I2s0
+        }
     }
 
     impl RegisterAccessPrivate for I2S0 {
@@ -1713,6 +1709,10 @@ mod private {
         fn register_block(&self) -> &RegisterBlock {
             unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
         }
+
+        fn peripheral(&self) -> crate::system::Peripheral {
+            crate::system::Peripheral::I2s1
+        }
     }
 
     #[cfg(i2s1)]
@@ -1786,6 +1786,7 @@ mod private {
                 super::AnyI2sInner::I2s1(i2s) => i2s,
             } {
                 fn register_block(&self) -> &RegisterBlock;
+                fn peripheral(&self) -> crate::system::Peripheral;
             }
         }
     }
