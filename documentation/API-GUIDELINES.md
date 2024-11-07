@@ -28,6 +28,7 @@ The following paragraphs contain additional recommendations.
   - `into_blocking` should undo the configuration done by `into_async`.
 - The asynchronous driver implemntation should also expose the blocking methods (except for interrupt related functions).
 - Consider adding a `Drop` implementation resetting the peripheral to idle state.
+- Consider using a builder-like pattern for driver construction.
 
 ## Interoperability
 
