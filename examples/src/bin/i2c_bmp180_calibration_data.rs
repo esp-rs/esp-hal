@@ -12,7 +12,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{gpio::Io, i2c::I2c, prelude::*};
+use esp_hal::{gpio::Io, i2c::master::I2c, prelude::*};
 use esp_println::println;
 
 #[entry]

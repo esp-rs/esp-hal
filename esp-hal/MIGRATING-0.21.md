@@ -65,7 +65,9 @@ the peripheral instance has been moved to the last generic parameter position.
 let spi: Spi<'static, FullDuplexMode, SPI2> = Spi::new_typed(peripherals.SPI2, 1.MHz(), SpiMode::Mode0);
 ```
 
-## I2C constructor changes
+## I2C changes
+
+The I2C master driver and related types have been moved to `esp_hal::i2c::master`.
 
 The `with_timeout` constructors have been removed in favour of `set_timeout` or `with_timeout`.
 

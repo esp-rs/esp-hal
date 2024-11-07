@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Peripheral interconnections via GPIO pins now use the GPIO matrix. (#2419)
 - The I2S driver has been moved to `i2s::master` (#2472)
 - `slave::Spi` constructors no longer take pins (#2485)
+- The `I2c` master driver has been moved to `esp_hal::i2c::master`. (#2476)
 
 ### Fixed
 

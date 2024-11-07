@@ -26,7 +26,7 @@ mod imp {
         Pin as _esp_hal_gpio_Pin,
     };
     #[cfg(any(i2c0, i2c1))]
-    pub use crate::i2c::Instance as _esp_hal_i2c_Instance;
+    pub use crate::i2c::master::Instance as _esp_hal_i2c_master_Instance;
     #[cfg(ledc)]
     pub use crate::ledc::{
         channel::{
