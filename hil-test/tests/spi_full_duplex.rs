@@ -497,10 +497,12 @@ mod tests {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         // This means that without working cancellation, the test case should
         // fail.
-        ctx.spi.apply_config(&Config {
-            frequency: 80.kHz(),
-            ..Config::default()
-        });
+        ctx.spi
+            .apply_config(&Config {
+                frequency: 80.kHz(),
+                ..Config::default()
+            })
+            .unwrap();
 
         // Set up a large buffer that would trigger a timeout
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
@@ -523,10 +525,12 @@ mod tests {
     #[timeout(3)]
     fn can_transmit_after_cancel(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
-        ctx.spi.apply_config(&Config {
-            frequency: 80.kHz(),
-            ..Config::default()
-        });
+        ctx.spi
+            .apply_config(&Config {
+                frequency: 80.kHz(),
+                ..Config::default()
+            })
+            .unwrap();
 
         // Set up a large buffer that would trigger a timeout
         let mut dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
@@ -547,7 +551,8 @@ mod tests {
         spi.apply_config(&Config {
             frequency: 10.MHz(),
             ..Config::default()
-        });
+        })
+        .unwrap();
 
         let transfer = spi
             .transfer(dma_rx_buf, dma_tx_buf)
