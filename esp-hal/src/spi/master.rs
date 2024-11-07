@@ -580,7 +580,7 @@ where
             _mode: PhantomData,
         };
 
-        PeripheralClockControl::enable(this.driver().peripheral);
+        PeripheralClockControl::enable(this.driver().peripheral, true);
         PeripheralClockControl::reset(this.driver().peripheral);
 
         this.driver().init();

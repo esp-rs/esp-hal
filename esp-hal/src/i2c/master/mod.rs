@@ -314,7 +314,7 @@ where
         };
 
         PeripheralClockControl::reset(i2c.info().peripheral);
-        PeripheralClockControl::enable(i2c.info().peripheral);
+        PeripheralClockControl::enable(i2c.info().peripheral, true);
 
         let i2c = i2c.with_sda(sda).with_scl(scl);
 
@@ -328,7 +328,7 @@ where
 
     fn internal_recover(&self) {
         PeripheralClockControl::reset(self.info().peripheral);
-        PeripheralClockControl::enable(self.info().peripheral);
+        PeripheralClockControl::enable(self.info().peripheral, true);
 
         self.info().setup(self.frequency, self.timeout);
     }

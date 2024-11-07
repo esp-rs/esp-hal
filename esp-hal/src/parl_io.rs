@@ -1275,7 +1275,7 @@ fn internal_init(frequency: HertzU32) -> Result<(), Error> {
     }
 
     PeripheralClockControl::reset(crate::system::Peripheral::ParlIo);
-    PeripheralClockControl::enable(crate::system::Peripheral::ParlIo);
+    PeripheralClockControl::enable(crate::system::Peripheral::ParlIo, true);
 
     let pcr = unsafe { &*crate::peripherals::PCR::PTR };
 

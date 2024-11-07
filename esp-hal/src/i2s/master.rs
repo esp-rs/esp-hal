@@ -289,7 +289,7 @@ where
         // the targets the same and force same configuration for both, TX and RX
 
         PeripheralClockControl::reset(i2s.peripheral());
-        PeripheralClockControl::enable(i2s.peripheral());
+        PeripheralClockControl::enable(i2s.peripheral(), true);
         i2s.set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));
         i2s.configure(&standard, &data_format);
         i2s.set_master();

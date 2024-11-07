@@ -114,7 +114,7 @@ impl<'d> Ledc<'d> {
         crate::into_ref!(_instance);
 
         PeripheralClockControl::reset(PeripheralEnable::Ledc);
-        PeripheralClockControl::enable(PeripheralEnable::Ledc);
+        PeripheralClockControl::enable(PeripheralEnable::Ledc, true);
 
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Ledc { _instance, ledc }
@@ -171,5 +171,11 @@ impl<'d> Ledc<'d> {
         output_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Channel<'d, S> {
         Channel::new(number, output_pin)
+    }
+}
+
+impl<'d> Drop for Ledc<'d> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(PeripheralEnable::Ledc, false);
     }
 }

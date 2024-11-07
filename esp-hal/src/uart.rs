@@ -1210,7 +1210,7 @@ where
             }
         };
 
-        PeripheralClockControl::enable(self.tx.uart.info().peripheral);
+        PeripheralClockControl::enable(self.tx.uart.info().peripheral, true);
         self.uart_peripheral_reset();
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();

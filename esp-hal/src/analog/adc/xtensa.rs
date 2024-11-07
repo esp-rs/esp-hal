@@ -402,7 +402,7 @@ where
         config: AdcConfig<ADCI>,
     ) -> Self {
         PeripheralClockControl::reset(Peripheral::ApbSarAdc);
-        PeripheralClockControl::enable(Peripheral::ApbSarAdc);
+        PeripheralClockControl::enable(Peripheral::ApbSarAdc, true);
 
         let sensors = unsafe { &*SENS::ptr() };
 
@@ -557,6 +557,12 @@ where
 
         ADCI::clear_start_sample();
         ADCI::start_sample();
+    }
+}
+
+impl<'d, ADCI> Drop for Adc<'d, ADCI> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(Peripheral::ApbSarAdc, false);
     }
 }
 

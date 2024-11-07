@@ -103,13 +103,19 @@ impl<'d> Ecc<'d, crate::Blocking> {
         crate::into_ref!(ecc);
 
         PeripheralClockControl::reset(PeripheralEnable::Ecc);
-        PeripheralClockControl::enable(PeripheralEnable::Ecc);
+        PeripheralClockControl::enable(PeripheralEnable::Ecc, true);
 
         Self {
             ecc,
             alignment_helper: AlignmentHelper::default(),
             phantom: PhantomData,
         }
+    }
+}
+
+impl<'d, DM: crate::Mode> Drop for Ecc<'d, DM> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(PeripheralEnable::Ecc, false);
     }
 }
 

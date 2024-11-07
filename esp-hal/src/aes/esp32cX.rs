@@ -5,7 +5,7 @@ use crate::{
 
 impl Aes<'_> {
     pub(super) fn init(&mut self) {
-        PeripheralClockControl::enable(PeripheralEnable::Aes);
+        PeripheralClockControl::enable(PeripheralEnable::Aes, true);
         self.write_dma(false);
     }
 

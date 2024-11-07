@@ -223,7 +223,7 @@ where
         let channel = channel.degrade();
 
         PeripheralClockControl::reset(i2s.peripheral());
-        PeripheralClockControl::enable(i2s.peripheral());
+        PeripheralClockControl::enable(i2s.peripheral(), true);
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin

@@ -135,7 +135,7 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
         crate::into_ref!(peripheral);
 
         PWM::reset();
-        PWM::enable();
+        PWM::enable(true);
 
         #[cfg(not(esp32c6))]
         {
@@ -317,7 +317,7 @@ pub struct FrequencyError;
 /// A MCPWM peripheral
 pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed {
     /// Enable peripheral
-    fn enable();
+    fn enable(enable: bool);
     /// Reset peripheral
     fn reset();
     /// Get a pointer to the peripheral RegisterBlock
@@ -328,8 +328,8 @@ pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed 
 
 #[cfg(mcpwm0)]
 impl PwmPeripheral for crate::peripherals::MCPWM0 {
-    fn enable() {
-        PeripheralClockControl::enable(PeripheralEnable::Mcpwm0)
+    fn enable(enable: bool) {
+        PeripheralClockControl::enable(PeripheralEnable::Mcpwm0, enable)
     }
 
     fn reset() {
@@ -355,8 +355,8 @@ impl PwmPeripheral for crate::peripherals::MCPWM0 {
 
 #[cfg(mcpwm1)]
 impl PwmPeripheral for crate::peripherals::MCPWM1 {
-    fn enable() {
-        PeripheralClockControl::enable(PeripheralEnable::Mcpwm1)
+    fn enable(enable: bool) {
+        PeripheralClockControl::enable(PeripheralEnable::Mcpwm1, enable)
     }
 
     fn reset() {

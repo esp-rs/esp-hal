@@ -774,7 +774,7 @@ where
         crate::into_mapped_ref!(tx_pin, rx_pin);
 
         // Enable the peripheral clock for the TWAI peripheral.
-        PeripheralClockControl::enable(twai.peripheral());
+        PeripheralClockControl::enable(twai.peripheral(), true);
         PeripheralClockControl::reset(twai.peripheral());
 
         let mut this = TwaiConfiguration {

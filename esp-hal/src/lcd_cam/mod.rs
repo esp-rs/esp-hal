@@ -39,7 +39,7 @@ impl<'d> LcdCam<'d, Blocking> {
         crate::into_ref!(lcd_cam);
 
         PeripheralClockControl::reset(system::Peripheral::LcdCam);
-        PeripheralClockControl::enable(system::Peripheral::LcdCam);
+        PeripheralClockControl::enable(system::Peripheral::LcdCam, true);
 
         Self {
             lcd: Lcd {

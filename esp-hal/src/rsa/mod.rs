@@ -96,7 +96,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
         crate::into_ref!(rsa);
 
         PeripheralClockControl::reset(PeripheralEnable::Rsa);
-        PeripheralClockControl::enable(PeripheralEnable::Rsa);
+        PeripheralClockControl::enable(PeripheralEnable::Rsa, true);
 
         Self {
             rsa,

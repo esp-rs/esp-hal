@@ -59,6 +59,8 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,
     reg_access::{AlignmentHelper, NativeEndianess},
+    system,
+    system::PeripheralClockControl,
 };
 
 #[cfg_attr(esp32, path = "esp32.rs")]
@@ -143,8 +145,8 @@ impl<'d> Aes<'d> {
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
 
-        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Aes);
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Aes);
+        PeripheralClockControl::reset(system::Peripheral::Aes);
+        PeripheralClockControl::enable(system::Peripheral::Aes, true);
 
         let mut ret = Self {
             aes,
@@ -187,6 +189,12 @@ impl<'d> Aes<'d> {
 
     fn start(&mut self) {
         self.write_start();
+    }
+}
+
+impl<'d> Drop for Aes<'d> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(system::Peripheral::Aes, false);
     }
 }
 

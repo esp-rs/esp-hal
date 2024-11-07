@@ -152,7 +152,7 @@ macro_rules! create_etm {
                     crate::into_ref!(peripheral);
 
                     PeripheralClockControl::reset(crate::system::Peripheral::Etm);
-                    PeripheralClockControl::enable(crate::system::Peripheral::Etm);
+                    PeripheralClockControl::enable(crate::system::Peripheral::Etm, true);
 
                     Self {
                         _peripheral: peripheral,

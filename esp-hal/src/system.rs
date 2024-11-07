@@ -127,8 +127,8 @@ pub(crate) struct PeripheralClockControl;
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
-    /// Enables and resets the given peripheral
-    pub(crate) fn enable(peripheral: Peripheral) {
+    /// Enables and clears reset of the given peripheral.
+    pub(crate) fn enable(peripheral: Peripheral, enable: bool) {
         let system = unsafe { &*SYSTEM::PTR };
 
         #[cfg(esp32)]
@@ -149,201 +149,201 @@ impl PeripheralClockControl {
         critical_section::with(|_cs| match peripheral {
             #[cfg(spi2)]
             Peripheral::Spi2 => {
-                perip_clk_en0.modify(|_, w| w.spi2_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.spi2_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.spi2_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.spi2_rst().bit(!enable));
             }
             #[cfg(spi3)]
             Peripheral::Spi3 => {
-                perip_clk_en0.modify(|_, w| w.spi3_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.spi3_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.spi3_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.spi3_rst().bit(!enable));
             }
             #[cfg(all(i2c0, esp32))]
             Peripheral::I2cExt0 => {
-                perip_clk_en0.modify(|_, w| w.i2c0_ext0_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.i2c0_ext0_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.i2c0_ext0_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.i2c0_ext0_rst().bit(!enable));
             }
             #[cfg(all(i2c0, not(esp32)))]
             Peripheral::I2cExt0 => {
-                perip_clk_en0.modify(|_, w| w.i2c_ext0_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.i2c_ext0_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.i2c_ext0_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.i2c_ext0_rst().bit(!enable));
             }
             #[cfg(i2c1)]
             Peripheral::I2cExt1 => {
-                perip_clk_en0.modify(|_, w| w.i2c_ext1_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.i2c_ext1_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.i2c_ext1_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.i2c_ext1_rst().bit(!enable));
             }
             #[cfg(rmt)]
             Peripheral::Rmt => {
-                perip_clk_en0.modify(|_, w| w.rmt_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.rmt_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.rmt_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.rmt_rst().bit(!enable));
             }
             #[cfg(ledc)]
             Peripheral::Ledc => {
-                perip_clk_en0.modify(|_, w| w.ledc_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.ledc_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.ledc_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.ledc_rst().bit(!enable));
             }
             #[cfg(mcpwm0)]
             Peripheral::Mcpwm0 => {
-                perip_clk_en0.modify(|_, w| w.pwm0_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.pwm0_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.pwm0_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.pwm0_rst().bit(!enable));
             }
             #[cfg(mcpwm1)]
             Peripheral::Mcpwm1 => {
-                perip_clk_en0.modify(|_, w| w.pwm1_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.pwm1_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.pwm1_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.pwm1_rst().bit(!enable));
             }
             #[cfg(pcnt)]
             Peripheral::Pcnt => {
-                perip_clk_en0.modify(|_, w| w.pcnt_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.pcnt_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.pcnt_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.pcnt_rst().bit(!enable));
             }
             #[cfg(apb_saradc)]
             Peripheral::ApbSarAdc => {
-                perip_clk_en0.modify(|_, w| w.apb_saradc_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.apb_saradc_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.apb_saradc_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.apb_saradc_rst().bit(!enable));
             }
             #[cfg(gdma)]
             Peripheral::Gdma => {
-                perip_clk_en1.modify(|_, w| w.dma_clk_en().set_bit());
-                perip_rst_en1.modify(|_, w| w.dma_rst().clear_bit());
+                perip_clk_en1.modify(|_, w| w.dma_clk_en().bit(enable));
+                perip_rst_en1.modify(|_, w| w.dma_rst().bit(!enable));
             }
             #[cfg(esp32)]
             Peripheral::Dma => {
-                perip_clk_en0.modify(|_, w| w.spi_dma_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.spi_dma_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.spi_dma_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.spi_dma_rst().bit(!enable));
             }
             #[cfg(esp32s2)]
             Peripheral::Dma => {
-                perip_clk_en0.modify(|_, w| w.spi2_dma_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.spi2_dma_rst().clear_bit());
-                perip_clk_en0.modify(|_, w| w.spi3_dma_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.spi3_dma_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.spi2_dma_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.spi2_dma_rst().bit(!enable));
+                perip_clk_en0.modify(|_, w| w.spi3_dma_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.spi3_dma_rst().bit(!enable));
             }
             #[cfg(esp32c3)]
             Peripheral::I2s0 => {
                 // on ESP32-C3 note that i2s1_clk_en / rst is really I2s0
-                perip_clk_en0.modify(|_, w| w.i2s1_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.i2s1_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.i2s1_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.i2s1_rst().bit(!enable));
             }
             #[cfg(any(esp32s3, esp32, esp32s2))]
             Peripheral::I2s0 => {
-                perip_clk_en0.modify(|_, w| w.i2s0_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.i2s0_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.i2s0_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.i2s0_rst().bit(!enable));
             }
             #[cfg(any(esp32s3, esp32))]
             Peripheral::I2s1 => {
-                perip_clk_en0.modify(|_, w| w.i2s1_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.i2s1_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.i2s1_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.i2s1_rst().bit(!enable));
             }
             #[cfg(usb0)]
             Peripheral::Usb => {
-                perip_clk_en0.modify(|_, w| w.usb_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.usb_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.usb_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.usb_rst().bit(!enable));
             }
             #[cfg(twai0)]
             Peripheral::Twai0 => {
-                perip_clk_en0.modify(|_, w| w.twai_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.twai_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.twai_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.twai_rst().bit(!enable));
             }
             #[cfg(esp32)]
             Peripheral::Aes => {
-                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | 1) });
-                peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() & (!1)) });
+                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | enable as u32) });
+                peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() & (!enable as u32)) });
             }
             #[cfg(any(esp32c3, esp32s2, esp32s3))]
             Peripheral::Aes => {
-                perip_clk_en1.modify(|_, w| w.crypto_aes_clk_en().set_bit());
-                perip_rst_en1.modify(|_, w| w.crypto_aes_rst().clear_bit());
+                perip_clk_en1.modify(|_, w| w.crypto_aes_clk_en().bit(enable));
+                perip_rst_en1.modify(|_, w| w.crypto_aes_rst().bit(!enable));
             }
             #[cfg(timg0)]
             Peripheral::Timg0 => {
                 #[cfg(any(esp32c3, esp32s2, esp32s3))]
-                perip_clk_en0.modify(|_, w| w.timers_clk_en().set_bit());
-                perip_clk_en0.modify(|_, w| w.timergroup_clk_en().set_bit());
+                perip_clk_en0.modify(|_, w| w.timers_clk_en().bit(enable));
+                perip_clk_en0.modify(|_, w| w.timergroup_clk_en().bit(enable));
 
                 #[cfg(any(esp32c3, esp32s2, esp32s3))]
-                perip_rst_en0.modify(|_, w| w.timers_rst().clear_bit());
-                perip_rst_en0.modify(|_, w| w.timergroup_rst().clear_bit());
+                perip_rst_en0.modify(|_, w| w.timers_rst().bit(!enable));
+                perip_rst_en0.modify(|_, w| w.timergroup_rst().bit(!enable));
             }
             #[cfg(timg1)]
             Peripheral::Timg1 => {
                 #[cfg(any(esp32c3, esp32s2, esp32s3))]
-                perip_clk_en0.modify(|_, w| w.timers_clk_en().set_bit());
-                perip_clk_en0.modify(|_, w| w.timergroup1_clk_en().set_bit());
+                perip_clk_en0.modify(|_, w| w.timers_clk_en().bit(enable));
+                perip_clk_en0.modify(|_, w| w.timergroup1_clk_en().bit(enable));
 
                 #[cfg(any(esp32c3, esp32s2, esp32s3))]
-                perip_rst_en0.modify(|_, w| w.timers_rst().clear_bit());
-                perip_rst_en0.modify(|_, w| w.timergroup1_rst().clear_bit());
+                perip_rst_en0.modify(|_, w| w.timers_rst().bit(!enable));
+                perip_rst_en0.modify(|_, w| w.timergroup1_rst().bit(!enable));
             }
             #[cfg(sha)]
             Peripheral::Sha => {
                 #[cfg(not(esp32))]
-                perip_clk_en1.modify(|_, w| w.crypto_sha_clk_en().set_bit());
+                perip_clk_en1.modify(|_, w| w.crypto_sha_clk_en().bit(enable));
                 #[cfg(not(esp32))]
-                perip_rst_en1.modify(|_, w| w.crypto_sha_rst().clear_bit());
+                perip_rst_en1.modify(|_, w| w.crypto_sha_rst().bit(!enable));
             }
             #[cfg(esp32c3)]
             Peripheral::UsbDevice => {
-                perip_clk_en0.modify(|_, w| w.usb_device_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.usb_device_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.usb_device_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.usb_device_rst().bit(!enable));
             }
             #[cfg(esp32s3)]
             Peripheral::UsbDevice => {
-                perip_clk_en1.modify(|_, w| w.usb_device_clk_en().set_bit());
-                perip_rst_en1.modify(|_, w| w.usb_device_rst().clear_bit());
+                perip_clk_en1.modify(|_, w| w.usb_device_clk_en().bit(enable));
+                perip_rst_en1.modify(|_, w| w.usb_device_rst().bit(!enable));
             }
             #[cfg(uart0)]
             Peripheral::Uart0 => {
-                perip_clk_en0.modify(|_, w| w.uart_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.uart_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.uart_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.uart_rst().bit(!enable));
             }
             #[cfg(uart1)]
             Peripheral::Uart1 => {
-                perip_clk_en0.modify(|_, w| w.uart1_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.uart1_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.uart1_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.uart1_rst().bit(!enable));
             }
             #[cfg(all(uart2, esp32s3))]
             Peripheral::Uart2 => {
-                perip_clk_en1.modify(|_, w| w.uart2_clk_en().set_bit());
-                perip_rst_en1.modify(|_, w| w.uart2_rst().clear_bit());
+                perip_clk_en1.modify(|_, w| w.uart2_clk_en().bit(enable));
+                perip_rst_en1.modify(|_, w| w.uart2_rst().bit(!enable));
             }
             #[cfg(all(uart2, esp32))]
             Peripheral::Uart2 => {
-                perip_clk_en0.modify(|_, w| w.uart2_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.uart2_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.uart2_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.uart2_rst().bit(!enable));
             }
             #[cfg(all(rsa, esp32))]
             Peripheral::Rsa => {
-                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | 1 << 2) });
-                peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | (enable as u32) << 2) });
+                peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() & !((enable as u32) << 2)) });
             }
             #[cfg(all(rsa, any(esp32c3, esp32s2, esp32s3)))]
             Peripheral::Rsa => {
-                perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().set_bit());
-                perip_rst_en1.modify(|_, w| w.crypto_rsa_rst().clear_bit());
+                perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
+                perip_rst_en1.modify(|_, w| w.crypto_rsa_rst().bit(!enable));
                 system
                     .rsa_pd_ctrl()
-                    .modify(|_, w| w.rsa_mem_pd().clear_bit());
+                    .modify(|_, w| w.rsa_mem_pd().bit(!enable));
             }
             #[cfg(hmac)]
             Peripheral::Hmac => {
-                perip_clk_en1.modify(|_, w| w.crypto_hmac_clk_en().set_bit());
-                perip_rst_en1.modify(|_, w| w.crypto_hmac_rst().clear_bit());
+                perip_clk_en1.modify(|_, w| w.crypto_hmac_clk_en().bit(enable));
+                perip_rst_en1.modify(|_, w| w.crypto_hmac_rst().bit(!enable));
             }
             #[cfg(ecc)]
             Peripheral::Ecc => {
-                perip_clk_en1.modify(|_, w| w.crypto_ecc_clk_en().set_bit());
-                perip_rst_en1.modify(|_, w| w.crypto_ecc_rst().clear_bit());
+                perip_clk_en1.modify(|_, w| w.crypto_ecc_clk_en().bit(enable));
+                perip_rst_en1.modify(|_, w| w.crypto_ecc_rst().bit(!enable));
             }
             #[cfg(lcd_cam)]
             Peripheral::LcdCam => {
-                perip_clk_en1.modify(|_, w| w.lcd_cam_clk_en().set_bit());
-                perip_rst_en1.modify(|_, w| w.lcd_cam_rst().clear_bit());
+                perip_clk_en1.modify(|_, w| w.lcd_cam_clk_en().bit(enable));
+                perip_rst_en1.modify(|_, w| w.lcd_cam_rst().bit(!enable));
             }
             #[cfg(systimer)]
             Peripheral::Systimer => {
-                perip_clk_en0.modify(|_, w| w.systimer_clk_en().set_bit());
-                perip_rst_en0.modify(|_, w| w.systimer_rst().clear_bit());
+                perip_clk_en0.modify(|_, w| w.systimer_clk_en().bit(enable));
+                perip_rst_en0.modify(|_, w| w.systimer_rst().bit(!enable));
             }
         });
     }
@@ -560,89 +560,99 @@ impl PeripheralClockControl {
 
 #[cfg(any(esp32c6, esp32h2))]
 impl PeripheralClockControl {
-    /// Enables and resets the given peripheral
-    pub(crate) fn enable(peripheral: Peripheral) {
+    /// Enables and clears reset of the given peripheral.
+    pub(crate) fn enable(peripheral: Peripheral, enable: bool) {
         let system = unsafe { &*SYSTEM::PTR };
 
         match peripheral {
             #[cfg(spi2)]
             Peripheral::Spi2 => {
-                system.spi2_conf().modify(|_, w| w.spi2_clk_en().set_bit());
                 system
                     .spi2_conf()
-                    .modify(|_, w| w.spi2_rst_en().clear_bit());
+                    .modify(|_, w| w.spi2_clk_en().bit(enable));
+                system
+                    .spi2_conf()
+                    .modify(|_, w| w.spi2_rst_en().bit(!enable));
             }
             #[cfg(i2c0)]
             Peripheral::I2cExt0 => {
                 #[cfg(any(esp32c6, esp32h2))]
                 {
-                    system.i2c0_conf().modify(|_, w| w.i2c0_clk_en().set_bit());
                     system
                         .i2c0_conf()
-                        .modify(|_, w| w.i2c0_rst_en().clear_bit());
+                        .modify(|_, w| w.i2c0_clk_en().bit(enable));
+                    system
+                        .i2c0_conf()
+                        .modify(|_, w| w.i2c0_rst_en().bit(!enable));
                 }
             }
             #[cfg(i2c1)]
             Peripheral::I2cExt1 => {
                 #[cfg(esp32h2)]
                 {
-                    system.i2c1_conf().modify(|_, w| w.i2c1_clk_en().set_bit());
                     system
                         .i2c1_conf()
-                        .modify(|_, w| w.i2c1_rst_en().clear_bit());
+                        .modify(|_, w| w.i2c1_clk_en().bit(enable));
+                    system
+                        .i2c1_conf()
+                        .modify(|_, w| w.i2c1_rst_en().bit(!enable));
                 }
             }
             #[cfg(rmt)]
             Peripheral::Rmt => {
-                system.rmt_conf().modify(|_, w| w.rmt_clk_en().set_bit());
-                system.rmt_conf().modify(|_, w| w.rmt_rst_en().clear_bit());
+                system.rmt_conf().modify(|_, w| w.rmt_clk_en().bit(enable));
+                system.rmt_conf().modify(|_, w| w.rmt_rst_en().bit(!enable));
             }
             #[cfg(ledc)]
             Peripheral::Ledc => {
-                system.ledc_conf().modify(|_, w| w.ledc_clk_en().set_bit());
                 system
                     .ledc_conf()
-                    .modify(|_, w| w.ledc_rst_en().clear_bit());
+                    .modify(|_, w| w.ledc_clk_en().bit(enable));
+                system
+                    .ledc_conf()
+                    .modify(|_, w| w.ledc_rst_en().bit(!enable));
             }
             #[cfg(mcpwm0)]
             Peripheral::Mcpwm0 => {
-                system.pwm_conf().modify(|_, w| w.pwm_clk_en().set_bit());
-                system.pwm_conf().modify(|_, w| w.pwm_rst_en().clear_bit());
+                system.pwm_conf().modify(|_, w| w.pwm_clk_en().bit(enable));
+                system.pwm_conf().modify(|_, w| w.pwm_rst_en().bit(!enable));
             }
             #[cfg(mcpwm1)]
             Peripheral::Mcpwm1 => {
-                system.pwm_conf.modify(|_, w| w.pwm_clk_en().set_bit());
-                system.pwm_conf.modify(|_, w| w.pwm_rst_en().clear_bit());
+                system.pwm_conf.modify(|_, w| w.pwm_clk_en().bit(enable));
+                system.pwm_conf.modify(|_, w| w.pwm_rst_en().bit(!enable));
             }
             #[cfg(apb_saradc)]
             Peripheral::ApbSarAdc => {
                 system
                     .saradc_conf()
-                    .modify(|_, w| w.saradc_reg_clk_en().set_bit());
+                    .modify(|_, w| w.saradc_reg_clk_en().bit(enable));
                 system
                     .saradc_conf()
-                    .modify(|_, w| w.saradc_reg_rst_en().clear_bit());
+                    .modify(|_, w| w.saradc_reg_rst_en().bit(!enable));
             }
             #[cfg(gdma)]
             Peripheral::Gdma => {
-                system.gdma_conf().modify(|_, w| w.gdma_clk_en().set_bit());
                 system
                     .gdma_conf()
-                    .modify(|_, w| w.gdma_rst_en().clear_bit());
+                    .modify(|_, w| w.gdma_clk_en().bit(enable));
+                system
+                    .gdma_conf()
+                    .modify(|_, w| w.gdma_rst_en().bit(!enable));
             }
             #[cfg(i2s0)]
             Peripheral::I2s0 => {
-                system.i2s_conf().modify(|_, w| w.i2s_clk_en().set_bit());
-                system.i2s_conf().modify(|_, w| w.i2s_rst_en().clear_bit());
+                system.i2s_conf().modify(|_, w| w.i2s_clk_en().bit(enable));
+                system.i2s_conf().modify(|_, w| w.i2s_rst_en().bit(!enable));
             }
             #[cfg(twai0)]
             Peripheral::Twai0 => {
                 system
                     .twai0_conf()
-                    .modify(|_, w| w.twai0_clk_en().set_bit());
+                    .modify(|_, w| w.twai0_clk_en().bit(enable));
                 system
                     .twai0_conf()
-                    .modify(|_, w| w.twai0_rst_en().clear_bit());
+                    .modify(|_, w| w.twai0_rst_en().bit(!enable));
 
                 // use Xtal clk-src
                 system.twai0_func_clk_conf().modify(|_, w| {
@@ -656,130 +666,131 @@ impl PeripheralClockControl {
             Peripheral::Twai1 => {
                 system
                     .twai1_conf()
-                    .modify(|_, w| w.twai1_clk_en().set_bit());
+                    .modify(|_, w| w.twai1_clk_en().bit(enable));
                 system
                     .twai1_conf()
-                    .modify(|_, w| w.twai1_rst_en().clear_bit());
+                    .modify(|_, w| w.twai1_rst_en().bit(!enable));
             }
             #[cfg(aes)]
             Peripheral::Aes => {
-                system.aes_conf().modify(|_, w| w.aes_clk_en().set_bit());
-                system.aes_conf().modify(|_, w| w.aes_rst_en().clear_bit());
+                system.aes_conf().modify(|_, w| w.aes_clk_en().bit(enable));
+                system.aes_conf().modify(|_, w| w.aes_rst_en().bit(!enable));
             }
             #[cfg(pcnt)]
             Peripheral::Pcnt => {
-                system.pcnt_conf().modify(|_, w| w.pcnt_clk_en().set_bit());
                 system
                     .pcnt_conf()
-                    .modify(|_, w| w.pcnt_rst_en().clear_bit());
+                    .modify(|_, w| w.pcnt_clk_en().bit(enable));
+                system
+                    .pcnt_conf()
+                    .modify(|_, w| w.pcnt_rst_en().bit(!enable));
             }
             #[cfg(timg0)]
             Peripheral::Timg0 => {
                 system
                     .timergroup0_timer_clk_conf()
-                    .modify(|_, w| w.tg0_timer_clk_en().set_bit());
+                    .modify(|_, w| w.tg0_timer_clk_en().bit(enable));
             }
             #[cfg(timg1)]
             Peripheral::Timg1 => {
                 system
                     .timergroup1_timer_clk_conf()
-                    .modify(|_, w| w.tg1_timer_clk_en().set_bit());
+                    .modify(|_, w| w.tg1_timer_clk_en().bit(enable));
             }
             #[cfg(lp_wdt)]
             Peripheral::Wdt => {
                 system
                     .timergroup0_wdt_clk_conf()
-                    .modify(|_, w| w.tg0_wdt_clk_en().set_bit());
+                    .modify(|_, w| w.tg0_wdt_clk_en().bit(enable));
                 system
                     .timergroup1_timer_clk_conf()
-                    .modify(|_, w| w.tg1_timer_clk_en().set_bit());
+                    .modify(|_, w| w.tg1_timer_clk_en().bit(enable));
             }
             #[cfg(sha)]
             Peripheral::Sha => {
-                system.sha_conf().modify(|_, w| w.sha_clk_en().set_bit());
-                system.sha_conf().modify(|_, w| w.sha_rst_en().clear_bit());
+                system.sha_conf().modify(|_, w| w.sha_clk_en().bit(enable));
+                system.sha_conf().modify(|_, w| w.sha_rst_en().bit(!enable));
             }
             #[cfg(usb_device)]
             Peripheral::UsbDevice => {
                 system
                     .usb_device_conf()
-                    .modify(|_, w| w.usb_device_clk_en().set_bit());
+                    .modify(|_, w| w.usb_device_clk_en().bit(enable));
                 system
                     .usb_device_conf()
-                    .modify(|_, w| w.usb_device_rst_en().clear_bit());
+                    .modify(|_, w| w.usb_device_rst_en().bit(!enable));
             }
             #[cfg(uart0)]
             Peripheral::Uart0 => {
                 system
                     .uart0_conf()
-                    .modify(|_, w| w.uart0_clk_en().set_bit());
+                    .modify(|_, w| w.uart0_clk_en().bit(enable));
                 system
                     .uart0_conf()
-                    .modify(|_, w| w.uart0_rst_en().clear_bit());
+                    .modify(|_, w| w.uart0_rst_en().bit(!enable));
             }
             #[cfg(uart1)]
             Peripheral::Uart1 => {
                 system
                     .uart1_conf()
-                    .modify(|_, w| w.uart1_clk_en().set_bit());
+                    .modify(|_, w| w.uart1_clk_en().bit(enable));
                 system
                     .uart1_conf()
-                    .modify(|_, w| w.uart1_rst_en().clear_bit());
+                    .modify(|_, w| w.uart1_rst_en().bit(!enable));
             }
             #[cfg(rsa)]
             Peripheral::Rsa => {
-                system.rsa_conf().modify(|_, w| w.rsa_clk_en().set_bit());
-                system.rsa_conf().modify(|_, w| w.rsa_rst_en().clear_bit());
+                system.rsa_conf().modify(|_, w| w.rsa_clk_en().bit(enable));
+                system.rsa_conf().modify(|_, w| w.rsa_rst_en().bit(!enable));
                 system
                     .rsa_pd_ctrl()
-                    .modify(|_, w| w.rsa_mem_pd().clear_bit());
+                    .modify(|_, w| w.rsa_mem_pd().bit(!enable));
             }
             #[cfg(parl_io)]
             Peripheral::ParlIo => {
                 system
                     .parl_io_conf()
-                    .modify(|_, w| w.parl_clk_en().set_bit());
+                    .modify(|_, w| w.parl_clk_en().bit(enable));
                 system
                     .parl_io_conf()
-                    .modify(|_, w| w.parl_rst_en().set_bit());
-                system
-                    .parl_io_conf()
-                    .modify(|_, w| w.parl_rst_en().clear_bit());
+                    .modify(|_, w| w.parl_rst_en().bit(!enable));
             }
             #[cfg(hmac)]
             Peripheral::Hmac => {
-                system.hmac_conf().modify(|_, w| w.hmac_clk_en().set_bit());
                 system
                     .hmac_conf()
-                    .modify(|_, w| w.hmac_rst_en().clear_bit());
+                    .modify(|_, w| w.hmac_clk_en().bit(enable));
+                system
+                    .hmac_conf()
+                    .modify(|_, w| w.hmac_rst_en().bit(!enable));
             }
             #[cfg(ecc)]
             Peripheral::Ecc => {
-                system.ecc_conf().modify(|_, w| w.ecc_clk_en().set_bit());
-                system.ecc_conf().modify(|_, w| w.ecc_rst_en().clear_bit());
+                system.ecc_conf().modify(|_, w| w.ecc_clk_en().bit(enable));
+                system.ecc_conf().modify(|_, w| w.ecc_rst_en().bit(!enable));
             }
             #[cfg(soc_etm)]
             Peripheral::Etm => {
-                system.etm_conf().modify(|_, w| w.etm_clk_en().set_bit());
-                system.etm_conf().modify(|_, w| w.etm_rst_en().clear_bit());
+                system.etm_conf().modify(|_, w| w.etm_clk_en().bit(enable));
+                system.etm_conf().modify(|_, w| w.etm_rst_en().bit(!enable));
             }
             #[cfg(trace0)]
             Peripheral::Trace0 => {
                 system
                     .trace_conf()
-                    .modify(|_, w| w.trace_clk_en().set_bit());
+                    .modify(|_, w| w.trace_clk_en().bit(enable));
                 system
                     .trace_conf()
-                    .modify(|_, w| w.trace_rst_en().clear_bit());
+                    .modify(|_, w| w.trace_rst_en().bit(!enable));
             }
             #[cfg(systimer)]
             Peripheral::Systimer => {
                 system
                     .systimer_conf()
-                    .modify(|_, w| w.systimer_clk_en().set_bit());
+                    .modify(|_, w| w.systimer_clk_en().bit(enable));
                 system
                     .systimer_conf()
-                    .modify(|_, w| w.systimer_rst_en().clear_bit());
+                    .modify(|_, w| w.systimer_rst_en().bit(!enable));
             }
         }
     }

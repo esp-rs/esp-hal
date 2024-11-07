@@ -22,8 +22,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::trace::Trace;
-//! let mut trace = Trace::new(peripherals.TRACE0);
 //! let mut buffer = [0_u8; 1024];
+//! let mut trace = Trace::new(peripherals.TRACE0);
 //! trace.start_trace(&mut buffer);
 //! // traced code
 //!
@@ -70,7 +70,7 @@ where
         crate::into_ref!(peripheral);
 
         PeripheralClockControl::reset(crate::system::Peripheral::Trace0);
-        PeripheralClockControl::enable(crate::system::Peripheral::Trace0);
+        PeripheralClockControl::enable(crate::system::Peripheral::Trace0, true);
 
         Self {
             peripheral,
@@ -200,6 +200,12 @@ where
             valid_start_index: start_index,
             valid_length: len,
         })
+    }
+}
+
+impl<'d, T> Drop for Trace<'d, T> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(crate::system::Peripheral::Trace0, false);
     }
 }
 

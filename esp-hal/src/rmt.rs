@@ -89,6 +89,7 @@ use core::{
 use embassy_sync::waitqueue::AtomicWaker;
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
+use portable_atomic::{AtomicU8, Ordering::Relaxed};
 
 use crate::{
     gpio::interconnect::{PeripheralInput, PeripheralOutput},
@@ -101,6 +102,7 @@ use crate::{
     Blocking,
     InterruptConfigurable,
 };
+static REF_COUNTER: AtomicU8 = AtomicU8::new(0);
 
 /// Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -230,7 +232,7 @@ where
         }
 
         PeripheralClockControl::reset(crate::system::Peripheral::Rmt);
-        PeripheralClockControl::enable(crate::system::Peripheral::Rmt);
+        PeripheralClockControl::enable(crate::system::Peripheral::Rmt, true);
 
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
@@ -325,6 +327,8 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal<M>, M: crat
     T::set_filter_threshold(config.filter_threshold);
     T::set_idle_threshold(config.idle_threshold);
 
+    REF_COUNTER.fetch_add(1, Relaxed);
+
     Ok(T::new())
 }
 
@@ -344,6 +348,8 @@ fn configure_tx_channel<'d, P: PeripheralOutput, T: TxChannelInternal<M>, M: cra
         config.carrier_level,
     );
     T::set_idle_output(config.idle_output, config.idle_output_level);
+
+    REF_COUNTER.fetch_add(1, Relaxed);
 
     Ok(T::new())
 }
@@ -976,6 +982,15 @@ where
     M: crate::Mode,
 {
     phantom: PhantomData<M>,
+}
+
+impl<M: crate::Mode, const CHANNEL: u8> Drop for Channel<M, CHANNEL> {
+    fn drop(&mut self) {
+        REF_COUNTER.fetch_sub(1, Relaxed);
+        if REF_COUNTER.load(Relaxed) == 0 {
+            PeripheralClockControl::enable(crate::system::Peripheral::Rmt, false);
+        }
+    }
 }
 
 /// Channel in TX mode

@@ -409,7 +409,7 @@ where
         config: AdcConfig<ADCI>,
     ) -> Self {
         PeripheralClockControl::reset(Peripheral::ApbSarAdc);
-        PeripheralClockControl::enable(Peripheral::ApbSarAdc);
+        PeripheralClockControl::enable(Peripheral::ApbSarAdc, true);
 
         unsafe { &*APB_SARADC::PTR }.ctrl().modify(|_, w| unsafe {
             w.start_force().set_bit();
@@ -497,6 +497,12 @@ where
         self.active_channel = None;
 
         Ok(converted_value)
+    }
+}
+
+impl<'d, ADCI> Drop for Adc<'d, ADCI> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(Peripheral::ApbSarAdc, false);
     }
 }
 

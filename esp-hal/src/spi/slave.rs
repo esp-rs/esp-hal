@@ -128,7 +128,7 @@ where
         };
 
         PeripheralClockControl::reset(this.spi.info().peripheral);
-        PeripheralClockControl::enable(this.spi.info().peripheral);
+        PeripheralClockControl::enable(this.spi.info().peripheral, true);
 
         this.spi.info().init();
         this.spi.info().set_data_mode(mode, false);
