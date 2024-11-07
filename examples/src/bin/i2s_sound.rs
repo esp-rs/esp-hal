@@ -51,7 +51,7 @@ const SINE: [i16; 64] = [
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -73,9 +73,9 @@ fn main() -> ! {
 
     let mut i2s_tx = i2s
         .i2s_tx
-        .with_bclk(io.pins.gpio2)
-        .with_ws(io.pins.gpio4)
-        .with_dout(io.pins.gpio5)
+        .with_bclk(peripherals.pins.gpio2)
+        .with_ws(peripherals.pins.gpio4)
+        .with_dout(peripherals.pins.gpio5)
         .build();
 
     let data =

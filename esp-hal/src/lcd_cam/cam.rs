@@ -21,7 +21,7 @@
 //! # use fugit::RateExtU32;
 //! # use esp_hal::dma_rx_stream_buffer;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let io = Io::new(peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
@@ -33,19 +33,19 @@
 //! #     DmaPriority::Priority0,
 //! # );
 //!
-//! let mclk_pin = io.pins.gpio15;
-//! let vsync_pin = io.pins.gpio6;
-//! let href_pin = io.pins.gpio7;
-//! let pclk_pin = io.pins.gpio13;
+//! let mclk_pin = peripherals.pins.gpio15;
+//! let vsync_pin = peripherals.pins.gpio6;
+//! let href_pin = peripherals.pins.gpio7;
+//! let pclk_pin = peripherals.pins.gpio13;
 //! let data_pins = RxEightBits::new(
-//!     io.pins.gpio11,
-//!     io.pins.gpio9,
-//!     io.pins.gpio8,
-//!     io.pins.gpio10,
-//!     io.pins.gpio12,
-//!     io.pins.gpio18,
-//!     io.pins.gpio17,
-//!     io.pins.gpio16,
+//!     peripherals.pins.gpio11,
+//!     peripherals.pins.gpio9,
+//!     peripherals.pins.gpio8,
+//!     peripherals.pins.gpio10,
+//!     peripherals.pins.gpio12,
+//!     peripherals.pins.gpio18,
+//!     peripherals.pins.gpio17,
+//!     peripherals.pins.gpio16,
 //! );
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);

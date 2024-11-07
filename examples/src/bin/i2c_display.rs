@@ -24,7 +24,6 @@ use embedded_graphics::{
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
     i2c::master::{Config, I2c},
     prelude::*,
 };
@@ -35,13 +34,12 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let delay = Delay::new();
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // Create a new peripheral object with the described wiring
     // and standard I2C clock speed
     let i2c = I2c::new(peripherals.I2C0, Config::default())
-        .with_sda(io.pins.gpio4)
-        .with_scl(io.pins.gpio5);
+        .with_sda(peripherals.pins.gpio4)
+        .with_scl(peripherals.pins.gpio5);
 
     // Initialize display
     let interface = I2CDisplayInterface::new(i2c);

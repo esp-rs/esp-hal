@@ -51,12 +51,12 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let mut io = Io::new(peripherals.IO_MUX);
         io.set_interrupt_handler(interrupt_handler);
 
         let delay = Delay::new();
 
-        let (gpio1, gpio2) = hil_test::common_test_pins!(io);
+        let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_hal_embassy::init(timg0.timer0);

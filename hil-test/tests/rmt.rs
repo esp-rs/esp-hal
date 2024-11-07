@@ -25,7 +25,7 @@ mod tests {
     fn rmt_loopback() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.IO_MUX);
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32h2")] {
@@ -37,7 +37,7 @@ mod tests {
 
         let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
-        let (rx, tx) = hil_test::common_test_pins!(io);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let tx_config = TxChannelConfig {
             clk_divider: 255,

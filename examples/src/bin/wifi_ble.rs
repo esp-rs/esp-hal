@@ -54,13 +54,13 @@ fn main() -> ! {
     )
     .unwrap();
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = Input::new(io.pins.gpio0, Pull::Down);
+            let button = Input::new(peripherals.pins.gpio0, Pull::Down);
         } else {
-            let button = Input::new(io.pins.gpio9, Pull::Down);
+            let button = Input::new(peripherals.pins.gpio9, Pull::Down);
         }
     }
 

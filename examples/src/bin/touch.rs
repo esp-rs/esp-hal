@@ -49,13 +49,13 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.set_interrupt_handler(interrupt_handler);
 
-    let touch_pin0 = io.pins.gpio2;
-    let touch_pin1 = io.pins.gpio4;
+    let touch_pin0 = peripherals.pins.gpio2;
+    let touch_pin1 = peripherals.pins.gpio4;
 
     let touch_cfg = Some(TouchConfig {
         measurement_duration: Some(0x2000),

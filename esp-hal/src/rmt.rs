@@ -56,14 +56,14 @@
 //! # use esp_hal::rmt::Rmt;
 //! # use esp_hal::gpio::Io;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let io = Io::new(peripherals.IO_MUX);
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
 //! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
-//!         io.pins.gpio1,
+//!         peripherals.pins.gpio1,
 //!         TxChannelConfig {
 //!             clk_divider: 1,
 //!             idle_output_level: false,

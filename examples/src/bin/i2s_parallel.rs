@@ -32,23 +32,23 @@ fn main() -> ! {
     info!("Starting!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let dma = Dma::new(peripherals.DMA);
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     let delay = Delay::new();
 
     let dma_channel = dma.i2s1channel;
     let i2s = peripherals.I2S1;
-    let clock = io.pins.gpio25;
+    let clock = peripherals.pins.gpio25;
 
     let pins = TxEightBits::new(
-        io.pins.gpio16,
-        io.pins.gpio4,
-        io.pins.gpio17,
-        io.pins.gpio18,
-        io.pins.gpio5,
-        io.pins.gpio19,
-        io.pins.gpio12,
-        io.pins.gpio14,
+        peripherals.pins.gpio16,
+        peripherals.pins.gpio4,
+        peripherals.pins.gpio17,
+        peripherals.pins.gpio18,
+        peripherals.pins.gpio5,
+        peripherals.pins.gpio19,
+        peripherals.pins.gpio12,
+        peripherals.pins.gpio14,
     );
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);

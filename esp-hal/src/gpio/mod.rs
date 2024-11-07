@@ -52,8 +52,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::{Io, Level, Output};
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let mut led = Output::new(io.pins.gpio5, Level::High);
+//! let io = Io::new(peripherals.IO_MUX);
+//! let mut led = Output::new(peripherals.pins.gpio5, Level::High);
 //! # }
 //! ```
 //! 
@@ -813,17 +813,12 @@ pub(crate) fn bind_default_interrupt_handler() {
 /// General Purpose Input/Output driver
 pub struct Io {
     _io_mux: IO_MUX,
-    /// The pins available on this chip
-    pub pins: Pins,
 }
 
 impl Io {
     /// Initialize the I/O driver.
-    pub fn new(_gpio: GPIO, _io_mux: IO_MUX) -> Self {
-        Io {
-            _io_mux,
-            pins: unsafe { Pins::steal() },
-        }
+    pub fn new(_io_mux: IO_MUX) -> Self {
+        Io { _io_mux }
     }
 
     /// Set the interrupt priority for GPIO interrupts.

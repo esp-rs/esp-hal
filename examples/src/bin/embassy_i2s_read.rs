@@ -37,7 +37,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -59,13 +59,13 @@ async fn main(_spawner: Spawner) {
     .into_async();
 
     #[cfg(not(feature = "esp32"))]
-    let i2s = i2s.with_mclk(io.pins.gpio0);
+    let i2s = i2s.with_mclk(peripherals.pins.gpio0);
 
     let i2s_rx = i2s
         .i2s_rx
-        .with_bclk(io.pins.gpio2)
-        .with_ws(io.pins.gpio4)
-        .with_din(io.pins.gpio5)
+        .with_bclk(peripherals.pins.gpio2)
+        .with_ws(peripherals.pins.gpio4)
+        .with_din(peripherals.pins.gpio5)
         .build();
 
     let buffer = rx_buffer;

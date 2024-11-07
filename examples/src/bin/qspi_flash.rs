@@ -46,22 +46,22 @@ use esp_println::{print, println};
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let sclk = io.pins.gpio0;
-            let miso = io.pins.gpio2;
-            let mosi = io.pins.gpio4;
-            let sio2 = io.pins.gpio5;
-            let sio3 = io.pins.gpio13;
-            let cs = io.pins.gpio14;
+            let sclk = peripherals.pins.gpio0;
+            let miso = peripherals.pins.gpio2;
+            let mosi = peripherals.pins.gpio4;
+            let sio2 = peripherals.pins.gpio5;
+            let sio3 = peripherals.pins.gpio13;
+            let cs = peripherals.pins.gpio14;
         } else {
-            let sclk = io.pins.gpio0;
-            let miso = io.pins.gpio1;
-            let mosi = io.pins.gpio2;
-            let sio2 = io.pins.gpio3;
-            let sio3 = io.pins.gpio4;
-            let cs = io.pins.gpio5;
+            let sclk = peripherals.pins.gpio0;
+            let miso = peripherals.pins.gpio1;
+            let mosi = peripherals.pins.gpio2;
+            let sio2 = peripherals.pins.gpio3;
+            let sio3 = peripherals.pins.gpio4;
+            let cs = peripherals.pins.gpio5;
         }
     }
 

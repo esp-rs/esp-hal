@@ -242,6 +242,8 @@ mod peripheral_macros {
                     /// Each field represents a hardware peripheral.
                     pub $name: peripherals::$name,
                 )*
+                /// The pins available on this chip
+                pub pins: $crate::gpio::Pins,
             }
 
             impl Peripherals {
@@ -271,6 +273,7 @@ mod peripheral_macros {
                         $(
                             $name: peripherals::$name::steal(),
                         )*
+                        pins: $crate::gpio::Pins::steal(),
                     }
                 }
             }

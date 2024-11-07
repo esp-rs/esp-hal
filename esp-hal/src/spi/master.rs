@@ -41,11 +41,11 @@
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::master::{Config, Spi};
 //! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let sclk = io.pins.gpio0;
-//! let miso = io.pins.gpio2;
-//! let mosi = io.pins.gpio1;
-//! let cs = io.pins.gpio5;
+//! # let io = Io::new(peripherals.IO_MUX);
+//! let sclk = peripherals.pins.gpio0;
+//! let miso = peripherals.pins.gpio2;
+//! let mosi = peripherals.pins.gpio1;
+//! let cs = peripherals.pins.gpio5;
 //!
 //! let mut spi = Spi::new_with_config(
 //!     peripherals.SPI2,

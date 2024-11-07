@@ -22,18 +22,18 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     // Set LED GPIOs as an output:
-    let led1 = Output::new(io.pins.gpio2.degrade(), Level::Low);
-    let led2 = Output::new(io.pins.gpio4.degrade(), Level::Low);
-    let led3 = Output::new(io.pins.gpio5.degrade(), Level::Low);
+    let led1 = Output::new(peripherals.pins.gpio2.degrade(), Level::Low);
+    let led2 = Output::new(peripherals.pins.gpio4.degrade(), Level::Low);
+    let led3 = Output::new(peripherals.pins.gpio5.degrade(), Level::Low);
 
     // Use boot button as an input:
     #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
-    let button = io.pins.gpio0.degrade();
+    let button = peripherals.pins.gpio0.degrade();
     #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3")))]
-    let button = io.pins.gpio9.degrade();
+    let button = peripherals.pins.gpio9.degrade();
 
     let button = Input::new(button, Pull::Up);
 

@@ -53,7 +53,7 @@ async fn control_led(
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0: AnyTimer = timg0.timer0.into();
@@ -65,7 +65,7 @@ async fn main(_spawner: Spawner) {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = Output::new(io.pins.gpio0, Level::Low);
+    let led = Output::new(peripherals.pins.gpio0, Level::Low);
 
     let _guard = cpu_control
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {

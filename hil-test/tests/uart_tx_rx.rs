@@ -28,9 +28,9 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.IO_MUX);
 
-        let (rx, tx) = hil_test::common_test_pins!(io);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let tx = UartTx::new(peripherals.UART0, tx).unwrap();
         let rx = UartRx::new(peripherals.UART1, rx).unwrap();

@@ -32,10 +32,10 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio0;
-    let miso_mosi = io.pins.gpio2;
-    let cs = io.pins.gpio5;
+    let io = Io::new(peripherals.IO_MUX);
+    let sclk = peripherals.pins.gpio0;
+    let miso_mosi = peripherals.pins.gpio2;
+    let cs = peripherals.pins.gpio5;
 
     let miso = unsafe { miso_mosi.clone_unchecked() };
 

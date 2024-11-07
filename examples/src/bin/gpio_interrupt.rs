@@ -30,15 +30,15 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO2 as an output, and set its state high initially.
-    let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut io = Io::new(peripherals.IO_MUX);
     io.set_interrupt_handler(handler);
-    let mut led = Output::new(io.pins.gpio2, Level::Low);
+    let mut led = Output::new(peripherals.pins.gpio2, Level::Low);
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = io.pins.gpio0;
+            let button = peripherals.pins.gpio0;
         } else {
-            let button = io.pins.gpio9;
+            let button = peripherals.pins.gpio9;
         }
     }
 

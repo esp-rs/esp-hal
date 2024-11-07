@@ -35,7 +35,7 @@ static VALUE: AtomicI32 = AtomicI32::new(0);
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     // Set up a pulse counter:
     println!("setup pulse counter unit 0");
@@ -50,8 +50,8 @@ fn main() -> ! {
     println!("setup channel 0");
     let ch0 = &u0.channel0;
 
-    let pin_a = Input::new(io.pins.gpio4, Pull::Up);
-    let pin_b = Input::new(io.pins.gpio5, Pull::Up);
+    let pin_a = Input::new(peripherals.pins.gpio4, Pull::Up);
+    let pin_b = Input::new(peripherals.pins.gpio5, Pull::Up);
 
     let (input_a, _) = pin_a.split();
     let (input_b, _) = pin_b.split();

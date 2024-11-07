@@ -46,7 +46,7 @@ use esp_println::{print, println};
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
@@ -55,21 +55,21 @@ fn main() -> ! {
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 
-    let cam_siod = io.pins.gpio4;
-    let cam_sioc = io.pins.gpio5;
-    let cam_xclk = io.pins.gpio15;
-    let cam_vsync = io.pins.gpio6;
-    let cam_href = io.pins.gpio7;
-    let cam_pclk = io.pins.gpio13;
+    let cam_siod = peripherals.pins.gpio4;
+    let cam_sioc = peripherals.pins.gpio5;
+    let cam_xclk = peripherals.pins.gpio15;
+    let cam_vsync = peripherals.pins.gpio6;
+    let cam_href = peripherals.pins.gpio7;
+    let cam_pclk = peripherals.pins.gpio13;
     let cam_data_pins = RxEightBits::new(
-        io.pins.gpio11,
-        io.pins.gpio9,
-        io.pins.gpio8,
-        io.pins.gpio10,
-        io.pins.gpio12,
-        io.pins.gpio18,
-        io.pins.gpio17,
-        io.pins.gpio16,
+        peripherals.pins.gpio11,
+        peripherals.pins.gpio9,
+        peripherals.pins.gpio8,
+        peripherals.pins.gpio10,
+        peripherals.pins.gpio12,
+        peripherals.pins.gpio18,
+        peripherals.pins.gpio17,
+        peripherals.pins.gpio16,
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);

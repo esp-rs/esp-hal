@@ -20,7 +20,6 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::master::{Config, I2c};
 //! # use esp_hal::gpio::Io;
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! // Create a new peripheral object with the described wiring
 //! // and standard I2C clock speed.
@@ -28,8 +27,8 @@
 //!     peripherals.I2C0,
 //!     Config::default(),
 //! )
-//! .with_sda(io.pins.gpio1)
-//! .with_scl(io.pins.gpio2);
+//! .with_sda(peripherals.pins.gpio1)
+//! .with_scl(peripherals.pins.gpio2);
 //!
 //! loop {
 //!     let mut data = [0u8; 22];

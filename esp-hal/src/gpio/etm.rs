@@ -33,9 +33,9 @@
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
 //! #
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let mut led = io.pins.gpio1;
-//! # let button = io.pins.gpio9;
+//! # let io = Io::new(peripherals.IO_MUX);
+//! # let mut led = peripherals.pins.gpio1;
+//! # let button = peripherals.pins.gpio9;
 //!
 //! let gpio_ext = Channels::new(peripherals.GPIO_SD);
 //! let led_task = gpio_ext.channel0_task.toggle(

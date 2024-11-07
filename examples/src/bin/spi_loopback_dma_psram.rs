@@ -63,11 +63,11 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio42;
-    let mosi = io.pins.gpio48;
+    let io = Io::new(peripherals.IO_MUX);
+    let sclk = peripherals.pins.gpio42;
+    let mosi = peripherals.pins.gpio48;
     let miso = unsafe { mosi.clone_unchecked() };
-    let cs = io.pins.gpio38;
+    let cs = peripherals.pins.gpio38;
 
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;

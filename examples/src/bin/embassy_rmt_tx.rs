@@ -30,7 +30,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
@@ -45,7 +45,7 @@ async fn main(_spawner: Spawner) {
     let mut channel = rmt
         .channel0
         .configure(
-            io.pins.gpio4,
+            peripherals.pins.gpio4,
             TxChannelConfig {
                 clk_divider: 255,
                 ..TxChannelConfig::default()

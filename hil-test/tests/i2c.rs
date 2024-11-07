@@ -33,9 +33,9 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.IO_MUX);
 
-        let (sda, scl) = hil_test::i2c_pins!(io);
+        let (sda, scl) = hil_test::i2c_pins!(peripherals);
 
         // Create a new peripheral object with the described wiring and standard
         // I2C clock speed:

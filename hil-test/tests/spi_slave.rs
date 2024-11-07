@@ -103,11 +103,11 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.IO_MUX);
 
-        let (mosi_pin, miso_pin) = hil_test::i2c_pins!(io);
-        let (sclk_pin, _) = hil_test::common_test_pins!(io);
-        let cs_pin = hil_test::unconnected_pin!(io);
+        let (mosi_pin, miso_pin) = hil_test::i2c_pins!(peripherals);
+        let (sclk_pin, _) = hil_test::common_test_pins!(peripherals);
+        let cs_pin = hil_test::unconnected_pin!(peripherals);
 
         let dma = Dma::new(peripherals.DMA);
 

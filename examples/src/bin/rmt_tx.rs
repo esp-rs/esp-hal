@@ -22,7 +22,7 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
@@ -39,7 +39,10 @@ fn main() -> ! {
         ..TxChannelConfig::default()
     };
 
-    let mut channel = rmt.channel0.configure(io.pins.gpio4, tx_config).unwrap();
+    let mut channel = rmt
+        .channel0
+        .configure(peripherals.pins.gpio4, tx_config)
+        .unwrap();
 
     let delay = Delay::new();
 

@@ -25,12 +25,12 @@
 //! # use esp_hal::uart::Uart;
 //! use esp_hal::gpio::Io;
 //!
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.IO_MUX);
 //!
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
-//!     io.pins.gpio1,
-//!     io.pins.gpio2,
+//!     peripherals.pins.gpio1,
+//!     peripherals.pins.gpio2,
 //! ).unwrap();
 //! # }
 //! ```
@@ -57,12 +57,12 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{Config, Uart};
 //! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let io = Io::new(peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     io.pins.gpio1,
-//! #     io.pins.gpio2,
+//! #     peripherals.pins.gpio1,
+//! #     peripherals.pins.gpio2,
 //! # ).unwrap();
 //! // Write bytes out over the UART:
 //! uart1.write_bytes(b"Hello, world!").expect("write error!");
@@ -74,12 +74,12 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{Config, Uart};
 //! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! # let io = Io::new(peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     io.pins.gpio1,
-//! #     io.pins.gpio2,
+//! #     peripherals.pins.gpio1,
+//! #     peripherals.pins.gpio2,
 //! # ).unwrap();
 //! // The UART can be split into separate Transmit and Receive components:
 //! let (mut rx, mut tx) = uart1.split();
@@ -96,10 +96,10 @@
 //! # use esp_hal::uart::Uart;
 //! use esp_hal::gpio::Io;
 //!
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.IO_MUX);
 //!
-//! let (rx, _) = io.pins.gpio2.split();
-//! let (_, tx) = io.pins.gpio1.split();
+//! let (rx, _) = peripherals.pins.gpio2.split();
+//! let (_, tx) = peripherals.pins.gpio1.split();
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
 //!     rx.inverted(),
@@ -114,10 +114,10 @@
 //! # use esp_hal::uart::{UartTx, UartRx};
 //! use esp_hal::gpio::Io;
 //!
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+//! let io = Io::new(peripherals.IO_MUX);
 //!
-//! let tx = UartTx::new(peripherals.UART0, io.pins.gpio1).unwrap();
-//! let rx = UartRx::new(peripherals.UART1, io.pins.gpio2).unwrap();
+//! let tx = UartTx::new(peripherals.UART0, peripherals.pins.gpio1).unwrap();
+//! let rx = UartRx::new(peripherals.UART1, peripherals.pins.gpio2).unwrap();
 //! # }
 //! ```
 //! 

@@ -92,13 +92,13 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     // Without an external transceiver, we only need a single line between the two MCUs.
-    let (rx_pin, tx_pin) = io.pins.gpio2.split();
+    let (rx_pin, tx_pin) = peripherals.pins.gpio2.split();
     // Use these if you want to use an external transceiver:
-    // let tx_pin = io.pins.gpio2;
-    // let rx_pin = io.pins.gpio0;
+    // let tx_pin = peripherals.pins.gpio2;
+    // let rx_pin = peripherals.pins.gpio0;
 
     // The speed of the bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;

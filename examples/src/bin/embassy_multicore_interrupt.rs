@@ -75,7 +75,7 @@ fn main() -> ! {
 
     let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = Io::new(peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0: AnyTimer = timg0.timer0.into();
@@ -87,7 +87,7 @@ fn main() -> ! {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = Output::new(io.pins.gpio0, Level::Low);
+    let led = Output::new(peripherals.pins.gpio0, Level::Low);
 
     static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
     let executor_core1 = InterruptExecutor::new(sw_ints.software_interrupt1);

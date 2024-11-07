@@ -44,7 +44,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let pcnt = Pcnt::new(peripherals.PCNT);
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let io = Io::new(peripherals.IO_MUX);
         let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, DATA_SIZE);
         let dma_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
@@ -102,11 +102,11 @@ mod tests {
         // issue with configuring pins as outputs after inputs have been sorted
         // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
-        let (unit_ctrl, cs_signal) = ctx.io.pins.gpio8.split();
-        let (unit0_input, unit0_signal) = ctx.io.pins.gpio11.split();
-        let (unit1_input, unit1_signal) = ctx.io.pins.gpio12.split();
-        let (unit2_input, unit2_signal) = ctx.io.pins.gpio16.split();
-        let (unit3_input, unit3_signal) = ctx.io.pins.gpio17.split();
+        let (unit_ctrl, cs_signal) = ctx.peripherals.pins.gpio8.split();
+        let (unit0_input, unit0_signal) = ctx.peripherals.pins.gpio11.split();
+        let (unit1_input, unit1_signal) = ctx.peripherals.pins.gpio12.split();
+        let (unit2_input, unit2_signal) = ctx.peripherals.pins.gpio16.split();
+        let (unit3_input, unit3_signal) = ctx.peripherals.pins.gpio17.split();
 
         let pcnt = ctx.pcnt;
 
@@ -213,11 +213,11 @@ mod tests {
         // issue with configuring pins as outputs after inputs have been sorted
         // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
-        let (unit_ctrl, cs_signal) = ctx.io.pins.gpio8.split();
-        let (unit0_input, unit0_signal) = ctx.io.pins.gpio11.split();
-        let (unit1_input, unit1_signal) = ctx.io.pins.gpio12.split();
-        let (unit2_input, unit2_signal) = ctx.io.pins.gpio16.split();
-        let (unit3_input, unit3_signal) = ctx.io.pins.gpio17.split();
+        let (unit_ctrl, cs_signal) = ctx.peripherals.pins.gpio8.split();
+        let (unit0_input, unit0_signal) = ctx.peripherals.pins.gpio11.split();
+        let (unit1_input, unit1_signal) = ctx.peripherals.pins.gpio12.split();
+        let (unit2_input, unit2_signal) = ctx.peripherals.pins.gpio16.split();
+        let (unit3_input, unit3_signal) = ctx.peripherals.pins.gpio17.split();
 
         let pcnt = ctx.pcnt;
 

@@ -11,8 +11,8 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::touch::{Touch, TouchPad};
 //! # use esp_hal::gpio::Io;
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let touch_pin0 = io.pins.gpio2;
+//! let io = Io::new(peripherals.IO_MUX);
+//! let touch_pin0 = peripherals.pins.gpio2;
 //! let touch = Touch::continuous_mode(peripherals.TOUCH, None);
 //! let mut touchpad = TouchPad::new(touch_pin0, &touch);
 //! // ... give the peripheral some time for the measurement
