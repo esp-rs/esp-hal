@@ -2,6 +2,7 @@ use core::mem::MaybeUninit;
 
 use embedded_storage::nor_flash::{
     ErrorType,
+    MultiwriteNorFlash,
     NorFlash,
     NorFlashError,
     NorFlashErrorKind,
@@ -202,6 +203,8 @@ impl NorFlash for FlashStorage {
         Ok(())
     }
 }
+
+impl MultiwriteNorFlash for FlashStorage {}
 
 #[cfg(test)]
 mod test {
