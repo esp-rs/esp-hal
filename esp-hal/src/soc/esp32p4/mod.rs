@@ -1,3 +1,5 @@
+//! # SOC (System-on-Chip) module (ESP32-P4)
+//!
 //! ## Overview
 //!
 //! The `SOC` module provides access, functions and structures that are useful
