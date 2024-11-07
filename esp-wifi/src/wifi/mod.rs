@@ -349,22 +349,16 @@ impl Default for ClientConfiguration {
     }
 }
 
-#[allow(clippy::type_complexity)]
-#[cfg(csi_enable)]
-static CSI_CB: Mutex<RefCell<Option<fn(crate::binary::include::wifi_csi_info_t)>>> =
-    Mutex::new(RefCell::new(None));
-
 #[cfg(csi_enable)]
 unsafe extern "C" fn promiscuous_csi_rx_cb(
-    _ctx: *mut crate::wifi::c_types::c_void,
+    ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
 ) {
-    critical_section::with(|cs| {
-        let Some(csi_callback) = *CSI_CB.borrow_ref(cs) else {
-            return;
-        };
-        csi_callback(*data);
-    });
+    let csi_callback = core::mem::transmute::<
+        *mut crate::wifi::c_types::c_void,
+        fn(crate::binary::include::wifi_csi_info_t),
+    >(ctx);
+    csi_callback(*data);
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -525,12 +519,9 @@ impl CsiConfig {
         unsafe {
             esp_wifi_result!(esp_wifi_set_csi_rx_cb(
                 Some(promiscuous_csi_rx_cb),
-                core::ptr::null_mut()
+                cb as *mut crate::wifi::c_types::c_void
             ))?;
         }
-        critical_section::with(|cs| {
-            *CSI_CB.borrow_ref_mut(cs) = Some(cb);
-        });
         Ok(())
     }
 
