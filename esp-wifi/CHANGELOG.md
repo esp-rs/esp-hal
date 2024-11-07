@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No need to add `rom_functions.x` manually anymore (#2374)
 - esp-now: Data is now private in `ReceivedData` - use `data()`(#2396)
 - Changed the async APIs to have a `_async` postfix to avoid name collisions (#2446)
+- `phy_enable_usb` is enabled by default (#2446)
 
 ### Fixed
 

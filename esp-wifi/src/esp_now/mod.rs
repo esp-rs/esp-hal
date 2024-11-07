@@ -16,9 +16,10 @@ use critical_section::Mutex;
 use enumset::EnumSet;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
+#[cfg(not(coex))]
+use crate::config::PowerSaveMode;
 use crate::{
     binary::include::*,
-    config::PowerSaveMode,
     hal::peripheral::{Peripheral, PeripheralRef},
     wifi::{Protocol, RxControlInfo, WifiError},
     EspWifiController,
@@ -336,10 +337,8 @@ impl EspNowManager<'_> {
         Ok(())
     }
 
+    #[cfg(not(coex))]
     /// Configures modem power saving
-    ///
-    /// This is ignored, and set to `PowerSaveMode::Minimum` when `coex` is
-    /// enabled.
     pub fn set_power_saving(&self, ps: PowerSaveMode) -> Result<(), WifiError> {
         crate::wifi::apply_power_saving(ps)
     }

@@ -61,9 +61,10 @@ use serde::{Deserialize, Serialize};
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 pub use state::*;
 
+#[cfg(not(coex))]
+use crate::config::PowerSaveMode;
 use crate::{
     common_adapter::*,
-    config::PowerSaveMode,
     esp_wifi_result,
     hal::{
         macros::ram,
@@ -2591,10 +2592,8 @@ impl<'d> WifiController<'d> {
         Ok(())
     }
 
+    #[cfg(not(coex))]
     /// Configures modem power saving
-    ///
-    /// This is ignored, and set to `PowerSaveMode::Minimum` when `coex` is
-    /// enabled.
     pub fn set_power_saving(&mut self, ps: PowerSaveMode) -> Result<(), WifiError> {
         apply_power_saving(ps)
     }
@@ -3266,10 +3265,8 @@ pub(crate) mod embassy {
     }
 }
 
-pub(crate) fn apply_power_saving(mut ps: PowerSaveMode) -> Result<(), WifiError> {
-    if cfg!(coex) {
-        ps = PowerSaveMode::Minimum;
-    }
+#[cfg(not(coex))]
+pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
     esp_wifi_result!(unsafe { esp_wifi_sys::include::esp_wifi_set_ps(ps.into()) })?;
     Ok(())
 }
