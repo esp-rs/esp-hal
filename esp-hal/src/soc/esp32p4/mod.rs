@@ -18,6 +18,14 @@ macro_rules! chip {
     };
 }
 
+/// A link to the Technical Reference Manual (TRM) for the chip.
+#[macro_export]
+macro_rules! trm_link {
+    () => {
+        "https://www.espressif.com/en/products/socs/esp32-p4"
+    }; // FIXME: no public TRM for now
+}
+
 pub use chip;
 
 #[allow(unused)]

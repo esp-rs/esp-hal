@@ -46,6 +46,7 @@ pub const NUM_PINS: usize = 55;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 1;
 
+pub(crate) type InputSignalType = u16;
 pub(crate) type OutputSignalType = u16;
 pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 256;
 // TODO: It seems more input signals are present in ESP-IDF, do we need these?
@@ -67,7 +68,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, _nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     SD_CARD_CCMD_2_PAD      = 1,
@@ -220,7 +222,8 @@ pub enum InputSignal {
 
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum OutputSignal {
     SD_CARD_CCLK_2_PAD         = 0,
