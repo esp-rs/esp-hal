@@ -73,7 +73,7 @@
 //! ```
 //! 
 //! ## Implementation State
-//! - Only master mode is supported.
+//!
 //! - Only TDM Philips standard is supported.
 
 use core::marker::PhantomData;
