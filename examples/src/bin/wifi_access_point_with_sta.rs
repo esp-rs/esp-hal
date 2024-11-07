@@ -15,7 +15,7 @@
 #![no_std]
 #![no_main]
 
-use blocking_network_stack::WifiStack;
+use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -73,14 +73,12 @@ fn main() -> ! {
     let now = || time::now().duration_since_epoch().to_millis();
     let mut ap_socket_set_entries: [SocketStorage; 3] = Default::default();
     let ap_socket_set = SocketSet::new(&mut ap_socket_set_entries[..]);
-    let mut wifi_ap_stack =
-        WifiStack::new(ap_interface, ap_device, ap_socket_set, now, rng.random());
+    let mut ap_stack = Stack::new(ap_interface, ap_device, ap_socket_set, now, rng.random());
 
     let mut sta_socket_set_entries: [SocketStorage; 3] = Default::default();
     let mut sta_socket_set = SocketSet::new(&mut sta_socket_set_entries[..]);
     sta_socket_set.add(smoltcp::socket::dhcpv4::Socket::new());
-    let wifi_sta_stack =
-        WifiStack::new(sta_interface, sta_device, sta_socket_set, now, rng.random());
+    let sta_stack = Stack::new(sta_interface, sta_device, sta_socket_set, now, rng.random());
 
     let client_config = Configuration::Mixed(
         ClientConfiguration {
@@ -101,7 +99,7 @@ fn main() -> ! {
 
     println!("{:?}", controller.get_capabilities());
 
-    wifi_ap_stack
+    ap_stack
         .set_iface_configuration(&blocking_network_stack::ipv4::Configuration::Client(
             blocking_network_stack::ipv4::ClientConfiguration::Fixed(
                 blocking_network_stack::ipv4::ClientSettings {
@@ -124,10 +122,10 @@ fn main() -> ! {
     // wait for STA getting an ip address
     println!("Wait to get an ip address");
     loop {
-        wifi_sta_stack.work();
+        sta_stack.work();
 
-        if wifi_sta_stack.is_iface_up() {
-            println!("got ip {:?}", wifi_sta_stack.get_ip_info());
+        if sta_stack.is_iface_up() {
+            println!("got ip {:?}", sta_stack.get_ip_info());
             break;
         }
     }
@@ -137,11 +135,11 @@ fn main() -> ! {
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
-    let mut ap_socket = wifi_ap_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+    let mut ap_socket = ap_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     let mut sta_rx_buffer = [0u8; 1536];
     let mut sta_tx_buffer = [0u8; 1536];
-    let mut sta_socket = wifi_sta_stack.get_socket(&mut sta_rx_buffer, &mut sta_tx_buffer);
+    let mut sta_socket = sta_stack.get_socket(&mut sta_rx_buffer, &mut sta_tx_buffer);
 
     ap_socket.listen(8080).unwrap();
 

@@ -53,7 +53,7 @@ own crate.
 The `create_network_interface` function doesn't take `&mut SocketSet[..]` anymore.
 
 ```diff
-+use blocking_network_stack::WifiStack;
++use blocking_network_stack::Stack;
 use esp_wifi::{
 -    wifi_interface::WifiStack,
 };
@@ -77,7 +77,7 @@ use esp_wifi::{
 +    let socket_set = SocketSet::new(&mut socket_set_entries[..]);
      let now = || time::now().duration_since_epoch().to_millis();
 -    let wifi_stack = WifiStack::new(iface, device, sockets, now);
-+    let wifi_stack = WifiStack::new(iface, device, socket_set, now, rng.random());
++    let wifi_stack = Stack::new(iface, device, socket_set, now, rng.random());
 ```
 
 The related features are removed from `esp-wifi`: wifi-default, ipv6, ipv4, tcp, udp, icmp, igmp, dns, dhcpv4

@@ -13,7 +13,7 @@
 #![no_std]
 #![no_main]
 
-use blocking_network_stack::WifiStack;
+use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -67,7 +67,7 @@ fn main() -> ! {
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
 
     let now = || time::now().duration_since_epoch().to_millis();
-    let mut wifi_stack = WifiStack::new(iface, device, socket_set, now, rng.random());
+    let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
@@ -107,7 +107,7 @@ fn main() -> ! {
 
     println!("Setting static IP {}", STATIC_IP);
 
-    wifi_stack
+    stack
         .set_iface_configuration(&blocking_network_stack::ipv4::Configuration::Client(
             blocking_network_stack::ipv4::ClientConfiguration::Fixed(
                 blocking_network_stack::ipv4::ClientSettings {
@@ -130,7 +130,7 @@ fn main() -> ! {
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
-    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+    let mut socket = stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     socket.listen(8080).unwrap();
 
