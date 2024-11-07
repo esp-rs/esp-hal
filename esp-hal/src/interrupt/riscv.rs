@@ -423,15 +423,27 @@ mod vectored {
         Ok(())
     }
 
-    /// Bind the given interrupt to the given handler
+    /// Binds the given interrupt to the given handler.
     ///
     /// # Safety
     ///
     /// This will replace any previously bound interrupt handler
-    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn() -> ()) {
+    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
         let ptr = &peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
-            as *mut unsafe extern "C" fn() -> ();
+            as *mut unsafe extern "C" fn();
         ptr.write_volatile(handler);
+    }
+
+    /// Returns the currently bound interrupt handler.
+    pub fn bound_handler(interrupt: Interrupt) -> Option<unsafe extern "C" fn()> {
+        unsafe {
+            let addr = peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
+            if addr as usize == 0 {
+                return None;
+            }
+
+            Some(addr)
+        }
     }
 
     #[no_mangle]

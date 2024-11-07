@@ -73,11 +73,12 @@ use procmacros::ram;
 
 pub use crate::soc::gpio::*;
 use crate::{
-    interrupt::InterruptHandler,
+    interrupt::{self, InterruptHandler, Priority},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{GPIO, IO_MUX},
+    peripherals::{Interrupt, GPIO, IO_MUX},
     private::{self, Sealed},
     InterruptConfigurable,
+    DEFAULT_INTERRUPT_HANDLER,
 };
 
 pub mod interconnect;
@@ -784,6 +785,54 @@ where
 
 impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> {}
 
+fn ensure_interrupt_handler_bound() {
+    #[cfg(multi_core)]
+    {
+        use portable_atomic::AtomicUsize;
+
+        use crate::Cpu;
+        // On multi-core, we need to call `interrupt::enable` on each core.
+        // However, we don't want to call it on a core where the handler is already
+        // bound, otherwise we'd overwrite the priority set for that handler.
+
+        // FIXME: handling GPIO interrupts on multiple cores may not be what the users
+        // want. Only ESP32 can handle a different set of pins on each core. Do
+        // we want to support this?
+        static BOUND: AtomicUsize = AtomicUsize::new(0);
+
+        let bound = BOUND.load(Ordering::Relaxed);
+
+        let cpu_bit = 1 << Cpu::current() as usize;
+        if bound & cpu_bit != 0 {
+            // Nothing to do.
+            return;
+        }
+
+        // A tiny optimization to avoid a CAS in the common case.
+        if BOUND.fetch_or(cpu_bit, Ordering::Relaxed) & cpu_bit != 0 {
+            // We have raced with something and lost.
+            return;
+        }
+    }
+
+    // We check this by looking up the handler in the vector table.
+    if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
+        let handler = handler as *const unsafe extern "C" fn();
+
+        // We only allow binding the default handler if nothing else is bound.
+        // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
+        if core::ptr::eq(handler, DEFAULT_INTERRUPT_HANDLER.handler() as _) {
+            unsafe { interrupt::bind_interrupt(Interrupt::GPIO, gpio_interrupt_handler) };
+        } else if core::ptr::eq(handler, gpio_interrupt_handler as _) {
+            warn!("GPIO interrupt handler already bound to a function other than `gpio_interrupt_handler`");
+            return;
+        }
+    }
+
+    // By default, we use lowest priority
+    unwrap!(interrupt::enable(Interrupt::GPIO, Priority::min()));
+}
+
 /// General Purpose Input/Output driver
 pub struct Io {
     _io_mux: IO_MUX,
@@ -793,38 +842,17 @@ pub struct Io {
 
 impl Io {
     /// Initialize the I/O driver.
-    pub fn new(gpio: GPIO, io_mux: IO_MUX) -> Self {
-        Self::new_with_priority(gpio, io_mux, crate::interrupt::Priority::min())
-    }
-
-    /// Initialize the I/O driver with a interrupt priority.
-    ///
-    /// This decides the priority for the interrupt when using async.
-    pub fn new_with_priority(
-        mut gpio: GPIO,
-        io_mux: IO_MUX,
-        prio: crate::interrupt::Priority,
-    ) -> Self {
-        gpio.bind_gpio_interrupt(gpio_interrupt_handler);
-        unwrap!(crate::interrupt::enable(
-            crate::peripherals::Interrupt::GPIO,
-            prio
-        ));
-
-        Self::new_no_bind_interrupt(gpio, io_mux)
-    }
-
-    /// Initialize the I/O driver without enabling the GPIO interrupt or
-    /// binding an interrupt handler to it.
-    ///
-    /// *Note:* You probably don't want to use this, it is intended to be used
-    /// in very specific use cases. Async GPIO functionality will not work
-    /// when instantiating `Io` using this constructor.
-    pub fn new_no_bind_interrupt(_gpio: GPIO, _io_mux: IO_MUX) -> Self {
+    pub fn new(_gpio: GPIO, _io_mux: IO_MUX) -> Self {
         Io {
             _io_mux,
             pins: unsafe { Pins::steal() },
         }
+    }
+
+    /// Set the interrupt priority for GPIO interrupts.
+    pub fn set_interrupt_priority(&self, prio: Priority) {
+        ensure_interrupt_handler_bound();
+        unwrap!(interrupt::enable(crate::peripherals::Interrupt::GPIO, prio));
     }
 }
 
@@ -842,11 +870,23 @@ impl InterruptConfigurable for Io {
     ///   async driver from detecting the interrupt, silently disabling the
     ///   corresponding pin's async API.
     /// - You will not be notified if you make a mistake.
+    #[cfg_attr(multi_core, doc = "")]
+    #[cfg_attr(
+        multi_core,
+        doc = " ⚠️ Be careful when using GPIO interrupts on multiple cores:"
+    )]
+    #[cfg_attr(multi_core, doc = "")]
+    #[cfg_attr(
+        multi_core,
+        doc = " - This function only enables interrupts for the current core. To enable interrupts for other cores, call this function or [`Io::set_interrupt_priority`] on those cores."
+    )]
+    #[cfg_attr(multi_core, doc = " - Both cores will use the same interrupt handler.")]
+    #[cfg_attr(
+        all(multi_core, esp32s3),
+        doc = " - Both cores will handle the interrupt requests, possibly at the same time."
+    )]
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unwrap!(crate::interrupt::enable(
-            crate::peripherals::Interrupt::GPIO,
-            handler.priority()
-        ));
+        self.set_interrupt_priority(handler.priority());
         USER_INTERRUPT_HANDLER.store(handler.handler());
     }
 }
@@ -1584,6 +1624,7 @@ where
         nmi_enable: bool,
         wake_up_from_light_sleep: bool,
     ) {
+        ensure_interrupt_handler_bound();
         if wake_up_from_light_sleep {
             match event {
                 Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {
