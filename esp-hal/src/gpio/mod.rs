@@ -806,7 +806,10 @@ impl Io {
         prio: crate::interrupt::Priority,
     ) -> Self {
         gpio.bind_gpio_interrupt(gpio_interrupt_handler);
-        crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, prio).unwrap();
+        unwrap!(crate::interrupt::enable(
+            crate::peripherals::Interrupt::GPIO,
+            prio
+        ));
 
         Self::new_no_bind_interrupt(gpio, io_mux)
     }
@@ -840,7 +843,10 @@ impl InterruptConfigurable for Io {
     ///   corresponding pin's async API.
     /// - You will not be notified if you make a mistake.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, handler.priority()).unwrap();
+        unwrap!(crate::interrupt::enable(
+            crate::peripherals::Interrupt::GPIO,
+            handler.priority()
+        ));
         USER_INTERRUPT_HANDLER.store(handler.handler());
     }
 }
