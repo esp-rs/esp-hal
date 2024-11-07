@@ -6,7 +6,7 @@
 //! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
 //! When using USB-SERIAL-JTAG you may have to activate the feature `phy-enable-usb` in the esp-wifi crate.
 
-//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -34,7 +34,10 @@ use esp_wifi::{
         WifiStaDevice,
     },
 };
-use smoltcp::iface::SocketStorage;
+use smoltcp::{
+    iface::{SocketSet, SocketStorage},
+    wire::DhcpOption,
+};
 use smoltcp_nal::{
     embedded_nal::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpClientStack},
     NetworkStack,
@@ -64,9 +67,11 @@ fn main() -> ! {
     .unwrap();
 
     let mut wifi = peripherals.WIFI;
+    let (iface, device, mut controller) =
+        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
-    let (iface, device, mut controller, mut sockets) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
+    let mut sockets = SocketSet::new(&mut socket_set_entries[..]);
 
     let mut rx_buffer = [0u8; 128];
     let mut tx_buffer = [0u8; 128];
@@ -74,6 +79,13 @@ fn main() -> ! {
         smoltcp::socket::tcp::SocketBuffer::new(&mut rx_buffer[..]),
         smoltcp::socket::tcp::SocketBuffer::new(&mut tx_buffer[..]),
     ));
+    let mut dhcp_socket = smoltcp::socket::dhcpv4::Socket::new();
+    // we can set a hostname here (or add other DHCP options)
+    dhcp_socket.set_outgoing_options(&[DhcpOption {
+        kind: 12,
+        data: b"esp-wifi",
+    }]);
+    sockets.add(dhcp_socket);
     let mut network_stack = NetworkStack::new(iface, device, sockets, StackClock);
 
     let client_config = Configuration::Client(ClientConfiguration {

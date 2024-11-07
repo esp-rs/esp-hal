@@ -42,3 +42,42 @@ The cost of this is that we need to rename the various `async` methods on `WifiC
 - controller.start().await.unwrap();
 + controller.start_async().await.unwrap();
 ```
+
+## The blocking networking stack was removed
+
+The blocking networking stack is not included anymore. You can use e.g. `smoltcp-nal` or even use `smoltcp` directly.
+
+For an easy migration path there is https://github.com/bjoernQ/blocking-network-stack.git which is basically the previously included networking stack as it's
+own crate.
+
+The `create_network_interface` function doesn't take `&mut SocketSet[..]` anymore.
+
+```diff
++use blocking_network_stack::WifiStack;
+use esp_wifi::{
+-    wifi_interface::WifiStack,
+};
+
+-    let init = init(
+-        timg0.timer0,
+-        Rng::new(peripherals.RNG),
+-        peripherals.RADIO_CLK,
+-    )
+-    .unwrap();
++    let mut rng = Rng::new(peripherals.RNG);
++    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+ 
+     let mut wifi = peripherals.WIFI;
++    let (iface, device, mut controller) =
++        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
++
+-    let (iface, device, mut controller, sockets) =
+-        create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
++    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
++    let socket_set = SocketSet::new(&mut socket_set_entries[..]);
+     let now = || time::now().duration_since_epoch().to_millis();
+-    let wifi_stack = WifiStack::new(iface, device, sockets, now);
++    let wifi_stack = WifiStack::new(iface, device, socket_set, now, rng.random());
+```
+
+The related features are removed from `esp-wifi`: wifi-default, ipv6, ipv4, tcp, udp, icmp, igmp, dns, dhcpv4

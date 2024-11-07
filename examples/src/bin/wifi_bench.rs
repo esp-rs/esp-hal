@@ -8,12 +8,13 @@
 //! Ensure you have set the IP of your local machine in the `HOST_IP` env variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env variable before running this example.
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
 
+use blocking_network_stack::WifiStack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -35,11 +36,10 @@ use esp_wifi::{
         WifiError,
         WifiStaDevice,
     },
-    wifi_interface::WifiStack,
 };
 use smoltcp::{
-    iface::SocketStorage,
-    wire::{IpAddress, Ipv4Address},
+    iface::{SocketSet, SocketStorage},
+    wire::{DhcpOption, IpAddress, Ipv4Address},
 };
 
 const SSID: &str = env!("SSID");
@@ -69,19 +69,26 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let mut rng = Rng::new(peripherals.RNG);
+
+    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
     let mut wifi = peripherals.WIFI;
+    let (iface, device, mut controller) =
+        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
-    let (iface, device, mut controller, sockets) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
+    let mut socket_set = SocketSet::new(&mut socket_set_entries[..]);
+    let mut dhcp_socket = smoltcp::socket::dhcpv4::Socket::new();
+    // we can set a hostname here (or add other DHCP options)
+    dhcp_socket.set_outgoing_options(&[DhcpOption {
+        kind: 12,
+        data: b"esp-wifi",
+    }]);
+    socket_set.add(dhcp_socket);
+
     let now = || time::now().duration_since_epoch().to_millis();
-    let wifi_stack = WifiStack::new(iface, device, sockets, now);
+    let wifi_stack = WifiStack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
@@ -149,9 +156,9 @@ fn main() -> ! {
     }
 }
 
-fn test_download<'a>(
+fn test_download<'a, D: smoltcp::phy::Device>(
     server_address: Ipv4Address,
-    socket: &mut esp_wifi::wifi_interface::Socket<'a, 'a, WifiStaDevice>,
+    socket: &mut blocking_network_stack::Socket<'a, 'a, D>,
 ) {
     println!("Testing download...");
     socket.work();
@@ -183,9 +190,9 @@ fn test_download<'a>(
     socket.disconnect();
 }
 
-fn test_upload<'a>(
+fn test_upload<'a, D: smoltcp::phy::Device>(
     server_address: Ipv4Address,
-    socket: &mut esp_wifi::wifi_interface::Socket<'a, 'a, WifiStaDevice>,
+    socket: &mut blocking_network_stack::Socket<'a, 'a, D>,
 ) {
     println!("Testing upload...");
     socket.work();
@@ -217,9 +224,9 @@ fn test_upload<'a>(
     socket.disconnect();
 }
 
-fn test_upload_download<'a>(
+fn test_upload_download<'a, D: smoltcp::phy::Device>(
     server_address: Ipv4Address,
-    socket: &mut esp_wifi::wifi_interface::Socket<'a, 'a, WifiStaDevice>,
+    socket: &mut blocking_network_stack::Socket<'a, 'a, D>,
 ) {
     println!("Testing upload+download...");
     socket.work();

@@ -136,17 +136,6 @@ pub mod tasks;
 
 pub(crate) mod memory_fence;
 
-#[cfg(all(feature = "wifi", any(feature = "tcp", feature = "udp")))]
-pub mod wifi_interface;
-
-// [esp_hal::time::now()] as a smoltcp [`Instant]`
-#[cfg(feature = "smoltcp")]
-fn timestamp() -> smoltcp::time::Instant {
-    smoltcp::time::Instant::from_micros(
-        esp_hal::time::now().duration_since_epoch().to_micros() as i64
-    )
-}
-
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
 const _: () = {

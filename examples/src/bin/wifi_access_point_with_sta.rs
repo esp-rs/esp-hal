@@ -9,12 +9,13 @@
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
 
+use blocking_network_stack::WifiStack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -33,10 +34,9 @@ use esp_wifi::{
         ClientConfiguration,
         Configuration,
     },
-    wifi_interface::WifiStack,
 };
 use smoltcp::{
-    iface::SocketStorage,
+    iface::{SocketSet, SocketStorage},
     wire::{IpAddress, Ipv4Address},
 };
 
@@ -56,17 +56,11 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let mut rng = Rng::new(peripherals.RNG);
+
+    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
     let wifi = peripherals.WIFI;
-
-    let mut ap_socket_set_entries: [SocketStorage; 3] = Default::default();
-    let mut sta_socket_set_entries: [SocketStorage; 3] = Default::default();
 
     let ApStaInterface {
         ap_interface,
@@ -74,19 +68,19 @@ fn main() -> ! {
         ap_device,
         sta_device,
         mut controller,
-        ap_socket_set,
-        sta_socket_set,
-    } = create_ap_sta_network_interface(
-        &init,
-        wifi,
-        &mut ap_socket_set_entries,
-        &mut sta_socket_set_entries,
-    )
-    .unwrap();
+    } = create_ap_sta_network_interface(&init, wifi).unwrap();
 
     let now = || time::now().duration_since_epoch().to_millis();
-    let mut wifi_ap_stack = WifiStack::new(ap_interface, ap_device, ap_socket_set, now);
-    let wifi_sta_stack = WifiStack::new(sta_interface, sta_device, sta_socket_set, now);
+    let mut ap_socket_set_entries: [SocketStorage; 3] = Default::default();
+    let ap_socket_set = SocketSet::new(&mut ap_socket_set_entries[..]);
+    let mut wifi_ap_stack =
+        WifiStack::new(ap_interface, ap_device, ap_socket_set, now, rng.random());
+
+    let mut sta_socket_set_entries: [SocketStorage; 3] = Default::default();
+    let mut sta_socket_set = SocketSet::new(&mut sta_socket_set_entries[..]);
+    sta_socket_set.add(smoltcp::socket::dhcpv4::Socket::new());
+    let wifi_sta_stack =
+        WifiStack::new(sta_interface, sta_device, sta_socket_set, now, rng.random());
 
     let client_config = Configuration::Mixed(
         ClientConfiguration {
@@ -108,13 +102,15 @@ fn main() -> ! {
     println!("{:?}", controller.get_capabilities());
 
     wifi_ap_stack
-        .set_iface_configuration(&esp_wifi::wifi::ipv4::Configuration::Client(
-            esp_wifi::wifi::ipv4::ClientConfiguration::Fixed(
-                esp_wifi::wifi::ipv4::ClientSettings {
-                    ip: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
-                    subnet: esp_wifi::wifi::ipv4::Subnet {
-                        gateway: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
-                        mask: esp_wifi::wifi::ipv4::Mask(24),
+        .set_iface_configuration(&blocking_network_stack::ipv4::Configuration::Client(
+            blocking_network_stack::ipv4::ClientConfiguration::Fixed(
+                blocking_network_stack::ipv4::ClientSettings {
+                    ip: blocking_network_stack::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
+                    subnet: blocking_network_stack::ipv4::Subnet {
+                        gateway: blocking_network_stack::ipv4::Ipv4Addr::from(parse_ip(
+                            "192.168.2.1",
+                        )),
+                        mask: blocking_network_stack::ipv4::Mask(24),
                     },
                     dns: None,
                     secondary_dns: None,

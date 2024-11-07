@@ -131,32 +131,6 @@ smoltcp = ["dep:smoltcp"]
 ## Provide utilities for smoltcp initialization. Adds smoltcp dependency
 utils = ["smoltcp"]
 
-## IPv6 support. Includes utils feature
-ipv6 = ["wifi", "utils", "smoltcp?/proto-ipv6"]
-
-## IPv4 support. Includes utils feature
-ipv4 = ["wifi", "utils", "smoltcp?/proto-ipv4"]
-
-## TCP socket support. Includes ipv4 feature
-tcp = ["ipv4", "smoltcp?/socket-tcp"]
-
-## UDP socket support. Includes ipv4 feature
-udp = ["ipv4", "smoltcp?/socket-udp"]
-
-## ICMP socket support. Includes ipv4 feature
-icmp = ["ipv4", "smoltcp?/socket-icmp"]
-
-## IGMP (multicast) support. Includes ipv4 featu
-igmp = ["ipv4", "smoltcp?/proto-igmp"]
-
-## DNS support. Includes udp feature
-dns = ["udp", "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
-
-## DHCPv4 support, both creating sockets and autoconfiguring network settings. Includes utils feature
-dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
-
-## Convenience to enable "ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"
-wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
 
 # Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde", "heapless/serde"]
