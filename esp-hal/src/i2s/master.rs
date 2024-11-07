@@ -29,9 +29,7 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::i2s::I2s;
-//! # use esp_hal::i2s::Standard;
-//! # use esp_hal::i2s::DataFormat;
+//! # use esp_hal::i2s::master::{I2s, Standard, DataFormat};
 //! # use esp_hal::gpio::Io;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{Dma, DmaPriority};
@@ -75,7 +73,7 @@
 //! ```
 //! 
 //! ## Implementation State
-//! - Only master mode is supported.
+//!
 //! - Only TDM Philips standard is supported.
 
 use core::marker::PhantomData;

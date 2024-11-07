@@ -21,7 +21,7 @@ use esp_hal::{
     dma::{Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
     gpio::Io,
-    i2s_parallel::{I2sParallel, TxEightBits},
+    i2s::parallel::{I2sParallel, TxEightBits},
     prelude::*,
     timer::timg::TimerGroup,
 };

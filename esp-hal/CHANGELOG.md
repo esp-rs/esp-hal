@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
 - `Cpu::COUNT` and `Cpu::current()` (#2411)
 - `UartInterrupt` and related functions (#2406)
-- I2S Parallel output driver for ESP32. (#2348, #2436)
+- I2S Parallel output driver for ESP32. (#2348, #2436, #2472)
 - Add an option to configure `WDT` action (#2330)
 - `DmaDescriptor` is now `Send` (#2456)
 - `into_async` and `into_blocking` functions for most peripherals (#2430, #2461)
@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART configuration types have been moved to `esp_hal::uart` (#2449)
 - `spi::master::Spi::new()` no longer takes `frequency` and `mode` as a parameter. (#2448)
 - Peripheral interconnections via GPIO pins now use the GPIO matrix. (#2419)
+- The I2S driver has been moved to `i2s::master` (#2472)
 
 ### Fixed
 
