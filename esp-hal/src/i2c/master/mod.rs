@@ -18,7 +18,7 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::i2c::master::I2c;
+//! # use esp_hal::i2c::master::{Config, I2c};
 //! # use esp_hal::gpio::Io;
 //! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
@@ -28,7 +28,7 @@
 //!     peripherals.I2C0,
 //!     io.pins.gpio1,
 //!     io.pins.gpio2,
-//!     100.kHz(),
+//!     Config::default(),
 //! );
 //!
 //! loop {
@@ -46,6 +46,7 @@ use core::{
     task::{Context, Poll},
 };
 
+use embassy_embedded_hal::SetConfig;
 use embassy_sync::waitqueue::AtomicWaker;
 use embedded_hal::i2c::Operation as EhalOperation;
 use fugit::HertzU32;
@@ -105,6 +106,11 @@ pub enum Error {
     /// Zero length read or write operation.
     InvalidZeroLength,
 }
+
+/// I2C-specific configuration errors
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ConfigError {}
 
 #[derive(PartialEq)]
 // This enum is used to keep track of the last/next operation that was/will be
@@ -230,12 +236,54 @@ impl From<Ack> for u32 {
     }
 }
 
+/// I2C driver configuration
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    /// The I2C clock frequency.
+    pub frequency: HertzU32,
+
+    /// I2C SCL timeout period.
+    ///
+    /// When the level of SCL remains unchanged for more than `timeout` bus
+    /// clock cycles, the bus goes to idle state.
+    ///
+    /// The default value is about 10 bus clock cycles.
+    #[doc = ""]
+    #[cfg_attr(
+        not(esp32),
+        doc = "Note that the effective timeout may be longer than the value configured here."
+    )]
+    #[cfg_attr(not(esp32), doc = "Configuring `None` disables timeout control.")]
+    #[cfg_attr(esp32, doc = "Configuring `None` equals to the maximum timeout value.")]
+    // TODO: when supporting interrupts, document that SCL = high also triggers an interrupt.
+    pub timeout: Option<u32>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        use fugit::RateExtU32;
+        Config {
+            frequency: 100.kHz(),
+            timeout: Some(10),
+        }
+    }
+}
+
 /// I2C driver
 pub struct I2c<'d, DM: Mode, T = AnyI2c> {
     i2c: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
-    frequency: HertzU32,
-    timeout: Option<u32>,
+    config: Config,
+}
+
+impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
 }
 
 impl<T> embedded_hal_02::blocking::i2c::Read for I2c<'_, Blocking, T>
@@ -301,7 +349,7 @@ where
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = impl PeripheralOutput> + 'd,
         scl: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        frequency: HertzU32,
+        config: Config,
     ) -> Self {
         crate::into_ref!(i2c);
         crate::into_mapped_ref!(sda, scl);
@@ -309,8 +357,7 @@ where
         let i2c = I2c {
             i2c,
             phantom: PhantomData,
-            frequency,
-            timeout: None,
+            config,
         };
 
         PeripheralClockControl::reset(i2c.info().peripheral);
@@ -318,7 +365,7 @@ where
 
         let i2c = i2c.with_sda(sda).with_scl(scl);
 
-        i2c.info().setup(frequency, None);
+        unwrap!(i2c.info().setup(&i2c.config));
         i2c
     }
 
@@ -330,16 +377,15 @@ where
         PeripheralClockControl::reset(self.info().peripheral);
         PeripheralClockControl::enable(self.info().peripheral);
 
-        self.info().setup(self.frequency, self.timeout);
+        // We know the configuration is valid, we can ignore the result.
+        _ = self.info().setup(&self.config);
     }
 
-    /// Set the I2C timeout.
-    // TODO: explain this function better - what's the unit, what happens on
-    // timeout, and just what exactly is a timeout in this context?
-    pub fn with_timeout(mut self, timeout: Option<u32>) -> Self {
-        self.timeout = timeout;
-        self.info().setup(self.frequency, self.timeout);
-        self
+    /// Applies a new configuration.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.info().setup(config)?;
+        self.config = *config;
+        Ok(())
     }
 
     fn transaction_impl<'a>(
@@ -442,9 +488,9 @@ impl<'d> I2c<'d, Blocking> {
         i2c: impl Peripheral<P = impl Instance> + 'd,
         sda: impl Peripheral<P = impl PeripheralOutput> + 'd,
         scl: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        frequency: HertzU32,
+        config: Config,
     ) -> Self {
-        Self::new_typed(i2c.map_into(), sda, scl, frequency)
+        Self::new_typed(i2c.map_into(), sda, scl, config)
     }
 }
 
@@ -459,9 +505,9 @@ where
         i2c: impl Peripheral<P = T> + 'd,
         sda: impl Peripheral<P = impl PeripheralOutput> + 'd,
         scl: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        frequency: HertzU32,
+        config: Config,
     ) -> Self {
-        Self::new_internal(i2c, sda, scl, frequency)
+        Self::new_internal(i2c, sda, scl, config)
     }
 
     // TODO: missing interrupt APIs
@@ -473,8 +519,7 @@ where
         I2c {
             i2c: self.i2c,
             phantom: PhantomData,
-            frequency: self.frequency,
-            timeout: self.timeout,
+            config: self.config,
         }
     }
 
@@ -743,8 +788,7 @@ where
         I2c {
             i2c: self.i2c,
             phantom: PhantomData,
-            frequency: self.frequency,
-            timeout: self.timeout,
+            config: self.config,
         }
     }
 
@@ -1324,7 +1368,7 @@ impl Info {
 
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
-    fn setup(&self, frequency: HertzU32, timeout: Option<u32>) {
+    fn setup(&self, config: &Config) -> Result<(), ConfigError> {
         self.register_block().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
@@ -1358,12 +1402,14 @@ impl Info {
                 let clock = clocks.xtal_clock.convert();
             }
         }
-        self.set_frequency(clock, frequency, timeout);
+        self.set_frequency(clock, config.frequency, config.timeout);
 
         self.update_config();
 
         // Reset entire peripheral (also resets fifo)
         self.reset();
+
+        Ok(())
     }
 
     /// Resets the I2C controller (FIFO + FSM + command list)

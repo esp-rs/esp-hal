@@ -29,7 +29,10 @@ use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_rx_stream_buffer,
     gpio::Io,
-    i2c::{self, master::I2c},
+    i2c::{
+        self,
+        master::{Config, I2c},
+    },
     lcd_cam::{
         cam::{Camera, RxEightBits},
         LcdCam,
@@ -79,7 +82,7 @@ fn main() -> ! {
 
     delay.delay_millis(500u32);
 
-    let i2c = I2c::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz());
+    let i2c = I2c::new(peripherals.I2C0, cam_siod, cam_sioc, Config::default());
 
     let mut sccb = Sccb::new(i2c);
 

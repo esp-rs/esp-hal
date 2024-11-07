@@ -69,11 +69,17 @@ let spi: Spi<'static, FullDuplexMode, SPI2> = Spi::new_typed(peripherals.SPI2, 1
 
 The I2C master driver and related types have been moved to `esp_hal::i2c::master`.
 
-The `with_timeout` constructors have been removed in favour of `set_timeout` or `with_timeout`.
+The `with_timeout` constructors have been removed. `new` and `new_typed` now take a `Config` struct
+with the available configuration options.
 
 ```diff
 -let i2c = I2c::new_with_timeout(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz(), timeout);
-+let i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz()).with_timeout(timeout);
++let i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, {
++    let mut config = Config::default();
++    config.frequency = 100.kHz();
++    config.timeout = timeout;
++    config
++});
 ```
 
 ## Changes to half-duplex SPI

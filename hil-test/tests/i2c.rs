@@ -7,8 +7,7 @@
 
 use esp_hal::{
     gpio::Io,
-    i2c::master::{I2c, Operation},
-    prelude::*,
+    i2c::master::{Config, I2c, Operation},
     Async,
     Blocking,
 };
@@ -40,7 +39,7 @@ mod tests {
 
         // Create a new peripheral object with the described wiring and standard
         // I2C clock speed:
-        let i2c = I2c::new(peripherals.I2C0, sda, scl, 100.kHz());
+        let i2c = I2c::new(peripherals.I2C0, sda, scl, Config::default());
 
         Context { i2c }
     }

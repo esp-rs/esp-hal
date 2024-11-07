@@ -22,7 +22,12 @@ use embedded_graphics::{
     text::{Alignment, Text},
 };
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, gpio::Io, i2c::master::I2c, prelude::*};
+use esp_hal::{
+    delay::Delay,
+    gpio::Io,
+    i2c::master::{Config, I2c},
+    prelude::*,
+};
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
 #[entry]
@@ -34,7 +39,12 @@ fn main() -> ! {
 
     // Create a new peripheral object with the described wiring
     // and standard I2C clock speed
-    let i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz());
+    let i2c = I2c::new(
+        peripherals.I2C0,
+        io.pins.gpio4,
+        io.pins.gpio5,
+        Config::default(),
+    );
 
     // Initialize display
     let interface = I2CDisplayInterface::new(i2c);

@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `embassy_embedded_hal::SetConfig` is now implemented for `{Spi, SpiDma, SpiDmaBus}` (#2448)
 - `slave::Spi::{with_mosi(), with_miso(), with_sclk(), with_cs()}` functions (#2485)
 - I8080: Added `set_8bits_order()` to set the byte order in 8-bit mode (#2487)
+- `embassy_embedded_hal::SetConfig` is now implemented for `spi::master::{Spi, SpiDma, SpiDmaBus}`, `i2c::master::I2c` (#2448, #?)
 
 ### Changed
 
