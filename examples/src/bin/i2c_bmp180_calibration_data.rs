@@ -27,12 +27,9 @@ fn main() -> ! {
 
     // Create a new peripheral object with the described wiring and standard
     // I2C clock speed:
-    let mut i2c = I2c::new(
-        peripherals.I2C0,
-        io.pins.gpio4,
-        io.pins.gpio5,
-        Config::default(),
-    );
+    let mut i2c = I2c::new(peripherals.I2C0, Config::default())
+        .with_sda(io.pins.gpio4)
+        .with_scl(io.pins.gpio5);
 
     loop {
         let mut data = [0u8; 22];

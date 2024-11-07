@@ -36,11 +36,13 @@ async fn main(_spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, {
+    let mut i2c = I2c::new(peripherals.I2C0, {
         let mut config = Config::default();
         config.frequency = 400.kHz();
         config
     })
+    .with_sda(io.pins.gpio4)
+    .with_scl(io.pins.gpio5)
     .into_async();
 
     loop {
