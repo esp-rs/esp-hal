@@ -34,16 +34,20 @@
 //! dma_buffers!(32000);
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     sclk,
-//!     mosi,
-//!     miso,
-//!     cs,
 //!     SpiMode::Mode0,
 //! )
-//! .with_dma(dma_channel.configure(
-//!     false,
-//!     DmaPriority::Priority0,
-//! ), rx_descriptors, tx_descriptors);
+//! .with_sck(sclk)
+//! .with_mosi(mosi)
+//! .with_miso(miso)
+//! .with_cs(cs)
+//! .with_dma(
+//!     dma_channel.configure(
+//!         false,
+//!         DmaPriority::Priority0,
+//!     ),
+//!     rx_descriptors,
+//!     tx_descriptors,
+//! );
 //!
 //! let mut receive = rx_buffer;
 //! let mut send = tx_buffer;
@@ -79,6 +83,7 @@ use crate::{
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
+        NoPin,
         OutputSignal,
     },
     peripheral::{Peripheral, PeripheralRef},
@@ -103,20 +108,8 @@ pub struct Spi<'d, M, T = AnySpi> {
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<
-        SCK: PeripheralInput,
-        MOSI: PeripheralInput,
-        MISO: PeripheralOutput,
-        CS: PeripheralInput,
-    >(
-        spi: impl Peripheral<P = impl Instance> + 'd,
-        sclk: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
-        mode: SpiMode,
-    ) -> Spi<'d, Blocking> {
-        Self::new_typed(spi.map_into(), sclk, mosi, miso, cs, mode)
+    pub fn new(spi: impl Peripheral<P = impl Instance> + 'd, mode: SpiMode) -> Spi<'d, Blocking> {
+        Self::new_typed(spi.map_into(), mode)
     }
 }
 
@@ -125,55 +118,57 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_typed<
-        SCK: PeripheralInput,
-        MOSI: PeripheralInput,
-        MISO: PeripheralOutput,
-        CS: PeripheralInput,
-    >(
-        spi: impl Peripheral<P = T> + 'd,
-        sclk: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
-        mode: SpiMode,
-    ) -> Spi<'d, M, T> {
-        crate::into_mapped_ref!(sclk, mosi, miso, cs);
-
-        let this = Self::new_internal(spi, mode);
-
-        // TODO: with_pins et. al.
-        sclk.enable_input(true, private::Internal);
-        this.spi.info().sclk.connect_to(sclk);
-
-        mosi.enable_input(true, private::Internal);
-        this.spi.info().mosi.connect_to(mosi);
-
-        miso.set_to_push_pull_output(private::Internal);
-        this.spi.info().miso.connect_to(miso);
-
-        cs.enable_input(true, private::Internal);
-        this.spi.info().cs.connect_to(cs);
-
-        this
-    }
-
-    pub(crate) fn new_internal(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, M, T> {
+    pub fn new_typed(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, M, T> {
         crate::into_ref!(spi);
 
-        let spi = Spi {
+        let this = Spi {
             spi,
             data_mode: mode,
             _mode: PhantomData,
         };
 
-        PeripheralClockControl::reset(spi.spi.info().peripheral);
-        PeripheralClockControl::enable(spi.spi.info().peripheral);
+        PeripheralClockControl::reset(this.spi.info().peripheral);
+        PeripheralClockControl::enable(this.spi.info().peripheral);
 
-        spi.spi.info().init();
-        spi.spi.info().set_data_mode(mode, false);
+        this.spi.info().init();
+        this.spi.info().set_data_mode(mode, false);
 
-        spi
+        this.with_mosi(NoPin)
+            .with_miso(NoPin)
+            .with_sck(NoPin)
+            .with_cs(NoPin)
+    }
+
+    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    pub fn with_sck(self, sclk: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(sclk);
+        sclk.enable_input(true, private::Internal);
+        self.spi.info().sclk.connect_to(sclk);
+        self
+    }
+
+    /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
+    pub fn with_mosi(self, mosi: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(mosi);
+        mosi.enable_input(true, private::Internal);
+        self.spi.info().mosi.connect_to(mosi);
+        self
+    }
+
+    /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
+    pub fn with_miso(self, miso: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        crate::into_mapped_ref!(miso);
+        miso.set_to_push_pull_output(private::Internal);
+        self.spi.info().miso.connect_to(miso);
+        self
+    }
+
+    /// Assign the CS (Chip Select) pin for the SPI instance.
+    pub fn with_cs(self, cs: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(cs);
+        cs.enable_input(true, private::Internal);
+        self.spi.info().cs.connect_to(cs);
+        self
     }
 }
 

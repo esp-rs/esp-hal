@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPIO ETM tasks and events now accept `InputSignal` and `OutputSignal` (#2427)
 - `spi::master::Config` and `{Spi, SpiDma, SpiDmaBus}::apply_config` (#2448)
 - `embassy_embedded_hal::SetConfig` is now implemented for `{Spi, SpiDma, SpiDmaBus}` (#2448)
+- `slave::Spi::{with_mosi(), with_miso(), with_sclk(), with_cs()}` functions (#2485)
 
 ### Changed
 
@@ -55,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `spi::master::Spi::new()` no longer takes `frequency` and `mode` as a parameter. (#2448)
 - Peripheral interconnections via GPIO pins now use the GPIO matrix. (#2419)
 - The I2S driver has been moved to `i2s::master` (#2472)
+- `slave::Spi` constructors no longer take pins (#2485)
 
 ### Fixed
 
