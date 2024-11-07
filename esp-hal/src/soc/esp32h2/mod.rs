@@ -1,5 +1,3 @@
-//! # SOC (System-on-Chip) module (ESP32-H2)
-//!
 //! ## Overview
 //!
 //! The `SOC` module provides access, functions and structures that are useful

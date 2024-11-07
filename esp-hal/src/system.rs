@@ -13,8 +13,8 @@ use crate::peripherals::SYSTEM;
 /// This enum represents various hardware peripherals that can be enabled
 /// by the system's clock control. Depending on the target device, different
 /// peripherals will be available for enabling.
-// NOTE: This enum needs to be public because it's exposed via a bunch of
-//       traits, but it's not useful to users.
+// FIXME: This enum needs to be public because it's exposed via a bunch of
+// traits, but it's not useful to users.
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1026,6 +1026,7 @@ impl PeripheralClockControl {
 
     /// Resets the given peripheral
     pub(crate) fn reset(peripheral: Peripheral) {
+        warn!("`reset`function for `PeripheralClockControl` is not fully implemented yet.");
         let _ = peripheral;
     }
 }

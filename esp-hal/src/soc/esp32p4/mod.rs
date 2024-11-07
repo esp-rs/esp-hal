@@ -1,5 +1,3 @@
-//! # SOC (System-on-Chip) module (ESP32-P4)
-//!
 //! ## Overview
 //!
 //! The `SOC` module provides access, functions and structures that are useful
@@ -10,7 +8,7 @@ pub mod gpio;
 pub mod peripherals;
 pub mod trng;
 
-/// The name of the chip ("esp32h2") as `&str`
+/// The name of the chip ("esp32p4") as `&str`
 #[macro_export]
 macro_rules! chip {
     () => {

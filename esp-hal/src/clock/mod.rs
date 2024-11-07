@@ -546,7 +546,7 @@ impl Clocks {
         // let xtal_freq = Self::measure_xtal_frequency();
 
         if cpu_clock_speed != CpuClock::default() {
-            // clocks_ll::set_cpu_clock(cpu_clock_speed);
+            panic!("Not implemented yet.")
         }
 
         Self {

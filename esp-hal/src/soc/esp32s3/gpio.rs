@@ -1,5 +1,3 @@
-//! # GPIO configuration module (ESP32-S3)
-//!
 //! ## Overview
 //!
 //! The `GPIO` module provides functions and configurations for controlling the
