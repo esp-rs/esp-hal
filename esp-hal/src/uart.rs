@@ -2174,6 +2174,7 @@ pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyUart> + 's
 }
 
 /// Peripheral data describing a particular UART instance.
+#[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this UART instance.
     ///
@@ -2200,6 +2201,7 @@ pub struct Info {
 }
 
 /// Peripheral state for a UART instance.
+#[non_exhaustive]
 pub struct State {
     /// Waker for the asynchronous RX operations.
     pub rx_waker: AtomicWaker,
