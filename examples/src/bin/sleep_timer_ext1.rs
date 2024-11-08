@@ -14,7 +14,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     entry,
-    gpio::{Input, Io, Pull, RtcPin},
+    gpio::{Input, Pull, RtcPin},
     peripheral::Peripheral,
     rtc_cntl::{
         get_reset_reason,
@@ -33,7 +33,6 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
-    let io = Io::new(peripherals.IO_MUX);
     let pin_0 = Input::new(peripherals.pins.gpio4, Pull::None);
     let mut pin_2 = peripherals.pins.gpio2;
 

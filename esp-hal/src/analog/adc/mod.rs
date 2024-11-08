@@ -31,10 +31,11 @@
 //! # use esp_hal::analog::adc::Attenuation;
 //! # use esp_hal::analog::adc::Adc;
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.IO_MUX);
 #![cfg_attr(esp32, doc = "let analog_pin = peripherals.pins.gpio32;")]
-#![cfg_attr(any(esp32s2, esp32s3), doc = "let analog_pin = peripherals.pins.gpio3;")]
+#![cfg_attr(
+    any(esp32s2, esp32s3),
+    doc = "let analog_pin = peripherals.pins.gpio3;"
+)]
 #![cfg_attr(
     not(any(esp32, esp32s2, esp32s3)),
     doc = "let analog_pin = peripherals.pins.gpio2;"

@@ -22,7 +22,6 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::Io,
     i2s::master::{DataFormat, I2s, Standard},
     prelude::*,
     timer::timg::TimerGroup,
@@ -36,8 +35,6 @@ async fn main(_spawner: Spawner) {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
-
-    let io = Io::new(peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]

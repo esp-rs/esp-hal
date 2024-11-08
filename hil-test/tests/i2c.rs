@@ -6,7 +6,6 @@
 #![no_main]
 
 use esp_hal::{
-    gpio::Io,
     i2c::master::{Config, I2c, Operation},
     Async,
     Blocking,
@@ -33,7 +32,6 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let io = Io::new(peripherals.IO_MUX);
 
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
 

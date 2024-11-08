@@ -32,10 +32,8 @@
 //! # use esp_hal::twai::TwaiConfiguration;
 //! # use esp_hal::twai::BaudRate;
 //! # use esp_hal::twai::TwaiMode;
-//! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
 //! # use nb::block;
-//! # let io = Io::new(peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
 //! let can_rx_pin = peripherals.pins.gpio3;
@@ -86,10 +84,8 @@
 //! # use esp_hal::twai::EspTwaiFrame;
 //! # use esp_hal::twai::StandardId;
 //! # use esp_hal::twai::TwaiMode;
-//! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
 //! # use nb::block;
-//! # let io = Io::new(peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
 //! let can_rx_pin = peripherals.pins.gpio3;

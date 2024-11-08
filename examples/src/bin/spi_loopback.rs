@@ -18,7 +18,6 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
     peripheral::Peripheral,
     prelude::*,
     spi::{
@@ -32,7 +31,6 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.IO_MUX);
     let sclk = peripherals.pins.gpio0;
     let miso_mosi = peripherals.pins.gpio2;
     let cs = peripherals.pins.gpio5;

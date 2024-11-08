@@ -171,6 +171,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI transactions are now cancelled if the transfer object (or async Future) is dropped. (#2216)
 - The DMA channel types have been removed from peripherals (#2261)
 - `I2C` driver renamed to `I2c` (#2320)
+- The  GPIO pins are now accessible via `Peripherals` and are no longer part of the `Io` struct (#2508)
 
 ### Fixed
 
@@ -215,6 +216,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `esp_hal::spi::slave::WithDmaSpiN` traits (#2260)
 - The `WithDmaAes` trait has been removed (#2261)
 - The `I2s::new_i2s1` constructor has been removed (#2261)
+- `Peripherals.GPIO` has been removed (#2508)
 
 ## [0.20.1] - 2024-08-30
 

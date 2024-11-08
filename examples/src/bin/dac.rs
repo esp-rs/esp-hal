@@ -19,13 +19,11 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{analog::dac::Dac, delay::Delay, gpio::Io, prelude::*};
+use esp_hal::{analog::dac::Dac, delay::Delay, prelude::*};
 
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {

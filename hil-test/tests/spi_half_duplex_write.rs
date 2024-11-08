@@ -8,7 +8,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{interconnect::InputSignal, Io},
+    gpio::interconnect::InputSignal,
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     prelude::*,
     spi::{
@@ -35,7 +35,6 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.IO_MUX);
         let sclk = peripherals.pins.gpio0;
         let (mosi, _) = hil_test::common_test_pins!(peripherals);
 

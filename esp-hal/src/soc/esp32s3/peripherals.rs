@@ -31,7 +31,6 @@ crate::peripherals! {
     DS <= DS,
     EFUSE <= EFUSE,
     EXTMEM <= EXTMEM,
-    GPIO <= GPIO (GPIO,GPIO_NMI),
     GPIO_SD <= GPIO_SD,
     HMAC <= HMAC,
     I2C0 <= I2C0,

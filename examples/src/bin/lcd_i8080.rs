@@ -27,7 +27,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority, DmaTxBuf},
     dma_tx_buffer,
-    gpio::{Input, Io, Level, Output, Pull},
+    gpio::{Input, Level, Output, Pull},
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
         LcdCam,
@@ -40,8 +40,6 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     let lcd_backlight = peripherals.pins.gpio45;
     let lcd_reset = peripherals.pins.gpio4;

@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
-    gpio::{Io, Level, Output},
+    gpio::{Level, Output},
     timer::{timg::TimerGroup, AnyTimer},
 };
 use esp_hal_embassy::Executor;
@@ -52,8 +52,6 @@ async fn control_led(
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0: AnyTimer = timg0.timer0.into();

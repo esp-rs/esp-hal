@@ -16,7 +16,6 @@ use esp_backtrace as _;
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
     delay::Delay,
-    gpio::Io,
     prelude::*,
 };
 use esp_println::println;
@@ -25,7 +24,6 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.IO_MUX);
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32s3")] {
             let analog_pin = peripherals.pins.gpio3;

@@ -11,7 +11,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, McPwm, PeripheralClockConfig},
     prelude::*,
 };
@@ -20,7 +19,6 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.IO_MUX);
     let pin = peripherals.pins.gpio0;
 
     // initialize peripheral

@@ -26,7 +26,6 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},
-    gpio::Io,
     peripheral::Peripheral,
     prelude::*,
     spi::{
@@ -63,7 +62,6 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    let io = Io::new(peripherals.IO_MUX);
     let sclk = peripherals.pins.gpio42;
     let mosi = peripherals.pins.gpio48;
     let miso = unsafe { mosi.clone_unchecked() };

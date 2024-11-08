@@ -54,9 +54,7 @@
 //! # use esp_hal::peripherals::Peripherals;
 //! # use esp_hal::rmt::TxChannelConfig;
 //! # use esp_hal::rmt::Rmt;
-//! # use esp_hal::gpio::Io;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
-//! # let io = Io::new(peripherals.IO_MUX);
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
 //! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();

@@ -11,7 +11,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Input, Io, Level, Output, Pull},
+    gpio::{Input, Level, Output, Pull},
     peripheral::Peripheral,
     spi::{slave::Spi, SpiMode},
     Blocking,
@@ -102,8 +102,6 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let io = Io::new(peripherals.IO_MUX);
 
         let (mosi_pin, miso_pin) = hil_test::i2c_pins!(peripherals);
         let (sclk_pin, _) = hil_test::common_test_pins!(peripherals);

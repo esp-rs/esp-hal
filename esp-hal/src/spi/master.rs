@@ -40,8 +40,6 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::master::{Config, Spi};
-//! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.IO_MUX);
 //! let sclk = peripherals.pins.gpio0;
 //! let miso = peripherals.pins.gpio2;
 //! let mosi = peripherals.pins.gpio1;

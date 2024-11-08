@@ -23,9 +23,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::Uart;
-//! use esp_hal::gpio::Io;
-//!
-//! let io = Io::new(peripherals.IO_MUX);
 //!
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
@@ -56,8 +53,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{Config, Uart};
-//! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
@@ -73,8 +68,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{Config, Uart};
-//! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.IO_MUX);
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
@@ -94,9 +87,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::Uart;
-//! use esp_hal::gpio::Io;
-//!
-//! let io = Io::new(peripherals.IO_MUX);
 //!
 //! let (rx, _) = peripherals.pins.gpio2.split();
 //! let (_, tx) = peripherals.pins.gpio1.split();
@@ -112,9 +102,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{UartTx, UartRx};
-//! use esp_hal::gpio::Io;
-//!
-//! let io = Io::new(peripherals.IO_MUX);
 //!
 //! let tx = UartTx::new(peripherals.UART0, peripherals.pins.gpio1).unwrap();
 //! let rx = UartRx::new(peripherals.UART1, peripherals.pins.gpio2).unwrap();

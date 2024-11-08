@@ -118,8 +118,7 @@ mod test {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let (_, mosi) = hil_test::common_test_pins!(io);
+        let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
         let mut spi = Spi::new_with_config(
             peripherals.SPI2,

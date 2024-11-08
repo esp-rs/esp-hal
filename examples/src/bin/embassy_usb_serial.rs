@@ -21,7 +21,6 @@ use embassy_usb::{
 };
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     otg_fs::{
         asynch::{Config, Driver},
         Usb,
@@ -37,9 +36,11 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.IO_MUX);
-
-    let usb = Usb::new(peripherals.USB0, peripherals.pins.gpio20, peripherals.pins.gpio19);
+    let usb = Usb::new(
+        peripherals.USB0,
+        peripherals.pins.gpio20,
+        peripherals.pins.gpio19,
+    );
 
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 1024];

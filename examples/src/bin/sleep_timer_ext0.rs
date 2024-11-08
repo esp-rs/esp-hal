@@ -14,7 +14,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     entry,
-    gpio::{Input, Io, Pull},
+    gpio::{Input, Pull},
     rtc_cntl::{
         get_reset_reason,
         get_wakeup_cause,
@@ -32,7 +32,6 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
-    let io = Io::new(peripherals.IO_MUX);
     let ext0_pin = Input::new(peripherals.pins.gpio4, Pull::None);
 
     println!("up and runnning!");

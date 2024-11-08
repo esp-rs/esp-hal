@@ -17,7 +17,7 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{GpioPin, Io},
+    gpio::GpioPin,
     macros::ram,
     prelude::*,
     rtc_cntl::Rtc,
@@ -48,8 +48,6 @@ fn interrupt_handler() {
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.set_interrupt_handler(interrupt_handler);

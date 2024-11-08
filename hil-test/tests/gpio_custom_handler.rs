@@ -66,9 +66,7 @@ mod tests {
     async fn default_handler_does_not_run_because_gpio_is_defined() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let (gpio1, gpio2) = hil_test::common_test_pins!(io);
+        let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_hal_embassy::init(timg0.timer0);
@@ -83,10 +81,10 @@ mod tests {
     async fn default_handler_runs_because_handler_is_set() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let mut io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let mut io = Io::new(peripherals.IO_MUX);
         io.set_interrupt_handler(interrupt_handler);
 
-        let (gpio1, gpio2) = hil_test::common_test_pins!(io);
+        let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_hal_embassy::init(timg0.timer0);

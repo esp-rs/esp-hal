@@ -17,7 +17,6 @@ use embassy_futures::select::{select, Either};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     rtc_cntl::Rtc,
     timer::timg::TimerGroup,
     touch::{Touch, TouchConfig, TouchPad},
@@ -32,7 +31,6 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.IO_MUX);
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     let touch_pin0 = peripherals.pins.gpio2;

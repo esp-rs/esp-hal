@@ -14,7 +14,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{Io, Level, Output},
+    gpio::{Level, Output},
     prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator},
 };
@@ -26,7 +26,6 @@ const WIDTH: usize = 80;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.IO_MUX);
     let mut out = Output::new(peripherals.pins.gpio5, Level::Low);
 
     cfg_if::cfg_if! {

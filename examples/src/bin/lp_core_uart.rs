@@ -16,10 +16,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{
-        lp_io::{LowPowerInput, LowPowerOutput},
-        Io,
-    },
+    gpio::lp_io::{LowPowerInput, LowPowerOutput},
     lp_core::{LpCore, LpCoreWakeupSource},
     prelude::*,
     uart::{lp_uart::LpUart, Config, Uart},
@@ -29,8 +26,6 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     // Set up (HP) UART1:
 

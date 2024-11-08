@@ -53,7 +53,6 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
-        let io = Io::new(peripherals.IO_MUX);
         let sclk = peripherals.pins.gpio0;
         let (mosi, _) = hil_test::common_test_pins!(peripherals);
 

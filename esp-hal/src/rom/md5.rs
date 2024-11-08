@@ -32,10 +32,8 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::md5;
 //! # use esp_hal::uart::Uart;
-//! # use esp_hal::gpio::Io;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let io = Io::new(peripherals.IO_MUX);
 //! # let mut uart0 = Uart::new(peripherals.UART0, peripherals.pins.gpio1, peripherals.pins.gpio2).unwrap();
 //! # let data = "Dummy";
 //! let d: md5::Digest = md5::compute(&data);
@@ -48,10 +46,8 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::md5;
 //! # use esp_hal::uart::Uart;
-//! # use esp_hal::gpio::Io;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let io = Io::new(peripherals.IO_MUX);
 //! # let mut uart0 = Uart::new(peripherals.UART0, peripherals.pins.gpio1, peripherals.pins.gpio2).unwrap();
 //! # let data0 = "Dummy";
 //! # let data1 = "Dummy";

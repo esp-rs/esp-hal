@@ -18,7 +18,6 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::Io,
     parl_io::{
         BitPackOrder,
         ClkOutPin,
@@ -34,8 +33,6 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
 

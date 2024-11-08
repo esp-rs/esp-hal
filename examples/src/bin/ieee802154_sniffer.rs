@@ -8,15 +8,13 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{gpio::Io, prelude::*, reset::software_reset, uart::Uart};
+use esp_hal::{prelude::*, reset::software_reset, uart::Uart};
 use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {

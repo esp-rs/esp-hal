@@ -29,8 +29,6 @@
 //! # use esp_hal::ledc::timer;
 //! # use esp_hal::ledc::LowSpeed;
 //! # use esp_hal::ledc::channel;
-//! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.IO_MUX);
 //! # let led = peripherals.pins.gpio0;
 //!
 //! let mut ledc = Ledc::new(peripherals.LEDC);

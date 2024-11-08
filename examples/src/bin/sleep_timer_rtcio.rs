@@ -19,7 +19,7 @@ use esp_hal::{
     delay::Delay,
     entry,
     gpio,
-    gpio::{Input, Io, Pull},
+    gpio::{Input, Pull},
     peripheral::Peripheral,
     rtc_cntl::{
         get_reset_reason,
@@ -36,7 +36,6 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.IO_MUX);
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     println!("up and runnning!");

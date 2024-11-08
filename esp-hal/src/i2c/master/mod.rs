@@ -19,7 +19,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2c::master::{Config, I2c};
-//! # use esp_hal::gpio::Io;
 //!
 //! // Create a new peripheral object with the described wiring
 //! // and standard I2C clock speed.

@@ -13,7 +13,6 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
     prelude::*,
     uart::{AtCmdConfig, Config, Uart, UartInterrupt},
     Blocking,
@@ -26,8 +25,6 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let delay = Delay::new();
-
-    let io = Io::new(peripherals.IO_MUX);
 
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {

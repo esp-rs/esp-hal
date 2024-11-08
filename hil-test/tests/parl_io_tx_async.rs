@@ -12,7 +12,6 @@ use esp_hal::{
     dma::{ChannelCreator, Dma, DmaPriority},
     gpio::{
         interconnect::{InputSignal, OutputSignal},
-        Io,
         NoPin,
     },
     parl_io::{
@@ -54,7 +53,6 @@ mod tests {
     async fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.IO_MUX);
         let (clock, _) = hil_test::common_test_pins!(peripherals);
         let valid = hil_test::unconnected_pin!(peripherals);
         let (clock_loopback, clock) = clock.split();

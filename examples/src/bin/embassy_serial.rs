@@ -13,7 +13,6 @@ use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     timer::timg::TimerGroup,
     uart::{AtCmdConfig, Config, Uart, UartRx, UartTx},
     Async,
@@ -70,8 +69,6 @@ async fn main(spawner: Spawner) {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
-
-    let io = Io::new(peripherals.IO_MUX);
 
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {

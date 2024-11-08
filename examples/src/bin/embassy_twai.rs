@@ -35,7 +35,6 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
 use embedded_can::{Frame, Id};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     timer::timg::TimerGroup,
     twai::{self, EspTwaiFrame, StandardId, TwaiMode, TwaiRx, TwaiTx},
 };
@@ -91,8 +90,6 @@ async fn main(spawner: Spawner) {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
-
-    let io = Io::new(peripherals.IO_MUX);
 
     // Without an external transceiver, we only need a single line between the two MCUs.
     let (rx_pin, tx_pin) = peripherals.pins.gpio2.split();

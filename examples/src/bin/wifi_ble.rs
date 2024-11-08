@@ -25,7 +25,7 @@ use bleps::{
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Input, Io, Pull},
+    gpio::{Input, Pull},
     prelude::*,
     rng::Rng,
     time,
@@ -53,8 +53,6 @@ fn main() -> ! {
         peripherals.RADIO_CLK,
     )
     .unwrap();
-
-    let io = Io::new(peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {

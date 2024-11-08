@@ -18,9 +18,9 @@
 //! GPIO interrupts. For more information, see the
 //! [`Io::set_interrupt_handler`].
 //!
-//! The pins are accessible via [`Io::pins`]. These pins can then be passed to
-//! peripherals (such as SPI, UART, I2C, etc.), to pin drivers or can be
-//! [`GpioPin::split`] into peripheral signals.
+//! The pins are accessible via [`crate::Peripherals::pins`]. These pins can
+//! then be passed to peripherals (such as SPI, UART, I2C, etc.), to pin drivers
+//! or can be [`GpioPin::split`] into peripheral signals.
 //!
 //! Each pin is a different type initially. Internally, `esp-hal` will often
 //! erase their types automatically, but they can also be converted into
@@ -52,7 +52,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::{Io, Level, Output};
-//! let io = Io::new(peripherals.IO_MUX);
 //! let mut led = Output::new(peripherals.pins.gpio5, Level::High);
 //! # }
 //! ```

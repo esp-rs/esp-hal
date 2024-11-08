@@ -52,9 +52,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::mcpwm::{operator::{DeadTimeCfg, PWMStream, PwmPinConfig}, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
-//! # use esp_hal::gpio::Io;
-//!
-//! # let io = Io::new(peripherals.IO_MUX);
 //! # let pin = peripherals.pins.gpio0;
 //!
 //! // initialize peripheral

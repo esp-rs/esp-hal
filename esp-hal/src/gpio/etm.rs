@@ -25,7 +25,6 @@
 //! ### Toggle an LED When a Button is Pressed
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::gpio::etm::Channels;
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::etm::InputConfig;
@@ -33,7 +32,6 @@
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
 //! #
-//! # let io = Io::new(peripherals.IO_MUX);
 //! # let mut led = peripherals.pins.gpio1;
 //! # let button = peripherals.pins.gpio9;
 //!

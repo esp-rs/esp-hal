@@ -7,7 +7,7 @@
 
 use esp_hal::{
     delay::Delay,
-    gpio::{AnyPin, Input, Io, Level, Output, Pin, Pull},
+    gpio::{AnyPin, Input, Level, Output, Pin, Pull},
     pcnt::{channel::EdgeMode, Pcnt},
 };
 use hil_test as _;
@@ -27,8 +27,6 @@ mod tests {
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let io = Io::new(peripherals.IO_MUX);
 
         let (din, dout) = hil_test::common_test_pins!(peripherals);
 

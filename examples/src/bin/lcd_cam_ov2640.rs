@@ -28,7 +28,6 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_rx_stream_buffer,
-    gpio::Io,
     i2c::{
         self,
         master::{Config, I2c},
@@ -45,8 +44,6 @@ use esp_println::{print, println};
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;

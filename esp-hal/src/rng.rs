@@ -138,9 +138,7 @@ impl rand_core::RngCore for Rng {
 /// # use esp_hal::peripherals::Peripherals;
 /// # use esp_hal::peripherals::ADC1;
 /// # use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
-/// # use esp_hal::gpio::Io;
 ///
-/// let io = Io::new(peripherals.IO_MUX);
 /// let mut buf = [0u8; 16];
 ///
 /// // ADC is not available from now
@@ -152,10 +150,12 @@ impl rand_core::RngCore for Rng {
 #[cfg_attr(esp32, doc = "let analog_pin = peripherals.pins.gpio32;")]
 #[cfg_attr(not(esp32), doc = "let analog_pin = peripherals.pins.gpio3;")]
 /// let mut adc1_config = AdcConfig::new();
-/// let mut adc1_pin = adc1_config.enable_pin(analog_pin,
-/// Attenuation::Attenuation11dB); let mut adc1 =
-/// Adc::<ADC1>::new(peripherals.ADC1, adc1_config); let pin_value: u16 =
-/// nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+/// let mut adc1_pin = adc1_config.enable_pin(
+///     analog_pin,
+///     Attenuation::Attenuation11dB
+/// );
+/// let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
+/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
 /// rng.read(&mut buf);
 /// true_rand = rng.random();
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();

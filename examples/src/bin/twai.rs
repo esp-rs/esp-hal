@@ -29,7 +29,6 @@ const IS_FIRST_SENDER: bool = true;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
     prelude::*,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
 };
@@ -39,8 +38,6 @@ use nb::block;
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     // Without an external transceiver, we only need a single line between the two MCUs.
     let (rx_pin, tx_pin) = peripherals.pins.gpio2.split();

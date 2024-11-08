@@ -18,13 +18,11 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::spi::{master::{Config, Spi}, SpiMode};
 //! # use esp_hal::dma::{Dma, DmaPriority};
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
-//! let io = Io::new(peripherals.IO_MUX);
 //! let sclk = peripherals.pins.gpio0;
 //! let miso = peripherals.pins.gpio2;
 //! let mosi = peripherals.pins.gpio4;

@@ -15,15 +15,13 @@
 use core::fmt::Write;
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, gpio::Io, prelude::*, uart::Uart};
+use esp_hal::{delay::Delay, prelude::*, uart::Uart};
 
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let delay = Delay::new();
-
-    let io = Io::new(peripherals.IO_MUX);
 
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {

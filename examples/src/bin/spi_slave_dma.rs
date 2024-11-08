@@ -34,7 +34,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Input, Io, Level, Output, Pull},
+    gpio::{Input, Level, Output, Pull},
     prelude::*,
     spi::{slave::Spi, SpiMode},
 };
@@ -44,17 +44,15 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut master_sclk = Output::new(peripherals.pins.gpio4, Level::Low);
+    let master_miso = Input::new(peripherals.pins.gpio5, Pull::None);
+    let mut master_mosi = Output::new(peripherals.pins.gpio8, Level::Low);
+    let mut master_cs = Output::new(peripherals.pins.gpio9, Level::High);
 
-    let mut master_sclk = Output::new(io.pins.gpio4, Level::Low);
-    let master_miso = Input::new(io.pins.gpio5, Pull::None);
-    let mut master_mosi = Output::new(io.pins.gpio8, Level::Low);
-    let mut master_cs = Output::new(io.pins.gpio9, Level::High);
-
-    let slave_sclk = io.pins.gpio0;
-    let slave_miso = io.pins.gpio1;
-    let slave_mosi = io.pins.gpio2;
-    let slave_cs = io.pins.gpio3;
+    let slave_sclk = peripherals.pins.gpio0;
+    let slave_miso = peripherals.pins.gpio1;
+    let slave_mosi = peripherals.pins.gpio2;
+    let slave_cs = peripherals.pins.gpio3;
 
     let dma = Dma::new(peripherals.DMA);
     cfg_if::cfg_if! {

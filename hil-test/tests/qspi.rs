@@ -10,7 +10,7 @@ use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
     dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Input, Io, Level, Output, Pull},
+    gpio::{AnyPin, Input, Level, Output, Pull},
     prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
@@ -183,8 +183,6 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let io = Io::new(peripherals.IO_MUX);
 
         let (mut pin, mut pin_mirror) = hil_test::common_test_pins!(peripherals);
         let mut unconnected_pin = hil_test::unconnected_pin!(peripherals);

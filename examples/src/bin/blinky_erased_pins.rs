@@ -14,15 +14,13 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{Input, Io, Level, Output, Pin, Pull},
+    gpio::{Input, Level, Output, Pin, Pull},
     prelude::*,
 };
 
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.IO_MUX);
 
     // Set LED GPIOs as an output:
     let led1 = Output::new(peripherals.pins.gpio2.degrade(), Level::Low);

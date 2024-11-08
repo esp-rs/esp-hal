@@ -21,7 +21,6 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     i2c::master::{Config, I2c},
     prelude::*,
     timer::timg::TimerGroup,

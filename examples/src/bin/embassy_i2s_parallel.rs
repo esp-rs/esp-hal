@@ -20,7 +20,6 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
-    gpio::Io,
     i2s::parallel::{I2sParallel, TxEightBits},
     prelude::*,
     timer::timg::TimerGroup,
@@ -35,7 +34,6 @@ async fn main(_spawner: Spawner) {
     info!("Starting!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let dma = Dma::new(peripherals.DMA);
-    let io = Io::new(peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
