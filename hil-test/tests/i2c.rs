@@ -46,8 +46,9 @@ mod tests {
 
     #[test]
     #[timeout(3)]
-    fn empty_read_write_returns_ack_error(mut ctx: Context) {
+    fn empty_write_returns_ack_error_for_unknown_address(mut ctx: Context) {
         assert_eq!(ctx.i2c.write(0xab, &[]), Err(Error::AckCheckFailed));
+        assert_eq!(ctx.i2c.write(0x77, &[]), Ok(()));
     }
 
     #[test]
