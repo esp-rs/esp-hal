@@ -793,7 +793,16 @@ pub(crate) fn bind_default_interrupt_handler() {
         // We only allow binding the default handler if nothing else is bound.
         // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
         if !core::ptr::eq(handler, DEFAULT_INTERRUPT_HANDLER.handler() as _) {
-            info!("Not using default GPIO interrupt handler: already bound");
+            // The user has configured an interrupt handler they wish to use.
+            info!("Not using default GPIO interrupt handler: already bound in vector table");
+            return;
+        } else if interrupt::bound_cpu_interrupt_for(crate::Cpu::current(), Interrupt::GPIO)
+            .is_some()
+        {
+            // The vector table doesn't contain a custom entry. Still, the
+            // peripheral interrupt may already be bound to
+            // something else.
+            info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
             return;
         }
     }

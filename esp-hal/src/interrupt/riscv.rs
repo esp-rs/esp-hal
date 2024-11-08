@@ -346,13 +346,17 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrup
     let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
 
     let cpu_intr = intr_map_base.offset(interrupt_number).read_volatile();
-    if cpu_intr > 0 {
+    if cpu_intr > 0 && cpu_intr != DISABLED_CPU_INTERRUPT {
         Some(core::mem::transmute::<u32, CpuInterrupt>(
             cpu_intr - EXTERNAL_INTERRUPT_OFFSET,
         ))
     } else {
         None
     }
+}
+
+pub(crate) fn bound_cpu_interrupt_for(_cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
+    unsafe { get_assigned_cpu_interrupt(interrupt) }
 }
 
 mod vectored {

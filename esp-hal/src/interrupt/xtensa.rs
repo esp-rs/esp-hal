@@ -94,6 +94,31 @@ pub enum CpuInterrupt {
     Interrupt31EdgePriority5,
 }
 
+impl CpuInterrupt {
+    fn from_u32(n: u32) -> Option<Self> {
+        if n < 32 {
+            Some(unsafe { core::mem::transmute::<u32, Self>(n) })
+        } else {
+            None
+        }
+    }
+
+    fn is_internal(self) -> bool {
+        matches!(
+            self,
+            |Self::Interrupt6Timer0Priority1| Self::Interrupt7SoftwarePriority1
+                | Self::Interrupt11ProfilingPriority3
+                | Self::Interrupt15Timer1Priority3
+                | Self::Interrupt16Timer2Priority5
+                | Self::Interrupt29SoftwarePriority3
+        )
+    }
+
+    fn is_peripheral(self) -> bool {
+        !self.is_internal()
+    }
+}
+
 /// The interrupts reserved by the HAL
 #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
 pub static RESERVED_INTERRUPTS: &[usize] = &[
@@ -158,6 +183,25 @@ pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     intr_map_base
         .offset(interrupt_number)
         .write_volatile(cpu_interrupt_number as u32);
+}
+
+/// Get cpu interrupt assigned to peripheral interrupt
+pub(crate) fn bound_cpu_interrupt_for(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
+    let interrupt_number = interrupt as isize;
+
+    let intr_map_base = match cpu {
+        Cpu::ProCpu => unsafe { (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr() },
+        #[cfg(multi_core)]
+        Cpu::AppCpu => unsafe { (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr() },
+    };
+    let cpu_intr = unsafe { intr_map_base.offset(interrupt_number).read_volatile() };
+    let cpu_intr = CpuInterrupt::from_u32(cpu_intr)?;
+
+    if cpu_intr.is_peripheral() {
+        Some(cpu_intr)
+    } else {
+        None
+    }
 }
 
 /// Disable the given peripheral interrupt
