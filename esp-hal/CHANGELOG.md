@@ -33,10 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `{Uart, UartRx, UartTx}` now implement `embassy_embedded_hal::SetConfig` (#2449)
 - GPIO ETM tasks and events now accept `InputSignal` and `OutputSignal` (#2427)
 - `spi::master::Config` and `{Spi, SpiDma, SpiDmaBus}::apply_config` (#2448)
-- `embassy_embedded_hal::SetConfig` is now implemented for `{Spi, SpiDma, SpiDmaBus}` (#2448)
+- `embassy_embedded_hal::SetConfig` is now implemented for `spi::master::{Spi, SpiDma, SpiDmaBus}`, `i2c::master::I2c` (#2448, #2477)
 - `slave::Spi::{with_mosi(), with_miso(), with_sclk(), with_cs()}` functions (#2485)
 - I8080: Added `set_8bits_order()` to set the byte order in 8-bit mode (#2487)
-- `embassy_embedded_hal::SetConfig` is now implemented for `spi::master::{Spi, SpiDma, SpiDmaBus}`, `i2c::master::I2c` (#2448, #2477)
 - `I2c::{apply_config(), with_sda(), with_scl()}` (#2477)
 
 ### Changed
@@ -61,7 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The I2S driver has been moved to `i2s::master` (#2472)
 - `slave::Spi` constructors no longer take pins (#2485)
 - The `I2c` master driver has been moved from `esp_hal::i2c` to `esp_hal::i2c::master`. (#2476)
-- The `I2c` master driver has been moved to `esp_hal::i2c::master`. (#2476)
 - `I2c` SCL timeout is now defined in bus clock cycles. (#2477)
 
 ### Fixed
@@ -79,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `i2s::{I2sWrite, I2sWriteDma, I2sRead, I2sReadDma, I2sWriteDmaAsync, I2sReadDmaAsync}` traits have been removed. (#2316)
 - The `ledc::ChannelHW` trait is no longer generic. (#2387)
 - The `I2c::new_with_timeout` constructors have been removed (#2361)
-- `I2c::new()` no longer takes `frequency` and pins as parameters. (#?)
+- `I2c::new()` no longer takes `frequency` and pins as parameters. (#2477)
 - The `spi::master::HalfDuplexReadWrite` trait has been removed. (#2373)
 - The `Spi::with_pins` methods have been removed. (#2373)
 - The `Spi::new_half_duplex` constructor have been removed. (#2373)
