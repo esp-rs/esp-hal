@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    i2c::master::{Config, I2c, Operation},
+    i2c::master::{Config, Error, I2c, Operation},
     Async,
     Blocking,
 };
@@ -42,6 +42,12 @@ mod tests {
             .with_scl(scl);
 
         Context { i2c }
+    }
+
+    #[test]
+    #[timeout(3)]
+    fn empty_read_write_returns_ack_error(mut ctx: Context) {
+        assert_eq!(ctx.i2c.write(0xab, &[]), Err(Error::AckCheckFailed));
     }
 
     #[test]

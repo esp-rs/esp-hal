@@ -2067,6 +2067,9 @@ impl Driver<'_> {
         start: bool,
         stop: bool,
     ) -> Result<(), Error> {
+        if buffer.is_empty() {
+            return self.write_operation_blocking(address, &[], start, stop);
+        }
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             self.write_operation_blocking(
@@ -2110,6 +2113,9 @@ impl Driver<'_> {
         start: bool,
         stop: bool,
     ) -> Result<(), Error> {
+        if buffer.is_empty() {
+            return self.write_operation(address, &[], start, stop).await;
+        }
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             self.write_operation(
