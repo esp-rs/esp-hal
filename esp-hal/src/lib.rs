@@ -560,5 +560,7 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(esp32)]
     crate::time::time_init();
 
+    crate::gpio::bind_default_interrupt_handler();
+
     peripherals
 }
