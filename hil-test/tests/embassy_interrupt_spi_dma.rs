@@ -11,6 +11,7 @@ use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
+    gpio::Io,
     interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
     spi::{
@@ -22,6 +23,7 @@ use esp_hal::{
 };
 use esp_hal_embassy::InterruptExecutor;
 use hil_test as _;
+use portable_atomic::AtomicBool;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -31,6 +33,8 @@ macro_rules! mk_static {
         x
     }};
 }
+
+static INTERRUPT_TASK_WORKING: AtomicBool = AtomicBool::new(false);
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
 #[embassy_executor::task]
@@ -46,7 +50,9 @@ async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Async>
     loop {
         let mut buffer: [u8; 8] = [0; 8];
 
+        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Release);
         spi.transfer_in_place_async(&mut buffer).await.unwrap();
+        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
 
         ticker.next().await;
     }
@@ -60,7 +66,10 @@ async fn interrupt_driven_task(mut i2s_tx: esp_hal::i2s::master::I2sTx<'static, 
     loop {
         let mut buffer: [u8; 8] = [0; 8];
 
+        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Release);
         i2s_tx.write_dma_async(&mut buffer).await.unwrap();
+        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
+
         ticker.next().await;
     }
 }
@@ -108,6 +117,9 @@ mod test {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
+        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let (miso, mosi) = hil_test::common_test_pins!(io);
+
         let mut spi = Spi::new_with_config(
             peripherals.SPI2,
             Config {
@@ -116,6 +128,8 @@ mod test {
                 ..Config::default()
             },
         )
+        .with_miso(miso)
+        .with_mosi(mosi)
         .with_dma(dma_channel1.configure(false, DmaPriority::Priority0))
         .with_buffers(dma_rx_buf, dma_tx_buf)
         .into_async();
@@ -167,12 +181,22 @@ mod test {
 
         let start = Instant::now();
         let mut buffer: [u8; 1024] = [0; 1024];
+        let mut dst_buffer: [u8; 1024] = [0; 1024];
+        let mut i = 0;
         loop {
-            spi.transfer_in_place_async(&mut buffer).await.unwrap();
+            buffer.fill(i);
+            dst_buffer.fill(i.wrapping_add(1));
+            spi.transfer_async(&mut dst_buffer, &buffer).await.unwrap();
+            // make sure the transfer didn't end prematurely
+            assert!(dst_buffer.iter().all(|&v| v == i));
 
             if start.elapsed() > Duration::from_secs(1) {
+                // make sure the other peripheral didn't got stuck
+                while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Acquire) {}
                 break;
             }
+
+            i = i.wrapping_add(1);
         }
     }
 
