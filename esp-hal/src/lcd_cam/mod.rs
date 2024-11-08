@@ -108,7 +108,7 @@ pub enum BitOrder {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ByteOrder {
-    /// Do not change bit order.
+    /// Do not change byte order.
     #[default]
     Native   = 0,
     /// Invert byte order.

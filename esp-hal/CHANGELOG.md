@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `spi::master::Config` and `{Spi, SpiDma, SpiDmaBus}::apply_config` (#2448)
 - `embassy_embedded_hal::SetConfig` is now implemented for `{Spi, SpiDma, SpiDmaBus}` (#2448)
 - `slave::Spi::{with_mosi(), with_miso(), with_sclk(), with_cs()}` functions (#2485)
+- I8080: Added `set_8bits_order()` to set the byte order in 8-bit mode (#2487)
 
 ### Changed
 
@@ -66,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: added UART-specific workaround for https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html (#2441)
 - Fixed some SysTimer race conditions and panics (#2451)
 - TWAI: accept all messages by default (#2467)
+- I8080: `set_byte_order()` now works correctly in 16-bit mode (#2487)
 
 ### Removed
 

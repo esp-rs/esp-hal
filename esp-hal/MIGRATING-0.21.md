@@ -306,3 +306,16 @@ refer to the `Config` struct as `uart::Config`.
 +    },
 +)
 ```
+
+## I8080 driver split `set_byte_order()` into `set_8bits_order()` and `set_byte_order()`.
+
+If you were using an 8-bit bus.
+```diff
+- i8080.set_byte_order(ByteOrder::default());
++ i8080.set_8bits_order(ByteOrder::default());
+```
+
+If you were using an 16-bit bus, you don't need to change anything, `set_byte_order()` now works correctly.
+
+If you were sharing the bus between an 8-bit and 16-bit device, you will have to call the corresponding method when
+you switch between devices. Be sure to read the documentation of the new methods.

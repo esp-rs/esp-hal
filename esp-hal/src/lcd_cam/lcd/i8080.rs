@@ -217,13 +217,25 @@ impl<'d, DM: Mode> I8080<'d, DM> {
 }
 
 impl<'d, DM: Mode> I8080<'d, DM> {
-    /// Configures the byte order for data transmission.
+    /// Configures the byte order for data transmission in 16-bit mode.
+    /// This must be set to [ByteOrder::default()] when transmitting in 8-bit
+    /// mode.
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
-        self.lcd_cam.lcd_user().modify(|_, w| {
-            w.lcd_byte_order().bit(is_inverted);
-            w.lcd_8bits_order().bit(is_inverted)
-        });
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_byte_order().bit(is_inverted));
+        self
+    }
+
+    /// Configures the byte order for data transmission in 8-bit mode.
+    /// This must be set to [ByteOrder::default()] when transmitting in 16-bit
+    /// mode.
+    pub fn set_8bits_order(&mut self, byte_order: ByteOrder) -> &mut Self {
+        let is_inverted = byte_order != ByteOrder::default();
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_8bits_order().bit(is_inverted));
         self
     }
 
