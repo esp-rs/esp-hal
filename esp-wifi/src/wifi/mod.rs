@@ -86,6 +86,8 @@ use include::{coex_adapter_funcs_t, coex_pre_init, esp_coex_adapter_register};
 #[cfg(all(csi_enable, esp32c6))]
 use crate::binary::include::wifi_csi_acquire_config_t;
 #[cfg(csi_enable)]
+pub use crate::binary::include::wifi_csi_info_t;
+#[cfg(csi_enable)]
 use crate::binary::include::{
     esp_wifi_set_csi,
     esp_wifi_set_csi_config,
@@ -354,10 +356,9 @@ unsafe extern "C" fn promiscuous_csi_rx_cb(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
 ) {
-    let csi_callback = core::mem::transmute::<
-        *mut crate::wifi::c_types::c_void,
-        fn(crate::binary::include::wifi_csi_info_t),
-    >(ctx);
+    let ctx = ctx as *mut alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>;
+    let csi_callback = &mut *ctx;
+
     csi_callback(*data);
 }
 
@@ -514,13 +515,13 @@ impl CsiConfig {
     /// received, the callback function will be called.
     pub(crate) fn set_receive_cb(
         &mut self,
-        cb: fn(crate::binary::include::wifi_csi_info_t),
+        cb: alloc::boxed::Box<alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>>,
     ) -> Result<(), WifiError> {
+        // Cast the callback back to dyn FnMut(crate::binary::include::wifi_csi_info_t)
+        let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut core::ffi::c_void;
+
         unsafe {
-            esp_wifi_result!(esp_wifi_set_csi_rx_cb(
-                Some(promiscuous_csi_rx_cb),
-                cb as *mut crate::wifi::c_types::c_void
-            ))?;
+            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(promiscuous_csi_rx_cb), cb_ptr))?;
         }
         Ok(())
     }
@@ -2736,7 +2737,7 @@ impl<'d> WifiController<'d> {
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
-        cb: fn(crate::binary::include::wifi_csi_info_t),
+        cb: alloc::boxed::Box<alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>>,
     ) -> Result<(), WifiError> {
         csi.apply_config()?;
         csi.set_receive_cb(cb)?;
