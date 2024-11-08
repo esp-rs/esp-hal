@@ -10,9 +10,9 @@
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
-//! When using USB-SERIAL-JTAG you may have to activate the feature `phy-enable-usb` in the esp-wifi crate.
+//!
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -315,7 +315,7 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("Device capabilities: {:?}", controller.get_capabilities());
 
     println!("Starting wifi");
-    controller.start().await.unwrap();
+    controller.start_async().await.unwrap();
     println!("Wifi started!");
 
     loop {
@@ -323,7 +323,7 @@ async fn connection(mut controller: WifiController<'static>) {
             WifiState::ApStarted => {
                 println!("About to connect...");
 
-                match controller.connect().await {
+                match controller.connect_async().await {
                     Ok(_) => {
                         // wait until we're no longer connected
                         controller.wait_for_event(WifiEvent::StaDisconnected).await;

@@ -48,19 +48,12 @@
 //! Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in
 //! your application you are not using this CPU timer.
 //!
-//! ## USB-SERIAL-JTAG
-//!
-//! When using USB-SERIAL-JTAG (for example by selecting `jtag-serial` in [`esp-println`](https://crates.io/crates/esp-println)) you have to activate the feature `phy-enable-usb`.
-//!
-//! Don't use this feature if you are _not_ using USB-SERIAL-JTAG as it might
-//! reduce WiFi performance.
-//!
 //! # Features flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
 //! (and thus, `coex`) is not available on ESP32-S2.
 //!
-//! When using the `dump-packets` feature you can use the extcap in
+//! When using the `dump_packets` config you can use the extcap in
 //! `extras/esp-wifishark` to analyze the frames in Wireshark.
 //! For more information see
 //! [extras/esp-wifishark/README.md](../extras/esp-wifishark/README.md)
@@ -134,6 +127,8 @@ pub mod ble;
 #[cfg(feature = "esp-now")]
 pub mod esp_now;
 
+pub mod config;
+
 pub(crate) mod common_adapter;
 
 #[doc(hidden)]
@@ -169,34 +164,7 @@ const _: () = {
     };
 };
 
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Tunable parameters for the WiFi driver
-#[allow(unused)] // currently there are no ble tunables
-struct Config {
-    rx_queue_size: usize,
-    tx_queue_size: usize,
-    static_rx_buf_num: usize,
-    dynamic_rx_buf_num: usize,
-    static_tx_buf_num: usize,
-    dynamic_tx_buf_num: usize,
-    ampdu_rx_enable: bool,
-    ampdu_tx_enable: bool,
-    amsdu_tx_enable: bool,
-    rx_ba_win: usize,
-    max_burst_size: usize,
-    country_code: &'static str,
-    country_code_operating_class: u8,
-    mtu: usize,
-    tick_rate_hz: u32,
-    listen_interval: u16,
-    beacon_timeout: u16,
-    ap_beacon_timeout: u16,
-    failure_retry_cnt: u8,
-    scan_method: u32,
-}
-
-pub(crate) const CONFIG: Config = Config {
+pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
     rx_queue_size: esp_config_int!(usize, "ESP_WIFI_RX_QUEUE_SIZE"),
     tx_queue_size: esp_config_int!(usize, "ESP_WIFI_TX_QUEUE_SIZE"),
     static_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_RX_BUF_NUM"),
@@ -371,11 +339,9 @@ impl private::Sealed for Trng<'_> {}
 /// ```rust, no_run
 #[doc = esp_hal::before_snippet!()]
 /// use esp_hal::{rng::Rng, timg::TimerGroup};
-/// use esp_wifi::EspWifiInitFor;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// let init = esp_wifi::init(
-///     EspWifiInitFor::Wifi,
 ///     timg0.timer0,
 ///     Rng::new(peripherals.RNG),
 ///     peripherals.RADIO_CLK,

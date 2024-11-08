@@ -16,6 +16,8 @@ use critical_section::Mutex;
 use enumset::EnumSet;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
+#[cfg(not(coex))]
+use crate::config::PowerSaveMode;
 use crate::{
     binary::include::*,
     hal::peripheral::{Peripheral, PeripheralRef},
@@ -333,6 +335,12 @@ impl EspNowManager<'_> {
         }
 
         Ok(())
+    }
+
+    #[cfg(not(coex))]
+    /// Configures modem power saving
+    pub fn set_power_saving(&self, ps: PowerSaveMode) -> Result<(), WifiError> {
+        crate::wifi::apply_power_saving(ps)
     }
 
     /// Set primary WiFi channel.
@@ -682,25 +690,6 @@ impl<'d> EspNow<'d> {
         check_error!({
             esp_wifi_set_inactive_time(wifi_interface_t_WIFI_IF_STA, crate::CONFIG.beacon_timeout)
         })?;
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "ps-min-modem")] {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
-                )})?;
-            } else if #[cfg(feature = "ps-max-modem")] {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM
-                )})?;
-            } else if #[cfg(coex)] {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
-                )})?;
-            } else {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE
-                )})?;
-            }
-        };
         check_error!({ esp_now_init() })?;
         check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) })?;
         check_error!({ esp_now_register_send_cb(Some(send_cb)) })?;
@@ -824,7 +813,6 @@ unsafe extern "C" fn send_cb(_mac_addr: *const u8, status: esp_now_send_status_t
 
         ESP_NOW_SEND_CB_INVOKED.store(true, Ordering::Release);
 
-        #[cfg(feature = "async")]
         asynch::ESP_NOW_TX_WAKER.wake();
     })
 }
@@ -871,15 +859,12 @@ unsafe extern "C" fn rcv_cb(
 
         queue.push_back(ReceivedData { data, info });
 
-        #[cfg(feature = "async")]
         asynch::ESP_NOW_RX_WAKER.wake();
     });
 }
 
-#[cfg(feature = "async")]
 pub use asynch::SendFuture;
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::task::{Context, Poll};
 

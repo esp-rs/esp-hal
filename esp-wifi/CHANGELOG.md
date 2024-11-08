@@ -10,12 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added `serde` support through the `serde` feature (#2346)
+- Added `PowerSaveMode` and `set_power_saving` methods on `EspNowManager` & `WifiController` (#2446)
 
 ### Changed
 
 - `esp_wifi::init` no longer requires `EspWifiInitFor`, and now returns `EspWifiController`, see the migration guide for more details (#2301)
 - No need to add `rom_functions.x` manually anymore (#2374)
 - esp-now: Data is now private in `ReceivedData` - use `data()`(#2396)
+- Changed the async APIs to have a `_async` postfix to avoid name collisions (#2446)
+- `phy_enable_usb` is enabled by default (#2446)
 
 ### Fixed
 
@@ -25,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Feature `have-strchr` is removed (#2462)
+- Features `async`, `embassy-net` have been removed (#2446)
+- Features `phy-enable-usb` & `dump-packets` have been turned into configuration options `phy_enable_usb` & `dump_packets` (#2446)
+- Features `ps-min-modem` & `ps-max-modem` have been removed in favour of a runtime config (#2446)
+
 
 ## 0.10.1 - 2024-10-10
 

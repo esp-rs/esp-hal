@@ -117,7 +117,6 @@ impl defmt::Format for ReceivedPacket {
     }
 }
 
-#[cfg(feature = "async")]
 pub fn have_hci_read_data() -> bool {
     critical_section::with(|cs| {
         let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
@@ -160,7 +159,7 @@ pub fn read_hci(data: &mut [u8]) -> usize {
 }
 
 fn dump_packet_info(_buffer: &[u8]) {
-    #[cfg(feature = "dump-packets")]
+    #[cfg(dump_packets)]
     critical_section::with(|_cs| {
         info!("@HCIFRAME {:?}", _buffer);
     });
