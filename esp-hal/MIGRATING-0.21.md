@@ -72,6 +72,10 @@ The I2C master driver and related types have been moved to `esp_hal::i2c::master
 The `with_timeout` constructors have been removed. `new` and `new_typed` now take a `Config` struct
 with the available configuration options.
 
+- The default configuration is now:
+  - bus frequency: 100 kHz
+  - timeout: about 10 bus clock cycles
+
 The constructors no longer take pins. Use `with_sda` and `with_scl` instead.
 
 ```diff
@@ -90,6 +94,16 @@ The constructors no longer take pins. Use `with_sda` and `with_scl` instead.
 +.with_sda(io.pins.gpio4)
 +.with_scl(io.pins.gpio5);
 ```
+
+### The calculation of I2C timeout has changed
+
+Previously, I2C timeouts were counted in increments of I2C peripheral clock cycles. This meant that
+the configure value meant different lengths of time depending on the device. With this update, the
+I2C configuration now expects the timeout value in number of bus clock cycles, which is consistent
+between devices.
+
+ESP32 and ESP32-S2 use an exact number of clock cycles for its timeout. Other MCUs, however, use
+the `2^timeout` value internally, and the HAL rounds up the timeout to the next appropriate value.
 
 ## Changes to half-duplex SPI
 

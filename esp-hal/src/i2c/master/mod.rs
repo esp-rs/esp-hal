@@ -1240,8 +1240,7 @@ fn configure_clock(
     scl_stop_setup_time: u32,
     scl_start_hold_time: u32,
     scl_stop_hold_time: u32,
-    time_out_value: u32,
-    time_out_en: bool,
+    timeout: Option<u32>,
 ) {
     unsafe {
         // divider
@@ -1291,19 +1290,15 @@ fn configure_clock(
         // timeout mechanism
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                // timeout
                 register_block
                     .to()
-                    .write(|w| w.time_out().bits(time_out_value));
+                    .write(|w| w.time_out().bits(unwrap!(timeout)));
             } else {
-                // timeout
-                // FIXME: Enable timout for other chips!
-                #[allow(clippy::useless_conversion)]
                 register_block
                     .to()
-                    .write(|w| w.time_out_en().bit(time_out_en)
+                    .write(|w| w.time_out_en().bit(timeout.is_some())
                     .time_out_value()
-                    .bits(time_out_value.try_into().unwrap())
+                    .bits(timeout.unwrap_or(1) as _)
                 );
             }
         }
@@ -1437,8 +1432,9 @@ impl Info {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        // default we set the timeout value to 10 bus cycles
-        let time_out_value = timeout.unwrap_or(half_cycle * 20);
+        let timeout = timeout.map_or(Some(0xF_FFFF), |to_bus| {
+            Some((to_bus * 2 * half_cycle).min(0xF_FFFF))
+        });
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -1491,8 +1487,7 @@ impl Info {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            time_out_value,
-            true,
+            timeout,
         );
     }
 
@@ -1515,8 +1510,6 @@ impl Info {
         let sda_sample = half_cycle / 2 - 1;
         let setup = half_cycle;
         let hold = half_cycle;
-        // default we set the timeout value to 10 bus cycles
-        let time_out_value = timeout.unwrap_or(half_cycle * 20);
 
         // scl period
         let scl_low_period = scl_low - 1;
@@ -1531,7 +1524,6 @@ impl Info {
         // hold
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold;
-        let time_out_en = true;
 
         configure_clock(
             self.register_block(),
@@ -1545,8 +1537,7 @@ impl Info {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            time_out_value,
-            time_out_en,
+            timeout.map(|to_bus| (to_bus * 2 * half_cycle).min(0xFF_FFFF)),
         );
     }
 
@@ -1578,14 +1569,6 @@ impl Info {
         let setup = half_cycle;
         let hold = half_cycle;
 
-        let time_out_value = if let Some(timeout) = timeout {
-            timeout
-        } else {
-            // default we set the timeout value to about 10 bus cycles
-            // log(20*half_cycle)/log(2) = log(half_cycle)/log(2) +  log(20)/log(2)
-            (4 * 8 - (5 * half_cycle).leading_zeros()) + 2
-        };
-
         // According to the Technical Reference Manual, the following timings must be
         // subtracted by 1. However, according to the practical measurement and
         // some hardware behaviour, if wait_high_period and scl_high minus one.
@@ -1605,7 +1588,6 @@ impl Info {
         // hold
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold - 1;
-        let time_out_en = true;
 
         configure_clock(
             self.register_block(),
@@ -1619,8 +1601,13 @@ impl Info {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            time_out_value,
-            time_out_en,
+            timeout.map(|to_bus| {
+                let to_peri = (to_bus * 2 * half_cycle).max(1);
+                let log2 = to_peri.ilog2();
+                // Round up so that we don't shorten timeouts.
+                let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
+                raw.min(0x1F)
+            }),
         );
     }
 

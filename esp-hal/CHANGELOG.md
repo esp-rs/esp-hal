@@ -61,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The I2S driver has been moved to `i2s::master` (#2472)
 - `slave::Spi` constructors no longer take pins (#2485)
 - The `I2c` master driver has been moved from `esp_hal::i2c` to `esp_hal::i2c::master`. (#2476)
+- The `I2c` master driver has been moved to `esp_hal::i2c::master`. (#2476)
+- `I2c` SCL timeout is now defined in bus clock cycles. (#2477)
 
 ### Fixed
 
