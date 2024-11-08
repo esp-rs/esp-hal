@@ -56,6 +56,10 @@ name    = "gpio"
 harness = false
 
 [[test]]
+name    = "gpio_custom_handler"
+harness = false
+
+[[test]]
 name    = "interrupt"
 harness = false
 
