@@ -351,14 +351,16 @@ impl Default for ClientConfiguration {
     }
 }
 
+pub(crate) trait CsiCallback: FnMut(crate::wifi::wifi_csi_info_t) + Sized {}
+
+impl<T> CsiCallback for T where T: FnMut(crate::wifi::wifi_csi_info_t) + Sized {}
+
 #[cfg(csi_enable)]
-unsafe extern "C" fn csi_rx_cb(
+unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
 ) {
-    let ctx = ctx as *mut alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>;
-    let csi_callback = &mut *ctx;
-
+    let csi_callback = unsafe { &mut *(ctx as *mut C) };
     csi_callback(*data);
 }
 
@@ -512,16 +514,12 @@ impl CsiConfig {
 
     /// Register the RX callback function of CSI data. Each time a CSI data is
     /// received, the callback function will be called.
-    pub(crate) fn set_receive_cb(
-        &mut self,
-        cb: alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>,
-    ) -> Result<(), WifiError> {
+    pub(crate) fn set_receive_cb<C: CsiCallback>(&mut self, cb: C) -> Result<(), WifiError> {
         let cb = alloc::boxed::Box::new(cb);
-        // Cast the callback back to dyn FnMut(crate::binary::include::wifi_csi_info_t)
-        let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut core::ffi::c_void;
+        let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut crate::wifi::c_types::c_void;
 
         unsafe {
-            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(csi_rx_cb), cb_ptr))?;
+            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(csi_rx_cb::<C>), cb_ptr))?;
         }
         Ok(())
     }
@@ -2737,7 +2735,7 @@ impl<'d> WifiController<'d> {
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
-        cb: alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>,
+        cb: impl FnMut(crate::wifi::wifi_csi_info_t) + Sized,
     ) -> Result<(), WifiError> {
         csi.apply_config()?;
         csi.set_receive_cb(cb)?;
