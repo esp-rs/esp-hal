@@ -130,7 +130,11 @@ mod tests {
         let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
 
         Context {
-            spi: Spi::new(peripherals.SPI2, sclk, mosi, miso, cs, SpiMode::Mode1),
+            spi: Spi::new(peripherals.SPI2, SpiMode::Mode1)
+                .with_sck(sclk)
+                .with_mosi(mosi)
+                .with_miso(miso)
+                .with_cs(cs),
             bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso_gpio, cs_gpio),
             dma_channel,
         }
