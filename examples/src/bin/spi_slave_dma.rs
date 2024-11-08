@@ -67,19 +67,16 @@ fn main() -> ! {
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
-    let mut spi = Spi::new(
-        peripherals.SPI2,
-        slave_sclk,
-        slave_mosi,
-        slave_miso,
-        slave_cs,
-        SpiMode::Mode0,
-    )
-    .with_dma(
-        dma_channel.configure(false, DmaPriority::Priority0),
-        tx_descriptors,
-        rx_descriptors,
-    );
+    let mut spi = Spi::new(peripherals.SPI2, SpiMode::Mode0)
+        .with_sck(slave_sclk)
+        .with_mosi(slave_mosi)
+        .with_miso(slave_miso)
+        .with_cs(slave_cs)
+        .with_dma(
+            dma_channel.configure(false, DmaPriority::Priority0),
+            rx_descriptors,
+            tx_descriptors,
+        );
 
     let delay = Delay::new();
 

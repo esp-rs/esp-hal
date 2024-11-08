@@ -84,7 +84,6 @@ drivers. It is now possible to execute half-duplex and full-duplex operations on
 - The `Spi::new_half_duplex` constructor has been removed. Use `new` (or `new_typed`) instead.
 - The `with_pins` methods have been removed. Use the individual `with_*` functions instead.
 - The `with_mosi` and `with_miso` functions now take input-output peripheral signals to support half-duplex mode.
-  > TODO(danielb): this means they are currently only usable with GPIO pins, but upcoming GPIO changes should allow using any output signal.
 
 ```diff
 - let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
@@ -129,6 +128,28 @@ The `Spi<'_, SPI, HalfDuplexMode>::read` and `Spi<'_, SPI, HalfDuplexMode>::writ
          dma_tx_buf,
      )
      .unwrap();
+```
+
+## Slave-mode SPI
+
+### Driver construction
+
+The constructors no longer accept pins. Use the `with_pin_name` setters instead.
+
+```diff
+ let mut spi = Spi::new(
+     peripherals.SPI2,
+-    sclk,
+-    mosi,
+-    miso,
+-    cs,
+     SpiMode::Mode0,
+-);
++)
++.with_sclk(sclk)
++.with_mosi(mosi)
++.with_miso(miso)
++.with_cs(cs);
 ```
 
 ## UART event listening
