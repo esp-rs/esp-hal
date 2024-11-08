@@ -93,7 +93,7 @@ mod tests {
 
         let counter = drive_pins(gpio1, gpio2).await;
 
-        // GPIO is bound to something else, so we don't expect the async API to work.
+        // We expect the async API to keep working even if a user handler is set.
         assert_eq!(counter, 5);
     }
 }
