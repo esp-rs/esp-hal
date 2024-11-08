@@ -73,11 +73,12 @@ use procmacros::ram;
 
 pub use crate::soc::gpio::*;
 use crate::{
-    interrupt::InterruptHandler,
+    interrupt::{self, InterruptHandler, Priority},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{GPIO, IO_MUX},
+    peripherals::{Interrupt, GPIO, IO_MUX},
     private::{self, Sealed},
     InterruptConfigurable,
+    DEFAULT_INTERRUPT_HANDLER,
 };
 
 pub mod interconnect;
@@ -784,6 +785,31 @@ where
 
 impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> {}
 
+pub(crate) fn bind_default_interrupt_handler() {
+    // We first check if a handler is set in the vector table.
+    if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
+        let handler = handler as *const unsafe extern "C" fn();
+
+        // We only allow binding the default handler if nothing else is bound.
+        // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
+        if !core::ptr::eq(handler, DEFAULT_INTERRUPT_HANDLER.handler() as _) {
+            // The user has configured an interrupt handler they wish to use.
+            info!("Not using default GPIO interrupt handler: already bound in vector table");
+            return;
+        }
+    }
+    // The vector table doesn't contain a custom entry.Still, the
+    // peripheral interrupt may already be bound to something else.
+    if interrupt::bound_cpu_interrupt_for(crate::Cpu::current(), Interrupt::GPIO).is_some() {
+        info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
+        return;
+    }
+
+    unsafe { interrupt::bind_interrupt(Interrupt::GPIO, default_gpio_interrupt_handler) };
+    // By default, we use lowest priority
+    unwrap!(interrupt::enable(Interrupt::GPIO, Priority::min()));
+}
+
 /// General Purpose Input/Output driver
 pub struct Io {
     _io_mux: IO_MUX,
@@ -793,35 +819,16 @@ pub struct Io {
 
 impl Io {
     /// Initialize the I/O driver.
-    pub fn new(gpio: GPIO, io_mux: IO_MUX) -> Self {
-        Self::new_with_priority(gpio, io_mux, crate::interrupt::Priority::min())
-    }
-
-    /// Initialize the I/O driver with a interrupt priority.
-    ///
-    /// This decides the priority for the interrupt when using async.
-    pub fn new_with_priority(
-        mut gpio: GPIO,
-        io_mux: IO_MUX,
-        prio: crate::interrupt::Priority,
-    ) -> Self {
-        gpio.bind_gpio_interrupt(gpio_interrupt_handler);
-        crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, prio).unwrap();
-
-        Self::new_no_bind_interrupt(gpio, io_mux)
-    }
-
-    /// Initialize the I/O driver without enabling the GPIO interrupt or
-    /// binding an interrupt handler to it.
-    ///
-    /// *Note:* You probably don't want to use this, it is intended to be used
-    /// in very specific use cases. Async GPIO functionality will not work
-    /// when instantiating `Io` using this constructor.
-    pub fn new_no_bind_interrupt(_gpio: GPIO, _io_mux: IO_MUX) -> Self {
+    pub fn new(_gpio: GPIO, _io_mux: IO_MUX) -> Self {
         Io {
             _io_mux,
             pins: unsafe { Pins::steal() },
         }
+    }
+
+    /// Set the interrupt priority for GPIO interrupts.
+    pub fn set_interrupt_priority(&self, prio: Priority) {
+        unwrap!(interrupt::enable(Interrupt::GPIO, prio));
     }
 }
 
@@ -840,15 +847,24 @@ impl InterruptConfigurable for Io {
     ///   corresponding pin's async API.
     /// - You will not be notified if you make a mistake.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        crate::interrupt::enable(crate::peripherals::Interrupt::GPIO, handler.priority()).unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::GPIO);
+        }
+        self.set_interrupt_priority(handler.priority());
+        unsafe { interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler) };
         USER_INTERRUPT_HANDLER.store(handler.handler());
     }
 }
 
 #[ram]
-extern "C" fn gpio_interrupt_handler() {
+extern "C" fn user_gpio_interrupt_handler() {
     USER_INTERRUPT_HANDLER.call();
 
+    default_gpio_interrupt_handler();
+}
+
+#[ram]
+extern "C" fn default_gpio_interrupt_handler() {
     handle_pin_interrupts(on_pin_irq);
 }
 

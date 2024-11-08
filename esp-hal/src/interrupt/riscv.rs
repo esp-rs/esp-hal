@@ -346,13 +346,17 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrup
     let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
 
     let cpu_intr = intr_map_base.offset(interrupt_number).read_volatile();
-    if cpu_intr > 0 {
+    if cpu_intr > 0 && cpu_intr != DISABLED_CPU_INTERRUPT {
         Some(core::mem::transmute::<u32, CpuInterrupt>(
             cpu_intr - EXTERNAL_INTERRUPT_OFFSET,
         ))
     } else {
         None
     }
+}
+
+pub(crate) fn bound_cpu_interrupt_for(_cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
+    unsafe { get_assigned_cpu_interrupt(interrupt) }
 }
 
 mod vectored {
@@ -423,15 +427,27 @@ mod vectored {
         Ok(())
     }
 
-    /// Bind the given interrupt to the given handler
+    /// Binds the given interrupt to the given handler.
     ///
     /// # Safety
     ///
     /// This will replace any previously bound interrupt handler
-    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn() -> ()) {
+    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
         let ptr = &peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
-            as *mut unsafe extern "C" fn() -> ();
+            as *mut unsafe extern "C" fn();
         ptr.write_volatile(handler);
+    }
+
+    /// Returns the currently bound interrupt handler.
+    pub fn bound_handler(interrupt: Interrupt) -> Option<unsafe extern "C" fn()> {
+        unsafe {
+            let addr = peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
+            if addr as usize == 0 {
+                return None;
+            }
+
+            Some(addr)
+        }
     }
 
     #[no_mangle]

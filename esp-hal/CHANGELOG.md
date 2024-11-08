@@ -97,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `GpioEtmEventRising`, `GpioEtmEventFalling`, `GpioEtmEventAny` types have been replaced with `Event` (#2427)
 - The `TaskSet`, `TaskClear`, `TaskToggle` types have been replaced with `Task` (#2427)
 - `{Spi, SpiDma, SpiDmaBus}` configuration methods (#2448)
+- `Io::new_with_priority` and `Io::new_no_bind_interrupt`. (#2486)
 
 ## [0.21.1]
 
