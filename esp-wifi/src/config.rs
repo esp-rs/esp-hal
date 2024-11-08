@@ -9,6 +9,7 @@ pub(crate) struct EspWifiConfig {
     pub(crate) dynamic_rx_buf_num: usize,
     pub(crate) static_tx_buf_num: usize,
     pub(crate) dynamic_tx_buf_num: usize,
+    pub(crate) csi_enable: bool,
     pub(crate) ampdu_rx_enable: bool,
     pub(crate) ampdu_tx_enable: bool,
     pub(crate) amsdu_tx_enable: bool,
