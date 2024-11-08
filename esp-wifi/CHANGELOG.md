@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Features `phy-enable-usb` & `dump-packets` have been turned into configuration options `phy_enable_usb` & `dump_packets` (#2446)
 - Features `ps-min-modem` & `ps-max-modem` have been removed in favour of a runtime config (#2446)
 
+- The blocking networking stack is removed (#2488)
 
 ## 0.10.1 - 2024-10-10
 
