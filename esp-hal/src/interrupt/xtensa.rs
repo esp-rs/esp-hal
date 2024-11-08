@@ -106,7 +106,8 @@ impl CpuInterrupt {
     fn is_internal(self) -> bool {
         matches!(
             self,
-            |Self::Interrupt6Timer0Priority1| Self::Interrupt7SoftwarePriority1
+            Self::Interrupt6Timer0Priority1
+                | Self::Interrupt7SoftwarePriority1
                 | Self::Interrupt11ProfilingPriority3
                 | Self::Interrupt15Timer1Priority3
                 | Self::Interrupt16Timer2Priority5
