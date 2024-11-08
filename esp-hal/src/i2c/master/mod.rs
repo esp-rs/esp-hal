@@ -1855,6 +1855,70 @@ impl Driver<'_> {
             .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
+    fn start_write_operation(
+        &self,
+        address: u8,
+        bytes: &[u8],
+        start: bool,
+        stop: bool,
+    ) -> Result<usize, Error> {
+        self.reset_fifo();
+        self.reset_command_list();
+        let cmd_iterator = &mut self.register_block().comd_iter();
+
+        if start {
+            add_cmd(cmd_iterator, Command::Start)?;
+        }
+
+        self.setup_write(address, bytes, start, cmd_iterator)?;
+
+        add_cmd(
+            cmd_iterator,
+            if stop { Command::Stop } else { Command::End },
+        )?;
+        let index = self.fill_tx_fifo(bytes);
+        self.start_transmission();
+
+        Ok(index)
+    }
+
+    /// Executes an I2C read operation.
+    /// - `addr` is the address of the slave device.
+    /// - `buffer` is the buffer to store the read data.
+    /// - `start` indicates whether the operation should start by a START
+    ///   condition and sending the address.
+    /// - `stop` indicates whether the operation should end with a STOP
+    ///   condition.
+    /// - `will_continue` indicates whether there is another read operation
+    ///   following this one and we should not nack the last byte.
+    /// - `cmd_iterator` is an iterator over the command registers.
+    fn start_read_operation(
+        &self,
+        address: u8,
+        buffer: &mut [u8],
+        start: bool,
+        stop: bool,
+        will_continue: bool,
+    ) -> Result<(), Error> {
+        self.reset_fifo();
+        self.reset_command_list();
+
+        let cmd_iterator = &mut self.register_block().comd_iter();
+
+        if start {
+            add_cmd(cmd_iterator, Command::Start)?;
+        }
+
+        self.setup_read(address, buffer, start, will_continue, cmd_iterator)?;
+
+        add_cmd(
+            cmd_iterator,
+            if stop { Command::Stop } else { Command::End },
+        )?;
+        self.start_transmission();
+        Ok(())
+    }
+
     /// Executes an I2C write operation.
     /// - `addr` is the address of the slave device.
     /// - `bytes` is the data two be sent.
@@ -1878,23 +1942,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        // Reset FIFO and command list
-        self.reset_fifo();
-        self.reset_command_list();
-
-        let cmd_iterator = &mut self.register_block().comd_iter();
-
-        if start {
-            add_cmd(cmd_iterator, Command::Start)?;
-        }
-        self.setup_write(address, bytes, start, cmd_iterator)?;
-        add_cmd(
-            cmd_iterator,
-            if stop { Command::Stop } else { Command::End },
-        )?;
-        let index = self.fill_tx_fifo(bytes);
-        self.start_transmission();
-
+        let index = self.start_write_operation(address, bytes, start, stop)?;
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo_blocking(index, bytes)?;
         self.wait_for_completion_blocking(!stop)?;
@@ -1927,23 +1975,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        // Reset FIFO and command list
-        self.reset_fifo();
-        self.reset_command_list();
-
-        let cmd_iterator = &mut self.register_block().comd_iter();
-
-        if start {
-            add_cmd(cmd_iterator, Command::Start)?;
-        }
-
-        self.setup_read(address, buffer, start, will_continue, cmd_iterator)?;
-
-        add_cmd(
-            cmd_iterator,
-            if stop { Command::Stop } else { Command::End },
-        )?;
-        self.start_transmission();
+        self.start_read_operation(address, buffer, start, stop, will_continue)?;
         self.read_all_from_fifo_blocking(buffer)?;
         self.wait_for_completion_blocking(!stop)?;
         Ok(())
@@ -1972,22 +2004,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        // Reset FIFO and command list
-        self.reset_fifo();
-        self.reset_command_list();
-
-        let cmd_iterator = &mut self.register_block().comd_iter();
-        if start {
-            add_cmd(cmd_iterator, Command::Start)?;
-        }
-        self.setup_write(address, bytes, start, cmd_iterator)?;
-        add_cmd(
-            cmd_iterator,
-            if stop { Command::Stop } else { Command::End },
-        )?;
-        let index = self.fill_tx_fifo(bytes);
-        self.start_transmission();
-
+        let index = self.start_write_operation(address, bytes, start, stop)?;
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo(index, bytes).await?;
         self.wait_for_completion(!stop).await?;
@@ -2020,19 +2037,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        // Reset FIFO and command list
-        self.reset_fifo();
-        self.reset_command_list();
-        let cmd_iterator = &mut self.register_block().comd_iter();
-        if start {
-            add_cmd(cmd_iterator, Command::Start)?;
-        }
-        self.setup_read(address, buffer, start, will_continue, cmd_iterator)?;
-        add_cmd(
-            cmd_iterator,
-            if stop { Command::Stop } else { Command::End },
-        )?;
-        self.start_transmission();
+        self.start_read_operation(address, buffer, start, stop, will_continue)?;
         self.read_all_from_fifo(buffer).await?;
         self.wait_for_completion(!stop).await?;
         Ok(())
