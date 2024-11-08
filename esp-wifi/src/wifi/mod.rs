@@ -502,7 +502,6 @@ impl From<CsiConfig> for wifi_csi_config_t {
 impl CsiConfig {
     /// Set CSI data configuration
     pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
-        // let conf = self.clone().into();
         let conf: wifi_csi_config_t = self.clone().into();
 
         unsafe {
@@ -515,8 +514,9 @@ impl CsiConfig {
     /// received, the callback function will be called.
     pub(crate) fn set_receive_cb(
         &mut self,
-        cb: alloc::boxed::Box<alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>>,
+        cb: alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>,
     ) -> Result<(), WifiError> {
+        let cb = alloc::boxed::Box::new(cb);
         // Cast the callback back to dyn FnMut(crate::binary::include::wifi_csi_info_t)
         let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut core::ffi::c_void;
 
@@ -2737,7 +2737,7 @@ impl<'d> WifiController<'d> {
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
-        cb: alloc::boxed::Box<alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>>,
+        cb: alloc::boxed::Box<dyn FnMut(crate::wifi::wifi_csi_info_t)>,
     ) -> Result<(), WifiError> {
         csi.apply_config()?;
         csi.set_receive_cb(cb)?;
