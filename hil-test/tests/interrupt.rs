@@ -94,6 +94,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     #[rustfmt::skip]
     fn interrupt_latency(_ctx: Context) {
         // unsafe {

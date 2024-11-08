@@ -129,6 +129,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     async fn test_i2s_loopback_async(ctx: Context) {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
 
@@ -185,6 +186,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_i2s_loopback(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(16000, 16000);
 
@@ -294,6 +296,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_i2s_push_too_late(ctx: Context) {
         let (_, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(0, 16000);
 

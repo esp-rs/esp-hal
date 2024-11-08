@@ -26,6 +26,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_estimated_clock(mut ctx: Context<'static>) {
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32c2")] {

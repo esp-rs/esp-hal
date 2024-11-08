@@ -262,6 +262,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_symmetric_dma_transfer(ctx: Context) {
         // This test case sends a large amount of data, multiple times to verify that
         // https://github.com/esp-rs/esp-hal/issues/2151 is and remains fixed.

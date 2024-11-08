@@ -42,6 +42,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_increment_on_pos_edge(ctx: Context<'static>) {
         let unit = ctx.pcnt.unit0;
 
@@ -79,6 +80,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_increment_on_neg_edge(ctx: Context<'static>) {
         let unit = ctx.pcnt.unit1;
 
@@ -116,6 +118,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_increment_past_high_limit(ctx: Context<'static>) {
         let unit = ctx.pcnt.unit3;
 
@@ -174,6 +177,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_increment_past_thresholds(ctx: Context<'static>) {
         let unit = ctx.pcnt.unit0;
 
@@ -240,6 +244,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_decrement_past_low_limit(ctx: Context<'static>) {
         let unit = ctx.pcnt.unit0;
 
@@ -300,6 +305,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_unit_count_range(ctx: Context<'static>) {
         let unit = ctx.pcnt.unit2;
 

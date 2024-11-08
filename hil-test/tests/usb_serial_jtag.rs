@@ -12,6 +12,7 @@ mod tests {
     use hil_test as _;
 
     #[test]
+    #[timeout(3)]
     fn creating_peripheral_does_not_break_debug_connection() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 

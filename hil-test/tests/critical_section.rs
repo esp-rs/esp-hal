@@ -20,6 +20,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn critical_section_is_reentrant() {
         let mut flag = false;
 
@@ -33,6 +34,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn locked_can_provide_mutable_access() {
         let flag = Locked::new(false);
 

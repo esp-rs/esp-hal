@@ -48,6 +48,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     async fn test_i8080_8bit(ctx: Context<'static>) {
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 

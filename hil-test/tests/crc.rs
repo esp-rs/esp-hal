@@ -19,6 +19,7 @@ mod tests {
     fn init() {}
 
     #[test]
+    #[timeout(3)]
     fn test_crc() {
         let data = "123456789";
 
@@ -42,6 +43,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_md5() {
         let sentence = "The quick brown fox jumps over a lazy dog";
 

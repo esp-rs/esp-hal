@@ -63,6 +63,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn fpu_is_enabled() {
         let result = super::run_float_calc(2.0);
         assert_eq!(result, 4.0);

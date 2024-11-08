@@ -30,6 +30,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_aes_128_encryption(mut ctx: Context<'static>) {
         let keytext = b"SUp4SeCp@sSw0rd";
         let plaintext = b"message";
@@ -50,6 +51,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_aes_128_decryption(mut ctx: Context<'static>) {
         let keytext = b"SUp4SeCp@sSw0rd";
         let plaintext = b"message";
@@ -67,6 +69,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
     fn test_aes_192_encryption(mut ctx: Context<'static>) {
         let keytext = b"SUp4SeCp@sSw0rd";
@@ -88,6 +91,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
     fn test_aes_192_decryption(mut ctx: Context<'static>) {
         let keytext = b"SUp4SeCp@sSw0rd";
@@ -106,6 +110,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_aes_256_encryption(mut ctx: Context<'static>) {
         let keytext = b"SUp4SeCp@sSw0rd";
         let plaintext = b"message";
@@ -126,6 +131,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_aes_256_decryption(mut ctx: Context<'static>) {
         let keytext = b"SUp4SeCp@sSw0rd";
         let plaintext = b"message";

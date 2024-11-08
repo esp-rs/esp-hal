@@ -54,6 +54,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_internal_mem2mem(ctx: Context) {
         let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 
@@ -76,6 +77,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_internal_mem2mem_chunk_size(ctx: Context) {
         const CHUNK_SIZE: usize = 2048;
 
@@ -102,6 +104,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_mem2mem_errors_zero_tx(ctx: Context) {
         use esp_hal::dma::CHUNK_SIZE;
 
@@ -119,6 +122,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_mem2mem_errors_zero_rx(ctx: Context) {
         use esp_hal::dma::CHUNK_SIZE;
 
@@ -136,6 +140,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_mem2mem_errors_chunk_size_too_small(ctx: Context) {
         let (rx_descriptors, tx_descriptors) = dma_descriptors!(1024, 1024);
         match Mem2Mem::new_with_chunk_size(
@@ -151,6 +156,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(3)]
     fn test_mem2mem_errors_chunk_size_too_big(ctx: Context) {
         let (rx_descriptors, tx_descriptors) = dma_descriptors!(1024, 1024);
         match Mem2Mem::new_with_chunk_size(
