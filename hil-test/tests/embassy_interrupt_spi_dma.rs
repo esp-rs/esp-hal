@@ -1,6 +1,6 @@
 //! Reproduction and regression test for a sneaky issue.
 
-//% CHIPS: esp32 esp32s2 esp32s3
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6 esp32h2
 //% FEATURES: integrated-timers
 //% FEATURES: generic-queue
 
@@ -14,7 +14,7 @@ use esp_hal::{
     interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
     spi::{
-        master::{Config, Spi, SpiDma},
+        master::{Config, Spi},
         SpiMode,
     },
     timer::AnyTimer,
@@ -32,8 +32,9 @@ macro_rules! mk_static {
     }};
 }
 
+#[cfg(any(esp32, esp32s2, esp32s3))]
 #[embassy_executor::task]
-async fn interrupt_driven_task(spi: SpiDma<'static, Async>) {
+async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Async>) {
     let mut ticker = Ticker::every(Duration::from_millis(1));
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);
@@ -47,6 +48,19 @@ async fn interrupt_driven_task(spi: SpiDma<'static, Async>) {
 
         spi.transfer_in_place_async(&mut buffer).await.unwrap();
 
+        ticker.next().await;
+    }
+}
+
+#[cfg(not(any(esp32, esp32s2, esp32s3)))]
+#[embassy_executor::task]
+async fn interrupt_driven_task(mut i2s_tx: esp_hal::i2s::master::I2sTx<'static, Async>) {
+    let mut ticker = Ticker::every(Duration::from_millis(1));
+
+    loop {
+        let mut buffer: [u8; 8] = [0; 8];
+
+        i2s_tx.write_dma_async(&mut buffer).await.unwrap();
         ticker.next().await;
     }
 }
@@ -106,7 +120,8 @@ mod test {
         .with_buffers(dma_rx_buf, dma_tx_buf)
         .into_async();
 
-        let spi2 = Spi::new_with_config(
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        let other_peripheral = Spi::new_with_config(
             peripherals.SPI3,
             Config {
                 frequency: 100.kHz(),
@@ -117,6 +132,26 @@ mod test {
         .with_dma(dma_channel2.configure(false, DmaPriority::Priority0))
         .into_async();
 
+        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+        let other_peripheral = {
+            let (_, rx_descriptors, _, tx_descriptors) = dma_buffers!(128);
+
+            let other_peripheral = esp_hal::i2s::master::I2s::new(
+                peripherals.I2S0,
+                esp_hal::i2s::master::Standard::Philips,
+                esp_hal::i2s::master::DataFormat::Data8Channel8,
+                8u32.kHz(),
+                dma_channel2.configure(false, DmaPriority::Priority0),
+                rx_descriptors,
+                tx_descriptors,
+            )
+            .into_async()
+            .i2s_tx
+            .build();
+
+            other_peripheral
+        };
+
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         let interrupt_executor = mk_static!(
@@ -126,7 +161,9 @@ mod test {
 
         let spawner = interrupt_executor.start(Priority::Priority3);
 
-        spawner.spawn(interrupt_driven_task(spi2)).unwrap();
+        spawner
+            .spawn(interrupt_driven_task(other_peripheral))
+            .unwrap();
 
         let start = Instant::now();
         let mut buffer: [u8; 1024] = [0; 1024];
