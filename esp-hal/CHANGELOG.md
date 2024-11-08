@@ -197,6 +197,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TWAI should no longer panic when receiving a non-compliant frame (#2255)
 - OneShotTimer: fixed `delay_nanos` behaviour (#2256)
 - Fixed unsoundness around `Efuse` (#2259)
+- Empty I2C writes to unknown addresses now correctly fail with `AckCheckFailed`. (#2506)
 
 ### Removed
 
