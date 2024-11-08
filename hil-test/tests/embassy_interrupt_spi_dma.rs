@@ -13,6 +13,7 @@ use esp_hal::{
     dma_buffers,
     gpio::Io,
     interrupt::{software::SoftwareInterruptControl, Priority},
+    peripheral::Peripheral,
     prelude::*,
     spi::{
         master::{Config, Spi},
@@ -118,7 +119,7 @@ mod test {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let (miso, mosi) = hil_test::common_test_pins!(io);
+        let (_, mosi) = hil_test::common_test_pins!(io);
 
         let mut spi = Spi::new_with_config(
             peripherals.SPI2,
@@ -128,7 +129,7 @@ mod test {
                 ..Config::default()
             },
         )
-        .with_miso(miso)
+        .with_miso(unsafe { mosi.clone_unchecked() })
         .with_mosi(mosi)
         .with_dma(dma_channel1.configure(false, DmaPriority::Priority0))
         .with_buffers(dma_rx_buf, dma_tx_buf)
@@ -191,7 +192,7 @@ mod test {
             assert!(dst_buffer.iter().all(|&v| v == i));
 
             if start.elapsed() > Duration::from_secs(1) {
-                // make sure the other peripheral didn't got stuck
+                // make sure the other peripheral didn't get stuck
                 while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Acquire) {}
                 break;
             }
