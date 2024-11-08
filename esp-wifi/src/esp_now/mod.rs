@@ -18,6 +18,8 @@ use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 #[cfg(not(coex))]
 use crate::config::PowerSaveMode;
+#[cfg(csi_enable)]
+use crate::wifi::CsiConfig;
 use crate::{
     binary::include::*,
     hal::peripheral::{Peripheral, PeripheralRef},
@@ -367,6 +369,20 @@ impl EspNowManager<'_> {
             priv_: core::ptr::null_mut(),
         };
         check_error!({ esp_now_add_peer(&raw_peer as *const _) })
+    }
+
+    /// Set CSI configuration and register the receiving callback.
+    #[cfg(csi_enable)]
+    pub fn set_csi(
+        &mut self,
+        mut csi: CsiConfig,
+        cb: impl FnMut(crate::wifi::wifi_csi_info_t) + Send,
+    ) -> Result<(), WifiError> {
+        csi.apply_config()?;
+        csi.set_receive_cb(cb)?;
+        csi.set_csi(true)?;
+
+        Ok(())
     }
 
     /// Remove the given peer.
