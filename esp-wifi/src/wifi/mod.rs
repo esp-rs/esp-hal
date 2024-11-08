@@ -352,7 +352,7 @@ impl Default for ClientConfiguration {
 }
 
 #[cfg(csi_enable)]
-unsafe extern "C" fn promiscuous_csi_rx_cb(
+unsafe extern "C" fn csi_rx_cb(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
 ) {
@@ -521,7 +521,7 @@ impl CsiConfig {
         let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut core::ffi::c_void;
 
         unsafe {
-            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(promiscuous_csi_rx_cb), cb_ptr))?;
+            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(csi_rx_cb), cb_ptr))?;
         }
         Ok(())
     }
