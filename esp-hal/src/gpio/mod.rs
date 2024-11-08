@@ -786,7 +786,7 @@ where
 impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> {}
 
 pub(crate) fn bind_default_interrupt_handler() {
-    // We check this by looking up the handler in the vector table.
+    // We first check if a handler is set in the vector table.
     if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
         let handler = handler as *const unsafe extern "C" fn();
 
@@ -796,15 +796,13 @@ pub(crate) fn bind_default_interrupt_handler() {
             // The user has configured an interrupt handler they wish to use.
             info!("Not using default GPIO interrupt handler: already bound in vector table");
             return;
-        } else if interrupt::bound_cpu_interrupt_for(crate::Cpu::current(), Interrupt::GPIO)
-            .is_some()
-        {
-            // The vector table doesn't contain a custom entry. Still, the
-            // peripheral interrupt may already be bound to
-            // something else.
-            info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
-            return;
         }
+    }
+    // The vector table doesn't contain a custom entry.Still, the
+    // peripheral interrupt may already be bound to something else.
+    if interrupt::bound_cpu_interrupt_for(crate::Cpu::current(), Interrupt::GPIO).is_some() {
+        info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
+        return;
     }
 
     unsafe { interrupt::bind_interrupt(Interrupt::GPIO, default_gpio_interrupt_handler) };
