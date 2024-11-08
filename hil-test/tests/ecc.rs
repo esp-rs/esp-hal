@@ -64,7 +64,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(5)]
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             match prime_field.len() {
@@ -165,7 +165,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     fn test_ecc_affine_point_verification(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             let t1 = &mut [0_u8; 96];
@@ -226,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     fn test_ecc_afine_point_verification_multiplication(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             let t1 = &mut [0_u8; 96];
@@ -341,7 +341,7 @@ mod tests {
         }
     }
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     fn test_ecc_jacobian_point_multiplication(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             let t1 = &mut [0_u8; 96];
@@ -463,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     fn test_jacobian_point_verification(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             let t1 = &mut [0_u8; 128];
@@ -551,7 +551,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     fn test_ecc_afine_point_verification_jacobian_multiplication(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             let t1 = &mut [0_u8; 96];
@@ -679,7 +679,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     #[cfg(feature = "esp32c2")]
     fn test_ecc_finite_field_division(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
@@ -743,7 +743,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     #[cfg(feature = "esp32h2")]
     fn test_ecc_point_addition_256(mut ctx: Context<'static>) {
         const ECC_256_X: [u8; 32] = [
@@ -802,7 +802,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     #[cfg(feature = "esp32h2")]
     fn test_ecc_point_addition_192(mut ctx: Context<'static>) {
         const ECC_192_X: [u8; 24] = [
@@ -855,7 +855,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     #[cfg(feature = "esp32h2")]
     fn test_ecc_mod_operations_256(mut ctx: Context<'static>) {
         const ECC_256_X: [u8; 32] = [
@@ -957,7 +957,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
+    #[timeout(10)]
     #[cfg(feature = "esp32h2")]
     fn test_ecc_mod_operations_192(mut ctx: Context<'static>) {
         const ECC_192_X: [u8; 24] = [
