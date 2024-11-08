@@ -94,17 +94,9 @@ static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; 
 impl<C: GdmaChannel> crate::private::Sealed for ChannelTxImpl<C> {}
 
 impl<C: GdmaChannel> ChannelTxImpl<C> {
-    #[cfg(not(esp32p4))]
     #[inline(always)]
     fn ch(&self) -> &crate::peripherals::dma::ch::CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(self.0.number() as usize)
-    }
-
-    #[cfg(esp32p4)]
-    #[inline(always)]
-    fn ch(&self) -> &crate::peripherals::ahb_dma::ch::CH {
-        let dma = unsafe { &*crate::peripherals::AHB_DMA::PTR };
         dma.ch(self.0.number() as usize)
     }
 
@@ -119,13 +111,6 @@ impl<C: GdmaChannel> ChannelTxImpl<C> {
     #[inline(always)]
     fn int(&self) -> &crate::peripherals::dma::out_int_ch::OUT_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.out_int_ch(self.0.number() as usize)
-    }
-
-    #[cfg(esp32p4)]
-    #[inline(always)]
-    fn int(&self) -> &crate::peripherals::ahb_dma::out_int_ch::OUT_INT_CH {
-        let dma = unsafe { &*crate::peripherals::AHB_DMA::PTR };
         dma.out_int_ch(self.0.number() as usize)
     }
 
@@ -167,17 +152,9 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
             .modify(|_, w| unsafe { w.peri_out_sel().bits(peripheral) });
     }
 
-    #[cfg(not(esp32p4))]
     fn set_link_addr(&self, address: u32) {
         self.ch()
             .out_link()
-            .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
-    }
-
-    #[cfg(esp32p4)]
-    fn set_link_addr(&self, address: u32) {
-        unsafe { &*crate::peripherals::AHB_DMA::PTR }
-            .out_link_addr_ch(self.0.number() as usize)
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
     }
 
@@ -310,17 +287,9 @@ pub struct ChannelRxImpl<C: GdmaChannel>(C);
 impl<C: GdmaChannel> crate::private::Sealed for ChannelRxImpl<C> {}
 
 impl<C: GdmaChannel> ChannelRxImpl<C> {
-    #[cfg(not(esp32p4))]
     #[inline(always)]
     fn ch(&self) -> &crate::peripherals::dma::ch::CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(self.0.number() as usize)
-    }
-
-    #[cfg(esp32p4)]
-    #[inline(always)]
-    fn ch(&self) -> &crate::peripherals::ahb_dma::ch::CH {
-        let dma = unsafe { &*crate::peripherals::AHB_DMA::PTR };
         dma.ch(self.0.number() as usize)
     }
 
@@ -329,13 +298,6 @@ impl<C: GdmaChannel> ChannelRxImpl<C> {
     fn int(&self) -> &crate::peripherals::dma::int_ch::INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.int_ch(self.0.number() as usize)
-    }
-
-    #[cfg(esp32p4)]
-    #[inline(always)]
-    fn int(&self) -> &crate::peripherals::ahb_dma::in_int_ch::IN_INT_CH {
-        let dma = unsafe { &*crate::peripherals::AHB_DMA::PTR };
-        dma.in_int_ch(self.0.number() as usize)
     }
 
     #[cfg(any(esp32c6, esp32h2))]
@@ -383,17 +345,9 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
             .modify(|_, w| unsafe { w.peri_in_sel().bits(peripheral) });
     }
 
-    #[cfg(not(esp32p4))]
     fn set_link_addr(&self, address: u32) {
         self.ch()
             .in_link()
-            .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
-    }
-
-    #[cfg(esp32p4)]
-    fn set_link_addr(&self, address: u32) {
-        unsafe { &*crate::peripherals::AHB_DMA::PTR }
-            .in_link_addr_ch(self.0.number() as usize)
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
@@ -615,11 +569,6 @@ cfg_if::cfg_if! {
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
         impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
         impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
-    } else if #[cfg(esp32p4)] {
-        const CHANNEL_COUNT: usize = 3;
-        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, AHB_PDMA_IN_CH0, AHB_PDMA_OUT_CH0);
-        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, AHB_PDMA_IN_CH1, AHB_PDMA_OUT_CH1);
-        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, AHB_PDMA_IN_CH2, AHB_PDMA_OUT_CH2);
     } else if #[cfg(esp32s3)] {
         const CHANNEL_COUNT: usize = 5;
         impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
@@ -691,10 +640,7 @@ crate::impl_dma_eligible! {
 ///
 /// This offers the available DMA channels.
 pub struct Dma<'d> {
-    #[cfg(not(esp32p4))]
     _inner: PeripheralRef<'d, crate::peripherals::DMA>,
-    #[cfg(esp32p4)]
-    _inner: PeripheralRef<'d, crate::peripherals::AHB_DMA>,
     /// Channel 0
     pub channel0: ChannelCreator<0>,
     /// Channel 1
@@ -714,8 +660,7 @@ pub struct Dma<'d> {
 impl<'d> Dma<'d> {
     /// Create a DMA instance.
     pub fn new(
-        #[cfg(not(esp32p4))] dma: impl crate::peripheral::Peripheral<P = crate::peripherals::DMA> + 'd,
-        #[cfg(esp32p4)] dma: impl crate::peripheral::Peripheral<P = crate::peripherals::AHB_DMA> + 'd,
+        dma: impl crate::peripheral::Peripheral<P = crate::peripherals::DMA> + 'd,
     ) -> Dma<'d> {
         crate::into_ref!(dma);
 
