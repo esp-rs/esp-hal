@@ -79,21 +79,16 @@ fn main() -> ! {
 
     let csi = CsiConfig::default();
     controller
-        .set_csi(
-            csi,
-            alloc::boxed::Box::new(alloc::boxed::Box::new(
-                |data: esp_wifi::wifi::wifi_csi_info_t| {
-                    let rx_ctrl = data.rx_ctrl;
-                    // Signed bitfields are broken in rust-bingen, see https://github.com/esp-rs/esp-wifi-sys/issues/482
-                    let rssi = if rx_ctrl.rssi() > 127 {
-                        rx_ctrl.rssi() - 256
-                    } else {
-                        rx_ctrl.rssi()
-                    };
-                    println!("rssi: {:?} rate: {}", rssi, rx_ctrl.rate());
-                },
-            )),
-        )
+        .set_csi(csi, |data: esp_wifi::wifi::wifi_csi_info_t| {
+            let rx_ctrl = data.rx_ctrl;
+            // Signed bitfields are broken in rust-bingen, see https://github.com/esp-rs/esp-wifi-sys/issues/482
+            let rssi = if rx_ctrl.rssi() > 127 {
+                rx_ctrl.rssi() - 256
+            } else {
+                rx_ctrl.rssi()
+            };
+            println!("rssi: {:?} rate: {}", rssi, rx_ctrl.rate());
+        })
         .unwrap();
 
     println!("Waiting for CSI data...");
