@@ -159,7 +159,6 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             let mut features = vec![];
             if config.contains("wifi") {
                 features.push("wifi".to_owned());
-                features.push("wifi-default".to_owned());
                 features.push("esp-now".to_owned());
                 features.push("sniffer".to_owned());
                 features.push("utils".to_owned());
