@@ -12,7 +12,11 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{gpio::Io, i2c::master::I2c, prelude::*};
+use esp_hal::{
+    gpio::Io,
+    i2c::master::{Config, I2c},
+    prelude::*,
+};
 use esp_println::println;
 
 #[entry]
@@ -23,7 +27,9 @@ fn main() -> ! {
 
     // Create a new peripheral object with the described wiring and standard
     // I2C clock speed:
-    let mut i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz());
+    let mut i2c = I2c::new(peripherals.I2C0, Config::default())
+        .with_sda(io.pins.gpio4)
+        .with_scl(io.pins.gpio5);
 
     loop {
         let mut data = [0u8; 22];

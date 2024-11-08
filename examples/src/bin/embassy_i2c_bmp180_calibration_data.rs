@@ -20,7 +20,12 @@
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{gpio::Io, i2c::master::I2c, prelude::*, timer::timg::TimerGroup};
+use esp_hal::{
+    gpio::Io,
+    i2c::master::{Config, I2c},
+    prelude::*,
+    timer::timg::TimerGroup,
+};
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
@@ -31,7 +36,14 @@ async fn main(_spawner: Spawner) {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 400.kHz()).into_async();
+    let mut i2c = I2c::new(peripherals.I2C0, {
+        let mut config = Config::default();
+        config.frequency = 400.kHz();
+        config
+    })
+    .with_sda(io.pins.gpio4)
+    .with_scl(io.pins.gpio5)
+    .into_async();
 
     loop {
         let mut data = [0u8; 22];
