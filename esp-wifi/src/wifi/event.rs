@@ -170,10 +170,16 @@ impl_wifi_event!(HomeChannelChange, wifi_event_home_channel_change_t);
 impl_wifi_event!(StaNeighborRep, wifi_event_neighbor_report_t);
 
 /// Handle the given event using the registered event handlers.
-pub fn handle<Event: EventExt>(cs: critical_section::CriticalSection<'_>, event_data: &Event) {
+pub fn handle<Event: EventExt>(
+    cs: critical_section::CriticalSection<'_>,
+    event_data: &Event,
+) -> bool {
     if let Some(handler) = &mut *Event::handler().borrow_ref_mut(cs) {
-        handler(cs, event_data)
-    };
+        handler(cs, event_data);
+        true
+    } else {
+        false
+    }
 }
 
 /// Handle an event given the raw pointers.
@@ -183,7 +189,7 @@ pub(crate) unsafe fn handle_raw<Event: EventExt>(
     cs: critical_section::CriticalSection<'_>,
     event_data: *mut crate::binary::c_types::c_void,
     event_data_size: usize,
-) {
+) -> bool {
     debug_assert_eq!(
         event_data_size,
         core::mem::size_of::<Event>(),
@@ -195,147 +201,148 @@ pub(crate) unsafe fn handle_raw<Event: EventExt>(
 /// Handle event regardless of its type.
 /// # Safety
 /// Arguments should be self-consistent.
+#[rustfmt::skip]
 pub(crate) unsafe fn dispatch_event_handler(
     cs: critical_section::CriticalSection<'_>,
     event: WifiEvent,
     event_data: *mut crate::binary::c_types::c_void,
     event_data_size: usize,
-) {
+) -> bool {
     match event {
         WifiEvent::WifiReady => {
-            handle_raw::<WifiReady>(cs, event_data, event_data_size);
+            handle_raw::<WifiReady>(cs, event_data, event_data_size)
         }
         WifiEvent::ScanDone => {
-            handle_raw::<ScanDone>(cs, event_data, event_data_size);
+            handle_raw::<ScanDone>(cs, event_data, event_data_size)
         }
         WifiEvent::StaStart => {
-            handle_raw::<StaStart>(cs, event_data, event_data_size);
+            handle_raw::<StaStart>(cs, event_data, event_data_size)
         }
         WifiEvent::StaStop => {
-            handle_raw::<StaStop>(cs, event_data, event_data_size);
+            handle_raw::<StaStop>(cs, event_data, event_data_size)
         }
         WifiEvent::StaConnected => {
-            handle_raw::<StaConnected>(cs, event_data, event_data_size);
+            handle_raw::<StaConnected>(cs, event_data, event_data_size)
         }
         WifiEvent::StaDisconnected => {
-            handle_raw::<StaDisconnected>(cs, event_data, event_data_size);
+            handle_raw::<StaDisconnected>(cs, event_data, event_data_size)
         }
         WifiEvent::StaAuthmodeChange => {
-            handle_raw::<StaAuthmodeChange>(cs, event_data, event_data_size);
+            handle_raw::<StaAuthmodeChange>(cs, event_data, event_data_size)
         }
         WifiEvent::StaWpsErSuccess => {
-            handle_raw::<StaWpsErSuccess>(cs, event_data, event_data_size);
+            handle_raw::<StaWpsErSuccess>(cs, event_data, event_data_size)
         }
         WifiEvent::StaWpsErFailed => {
-            handle_raw::<StaWpsErFailed>(cs, event_data, event_data_size);
+            handle_raw::<StaWpsErFailed>(cs, event_data, event_data_size)
         }
         WifiEvent::StaWpsErTimeout => {
-            handle_raw::<StaWpsErTimeout>(cs, event_data, event_data_size);
+            handle_raw::<StaWpsErTimeout>(cs, event_data, event_data_size)
         }
         WifiEvent::StaWpsErPin => {
-            handle_raw::<StaWpsErPin>(cs, event_data, event_data_size);
+            handle_raw::<StaWpsErPin>(cs, event_data, event_data_size)
         }
         WifiEvent::StaWpsErPbcOverlap => {
-            handle_raw::<StaWpsErPbcOverlap>(cs, event_data, event_data_size);
+            handle_raw::<StaWpsErPbcOverlap>(cs, event_data, event_data_size)
         }
         WifiEvent::ApStart => {
-            handle_raw::<ApStart>(cs, event_data, event_data_size);
+            handle_raw::<ApStart>(cs, event_data, event_data_size)
         }
         WifiEvent::ApStop => {
-            handle_raw::<ApStop>(cs, event_data, event_data_size);
+            handle_raw::<ApStop>(cs, event_data, event_data_size)
         }
         WifiEvent::ApStaconnected => {
-            handle_raw::<ApStaconnected>(cs, event_data, event_data_size);
+            handle_raw::<ApStaconnected>(cs, event_data, event_data_size)
         }
         WifiEvent::ApStadisconnected => {
-            handle_raw::<ApStadisconnected>(cs, event_data, event_data_size);
+            handle_raw::<ApStadisconnected>(cs, event_data, event_data_size)
         }
         WifiEvent::ApProbereqrecved => {
-            handle_raw::<ApProbereqrecved>(cs, event_data, event_data_size);
+            handle_raw::<ApProbereqrecved>(cs, event_data, event_data_size)
         }
         WifiEvent::FtmReport => {
-            handle_raw::<FtmReport>(cs, event_data, event_data_size);
+            handle_raw::<FtmReport>(cs, event_data, event_data_size)
         }
         WifiEvent::StaBssRssiLow => {
-            handle_raw::<StaBssRssiLow>(cs, event_data, event_data_size);
+            handle_raw::<StaBssRssiLow>(cs, event_data, event_data_size)
         }
         WifiEvent::ActionTxStatus => {
-            handle_raw::<ActionTxStatus>(cs, event_data, event_data_size);
+            handle_raw::<ActionTxStatus>(cs, event_data, event_data_size)
         }
         WifiEvent::RocDone => {
-            handle_raw::<RocDone>(cs, event_data, event_data_size);
+            handle_raw::<RocDone>(cs, event_data, event_data_size)
         }
         WifiEvent::StaBeaconTimeout => {
-            handle_raw::<StaBeaconTimeout>(cs, event_data, event_data_size);
+            handle_raw::<StaBeaconTimeout>(cs, event_data, event_data_size)
         }
         WifiEvent::ConnectionlessModuleWakeIntervalStart => {
-            handle_raw::<ConnectionlessModuleWakeIntervalStart>(cs, event_data, event_data_size);
+            handle_raw::<ConnectionlessModuleWakeIntervalStart>(cs, event_data, event_data_size)
         }
         WifiEvent::ApWpsRgSuccess => {
-            handle_raw::<ApWpsRgSuccess>(cs, event_data, event_data_size);
+            handle_raw::<ApWpsRgSuccess>(cs, event_data, event_data_size)
         }
         WifiEvent::ApWpsRgFailed => {
-            handle_raw::<ApWpsRgFailed>(cs, event_data, event_data_size);
+            handle_raw::<ApWpsRgFailed>(cs, event_data, event_data_size)
         }
         WifiEvent::ApWpsRgTimeout => {
-            handle_raw::<ApWpsRgTimeout>(cs, event_data, event_data_size);
+            handle_raw::<ApWpsRgTimeout>(cs, event_data, event_data_size)
         }
         WifiEvent::ApWpsRgPin => {
-            handle_raw::<ApWpsRgPin>(cs, event_data, event_data_size);
+            handle_raw::<ApWpsRgPin>(cs, event_data, event_data_size)
         }
         WifiEvent::ApWpsRgPbcOverlap => {
-            handle_raw::<ApWpsRgPbcOverlap>(cs, event_data, event_data_size);
+            handle_raw::<ApWpsRgPbcOverlap>(cs, event_data, event_data_size)
         }
         WifiEvent::ItwtSetup => {
-            handle_raw::<ItwtSetup>(cs, event_data, event_data_size);
+            handle_raw::<ItwtSetup>(cs, event_data, event_data_size)
         }
         WifiEvent::ItwtTeardown => {
-            handle_raw::<ItwtTeardown>(cs, event_data, event_data_size);
+            handle_raw::<ItwtTeardown>(cs, event_data, event_data_size)
         }
         WifiEvent::ItwtProbe => {
-            handle_raw::<ItwtProbe>(cs, event_data, event_data_size);
+            handle_raw::<ItwtProbe>(cs, event_data, event_data_size)
         }
         WifiEvent::ItwtSuspend => {
-            handle_raw::<ItwtSuspend>(cs, event_data, event_data_size);
+            handle_raw::<ItwtSuspend>(cs, event_data, event_data_size)
         }
         WifiEvent::TwtWakeup => {
-            handle_raw::<TwtWakeup>(cs, event_data, event_data_size);
+            handle_raw::<TwtWakeup>(cs, event_data, event_data_size)
         }
         WifiEvent::BtwtSetup => {
-            handle_raw::<BtwtSetup>(cs, event_data, event_data_size);
+            handle_raw::<BtwtSetup>(cs, event_data, event_data_size)
         }
         WifiEvent::BtwtTeardown => {
-            handle_raw::<BtwtTeardown>(cs, event_data, event_data_size);
+            handle_raw::<BtwtTeardown>(cs, event_data, event_data_size)
         }
         WifiEvent::NanStarted => {
-            handle_raw::<NanStarted>(cs, event_data, event_data_size);
+            handle_raw::<NanStarted>(cs, event_data, event_data_size)
         }
         WifiEvent::NanStopped => {
-            handle_raw::<NanStopped>(cs, event_data, event_data_size);
+            handle_raw::<NanStopped>(cs, event_data, event_data_size)
         }
         WifiEvent::NanSvcMatch => {
-            handle_raw::<NanSvcMatch>(cs, event_data, event_data_size);
+            handle_raw::<NanSvcMatch>(cs, event_data, event_data_size)
         }
         WifiEvent::NanReplied => {
-            handle_raw::<NanReplied>(cs, event_data, event_data_size);
+            handle_raw::<NanReplied>(cs, event_data, event_data_size)
         }
         WifiEvent::NanReceive => {
-            handle_raw::<NanReceive>(cs, event_data, event_data_size);
+            handle_raw::<NanReceive>(cs, event_data, event_data_size)
         }
         WifiEvent::NdpIndication => {
-            handle_raw::<NdpIndication>(cs, event_data, event_data_size);
+            handle_raw::<NdpIndication>(cs, event_data, event_data_size)
         }
         WifiEvent::NdpConfirm => {
-            handle_raw::<NdpConfirm>(cs, event_data, event_data_size);
+            handle_raw::<NdpConfirm>(cs, event_data, event_data_size)
         }
         WifiEvent::NdpTerminated => {
-            handle_raw::<NdpTerminated>(cs, event_data, event_data_size);
+            handle_raw::<NdpTerminated>(cs, event_data, event_data_size)
         }
         WifiEvent::HomeChannelChange => {
-            handle_raw::<HomeChannelChange>(cs, event_data, event_data_size);
+            handle_raw::<HomeChannelChange>(cs, event_data, event_data_size)
         }
         WifiEvent::StaNeighborRep => {
-            handle_raw::<StaNeighborRep>(cs, event_data, event_data_size);
+            handle_raw::<StaNeighborRep>(cs, event_data, event_data_size)
         }
     }
 }
