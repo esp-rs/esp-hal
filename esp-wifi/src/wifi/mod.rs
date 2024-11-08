@@ -351,9 +351,9 @@ impl Default for ClientConfiguration {
     }
 }
 
-pub(crate) trait CsiCallback: FnMut(crate::wifi::wifi_csi_info_t) + Sized {}
+pub(crate) trait CsiCallback: FnMut(crate::wifi::wifi_csi_info_t) {}
 
-impl<T> CsiCallback for T where T: FnMut(crate::wifi::wifi_csi_info_t) + Sized {}
+impl<T> CsiCallback for T where T: FnMut(crate::wifi::wifi_csi_info_t) {}
 
 #[cfg(csi_enable)]
 unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
@@ -2735,7 +2735,7 @@ impl<'d> WifiController<'d> {
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
-        cb: impl FnMut(crate::wifi::wifi_csi_info_t) + Sized,
+        cb: impl FnMut(crate::wifi::wifi_csi_info_t) + Send,
     ) -> Result<(), WifiError> {
         csi.apply_config()?;
         csi.set_receive_cb(cb)?;
