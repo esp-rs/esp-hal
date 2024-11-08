@@ -377,8 +377,7 @@ impl PeripheralClockControl {
             Peripheral::Rsa => {
                 peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | (enable as u32) << 2) });
                 if enable {
-                    peri_rst_en
-                        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+                    peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
                 }
             }
             #[cfg(all(rsa, any(esp32c3, esp32s2, esp32s3)))]
@@ -884,7 +883,9 @@ impl PeripheralClockControl {
             #[cfg(ecc)]
             Peripheral::Ecc => {
                 system.ecc_conf().modify(|_, w| w.ecc_clk_en().bit(enable));
-                if enable {    system.ecc_conf().modify(|_, w| w.ecc_rst_en().clear_bit()); }
+                if enable {
+                    system.ecc_conf().modify(|_, w| w.ecc_rst_en().clear_bit());
+                }
             }
             #[cfg(soc_etm)]
             Peripheral::Etm => {
