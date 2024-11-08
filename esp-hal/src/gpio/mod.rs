@@ -798,7 +798,7 @@ pub(crate) fn bind_default_interrupt_handler() {
         }
     }
 
-    unsafe { interrupt::bind_interrupt(Interrupt::GPIO, gpio_interrupt_handler) };
+    unsafe { interrupt::bind_interrupt(Interrupt::GPIO, default_gpio_interrupt_handler) };
     // By default, we use lowest priority
     unwrap!(interrupt::enable(Interrupt::GPIO, Priority::min()));
 }
@@ -821,7 +821,7 @@ impl Io {
 
     /// Set the interrupt priority for GPIO interrupts.
     pub fn set_interrupt_priority(&self, prio: Priority) {
-        unwrap!(interrupt::enable(crate::peripherals::Interrupt::GPIO, prio));
+        unwrap!(interrupt::enable(Interrupt::GPIO, prio));
     }
 }
 
@@ -840,15 +840,24 @@ impl InterruptConfigurable for Io {
     ///   corresponding pin's async API.
     /// - You will not be notified if you make a mistake.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::GPIO);
+        }
         self.set_interrupt_priority(handler.priority());
+        unsafe { interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler) };
         USER_INTERRUPT_HANDLER.store(handler.handler());
     }
 }
 
 #[ram]
-extern "C" fn gpio_interrupt_handler() {
+extern "C" fn user_gpio_interrupt_handler() {
     USER_INTERRUPT_HANDLER.call();
 
+    default_gpio_interrupt_handler();
+}
+
+#[ram]
+extern "C" fn default_gpio_interrupt_handler() {
     handle_pin_interrupts(on_pin_irq);
 }
 
