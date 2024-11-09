@@ -19,7 +19,7 @@ use esp_println::{print, println};
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let pin = LowPowerOutput::new(peripherals.pins.gpio1);
+    let pin = LowPowerOutput::new(peripherals.GPIO1);
 
     let mut ulp_core = ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 

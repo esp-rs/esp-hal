@@ -32,14 +32,14 @@ fn main() -> ! {
     let mut uart1 = Uart::new_with_config(
         peripherals.UART1,
         Config::default(),
-        peripherals.pins.gpio6,
-        peripherals.pins.gpio7,
+        peripherals.GPIO6,
+        peripherals.GPIO7,
     )
     .unwrap();
 
     // Set up (LP) UART:
-    let lp_tx = LowPowerOutput::new(peripherals.pins.gpio5);
-    let lp_rx = LowPowerInput::new(peripherals.pins.gpio4);
+    let lp_tx = LowPowerOutput::new(peripherals.GPIO5);
+    let lp_rx = LowPowerInput::new(peripherals.GPIO4);
     let lp_uart = LpUart::new(peripherals.LP_UART, lp_tx, lp_rx);
 
     let mut lp_core = LpCore::new(peripherals.LP_CORE);

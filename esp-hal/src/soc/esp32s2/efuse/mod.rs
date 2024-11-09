@@ -27,7 +27,7 @@
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let mut serial_tx = Uart::new(peripherals.UART0, peripherals.pins.gpio4, peripherals.pins.gpio5).unwrap();
+//! # let mut serial_tx = Uart::new(peripherals.UART0, peripherals.GPIO4, peripherals.GPIO5).unwrap();
 //! let mac_address = Efuse::read_base_mac_address();
 //! writeln!(
 //!     serial_tx,

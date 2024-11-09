@@ -243,31 +243,6 @@ where
     }
 }
 
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo])
-    (1, [Input, Output, Analog, RtcIo])
-    (2, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
-    (3, [Input, Output, Analog, RtcIo])
-    (4, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
-    (5, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
-    (6, [Input, Output] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
-    (7, [Input, Output] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
-    (8, [Input, Output])
-    (9, [Input, Output])
-    (10, [Input, Output] (2 => FSPICS0) (2 => FSPICS0))
-    (11, [Input, Output])
-    (12, [Input, Output] (0 => SPIHD) (0 => SPIHD))
-    (13, [Input, Output] (0 => SPIWP) (0 => SPIWP))
-    (14, [Input, Output] () (0 => SPICS0))
-    (15, [Input, Output] () (0 => SPICLK_MUX))
-    (16, [Input, Output] (0 => SPID) (0 => SPID))
-    (17, [Input, Output] (0 => SPIQ) (0 => SPIQ))
-    (18, [Input, Output])
-    (19, [Input, Output])
-    (20, [Input, Output] (0 => U0RXD) ())
-    (21, [Input, Output] () (0 => U0TXD))
-}
-
 // RTC pins 0 through 5 (inclusive) support GPIO wakeup
 rtc_pins! {
     0

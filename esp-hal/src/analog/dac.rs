@@ -20,8 +20,8 @@
 //! # use esp_hal::analog::dac::Dac;
 //! # use esp_hal::delay::Delay;
 //! # use embedded_hal::delay::DelayNs;
-#![cfg_attr(esp32, doc = "let dac1_pin = peripherals.pins.gpio25;")]
-#![cfg_attr(esp32s2, doc = "let dac1_pin = peripherals.pins.gpio17;")]
+#![cfg_attr(esp32, doc = "let dac1_pin = peripherals.GPIO25;")]
+#![cfg_attr(esp32s2, doc = "let dac1_pin = peripherals.GPIO17;")]
 //! let mut dac1 = Dac::new(peripherals.DAC1, dac1_pin);
 //!
 //! let mut delay = Delay::new();

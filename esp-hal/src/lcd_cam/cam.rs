@@ -31,19 +31,19 @@
 //! #     DmaPriority::Priority0,
 //! # );
 //!
-//! let mclk_pin = peripherals.pins.gpio15;
-//! let vsync_pin = peripherals.pins.gpio6;
-//! let href_pin = peripherals.pins.gpio7;
-//! let pclk_pin = peripherals.pins.gpio13;
+//! let mclk_pin = peripherals.GPIO15;
+//! let vsync_pin = peripherals.GPIO6;
+//! let href_pin = peripherals.GPIO7;
+//! let pclk_pin = peripherals.GPIO13;
 //! let data_pins = RxEightBits::new(
-//!     peripherals.pins.gpio11,
-//!     peripherals.pins.gpio9,
-//!     peripherals.pins.gpio8,
-//!     peripherals.pins.gpio10,
-//!     peripherals.pins.gpio12,
-//!     peripherals.pins.gpio18,
-//!     peripherals.pins.gpio17,
-//!     peripherals.pins.gpio16,
+//!     peripherals.GPIO11,
+//!     peripherals.GPIO9,
+//!     peripherals.GPIO8,
+//!     peripherals.GPIO10,
+//!     peripherals.GPIO12,
+//!     peripherals.GPIO18,
+//!     peripherals.GPIO17,
+//!     peripherals.GPIO16,
 //! );
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);

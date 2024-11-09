@@ -40,10 +40,10 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::master::{Config, Spi};
-//! let sclk = peripherals.pins.gpio0;
-//! let miso = peripherals.pins.gpio2;
-//! let mosi = peripherals.pins.gpio1;
-//! let cs = peripherals.pins.gpio5;
+//! let sclk = peripherals.GPIO0;
+//! let miso = peripherals.GPIO2;
+//! let mosi = peripherals.GPIO1;
+//! let cs = peripherals.GPIO5;
 //!
 //! let mut spi = Spi::new_with_config(
 //!     peripherals.SPI2,

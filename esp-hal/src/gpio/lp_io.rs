@@ -23,7 +23,7 @@
 //! use esp_hal::gpio::lp_io::LowPowerOutput;
 //! // configure GPIO 1 as LP output pin
 //! let lp_pin: LowPowerOutput<'_, 1> =
-//!     LowPowerOutput::new(peripherals.pins.gpio1);
+//!     LowPowerOutput::new(peripherals.GPIO1);
 //! # }
 //! ```
 

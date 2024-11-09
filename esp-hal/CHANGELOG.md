@@ -171,7 +171,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI transactions are now cancelled if the transfer object (or async Future) is dropped. (#2216)
 - The DMA channel types have been removed from peripherals (#2261)
 - `I2C` driver renamed to `I2c` (#2320)
-- The  GPIO pins are now accessible via `Peripherals` and are no longer part of the `Io` struct (#2508)
+- The GPIO pins are now accessible via `Peripherals` and are no longer part of the `Io` struct (#2508)
 
 ### Fixed
 

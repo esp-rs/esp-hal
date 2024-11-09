@@ -10,7 +10,7 @@ use esp_hal::{
     dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     dma_descriptors_chunk_size,
-    gpio::{interconnect::InputSignal, Io},
+    gpio::interconnect::InputSignal,
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
     prelude::*,
     spi::{
@@ -53,7 +53,7 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
-        let sclk = peripherals.pins.gpio0;
+        let sclk = peripherals.GPIO0;
         let (mosi, _) = hil_test::common_test_pins!(peripherals);
 
         let pcnt = Pcnt::new(peripherals.PCNT);

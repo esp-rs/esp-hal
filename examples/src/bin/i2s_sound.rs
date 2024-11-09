@@ -70,9 +70,9 @@ fn main() -> ! {
 
     let mut i2s_tx = i2s
         .i2s_tx
-        .with_bclk(peripherals.pins.gpio2)
-        .with_ws(peripherals.pins.gpio4)
-        .with_dout(peripherals.pins.gpio5)
+        .with_bclk(peripherals.GPIO2)
+        .with_ws(peripherals.GPIO4)
+        .with_dout(peripherals.GPIO5)
         .build();
 
     let data =

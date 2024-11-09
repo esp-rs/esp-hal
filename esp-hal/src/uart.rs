@@ -26,8 +26,8 @@
 //!
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
-//!     peripherals.pins.gpio1,
-//!     peripherals.pins.gpio2,
+//!     peripherals.GPIO1,
+//!     peripherals.GPIO2,
 //! ).unwrap();
 //! # }
 //! ```
@@ -56,8 +56,8 @@
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     peripherals.pins.gpio1,
-//! #     peripherals.pins.gpio2,
+//! #     peripherals.GPIO1,
+//! #     peripherals.GPIO2,
 //! # ).unwrap();
 //! // Write bytes out over the UART:
 //! uart1.write_bytes(b"Hello, world!").expect("write error!");
@@ -71,8 +71,8 @@
 //! # let mut uart1 = Uart::new_with_config(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     peripherals.pins.gpio1,
-//! #     peripherals.pins.gpio2,
+//! #     peripherals.GPIO1,
+//! #     peripherals.GPIO2,
 //! # ).unwrap();
 //! // The UART can be split into separate Transmit and Receive components:
 //! let (mut rx, mut tx) = uart1.split();
@@ -88,8 +88,8 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::Uart;
 //!
-//! let (rx, _) = peripherals.pins.gpio2.split();
-//! let (_, tx) = peripherals.pins.gpio1.split();
+//! let (rx, _) = peripherals.GPIO2.split();
+//! let (_, tx) = peripherals.GPIO1.split();
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
 //!     rx.inverted(),
@@ -103,8 +103,8 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{UartTx, UartRx};
 //!
-//! let tx = UartTx::new(peripherals.UART0, peripherals.pins.gpio1).unwrap();
-//! let rx = UartRx::new(peripherals.UART1, peripherals.pins.gpio2).unwrap();
+//! let tx = UartTx::new(peripherals.UART0, peripherals.GPIO1).unwrap();
+//! let rx = UartRx::new(peripherals.UART1, peripherals.GPIO2).unwrap();
 //! # }
 //! ```
 //! 

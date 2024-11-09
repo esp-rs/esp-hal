@@ -58,7 +58,7 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let sclk = peripherals.pins.gpio0;
+        let sclk = peripherals.GPIO0;
         let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
         let dma = Dma::new(peripherals.DMA);

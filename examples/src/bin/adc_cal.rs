@@ -26,9 +26,9 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32s3")] {
-            let analog_pin = peripherals.pins.gpio3;
+            let analog_pin = peripherals.GPIO3;
         } else {
-            let analog_pin = peripherals.pins.gpio2;
+            let analog_pin = peripherals.GPIO2;
         }
     }
 

@@ -48,8 +48,8 @@ fn main() -> ! {
     println!("setup channel 0");
     let ch0 = &u0.channel0;
 
-    let pin_a = Input::new(peripherals.pins.gpio4, Pull::Up);
-    let pin_b = Input::new(peripherals.pins.gpio5, Pull::Up);
+    let pin_a = Input::new(peripherals.GPIO4, Pull::Up);
+    let pin_b = Input::new(peripherals.GPIO5, Pull::Up);
 
     let (input_a, _) = pin_a.split();
     let (input_b, _) = pin_b.split();

@@ -40,10 +40,10 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Without an external transceiver, we only need a single line between the two MCUs.
-    let (rx_pin, tx_pin) = peripherals.pins.gpio2.split();
+    let (rx_pin, tx_pin) = peripherals.GPIO2.split();
     // Use these if you want to use an external transceiver:
-    // let tx_pin = peripherals.pins.gpio2;
-    // let rx_pin = peripherals.pins.gpio0;
+    // let tx_pin = peripherals.GPIO2;
+    // let rx_pin = peripherals.GPIO0;
 
     // The speed of the bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;

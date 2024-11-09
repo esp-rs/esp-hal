@@ -33,8 +33,8 @@ async fn main(_spawner: Spawner) {
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
-    let touch_pin0 = peripherals.pins.gpio2;
-    let touch_pin1 = peripherals.pins.gpio4;
+    let touch_pin0 = peripherals.GPIO2;
+    let touch_pin1 = peripherals.GPIO4;
 
     let touch_cfg = Some(TouchConfig {
         measurement_duration: Some(0x2000),

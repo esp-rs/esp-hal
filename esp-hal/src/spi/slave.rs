@@ -23,10 +23,10 @@
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(pdma, doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(gdma, doc = "let dma_channel = dma.channel0;")]
-//! let sclk = peripherals.pins.gpio0;
-//! let miso = peripherals.pins.gpio1;
-//! let mosi = peripherals.pins.gpio2;
-//! let cs = peripherals.pins.gpio3;
+//! let sclk = peripherals.GPIO0;
+//! let miso = peripherals.GPIO1;
+//! let mosi = peripherals.GPIO2;
+//! let cs = peripherals.GPIO3;
 //!
 //! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 //! dma_buffers!(32000);

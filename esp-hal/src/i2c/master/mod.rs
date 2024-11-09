@@ -26,8 +26,8 @@
 //!     peripherals.I2C0,
 //!     Config::default(),
 //! )
-//! .with_sda(peripherals.pins.gpio1)
-//! .with_scl(peripherals.pins.gpio2);
+//! .with_sda(peripherals.GPIO1)
+//! .with_scl(peripherals.GPIO2);
 //!
 //! loop {
 //!     let mut data = [0u8; 22];

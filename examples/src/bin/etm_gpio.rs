@@ -24,8 +24,8 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut led = Output::new(peripherals.pins.gpio1, Level::Low);
-    let button = peripherals.pins.gpio9;
+    let mut led = Output::new(peripherals.GPIO1, Level::Low);
+    let button = peripherals.GPIO9;
 
     led.set_high();
 

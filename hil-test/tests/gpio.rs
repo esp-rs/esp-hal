@@ -387,8 +387,8 @@ mod tests {
     #[cfg(esp32)]
     #[test]
     fn can_configure_rtcio_pins_as_input() {
-        let pins = unsafe { esp_hal::gpio::Pins::steal() };
+        let pin = unsafe { esp_hal::gpio::GpioPin::<37>::steal() };
 
-        _ = Input::new(pins.gpio37, Pull::Down);
+        _ = Input::new(pin, Pull::Down);
     }
 }

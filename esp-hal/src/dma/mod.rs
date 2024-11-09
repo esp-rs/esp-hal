@@ -23,10 +23,10 @@
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
-//! let sclk = peripherals.pins.gpio0;
-//! let miso = peripherals.pins.gpio2;
-//! let mosi = peripherals.pins.gpio4;
-//! let cs = peripherals.pins.gpio5;
+//! let sclk = peripherals.GPIO0;
+//! let miso = peripherals.GPIO2;
+//! let mosi = peripherals.GPIO4;
+//! let cs = peripherals.GPIO5;
 //!
 //! let mut spi = Spi::new_with_config(
 //!     peripherals.SPI2,

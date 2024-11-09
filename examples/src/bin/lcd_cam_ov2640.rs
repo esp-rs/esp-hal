@@ -52,21 +52,21 @@ fn main() -> ! {
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 
-    let cam_siod = peripherals.pins.gpio4;
-    let cam_sioc = peripherals.pins.gpio5;
-    let cam_xclk = peripherals.pins.gpio15;
-    let cam_vsync = peripherals.pins.gpio6;
-    let cam_href = peripherals.pins.gpio7;
-    let cam_pclk = peripherals.pins.gpio13;
+    let cam_siod = peripherals.GPIO4;
+    let cam_sioc = peripherals.GPIO5;
+    let cam_xclk = peripherals.GPIO15;
+    let cam_vsync = peripherals.GPIO6;
+    let cam_href = peripherals.GPIO7;
+    let cam_pclk = peripherals.GPIO13;
     let cam_data_pins = RxEightBits::new(
-        peripherals.pins.gpio11,
-        peripherals.pins.gpio9,
-        peripherals.pins.gpio8,
-        peripherals.pins.gpio10,
-        peripherals.pins.gpio12,
-        peripherals.pins.gpio18,
-        peripherals.pins.gpio17,
-        peripherals.pins.gpio16,
+        peripherals.GPIO11,
+        peripherals.GPIO9,
+        peripherals.GPIO8,
+        peripherals.GPIO10,
+        peripherals.GPIO12,
+        peripherals.GPIO18,
+        peripherals.GPIO17,
+        peripherals.GPIO16,
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);

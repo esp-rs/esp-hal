@@ -29,17 +29,17 @@ fn main() -> ! {
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let (tx_pin, rx_pin) = (peripherals.pins.gpio1, peripherals.pins.gpio3);
+            let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);
         } else if #[cfg(feature = "esp32c2")] {
-            let (tx_pin, rx_pin) = (peripherals.pins.gpio20, peripherals.pins.gpio19);
+            let (tx_pin, rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);
         } else if #[cfg(feature = "esp32c3")] {
-            let (tx_pin, rx_pin) = (peripherals.pins.gpio21, peripherals.pins.gpio20);
+            let (tx_pin, rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);
         } else if #[cfg(feature = "esp32c6")] {
-            let (tx_pin, rx_pin) = (peripherals.pins.gpio16, peripherals.pins.gpio17);
+            let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         } else if #[cfg(feature = "esp32h2")] {
-            let (tx_pin, rx_pin) = (peripherals.pins.gpio24, peripherals.pins.gpio23);
+            let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
-            let (tx_pin, rx_pin) = (peripherals.pins.gpio43, peripherals.pins.gpio44);
+            let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);
         }
     }
     let config = Config::default().rx_fifo_full_threshold(30);

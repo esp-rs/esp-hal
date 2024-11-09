@@ -25,7 +25,7 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let led = peripherals.pins.gpio0;
+    let led = peripherals.GPIO0;
 
     let mut ledc = Ledc::new(peripherals.LEDC);
 

@@ -18,9 +18,10 @@
 //! GPIO interrupts. For more information, see the
 //! [`Io::set_interrupt_handler`].
 //!
-//! The pins are accessible via [`crate::Peripherals::pins`]. These pins can
-//! then be passed to peripherals (such as SPI, UART, I2C, etc.), to pin drivers
-//! or can be [`GpioPin::split`] into peripheral signals.
+//! The pins are accessible via the [`crate::Peripherals`] struct returned by
+//! [`crate::init`]. These pins can then be passed to peripherals (such as
+//! SPI, UART, I2C, etc.), to pin drivers or can be [`GpioPin::split`] into
+//! peripheral signals.
 //!
 //! Each pin is a different type initially. Internally, `esp-hal` will often
 //! erase their types automatically, but they can also be converted into
@@ -52,7 +53,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::{Io, Level, Output};
-//! let mut led = Output::new(peripherals.pins.gpio5, Level::High);
+//! let mut led = Output::new(peripherals.GPIO5, Level::High);
 //! # }
 //! ```
 //! 
@@ -70,11 +71,18 @@
 use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
 
+#[cfg(any(lp_io, rtc_cntl))]
+use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
     interrupt::{self, InterruptHandler, Priority},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{Interrupt, GPIO, IO_MUX},
+    peripherals::{
+        gpio::{handle_gpio_input, handle_gpio_output, AnyPinInner},
+        Interrupt,
+        GPIO,
+        IO_MUX,
+    },
     private::{self, Sealed},
     InterruptConfigurable,
     DEFAULT_INTERRUPT_HANDLER,
@@ -715,6 +723,9 @@ impl Bank1GpioRegisterAccess {
 /// GPIO pin
 pub struct GpioPin<const GPIONUM: u8>;
 
+/// Type-erased GPIO pin
+pub struct AnyPin(pub(crate) AnyPinInner);
+
 impl<const GPIONUM: u8> GpioPin<GPIONUM>
 where
     Self: Pin,
@@ -905,20 +916,20 @@ macro_rules! if_rtcio_pin {
 #[macro_export]
 macro_rules! io_type {
     (Input, $gpionum:literal) => {
-        impl $crate::gpio::InputPin for GpioPin<$gpionum> {}
+        impl $crate::gpio::InputPin for $crate::gpio::GpioPin<$gpionum> {}
     };
     (Output, $gpionum:literal) => {
-        impl $crate::gpio::OutputPin for GpioPin<$gpionum> {}
+        impl $crate::gpio::OutputPin for $crate::gpio::GpioPin<$gpionum> {}
     };
     (Analog, $gpionum:literal) => {
         // FIXME: the implementation shouldn't be in the GPIO module
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-        impl $crate::gpio::AnalogPin for GpioPin<$gpionum> {
+        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<$gpionum> {
             /// Configures the pin for analog mode.
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::GPIO;
 
-                get_io_mux_reg($gpionum).modify(|_, w| unsafe {
+                $crate::gpio::get_io_mux_reg($gpionum).modify(|_, w| unsafe {
                     w.mcu_sel().bits(1);
                     w.fun_ie().clear_bit();
                     w.fun_wpu().clear_bit();
@@ -950,91 +961,70 @@ macro_rules! gpio {
         )+
     ) => {
         paste::paste! {
-            /// Pins available on this chip
-            pub struct Pins {
-                $(
-                    #[doc = concat!("GPIO pin number ", $gpionum, ".")]
-                    pub [< gpio $gpionum >] : GpioPin<$gpionum>,
-                )+
-            }
-
-            impl Pins {
-                /// Unsafely create GPIO pins.
-                ///
-                /// # Safety
-                ///
-                /// The caller must ensure that only one instance of a pin is in use at one time.
-                pub unsafe fn steal() -> Self {
-                    Self {
-                        $(
-                            [< gpio $gpionum >]: GpioPin::steal(),
-                        )+
-                    }
-                }
-            }
-
             $(
                 $(
                     $crate::io_type!($type, $gpionum);
                 )*
 
-                impl $crate::gpio::Pin for GpioPin<$gpionum> {
+                impl $crate::gpio::Pin for $crate::gpio::GpioPin<$gpionum> {
                     fn number(&self) -> u8 {
                         $gpionum
                     }
 
-                    fn degrade_pin(&self, _: $crate::private::Internal) -> AnyPin {
-                        AnyPin($crate::gpio::AnyPinInner::[< Gpio $gpionum >](unsafe { Self::steal() }))
+                    fn degrade_pin(&self, _: $crate::private::Internal) -> $crate::gpio::AnyPin {
+                        $crate::gpio::AnyPin(AnyPinInner::[< Gpio $gpionum >](unsafe { Self::steal() }))
                     }
 
                     fn gpio_bank(&self, _: $crate::private::Internal) -> $crate::gpio::GpioRegisterAccess {
                         $crate::gpio::GpioRegisterAccess::from($gpionum)
                     }
 
-                    fn output_signals(&self, _: $crate::private::Internal) -> &[(AlternateFunction, OutputSignal)] {
+                    fn output_signals(&self, _: $crate::private::Internal) -> &[($crate::gpio::AlternateFunction, $crate::gpio::OutputSignal)] {
                         &[
                             $(
                                 $(
-                                    (AlternateFunction::[< Function $af_output_num >], OutputSignal::$af_output_signal ),
+                                    (
+                                        $crate::gpio::AlternateFunction::[< Function $af_output_num >],
+                                        $crate::gpio::OutputSignal::$af_output_signal
+                                    ),
                                 )*
                             )?
                         ]
                     }
 
-                    fn input_signals(&self, _: $crate::private::Internal) -> &[(AlternateFunction, InputSignal)] {
+                    fn input_signals(&self, _: $crate::private::Internal) -> &[($crate::gpio::AlternateFunction, $crate::gpio::InputSignal)] {
                         &[
                             $(
                                 $(
-                                    (AlternateFunction::[< Function $af_input_num >], InputSignal::$af_input_signal ),
+                                    (
+                                        $crate::gpio::AlternateFunction::[< Function $af_input_num >],
+                                        $crate::gpio::InputSignal::$af_input_signal
+                                    ),
                                 )*
                             )?
                         ]
                     }
                 }
 
-                impl From<GpioPin<$gpionum>> for AnyPin {
-                    fn from(pin: GpioPin<$gpionum>) -> Self {
-                        use $crate::gpio::Pin;
-                        pin.degrade()
+                impl From<$crate::gpio::GpioPin<$gpionum>> for $crate::gpio::AnyPin {
+                    fn from(pin: $crate::gpio::GpioPin<$gpionum>) -> Self {
+                        $crate::gpio::Pin::degrade(pin)
                     }
                 }
             )+
 
             pub(crate) enum AnyPinInner {
                 $(
-                    [<Gpio $gpionum >](GpioPin<$gpionum>),
+                    [<Gpio $gpionum >]($crate::gpio::GpioPin<$gpionum>),
                 )+
             }
 
-            /// Type-erased GPIO pin
-            pub struct AnyPin(pub(crate) AnyPinInner);
-
-            impl $crate::peripheral::Peripheral for AnyPin {
-                type P = AnyPin;
+            impl $crate::peripheral::Peripheral for $crate::gpio::AnyPin {
+                type P = $crate::gpio::AnyPin;
                 unsafe fn clone_unchecked(&self) ->  Self {
                     match self.0 {
                         $(AnyPinInner::[<Gpio $gpionum >](_) => {
-                            Self(AnyPinInner::[< Gpio $gpionum >](unsafe { GpioPin::steal() }))
+                            Self(AnyPinInner::[< Gpio $gpionum >](unsafe { $crate::gpio::GpioPin::steal() }))
                         })+
                     }
                 }
@@ -1043,7 +1033,6 @@ macro_rules! gpio {
             // These macros call the code block on the actually contained GPIO pin.
 
             #[doc(hidden)]
-            #[macro_export]
             macro_rules! handle_gpio_output {
                 ($this:expr, $inner:ident, $code:tt) => {
                     match $this {
@@ -1060,7 +1049,6 @@ macro_rules! gpio {
             }
 
             #[doc(hidden)]
-            #[macro_export]
             macro_rules! handle_gpio_input {
                 ($this:expr, $inner:ident, $code:tt) => {
                     match $this {
@@ -1077,7 +1065,6 @@ macro_rules! gpio {
             cfg_if::cfg_if! {
                 if #[cfg(any(lp_io, rtc_cntl))] {
                     #[doc(hidden)]
-                    #[macro_export]
                     macro_rules! handle_rtcio {
                         ($this:expr, $inner:ident, $code:tt) => {
                             match $this {
@@ -1094,7 +1081,6 @@ macro_rules! gpio {
                     }
 
                     #[doc(hidden)]
-                    #[macro_export]
                     macro_rules! handle_rtcio_with_resistors {
                         ($this:expr, $inner:ident, $code:tt) => {
                             match $this {

@@ -11,7 +11,6 @@ use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::Io,
     interrupt::{software::SoftwareInterruptControl, Priority},
     peripheral::Peripheral,
     prelude::*,

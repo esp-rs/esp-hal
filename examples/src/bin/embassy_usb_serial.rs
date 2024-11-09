@@ -36,11 +36,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let usb = Usb::new(
-        peripherals.USB0,
-        peripherals.pins.gpio20,
-        peripherals.pins.gpio19,
-    );
+    let usb = Usb::new(peripherals.USB0, peripherals.GPIO20, peripherals.GPIO19);
 
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 1024];

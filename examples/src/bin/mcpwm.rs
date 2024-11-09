@@ -19,7 +19,7 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let pin = peripherals.pins.gpio0;
+    let pin = peripherals.GPIO0;
 
     // initialize peripheral
     cfg_if::cfg_if! {

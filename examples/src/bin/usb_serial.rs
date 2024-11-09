@@ -27,11 +27,7 @@ static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let usb = Usb::new(
-        peripherals.USB0,
-        peripherals.pins.gpio20,
-        peripherals.pins.gpio19,
-    );
+    let usb = Usb::new(peripherals.USB0, peripherals.GPIO20, peripherals.GPIO19);
     let usb_bus = UsbBus::new(usb, unsafe { &mut *addr_of_mut!(EP_MEMORY) });
 
     let mut serial = SerialPort::new(&usb_bus);

@@ -30,7 +30,7 @@ fn main() -> ! {
     let mut alarm0 = syst_alarms.alarm0;
     alarm0.set_period(1u32.secs());
 
-    let mut led = peripherals.pins.gpio1;
+    let mut led = peripherals.GPIO1;
 
     // setup ETM
     let gpio_ext = Channels::new(peripherals.GPIO_SD);

@@ -21,12 +21,7 @@ use nb::block;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut serial1 = Uart::new(
-        peripherals.UART1,
-        peripherals.pins.gpio4,
-        peripherals.pins.gpio5,
-    )
-    .unwrap();
+    let mut serial1 = Uart::new(peripherals.UART1, peripherals.GPIO4, peripherals.GPIO5).unwrap();
 
     let delay = Delay::new();
 

@@ -495,9 +495,9 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 ///
 /// let mut pins = mcpwm.operator0.with_linked_pins(
-///     peripherals.pins.gpio0,
+///     peripherals.GPIO0,
 ///     PwmPinConfig::UP_DOWN_ACTIVE_HIGH, // use PWMA as our main input
-///     peripherals.pins.gpio1,
+///     peripherals.GPIO1,
 ///     PwmPinConfig::EMPTY, // keep PWMB "low"
 ///     bridge_off,
 /// );

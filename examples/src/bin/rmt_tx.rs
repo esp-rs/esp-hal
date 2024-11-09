@@ -38,7 +38,7 @@ fn main() -> ! {
 
     let mut channel = rmt
         .channel0
-        .configure(peripherals.pins.gpio4, tx_config)
+        .configure(peripherals.GPIO4, tx_config)
         .unwrap();
 
     let delay = Delay::new();

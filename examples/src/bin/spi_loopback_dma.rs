@@ -35,10 +35,10 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sclk = peripherals.pins.gpio0;
-    let miso = peripherals.pins.gpio2;
-    let mosi = peripherals.pins.gpio4;
-    let cs = peripherals.pins.gpio5;
+    let sclk = peripherals.GPIO0;
+    let miso = peripherals.GPIO2;
+    let mosi = peripherals.GPIO4;
+    let cs = peripherals.GPIO5;
 
     let dma = Dma::new(peripherals.DMA);
 

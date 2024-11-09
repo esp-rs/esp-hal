@@ -38,8 +38,8 @@ async fn main(_spawner: Spawner) {
         config.frequency = 400.kHz();
         config
     })
-    .with_sda(peripherals.pins.gpio4)
-    .with_scl(peripherals.pins.gpio5)
+    .with_sda(peripherals.GPIO4)
+    .with_scl(peripherals.GPIO5)
     .into_async();
 
     let mut lis3dh = Lis3dh::new_i2c(i2c0, SlaveAddr::Alternate).await.unwrap();

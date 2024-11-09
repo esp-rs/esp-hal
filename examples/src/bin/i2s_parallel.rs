@@ -36,17 +36,17 @@ fn main() -> ! {
 
     let dma_channel = dma.i2s1channel;
     let i2s = peripherals.I2S1;
-    let clock = peripherals.pins.gpio25;
+    let clock = peripherals.GPIO25;
 
     let pins = TxEightBits::new(
-        peripherals.pins.gpio16,
-        peripherals.pins.gpio4,
-        peripherals.pins.gpio17,
-        peripherals.pins.gpio18,
-        peripherals.pins.gpio5,
-        peripherals.pins.gpio19,
-        peripherals.pins.gpio12,
-        peripherals.pins.gpio14,
+        peripherals.GPIO16,
+        peripherals.GPIO4,
+        peripherals.GPIO17,
+        peripherals.GPIO18,
+        peripherals.GPIO5,
+        peripherals.GPIO19,
+        peripherals.GPIO12,
+        peripherals.GPIO14,
     );
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);

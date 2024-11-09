@@ -81,7 +81,7 @@
 //!     });
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let mut led = Output::new(peripherals.pins.gpio0, Level::High);
+//!     let mut led = Output::new(peripherals.GPIO0, Level::High);
 //!
 //!     let delay = Delay::new();
 //!

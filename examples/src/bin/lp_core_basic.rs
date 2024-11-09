@@ -27,7 +27,7 @@ fn main() -> ! {
 
     // configure GPIO 1 as LP output pin
 
-    let lp_pin = LowPowerOutput::new(peripherals.pins.gpio1);
+    let lp_pin = LowPowerOutput::new(peripherals.GPIO1);
 
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
     lp_core.stop();

@@ -30,11 +30,11 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let analog_pin = peripherals.pins.gpio32;
+            let analog_pin = peripherals.GPIO32;
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
-            let analog_pin = peripherals.pins.gpio3;
+            let analog_pin = peripherals.GPIO3;
         } else {
-            let analog_pin = peripherals.pins.gpio2;
+            let analog_pin = peripherals.GPIO2;
         }
     }
 

@@ -19,9 +19,9 @@ fn main() -> ! {
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32c6")] {
-            let (mut tx_pin, mut rx_pin) = (peripherals.pins.gpio16, peripherals.pins.gpio17);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         } else if #[cfg(feature = "esp32h2")] {
-            let (mut tx_pin, mut rx_pin) = (peripherals.pins.gpio24, peripherals.pins.gpio23);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
         }
     }
 

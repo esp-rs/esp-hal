@@ -8,7 +8,7 @@
  let peripherals = esp_hal::init(Default::default());
 -let io = Io::new(peripherals.GPIO, peripherals.IOMUX);
 -let pin = io.pins.gpio5;
-+let pin = peripherals.pins.gpio5;
++let pin = peripherals.GPIO5;
 ```
 
 ### `Io` constructor changes

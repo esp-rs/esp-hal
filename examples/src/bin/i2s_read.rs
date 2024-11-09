@@ -52,13 +52,13 @@ fn main() -> ! {
     );
 
     #[cfg(not(feature = "esp32"))]
-    let i2s = i2s.with_mclk(peripherals.pins.gpio0);
+    let i2s = i2s.with_mclk(peripherals.GPIO0);
 
     let mut i2s_rx = i2s
         .i2s_rx
-        .with_bclk(peripherals.pins.gpio2)
-        .with_ws(peripherals.pins.gpio4)
-        .with_din(peripherals.pins.gpio5)
+        .with_bclk(peripherals.GPIO2)
+        .with_ws(peripherals.GPIO4)
+        .with_din(peripherals.GPIO5)
         .build();
 
     let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();

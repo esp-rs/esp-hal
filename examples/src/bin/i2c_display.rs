@@ -38,8 +38,8 @@ fn main() -> ! {
     // Create a new peripheral object with the described wiring
     // and standard I2C clock speed
     let i2c = I2c::new(peripherals.I2C0, Config::default())
-        .with_sda(peripherals.pins.gpio4)
-        .with_scl(peripherals.pins.gpio5);
+        .with_sda(peripherals.GPIO4)
+        .with_scl(peripherals.GPIO5);
 
     // Initialize display
     let interface = I2CDisplayInterface::new(i2c);

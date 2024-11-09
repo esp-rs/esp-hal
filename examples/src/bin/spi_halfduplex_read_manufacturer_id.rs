@@ -45,19 +45,19 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let sclk = peripherals.pins.gpio0;
-            let miso = peripherals.pins.gpio2;
-            let mosi = peripherals.pins.gpio4;
-            let sio2 = peripherals.pins.gpio5;
-            let sio3 = peripherals.pins.gpio13;
-            let cs = peripherals.pins.gpio14;
+            let sclk = peripherals.GPIO0;
+            let miso = peripherals.GPIO2;
+            let mosi = peripherals.GPIO4;
+            let sio2 = peripherals.GPIO5;
+            let sio3 = peripherals.GPIO13;
+            let cs = peripherals.GPIO14;
         } else {
-            let sclk = peripherals.pins.gpio0;
-            let miso = peripherals.pins.gpio1;
-            let mosi = peripherals.pins.gpio2;
-            let sio2 = peripherals.pins.gpio3;
-            let sio3 = peripherals.pins.gpio4;
-            let cs = peripherals.pins.gpio5;
+            let sclk = peripherals.GPIO0;
+            let miso = peripherals.GPIO1;
+            let mosi = peripherals.GPIO2;
+            let sio2 = peripherals.GPIO3;
+            let sio3 = peripherals.GPIO4;
+            let cs = peripherals.GPIO5;
         }
     }
 

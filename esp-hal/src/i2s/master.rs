@@ -50,11 +50,11 @@
 //!     rx_descriptors,
 //!     tx_descriptors,
 //! );
-#![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(peripherals.pins.gpio0);")]
+#![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(peripherals.GPIO0);")]
 //! let mut i2s_rx = i2s.i2s_rx
-//!     .with_bclk(peripherals.pins.gpio1)
-//!     .with_ws(peripherals.pins.gpio2)
-//!     .with_din(peripherals.pins.gpio5)
+//!     .with_bclk(peripherals.GPIO1)
+//!     .with_ws(peripherals.GPIO2)
+//!     .with_din(peripherals.GPIO5)
 //!     .build();
 //!
 //! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();

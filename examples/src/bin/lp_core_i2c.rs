@@ -27,8 +27,8 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let lp_sda = LowPowerOutputOpenDrain::new(peripherals.pins.gpio6);
-    let lp_scl = LowPowerOutputOpenDrain::new(peripherals.pins.gpio7);
+    let lp_sda = LowPowerOutputOpenDrain::new(peripherals.GPIO6);
+    let lp_scl = LowPowerOutputOpenDrain::new(peripherals.GPIO7);
 
     let lp_i2c = LpI2c::new(peripherals.LP_I2C0, lp_sda, lp_scl, 100.kHz());
 

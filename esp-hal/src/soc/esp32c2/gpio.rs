@@ -215,23 +215,6 @@ where
     }
 }
 
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo])
-    (1, [Input, Output, Analog, RtcIo])
-    (2, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
-    (3, [Input, Output, Analog, RtcIo])
-    (4, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (2 => FSPIHD))
-    (5, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (2 => FSPIWP))
-    (6, [Input, Output] (2 => FSPICLK) (2 => FSPICLK_MUX))
-    (7, [Input, Output] (2 => FSPID) (2 => FSPID))
-    (8, [Input, Output])
-    (9, [Input, Output])
-    (10, [Input, Output] (2 => FSPICS0) (2 => FSPICS0))
-    (18, [Input, Output])
-    (19, [Input, Output])
-    (20, [Input, Output] (0 => U0RXD) ())
-}
-
 rtc_pins! {
     0
     1

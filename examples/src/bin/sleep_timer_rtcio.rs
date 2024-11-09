@@ -49,16 +49,16 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32c3", feature = "esp32c2"))] {
-            let pin2 = Input::new(peripherals.pins.gpio2, Pull::None);
-            let mut pin3 = peripherals.pins.gpio3;
+            let pin2 = Input::new(peripherals.GPIO2, Pull::None);
+            let mut pin3 = peripherals.GPIO3;
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
                 (&mut *pin2.into_ref(), WakeupLevel::Low),
                 (&mut pin3, WakeupLevel::High),
             ];
         } else if #[cfg(feature = "esp32s3")] {
-            let pin17 = Input::new(peripherals.pins.gpio17, Pull::None);
-            let mut pin18 = peripherals.pins.gpio18;
+            let pin17 = Input::new(peripherals.GPIO17, Pull::None);
+            let mut pin18 = peripherals.GPIO18;
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut [
                 (&mut *pin17.into_ref(), WakeupLevel::Low),

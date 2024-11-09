@@ -32,7 +32,7 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
-    let ext0_pin = Input::new(peripherals.pins.gpio4, Pull::None);
+    let ext0_pin = Input::new(peripherals.GPIO4, Pull::None);
 
     println!("up and runnning!");
     let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);

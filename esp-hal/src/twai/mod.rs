@@ -36,8 +36,8 @@
 //! # use nb::block;
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_rx_pin = peripherals.pins.gpio3;
-//! let can_tx_pin = peripherals.pins.gpio2;
+//! let can_rx_pin = peripherals.GPIO3;
+//! let can_tx_pin = peripherals.GPIO2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
@@ -88,8 +88,8 @@
 //! # use nb::block;
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_rx_pin = peripherals.pins.gpio3;
-//! let can_tx_pin = peripherals.pins.gpio2;
+//! let can_rx_pin = peripherals.GPIO3;
+//! let can_tx_pin = peripherals.GPIO2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;

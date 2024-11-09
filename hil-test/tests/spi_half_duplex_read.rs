@@ -33,7 +33,7 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let sclk = peripherals.pins.gpio0;
+        let sclk = peripherals.GPIO0;
         let (miso, miso_mirror) = hil_test::common_test_pins!(peripherals);
 
         let miso_mirror = Output::new(miso_mirror, Level::High);

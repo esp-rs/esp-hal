@@ -28,8 +28,8 @@
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
 //!
-//! let mut led = peripherals.pins.gpio1;
-//! let button = peripherals.pins.gpio9;
+//! let mut led = peripherals.GPIO1;
+//! let button = peripherals.GPIO9;
 //!
 //! // setup ETM
 //! let gpio_ext = Channels::new(peripherals.GPIO_SD);

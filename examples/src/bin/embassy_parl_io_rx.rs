@@ -36,10 +36,10 @@ async fn main(_spawner: Spawner) {
     let dma_channel = dma.channel0;
 
     let mut rx_pins = RxFourBits::new(
-        peripherals.pins.gpio1,
-        peripherals.pins.gpio2,
-        peripherals.pins.gpio3,
-        peripherals.pins.gpio4,
+        peripherals.GPIO1,
+        peripherals.GPIO2,
+        peripherals.GPIO3,
+        peripherals.GPIO4,
     );
 
     let parl_io = ParlIoRxOnly::new(

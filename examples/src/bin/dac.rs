@@ -27,11 +27,11 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let dac1_pin = peripherals.pins.gpio25;
-            let dac2_pin = peripherals.pins.gpio26;
+            let dac1_pin = peripherals.GPIO25;
+            let dac2_pin = peripherals.GPIO26;
         } else if #[cfg(feature = "esp32s2")] {
-            let dac1_pin = peripherals.pins.gpio17;
-            let dac2_pin = peripherals.pins.gpio18;
+            let dac1_pin = peripherals.GPIO17;
+            let dac2_pin = peripherals.GPIO18;
         }
     }
 

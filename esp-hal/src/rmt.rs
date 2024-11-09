@@ -61,7 +61,7 @@
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
-//!         peripherals.pins.gpio1,
+//!         peripherals.GPIO1,
 //!         TxChannelConfig {
 //!             clk_divider: 1,
 //!             idle_output_level: false,

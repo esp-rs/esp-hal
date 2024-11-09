@@ -32,13 +32,13 @@ fn main() -> ! {
     // Set GPIO2 as an output, and set its state high initially.
     let mut io = Io::new(peripherals.IO_MUX);
     io.set_interrupt_handler(handler);
-    let mut led = Output::new(peripherals.pins.gpio2, Level::Low);
+    let mut led = Output::new(peripherals.GPIO2, Level::Low);
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = peripherals.pins.gpio0;
+            let button = peripherals.GPIO0;
         } else {
-            let button = peripherals.pins.gpio9;
+            let button = peripherals.GPIO9;
         }
     }
 
