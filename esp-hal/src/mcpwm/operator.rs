@@ -313,7 +313,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
 
         // SAFETY:
         // `bits` is a valid bit pattern
-        ch.gen((!IS_A) as usize).write(|w| unsafe { w.bits(bits) })
+        ch.gen((!IS_A) as usize).write(|w| unsafe { w.bits(bits) });
     }
 
     /// Set how a new timestamp syncs with the timer
@@ -334,7 +334,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
             } else {
                 w.b_upmethod().bits(bits)
             }
-        })
+        });
     }
 
     /// Write a new timestamp.
@@ -347,16 +347,16 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
 
         #[cfg(esp32s3)]
         if IS_A {
-            ch.cmpr_value0().write(|w| unsafe { w.a().bits(value) })
+            ch.cmpr_value0().write(|w| unsafe { w.a().bits(value) });
         } else {
-            ch.cmpr_value1().write(|w| unsafe { w.b().bits(value) })
+            ch.cmpr_value1().write(|w| unsafe { w.b().bits(value) });
         }
 
         #[cfg(any(esp32, esp32c6, esp32h2))]
         if IS_A {
-            ch.gen_tstmp_a().write(|w| unsafe { w.a().bits(value) })
+            ch.gen_tstmp_a().write(|w| unsafe { w.a().bits(value) });
         } else {
-            ch.gen_tstmp_b().write(|w| unsafe { w.b().bits(value) })
+            ch.gen_tstmp_b().write(|w| unsafe { w.b().bits(value) });
         }
     }
 

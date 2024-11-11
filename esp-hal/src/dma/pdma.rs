@@ -124,7 +124,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaTxInte
                 };
             }
             w
-        })
+        });
     }
 
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
@@ -160,7 +160,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaTxInte
                 };
             }
             w
-        })
+        });
     }
 
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
@@ -259,7 +259,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaRxInte
                 };
             }
             w
-        })
+        });
     }
 
     fn is_listening(&self) -> EnumSet<DmaRxInterrupt> {
@@ -299,7 +299,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaRxInte
                 };
             }
             w
-        })
+        });
     }
 
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
@@ -535,7 +535,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaTxInte
                 };
             }
             w
-        })
+        });
     }
 
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
@@ -592,7 +592,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaTxInte
                 };
             }
             w
-        })
+        });
     }
 
     fn waker(&self) -> &'static AtomicWaker {
@@ -676,7 +676,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaRxInte
                 };
             }
             w
-        })
+        });
     }
 
     fn is_listening(&self) -> EnumSet<DmaRxInterrupt> {
@@ -740,7 +740,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaRxInte
                 };
             }
             w
-        })
+        });
     }
 
     fn waker(&self) -> &'static AtomicWaker {

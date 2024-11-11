@@ -708,7 +708,7 @@ pub(crate) mod utils {
                 let iomux = &*esp32s3::IO_MUX::PTR;
                 iomux
                     .gpio(cs1_io as usize)
-                    .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1))
+                    .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
             }
         } else {
             unsafe {
@@ -717,7 +717,7 @@ pub(crate) mod utils {
                 let iomux = &*esp32s3::IO_MUX::PTR;
                 iomux
                     .gpio(cs1_io as usize)
-                    .modify(|_, w| w.mcu_sel().bits(PIN_FUNC_GPIO))
+                    .modify(|_, w| w.mcu_sel().bits(PIN_FUNC_GPIO));
             }
         }
 
@@ -1156,7 +1156,7 @@ pub(crate) mod utils {
             spi.sram_cmd().modify(|_, w| w.sdout_oct().set_bit());
             spi.sram_cmd().modify(|_, w| w.sdin_oct().set_bit());
 
-            spi.cache_sctrl().modify(|_, w| w.sram_oct().set_bit())
+            spi.cache_sctrl().modify(|_, w| w.sram_oct().set_bit());
         }
     }
 
@@ -1164,7 +1164,7 @@ pub(crate) mod utils {
     fn spi_flash_set_rom_required_regs() {
         // Disable the variable dummy mode when doing timing tuning
         let spi = unsafe { &*crate::peripherals::SPI1::PTR };
-        spi.ddr().modify(|_, w| w.spi_fmem_var_dummy().clear_bit())
+        spi.ddr().modify(|_, w| w.spi_fmem_var_dummy().clear_bit());
         // STR /DTR mode setting is done every time when
         // `esp_rom_opiflash_exec_cmd` is called
         //
@@ -1199,7 +1199,7 @@ pub(crate) mod utils {
             let pins = &[27usize, 28, 31, 32, 33, 34, 35, 36, 37];
             for pin in pins {
                 let iomux = &*esp32s3::IO_MUX::PTR;
-                iomux.gpio(*pin).modify(|_, w| w.fun_drv().bits(3))
+                iomux.gpio(*pin).modify(|_, w| w.fun_drv().bits(3));
             }
         }
     }
@@ -1287,7 +1287,7 @@ pub(crate) mod utils {
             let iomux = &*esp32s3::IO_MUX::PTR;
             iomux
                 .gpio(OCT_PSRAM_CS1_IO as usize)
-                .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1))
+                .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
         }
 
         // Set mspi cs1 drive strength
@@ -1295,7 +1295,7 @@ pub(crate) mod utils {
             let iomux = &*esp32s3::IO_MUX::PTR;
             iomux
                 .gpio(OCT_PSRAM_CS1_IO as usize)
-                .modify(|_, w| w.fun_drv().bits(3))
+                .modify(|_, w| w.fun_drv().bits(3));
         }
 
         // Set psram clock pin drive strength

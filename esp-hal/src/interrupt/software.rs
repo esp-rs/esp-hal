@@ -93,7 +93,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
                 .cpu_intr_from_cpu_3()
                 .write(|w| w.cpu_intr_from_cpu_3().set_bit()),
             _ => unreachable!(),
-        }
+        };
     }
 
     /// Resets this software-interrupt
@@ -120,7 +120,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
                 .cpu_intr_from_cpu_3()
                 .write(|w| w.cpu_intr_from_cpu_3().clear_bit()),
             _ => unreachable!(),
-        }
+        };
     }
 
     /// Unsafely create an instance of this peripheral out of thin air.

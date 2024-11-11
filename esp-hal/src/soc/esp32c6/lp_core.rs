@@ -63,12 +63,12 @@ impl<'d> LpCore<'d> {
             LpCoreClockSource::RcFastClk => unsafe {
                 (*crate::soc::peripherals::LP_CLKRST::PTR)
                     .lp_clk_conf()
-                    .modify(|_, w| w.fast_clk_sel().clear_bit())
+                    .modify(|_, w| w.fast_clk_sel().clear_bit());
             },
             LpCoreClockSource::XtalD2Clk => unsafe {
                 (*crate::soc::peripherals::LP_CLKRST::PTR)
                     .lp_clk_conf()
-                    .modify(|_, w| w.fast_clk_sel().set_bit())
+                    .modify(|_, w| w.fast_clk_sel().set_bit());
             },
         }
 
