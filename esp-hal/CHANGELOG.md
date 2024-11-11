@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `slave::Spi::{with_mosi(), with_miso(), with_sclk(), with_cs()}` functions (#2485)
 - I8080: Added `set_8bits_order()` to set the byte order in 8-bit mode (#2487)
 - `I2c::{apply_config(), with_sda(), with_scl()}` (#2477)
+- ESP32-S2: Added missing GPIO alternate functions (#2512)
 
 ### Changed
 
