@@ -345,21 +345,24 @@ impl<'d, T, DM: Mode> I2c<'d, DM, T>
 where
     T: Instance,
 {
-    fn info(&self) -> &Info {
-        self.i2c.info()
+    fn driver(&self) -> Driver<'_> {
+        Driver {
+            info: self.i2c.info(),
+            state: self.i2c.state(),
+        }
     }
 
     fn internal_recover(&self) {
-        PeripheralClockControl::reset(self.info().peripheral);
-        PeripheralClockControl::enable(self.info().peripheral);
+        PeripheralClockControl::reset(self.driver().info.peripheral);
+        PeripheralClockControl::enable(self.driver().info.peripheral);
 
         // We know the configuration is valid, we can ignore the result.
-        _ = self.info().setup(&self.config);
+        _ = self.driver().setup(&self.config);
     }
 
     /// Applies a new configuration.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.info().setup(config)?;
+        self.driver().setup(config)?;
         self.config = *config;
         Ok(())
     }
@@ -369,6 +372,7 @@ where
         address: u8,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
+        let driver = self.driver();
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
         let mut op_iter = operations
@@ -379,15 +383,15 @@ where
             let next_op = op_iter.peek().map(|v| v.kind());
             let kind = op.kind();
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
             match op {
                 Operation::Write(buffer) => {
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
-                    self.info()
+                    driver
                         .write_operation(
                             address,
                             buffer,
@@ -402,7 +406,7 @@ where
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     // - will_continue is true if there is another read operation next
-                    self.info()
+                    driver
                         .read_operation(
                             address,
                             buffer,
@@ -423,7 +427,7 @@ where
 
     /// Connect a pin to the I2C SDA signal.
     pub fn with_sda(self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        let info = self.info();
+        let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
         self.with_pin(sda, input, output)
@@ -431,7 +435,7 @@ where
 
     /// Connect a pin to the I2C SCL signal.
     pub fn with_scl(self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        let info = self.info();
+        let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
         self.with_pin(scl, input, output)
@@ -483,10 +487,10 @@ where
             config,
         };
 
-        PeripheralClockControl::reset(i2c.info().peripheral);
-        PeripheralClockControl::enable(i2c.info().peripheral);
+        PeripheralClockControl::reset(i2c.driver().info.peripheral);
+        PeripheralClockControl::enable(i2c.driver().info.peripheral);
 
-        unwrap!(i2c.info().setup(&i2c.config));
+        unwrap!(i2c.driver().setup(&i2c.config));
         i2c
     }
 
@@ -494,7 +498,7 @@ where
 
     /// Configures the I2C peripheral to operate in asynchronous mode.
     pub fn into_async(mut self) -> I2c<'d, Async, T> {
-        self.set_interrupt_handler(self.info().async_handler);
+        self.set_interrupt_handler(self.driver().info.async_handler);
 
         I2c {
             i2c: self.i2c,
@@ -505,14 +509,15 @@ where
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
     pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+        let driver = self.driver();
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
 
-            self.info()
+            driver
                 .read_operation(
                     address,
                     chunk,
@@ -529,14 +534,15 @@ where
 
     /// Writes bytes to slave with address `address`
     pub fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+        let driver = self.driver();
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
 
-            self.info()
+            driver
                 .write_operation(
                     address,
                     chunk,
@@ -558,16 +564,17 @@ where
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
+        let driver = self.driver();
         let write_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
         let read_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
 
         for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
 
-            self.info()
+            self.driver()
                 .write_operation(
                     address,
                     chunk,
@@ -580,11 +587,11 @@ where
 
         for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
 
-            self.info()
+            self.driver()
                 .read_operation(
                     address,
                     chunk,
@@ -633,7 +640,7 @@ where
     T: Instance,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        let interrupt = self.info().interrupt;
+        let interrupt = self.driver().info.interrupt;
         for core in Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
@@ -660,8 +667,8 @@ struct I2cFuture<'a> {
 
 #[cfg(not(esp32))]
 impl<'a> I2cFuture<'a> {
-    pub fn new(event: Event, instance: &'a impl Instance) -> Self {
-        instance.info().register_block().int_ena().modify(|_, w| {
+    pub fn new(event: Event, info: &'a Info, state: &'a State) -> Self {
+        info.register_block().int_ena().modify(|_, w| {
             let w = match event {
                 Event::EndDetect => w.end_detect().set_bit(),
                 Event::TxComplete => w.trans_complete().set_bit(),
@@ -680,11 +687,7 @@ impl<'a> I2cFuture<'a> {
             w
         });
 
-        Self {
-            event,
-            state: instance.state(),
-            info: instance.info(),
-        }
+        Self { event, state, info }
     }
 
     fn event_bit_is_clear(&self) -> bool {
@@ -763,7 +766,7 @@ where
 {
     /// Configure the I2C peripheral to operate in blocking mode.
     pub fn into_blocking(self) -> I2c<'d, Blocking, T> {
-        crate::interrupt::disable(Cpu::current(), self.info().interrupt);
+        crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
 
         I2c {
             i2c: self.i2c,
@@ -778,10 +781,10 @@ where
             panic!("On ESP32 and ESP32-S2 the max I2C read is limited to 32 bytes");
         }
 
-        self.wait_for_completion(false).await?;
+        self.driver().wait_for_completion(false).await?;
 
         for byte in buffer.iter_mut() {
-            *byte = read_fifo(self.info().register_block());
+            *byte = read_fifo(self.driver().register_block());
         }
 
         Ok(())
@@ -789,99 +792,7 @@ where
 
     #[cfg(not(any(esp32, esp32s2)))]
     async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
-        self.info().read_all_from_fifo(buffer)
-    }
-
-    #[cfg(any(esp32, esp32s2))]
-    async fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
-        if start_index >= bytes.len() {
-            return Ok(());
-        }
-
-        for b in bytes {
-            write_fifo(self.info().register_block(), *b);
-            self.info().check_errors()?;
-        }
-
-        Ok(())
-    }
-
-    #[cfg(not(any(esp32, esp32s2)))]
-    async fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
-        let mut index = start_index;
-        loop {
-            self.info().check_errors()?;
-
-            I2cFuture::new(Event::TxFifoWatermark, &*self.i2c).await?;
-
-            self.info()
-                .register_block()
-                .int_clr()
-                .write(|w| w.txfifo_wm().clear_bit_by_one());
-
-            I2cFuture::new(Event::TxFifoWatermark, &*self.i2c).await?;
-
-            if index >= bytes.len() {
-                break Ok(());
-            }
-
-            write_fifo(self.info().register_block(), bytes[index]);
-            index += 1;
-        }
-    }
-
-    #[cfg(not(esp32))]
-    async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-        self.info().check_errors()?;
-
-        if end_only {
-            I2cFuture::new(Event::EndDetect, &*self.i2c).await?;
-        } else {
-            let res = embassy_futures::select::select(
-                I2cFuture::new(Event::TxComplete, &*self.i2c),
-                I2cFuture::new(Event::EndDetect, &*self.i2c),
-            )
-            .await;
-
-            match res {
-                embassy_futures::select::Either::First(res) => res?,
-                embassy_futures::select::Either::Second(res) => res?,
-            }
-        }
-        self.info().check_all_commands_done()?;
-
-        Ok(())
-    }
-
-    #[cfg(esp32)]
-    async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-        // for ESP32 we need a timeout here but wasting a timer seems unnecessary
-        // given the short time we spend here
-
-        let mut tout = MAX_ITERATIONS / 10; // adjust the timeout because we are yielding in the loop
-        loop {
-            let interrupts = self.info().register_block().int_raw().read();
-
-            self.info().check_errors()?;
-
-            // Handle completion cases
-            // A full transmission was completed (either a STOP condition or END was
-            // processed)
-            if (!end_only && interrupts.trans_complete().bit_is_set())
-                || interrupts.end_detect().bit_is_set()
-            {
-                break;
-            }
-
-            tout -= 1;
-            if tout == 0 {
-                return Err(Error::TimeOut);
-            }
-
-            embassy_futures::yield_now().await;
-        }
-        self.info().check_all_commands_done()?;
-        Ok(())
+        self.driver().read_all_from_fifo(buffer)
     }
 
     /// Executes an async I2C write operation.
@@ -910,24 +821,23 @@ where
         }
 
         // Reset FIFO and command list
-        self.info().reset_fifo();
-        self.info().reset_command_list();
+        self.driver().reset_fifo();
+        self.driver().reset_command_list();
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
         }
-        self.i2c
-            .info()
+        self.driver()
             .setup_write(address, bytes, start, cmd_iterator)?;
         add_cmd(
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
-        let index = self.info().fill_tx_fifo(bytes);
-        self.info().start_transmission();
+        let index = self.driver().fill_tx_fifo(bytes);
+        self.driver().start_transmission();
 
         // Fill the FIFO with the remaining bytes:
-        self.write_remaining_tx_fifo(index, bytes).await?;
-        self.wait_for_completion(!stop).await?;
+        self.driver().write_remaining_tx_fifo(index, bytes).await?;
+        self.driver().wait_for_completion(!stop).await?;
         Ok(())
     }
 
@@ -960,32 +870,32 @@ where
         }
 
         // Reset FIFO and command list
-        self.info().reset_fifo();
-        self.info().reset_command_list();
+        self.driver().reset_fifo();
+        self.driver().reset_command_list();
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
         }
-        self.i2c
-            .info()
+        self.driver()
             .setup_read(address, buffer, start, will_continue, cmd_iterator)?;
         add_cmd(
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
-        self.info().start_transmission();
+        self.driver().start_transmission();
         self.read_all_from_fifo(buffer).await?;
-        self.wait_for_completion(!stop).await?;
+        self.driver().wait_for_completion(!stop).await?;
         Ok(())
     }
 
     /// Writes bytes to slave with address `address`
     pub async fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+        let driver = self.driver();
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
 
             self.write_operation(
                 address,
@@ -1002,12 +912,13 @@ where
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
     pub async fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+        let driver = self.driver();
         let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
 
             self.read_operation(
                 address,
@@ -1031,13 +942,14 @@ where
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
+        let driver = self.driver();
         let write_count = write_buffer.len().div_ceil(I2C_CHUNK_SIZE);
         let read_count = read_buffer.len().div_ceil(I2C_CHUNK_SIZE);
         for (idx, chunk) in write_buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
 
             self.write_operation(
                 address,
@@ -1051,9 +963,9 @@ where
 
         for (idx, chunk) in read_buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
 
             self.read_operation(
                 address,
@@ -1102,6 +1014,7 @@ where
         address: u8,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
+        let driver = self.driver();
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
         let mut op_iter = operations
@@ -1112,9 +1025,9 @@ where
             let next_op = op_iter.peek().map(|v| v.kind());
             let kind = op.kind();
             // Clear all I2C interrupts
-            self.info().clear_all_interrupts();
+            driver.clear_all_interrupts();
 
-            let cmd_iterator = &mut self.info().register_block().comd_iter();
+            let cmd_iterator = &mut driver.register_block().comd_iter();
             match op {
                 Operation::Write(buffer) => {
                     // execute a write operation:
@@ -1339,6 +1252,18 @@ impl Info {
     /// Returns the register block for this I2C instance.
     pub fn register_block(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
+    }
+}
+
+#[allow(dead_code)] // Some versions don't need `state`
+struct Driver<'a> {
+    info: &'a Info,
+    state: &'a State,
+}
+
+impl Driver<'_> {
+    fn register_block(&self) -> &RegisterBlock {
+        self.info.register_block()
     }
 
     /// Configures the I2C peripheral with the specified frequency, clocks, and
@@ -1773,7 +1698,7 @@ impl Info {
         // wait for completion - then we can just read the data from FIFO
         // once we change to non-fifo mode to support larger transfers that
         // won't work anymore
-        self.wait_for_completion(false)?;
+        self.wait_for_completion_blocking(false)?;
 
         // Read bytes from FIFO
         // FIXME: Handle case where less data has been provided by the slave than
@@ -1792,8 +1717,99 @@ impl Info {
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
     }
 
+    #[cfg(any(esp32, esp32s2))]
+    async fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
+        if start_index >= bytes.len() {
+            return Ok(());
+        }
+
+        for b in bytes {
+            write_fifo(self.register_block(), *b);
+            self.check_errors()?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(any(esp32, esp32s2)))]
+    async fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
+        let mut index = start_index;
+        loop {
+            self.check_errors()?;
+
+            I2cFuture::new(Event::TxFifoWatermark, self.info, self.state).await?;
+
+            self.register_block()
+                .int_clr()
+                .write(|w| w.txfifo_wm().clear_bit_by_one());
+
+            I2cFuture::new(Event::TxFifoWatermark, self.info, self.state).await?;
+
+            if index >= bytes.len() {
+                break Ok(());
+            }
+
+            write_fifo(self.register_block(), bytes[index]);
+            index += 1;
+        }
+    }
+
+    #[cfg(not(esp32))]
+    async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
+        self.check_errors()?;
+
+        if end_only {
+            I2cFuture::new(Event::EndDetect, self.info, self.state).await?;
+        } else {
+            let res = embassy_futures::select::select(
+                I2cFuture::new(Event::TxComplete, self.info, self.state),
+                I2cFuture::new(Event::EndDetect, self.info, self.state),
+            )
+            .await;
+
+            match res {
+                embassy_futures::select::Either::First(res) => res?,
+                embassy_futures::select::Either::Second(res) => res?,
+            }
+        }
+        self.check_all_commands_done()?;
+
+        Ok(())
+    }
+
+    #[cfg(esp32)]
+    async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
+        // for ESP32 we need a timeout here but wasting a timer seems unnecessary
+        // given the short time we spend here
+
+        let mut tout = MAX_ITERATIONS / 10; // adjust the timeout because we are yielding in the loop
+        loop {
+            let interrupts = self.register_block().int_raw().read();
+
+            self.check_errors()?;
+
+            // Handle completion cases
+            // A full transmission was completed (either a STOP condition or END was
+            // processed)
+            if (!end_only && interrupts.trans_complete().bit_is_set())
+                || interrupts.end_detect().bit_is_set()
+            {
+                break;
+            }
+
+            tout -= 1;
+            if tout == 0 {
+                return Err(Error::TimeOut);
+            }
+
+            embassy_futures::yield_now().await;
+        }
+        self.check_all_commands_done()?;
+        Ok(())
+    }
+
     /// Waits for the completion of an I2C transaction.
-    fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
+    fn wait_for_completion_blocking(&self, end_only: bool) -> Result<(), Error> {
         let mut tout = MAX_ITERATIONS;
         loop {
             let interrupts = self.register_block().int_raw().read();
@@ -1940,7 +1956,11 @@ impl Info {
     #[cfg(not(any(esp32, esp32s2)))]
     /// Writes remaining data from byte slice to the TX FIFO from the specified
     /// index.
-    fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
+    fn write_remaining_tx_fifo_blocking(
+        &self,
+        start_index: usize,
+        bytes: &[u8],
+    ) -> Result<(), Error> {
         let mut index = start_index;
         loop {
             self.check_errors()?;
@@ -1999,7 +2019,11 @@ impl Info {
     #[cfg(any(esp32, esp32s2))]
     /// Writes remaining data from byte slice to the TX FIFO from the specified
     /// index.
-    fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
+    fn write_remaining_tx_fifo_blocking(
+        &self,
+        start_index: usize,
+        bytes: &[u8],
+    ) -> Result<(), Error> {
         // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
         // FIFO apparently it would be possible by using non-fifo mode
         // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
@@ -2107,8 +2131,8 @@ impl Info {
         self.start_transmission();
 
         // Fill the FIFO with the remaining bytes:
-        self.write_remaining_tx_fifo(index, bytes)?;
-        self.wait_for_completion(!stop)?;
+        self.write_remaining_tx_fifo_blocking(index, bytes)?;
+        self.wait_for_completion_blocking(!stop)?;
         Ok(())
     }
 
@@ -2156,7 +2180,7 @@ impl Info {
         )?;
         self.start_transmission();
         self.read_all_from_fifo(buffer)?;
-        self.wait_for_completion(!stop)?;
+        self.wait_for_completion_blocking(!stop)?;
         Ok(())
     }
 }
