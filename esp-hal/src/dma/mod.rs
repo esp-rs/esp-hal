@@ -67,6 +67,7 @@ pub use self::m2m::*;
 pub use self::pdma::*;
 use crate::{
     interrupt::InterruptHandler,
+    peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     soc::is_slice_in_dram,
     Async,
@@ -943,6 +944,13 @@ pub trait DmaEligible {
     fn dma_peripheral(&self) -> DmaPeripheral;
 }
 
+/// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
+pub type DmaChannelFor<T> = <T as DmaEligible>::Dma;
+/// Helper type to get the DMA Rx channel for a peripheral.
+pub type RxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Rx;
+/// Helper type to get the DMA Tx channel for a peripheral.
+pub type TxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Tx;
+
 #[doc(hidden)]
 #[macro_export]
 macro_rules! impl_dma_eligible {
@@ -1585,13 +1593,42 @@ impl RxCircularState {
     }
 }
 
+#[doc(hidden)]
+pub trait DmaRxChannel:
+    RxRegisterAccess + InterruptAccess<DmaRxInterrupt> + Peripheral<P = Self>
+{
+}
+
+#[doc(hidden)]
+pub trait DmaTxChannel:
+    TxRegisterAccess + InterruptAccess<DmaTxInterrupt> + Peripheral<P = Self>
+{
+}
+
 /// A description of a DMA Channel.
-pub trait DmaChannel: crate::private::Sealed + Sized {
+pub trait DmaChannel: Peripheral<P = Self> {
     /// A description of the RX half of a DMA Channel.
-    type Rx: RxRegisterAccess + InterruptAccess<DmaRxInterrupt>;
+    type Rx: DmaRxChannel;
 
     /// A description of the TX half of a DMA Channel.
-    type Tx: TxRegisterAccess + InterruptAccess<DmaTxInterrupt>;
+    type Tx: DmaTxChannel;
+
+    /// Splits the DMA channel into its RX and TX halves.
+    #[cfg(any(not(esp32c2), not(esp32s3)))]
+    fn split(self) -> (Self::Rx, Self::Tx) {
+        // This function is exposed safely on chips that have separate IN and OUT
+        // interrupt handlers.
+        // TODO: this includes the P4 as well.
+        unsafe { self.split_internal(crate::private::Internal) }
+    }
+
+    /// Splits the DMA channel into its RX and TX halves.
+    ///
+    /// # Safety
+    ///
+    /// This function must only be used if the separate halves are used by the
+    /// same peripheral.
+    unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx);
 }
 
 #[doc(hidden)]
@@ -1606,18 +1643,13 @@ pub trait DmaChannelExt: DmaChannel {
     note = "Not all channels are useable with all peripherals"
 )]
 #[doc(hidden)]
-pub trait DmaChannelConvert<DEG: DmaChannel>: DmaChannel {
-    fn degrade_rx(rx: Self::Rx) -> DEG::Rx;
-    fn degrade_tx(tx: Self::Tx) -> DEG::Tx;
+pub trait DmaChannelConvert<DEG>: DmaChannel {
+    fn degrade(self) -> DEG;
 }
 
 impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
-    fn degrade_rx(rx: Self::Rx) -> DEG::Rx {
-        rx
-    }
-
-    fn degrade_tx(tx: Self::Tx) -> DEG::Tx {
-        tx
+    fn degrade(self) -> DEG {
+        self
     }
 }
 
@@ -1683,17 +1715,20 @@ pub trait Rx: crate::private::Sealed {
 #[doc(hidden)]
 pub struct ChannelRx<'a, M, CH>
 where
-    CH: DmaChannel,
+    M: Mode,
+    CH: DmaRxChannel,
 {
-    pub(crate) rx_impl: CH::Rx,
-    pub(crate) _phantom: PhantomData<(&'a (), CH, M)>,
+    pub(crate) rx_impl: PeripheralRef<'a, CH>,
+    pub(crate) _phantom: PhantomData<M>,
 }
 
 impl<'a, CH> ChannelRx<'a, Blocking, CH>
 where
-    CH: DmaChannel,
+    CH: DmaRxChannel,
 {
-    fn new(rx_impl: CH::Rx) -> Self {
+    /// Creates a new RX channel half.
+    pub fn new(rx_impl: impl Peripheral<P = CH> + 'a) -> Self {
+        crate::into_ref!(rx_impl);
         #[cfg(gdma)]
         // clear the mem2mem mode to avoid failed DMA if this
         // channel was previously used for a mem2mem transfer.
@@ -1724,10 +1759,7 @@ where
         }
     }
 
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler)
-    where
-        CH: DmaChannel,
-    {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.unlisten_in(EnumSet::all());
         self.clear_in(EnumSet::all());
 
@@ -1743,7 +1775,7 @@ where
 
 impl<'a, CH> ChannelRx<'a, Async, CH>
 where
-    CH: DmaChannel,
+    CH: DmaRxChannel,
 {
     /// Converts an async channel into a blocking channel.
     pub(crate) fn into_blocking(self) -> ChannelRx<'a, Blocking, CH> {
@@ -1761,20 +1793,8 @@ where
 impl<'a, M, CH> ChannelRx<'a, M, CH>
 where
     M: Mode,
-    CH: DmaChannel,
+    CH: DmaRxChannel,
 {
-    /// Return a less specific (degraded) version of this channel.
-    #[doc(hidden)]
-    pub fn degrade<DEG: DmaChannel>(self) -> ChannelRx<'a, M, DEG>
-    where
-        CH: DmaChannelConvert<DEG>,
-    {
-        ChannelRx {
-            rx_impl: CH::degrade_rx(self.rx_impl),
-            _phantom: PhantomData,
-        }
-    }
-
     /// Configure the channel.
     #[cfg(gdma)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
@@ -1806,14 +1826,14 @@ where
 impl<M, CH> crate::private::Sealed for ChannelRx<'_, M, CH>
 where
     M: Mode,
-    CH: DmaChannel,
+    CH: DmaRxChannel,
 {
 }
 
 impl<M, CH> Rx for ChannelRx<'_, M, CH>
 where
     M: Mode,
-    CH: DmaChannel,
+    CH: DmaRxChannel,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
     // API.
@@ -1978,24 +1998,26 @@ pub trait Tx: crate::private::Sealed {
 #[doc(hidden)]
 pub struct ChannelTx<'a, M, CH>
 where
-    CH: DmaChannel,
+    M: Mode,
+    CH: DmaTxChannel,
 {
-    pub(crate) tx_impl: CH::Tx,
-    pub(crate) _phantom: PhantomData<(&'a (), CH, M)>,
+    pub(crate) tx_impl: PeripheralRef<'a, CH>,
+    pub(crate) _phantom: PhantomData<M>,
 }
 
 impl<'a, CH> ChannelTx<'a, Blocking, CH>
 where
-    CH: DmaChannel,
+    CH: DmaTxChannel,
 {
-    fn new(tx_impl: CH::Tx) -> Self {
+    /// Creates a new TX channel half.
+    pub fn new(tx_impl: impl Peripheral<P = CH> + 'a) -> Self {
+        crate::into_ref!(tx_impl);
         if let Some(interrupt) = tx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
                 crate::interrupt::disable(cpu, interrupt);
             }
         }
         tx_impl.set_async(false);
-
         Self {
             tx_impl,
             _phantom: PhantomData,
@@ -2014,10 +2036,7 @@ where
         }
     }
 
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler)
-    where
-        CH: DmaChannel,
-    {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.unlisten_out(EnumSet::all());
         self.clear_out(EnumSet::all());
 
@@ -2033,7 +2052,7 @@ where
 
 impl<'a, CH> ChannelTx<'a, Async, CH>
 where
-    CH: DmaChannel,
+    CH: DmaTxChannel,
 {
     /// Converts an async channel into a blocking channel.
     pub(crate) fn into_blocking(self) -> ChannelTx<'a, Blocking, CH> {
@@ -2051,20 +2070,8 @@ where
 impl<'a, M, CH> ChannelTx<'a, M, CH>
 where
     M: Mode,
-    CH: DmaChannel,
+    CH: DmaTxChannel,
 {
-    /// Return a less specific (degraded) version of this channel.
-    #[doc(hidden)]
-    pub fn degrade<DEG: DmaChannel>(self) -> ChannelTx<'a, M, DEG>
-    where
-        CH: DmaChannelConvert<DEG>,
-    {
-        ChannelTx {
-            tx_impl: CH::degrade_tx(self.tx_impl),
-            _phantom: PhantomData,
-        }
-    }
-
     /// Configure the channel priority.
     #[cfg(gdma)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
@@ -2101,14 +2108,14 @@ where
 impl<M, CH> crate::private::Sealed for ChannelTx<'_, M, CH>
 where
     M: Mode,
-    CH: DmaChannel,
+    CH: DmaTxChannel,
 {
 }
 
 impl<M, CH> Tx for ChannelTx<'_, M, CH>
 where
     M: Mode,
-    CH: DmaChannel,
+    CH: DmaTxChannel,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
     // API.
@@ -2309,28 +2316,38 @@ pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
 }
 
 /// DMA Channel
+#[non_exhaustive]
 pub struct Channel<'d, M, CH>
 where
     M: Mode,
     CH: DmaChannel,
 {
     /// RX half of the channel
-    pub rx: ChannelRx<'d, M, CH>,
+    pub rx: ChannelRx<'d, M, CH::Rx>,
     /// TX half of the channel
-    pub tx: ChannelTx<'d, M, CH>,
+    pub tx: ChannelTx<'d, M, CH::Tx>,
 }
 
 impl<'d, CH> Channel<'d, Blocking, CH>
 where
     CH: DmaChannel,
 {
+    pub(crate) fn new(channel: impl Peripheral<P = CH>) -> Self {
+        let (rx, tx) = unsafe {
+            channel
+                .clone_unchecked()
+                .split_internal(crate::private::Internal)
+        };
+        Self {
+            rx: ChannelRx::new(rx),
+            tx: ChannelTx::new(tx),
+        }
+    }
+
     /// Sets the interrupt handler for RX and TX interrupts.
     ///
     /// Interrupts are not enabled at the peripheral level here.
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler)
-    where
-        CH: DmaChannel,
-    {
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.rx.set_interrupt_handler(handler);
         self.tx.set_interrupt_handler(handler);
     }
@@ -2415,25 +2432,6 @@ impl<'d, CH: DmaChannel> From<Channel<'d, Blocking, CH>> for Channel<'d, Async, 
 impl<'d, CH: DmaChannel> From<Channel<'d, Async, CH>> for Channel<'d, Blocking, CH> {
     fn from(channel: Channel<'d, Async, CH>) -> Self {
         channel.into_blocking()
-    }
-}
-
-impl<'d, M, CH> Channel<'d, M, CH>
-where
-    M: Mode,
-    CH: DmaChannel,
-{
-    /// Return a less specific (degraded) version of this channel (both rx and
-    /// tx).
-    #[doc(hidden)]
-    pub fn degrade<DEG: DmaChannel>(self) -> Channel<'d, M, DEG>
-    where
-        CH: DmaChannelConvert<DEG>,
-    {
-        Channel {
-            rx: self.rx.degrade(),
-            tx: self.tx.degrade(),
-        }
     }
 }
 

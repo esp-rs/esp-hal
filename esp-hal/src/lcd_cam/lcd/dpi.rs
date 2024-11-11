@@ -105,7 +105,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelTx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaTxBuffer, Tx},
+    dma::{ChannelTx, DmaChannelConvert, DmaError, DmaPeripheral, DmaTxBuffer, Tx, TxChannelFor},
     gpio::{interconnect::PeripheralOutput, Level, OutputSignal},
     lcd_cam::{
         calculate_clkm,
@@ -122,20 +122,21 @@ use crate::{
 /// Represents the RGB LCD interface.
 pub struct Dpi<'d> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, Blocking, <LCD_CAM as DmaEligible>::Dma>,
+    tx_channel: ChannelTx<'d, Blocking, TxChannelFor<LCD_CAM>>,
 }
 
 impl<'d> Dpi<'d> {
     /// Create a new instance of the RGB/DPI driver.
     pub fn new<DM: Mode, CH>(
         lcd: Lcd<'d, DM>,
-        channel: ChannelTx<'d, Blocking, CH>,
+        channel: impl Peripheral<P = CH> + 'd,
         frequency: HertzU32,
         config: Config,
     ) -> Self
     where
-        CH: DmaChannelConvert<<LCD_CAM as DmaEligible>::Dma>,
+        CH: DmaChannelConvert<TxChannelFor<LCD_CAM>>,
     {
+        let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));
         let lcd_cam = lcd.lcd_cam;
 
         let clocks = Clocks::get();
@@ -270,7 +271,7 @@ impl<'d> Dpi<'d> {
 
         Self {
             lcd_cam,
-            tx_channel: channel.degrade(),
+            tx_channel,
         }
     }
 

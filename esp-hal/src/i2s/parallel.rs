@@ -47,11 +47,13 @@ use crate::{
         Channel,
         ChannelTx,
         DmaChannelConvert,
+        DmaChannelFor,
         DmaEligible,
         DmaError,
         DmaPeripheral,
         DmaTxBuffer,
         Tx,
+        TxChannelFor,
     },
     gpio::{
         interconnect::{OutputConnection, PeripheralOutput},
@@ -177,7 +179,7 @@ where
     I: Instance,
 {
     instance: PeripheralRef<'d, I>,
-    tx_channel: ChannelTx<'d, DM, I::Dma>,
+    tx_channel: ChannelTx<'d, DM, TxChannelFor<I>>,
     _guard: PeripheralGuard,
 }
 
@@ -185,13 +187,13 @@ impl<'d> I2sParallel<'d, Blocking> {
     /// Create a new I2S Parallel Interface
     pub fn new<CH>(
         i2s: impl Peripheral<P = impl Instance> + 'd,
-        channel: Channel<'d, Blocking, CH>,
+        channel: impl Peripheral<P = CH> + 'd,
         frequency: impl Into<fugit::HertzU32>,
         pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
-        CH: DmaChannelConvert<<AnyI2s as DmaEligible>::Dma>,
+        CH: DmaChannelConvert<DmaChannelFor<AnyI2s>>,
     {
         Self::new_typed(i2s.map_into(), channel, frequency, pins, clock_pin)
     }
@@ -204,19 +206,19 @@ where
     /// Create a new I2S Parallel Interface
     pub fn new_typed<CH>(
         i2s: impl Peripheral<P = I> + 'd,
-        channel: Channel<'d, Blocking, CH>,
+        channel: impl Peripheral<P = CH> + 'd,
         frequency: impl Into<fugit::HertzU32>,
         mut pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
-        CH: DmaChannelConvert<I::Dma>,
+        CH: DmaChannelConvert<DmaChannelFor<I>>,
     {
         crate::into_ref!(i2s);
         crate::into_mapped_ref!(clock_pin);
 
+        let channel = Channel::new(channel.map(|ch| ch.degrade()));
         channel.runtime_ensure_compatible(&i2s);
-        let channel = channel.degrade();
 
         let guard = PeripheralGuard::new(i2s.peripheral());
 
