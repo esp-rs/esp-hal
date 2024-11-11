@@ -469,7 +469,7 @@ where
                 .enumerate()
             {
                 unsafe {
-                    ptr.add(idx).write_volatile((*entry).into());
+                    ptr.add(idx).write_volatile(*entry);
                 }
             }
 
@@ -1062,7 +1062,7 @@ where
             as *mut u32;
         let len = self.data.len();
         for (idx, entry) in self.data.iter_mut().take(len).enumerate() {
-            *entry = unsafe { ptr.add(idx).read_volatile().into() };
+            *entry = unsafe { ptr.add(idx).read_volatile() };
         }
 
         Ok(self.channel)
@@ -1419,7 +1419,7 @@ where
             .enumerate()
         {
             unsafe {
-                ptr.add(idx).write_volatile((*entry).into());
+                ptr.add(idx).write_volatile(*entry);
             }
         }
 
