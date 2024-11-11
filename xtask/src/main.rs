@@ -700,7 +700,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     let mut features = format!("--features={chip},defmt,sys-logs");
 
                     if device.contains("wifi") {
-                        features.push_str(",esp-now,embassy-net,sniffer")
+                        features.push_str(",esp-now,sniffer")
                     }
                     if device.contains("bt") {
                         features.push_str(",ble")
