@@ -81,27 +81,12 @@ mod tests {
             }
         }
 
-        let mut tx_data = [PulseCode {
-            level1: true,
-            length1: 200,
-            level2: false,
-            length2: 50,
-        }; 20];
+        let mut tx_data = [PulseCode::new(true, 200, false, 50); 20];
 
-        tx_data[tx_data.len() - 2] = PulseCode {
-            level1: true,
-            length1: 3000,
-            level2: false,
-            length2: 500,
-        };
-        tx_data[tx_data.len() - 1] = PulseCode::default();
+        tx_data[tx_data.len() - 2] = PulseCode::new(true, 3000, false, 500);
+        tx_data[tx_data.len() - 1] = PulseCode::empty();
 
-        let mut rcv_data = [PulseCode {
-            level1: false,
-            length1: 0,
-            level2: false,
-            length2: 0,
-        }; 20];
+        let mut rcv_data: [u32; 20] = [PulseCode::empty(); 20];
 
         let rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
         let tx_transaction = tx_channel.transmit(&tx_data).unwrap();
@@ -143,12 +128,7 @@ mod tests {
             rmt.channel0.configure(tx, tx_config).unwrap()
         };
 
-        let tx_data = [PulseCode {
-            level1: true,
-            length1: 200,
-            level2: false,
-            length2: 50,
-        }; 20];
+        let tx_data = [PulseCode::new(true, 200, false, 50); 20];
 
         let tx_transaction = tx_channel.transmit(&tx_data);
 
