@@ -13,7 +13,7 @@ impl<'d> Aes<'d> {
         match enable_dma {
             true => self.aes.dma_enable().write(|w| w.dma_enable().set_bit()),
             false => self.aes.dma_enable().write(|w| w.dma_enable().clear_bit()),
-        }
+        };
     }
 
     pub(super) fn write_key(&mut self, key: &[u8]) {
@@ -39,7 +39,7 @@ impl<'d> Aes<'d> {
     }
 
     pub(super) fn write_start(&mut self) {
-        self.aes.trigger().write(|w| w.trigger().set_bit())
+        self.aes.trigger().write(|w| w.trigger().set_bit());
     }
 
     pub(super) fn read_idle(&mut self) -> bool {

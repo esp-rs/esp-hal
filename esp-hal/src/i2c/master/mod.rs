@@ -1091,13 +1091,7 @@ fn async_handler(info: &Info, state: &State) {
         #[cfg(not(any(esp32, esp32s2)))]
         w.txfifo_wm().clear_bit();
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                w.ack_err().clear_bit()
-            } else {
-                w.nack().clear_bit()
-            }
-        }
+        w.nack().clear_bit()
     });
 
     state.waker.wake();
@@ -1867,7 +1861,7 @@ impl Driver<'_> {
                 // Handle error cases
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::TimeOut)
-                } else if interrupts.ack_err().bit_is_set() {
+                } else if interrupts.nack().bit_is_set() {
                     Err(Error::AckCheckFailed)
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)

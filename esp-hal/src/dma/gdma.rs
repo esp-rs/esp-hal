@@ -216,7 +216,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
                 };
             }
             w
-        })
+        });
     }
 
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
@@ -250,7 +250,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
                 };
             }
             w
-        })
+        });
     }
 
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
@@ -438,7 +438,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
                 };
             }
             w
-        })
+        });
     }
 
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {

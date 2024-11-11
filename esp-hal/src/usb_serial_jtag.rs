@@ -264,7 +264,7 @@ where
     pub fn reset_rx_packet_recv_interrupt(&mut self) {
         USB_DEVICE::register_block()
             .int_clr()
-            .write(|w| w.serial_out_recv_pkt().clear_bit_by_one())
+            .write(|w| w.serial_out_recv_pkt().clear_bit_by_one());
     }
 }
 
@@ -408,7 +408,7 @@ pub trait Instance: crate::private::Sealed {
 
         Self::register_block()
             .int_clr()
-            .write(|w| w.serial_in_empty().clear_bit_by_one())
+            .write(|w| w.serial_in_empty().clear_bit_by_one());
     }
 
     /// Disable all receive interrupts for the peripheral
@@ -419,7 +419,7 @@ pub trait Instance: crate::private::Sealed {
 
         Self::register_block()
             .int_clr()
-            .write(|w| w.serial_out_recv_pkt().clear_bit_by_one())
+            .write(|w| w.serial_out_recv_pkt().clear_bit_by_one());
     }
 }
 

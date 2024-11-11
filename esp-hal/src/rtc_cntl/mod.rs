@@ -983,7 +983,7 @@ impl Rwdt {
                 RwdtStage::Stage3 => rtc_cntl
                     .wdtconfig4()
                     .modify(|_, w| w.wdt_stg3_hold().bits(timeout_raw)),
-            }
+            };
 
             #[cfg(any(esp32c6, esp32h2))]
             match stage {
@@ -1003,7 +1003,7 @@ impl Rwdt {
                     w.wdt_stg3_hold()
                         .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
                 }),
-            }
+            };
 
             #[cfg(not(any(esp32, esp32c6, esp32h2)))]
             match stage {
@@ -1023,7 +1023,7 @@ impl Rwdt {
                     w.wdt_stg3_hold()
                         .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
                 }),
-            }
+            };
         }
 
         self.set_write_protection(true);
@@ -1048,7 +1048,7 @@ impl Rwdt {
             RwdtStage::Stage3 => rtc_cntl
                 .wdtconfig0()
                 .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) }),
-        }
+        };
 
         self.set_write_protection(true);
     }

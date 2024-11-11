@@ -804,7 +804,7 @@ where
     fn set_divider(&self, divider: u16) {
         unsafe { Self::t() }
             .config()
-            .modify(|_, w| unsafe { w.divider().bits(divider) })
+            .modify(|_, w| unsafe { w.divider().bits(divider) });
     }
 }
 
@@ -1074,7 +1074,7 @@ where
                 MwdtStage::Stage3 => reg_block
                     .wdtconfig5()
                     .write(|w| w.wdt_stg3_hold().bits(timeout_raw)),
-            }
+            };
         }
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
