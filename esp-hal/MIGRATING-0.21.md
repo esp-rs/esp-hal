@@ -352,11 +352,29 @@ If you were sharing the bus between an 8-bit and 16-bit device, you will have to
 you switch between devices. Be sure to read the documentation of the new methods.
 
 
-## `rmt::Channel::transmit` is now returns `Result`
+## `rmt::Channel::transmit` now returns `Result`, `PulseCode` is now `u32`
 
 When trying to send a one-shot transmission will fail if it doesn't end with an end-marker.
 
 ```diff
+-    let mut data = [PulseCode {
+-        level1: true,
+-        length1: 200,
+-        level2: false,
+-        length2: 50,
+-    }; 20];
+-
+-    data[data.len() - 2] = PulseCode {
+-        level1: true,
+-        length1: 3000,
+-        level2: false,
+-        length2: 500,
+-    };
+-    data[data.len() - 1] = PulseCode::default();
++    let mut data = [PulseCode::new(true, 200, false, 50); 20];
++    data[data.len() - 2] = PulseCode::new(true, 3000, false, 500);
++    data[data.len() - 1] = PulseCode::empty();
+
 -        let transaction = channel.transmit(&data);
 +        let transaction = channel.transmit(&data).unwrap();
 ```

@@ -118,59 +118,58 @@ pub enum Error {
     EndMarkerMissing,
 }
 
-/// Convenience representation of a pulse code entry.
-///
-/// Allows for the assignment of two levels and their lengths
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct PulseCode {
+///  Convenience trait to work with pulse codes.
+pub trait PulseCode: crate::private::Sealed {
+    /// Create a new instance
+    fn new(level1: bool, length1: u16, level2: bool, length2: u16) -> Self;
+
+    /// Create a new empty instance
+    fn empty() -> Self;
+
+    /// Set all levels and lengths to 0
+    fn reset(&mut self);
+
     /// Logical output level in the first pulse code interval
-    pub level1: bool,
+    fn level1(&self) -> bool;
+
     /// Length of the first pulse code interval (in clock cycles)
-    pub length1: u16,
+    fn length1(&self) -> u16;
+
     /// Logical output level in the second pulse code interval
-    pub level2: bool,
+    fn level2(&self) -> bool;
+
     /// Length of the second pulse code interval (in clock cycles)
-    pub length2: u16,
+    fn length2(&self) -> u16;
 }
 
-impl From<u32> for PulseCode {
-    fn from(value: u32) -> Self {
-        Self {
-            level1: value & (1 << 15) != 0,
-            length1: (value & 0b111_1111_1111_1111) as u16,
-            level2: value & (1 << 31) != 0,
-            length2: ((value >> 16) & 0b111_1111_1111_1111) as u16,
-        }
+impl PulseCode for u32 {
+    fn new(level1: bool, length1: u16, level2: bool, length2: u16) -> Self {
+        (((level1 as u32) << 15) | length1 as u32 & 0b111_1111_1111_1111)
+            | (((level2 as u32) << 15) | length2 as u32 & 0b111_1111_1111_1111) << 16
     }
-}
 
-/// Convert a pulse code structure into a u32 value that can be written
-/// into the data registers
-impl From<PulseCode> for u32 {
-    #[inline(always)]
-    fn from(p: PulseCode) -> u32 {
-        // The length1 value resides in bits [14:0]
-        let mut entry: u32 = p.length1 as u32;
+    fn empty() -> Self {
+        0
+    }
 
-        // If level1 is high, set bit 15, otherwise clear it
-        if p.level1 {
-            entry |= 1 << 15;
-        } else {
-            entry &= !(1 << 15);
-        }
+    fn reset(&mut self) {
+        *self = 0
+    }
 
-        // If level2 is high, set bit 31, otherwise clear it
-        if p.level2 {
-            entry |= 1 << 31;
-        } else {
-            entry &= !(1 << 31);
-        }
+    fn level1(&self) -> bool {
+        self & (1 << 15) != 0
+    }
 
-        // The length2 value resides in bits [30:16]
-        entry |= (p.length2 as u32) << 16;
+    fn length1(&self) -> u16 {
+        (self & 0b111_1111_1111_1111) as u16
+    }
 
-        entry
+    fn level2(&self) -> bool {
+        self & (1 << 31) != 0
+    }
+
+    fn length2(&self) -> u16 {
+        ((self >> 16) & 0b111_1111_1111_1111) as u16
     }
 }
 
@@ -427,16 +426,16 @@ where
 }
 
 /// An in-progress transaction for a single shot TX transaction.
-pub struct SingleShotTxTransaction<'a, C, T: Into<u32> + Copy>
+pub struct SingleShotTxTransaction<'a, C>
 where
     C: TxChannel,
 {
     channel: C,
     index: usize,
-    data: &'a [T],
+    data: &'a [u32],
 }
 
-impl<C, T: Into<u32> + Copy> SingleShotTxTransaction<'_, C, T>
+impl<C> SingleShotTxTransaction<'_, C>
 where
     C: TxChannel,
 {
@@ -986,10 +985,7 @@ pub trait TxChannel: TxChannelInternal<Blocking> {
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit<T: Into<u32> + Copy>(
-        self,
-        data: &[T],
-    ) -> Result<SingleShotTxTransaction<'_, Self, T>, Error>
+    fn transmit(self, data: &[u32]) -> Result<SingleShotTxTransaction<'_, Self>, Error>
     where
         Self: Sized,
     {
@@ -1005,10 +1001,7 @@ pub trait TxChannel: TxChannelInternal<Blocking> {
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continuously<T: Into<u32> + Copy>(
-        self,
-        data: &[T],
-    ) -> Result<ContinuousTxTransaction<Self>, Error>
+    fn transmit_continuously(self, data: &[u32]) -> Result<ContinuousTxTransaction<Self>, Error>
     where
         Self: Sized,
     {
@@ -1018,10 +1011,10 @@ pub trait TxChannel: TxChannelInternal<Blocking> {
     /// Like [`Self::transmit_continuously`] but also sets a loop count.
     /// [`ContinuousTxTransaction`] can be used to check if the loop count is
     /// reached.
-    fn transmit_continuously_with_loopcount<T: Into<u32> + Copy>(
+    fn transmit_continuously_with_loopcount(
         self,
         loopcount: u16,
-        data: &[T],
+        data: &[u32],
     ) -> Result<ContinuousTxTransaction<Self>, Error>
     where
         Self: Sized,
@@ -1036,15 +1029,15 @@ pub trait TxChannel: TxChannelInternal<Blocking> {
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'a, C, T: From<u32> + Copy>
+pub struct RxTransaction<'a, C>
 where
     C: RxChannel,
 {
     channel: C,
-    data: &'a mut [T],
+    data: &'a mut [u32],
 }
 
-impl<C, T: From<u32> + Copy> RxTransaction<'_, C, T>
+impl<C> RxTransaction<'_, C>
 where
     C: RxChannel,
 {
@@ -1082,10 +1075,7 @@ pub trait RxChannel: RxChannelInternal<Blocking> {
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive<T: From<u32> + Copy>(
-        self,
-        data: &mut [T],
-    ) -> Result<RxTransaction<'_, Self, T>, Error>
+    fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self>, Error>
     where
         Self: Sized,
     {
@@ -1150,7 +1140,7 @@ pub trait TxChannelAsync: TxChannelInternal<Async> {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn transmit<'a, T: Into<u32> + Copy>(&mut self, data: &'a [T]) -> Result<(), Error>
+    async fn transmit<'a>(&mut self, data: &'a [u32]) -> Result<(), Error>
     where
         Self: Sized,
     {
@@ -1409,20 +1399,15 @@ where
 
     fn is_loopcount_interrupt_set() -> bool;
 
-    fn send_raw<T: Into<u32> + Copy>(
-        data: &[T],
-        continuous: bool,
-        repeat: u16,
-    ) -> Result<usize, Error> {
+    fn send_raw(data: &[u32], continuous: bool, repeat: u16) -> Result<usize, Error> {
         Self::clear_interrupts();
 
-        if data.is_empty() {
+        if let Some(last) = data.last() {
+            if !continuous && last.length2() != 0 && last.length1() != 0 {
+                return Err(Error::EndMarkerMissing);
+            }
+        } else {
             return Err(Error::InvalidArgument);
-        }
-
-        let last = PulseCode::from(Into::<u32>::into(*data.last().unwrap()));
-        if !continuous && last.length2 != 0 && last.length1 != 0 {
-            return Err(Error::EndMarkerMissing);
         }
 
         let ptr = (constants::RMT_RAM_START
