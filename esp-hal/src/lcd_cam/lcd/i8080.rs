@@ -38,7 +38,7 @@
 //!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
-//!     channel.tx,
+//!     channel,
 //!     tx_pins,
 //!     20.MHz(),
 //!     Config::default(),

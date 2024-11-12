@@ -44,7 +44,7 @@
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //! let mut camera = Camera::new(
 //!     lcd_cam.cam,
-//!     channel.rx,
+//!     channel,
 //!     data_pins,
 //!     20u32.MHz(),
 //! )

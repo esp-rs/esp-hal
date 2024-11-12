@@ -9,7 +9,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Channel, Dma},
+    dma::Dma,
     dma_buffers,
     gpio::{Input, Level, Output, Pull},
     peripheral::Peripheral,
@@ -28,7 +28,7 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: Spi<'static, Blocking>,
-    dma_channel: Channel<'static, Blocking, DmaChannel>,
+    dma_channel: DmaChannel,
     bitbang_spi: BitbangSpi,
 }
 

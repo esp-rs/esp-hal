@@ -12,7 +12,7 @@ use embedded_hal::spi::SpiBus;
 #[cfg(pcnt)]
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
-    dma::{Channel, Dma, DmaDescriptor, DmaRxBuf, DmaTxBuf},
+    dma::{Dma, DmaDescriptor, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, NoPin},
     peripheral::Peripheral,
@@ -37,7 +37,7 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: Spi<'static, Blocking>,
-    dma_channel: Channel<'static, Blocking, DmaChannel>,
+    dma_channel: DmaChannel,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
     rx_descriptors: &'static mut [DmaDescriptor],
@@ -424,9 +424,9 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let mut spi = ctx
             .spi
-            .into_async()
             .with_dma(ctx.dma_channel)
-            .with_buffers(dma_rx_buf, dma_tx_buf);
+            .with_buffers(dma_rx_buf, dma_tx_buf)
+            .into_async();
 
         ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
         ctx.pcnt_unit

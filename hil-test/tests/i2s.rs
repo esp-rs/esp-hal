@@ -12,14 +12,13 @@
 
 use esp_hal::{
     delay::Delay,
-    dma::{Channel, Dma},
+    dma::Dma,
     dma_buffers,
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     prelude::*,
     Async,
-    Blocking,
 };
 use hil_test as _;
 
@@ -105,7 +104,7 @@ mod tests {
 
     struct Context {
         dout: AnyPin,
-        dma_channel: Channel<'static, Blocking, DmaChannel0>,
+        dma_channel: DmaChannel0,
         i2s: I2S0,
     }
 

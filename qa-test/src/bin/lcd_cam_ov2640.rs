@@ -69,7 +69,7 @@ fn main() -> ! {
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let camera = Camera::new(lcd_cam.cam, dma.channel0.rx, cam_data_pins, 20u32.MHz())
+    let camera = Camera::new(lcd_cam.cam, dma.channel0, cam_data_pins, 20u32.MHz())
         .with_master_clock(cam_xclk)
         .with_pixel_clock(cam_pclk)
         .with_ctrl_pins(cam_vsync, cam_href);

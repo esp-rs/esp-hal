@@ -6,11 +6,10 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{AnyGdmaChannel, Channel, Dma, DmaError, Mem2Mem},
+    dma::{AnyGdmaChannel, Dma, DmaChannelConvert, DmaError, Mem2Mem},
     dma_buffers,
     dma_buffers_chunk_size,
     dma_descriptors,
-    Blocking,
 };
 use hil_test as _;
 
@@ -25,7 +24,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    channel: Channel<'static, Blocking, AnyGdmaChannel>,
+    channel: AnyGdmaChannel,
     dma_peripheral: DmaPeripheralType,
 }
 

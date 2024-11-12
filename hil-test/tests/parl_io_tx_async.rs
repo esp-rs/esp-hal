@@ -9,7 +9,7 @@
 #[cfg(esp32c6)]
 use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
-    dma::{Channel, Dma, DmaChannel0},
+    dma::{Dma, DmaChannel0},
     gpio::{
         interconnect::{InputSignal, OutputSignal},
         NoPin,
@@ -29,13 +29,12 @@ use esp_hal::{
     },
     peripherals::PARL_IO,
     prelude::*,
-    Async,
 };
 use hil_test as _;
 
 struct Context {
     parl_io: PARL_IO,
-    dma_channel: Channel<'static, Async, DmaChannel0>,
+    dma_channel: DmaChannel0,
     clock: OutputSignal,
     valid: OutputSignal,
     clock_loopback: InputSignal,
@@ -61,7 +60,7 @@ mod tests {
         let pcnt = Pcnt::new(peripherals.PCNT);
         let pcnt_unit = pcnt.unit0;
         let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0.into_async();
+        let dma_channel = dma.channel0;
 
         let parl_io = peripherals.PARL_IO;
 
@@ -91,8 +90,9 @@ mod tests {
         let mut pins = TxPinConfigIncludingValidPin::new(pins);
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio =
-            ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz()).unwrap();
+        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz())
+            .unwrap()
+            .into_async();
 
         let mut pio = pio
             .tx
@@ -152,8 +152,9 @@ mod tests {
 
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio =
-            ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz()).unwrap();
+        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz())
+            .unwrap()
+            .into_async();
 
         let mut pio = pio
             .tx
@@ -166,7 +167,8 @@ mod tests {
             )
             .unwrap();
 
-        // use a PCNT unit to count the negitive clock edges only when valid is high
+        // use a PCNT unit to count the negitive clock edges only when
+        // valid is high
         let clock_unit = ctx.pcnt_unit;
         clock_unit.channel0.set_edge_signal(ctx.clock_loopback);
         clock_unit.channel0.set_ctrl_signal(ctx.valid_loopback);

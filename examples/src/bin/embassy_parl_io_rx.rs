@@ -43,13 +43,9 @@ async fn main(_spawner: Spawner) {
     );
     let mut rx_clk_pin = NoPin;
 
-    let parl_io = ParlIoRxOnly::new(
-        peripherals.PARL_IO,
-        dma.channel0.into_async(),
-        rx_descriptors,
-        1.MHz(),
-    )
-    .unwrap();
+    let parl_io = ParlIoRxOnly::new(peripherals.PARL_IO, dma.channel0, rx_descriptors, 1.MHz())
+        .unwrap()
+        .into_async();
 
     let mut parl_io_rx = parl_io
         .rx
