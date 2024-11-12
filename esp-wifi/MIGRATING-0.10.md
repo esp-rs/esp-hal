@@ -63,12 +63,12 @@ use esp_wifi::{
 +    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
  
      let mut wifi = peripherals.WIFI;
+     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
 +    let (iface, device, mut controller) =
 +        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
 +
 -    let (iface, device, mut controller, sockets) =
 -        create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
-+    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
 +    let socket_set = SocketSet::new(&mut socket_set_entries[..]);
      let now = || time::now().duration_since_epoch().to_millis();
 -    let wifi_stack = WifiStack::new(iface, device, sockets, now);
