@@ -70,31 +70,4 @@ mod tests {
 
         transfer.wait().0.unwrap();
     }
-
-    #[test]
-    async fn test_i8080_8bit_async_channel(ctx: Context<'static>) {
-        let channel = ctx
-            .dma
-            .channel0
-            .configure(false, DmaPriority::Priority0)
-            .into_async();
-        let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
-
-        let i8080 = I8080::new(
-            ctx.lcd_cam.lcd,
-            channel.tx,
-            pins,
-            20.MHz(),
-            Config::default(),
-        );
-
-        let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
-
-        transfer.wait_for_done().await;
-
-        // This should not block forever and should immediately return.
-        transfer.wait_for_done().await;
-
-        transfer.wait().0.unwrap();
-    }
 }

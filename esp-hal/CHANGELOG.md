@@ -180,6 +180,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The DMA channel types have been removed from peripherals (#2261)
 - `I2C` driver renamed to `I2c` (#2320)
 - The GPIO pins are now accessible via `Peripherals` and are no longer part of the `Io` struct (#2508)
+- `dma::{ChannelRx, ChannelTx}` now have a `Mode` type parameter (#2519)
 
 ### Fixed
 

@@ -324,7 +324,7 @@ pub mod dma {
     }
 
     impl<'d> DmaSupportTx for AesDma<'d> {
-        type TX = ChannelTx<'d, <AES as DmaEligible>::Dma>;
+        type TX = ChannelTx<'d, <AES as DmaEligible>::Dma, Blocking>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -336,7 +336,7 @@ pub mod dma {
     }
 
     impl<'d> DmaSupportRx for AesDma<'d> {
-        type RX = ChannelRx<'d, <AES as DmaEligible>::Dma>;
+        type RX = ChannelRx<'d, <AES as DmaEligible>::Dma, Blocking>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx

@@ -91,27 +91,6 @@ mod tests {
     }
 
     #[test]
-    fn test_i8080_8bit_async_channel(ctx: Context<'static>) {
-        let channel = ctx
-            .dma
-            .channel0
-            .configure(false, DmaPriority::Priority0)
-            .into_async();
-        let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
-
-        let i8080 = I8080::new(
-            ctx.lcd_cam.lcd,
-            channel.tx,
-            pins,
-            20.MHz(),
-            Config::default(),
-        );
-
-        let xfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
-        xfer.wait().0.unwrap();
-    }
-
-    #[test]
     fn test_i8080_8bit_is_seen_by_pcnt(ctx: Context<'static>) {
         // FIXME: Update this test to exercise all the I8080 output signals once the
         // issue with configuring pins as outputs after inputs have been sorted

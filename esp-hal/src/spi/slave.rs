@@ -262,7 +262,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, T::Dma>;
+        type TX = ChannelTx<'d, T::Dma, DmaMode>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -278,7 +278,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, T::Dma>;
+        type RX = ChannelRx<'d, T::Dma, DmaMode>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx

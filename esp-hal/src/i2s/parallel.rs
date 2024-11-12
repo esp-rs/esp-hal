@@ -35,7 +35,6 @@
 //!   - `DMA`
 //!   - `system` (to configure and enable the I2S peripheral)
 use core::{
-    marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
@@ -177,8 +176,7 @@ where
     I: Instance,
 {
     instance: PeripheralRef<'d, I>,
-    tx_channel: ChannelTx<'d, I::Dma>,
-    mode: PhantomData<DM>,
+    tx_channel: ChannelTx<'d, I::Dma, DM>,
 }
 
 impl<'d, DM> I2sParallel<'d, DM>
@@ -234,7 +232,6 @@ where
         Self {
             instance: i2s,
             tx_channel: channel.tx,
-            mode: PhantomData,
         }
     }
 

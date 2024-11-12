@@ -74,8 +74,6 @@
 //!
 //! - Only TDM Philips standard is supported.
 
-use core::marker::PhantomData;
-
 use enumset::{EnumSet, EnumSetType};
 use private::*;
 
@@ -251,6 +249,7 @@ impl DataFormat {
 }
 
 /// Instance of the I2S peripheral driver
+#[non_exhaustive]
 pub struct I2s<'d, M, T = AnyI2s>
 where
     T: RegisterAccess,
@@ -260,7 +259,6 @@ where
     pub i2s_rx: RxCreator<'d, M, T>,
     /// Handles the transmission (TX) side of the I2S peripheral.
     pub i2s_tx: TxCreator<'d, M, T>,
-    phantom: PhantomData<M>,
 }
 
 impl<'d, DmaMode, T> I2s<'d, DmaMode, T>
@@ -299,15 +297,12 @@ where
                 i2s: unsafe { i2s.clone_unchecked() },
                 rx_channel: channel.rx,
                 descriptors: rx_descriptors,
-                phantom: PhantomData,
             },
             i2s_tx: TxCreator {
                 i2s,
                 tx_channel: channel.tx,
                 descriptors: tx_descriptors,
-                phantom: PhantomData,
             },
-            phantom: PhantomData,
         }
     }
 }
@@ -432,26 +427,17 @@ where
 
     /// Converts the SPI instance into async mode.
     pub fn into_async(self) -> I2s<'d, Async, T> {
-        let channel = Channel {
-            rx: self.i2s_rx.rx_channel,
-            tx: self.i2s_tx.tx_channel,
-            phantom: PhantomData::<Blocking>,
-        };
-        let channel = channel.into_async();
         I2s {
             i2s_rx: RxCreator {
                 i2s: self.i2s_rx.i2s,
-                rx_channel: channel.rx,
+                rx_channel: self.i2s_rx.rx_channel.into_async(),
                 descriptors: self.i2s_rx.descriptors,
-                phantom: PhantomData,
             },
             i2s_tx: TxCreator {
                 i2s: self.i2s_tx.i2s,
-                tx_channel: channel.tx,
+                tx_channel: self.i2s_tx.tx_channel.into_async(),
                 descriptors: self.i2s_tx.descriptors,
-                phantom: PhantomData,
             },
-            phantom: PhantomData,
         }
     }
 }
@@ -477,9 +463,8 @@ where
     T: RegisterAccess,
 {
     i2s: PeripheralRef<'d, T>,
-    tx_channel: ChannelTx<'d, T::Dma>,
+    tx_channel: ChannelTx<'d, T::Dma, DmaMode>,
     tx_chain: DescriptorChain,
-    phantom: PhantomData<DmaMode>,
 }
 
 impl<DmaMode, T> core::fmt::Debug for I2sTx<'_, DmaMode, T>
@@ -511,7 +496,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type TX = ChannelTx<'d, T::Dma>;
+    type TX = ChannelTx<'d, T::Dma, DmaMode>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -610,9 +595,8 @@ where
     DmaMode: Mode,
 {
     i2s: PeripheralRef<'d, T>,
-    rx_channel: ChannelRx<'d, T::Dma>,
+    rx_channel: ChannelRx<'d, T::Dma, DmaMode>,
     rx_chain: DescriptorChain,
-    phantom: PhantomData<DmaMode>,
 }
 
 impl<DmaMode, T> core::fmt::Debug for I2sRx<'_, DmaMode, T>
@@ -644,7 +628,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type RX = ChannelRx<'d, T::Dma>;
+    type RX = ChannelRx<'d, T::Dma, DmaMode>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -750,8 +734,6 @@ pub trait RegisterAccess: RegisterAccessPrivate {}
 impl<T> RegisterAccess for T where T: RegisterAccessPrivate {}
 
 mod private {
-    use core::marker::PhantomData;
-
     use enumset::EnumSet;
     use fugit::HertzU32;
 
@@ -790,22 +772,20 @@ mod private {
         M: Mode,
     {
         pub i2s: PeripheralRef<'d, T>,
-        pub tx_channel: ChannelTx<'d, T::Dma>,
+        pub tx_channel: ChannelTx<'d, T::Dma, M>,
         pub descriptors: &'static mut [DmaDescriptor],
-        pub(crate) phantom: PhantomData<M>,
     }
 
-    impl<'d, DmaMode, T> TxCreator<'d, DmaMode, T>
+    impl<'d, M, T> TxCreator<'d, M, T>
     where
+        M: Mode,
         T: RegisterAccess,
-        DmaMode: Mode,
     {
-        pub fn build(self) -> I2sTx<'d, DmaMode, T> {
+        pub fn build(self) -> I2sTx<'d, M, T> {
             I2sTx {
                 i2s: self.i2s,
                 tx_channel: self.tx_channel,
                 tx_chain: DescriptorChain::new(self.descriptors),
-                phantom: PhantomData,
             }
         }
 
@@ -849,22 +829,20 @@ mod private {
         M: Mode,
     {
         pub i2s: PeripheralRef<'d, T>,
-        pub rx_channel: ChannelRx<'d, T::Dma>,
+        pub rx_channel: ChannelRx<'d, T::Dma, M>,
         pub descriptors: &'static mut [DmaDescriptor],
-        pub(crate) phantom: PhantomData<M>,
     }
 
     impl<'d, M, T> RxCreator<'d, M, T>
     where
-        T: RegisterAccess,
         M: Mode,
+        T: RegisterAccess,
     {
         pub fn build(self) -> I2sRx<'d, M, T> {
             I2sRx {
                 i2s: self.i2s,
                 rx_channel: self.rx_channel,
                 rx_chain: DescriptorChain::new(self.descriptors),
-                phantom: PhantomData,
             }
         }
 

@@ -3003,10 +3003,10 @@ macro_rules! spi_instance {
                         cs: OutputSignal::$cs,
                         sio0_input: InputSignal::$mosi,
                         sio1_output: OutputSignal::$miso,
-                        sio2_output: if_set!($(Some(OutputSignal::$sio2))?, None),
-                        sio2_input: if_set!($(Some(InputSignal::$sio2))?, None),
-                        sio3_output: if_set!($(Some(OutputSignal::$sio3))?, None),
-                        sio3_input: if_set!($(Some(InputSignal::$sio3))?, None),
+                        sio2_output: $crate::if_set!($(Some(OutputSignal::$sio2))?, None),
+                        sio2_input: $crate::if_set!($(Some(InputSignal::$sio2))?, None),
+                        sio3_output: $crate::if_set!($(Some(OutputSignal::$sio3))?, None),
+                        sio3_input: $crate::if_set!($(Some(InputSignal::$sio3))?, None),
                     };
 
                     &INFO
@@ -3020,17 +3020,6 @@ macro_rules! spi_instance {
             )?
         }
     }
-}
-
-/// Macro to choose between two expressions. Useful for implementing "else" for
-/// `$()?` macro syntax.
-macro_rules! if_set {
-    (, $not_set:expr) => {
-        $not_set
-    };
-    ($set:expr, $not_set:expr) => {
-        $set
-    };
 }
 
 #[cfg(spi2)]

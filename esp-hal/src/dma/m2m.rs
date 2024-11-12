@@ -190,11 +190,11 @@ where
     }
 }
 
-impl<'d, MODE> DmaSupportRx for Mem2Mem<'d, MODE>
+impl<'d, M> DmaSupportRx for Mem2Mem<'d, M>
 where
-    MODE: Mode,
+    M: Mode,
 {
-    type RX = ChannelRx<'d, AnyGdmaChannel>;
+    type RX = ChannelRx<'d, AnyGdmaChannel, M>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.channel.rx
