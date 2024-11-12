@@ -8,7 +8,7 @@
 //! Note: On ESP32-C2 and ESP32-C3 you need a wifi-heap size of 70000, on ESP32-C6 you need 80000 and a tx_queue_size of 10
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils esp-wifi/ble esp-wifi/coex
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/ble esp-wifi/coex
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![allow(static_mut_refs)]
@@ -26,6 +26,7 @@ use bleps::{
     Ble,
     HciConnector,
 };
+use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -40,11 +41,10 @@ use esp_wifi::{
     ble::controller::BleConnector,
     init,
     wifi::{utils::create_network_interface, ClientConfiguration, Configuration, WifiStaDevice},
-    wifi_interface::WifiStack,
 };
 use smoltcp::{
-    iface::SocketStorage,
-    wire::{IpAddress, Ipv4Address},
+    iface::{SocketSet, SocketStorage},
+    wire::{DhcpOption, IpAddress, Ipv4Address},
 };
 
 const SSID: &str = env!("SSID");
@@ -81,22 +81,28 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let mut rng = Rng::new(peripherals.RNG);
+
+    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
     let mut wifi = peripherals.WIFI;
     let bluetooth = peripherals.BT;
 
-    let mut socket_set_entries: [SocketStorage; 2] = Default::default();
-    let (iface, device, mut controller, sockets) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
+    let (iface, device, mut controller) =
+        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+
+    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+    let mut socket_set = SocketSet::new(&mut socket_set_entries[..]);
+    let mut dhcp_socket = smoltcp::socket::dhcpv4::Socket::new();
+    // we can set a hostname here (or add other DHCP options)
+    dhcp_socket.set_outgoing_options(&[DhcpOption {
+        kind: 12,
+        data: b"esp-wifi",
+    }]);
+    socket_set.add(dhcp_socket);
 
     let now = || time::now().duration_since_epoch().to_millis();
-    let wifi_stack = WifiStack::new(iface, device, sockets, now);
+    let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
@@ -128,10 +134,10 @@ fn main() -> ! {
     // wait for getting an ip address
     println!("Wait to get an ip address");
     loop {
-        wifi_stack.work();
+        stack.work();
 
-        if wifi_stack.is_iface_up() {
-            println!("got ip {:?}", wifi_stack.get_ip_info());
+        if stack.is_iface_up() {
+            println!("got ip {:?}", stack.get_ip_info());
             break;
         }
     }
@@ -161,7 +167,7 @@ fn main() -> ! {
 
     let mut rx_buffer = [0u8; 128];
     let mut tx_buffer = [0u8; 128];
-    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+    let mut socket = stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     loop {
         println!("Making HTTP request");

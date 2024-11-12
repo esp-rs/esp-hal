@@ -159,11 +159,11 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             let mut features = vec![];
             if config.contains("wifi") {
                 features.push("wifi".to_owned());
-                features.push("wifi-default".to_owned());
                 features.push("esp-now".to_owned());
                 features.push("sniffer".to_owned());
                 features.push("utils".to_owned());
-                features.push("embassy-net".to_owned());
+                features.push("smoltcp/proto-ipv4".to_owned());
+                features.push("smoltcp/proto-ipv6".to_owned());
             }
             if config.contains("ble") {
                 features.push("ble".to_owned());
@@ -171,7 +171,6 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             if config.contains("wifi") && config.contains("ble") {
                 features.push("coex".to_owned());
             }
-            features.push("async".to_owned());
             features
         }
         _ => vec![],

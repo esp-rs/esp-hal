@@ -7,12 +7,13 @@
 //! - responds with some HTML content when connecting to port 8080
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
 
+use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -33,9 +34,8 @@ use esp_wifi::{
         WifiError,
         WifiStaDevice,
     },
-    wifi_interface::WifiStack,
 };
-use smoltcp::iface::SocketStorage;
+use smoltcp::iface::{SocketSet, SocketStorage};
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -55,20 +55,19 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let mut rng = Rng::new(peripherals.RNG);
+
+    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
     let mut wifi = peripherals.WIFI;
+    let (iface, device, mut controller) =
+        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
-    let (iface, device, mut controller, sockets) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
+    let socket_set = SocketSet::new(&mut socket_set_entries[..]);
 
     let now = || time::now().duration_since_epoch().to_millis();
-    let mut wifi_stack = WifiStack::new(iface, device, sockets, now);
+    let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
@@ -108,14 +107,14 @@ fn main() -> ! {
 
     println!("Setting static IP {}", STATIC_IP);
 
-    wifi_stack
-        .set_iface_configuration(&esp_wifi::wifi::ipv4::Configuration::Client(
-            esp_wifi::wifi::ipv4::ClientConfiguration::Fixed(
-                esp_wifi::wifi::ipv4::ClientSettings {
-                    ip: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip(STATIC_IP)),
-                    subnet: esp_wifi::wifi::ipv4::Subnet {
-                        gateway: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip(GATEWAY_IP)),
-                        mask: esp_wifi::wifi::ipv4::Mask(24),
+    stack
+        .set_iface_configuration(&blocking_network_stack::ipv4::Configuration::Client(
+            blocking_network_stack::ipv4::ClientConfiguration::Fixed(
+                blocking_network_stack::ipv4::ClientSettings {
+                    ip: blocking_network_stack::ipv4::Ipv4Addr::from(parse_ip(STATIC_IP)),
+                    subnet: blocking_network_stack::ipv4::Subnet {
+                        gateway: blocking_network_stack::ipv4::Ipv4Addr::from(parse_ip(GATEWAY_IP)),
+                        mask: blocking_network_stack::ipv4::Mask(24),
                     },
                     dns: None,
                     secondary_dns: None,
@@ -131,7 +130,7 @@ fn main() -> ! {
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
-    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+    let mut socket = stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     socket.listen(8080).unwrap();
 

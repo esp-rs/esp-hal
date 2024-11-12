@@ -8,12 +8,13 @@
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
 
+use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -32,9 +33,8 @@ use esp_wifi::{
         Configuration,
         WifiApDevice,
     },
-    wifi_interface::WifiStack,
 };
-use smoltcp::iface::SocketStorage;
+use smoltcp::iface::{SocketSet, SocketStorage};
 
 #[entry]
 fn main() -> ! {
@@ -49,19 +49,18 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let mut rng = Rng::new(peripherals.RNG);
+
+    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
     let mut wifi = peripherals.WIFI;
-    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
-    let (iface, device, mut controller, sockets) =
-        create_network_interface(&init, &mut wifi, WifiApDevice, &mut socket_set_entries).unwrap();
+    let (iface, device, mut controller) =
+        create_network_interface(&init, &mut wifi, WifiApDevice).unwrap();
     let now = || time::now().duration_since_epoch().to_millis();
-    let mut wifi_stack = WifiStack::new(iface, device, sockets, now);
+
+    let mut socket_set_entries: [SocketStorage; 3] = Default::default();
+    let socket_set = SocketSet::new(&mut socket_set_entries[..]);
+    let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::AccessPoint(AccessPointConfiguration {
         ssid: "esp-wifi".try_into().unwrap(),
@@ -75,14 +74,16 @@ fn main() -> ! {
 
     println!("{:?}", controller.get_capabilities());
 
-    wifi_stack
-        .set_iface_configuration(&esp_wifi::wifi::ipv4::Configuration::Client(
-            esp_wifi::wifi::ipv4::ClientConfiguration::Fixed(
-                esp_wifi::wifi::ipv4::ClientSettings {
-                    ip: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
-                    subnet: esp_wifi::wifi::ipv4::Subnet {
-                        gateway: esp_wifi::wifi::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
-                        mask: esp_wifi::wifi::ipv4::Mask(24),
+    stack
+        .set_iface_configuration(&blocking_network_stack::ipv4::Configuration::Client(
+            blocking_network_stack::ipv4::ClientConfiguration::Fixed(
+                blocking_network_stack::ipv4::ClientSettings {
+                    ip: blocking_network_stack::ipv4::Ipv4Addr::from(parse_ip("192.168.2.1")),
+                    subnet: blocking_network_stack::ipv4::Subnet {
+                        gateway: blocking_network_stack::ipv4::Ipv4Addr::from(parse_ip(
+                            "192.168.2.1",
+                        )),
+                        mask: blocking_network_stack::ipv4::Mask(24),
                     },
                     dns: None,
                     secondary_dns: None,
@@ -96,7 +97,7 @@ fn main() -> ! {
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
-    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+    let mut socket = stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     socket.listen(8080).unwrap();
 
