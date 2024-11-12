@@ -6,7 +6,7 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{gpio::Io, uart::Uart, Async};
+use esp_hal::{uart::Uart, Async};
 use hil_test as _;
 
 struct Context {
@@ -22,9 +22,7 @@ mod tests {
     async fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let (rx, tx) = hil_test::common_test_pins!(io);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let uart = Uart::new(peripherals.UART0, rx, tx).unwrap().into_async();
 

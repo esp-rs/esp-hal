@@ -1,5 +1,23 @@
 # Migration Guide from 0.21.x to v0.22.x
 
+## IO changes
+
+### GPIO pins are now accessible via `Peripherals`
+
+```diff
+ let peripherals = esp_hal::init(Default::default());
+-let io = Io::new(peripherals.GPIO, peripherals.IOMUX);
+-let pin = io.pins.gpio5;
++let pin = peripherals.GPIO5;
+```
+
+### `Io` constructor changes
+
+- `new_with_priority` and `new_no_bind_interrupts` have been removed.
+  Use `set_priority` to configure the GPIO interrupt priority.
+  We no longer overwrite interrupt handlers set by user code during initialization.
+- `new` no longer takes `peripherals.GPIO`
+
 ## Removed `async`-specific constructors
 
 The following async-specific constuctors have been removed:

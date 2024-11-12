@@ -20,53 +20,100 @@ pub(crate) use self::peripherals::*;
 // peripheral (no `PSRAM`, `RADIO`, etc. peripheral in the PACs), so we're
 // creating "virtual peripherals" for them.
 crate::peripherals! {
-    ADC1 <= virtual,
-    ADC2 <= virtual,
-    AES <= AES,
-    DAC1 <= virtual,
-    DAC2 <= virtual,
-    DMA <= virtual,
-    DEDICATED_GPIO <= DEDICATED_GPIO,
-    DS <= DS,
-    EFUSE <= EFUSE,
-    EXTMEM <= EXTMEM,
-    GPIO <= GPIO (GPIO,GPIO_NMI),
-    GPIO_SD <= GPIO_SD,
-    HMAC <= HMAC,
-    I2C0 <= I2C0,
-    I2C1 <= I2C1,
-    I2S0 <= I2S0 (I2S0),
-    INTERRUPT_CORE0 <= INTERRUPT_CORE0,
-    IO_MUX <= IO_MUX,
-    LEDC <= LEDC,
-    LPWR <= RTC_CNTL,
-    PCNT <= PCNT,
-    PMS <= PMS,
-    PSRAM <= virtual,
-    RADIO_CLK <= virtual,
-    RMT <= RMT,
-    RNG <= RNG,
-    RSA <= RSA,
-    RTC_IO <= RTC_IO,
-    RTC_I2C <= RTC_I2C,
-    SHA <= SHA,
-    SPI0 <= SPI0,
-    SPI1 <= SPI1,
-    SPI2 <= SPI2 (SPI2_DMA, SPI2),
-    SPI3 <= SPI3 (SPI3_DMA, SPI3),
-    SYSCON <= SYSCON,
-    SYSTEM <= SYSTEM,
-    SYSTIMER <= SYSTIMER,
-    SW_INTERRUPT <= virtual,
-    TIMG0 <= TIMG0,
-    TIMG1 <= TIMG1,
-    TWAI0 <= TWAI0,
-    UART0 <= UART0,
-    UART1 <= UART1,
-    UHCI0 <= UHCI0,
-    ULP_RISCV_CORE <= virtual,
-    USB0 <= USB0,
-    USB_WRAP <= USB_WRAP,
-    WIFI <= virtual,
-    XTS_AES <= XTS_AES,
+    peripherals: [
+        ADC1 <= virtual,
+        ADC2 <= virtual,
+        AES <= AES,
+        DAC1 <= virtual,
+        DAC2 <= virtual,
+        DMA <= virtual,
+        DEDICATED_GPIO <= DEDICATED_GPIO,
+        DS <= DS,
+        EFUSE <= EFUSE,
+        EXTMEM <= EXTMEM,
+        GPIO_SD <= GPIO_SD,
+        HMAC <= HMAC,
+        I2C0 <= I2C0,
+        I2C1 <= I2C1,
+        I2S0 <= I2S0 (I2S0),
+        INTERRUPT_CORE0 <= INTERRUPT_CORE0,
+        IO_MUX <= IO_MUX,
+        LEDC <= LEDC,
+        LPWR <= RTC_CNTL,
+        PCNT <= PCNT,
+        PMS <= PMS,
+        PSRAM <= virtual,
+        RADIO_CLK <= virtual,
+        RMT <= RMT,
+        RNG <= RNG,
+        RSA <= RSA,
+        RTC_IO <= RTC_IO,
+        RTC_I2C <= RTC_I2C,
+        SHA <= SHA,
+        SPI0 <= SPI0,
+        SPI1 <= SPI1,
+        SPI2 <= SPI2 (SPI2_DMA, SPI2),
+        SPI3 <= SPI3 (SPI3_DMA, SPI3),
+        SYSCON <= SYSCON,
+        SYSTEM <= SYSTEM,
+        SYSTIMER <= SYSTIMER,
+        SW_INTERRUPT <= virtual,
+        TIMG0 <= TIMG0,
+        TIMG1 <= TIMG1,
+        TWAI0 <= TWAI0,
+        UART0 <= UART0,
+        UART1 <= UART1,
+        UHCI0 <= UHCI0,
+        ULP_RISCV_CORE <= virtual,
+        USB0 <= USB0,
+        USB_WRAP <= USB_WRAP,
+        WIFI <= virtual,
+        XTS_AES <= XTS_AES,
+    ],
+    pins: [
+        (0, [Input, Output, Analog, RtcIo])
+        (1, [Input, Output, Analog, RtcIo])
+        (2, [Input, Output, Analog, RtcIo])
+        (3, [Input, Output, Analog, RtcIo])
+        (4, [Input, Output, Analog, RtcIo])
+        (5, [Input, Output, Analog, RtcIo])
+        (6, [Input, Output, Analog, RtcIo])
+        (7, [Input, Output, Analog, RtcIo])
+        (8, [Input, Output, Analog, RtcIo])
+        (9, [Input, Output, Analog, RtcIo])
+        (10, [Input, Output, Analog, RtcIo])
+        (11, [Input, Output, Analog, RtcIo])
+        (12, [Input, Output, Analog, RtcIo])
+        (13, [Input, Output, Analog, RtcIo])
+        (14, [Input, Output, Analog, RtcIo])
+        (15, [Input, Output, Analog, RtcIo])
+        (16, [Input, Output, Analog, RtcIo])
+        (17, [Input, Output, Analog, RtcIo])
+        (18, [Input, Output, Analog, RtcIo])
+        (19, [Input, Output, Analog, RtcIo])
+        (20, [Input, Output, Analog, RtcIo])
+        (21, [Input, Output, Analog, RtcIo])
+
+        (26, [Input, Output])
+        (27, [Input, Output])
+        (28, [Input, Output])
+        (29, [Input, Output])
+        (30, [Input, Output])
+        (31, [Input, Output])
+        (32, [Input, Output])
+        (33, [Input, Output])
+        (34, [Input, Output])
+        (35, [Input, Output])
+        (36, [Input, Output])
+        (37, [Input, Output])
+        (38, [Input, Output])
+        (39, [Input, Output])
+        (40, [Input, Output])
+        (41, [Input, Output])
+        (42, [Input, Output])
+        (43, [Input, Output])
+        (44, [Input, Output])
+        (45, [Input, Output])
+        (46, [Input, Output])
+    ]
 }

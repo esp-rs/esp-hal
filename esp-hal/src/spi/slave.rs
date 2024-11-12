@@ -20,15 +20,13 @@
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::slave::Spi;
 //! # use esp_hal::dma::Dma;
-//! # use esp_hal::gpio::Io;
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(pdma, doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(gdma, doc = "let dma_channel = dma.channel0;")]
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let sclk = io.pins.gpio0;
-//! let miso = io.pins.gpio1;
-//! let mosi = io.pins.gpio2;
-//! let cs = io.pins.gpio3;
+//! let sclk = peripherals.GPIO0;
+//! let miso = peripherals.GPIO1;
+//! let mosi = peripherals.GPIO2;
+//! let cs = peripherals.GPIO3;
 //!
 //! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 //! dma_buffers!(32000);

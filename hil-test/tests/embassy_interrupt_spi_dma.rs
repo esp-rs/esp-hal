@@ -11,7 +11,6 @@ use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::Io,
     interrupt::{software::SoftwareInterruptControl, Priority},
     peripheral::Peripheral,
     prelude::*,
@@ -118,8 +117,7 @@ mod test {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let (_, mosi) = hil_test::common_test_pins!(io);
+        let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
         let mut spi = Spi::new_with_config(
             peripherals.SPI2,

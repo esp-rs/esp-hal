@@ -19,21 +19,19 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{analog::dac::Dac, delay::Delay, gpio::Io, prelude::*};
+use esp_hal::{analog::dac::Dac, delay::Delay, prelude::*};
 
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let dac1_pin = io.pins.gpio25;
-            let dac2_pin = io.pins.gpio26;
+            let dac1_pin = peripherals.GPIO25;
+            let dac2_pin = peripherals.GPIO26;
         } else if #[cfg(feature = "esp32s2")] {
-            let dac1_pin = io.pins.gpio17;
-            let dac2_pin = io.pins.gpio18;
+            let dac1_pin = peripherals.GPIO17;
+            let dac2_pin = peripherals.GPIO18;
         }
     }
 

@@ -14,7 +14,7 @@ use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
     dma::{Dma, DmaDescriptor, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Level, NoPin},
+    gpio::{Level, NoPin},
     peripheral::Peripheral,
     prelude::*,
     spi::master::{Config, Spi},
@@ -58,9 +58,8 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
-        let (_, mosi) = hil_test::common_test_pins!(io);
+        let sclk = peripherals.GPIO0;
+        let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
         let dma = Dma::new(peripherals.DMA);
 

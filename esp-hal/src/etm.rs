@@ -23,15 +23,13 @@
 //! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
 //!
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let mut led = io.pins.gpio1;
-//! let button = io.pins.gpio9;
+//! let mut led = peripherals.GPIO1;
+//! let button = peripherals.GPIO9;
 //!
 //! // setup ETM
 //! let gpio_ext = Channels::new(peripherals.GPIO_SD);

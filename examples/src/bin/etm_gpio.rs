@@ -13,7 +13,6 @@ use esp_hal::{
     etm::Etm,
     gpio::{
         etm::{Channels, InputConfig, OutputConfig},
-        Io,
         Level,
         Output,
         Pull,
@@ -25,10 +24,8 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    let mut led = Output::new(io.pins.gpio1, Level::Low);
-    let button = io.pins.gpio9;
+    let mut led = Output::new(peripherals.GPIO1, Level::Low);
+    let button = peripherals.GPIO9;
 
     led.set_high();
 

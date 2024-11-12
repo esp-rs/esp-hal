@@ -20,7 +20,6 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     i2c::master::{Config, I2c},
     prelude::*,
     timer::timg::TimerGroup,
@@ -34,15 +33,13 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     let i2c0 = I2c::new(peripherals.I2C0, {
         let mut config = Config::default();
         config.frequency = 400.kHz();
         config
     })
-    .with_sda(io.pins.gpio4)
-    .with_scl(io.pins.gpio5)
+    .with_sda(peripherals.GPIO4)
+    .with_scl(peripherals.GPIO5)
     .into_async();
 
     let mut lis3dh = Lis3dh::new_i2c(i2c0, SlaveAddr::Alternate).await.unwrap();

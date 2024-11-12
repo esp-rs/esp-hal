@@ -8,7 +8,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, NoPin},
+    gpio::{GpioPin, NoPin},
     lcd_cam::{
         lcd::i8080::{Command, Config, TxEightBits, TxSixteenBits, I8080},
         BitOrder,
@@ -25,10 +25,19 @@ use hil_test as _;
 
 const DATA_SIZE: usize = 1024 * 10;
 
+#[allow(non_snake_case)]
+struct Pins {
+    pub GPIO8: GpioPin<8>,
+    pub GPIO11: GpioPin<11>,
+    pub GPIO12: GpioPin<12>,
+    pub GPIO16: GpioPin<16>,
+    pub GPIO17: GpioPin<17>,
+}
+
 struct Context<'d> {
     lcd_cam: LcdCam<'d, Blocking>,
     pcnt: Pcnt<'d>,
-    io: Io,
+    pins: Pins,
     dma: Dma<'d>,
     dma_buf: DmaTxBuf,
 }
@@ -44,7 +53,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let pcnt = Pcnt::new(peripherals.PCNT);
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
         let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, DATA_SIZE);
         let dma_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
@@ -52,7 +61,13 @@ mod tests {
             lcd_cam,
             dma,
             pcnt,
-            io,
+            pins: Pins {
+                GPIO8: peripherals.GPIO8,
+                GPIO11: peripherals.GPIO11,
+                GPIO12: peripherals.GPIO12,
+                GPIO16: peripherals.GPIO16,
+                GPIO17: peripherals.GPIO17,
+            },
             dma_buf,
         }
     }
@@ -102,11 +117,11 @@ mod tests {
         // issue with configuring pins as outputs after inputs have been sorted
         // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
-        let (unit_ctrl, cs_signal) = ctx.io.pins.gpio8.split();
-        let (unit0_input, unit0_signal) = ctx.io.pins.gpio11.split();
-        let (unit1_input, unit1_signal) = ctx.io.pins.gpio12.split();
-        let (unit2_input, unit2_signal) = ctx.io.pins.gpio16.split();
-        let (unit3_input, unit3_signal) = ctx.io.pins.gpio17.split();
+        let (unit_ctrl, cs_signal) = ctx.pins.GPIO8.split();
+        let (unit0_input, unit0_signal) = ctx.pins.GPIO11.split();
+        let (unit1_input, unit1_signal) = ctx.pins.GPIO12.split();
+        let (unit2_input, unit2_signal) = ctx.pins.GPIO16.split();
+        let (unit3_input, unit3_signal) = ctx.pins.GPIO17.split();
 
         let pcnt = ctx.pcnt;
 
@@ -213,11 +228,11 @@ mod tests {
         // issue with configuring pins as outputs after inputs have been sorted
         // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
-        let (unit_ctrl, cs_signal) = ctx.io.pins.gpio8.split();
-        let (unit0_input, unit0_signal) = ctx.io.pins.gpio11.split();
-        let (unit1_input, unit1_signal) = ctx.io.pins.gpio12.split();
-        let (unit2_input, unit2_signal) = ctx.io.pins.gpio16.split();
-        let (unit3_input, unit3_signal) = ctx.io.pins.gpio17.split();
+        let (unit_ctrl, cs_signal) = ctx.pins.GPIO8.split();
+        let (unit0_input, unit0_signal) = ctx.pins.GPIO11.split();
+        let (unit1_input, unit1_signal) = ctx.pins.GPIO12.split();
+        let (unit2_input, unit2_signal) = ctx.pins.GPIO16.split();
+        let (unit3_input, unit3_signal) = ctx.pins.GPIO17.split();
 
         let pcnt = ctx.pcnt;
 

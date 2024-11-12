@@ -6,7 +6,6 @@
 #![no_main]
 
 use esp_hal::{
-    gpio::Io,
     prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
 };
@@ -25,8 +24,6 @@ mod tests {
     fn rmt_loopback() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32h2")] {
                 let freq = 32.MHz();
@@ -37,7 +34,7 @@ mod tests {
 
         let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
-        let (rx, tx) = hil_test::common_test_pins!(io);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let tx_config = TxChannelConfig {
             clk_divider: 255,

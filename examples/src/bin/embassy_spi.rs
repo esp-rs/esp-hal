@@ -24,7 +24,6 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::*,
     dma_buffers,
-    gpio::Io,
     prelude::*,
     spi::{
         master::{Config, Spi},
@@ -41,11 +40,10 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio0;
-    let miso = io.pins.gpio2;
-    let mosi = io.pins.gpio4;
-    let cs = io.pins.gpio5;
+    let sclk = peripherals.GPIO0;
+    let miso = peripherals.GPIO2;
+    let mosi = peripherals.GPIO4;
+    let cs = peripherals.GPIO5;
 
     let dma = Dma::new(peripherals.DMA);
 

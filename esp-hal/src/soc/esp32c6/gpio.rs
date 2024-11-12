@@ -287,40 +287,6 @@ pub enum OutputSignal {
     GPIO                  = 128,
 }
 
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo])
-    (1, [Input, Output, Analog, RtcIo])
-    (2, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
-    (3, [Input, Output, Analog, RtcIo])
-    (4, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
-    (5, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
-    (6, [Input, Output, Analog, RtcIo] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
-    (7, [Input, Output, Analog, RtcIo] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
-    (8, [Input, Output])
-    (9, [Input, Output])
-    (10, [Input, Output])
-    (11, [Input, Output])
-    (12, [Input, Output])
-    (13, [Input, Output])
-    (14, [Input, Output])
-    (15, [Input, Output])
-    (16, [Input, Output] (0 => U0RXD) (2 => FSPICS0))
-    (17, [Input, Output] () (0 => U0TXD 2 => FSPICS1))
-    (18, [Input, Output] () (2 => FSPICS2)) //  0 => SDIO_CMD but there are no signals since it's a fixed pin
-    (19, [Input, Output] () (2 => FSPICS3)) //  0 => SDIO_CLK but there are no signals since it's a fixed pin
-    (20, [Input, Output] () (2 => FSPICS4)) // 0 => SDIO_DATA0 but there are no signals since it's a fixed pin
-    (21, [Input, Output] () (2 => FSPICS5)) // 0 => SDIO_DATA1 but there are no signals since it's a fixed pin
-    (22, [Input, Output] () ()) // 0 => SDIO_DATA2 but there are no signals since it's a fixed pin
-    (23, [Input, Output] () ()) // 0 => SDIO_DATA3 but there are no signals since it's a fixed pin
-    (24, [Input, Output] () (0 => SPICS0))
-    (25, [Input, Output] (0 => SPIQ) (0 => SPIQ))
-    (26, [Input, Output] (0 => SPIWP) (0 => SPIWP))
-    (27, [Input, Output])
-    (28, [Input, Output] (0 => SPIHD) (0 => SPIHD))
-    (29, [Input, Output] () (0 => SPICLK_MUX))
-    (30, [Input, Output] (0 => SPID) (0 => SPID))
-}
-
 crate::lp_gpio! {
     0
     1

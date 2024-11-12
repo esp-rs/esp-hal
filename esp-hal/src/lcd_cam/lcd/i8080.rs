@@ -15,11 +15,9 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::dma::{Dma, DmaPriority, DmaTxBuf};
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
@@ -32,14 +30,14 @@
 //! # );
 //!
 //! let tx_pins = TxEightBits::new(
-//!     io.pins.gpio9,
-//!     io.pins.gpio46,
-//!     io.pins.gpio3,
-//!     io.pins.gpio8,
-//!     io.pins.gpio18,
-//!     io.pins.gpio17,
-//!     io.pins.gpio16,
-//!     io.pins.gpio15,
+//!     peripherals.GPIO9,
+//!     peripherals.GPIO46,
+//!     peripherals.GPIO3,
+//!     peripherals.GPIO8,
+//!     peripherals.GPIO18,
+//!     peripherals.GPIO17,
+//!     peripherals.GPIO16,
+//!     peripherals.GPIO15,
 //! );
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
@@ -50,7 +48,7 @@
 //!     20.MHz(),
 //!     Config::default(),
 //! )
-//! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
+//! .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
 //!
 //! dma_buf.fill(&[0x55]);
 //! let transfer = i8080.send(0x3Au8, 0, dma_buf).unwrap(); // RGB565

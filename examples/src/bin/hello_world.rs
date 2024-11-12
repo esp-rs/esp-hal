@@ -15,7 +15,7 @@
 use core::fmt::Write;
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, gpio::Io, prelude::*, uart::Uart};
+use esp_hal::{delay::Delay, prelude::*, uart::Uart};
 
 #[entry]
 fn main() -> ! {
@@ -23,22 +23,20 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio1, io.pins.gpio3);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);
         } else if #[cfg(feature = "esp32c2")] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio20, io.pins.gpio19);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);
         } else if #[cfg(feature = "esp32c3")] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio21, io.pins.gpio20);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);
         } else if #[cfg(feature = "esp32c6")] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio16, io.pins.gpio17);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         } else if #[cfg(feature = "esp32h2")] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio24, io.pins.gpio23);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio43, io.pins.gpio44);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);
         }
     }
 
