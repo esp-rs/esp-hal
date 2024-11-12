@@ -433,6 +433,33 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
     manifest["package"]["version"] = toml_edit::value(version.to_string());
     fs::write(manifest_path, manifest.to_string())?;
 
+    for pkg in
+        Package::iter().filter(|p| ![package, Package::Examples, Package::HilTest].contains(p))
+    {
+        let manifest_path = workspace.join(pkg.to_string()).join("Cargo.toml");
+        let manifest = fs::read_to_string(&manifest_path)
+            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
+
+        let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
+
+        if manifest["dependencies"]
+            .as_table()
+            .unwrap()
+            .contains_key(&package.to_string())
+        {
+            log::info!(
+                "  Bumping {package} version for package {pkg}: ({prev_version} -> {version})"
+            );
+
+            manifest["dependencies"].as_table_mut().map(|table| {
+                table[&package.to_string()]["version"] = toml_edit::value(version.to_string())
+            });
+
+            fs::write(&manifest_path, manifest.to_string())
+                .with_context(|| format!("Could not write {}", manifest_path.display()))?;
+        }
+    }
+
     Ok(())
 }
 
