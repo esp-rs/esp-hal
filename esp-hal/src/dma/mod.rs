@@ -1691,6 +1691,7 @@ where
         if let Some(handler) = self.rx_impl.async_handler() {
             self.set_interrupt_handler(handler);
         }
+        self.rx_impl.set_async(true);
         ChannelRx {
             burst_mode: self.burst_mode,
             rx_impl: self.rx_impl,
@@ -1724,6 +1725,7 @@ where
         if let Some(interrupt) = self.rx_impl.peripheral_interrupt() {
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
+        self.rx_impl.set_async(false);
         ChannelRx {
             burst_mode: self.burst_mode,
             rx_impl: self.rx_impl,
@@ -1972,6 +1974,7 @@ where
         if let Some(handler) = self.tx_impl.async_handler() {
             self.set_interrupt_handler(handler);
         }
+        self.tx_impl.set_async(true);
         ChannelTx {
             burst_mode: self.burst_mode,
             tx_impl: self.tx_impl,
@@ -2005,6 +2008,7 @@ where
         if let Some(interrupt) = self.tx_impl.peripheral_interrupt() {
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
+        self.tx_impl.set_async(false);
         ChannelTx {
             burst_mode: self.burst_mode,
             tx_impl: self.tx_impl,
@@ -2259,6 +2263,9 @@ pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
     fn clear(&self, interrupts: impl Into<EnumSet<T>>);
     fn pending_interrupts(&self) -> EnumSet<T>;
     fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker;
+
+    fn is_async(&self) -> bool;
+    fn set_async(&self, is_async: bool);
 }
 
 /// DMA Channel
@@ -2985,6 +2992,10 @@ pub(crate) mod asynch {
     fn handle_in_interrupt<CH: DmaChannelExt>() {
         let rx = CH::rx_interrupts();
 
+        if !rx.is_async() {
+            return;
+        }
+
         if rx.pending_interrupts().is_disjoint(
             DmaRxInterrupt::DescriptorError
                 | DmaRxInterrupt::DescriptorEmpty
@@ -3016,6 +3027,10 @@ pub(crate) mod asynch {
 
     fn handle_out_interrupt<CH: DmaChannelExt>() {
         let tx = CH::tx_interrupts();
+
+        if !tx.is_async() {
+            return;
+        }
 
         if tx
             .pending_interrupts()

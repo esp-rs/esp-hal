@@ -121,6 +121,14 @@ use embassy_sync::waitqueue::AtomicWaker;
 static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
 static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
 
+cfg_if::cfg_if! {
+    if #[cfg(any(esp32c2, esp32c3))] {
+        use portable_atomic::AtomicBool;
+        static TX_IS_ASYNC: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
+        static RX_IS_ASYNC: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
+    }
+}
+
 impl<C: GdmaChannel> crate::private::Sealed for ChannelTxImpl<C> {}
 
 impl<C: GdmaChannel> ChannelTxImpl<C> {
@@ -313,6 +321,24 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
 
     fn waker(&self) -> &'static AtomicWaker {
         &TX_WAKERS[self.0.number() as usize]
+    }
+
+    fn is_async(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                TX_IS_ASYNC[self.0.number() as usize].load(portable_atomic::Ordering::Acquire)
+            } else {
+                true
+            }
+        }
+    }
+
+    fn set_async(&self, _is_async: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                TX_IS_ASYNC[self.0.number() as usize].store(_is_async, portable_atomic::Ordering::Release);
+            }
+        }
     }
 }
 
@@ -512,6 +538,24 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
 
     fn waker(&self) -> &'static AtomicWaker {
         &RX_WAKERS[self.0.number() as usize]
+    }
+
+    fn is_async(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                RX_IS_ASYNC[self.0.number() as usize].load(portable_atomic::Ordering::Acquire)
+            } else {
+                true
+            }
+        }
+    }
+
+    fn set_async(&self, _is_async: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                RX_IS_ASYNC[self.0.number() as usize].store(_is_async, portable_atomic::Ordering::Release);
+            }
+        }
     }
 }
 

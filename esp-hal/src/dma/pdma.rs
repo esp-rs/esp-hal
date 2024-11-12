@@ -12,6 +12,7 @@
 //! [I2S]: ../i2s/index.html
 
 use embassy_sync::waitqueue::AtomicWaker;
+use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{
     dma::*,
@@ -35,6 +36,8 @@ pub trait PdmaChannel: crate::private::Sealed {
 
     fn peripheral_interrupt(&self) -> Interrupt;
     fn async_handler(&self) -> InterruptHandler;
+    fn rx_async_flag(&self) -> &'static AtomicBool;
+    fn tx_async_flag(&self) -> &'static AtomicBool;
 }
 
 #[doc(hidden)]
@@ -198,6 +201,14 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaTxInte
     fn waker(&self) -> &'static AtomicWaker {
         self.0.tx_waker()
     }
+
+    fn is_async(&self) -> bool {
+        self.0.tx_async_flag().load(Ordering::Acquire)
+    }
+
+    fn set_async(&self, is_async: bool) {
+        self.0.tx_async_flag().store(is_async, Ordering::Release);
+    }
 }
 
 impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDmaRxChannelImpl<C> {
@@ -348,6 +359,14 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaRxInte
     fn waker(&self) -> &'static AtomicWaker {
         self.0.rx_waker()
     }
+
+    fn is_async(&self) -> bool {
+        self.0.rx_async_flag().load(Ordering::Relaxed)
+    }
+
+    fn set_async(&self, _is_async: bool) {
+        self.0.rx_async_flag().store(_is_async, Ordering::Relaxed);
+    }
 }
 
 #[doc(hidden)]
@@ -382,12 +401,12 @@ macro_rules! ImplSpiChannel {
                 fn register_block(&self) -> &SpiRegisterBlock {
                     unsafe { &*crate::peripherals::[<SPI $num>]::PTR }
                 }
-                fn tx_waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker {
-                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                fn tx_waker(&self) -> &'static AtomicWaker {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
                     &WAKER
                 }
-                fn rx_waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker {
-                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                fn rx_waker(&self) -> &'static AtomicWaker {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
                     &WAKER
                 }
 
@@ -401,6 +420,14 @@ macro_rules! ImplSpiChannel {
 
                 fn async_handler(&self) -> InterruptHandler {
                     super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]
+                }
+                fn rx_async_flag(&self) -> &'static AtomicBool {
+                    static FLAG: AtomicBool = AtomicBool::new(false);
+                    &FLAG
+                }
+                fn tx_async_flag(&self) -> &'static AtomicBool {
+                    static FLAG: AtomicBool = AtomicBool::new(false);
+                    &FLAG
                 }
             }
 
@@ -614,6 +641,14 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaTxInte
     fn waker(&self) -> &'static AtomicWaker {
         self.0.tx_waker()
     }
+
+    fn is_async(&self) -> bool {
+        self.0.tx_async_flag().load(Ordering::Relaxed)
+    }
+
+    fn set_async(&self, _is_async: bool) {
+        self.0.tx_async_flag().store(_is_async, Ordering::Relaxed);
+    }
 }
 
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaRxChannelImpl<C> {
@@ -770,6 +805,14 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaRxInte
     fn waker(&self) -> &'static AtomicWaker {
         self.0.rx_waker()
     }
+
+    fn is_async(&self) -> bool {
+        self.0.rx_async_flag().load(Ordering::Relaxed)
+    }
+
+    fn set_async(&self, _is_async: bool) {
+        self.0.rx_async_flag().store(_is_async, Ordering::Relaxed);
+    }
 }
 
 macro_rules! ImplI2sChannel {
@@ -800,12 +843,12 @@ macro_rules! ImplI2sChannel {
                 fn register_block(&self) -> &I2sRegisterBlock {
                     unsafe { &*crate::peripherals::[< I2S $num >]::PTR }
                 }
-                fn tx_waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker {
-                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                fn tx_waker(&self) -> &'static AtomicWaker {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
                     &WAKER
                 }
-                fn rx_waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker {
-                    static WAKER: embassy_sync::waitqueue::AtomicWaker = embassy_sync::waitqueue::AtomicWaker::new();
+                fn rx_waker(&self) -> &'static AtomicWaker {
+                    static WAKER: AtomicWaker = AtomicWaker::new();
                     &WAKER
                 }
                 fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
@@ -818,6 +861,14 @@ macro_rules! ImplI2sChannel {
 
                 fn async_handler(&self) -> InterruptHandler {
                     super::asynch::interrupt::[< interrupt_handler_i2s $num _dma >]
+                }
+                fn rx_async_flag(&self) -> &'static AtomicBool {
+                    static FLAG: AtomicBool = AtomicBool::new(false);
+                    &FLAG
+                }
+                fn tx_async_flag(&self) -> &'static AtomicBool {
+                    static FLAG: AtomicBool = AtomicBool::new(false);
+                    &FLAG
                 }
             }
 
@@ -968,6 +1019,8 @@ impl PdmaChannel for AnySpiDmaChannelInner {
             fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
             fn peripheral_interrupt(&self) -> Interrupt;
             fn async_handler(&self) -> InterruptHandler;
+            fn rx_async_flag(&self) -> &'static AtomicBool;
+            fn tx_async_flag(&self) -> &'static AtomicBool;
         }
     }
 }
@@ -1008,6 +1061,8 @@ impl PdmaChannel for AnyI2sDmaChannelInner {
             fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
             fn peripheral_interrupt(&self) -> Interrupt;
             fn async_handler(&self) -> InterruptHandler;
+            fn rx_async_flag(&self) -> &'static AtomicBool;
+            fn tx_async_flag(&self) -> &'static AtomicBool;
         }
     }
 }
