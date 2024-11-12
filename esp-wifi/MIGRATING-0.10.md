@@ -58,13 +58,8 @@ use esp_wifi::{
 -    wifi_interface::WifiStack,
 };
 
--    let init = init(
--        timg0.timer0,
--        Rng::new(peripherals.RNG),
--        peripherals.RADIO_CLK,
--    )
--    .unwrap();
 +    let mut rng = Rng::new(peripherals.RNG);
+-    let init = init(timg0.timer0, rng, peripherals.RADIO_CLK).unwrap();
 +    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
  
      let mut wifi = peripherals.WIFI;
