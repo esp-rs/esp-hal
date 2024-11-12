@@ -425,7 +425,7 @@ macro_rules! ImplSpiChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, [<Spi $num DmaChannel>], Blocking> {
+                ) -> Channel<'a, Blocking, [<Spi $num DmaChannel>]> {
                     let mut this = Channel {
                         tx: ChannelTx::new(SpiDmaTxChannelImpl([<Spi $num DmaChannel>] {})),
                         rx: ChannelRx::new(SpiDmaRxChannelImpl([<Spi $num DmaChannel>] {})),
@@ -839,7 +839,7 @@ macro_rules! ImplI2sChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, [<I2s $num DmaChannel>], Blocking> {
+                ) -> Channel<'a, Blocking, [<I2s $num DmaChannel>]> {
                     let mut this = Channel {
                         tx: ChannelTx::new(I2sDmaTxChannelImpl([<I2s $num DmaChannel>] {})),
                         rx: ChannelRx::new(I2sDmaRxChannelImpl([<I2s $num DmaChannel>] {})),
@@ -917,9 +917,10 @@ impl<'d> Dma<'d> {
     }
 }
 
-impl<'d, C, M: Mode> Channel<'d, C, M>
+impl<'d, CH, M> Channel<'d, M, CH>
 where
-    C: DmaChannel,
+    CH: DmaChannel,
+    M: Mode,
 {
     /// Asserts that the channel is compatible with the given peripheral.
     pub fn runtime_ensure_compatible(&self, peripheral: &PeripheralRef<'_, impl DmaEligible>) {

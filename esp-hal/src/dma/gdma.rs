@@ -519,7 +519,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
 #[non_exhaustive]
 pub struct ChannelCreator<const N: u8> {}
 
-impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
+impl<CH: DmaChannel, M: Mode> Channel<'_, M, CH> {
     /// Asserts that the channel is compatible with the given peripheral.
     pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &PeripheralRef<'_, P>) {
         // No runtime checks; GDMA channels are compatible with any peripheral
@@ -583,7 +583,7 @@ macro_rules! impl_channel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, [<DmaChannel $num>], Blocking> {
+                ) -> Channel<'a, Blocking, [<DmaChannel $num>]> {
                     let mut this = Channel {
                         tx: ChannelTx::new(ChannelTxImpl(SpecificGdmaChannel::<$num> {})),
                         rx: ChannelRx::new(ChannelRxImpl(SpecificGdmaChannel::<$num> {})),

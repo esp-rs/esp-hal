@@ -272,7 +272,7 @@ where
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, CH, DmaMode>,
+        channel: Channel<'d, DmaMode, CH>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
@@ -371,14 +371,14 @@ impl<'d> I2s<'d, Blocking> {
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, CH, DM>,
+        channel: Channel<'d, DM, CH>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
         CH: DmaChannelConvert<<AnyI2s as DmaEligible>::Dma>,
         DM: Mode,
-        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
+        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
         Self::new_typed(
             i2s.map_into(),
@@ -404,14 +404,14 @@ where
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, CH, DM>,
+        channel: Channel<'d, DM, CH>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
         CH: DmaChannelConvert<T::Dma>,
         DM: Mode,
-        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
+        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
         crate::into_ref!(i2s);
         Self::new_internal(
@@ -463,7 +463,7 @@ where
     T: RegisterAccess,
 {
     i2s: PeripheralRef<'d, T>,
-    tx_channel: ChannelTx<'d, T::Dma, DmaMode>,
+    tx_channel: ChannelTx<'d, DmaMode, T::Dma>,
     tx_chain: DescriptorChain,
 }
 
@@ -496,7 +496,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type TX = ChannelTx<'d, T::Dma, DmaMode>;
+    type TX = ChannelTx<'d, DmaMode, T::Dma>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -595,7 +595,7 @@ where
     DmaMode: Mode,
 {
     i2s: PeripheralRef<'d, T>,
-    rx_channel: ChannelRx<'d, T::Dma, DmaMode>,
+    rx_channel: ChannelRx<'d, DmaMode, T::Dma>,
     rx_chain: DescriptorChain,
 }
 
@@ -628,7 +628,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type RX = ChannelRx<'d, T::Dma, DmaMode>;
+    type RX = ChannelRx<'d, DmaMode, T::Dma>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -772,7 +772,7 @@ mod private {
         M: Mode,
     {
         pub i2s: PeripheralRef<'d, T>,
-        pub tx_channel: ChannelTx<'d, T::Dma, M>,
+        pub tx_channel: ChannelTx<'d, M, T::Dma>,
         pub descriptors: &'static mut [DmaDescriptor],
     }
 
@@ -829,7 +829,7 @@ mod private {
         M: Mode,
     {
         pub i2s: PeripheralRef<'d, T>,
-        pub rx_channel: ChannelRx<'d, T::Dma, M>,
+        pub rx_channel: ChannelRx<'d, M, T::Dma>,
         pub descriptors: &'static mut [DmaDescriptor],
     }
 

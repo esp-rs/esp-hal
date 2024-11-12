@@ -32,7 +32,7 @@ pub struct Mem2Mem<'d, M>
 where
     M: Mode,
 {
-    channel: Channel<'d, AnyGdmaChannel, M>,
+    channel: Channel<'d, M, AnyGdmaChannel>,
     rx_chain: DescriptorChain,
     tx_chain: DescriptorChain,
     peripheral: DmaPeripheral,
@@ -41,7 +41,7 @@ where
 impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new Mem2Mem instance.
     pub fn new<CH, DM>(
-        channel: Channel<'d, CH, DM>,
+        channel: Channel<'d, DM, CH>,
         peripheral: impl DmaEligible,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -49,7 +49,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
         DM: Mode,
-        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
+        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
         unsafe {
             Self::new_unsafe(
@@ -64,7 +64,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
 
     /// Create a new Mem2Mem instance with specific chunk size.
     pub fn new_with_chunk_size<CH, DM>(
-        channel: Channel<'d, CH, DM>,
+        channel: Channel<'d, DM, CH>,
         peripheral: impl DmaEligible,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -73,7 +73,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
         DM: Mode,
-        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
+        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
         unsafe {
             Self::new_unsafe(
@@ -93,7 +93,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
     /// You must ensure that your not using DMA for the same peripheral and
     /// that your the only one using the DmaPeripheral.
     pub unsafe fn new_unsafe<CH, DM>(
-        channel: Channel<'d, CH, DM>,
+        channel: Channel<'d, DM, CH>,
         peripheral: DmaPeripheral,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -102,7 +102,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
         DM: Mode,
-        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
+        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
         if !(1..=4092).contains(&chunk_size) {
             return Err(DmaError::InvalidChunkSize);
@@ -111,7 +111,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
             return Err(DmaError::OutOfDescriptors);
         }
         Ok(Mem2Mem {
-            channel: Channel::<_, Blocking>::from(channel).degrade(),
+            channel: Channel::<Blocking, _>::from(channel).degrade(),
             peripheral,
             rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
             tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
@@ -194,7 +194,7 @@ impl<'d, M> DmaSupportRx for Mem2Mem<'d, M>
 where
     M: Mode,
 {
-    type RX = ChannelRx<'d, AnyGdmaChannel, M>;
+    type RX = ChannelRx<'d, M, AnyGdmaChannel>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.channel.rx

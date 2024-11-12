@@ -90,7 +90,7 @@ use crate::{
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, <LCD_CAM as DmaEligible>::Dma, Blocking>,
+    tx_channel: ChannelTx<'d, Blocking, <LCD_CAM as DmaEligible>::Dma>,
     _mode: PhantomData<DM>,
 }
 
@@ -101,7 +101,7 @@ where
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P, CH>(
         lcd: Lcd<'d, DM>,
-        channel: ChannelTx<'d, CH, Blocking>,
+        channel: ChannelTx<'d, Blocking, CH>,
         mut pins: P,
         frequency: HertzU32,
         config: Config,

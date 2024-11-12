@@ -126,14 +126,14 @@ pub struct Cam<'d> {
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    rx_channel: ChannelRx<'d, <LCD_CAM as DmaEligible>::Dma, Blocking>,
+    rx_channel: ChannelRx<'d, Blocking, <LCD_CAM as DmaEligible>::Dma>,
 }
 
 impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
     pub fn new<P, CH>(
         cam: Cam<'d>,
-        channel: ChannelRx<'d, CH, Blocking>,
+        channel: ChannelRx<'d, Blocking, CH>,
         _pins: P,
         frequency: HertzU32,
     ) -> Self

@@ -1660,17 +1660,16 @@ pub trait Rx: crate::private::Sealed {
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
-pub struct ChannelRx<'a, CH, M>
+pub struct ChannelRx<'a, M, CH>
 where
     CH: DmaChannel,
 {
     pub(crate) burst_mode: bool,
     pub(crate) rx_impl: CH::Rx,
-    pub(crate) mode: PhantomData<M>,
-    pub(crate) _phantom: PhantomData<(&'a (), CH)>,
+    pub(crate) _phantom: PhantomData<(&'a (), CH, M)>,
 }
 
-impl<'a, CH> ChannelRx<'a, CH, Blocking>
+impl<'a, CH> ChannelRx<'a, Blocking, CH>
 where
     CH: DmaChannel,
 {
@@ -1683,20 +1682,18 @@ where
         Self {
             burst_mode: false,
             rx_impl,
-            mode: PhantomData,
             _phantom: PhantomData,
         }
     }
 
     /// Converts a blocking channel to an async channel.
-    pub(crate) fn into_async(mut self) -> ChannelRx<'a, CH, Async> {
+    pub(crate) fn into_async(mut self) -> ChannelRx<'a, Async, CH> {
         if let Some(handler) = self.rx_impl.async_handler() {
             self.set_interrupt_handler(handler);
         }
         ChannelRx {
             burst_mode: false,
             rx_impl: self.rx_impl,
-            mode: PhantomData,
             _phantom: PhantomData,
         }
     }
@@ -1718,39 +1715,37 @@ where
     }
 }
 
-impl<'a, CH> ChannelRx<'a, CH, Async>
+impl<'a, CH> ChannelRx<'a, Async, CH>
 where
     CH: DmaChannel,
 {
     /// Converts an async channel into a blocking channel.
-    pub(crate) fn into_blocking(self) -> ChannelRx<'a, CH, Blocking> {
+    pub(crate) fn into_blocking(self) -> ChannelRx<'a, Blocking, CH> {
         if let Some(interrupt) = self.rx_impl.peripheral_interrupt() {
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
         ChannelRx {
             burst_mode: false,
             rx_impl: self.rx_impl,
-            mode: PhantomData,
             _phantom: PhantomData,
         }
     }
 }
 
-impl<'a, CH, M> ChannelRx<'a, CH, M>
+impl<'a, M, CH> ChannelRx<'a, M, CH>
 where
-    CH: DmaChannel,
     M: Mode,
+    CH: DmaChannel,
 {
     /// Return a less specific (degraded) version of this channel.
     #[doc(hidden)]
-    pub fn degrade<DEG: DmaChannel>(self) -> ChannelRx<'a, DEG, M>
+    pub fn degrade<DEG: DmaChannel>(self) -> ChannelRx<'a, M, DEG>
     where
         CH: DmaChannelConvert<DEG>,
     {
         ChannelRx {
             burst_mode: self.burst_mode,
             rx_impl: CH::degrade_rx(self.rx_impl),
-            mode: PhantomData,
             _phantom: PhantomData,
         }
     }
@@ -1762,17 +1757,17 @@ where
     }
 }
 
-impl<CH, M> crate::private::Sealed for ChannelRx<'_, CH, M>
+impl<M, CH> crate::private::Sealed for ChannelRx<'_, M, CH>
 where
-    CH: DmaChannel,
     M: Mode,
+    CH: DmaChannel,
 {
 }
 
-impl<CH, M> Rx for ChannelRx<'_, CH, M>
+impl<M, CH> Rx for ChannelRx<'_, M, CH>
 where
-    CH: DmaChannel,
     M: Mode,
+    CH: DmaChannel,
 {
     unsafe fn prepare_transfer_without_start(
         &mut self,
@@ -1950,18 +1945,17 @@ pub trait Tx: crate::private::Sealed {
 
 /// DMA transmit channel
 #[doc(hidden)]
-pub struct ChannelTx<'a, CH, M>
+pub struct ChannelTx<'a, M, CH>
 where
     CH: DmaChannel,
 {
     #[allow(unused)]
     pub(crate) burst_mode: bool,
     pub(crate) tx_impl: CH::Tx,
-    pub(crate) mode: PhantomData<M>,
-    pub(crate) _phantom: PhantomData<(&'a (), CH)>,
+    pub(crate) _phantom: PhantomData<(&'a (), CH, M)>,
 }
 
-impl<'a, CH> ChannelTx<'a, CH, Blocking>
+impl<'a, CH> ChannelTx<'a, Blocking, CH>
 where
     CH: DmaChannel,
 {
@@ -1969,20 +1963,18 @@ where
         Self {
             burst_mode: false,
             tx_impl,
-            mode: PhantomData,
             _phantom: PhantomData,
         }
     }
 
     /// Converts a blocking channel to an async channel.
-    pub(crate) fn into_async(mut self) -> ChannelTx<'a, CH, Async> {
+    pub(crate) fn into_async(mut self) -> ChannelTx<'a, Async, CH> {
         if let Some(handler) = self.tx_impl.async_handler() {
             self.set_interrupt_handler(handler);
         }
         ChannelTx {
             burst_mode: false,
             tx_impl: self.tx_impl,
-            mode: PhantomData,
             _phantom: PhantomData,
         }
     }
@@ -2004,39 +1996,37 @@ where
     }
 }
 
-impl<'a, CH> ChannelTx<'a, CH, Async>
+impl<'a, CH> ChannelTx<'a, Async, CH>
 where
     CH: DmaChannel,
 {
     /// Converts an async channel into a blocking channel.
-    pub(crate) fn into_blocking(self) -> ChannelTx<'a, CH, Blocking> {
+    pub(crate) fn into_blocking(self) -> ChannelTx<'a, Blocking, CH> {
         if let Some(interrupt) = self.tx_impl.peripheral_interrupt() {
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
         ChannelTx {
             burst_mode: false,
             tx_impl: self.tx_impl,
-            mode: PhantomData,
             _phantom: PhantomData,
         }
     }
 }
 
-impl<'a, CH, M> ChannelTx<'a, CH, M>
+impl<'a, M, CH> ChannelTx<'a, M, CH>
 where
-    CH: DmaChannel,
     M: Mode,
+    CH: DmaChannel,
 {
     /// Return a less specific (degraded) version of this channel.
     #[doc(hidden)]
-    pub fn degrade<DEG: DmaChannel>(self) -> ChannelTx<'a, DEG, M>
+    pub fn degrade<DEG: DmaChannel>(self) -> ChannelTx<'a, M, DEG>
     where
         CH: DmaChannelConvert<DEG>,
     {
         ChannelTx {
             burst_mode: self.burst_mode,
             tx_impl: CH::degrade_tx(self.tx_impl),
-            mode: PhantomData,
             _phantom: PhantomData,
         }
     }
@@ -2048,17 +2038,17 @@ where
     }
 }
 
-impl<CH, M> crate::private::Sealed for ChannelTx<'_, CH, M>
+impl<M, CH> crate::private::Sealed for ChannelTx<'_, M, CH>
 where
-    CH: DmaChannel,
     M: Mode,
+    CH: DmaChannel,
 {
 }
 
-impl<CH, M> Tx for ChannelTx<'_, CH, M>
+impl<M, CH> Tx for ChannelTx<'_, M, CH>
 where
-    CH: DmaChannel,
     M: Mode,
+    CH: DmaChannel,
 {
     unsafe fn prepare_transfer_without_start(
         &mut self,
@@ -2272,27 +2262,27 @@ pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
 }
 
 /// DMA Channel
-pub struct Channel<'d, CH, M>
+pub struct Channel<'d, M, CH>
 where
-    CH: DmaChannel,
     M: Mode,
+    CH: DmaChannel,
 {
     /// RX half of the channel
-    pub rx: ChannelRx<'d, CH, M>,
+    pub rx: ChannelRx<'d, M, CH>,
     /// TX half of the channel
-    pub tx: ChannelTx<'d, CH, M>,
+    pub tx: ChannelTx<'d, M, CH>,
 }
 
-impl<'d, C> Channel<'d, C, Blocking>
+impl<'d, CH> Channel<'d, Blocking, CH>
 where
-    C: DmaChannel,
+    CH: DmaChannel,
 {
     /// Sets the interrupt handler for RX and TX interrupts.
     ///
     /// Interrupts are not enabled at the peripheral level here.
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler)
     where
-        C: DmaChannel,
+        CH: DmaChannel,
     {
         self.rx.set_interrupt_handler(handler);
         self.tx.set_interrupt_handler(handler);
@@ -2347,7 +2337,7 @@ where
     }
 
     /// Converts a blocking channel to an async channel.
-    pub fn into_async(self) -> Channel<'d, C, Async> {
+    pub fn into_async(self) -> Channel<'d, Async, CH> {
         Channel {
             rx: self.rx.into_async(),
             tx: self.tx.into_async(),
@@ -2355,12 +2345,12 @@ where
     }
 }
 
-impl<'d, C> Channel<'d, C, Async>
+impl<'d, CH> Channel<'d, Async, CH>
 where
-    C: DmaChannel,
+    CH: DmaChannel,
 {
     /// Converts an async channel to a blocking channel.
-    pub fn into_blocking(self) -> Channel<'d, C, Blocking> {
+    pub fn into_blocking(self) -> Channel<'d, Blocking, CH> {
         Channel {
             rx: self.rx.into_blocking(),
             tx: self.tx.into_blocking(),
@@ -2368,26 +2358,27 @@ where
     }
 }
 
-impl<'d, C: DmaChannel> From<Channel<'d, C, Blocking>> for Channel<'d, C, Async> {
-    fn from(channel: Channel<'d, C, Blocking>) -> Self {
+impl<'d, CH: DmaChannel> From<Channel<'d, Blocking, CH>> for Channel<'d, Async, CH> {
+    fn from(channel: Channel<'d, Blocking, CH>) -> Self {
         channel.into_async()
     }
 }
 
-impl<'d, C: DmaChannel> From<Channel<'d, C, Async>> for Channel<'d, C, Blocking> {
-    fn from(channel: Channel<'d, C, Async>) -> Self {
+impl<'d, CH: DmaChannel> From<Channel<'d, Async, CH>> for Channel<'d, Blocking, CH> {
+    fn from(channel: Channel<'d, Async, CH>) -> Self {
         channel.into_blocking()
     }
 }
 
-impl<'d, CH, M: Mode> Channel<'d, CH, M>
+impl<'d, M, CH> Channel<'d, M, CH>
 where
+    M: Mode,
     CH: DmaChannel,
 {
     /// Return a less specific (degraded) version of this channel (both rx and
     /// tx).
     #[doc(hidden)]
-    pub fn degrade<DEG: DmaChannel>(self) -> Channel<'d, DEG, M>
+    pub fn degrade<DEG: DmaChannel>(self) -> Channel<'d, M, DEG>
     where
         CH: DmaChannelConvert<DEG>,
     {

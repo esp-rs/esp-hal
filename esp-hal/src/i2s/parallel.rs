@@ -176,7 +176,7 @@ where
     I: Instance,
 {
     instance: PeripheralRef<'d, I>,
-    tx_channel: ChannelTx<'d, I::Dma, DM>,
+    tx_channel: ChannelTx<'d, DM, I::Dma>,
 }
 
 impl<'d, DM> I2sParallel<'d, DM>
@@ -186,7 +186,7 @@ where
     /// Create a new I2S Parallel Interface
     pub fn new<CH>(
         i2s: impl Peripheral<P = impl Instance> + 'd,
-        channel: Channel<'d, CH, DM>,
+        channel: Channel<'d, DM, CH>,
         frequency: impl Into<fugit::HertzU32>,
         pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
@@ -206,7 +206,7 @@ where
     /// Create a new I2S Parallel Interface
     pub fn new_typed<CH>(
         i2s: impl Peripheral<P = I> + 'd,
-        channel: Channel<'d, CH, DM>,
+        channel: Channel<'d, DM, CH>,
         frequency: impl Into<fugit::HertzU32>,
         mut pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
