@@ -611,16 +611,16 @@ cfg_if::cfg_if! {
         impl_channel!(2, DMA_CH2, asynch_handler::interrupt_handler_ch2);
     } else if #[cfg(any(esp32c6, esp32h2))] {
         const CHANNEL_COUNT: usize = 3;
-        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_ch0);
-        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_ch1);
-        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_ch2);
+        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_in_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_out_ch0);
+        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_in_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_out_ch1);
+        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_in_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_out_ch2);
     } else if #[cfg(esp32s3)] {
         const CHANNEL_COUNT: usize = 5;
-        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_ch0);
-        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_ch1);
-        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_ch2);
-        impl_channel!(3, DMA_IN_CH3, asynch_handler::interrupt_handler_ch3, DMA_OUT_CH3, asynch_handler::interrupt_handler_ch3);
-        impl_channel!(4, DMA_IN_CH4, asynch_handler::interrupt_handler_ch4, DMA_OUT_CH4, asynch_handler::interrupt_handler_ch4);
+        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_in_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_out_ch0);
+        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_in_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_out_ch1);
+        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_in_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_out_ch2);
+        impl_channel!(3, DMA_IN_CH3, asynch_handler::interrupt_handler_in_ch3, DMA_OUT_CH3, asynch_handler::interrupt_handler_out_ch3);
+        impl_channel!(4, DMA_IN_CH4, asynch_handler::interrupt_handler_in_ch4, DMA_OUT_CH4, asynch_handler::interrupt_handler_out_ch4);
     }
 }
 
