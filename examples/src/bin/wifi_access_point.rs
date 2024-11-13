@@ -28,6 +28,7 @@ use esp_println::{print, println};
 use esp_wifi::{
     init,
     wifi::{
+        event::{self, EventExt},
         utils::create_network_interface,
         AccessPointConfiguration,
         Configuration,
@@ -48,6 +49,24 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+
+    // Set event handlers for wifi before init to avoid missing any.
+    let mut connections = 0u32;
+    _ = event::ApStart::replace_handler(|_, _| esp_println::println!("ap start event"));
+    event::ApStaconnected::update_handler(move |_, event| {
+        connections += 1;
+        esp_println::println!("connected {}, mac: {:?}", connections, event.0.mac);
+    });
+    event::ApStaconnected::update_handler(|_, event| {
+        esp_println::println!("connected aid: {}", event.0.aid);
+    });
+    event::ApStadisconnected::update_handler(|_, event| {
+        esp_println::println!(
+            "disconnected mac: {:?}, reason: {:?}",
+            event.0.mac,
+            event.0.reason
+        );
+    });
 
     let mut rng = Rng::new(peripherals.RNG);
 

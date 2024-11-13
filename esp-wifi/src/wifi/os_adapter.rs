@@ -866,9 +866,14 @@ pub unsafe extern "C" fn event_post(
 
     let event = unwrap!(WifiEvent::from_i32(event_id));
     trace!("EVENT: {:?}", event);
-    critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).insert(event));
 
-    super::state::update_state(event);
+    let mut handled = false;
+    critical_section::with(|cs| {
+        WIFI_EVENTS.borrow_ref_mut(cs).insert(event);
+        handled = super::event::dispatch_event_handler(cs, event, event_data, event_data_size);
+    });
+
+    super::state::update_state(event, handled);
 
     event.waker().wake();
 

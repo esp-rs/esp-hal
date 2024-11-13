@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `serde` support through the `serde` feature (#2346)
 - Added `PowerSaveMode` and `set_power_saving` methods on `EspNowManager` & `WifiController` (#2446)
 - Added CSI support (#2422)
+- Enable setting event handlers for wifi events (#2453)
 
 ### Changed
 
