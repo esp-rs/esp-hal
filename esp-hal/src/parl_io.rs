@@ -1036,6 +1036,17 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
 
     /// Convert to an async version.
     pub fn into_async(self) -> ParlIoFullDuplex<'d, Async> {
+        for core in crate::Cpu::other() {
+            #[cfg(esp32c6)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO);
+            }
+            #[cfg(esp32h2)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
+                crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
+            }
+        }
         ParlIoFullDuplex {
             tx: TxCreatorFullDuplex {
                 tx_channel: self.tx.tx_channel.into_async(),
@@ -1117,7 +1128,6 @@ where
 
 impl<'d> ParlIoTxOnly<'d, Blocking> {
     /// Creates a new [ParlIoTxOnly]
-    // TODO: into_async()
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = PARL_IO> + 'd,
         dma_channel: impl Peripheral<P = CH> + 'd,
@@ -1139,9 +1149,29 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
             },
         })
     }
-}
 
-impl ParlIoTxOnly<'_, Blocking> {
+    /// Converts to Async mode.
+    pub fn into_async(self) -> ParlIoTxOnly<'d, Async> {
+        for core in crate::Cpu::other() {
+            #[cfg(esp32c6)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO);
+            }
+            #[cfg(esp32h2)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
+                crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
+            }
+        }
+        ParlIoTxOnly {
+            tx: TxCreator {
+                tx_channel: self.tx.tx_channel.into_async(),
+                descriptors: self.tx.descriptors,
+                _guard: self.tx._guard,
+            },
+        }
+    }
+
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1168,6 +1198,19 @@ impl ParlIoTxOnly<'_, Blocking> {
     /// Resets asserted interrupts
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
         internal_clear_interrupts(interrupts.into());
+    }
+}
+
+impl<'d> ParlIoTxOnly<'d, Async> {
+    /// Convert to a blocking version.
+    pub fn into_blocking(self) -> ParlIoTxOnly<'d, Blocking> {
+        ParlIoTxOnly {
+            tx: TxCreator {
+                tx_channel: self.tx.tx_channel.into_blocking(),
+                descriptors: self.tx.descriptors,
+                _guard: self.tx._guard,
+            },
+        }
     }
 }
 
@@ -1191,7 +1234,6 @@ where
 
 impl<'d> ParlIoRxOnly<'d, Blocking> {
     /// Create a new [ParlIoRxOnly] instance
-    // TODO: into_async()
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = PARL_IO> + 'd,
         dma_channel: impl Peripheral<P = CH> + 'd,
@@ -1213,9 +1255,30 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
             },
         })
     }
-}
 
-impl ParlIoRxOnly<'_, Blocking> {
+    /// Converts to Async mode.
+    pub fn into_async(self) -> ParlIoRxOnly<'d, Async> {
+        for core in crate::Cpu::other() {
+            #[cfg(esp32c6)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO);
+            }
+            #[cfg(esp32h2)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
+                crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
+            }
+        }
+
+        ParlIoRxOnly {
+            rx: RxCreator {
+                rx_channel: self.rx.rx_channel.into_async(),
+                descriptors: self.rx.descriptors,
+                _guard: self.rx._guard,
+            },
+        }
+    }
+
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1242,6 +1305,19 @@ impl ParlIoRxOnly<'_, Blocking> {
     /// Resets asserted interrupts
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
         internal_clear_interrupts(interrupts.into());
+    }
+}
+
+impl<'d> ParlIoRxOnly<'d, Async> {
+    /// Convert to a blocking version.
+    pub fn into_blocking(self) -> ParlIoRxOnly<'d, Blocking> {
+        ParlIoRxOnly {
+            rx: RxCreator {
+                rx_channel: self.rx.rx_channel.into_blocking(),
+                descriptors: self.rx.descriptors,
+                _guard: self.rx._guard,
+            },
+        }
     }
 }
 
@@ -1525,6 +1601,25 @@ pub mod asynch {
     impl TxDoneFuture {
         pub fn new() -> Self {
             Instance::listen_tx_done();
+            let mut parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
+
+            #[cfg(esp32c6)]
+            {
+                parl_io.bind_parl_io_interrupt(interrupt_handler.handler());
+                unwrap!(crate::interrupt::enable(
+                    Interrupt::PARL_IO,
+                    interrupt_handler.priority()
+                ));
+            }
+            #[cfg(esp32h2)]
+            {
+                parl_io.bind_parl_io_tx_interrupt(interrupt_handler.handler());
+                unwrap!(crate::interrupt::enable(
+                    Interrupt::PARL_IO_TX,
+                    interrupt_handler.priority()
+                ));
+            }
+
             Self {}
         }
     }
@@ -1536,20 +1631,6 @@ pub mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            let mut parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
-
-            #[cfg(esp32c6)]
-            {
-                parl_io.bind_parl_io_interrupt(interrupt_handler.handler());
-                crate::interrupt::enable(Interrupt::PARL_IO, interrupt_handler.priority()).unwrap();
-            }
-            #[cfg(esp32h2)]
-            {
-                parl_io.bind_parl_io_tx_interrupt(interrupt_handler.handler());
-                crate::interrupt::enable(Interrupt::PARL_IO_TX, interrupt_handler.priority())
-                    .unwrap();
-            }
-
             TX_WAKER.register(cx.waker());
             if Instance::is_listening_tx_done() {
                 Poll::Pending
