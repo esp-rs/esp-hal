@@ -50,20 +50,10 @@ async fn main(_spawner: Spawner) {
         )
         .unwrap();
 
-    let mut data = [PulseCode {
-        level1: true,
-        length1: 200,
-        level2: false,
-        length2: 50,
-    }; 20];
+    let mut data = [PulseCode::new(true, 200, false, 50); 20];
 
-    data[data.len() - 2] = PulseCode {
-        level1: true,
-        length1: 3000,
-        level2: false,
-        length2: 500,
-    };
-    data[data.len() - 1] = PulseCode::default();
+    data[data.len() - 2] = PulseCode::new(true, 3000, false, 500);
+    data[data.len() - 1] = PulseCode::empty();
 
     loop {
         println!("transmit");

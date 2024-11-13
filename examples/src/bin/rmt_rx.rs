@@ -56,17 +56,11 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let mut data = [PulseCode {
-        level1: true,
-        length1: 1,
-        level2: false,
-        length2: 1,
-    }; 48];
+    let mut data: [u32; 48] = [PulseCode::empty(); 48];
 
     loop {
         for x in data.iter_mut() {
-            x.length1 = 0;
-            x.length2 = 0;
+            x.reset()
         }
 
         let transaction = channel.receive(&mut data).unwrap();
@@ -84,34 +78,34 @@ fn main() -> ! {
                 channel = channel_res;
                 let mut total = 0usize;
                 for entry in &data[..data.len()] {
-                    if entry.length1 == 0 {
+                    if entry.length1() == 0 {
                         break;
                     }
-                    total += entry.length1 as usize;
+                    total += entry.length1() as usize;
 
-                    if entry.length2 == 0 {
+                    if entry.length2() == 0 {
                         break;
                     }
-                    total += entry.length2 as usize;
+                    total += entry.length2() as usize;
                 }
 
                 for entry in &data[..data.len()] {
-                    if entry.length1 == 0 {
+                    if entry.length1() == 0 {
                         break;
                     }
 
-                    let count = WIDTH / (total / entry.length1 as usize);
-                    let c = if entry.level1 { '-' } else { '_' };
+                    let count = WIDTH / (total / entry.length1() as usize);
+                    let c = if entry.level1() { '-' } else { '_' };
                     for _ in 0..count + 1 {
                         print!("{}", c);
                     }
 
-                    if entry.length2 == 0 {
+                    if entry.length2() == 0 {
                         break;
                     }
 
-                    let count = WIDTH / (total / entry.length2 as usize);
-                    let c = if entry.level2 { '-' } else { '_' };
+                    let count = WIDTH / (total / entry.length2() as usize);
+                    let c = if entry.level2() { '-' } else { '_' };
                     for _ in 0..count + 1 {
                         print!("{}", c);
                     }
