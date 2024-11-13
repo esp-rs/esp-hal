@@ -18,8 +18,8 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal}
 use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
+    core,
     cpu_control::{CpuControl, Stack},
-    get_core,
     gpio::{Level, Output},
     interrupt::{software::SoftwareInterruptControl, Priority},
     prelude::*,
@@ -38,7 +38,7 @@ async fn control_led(
     mut led: Output<'static>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
-    println!("Starting control_led() on core {}", get_core() as usize);
+    println!("Starting control_led() on core {}", core() as usize);
     loop {
         if control.wait().await {
             esp_println::println!("LED on");
@@ -53,10 +53,7 @@ async fn control_led(
 /// Sends periodic messages to control_led, enabling or disabling it.
 #[embassy_executor::task]
 async fn enable_disable_led(control: &'static Signal<CriticalSectionRawMutex, bool>) {
-    println!(
-        "Starting enable_disable_led() on core {}",
-        get_core() as usize
-    );
+    println!("Starting enable_disable_led() on core {}", core() as usize);
     let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
         esp_println::println!("Sending LED on");

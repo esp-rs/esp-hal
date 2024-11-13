@@ -115,7 +115,7 @@ mod tests {
             .unwrap();
         (spi, dma_tx_buf) = transfer.wait();
 
-        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
+        assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
         let transfer = spi
             .half_duplex_write(
@@ -129,7 +129,7 @@ mod tests {
             .unwrap();
         transfer.wait();
 
-        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
+        assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }
 
     #[test]
@@ -165,7 +165,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
+        assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
         spi.half_duplex_write(
             SpiDataMode::Single,
@@ -176,6 +176,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
+        assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }
 }

@@ -29,7 +29,7 @@ impl<'d> BleConnector<'d> {
         }
     }
 
-    pub fn get_next(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
+    pub fn next(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
         Ok(read_next(buf))
     }
 }

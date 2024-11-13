@@ -122,8 +122,8 @@ mod tests {
             clock_unit.clear();
             let xfer = pio.write_dma(&tx_buffer).unwrap();
             xfer.wait().unwrap();
-            info!("clock count: {}", clock_unit.get_value());
-            assert_eq!(clock_unit.get_value(), BUFFER_SIZE as _);
+            info!("clock count: {}", clock_unit.value());
+            assert_eq!(clock_unit.value(), BUFFER_SIZE as _);
         }
     }
 
@@ -189,8 +189,8 @@ mod tests {
             clock_unit.clear();
             let xfer = pio.write_dma(&tx_buffer).unwrap();
             xfer.wait().unwrap();
-            info!("clock count: {}", clock_unit.get_value());
-            assert_eq!(clock_unit.get_value(), BUFFER_SIZE as _);
+            info!("clock count: {}", clock_unit.value());
+            assert_eq!(clock_unit.value(), BUFFER_SIZE as _);
         }
     }
 }

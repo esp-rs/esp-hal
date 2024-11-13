@@ -239,8 +239,8 @@ pub fn enable_direct(
         return Err(Error::InvalidInterruptPriority);
     }
     unsafe {
-        map(crate::get_core(), interrupt, cpu_interrupt);
-        set_priority(crate::get_core(), cpu_interrupt, level);
+        map(crate::core(), interrupt, cpu_interrupt);
+        set_priority(crate::core(), cpu_interrupt, level);
         enable_cpu_interrupt(cpu_interrupt);
     }
     Ok(())
@@ -262,7 +262,7 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
 
 /// Get status of peripheral interrupts
 #[inline]
-pub fn get_status(_core: Cpu) -> InterruptStatus {
+pub fn status(_core: Cpu) -> InterruptStatus {
     #[cfg(large_intr_status)]
     unsafe {
         InterruptStatus::from(
@@ -341,7 +341,7 @@ pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
 
 /// Get cpu interrupt assigned to peripheral interrupt
 #[inline]
-unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrupt> {
+unsafe fn assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrupt> {
     let interrupt_number = interrupt as isize;
     let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
 
@@ -356,7 +356,7 @@ unsafe fn get_assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrup
 }
 
 pub(crate) fn bound_cpu_interrupt_for(_cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
-    unsafe { get_assigned_cpu_interrupt(interrupt) }
+    unsafe { assigned_cpu_interrupt(interrupt) }
 }
 
 mod vectored {
@@ -369,12 +369,12 @@ mod vectored {
     pub(crate) unsafe fn init_vectoring() {
         for (prio, num) in PRIORITY_TO_INTERRUPT.iter().enumerate() {
             set_kind(
-                crate::get_core(),
+                crate::core(),
                 core::mem::transmute::<u32, CpuInterrupt>(*num as u32),
                 InterruptKind::Level,
             );
             set_priority(
-                crate::get_core(),
+                crate::core(),
                 core::mem::transmute::<u32, CpuInterrupt>(*num as u32),
                 core::mem::transmute::<u8, Priority>((prio as u8) + 1),
             );
@@ -385,7 +385,7 @@ mod vectored {
     /// Get the interrupts configured for the core at the given priority
     /// matching the given status
     #[inline]
-    fn get_configured_interrupts(
+    fn configured_interrupts(
         core: Cpu,
         status: InterruptStatus,
         priority: Priority,
@@ -396,11 +396,11 @@ mod vectored {
             for interrupt_nr in status.iterator() {
                 // safety: cast is safe because of repr(u16)
                 if let Some(cpu_interrupt) =
-                    get_assigned_cpu_interrupt(core::mem::transmute::<u16, Interrupt>(
+                    assigned_cpu_interrupt(core::mem::transmute::<u16, Interrupt>(
                         interrupt_nr as u16,
                     ))
                 {
-                    if get_priority_by_core(core, cpu_interrupt) == priority {
+                    if priority_by_core(core, cpu_interrupt) == priority {
                         res.set(interrupt_nr as u16);
                     }
                 }
@@ -421,7 +421,7 @@ mod vectored {
             let cpu_interrupt = core::mem::transmute::<u32, CpuInterrupt>(
                 PRIORITY_TO_INTERRUPT[(level as usize) - 1] as u32,
             );
-            map(crate::get_core(), interrupt, cpu_interrupt);
+            map(crate::core(), interrupt, cpu_interrupt);
             enable_cpu_interrupt(cpu_interrupt);
         }
         Ok(())
@@ -453,15 +453,15 @@ mod vectored {
     #[no_mangle]
     #[ram]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
-        let core = crate::get_core();
-        let status = get_status(core);
+        let core = crate::core();
+        let status = status(core);
 
         // this has no effect on level interrupts, but the interrupt may be an edge one
         // so we clear it anyway
         clear(core, cpu_intr);
         let prio: Priority =
             unsafe { core::mem::transmute(INTERRUPT_TO_PRIORITY[cpu_intr as usize - 1] as u8) };
-        let configured_interrupts = get_configured_interrupts(core, status, prio);
+        let configured_interrupts = configured_interrupts(core, status, prio);
 
         for interrupt_nr in configured_interrupts.iterator() {
             // Don't use `Interrupt::try_from`. It's slower and placed in flash
@@ -639,13 +639,13 @@ mod classic {
 
     /// Get interrupt priority
     #[inline]
-    pub(super) fn get_priority_by_core(_core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
-        unsafe { get_priority(cpu_interrupt) }
+    pub(super) fn priority_by_core(_core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
+        unsafe { priority(cpu_interrupt) }
     }
 
     /// Get interrupt priority - called by assembly code
     #[inline]
-    pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
+    pub(super) unsafe extern "C" fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         core::mem::transmute::<u8, Priority>(
             intr.cpu_int_pri(cpu_interrupt as usize).read().map().bits(),
@@ -771,16 +771,16 @@ mod plic {
 
     /// Get interrupt priority
     #[inline]
-    pub(super) unsafe extern "C" fn get_priority_by_core(
+    pub(super) unsafe extern "C" fn priority_by_core(
         _core: Cpu,
         cpu_interrupt: CpuInterrupt,
     ) -> Priority {
-        unsafe { get_priority(cpu_interrupt) }
+        unsafe { priority(cpu_interrupt) }
     }
 
     /// Get interrupt priority - called by assembly code
     #[inline]
-    pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
+    pub(super) unsafe extern "C" fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let plic = &*crate::peripherals::PLIC_MX::PTR;
         let prio = plic
             .mxint_pri(cpu_interrupt as usize)

@@ -1581,8 +1581,8 @@ pub trait DmaChannel: crate::private::Sealed + Sized {
 
 #[doc(hidden)]
 pub trait DmaChannelExt: DmaChannel {
-    fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt>;
-    fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
+    fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt>;
+    fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
 }
 
 #[diagnostic::on_unimplemented(
@@ -2885,8 +2885,8 @@ pub(crate) mod asynch {
     }
 
     fn handle_interrupt<CH: DmaChannelExt>() {
-        let rx = CH::get_rx_interrupts();
-        let tx = CH::get_tx_interrupts();
+        let rx = CH::rx_interrupts();
+        let tx = CH::tx_interrupts();
 
         if rx.pending_interrupts().is_disjoint(
             DmaRxInterrupt::DescriptorError

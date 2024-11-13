@@ -38,7 +38,7 @@ impl WakeSource for TimerWakeupSource {
         triggers.set_timer(true);
 
         let lp_timer = unsafe { &*esp32c6::LP_TIMER::ptr() };
-        let clock_freq = RtcClock::get_slow_freq();
+        let clock_freq = RtcClock::slow_freq();
         // TODO: maybe add sleep time adjustment like idf
         // TODO: maybe add check to prevent overflow?
         let clock_hz = clock_freq.frequency().to_Hz() as u64;

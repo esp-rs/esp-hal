@@ -189,7 +189,7 @@ where
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error> {
         let duty_exp;
         if let Some(timer) = self.timer {
-            if let Some(timer_duty) = timer.get_duty() {
+            if let Some(timer_duty) = timer.duty() {
                 duty_exp = timer_duty as u32;
             } else {
                 return Err(Error::Timer);
@@ -238,10 +238,10 @@ where
             return Err(Error::Fade(FadeError::EndDuty));
         }
         if let Some(timer) = self.timer {
-            if let Some(timer_duty) = timer.get_duty() {
-                if timer.get_frequency() > 0 {
+            if let Some(timer_duty) = timer.duty() {
+                if timer.frequency() > 0 {
                     duty_exp = timer_duty as u32;
-                    frequency = timer.get_frequency();
+                    frequency = timer.frequency();
                 } else {
                     return Err(Error::Timer);
                 }
@@ -323,7 +323,7 @@ mod ehal1 {
         fn max_duty_cycle(&self) -> u16 {
             let duty_exp;
 
-            if let Some(timer_duty) = self.timer.and_then(|timer| timer.get_duty()) {
+            if let Some(timer_duty) = self.timer.and_then(|timer| timer.duty()) {
                 duty_exp = timer_duty as u32;
             } else {
                 return 0;
@@ -571,7 +571,7 @@ where
                     .set_to_open_drain_output(crate::private::Internal),
             };
 
-            let timer_number = timer.get_number() as u8;
+            let timer_number = timer.number() as u8;
 
             self.set_channel(timer_number);
             self.update_channel();

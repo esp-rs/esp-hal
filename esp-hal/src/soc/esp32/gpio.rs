@@ -8,7 +8,7 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0:`:
+//!   - `io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0:`:
 //!       * This function returns a reference to the GPIO register associated
 //!         with the given GPIO number. It uses unsafe code and transmutation to
 //!         access the GPIO registers based on the provided GPIO number.
@@ -63,7 +63,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x30;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function2;
 
-pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
+pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
     unsafe {
         let iomux = &*IO_MUX::PTR;
 
@@ -110,7 +110,7 @@ pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    match crate::get_core() {
+    match crate::core() {
         Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
         // this should be bits 3 & 4 respectively, according to the TRM, but it doesn't seem to
         // work. This does though.
@@ -719,7 +719,7 @@ macro_rules! touch {
                 }
             }
 
-            fn get_touch_measurement(&self, _: $crate::private::Internal) -> u16 {
+            fn touch_measurement(&self, _: $crate::private::Internal) -> u16 {
                 paste::paste! {
                     unsafe { $crate::peripherals::SENS::steal() }
                         . $touch_out_reg ().read()
@@ -727,7 +727,7 @@ macro_rules! touch {
                 }
             }
 
-            fn get_touch_nr(&self, _: $crate::private::Internal) -> u8 {
+            fn touch_nr(&self, _: $crate::private::Internal) -> u8 {
                 $touch_num
             }
 
@@ -789,11 +789,11 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => match crate::get_core() {
+            Self::Bank0 => match crate::core() {
                 crate::Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
                 crate::Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int().read().bits(),
             },
-            Self::Bank1 => match crate::get_core() {
+            Self::Bank1 => match crate::core() {
                 crate::Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
                 crate::Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int1().read().bits(),
             },

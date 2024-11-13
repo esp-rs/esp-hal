@@ -62,7 +62,7 @@ fn main() -> ! {
     ieee802154.start_receive();
 
     loop {
-        if let Some(frame) = ieee802154.get_raw_received() {
+        if let Some(frame) = ieee802154.raw_received() {
             println!("@RAW {:02x?}", &frame.data);
         }
 

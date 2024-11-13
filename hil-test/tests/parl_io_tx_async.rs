@@ -125,8 +125,8 @@ mod tests {
         for _ in 0..100 {
             clock_unit.clear();
             pio.write_dma_async(&tx_buffer).await.unwrap();
-            info!("clock count: {}", clock_unit.get_value());
-            assert_eq!(clock_unit.get_value(), BUFFER_SIZE as _);
+            info!("clock count: {}", clock_unit.value());
+            assert_eq!(clock_unit.value(), BUFFER_SIZE as _);
         }
     }
 
@@ -193,8 +193,8 @@ mod tests {
         for _ in 0..100 {
             clock_unit.clear();
             pio.write_dma_async(&tx_buffer).await.unwrap();
-            info!("clock count: {}", clock_unit.get_value());
-            assert_eq!(clock_unit.get_value(), BUFFER_SIZE as _);
+            info!("clock count: {}", clock_unit.value());
+            assert_eq!(clock_unit.value(), BUFFER_SIZE as _);
         }
     }
 }

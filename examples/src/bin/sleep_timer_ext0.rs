@@ -16,9 +16,9 @@ use esp_hal::{
     entry,
     gpio::{Input, Pull},
     rtc_cntl::{
-        get_reset_reason,
-        get_wakeup_cause,
+        reset_reason,
         sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel},
+        wakeup_cause,
         Rtc,
         SocResetReason,
     },
@@ -35,9 +35,9 @@ fn main() -> ! {
     let ext0_pin = Input::new(peripherals.GPIO4, Pull::None);
 
     println!("up and runnning!");
-    let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
+    let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
-    let wake_reason = get_wakeup_cause();
+    let wake_reason = wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
     let delay = Delay::new();

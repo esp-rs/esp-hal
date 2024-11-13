@@ -379,9 +379,9 @@ pub(crate) mod utils {
     /// or `calculate_best_flash_tuning_config`
     #[ram]
     fn mspi_timing_enter_high_speed_mode(control_spi1: bool, config: &PsramConfig) {
-        let core_clock: SpiTimingConfigCoreClock = get_mspi_core_clock(config);
-        let flash_div: u32 = get_flash_clock_divider(config);
-        let psram_div: u32 = get_psram_clock_divider(config);
+        let core_clock: SpiTimingConfigCoreClock = mspi_core_clock(config);
+        let flash_div: u32 = flash_clock_divider(config);
+        let psram_div: u32 = psram_clock_divider(config);
 
         info!(
             "PSRAM core_clock {:?}, flash_div = {}, psram_div = {}",
@@ -466,17 +466,17 @@ pub(crate) mod utils {
     }
 
     #[ram]
-    fn get_mspi_core_clock(config: &PsramConfig) -> SpiTimingConfigCoreClock {
+    fn mspi_core_clock(config: &PsramConfig) -> SpiTimingConfigCoreClock {
         config.core_clock
     }
 
     #[ram]
-    fn get_flash_clock_divider(config: &PsramConfig) -> u32 {
+    fn flash_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock as u32 / config.flash_frequency as u32
     }
 
     #[ram]
-    fn get_psram_clock_divider(config: &PsramConfig) -> u32 {
+    fn psram_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock as u32 / config.ram_frequency as u32
     }
 
@@ -1058,7 +1058,7 @@ pub(crate) mod utils {
 
         init_psram_mode_reg(1, &mode_reg);
         // Print PSRAM info
-        get_psram_mode_reg(1, &mut mode_reg);
+        psram_mode_reg(1, &mut mode_reg);
 
         print_psram_info(&mode_reg);
 
@@ -1238,11 +1238,11 @@ pub(crate) mod utils {
     // This function should always be called after `spi_timing_flash_tuning` or
     // `calculate_best_flash_tuning_config`
     fn spi_timing_enter_mspi_high_speed_mode(control_spi1: bool, config: &PsramConfig) {
-        // spi_timing_config_core_clock_t core_clock = get_mspi_core_clock();
+        // spi_timing_config_core_clock_t core_clock = mspi_core_clock();
         let core_clock = SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m;
 
-        let flash_div: u32 = get_flash_clock_divider(config);
-        let psram_div: u32 = get_psram_clock_divider(config);
+        let flash_div: u32 = flash_clock_divider(config);
+        let psram_div: u32 = psram_clock_divider(config);
 
         // Set SPI01 core clock
         spi0_timing_config_set_core_clock(core_clock); // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
@@ -1306,7 +1306,7 @@ pub(crate) mod utils {
         }
     }
 
-    fn get_psram_mode_reg(spi_num: u32, out_reg: &mut OpiPsramModeReg) {
+    fn psram_mode_reg(spi_num: u32, out_reg: &mut OpiPsramModeReg) {
         let mode = ESP_ROM_SPIFLASH_OPI_DTR_MODE;
         let cmd_len: u32 = 16;
         let addr_bit_len: u32 = 32;
@@ -1601,12 +1601,12 @@ pub(crate) mod utils {
     }
 
     #[ram]
-    fn get_flash_clock_divider(config: &PsramConfig) -> u32 {
+    fn flash_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock as u32 / config.flash_frequency as u32
     }
 
     #[ram]
-    fn get_psram_clock_divider(config: &PsramConfig) -> u32 {
+    fn psram_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock as u32 / config.ram_frequency as u32
     }
 }

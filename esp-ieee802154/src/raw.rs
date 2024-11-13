@@ -252,7 +252,7 @@ fn enable_rx() {
 }
 
 fn stop_current_operation() {
-    let events = get_events();
+    let events = events();
     set_cmd(Command::Stop);
     clear_events(events);
 }
@@ -359,7 +359,7 @@ fn next_operation() {
 fn ZB_MAC() {
     trace!("ZB_MAC interrupt");
 
-    let events = get_events();
+    let events = events();
     clear_events(events);
 
     trace!("events = {:032b}", events);
@@ -390,7 +390,7 @@ fn ZB_MAC() {
                 if !queue.is_full() {
                     let item = RawReceived {
                         data: RX_BUFFER,
-                        channel: freq_to_channel(get_freq()),
+                        channel: freq_to_channel(freq()),
                     };
                     queue.enqueue(item).ok();
                 } else {
@@ -440,11 +440,9 @@ fn freq_to_channel(freq: u8) -> u8 {
 }
 
 fn will_auto_send_ack(frame: &[u8]) -> bool {
-    frame_is_ack_required(frame) && frame_get_version(frame) <= FRAME_VERSION_1 && get_tx_auto_ack()
+    frame_is_ack_required(frame) && frame_get_version(frame) <= FRAME_VERSION_1 && tx_auto_ack()
 }
 
 fn should_send_enhanced_ack(frame: &[u8]) -> bool {
-    frame_is_ack_required(frame)
-        && frame_get_version(frame) <= FRAME_VERSION_2
-        && get_tx_enhance_ack()
+    frame_is_ack_required(frame) && frame_get_version(frame) <= FRAME_VERSION_2 && tx_enhance_ack()
 }

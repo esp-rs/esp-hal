@@ -58,7 +58,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     let wifi = peripherals.WIFI;
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&init, wifi).unwrap();
-    println!("esp-now version {}", esp_now.get_version().unwrap());
+    println!("esp-now version {}", esp_now.version().unwrap());
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {

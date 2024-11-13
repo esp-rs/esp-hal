@@ -522,11 +522,11 @@ macro_rules! impl_channel {
             }
 
             impl DmaChannelExt for [<DmaChannel $num>] {
-                fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
+                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     ChannelRxImpl(SpecificGdmaChannel::<$num> {})
                 }
 
-                fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
+                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     ChannelTxImpl(SpecificGdmaChannel::<$num> {})
                 }
             }

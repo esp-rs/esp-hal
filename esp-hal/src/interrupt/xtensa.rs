@@ -156,7 +156,7 @@ pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Resul
         return Err(Error::CpuInterruptReserved);
     }
     unsafe {
-        map(crate::get_core(), interrupt, cpu_interrupt);
+        map(crate::core(), interrupt, cpu_interrupt);
 
         xtensa_lx::interrupt::enable_mask(
             xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
@@ -230,7 +230,7 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 
 /// Get status of peripheral interrupts
 #[cfg(large_intr_status)]
-pub fn get_status(core: Cpu) -> InterruptStatus {
+pub fn status(core: Cpu) -> InterruptStatus {
     unsafe {
         match core {
             Cpu::ProCpu => InterruptStatus::from(
@@ -268,7 +268,7 @@ pub fn get_status(core: Cpu) -> InterruptStatus {
 
 /// Get status of peripheral interrupts
 #[cfg(very_large_intr_status)]
-pub fn get_status(core: Cpu) -> InterruptStatus {
+pub fn status(core: Cpu) -> InterruptStatus {
     unsafe {
         match core {
             Cpu::ProCpu => InterruptStatus::from(
@@ -338,7 +338,7 @@ mod vectored {
     use procmacros::ram;
 
     use super::*;
-    use crate::get_core;
+    use crate::core;
 
     /// Interrupt priority levels.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -414,11 +414,7 @@ mod vectored {
 
     /// Get the interrupts configured for the core
     #[inline(always)]
-    fn get_configured_interrupts(
-        core: Cpu,
-        status: InterruptStatus,
-        level: u32,
-    ) -> InterruptStatus {
+    fn configured_interrupts(core: Cpu, status: InterruptStatus, level: u32) -> InterruptStatus {
         unsafe {
             let intr_map_base = match core {
                 Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
@@ -451,7 +447,7 @@ mod vectored {
             interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
 
         unsafe {
-            map(get_core(), interrupt, cpu_interrupt);
+            map(core(), interrupt, cpu_interrupt);
 
             xtensa_lx::interrupt::enable_mask(
                 xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
@@ -545,7 +541,7 @@ mod vectored {
     #[no_mangle]
     #[ram]
     unsafe fn handle_interrupts(level: u32, save_frame: &mut Context) {
-        let core = crate::get_core();
+        let core = crate::core();
 
         let cpu_interrupt_mask =
             interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[level as usize];
@@ -583,10 +579,10 @@ mod vectored {
             } else {
                 // Finally, check level-triggered peripheral sources.
                 // These interrupts are cleared by the peripheral.
-                get_status(core)
+                status(core)
             };
 
-            let configured_interrupts = get_configured_interrupts(core, status, level);
+            let configured_interrupts = configured_interrupts(core, status, level);
             for interrupt_nr in configured_interrupts.iterator() {
                 // Don't use `Interrupt::try_from`. It's slower and placed in flash
                 let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };

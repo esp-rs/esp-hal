@@ -369,7 +369,7 @@ impl Cpu {
     /// Returns the core the application is currently executing on
     #[inline(always)]
     pub fn current() -> Self {
-        get_core()
+        core()
     }
 
     /// Returns an iterator over the "other" cores.
@@ -377,7 +377,7 @@ impl Cpu {
     pub fn other() -> impl Iterator<Item = Self> {
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
-                match get_core() {
+                match core() {
                     Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
                     Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
                 }
@@ -390,12 +390,12 @@ impl Cpu {
 
 /// Which core the application is currently executing on
 #[inline(always)]
-pub fn get_core() -> Cpu {
+pub fn core() -> Cpu {
     // This works for both RISCV and Xtensa because both
-    // get_raw_core functions return zero, _or_ something
+    // raw_core functions return zero, _or_ something
     // greater than zero; 1 in the case of RISCV and 0x2000
     // in the case of Xtensa.
-    match get_raw_core() {
+    match raw_core() {
         0 => Cpu::ProCpu,
         #[cfg(all(multi_core, riscv))]
         1 => Cpu::AppCpu,
@@ -410,7 +410,7 @@ pub fn get_core() -> Cpu {
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(riscv)]
 #[inline(always)]
-fn get_raw_core() -> usize {
+fn raw_core() -> usize {
     #[cfg(multi_core)]
     {
         riscv::register::mhartid::read()
@@ -429,7 +429,7 @@ fn get_raw_core() -> usize {
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(xtensa)]
 #[inline(always)]
-fn get_raw_core() -> usize {
+fn raw_core() -> usize {
     (xtensa_lx::get_processor_id() & 0x2000) as usize
 }
 

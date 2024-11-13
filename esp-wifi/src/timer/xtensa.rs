@@ -17,7 +17,7 @@ pub const TICKS_PER_SECOND: u64 = 1_000_000;
 
 /// This function must not be called in a critical section. Doing so may return
 /// an incorrect value.
-pub(crate) fn get_systimer_count() -> u64 {
+pub(crate) fn systimer_count() -> u64 {
     esp_hal::time::now().ticks()
 }
 

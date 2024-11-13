@@ -97,7 +97,7 @@ fn main() -> ! {
     controller.start().unwrap();
     println!("is wifi started: {:?}", controller.is_started());
 
-    println!("{:?}", controller.get_capabilities());
+    println!("{:?}", controller.capabilities());
 
     ap_stack
         .set_iface_configuration(&blocking_network_stack::ipv4::Configuration::Client(

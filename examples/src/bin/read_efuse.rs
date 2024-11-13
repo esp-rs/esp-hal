@@ -14,15 +14,15 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    println!("MAC address {:02x?}", Efuse::get_mac_address());
-    println!("Flash Encryption {:?}", Efuse::get_flash_encryption());
+    println!("MAC address {:02x?}", Efuse::mac_address());
+    println!("Flash Encryption {:?}", Efuse::flash_encryption());
 
     #[cfg(feature = "esp32")]
     {
-        println!("Core Count {}", Efuse::get_core_count());
+        println!("Core Count {}", Efuse::core_count());
         println!("Bluetooth enabled {}", Efuse::is_bluetooth_enabled());
-        println!("Chip type {:?}", Efuse::get_chip_type());
-        println!("Max CPU clock {:?}", Efuse::get_max_cpu_frequency());
+        println!("Chip type {:?}", Efuse::chip_type());
+        println!("Max CPU clock {:?}", Efuse::max_cpu_frequency());
     }
 
     loop {}

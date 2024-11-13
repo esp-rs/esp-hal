@@ -367,10 +367,10 @@ macro_rules! ImplSpiChannel {
             }
 
             impl DmaChannelExt for [<Spi $num DmaChannel>] {
-                fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
+                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     SpiDmaRxChannelImpl(Self {})
                 }
-                fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
+                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     SpiDmaTxChannelImpl(Self {})
                 }
             }
@@ -780,10 +780,10 @@ macro_rules! ImplI2sChannel {
             }
 
             impl DmaChannelExt for [<I2s $num DmaChannel>] {
-                fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
+                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     I2sDmaRxChannelImpl(Self {})
                 }
-                fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
+                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     I2sDmaTxChannelImpl(Self {})
                 }
             }

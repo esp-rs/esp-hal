@@ -264,7 +264,7 @@ impl<'d> CpuControl<'d> {
                 let entry = unsafe { ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>()) };
                 entry();
                 loop {
-                    unsafe { internal_park_core(crate::get_core()) };
+                    unsafe { internal_park_core(crate::core()) };
                 }
             }
             None => panic!("No start function set"),

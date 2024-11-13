@@ -143,7 +143,7 @@ mod tests {
         // Flush because we're not reading, so the write may happen in the background
         ctx.spi.flush().expect("Flush failed");
 
-        assert_eq!(unit.get_value(), 9);
+        assert_eq!(unit.value(), 9);
     }
 
     #[test]
@@ -162,7 +162,7 @@ mod tests {
         // Flush because we're not reading, so the write may happen in the background
         ctx.spi.flush().expect("Flush failed");
 
-        assert_eq!(unit.get_value(), 9);
+        assert_eq!(unit.value(), 9);
     }
 
     #[test]
@@ -223,7 +223,7 @@ mod tests {
 
             let transfer = spi.write(dma_tx_buf).map_err(|e| e.0).unwrap();
             (spi, dma_tx_buf) = transfer.wait();
-            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 
@@ -259,7 +259,7 @@ mod tests {
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 
@@ -418,7 +418,7 @@ mod tests {
             assert_eq!(receive, [0, 0, 0, 0, 0]);
 
             SpiBusAsync::write(&mut spi, &transmit).await.unwrap();
-            assert_eq!(ctx.pcnt_unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 
@@ -454,7 +454,7 @@ mod tests {
             SpiBusAsync::transfer(&mut spi, &mut receive, &transmit)
                 .await
                 .unwrap();
-            assert_eq!(ctx.pcnt_unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 

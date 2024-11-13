@@ -212,10 +212,10 @@ mod tests {
         xfer.wait().0.unwrap();
 
         let actual = [
-            pcnt.unit0.get_value(),
-            pcnt.unit1.get_value(),
-            pcnt.unit2.get_value(),
-            pcnt.unit3.get_value(),
+            pcnt.unit0.value(),
+            pcnt.unit1.value(),
+            pcnt.unit2.value(),
+            pcnt.unit3.value(),
         ];
         let expected = [5, 3, 2, 1];
 
@@ -339,10 +339,10 @@ mod tests {
         xfer.wait().0.unwrap();
 
         let actual = [
-            pcnt.unit0.get_value(),
-            pcnt.unit1.get_value(),
-            pcnt.unit2.get_value(),
-            pcnt.unit3.get_value(),
+            pcnt.unit0.value(),
+            pcnt.unit1.value(),
+            pcnt.unit2.value(),
+            pcnt.unit3.value(),
         ];
         let expected = [5, 3, 2, 1];
 

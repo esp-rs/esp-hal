@@ -28,7 +28,7 @@ fn main() -> ! {
     ieee802154.start_receive();
 
     loop {
-        if let Some(frame) = ieee802154.get_received() {
+        if let Some(frame) = ieee802154.received() {
             println!("Received {:?}\n", &frame);
         }
     }
