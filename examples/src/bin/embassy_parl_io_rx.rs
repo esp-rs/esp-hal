@@ -16,7 +16,8 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    parl_io::{no_clk_pin, BitPackOrder, ParlIoRxOnly, RxFourBits},
+    gpio::NoPin,
+    parl_io::{BitPackOrder, ParlIoRxOnly, RxFourBits},
     prelude::*,
     timer::systimer::{SystemTimer, Target},
 };
@@ -41,6 +42,7 @@ async fn main(_spawner: Spawner) {
         peripherals.GPIO3,
         peripherals.GPIO4,
     );
+    let mut rx_clk_pin = NoPin;
 
     let parl_io = ParlIoRxOnly::new(
         peripherals.PARL_IO,
@@ -54,7 +56,12 @@ async fn main(_spawner: Spawner) {
 
     let mut parl_io_rx = parl_io
         .rx
-        .with_config(&mut rx_pins, no_clk_pin(), BitPackOrder::Msb, Some(0xfff))
+        .with_config(
+            &mut rx_pins,
+            &mut rx_clk_pin,
+            BitPackOrder::Msb,
+            Some(0xfff),
+        )
         .unwrap();
 
     let buffer = rx_buffer;
