@@ -110,7 +110,7 @@ pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    match crate::core() {
+    match Cpu::current() {
         Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
         // this should be bits 3 & 4 respectively, according to the TRM, but it doesn't seem to
         // work. This does though.
@@ -789,13 +789,13 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => match crate::core() {
-                crate::Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
-                crate::Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int().read().bits(),
+            Self::Bank0 => match Cpu::current() {
+                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
+                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int().read().bits(),
             },
-            Self::Bank1 => match crate::core() {
-                crate::Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
-                crate::Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int1().read().bits(),
+            Self::Bank1 => match Cpu::current() {
+                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
+                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int1().read().bits(),
             },
         }
     }

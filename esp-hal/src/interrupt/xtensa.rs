@@ -156,7 +156,7 @@ pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Resul
         return Err(Error::CpuInterruptReserved);
     }
     unsafe {
-        map(crate::core(), interrupt, cpu_interrupt);
+        map(Cpu::current(), interrupt, cpu_interrupt);
 
         xtensa_lx::interrupt::enable_mask(
             xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
@@ -338,7 +338,6 @@ mod vectored {
     use procmacros::ram;
 
     use super::*;
-    use crate::core;
 
     /// Interrupt priority levels.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -447,7 +446,7 @@ mod vectored {
             interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
 
         unsafe {
-            map(core(), interrupt, cpu_interrupt);
+            map(Cpu::current(), interrupt, cpu_interrupt);
 
             xtensa_lx::interrupt::enable_mask(
                 xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
@@ -541,7 +540,7 @@ mod vectored {
     #[no_mangle]
     #[ram]
     unsafe fn handle_interrupts(level: u32, save_frame: &mut Context) {
-        let core = crate::core();
+        let core = Cpu::current();
 
         let cpu_interrupt_mask =
             interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[level as usize];

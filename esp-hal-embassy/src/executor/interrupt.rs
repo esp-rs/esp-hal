@@ -4,8 +4,8 @@ use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 use embassy_executor::{raw, SendSpawner};
 use esp_hal::{
-    core,
     interrupt::{self, software::SoftwareInterrupt, InterruptHandler},
+    Cpu,
 };
 use portable_atomic::{AtomicUsize, Ordering};
 
@@ -87,7 +87,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
             .core
             .compare_exchange(
                 usize::MAX,
-                core() as usize,
+                Cpu::current() as usize,
                 Ordering::Acquire,
                 Ordering::Relaxed,
             )
