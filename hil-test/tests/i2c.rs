@@ -50,7 +50,10 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn empty_write_returns_ack_error_for_unknown_address(mut ctx: Context) {
-        assert_eq!(ctx.i2c.write(NON_EXISTENT_ADDRESS, &[]), Err(Error::AckCheckFailed));
+        assert_eq!(
+            ctx.i2c.write(NON_EXISTENT_ADDRESS, &[]),
+            Err(Error::AckCheckFailed)
+        );
         assert_eq!(ctx.i2c.write(DUT_ADDRESS, &[]), Ok(()));
     }
 
@@ -61,10 +64,14 @@ mod tests {
 
         // have a failing read which might could leave the peripheral in an undesirable
         // state
-        ctx.i2c.write_read(NON_EXISTENT_ADDRESS, &[0xaa], &mut read_data).ok();
+        ctx.i2c
+            .write_read(NON_EXISTENT_ADDRESS, &[0xaa], &mut read_data)
+            .ok();
 
         // do the real read which should succeed
-        ctx.i2c.write_read(DUT_ADDRESS, &[0xaa], &mut read_data).ok();
+        ctx.i2c
+            .write_read(DUT_ADDRESS, &[0xaa], &mut read_data)
+            .ok();
 
         assert_ne!(read_data, [0u8; 22])
     }
