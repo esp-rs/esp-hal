@@ -61,6 +61,7 @@ esp32c2 = { version = "0.23.0", features = ["critical-section", "rt"], optional 
 esp32c3 = { version = "0.26.0", features = ["critical-section", "rt"], optional = true }
 esp32c6 = { version = "0.17.0", features = ["critical-section", "rt"], optional = true }
 esp32h2 = { version = "0.13.0", features = ["critical-section", "rt"], optional = true }
+esp32p4 = { path = "../../esp-pacs/esp32p4", features = ["critical-section", "rt"], optional = true }
 esp32s2 = { version = "0.25.0", features = ["critical-section", "rt"], optional = true }
 esp32s3 = { version = "0.29.0", features = ["critical-section", "rt"], optional = true }
 

@@ -393,64 +393,6 @@ pub enum OutputSignal {
     GPIO                       = 256,
 }
 
-crate::gpio! {
-    (0, [Input, Output, RtcIo])
-    (1, [Input, Output, RtcIo])
-    (2, [Input, Output, RtcIo])
-    (3, [Input, Output, RtcIo])
-    (4, [Input, Output, RtcIo])
-    (5, [Input, Output, RtcIo])
-    (6, [Input, Output, RtcIo] (3 => SPI2_HOLD_PAD) (3 => SPI2_HOLD_PAD))
-    (7, [Input, Output, RtcIo] (3 => SPI2_CS_PAD) (3 => SPI2_CS_PAD))
-    (8, [Input, Output, RtcIo] (3 => SPI2_D_PAD) (2 => U0RTS 3 => SPI2_D_PAD))
-    (9, [Input, Output, RtcIo] (2 => U0CTS) (3 => SPI2_CK_PAD))
-    (10, [Input, Output, RtcIo] (3 => SPI2_Q_PAD) (2 => U1TXD))
-    (11, [Input, Output, RtcIo] (2 => U1RXD 3 => SPI2_WP_PAD) (3 => SPI2_WP_PAD))
-    (12, [Input, Output, RtcIo] () (2 => U1RTS))
-    (13, [Input, Output, RtcIo] (2 => U1CTS) ())
-    (14, [Input, Output, RtcIo])
-    (15, [Input, Output, RtcIo])
-    (16, [Input, Output, RtcIo])
-    (17, [Input, Output, RtcIo])
-    (18, [Input, Output, RtcIo])
-    (19, [Input, Output, RtcIo])
-    (20, [Input, Output, RtcIo])
-    (21, [Input, Output, RtcIo])
-    (22, [Input, Output, RtcIo])
-    (23, [Input, Output, RtcIo])
-    (24, [Input, Output, RtcIo])
-    (25, [Input, Output, RtcIo])
-    (26, [Input, Output, RtcIo])
-    (27, [Input, Output, RtcIo])
-    (28, [Input, Output, RtcIo] (2 => SPI2_CS_PAD 3 => GMAC_PHY_RXDV_PAD) ())
-    (29, [Input, Output, RtcIo] (2 => SPI2_D_PAD 3 => GMAC_PHY_RXD0_PAD) ())
-    (30, [Input, Output, RtcIo] (3 => GMAC_PHY_RXD1_PAD) (2 => SPI2_CK_PAD))
-    (31, [Input, Output, RtcIo] (2 => SPI2_Q_PAD 3 => GMAC_PHY_RXER_PAD) ())
-    (32, [Input, Output] (2 => SPI2_HOLD_PAD 3 => GMAC_RX_CLK_PAD) (2 => SPI2_HOLD_PAD))
-    (33, [Input, Output] (2 => SPI2_WP_PAD) (2 => SPI2_WP_PAD 3 => GMAC_PHY_TXEN_PAD))
-    (34, [Input, Output] (2 => SPI2_IO4_PAD) (2 => SPI2_IO4_PAD 3 => GMAC_PHY_TXD0_PAD))
-    (35, [Input, Output] (2 => SPI2_IO5_PAD) (2 => SPI2_IO5_PAD 3 => GMAC_PHY_TXD1_PAD))
-    (36, [Input, Output] (2 => SPI2_IO6_PAD) (2 => SPI2_IO6_PAD 3 => GMAC_PHY_TXER_PAD))
-    (37, [Input, Output] (2 => SPI2_IO7_PAD) (2 => SPI2_IO7_PAD))
-    (38, [Input, Output] (2 => SPI2_Q_PAD) (2 => SPI2_Q_PAD))
-    (39, [Input, Output])
-    (40, [Input, Output] () (3 => GMAC_PHY_TXEN_PAD))
-    (41, [Input, Output] () (3 => GMAC_PHY_TXD0_PAD))
-    (42, [Input, Output] () (3 => GMAC_PHY_TXD1_PAD))
-    (43, [Input, Output] () (3 => GMAC_PHY_TXER_PAD))
-    (44, [Input, Output] (3 => GMAC_RX_CLK_PAD) ())
-    (45, [Input, Output] (3 => GMAC_PHY_RXDV_PAD) ())
-    (46, [Input, Output] (3 => GMAC_PHY_RXD0_PAD) ())
-    (47, [Input, Output] (3 => GMAC_PHY_RXD1_PAD) ())
-    (48, [Input, Output] (3 => GMAC_PHY_RXER_PAD) ())
-    (49, [Input, Output] () (3 => GMAC_PHY_TXEN_PAD))
-    (50, [Input, Output] (3 => GMAC_RX_CLK_PAD) ())
-    (51, [Input, Output] (3 => GMAC_PHY_RXDV_PAD) ())
-    (52, [Input, Output] (3 => GMAC_PHY_RXD0_PAD) ())
-    (53, [Input, Output] (3 => GMAC_PHY_RXD1_PAD) ())
-    (54, [Input, Output] (3 => GMAC_PHY_RXER_PAD) ())
-}
-
 // crate::gpio::analog! {}
 
 // crate::gpio::rtc_pins! {}
@@ -464,14 +406,8 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => match crate::get_core() {
-                crate::Cpu::ProCpu => todo!(),
-                crate::Cpu::AppCpu => todo!(),
-            },
-            Self::Bank1 => match crate::get_core() {
-                crate::Cpu::ProCpu => todo!(),
-                crate::Cpu::AppCpu => todo!(),
-            },
+            Self::Bank0 => unsafe { GPIO::steal() }.intr_0().read().bits(),
+            Self::Bank1 => unsafe { GPIO::steal() }.intr1_0().read().bits(),
         }
     }
 }
