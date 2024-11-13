@@ -80,8 +80,8 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
+        CompatibleWith,
         DescriptorChain,
-        DmaChannelConvert,
         DmaChannelFor,
         DmaDescriptor,
         DmaEligible,
@@ -377,7 +377,7 @@ impl<'d> I2s<'d, Blocking> {
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
-        CH: DmaChannelConvert<DmaChannelFor<AnyI2s>>,
+        CH: CompatibleWith<AnyI2s>,
     {
         Self::new_typed(
             i2s.map_into(),
@@ -408,7 +408,7 @@ where
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
-        CH: DmaChannelConvert<DmaChannelFor<T>>,
+        CH: CompatibleWith<T>,
     {
         crate::into_ref!(i2s);
         Self::new_internal(

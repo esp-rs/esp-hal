@@ -240,8 +240,8 @@ pub mod dma {
             Channel,
             ChannelRx,
             ChannelTx,
+            CompatibleWith,
             DescriptorChain,
-            DmaChannelConvert,
             DmaChannelFor,
             DmaDescriptor,
             DmaPeripheral,
@@ -295,7 +295,7 @@ pub mod dma {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d>
         where
-            CH: DmaChannelConvert<DmaChannelFor<AES>>,
+            CH: CompatibleWith<AES>,
         {
             let channel = Channel::new(channel.map(|ch| ch.degrade()));
             channel.runtime_ensure_compatible(&self.aes);

@@ -62,7 +62,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelTx, DmaChannelConvert, DmaError, DmaPeripheral, DmaTxBuffer, Tx, TxChannelFor},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, Tx, TxChannelFor, TxCompatibleWith},
     gpio::{
         interconnect::{OutputConnection, PeripheralOutput},
         OutputSignal,
@@ -102,7 +102,7 @@ where
         config: Config,
     ) -> Self
     where
-        CH: DmaChannelConvert<TxChannelFor<LCD_CAM>>,
+        CH: TxCompatibleWith<LCD_CAM>,
         P: TxPins,
     {
         let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));

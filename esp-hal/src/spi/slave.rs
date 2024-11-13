@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 
 use super::{Error, SpiMode};
 use crate::{
-    dma::{DmaChannelConvert, DmaEligible},
+    dma::DmaEligible,
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -176,6 +176,7 @@ pub mod dma {
             Channel,
             ChannelRx,
             ChannelTx,
+            CompatibleWith,
             DescriptorChain,
             DmaChannelFor,
             DmaDescriptor,
@@ -206,7 +207,7 @@ pub mod dma {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, Blocking, T>
         where
-            CH: DmaChannelConvert<DmaChannelFor<T>>,
+            CH: CompatibleWith<T>,
         {
             self.spi.info().set_data_mode(self.data_mode, true);
             SpiDma::new(

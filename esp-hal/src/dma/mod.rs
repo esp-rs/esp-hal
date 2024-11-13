@@ -1647,7 +1647,7 @@ pub trait DmaChannelExt: DmaChannel {
     note = "Not all channels are useable with all peripherals"
 )]
 #[doc(hidden)]
-pub trait DmaChannelConvert<DEG>: DmaChannel {
+pub trait DmaChannelConvert<DEG> {
     fn degrade(self) -> DEG;
 }
 
@@ -1655,6 +1655,69 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
     fn degrade(self) -> DEG {
         self
     }
+}
+
+/// Trait implemented for DMA channels that are compatible with a particular
+/// peripheral.
+#[cfg_attr(pdma, doc = "")]
+#[cfg_attr(
+    pdma,
+    doc = "Note that using mismatching channels (e.g. trying to use `spi2channel` with SPI3) may compile, but will panic in runtime."
+)]
+#[cfg_attr(pdma, doc = "")]
+/// ## Example
+///
+/// The following example demonstrates how this trait can be used to only accept
+/// types compatible with a specific peripheral.
+///
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::spi::master::{Spi, Config, Instance as SpiInstance};
+/// use esp_hal::dma::CompatibleWith;
+/// use esp_hal::Blocking;
+/// use esp_hal::dma::Dma;
+///
+/// fn takes_spi<S: SpiInstance>(spi: Spi<'_, Blocking, S>, channel: impl
+/// CompatibleWith<S>) {}
+///
+/// let dma = Dma::new(peripherals.DMA);
+#[cfg_attr(pdma, doc = "let dma_channel = dma.spi2channel;")]
+#[cfg_attr(gdma, doc = "let dma_channel = dma.channel0;")]
+#[doc = ""]
+/// let spi = Spi::new_with_config(
+///     peripherals.SPI2,
+///     Config::default(),
+/// );
+///
+/// takes_spi(spi, dma_channel);
+/// # }
+/// ```
+pub trait CompatibleWith<P: DmaEligible>: DmaChannel + DmaChannelConvert<DmaChannelFor<P>> {}
+impl<P, CH> CompatibleWith<P> for CH
+where
+    P: DmaEligible,
+    CH: DmaChannel + DmaChannelConvert<DmaChannelFor<P>>,
+{
+}
+
+/// Trait implemented for the RX half of split DMA channels that are compatible
+/// with a particular peripheral.
+pub trait RxCompatibleWith<P: DmaEligible>: DmaChannelConvert<RxChannelFor<P>> {}
+impl<P, RX> RxCompatibleWith<P> for RX
+where
+    P: DmaEligible,
+    RX: DmaChannelConvert<RxChannelFor<P>>,
+{
+}
+
+/// Trait implemented for the TX half of split DMA channels that are compatible
+/// with a particular peripheral.
+pub trait TxCompatibleWith<PER: DmaEligible>: DmaChannelConvert<TxChannelFor<PER>> {}
+impl<P, TX> TxCompatibleWith<P> for TX
+where
+    P: DmaEligible,
+    TX: DmaChannelConvert<TxChannelFor<P>>,
+{
 }
 
 /// The functions here are not meant to be used outside the HAL

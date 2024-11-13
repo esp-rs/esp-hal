@@ -78,7 +78,7 @@ use procmacros::ram;
 use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
 use crate::{
     clock::Clocks,
-    dma::{DmaChannelConvert, DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
+    dma::{CompatibleWith, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{interconnect::PeripheralOutput, InputSignal, NoPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -540,7 +540,7 @@ where
     /// operations.
     pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking, T>
     where
-        CH: DmaChannelConvert<DmaChannelFor<T>>,
+        CH: CompatibleWith<T>,
     {
         SpiDma::new(self.spi, channel.map(|ch| ch.degrade()).into_ref())
     }

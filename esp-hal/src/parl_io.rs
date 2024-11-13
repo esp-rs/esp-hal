@@ -34,9 +34,8 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
+        CompatibleWith,
         DescriptorChain,
-        DmaChannelConvert,
-        DmaChannelFor,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
@@ -45,8 +44,10 @@ use crate::{
         ReadBuffer,
         Rx,
         RxChannelFor,
+        RxCompatibleWith,
         Tx,
         TxChannelFor,
+        TxCompatibleWith,
         WriteBuffer,
     },
     gpio::{
@@ -1013,7 +1014,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<DmaChannelFor<PARL_IO>>,
+        CH: CompatibleWith<PARL_IO>,
     {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
@@ -1135,7 +1136,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<TxChannelFor<PARL_IO>>,
+        CH: TxCompatibleWith<PARL_IO>,
     {
         let guard = GenericPeripheralGuard::new();
         let tx_channel = ChannelTx::new(dma_channel.map(|ch| ch.degrade()));
@@ -1241,7 +1242,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<RxChannelFor<PARL_IO>>,
+        CH: RxCompatibleWith<PARL_IO>,
     {
         let guard = GenericPeripheralGuard::new();
         let rx_channel = ChannelRx::new(dma_channel.map(|ch| ch.degrade()));

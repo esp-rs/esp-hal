@@ -60,6 +60,12 @@ impl Peripheral for AnyGdmaRxChannel {
     }
 }
 
+impl DmaChannelConvert<AnyGdmaRxChannel> for AnyGdmaRxChannel {
+    fn degrade(self) -> AnyGdmaRxChannel {
+        self
+    }
+}
+
 /// An arbitrary GDMA TX channel
 pub struct AnyGdmaTxChannel(u8);
 
@@ -68,6 +74,12 @@ impl Peripheral for AnyGdmaTxChannel {
 
     unsafe fn clone_unchecked(&self) -> Self::P {
         Self(self.0)
+    }
+}
+
+impl DmaChannelConvert<AnyGdmaTxChannel> for AnyGdmaTxChannel {
+    fn degrade(self) -> AnyGdmaTxChannel {
+        self
     }
 }
 
