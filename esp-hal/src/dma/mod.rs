@@ -1844,6 +1844,7 @@ where
         let preparation = buffer.prepare();
 
         self.rx_impl.set_burst_mode(false);
+        self.rx_impl.set_descr_burst_mode(true);
         self.rx_impl.set_check_owner(preparation.check_owner);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
@@ -2132,6 +2133,7 @@ where
         );
 
         self.tx_impl.set_burst_mode(false);
+        self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
@@ -2205,8 +2207,12 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn reset(&self);
 
     /// Enable/Disable INCR burst transfer for channel reading
-    /// descriptor and accessing data in internal RAM.
+    /// accessing data in internal RAM.
     fn set_burst_mode(&self, burst_mode: bool);
+
+    /// Enable/Disable burst transfer for channel reading
+    /// descriptors in internal RAM.
+    fn set_descr_burst_mode(&self, burst_mode: bool);
 
     /// The priority of the channel. The larger the value, the higher the
     /// priority.

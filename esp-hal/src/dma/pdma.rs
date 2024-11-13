@@ -60,6 +60,12 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
     fn set_burst_mode(&self, burst_mode: bool) {
         let spi = self.0.register_block();
         spi.dma_conf()
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode));
+    }
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        let spi = self.0.register_block();
+        spi.dma_conf()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
@@ -216,7 +222,9 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         spi.dma_conf().modify(|_, w| w.in_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, burst_mode: bool) {
+    fn set_burst_mode(&self, _burst_mode: bool) {}
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
         let spi = self.0.register_block();
         spi.dma_conf()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
@@ -466,17 +474,24 @@ pub struct I2sDmaTxChannelImpl<C>(C);
 impl<C> crate::private::Sealed for I2sDmaTxChannelImpl<C> {}
 
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaTxChannelImpl<C> {
-    fn set_burst_mode(&self, burst_mode: bool) {
-        let reg_block = self.0.register_block();
-        reg_block
-            .lc_conf()
-            .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
-    }
-
     fn reset(&self) {
         let reg_block = self.0.register_block();
         reg_block.lc_conf().modify(|_, w| w.out_rst().set_bit());
         reg_block.lc_conf().modify(|_, w| w.out_rst().clear_bit());
+    }
+
+    fn set_burst_mode(&self, burst_mode: bool) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode));
+    }
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
     fn set_link_addr(&self, address: u32) {
@@ -638,17 +653,19 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaTxInte
 }
 
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaRxChannelImpl<C> {
-    fn set_burst_mode(&self, burst_mode: bool) {
-        let reg_block = self.0.register_block();
-        reg_block
-            .lc_conf()
-            .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
-    }
-
     fn reset(&self) {
         let reg_block = self.0.register_block();
         reg_block.lc_conf().modify(|_, w| w.in_rst().set_bit());
         reg_block.lc_conf().modify(|_, w| w.in_rst().clear_bit());
+    }
+
+    fn set_burst_mode(&self, _burst_mode: bool) {}
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
     fn set_link_addr(&self, address: u32) {

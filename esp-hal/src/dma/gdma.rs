@@ -170,10 +170,15 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
     }
 
     fn set_burst_mode(&self, burst_mode: bool) {
-        self.ch().out_conf0().modify(|_, w| {
-            w.out_data_burst_en().bit(burst_mode);
-            w.outdscr_burst_en().bit(burst_mode)
-        });
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode));
+    }
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
     fn set_priority(&self, priority: DmaPriority) {
@@ -389,10 +394,15 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
     }
 
     fn set_burst_mode(&self, burst_mode: bool) {
-        self.ch().in_conf0().modify(|_, w| {
-            w.in_data_burst_en().bit(burst_mode);
-            w.indscr_burst_en().bit(burst_mode)
-        });
+        self.ch()
+            .in_conf0()
+            .modify(|_, w| w.in_data_burst_en().bit(burst_mode));
+    }
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        self.ch()
+            .in_conf0()
+            .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
     fn set_priority(&self, priority: DmaPriority) {
