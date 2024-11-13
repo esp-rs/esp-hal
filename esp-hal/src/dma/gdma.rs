@@ -753,7 +753,9 @@ impl<'d> Dma<'d> {
     ) -> Dma<'d> {
         crate::into_ref!(dma);
 
-        PeripheralClockControl::enable(Peripheral::Gdma);
+        if PeripheralClockControl::enable(Peripheral::Gdma, true) {
+            PeripheralClockControl::reset(Peripheral::Gdma);
+        }
         dma.misc_conf().modify(|_, w| w.ahbm_rst_inter().set_bit());
         dma.misc_conf()
             .modify(|_, w| w.ahbm_rst_inter().clear_bit());

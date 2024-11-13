@@ -85,7 +85,7 @@ use crate::{
     peripherals::spi2::RegisterBlock,
     private,
     spi::AnySpi,
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
     Async,
     Blocking,
     Mode,
@@ -462,6 +462,7 @@ pub enum ConfigError {}
 pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     _mode: PhantomData<M>,
+    guard: PeripheralGuard,
 }
 
 impl<'d, M, T> Spi<'d, M, T>
@@ -543,6 +544,7 @@ impl<'d> Spi<'d, Blocking> {
         Spi {
             spi: self.spi,
             _mode: PhantomData,
+            guard: self.guard,
         }
     }
 }
@@ -553,6 +555,7 @@ impl<'d> Spi<'d, Async> {
         Spi {
             spi: self.spi,
             _mode: PhantomData,
+            guard: self.guard,
         }
     }
 }
@@ -573,13 +576,13 @@ where
     ) -> Spi<'d, M, T> {
         crate::into_ref!(spi);
 
+        let guard = PeripheralGuard::new(spi.info().peripheral);
+
         let mut this = Spi {
             spi,
             _mode: PhantomData,
+            guard,
         };
-
-        PeripheralClockControl::enable(this.driver().peripheral);
-        PeripheralClockControl::reset(this.driver().peripheral);
 
         this.driver().init();
         unwrap!(this.apply_config(&config)); // FIXME: update based on the resolution of https://github.com/esp-rs/esp-hal/issues/2416
@@ -885,6 +888,7 @@ mod dma {
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
         address_buffer: DmaTxBuf,
+        guard: PeripheralGuard,
     }
 
     impl<M, T> crate::private::Sealed for SpiDma<'_, M, T>
@@ -907,6 +911,7 @@ mod dma {
                 rx_transfer_in_progress: self.rx_transfer_in_progress,
                 #[cfg(all(esp32, spi_address_workaround))]
                 address_buffer: self.address_buffer,
+                guard: self.guard,
             }
         }
     }
@@ -924,6 +929,7 @@ mod dma {
                 rx_transfer_in_progress: self.rx_transfer_in_progress,
                 #[cfg(all(esp32, spi_address_workaround))]
                 address_buffer: self.address_buffer,
+                guard: self.guard,
             }
         }
     }
@@ -1015,6 +1021,8 @@ mod dma {
                 ))
             };
 
+            let guard = PeripheralGuard::new(spi.info().peripheral);
+
             Self {
                 spi,
                 channel: channel.degrade(),
@@ -1022,6 +1030,7 @@ mod dma {
                 address_buffer,
                 tx_transfer_in_progress: false,
                 rx_transfer_in_progress: false,
+                guard,
             }
         }
 

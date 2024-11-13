@@ -401,8 +401,9 @@ where
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
     ) -> Self {
-        PeripheralClockControl::reset(Peripheral::ApbSarAdc);
-        PeripheralClockControl::enable(Peripheral::ApbSarAdc);
+        if PeripheralClockControl::enable(Peripheral::ApbSarAdc, true) {
+            PeripheralClockControl::reset(Peripheral::ApbSarAdc);
+        }
 
         let sensors = unsafe { &*SENS::ptr() };
 
@@ -557,6 +558,12 @@ where
 
         ADCI::clear_start_sample();
         ADCI::start_sample();
+    }
+}
+
+impl<ADCI> Drop for Adc<'_, ADCI> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(Peripheral::ApbSarAdc, false);
     }
 }
 

@@ -134,7 +134,7 @@ use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
     twai::filter::SingleStandardFilter,
     Async,
     Blocking,
@@ -751,6 +751,7 @@ pub struct TwaiConfiguration<'d, DM: crate::Mode, T = AnyTwai> {
     filter: Option<(FilterType, [u8; 8])>,
     phantom: PhantomData<DM>,
     mode: TwaiMode,
+    _guard: PeripheralGuard,
 }
 
 impl<'d, DM, T> TwaiConfiguration<'d, DM, T>
@@ -769,15 +770,14 @@ where
         crate::into_ref!(twai);
         crate::into_mapped_ref!(tx_pin, rx_pin);
 
-        // Enable the peripheral clock for the TWAI peripheral.
-        PeripheralClockControl::enable(twai.peripheral());
-        PeripheralClockControl::reset(twai.peripheral());
+        let guard = PeripheralGuard::new(twai.peripheral());
 
         let mut this = TwaiConfiguration {
             twai,
             filter: None, // We'll immediately call `set_filter`
             phantom: PhantomData,
             mode,
+            _guard: guard,
         };
 
         // Accept all messages by default.
@@ -1035,10 +1035,12 @@ where
             rx: TwaiRx {
                 twai: unsafe { self.twai.clone_unchecked() },
                 phantom: PhantomData,
+                _guard: PeripheralGuard::new(self.twai.peripheral()),
             },
             tx: TwaiTx {
                 twai: unsafe { self.twai.clone_unchecked() },
                 phantom: PhantomData,
+                _guard: PeripheralGuard::new(self.twai.peripheral()),
             },
             twai: unsafe { self.twai.clone_unchecked() },
             phantom: PhantomData,
@@ -1116,6 +1118,7 @@ where
             filter: self.filter,
             phantom: PhantomData,
             mode: self.mode,
+            _guard: self._guard,
         }
     }
 }
@@ -1136,6 +1139,7 @@ where
             filter: self.filter,
             phantom: PhantomData,
             mode: self.mode,
+            _guard: self._guard,
         }
     }
 }
@@ -1191,11 +1195,13 @@ where
 
         let mode = self.mode();
 
+        let guard = PeripheralGuard::new(self.twai.peripheral());
         TwaiConfiguration {
             twai: self.twai,
             filter: None, // filter already applied, no need to restore it
             phantom: PhantomData,
             mode,
+            _guard: guard,
         }
     }
 
@@ -1277,6 +1283,7 @@ where
 pub struct TwaiTx<'d, DM: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
+    _guard: PeripheralGuard,
 }
 
 impl<DM, T> TwaiTx<'_, DM, T>
@@ -1319,6 +1326,7 @@ where
 pub struct TwaiRx<'d, DM: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
+    _guard: PeripheralGuard,
 }
 
 impl<DM, T> TwaiRx<'_, DM, T>

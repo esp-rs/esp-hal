@@ -152,7 +152,7 @@ impl TimerGroupInstance for TIMG0 {
     }
 
     fn enable_peripheral() {
-        PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg0, true);
     }
 
     fn reset_peripheral() {
@@ -215,7 +215,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
     }
 
     fn enable_peripheral() {
-        PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg1, true);
     }
 
     fn reset_peripheral() {
@@ -929,9 +929,6 @@ where
 {
     /// Construct a new instance of [`Wdt`]
     pub fn new() -> Self {
-        #[cfg(lp_wdt)]
-        PeripheralClockControl::enable(crate::system::Peripheral::Wdt);
-
         TG::configure_wdt_src_clk();
 
         Self {

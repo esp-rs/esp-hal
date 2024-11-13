@@ -56,7 +56,10 @@ pub struct TraceResult {
 }
 
 /// TRACE Encoder Instance
-pub struct Trace<'d, T> {
+pub struct Trace<'d, T>
+where
+    T: Instance,
+{
     peripheral: PeripheralRef<'d, T>,
     buffer: Option<&'d mut [u8]>,
 }
@@ -69,8 +72,9 @@ where
     pub fn new(peripheral: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(peripheral);
 
-        PeripheralClockControl::reset(crate::system::Peripheral::Trace0);
-        PeripheralClockControl::enable(crate::system::Peripheral::Trace0);
+        if PeripheralClockControl::enable(peripheral.peripheral(), true) {
+            PeripheralClockControl::reset(peripheral.peripheral());
+        }
 
         Self {
             peripheral,
@@ -203,14 +207,30 @@ where
     }
 }
 
+impl<T> Drop for Trace<'_, T>
+where
+    T: Instance,
+{
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(self.peripheral.peripheral(), false);
+    }
+}
+
 /// Trace peripheral instance
 pub trait Instance: crate::private::Sealed {
     /// Get a reference to the peripheral's underlying register block
     fn register_block(&self) -> &RegisterBlock;
+
+    /// Peripheral
+    fn peripheral(&self) -> crate::system::Peripheral;
 }
 
 impl Instance for crate::peripherals::TRACE0 {
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Trace0
     }
 }

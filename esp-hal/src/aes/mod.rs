@@ -143,8 +143,9 @@ impl<'d> Aes<'d> {
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
 
-        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Aes);
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Aes);
+        if crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Aes, true) {
+            crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Aes);
+        }
 
         let mut ret = Self {
             aes,
@@ -187,6 +188,12 @@ impl<'d> Aes<'d> {
 
     fn start(&mut self) {
         self.write_start();
+    }
+}
+
+impl Drop for Aes<'_> {
+    fn drop(&mut self) {
+        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Aes, false);
     }
 }
 

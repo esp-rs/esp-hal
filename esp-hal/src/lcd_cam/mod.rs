@@ -18,7 +18,7 @@ use crate::{
     macros::handler,
     peripheral::Peripheral,
     peripherals::{Interrupt, LCD_CAM},
-    system::{self, PeripheralClockControl},
+    system::{self, PeripheralGuard},
     Async,
     Blocking,
     Cpu,
@@ -31,6 +31,8 @@ pub struct LcdCam<'d, DM: crate::Mode> {
     pub lcd: Lcd<'d, DM>,
     /// The Camera interface.
     pub cam: Cam<'d>,
+
+    _guard: PeripheralGuard,
 }
 
 impl<'d> LcdCam<'d, Blocking> {
@@ -38,8 +40,7 @@ impl<'d> LcdCam<'d, Blocking> {
     pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
         crate::into_ref!(lcd_cam);
 
-        PeripheralClockControl::reset(system::Peripheral::LcdCam);
-        PeripheralClockControl::enable(system::Peripheral::LcdCam);
+        let guard = PeripheralGuard::new(system::Peripheral::LcdCam);
 
         Self {
             lcd: Lcd {
@@ -47,6 +48,7 @@ impl<'d> LcdCam<'d, Blocking> {
                 _mode: PhantomData,
             },
             cam: Cam { lcd_cam },
+            _guard: guard,
         }
     }
 
@@ -59,6 +61,7 @@ impl<'d> LcdCam<'d, Blocking> {
                 _mode: PhantomData,
             },
             cam: self.cam,
+            _guard: self._guard,
         }
     }
 }
@@ -89,6 +92,7 @@ impl<'d> LcdCam<'d, Async> {
                 _mode: PhantomData,
             },
             cam: self.cam,
+            _guard: self._guard,
         }
     }
 }

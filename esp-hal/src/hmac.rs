@@ -107,8 +107,9 @@ impl<'d> Hmac<'d> {
     pub fn new(hmac: impl Peripheral<P = HMAC> + 'd) -> Self {
         crate::into_ref!(hmac);
 
-        PeripheralClockControl::reset(PeripheralEnable::Hmac);
-        PeripheralClockControl::enable(PeripheralEnable::Hmac);
+        if PeripheralClockControl::enable(PeripheralEnable::Hmac, true) {
+            PeripheralClockControl::reset(PeripheralEnable::Hmac);
+        }
 
         Self {
             hmac,
@@ -343,5 +344,11 @@ impl<'d> Hmac<'d> {
             .write(|w| w.set_text_one().set_bit());
 
         while self.is_busy() {}
+    }
+}
+
+impl Drop for Hmac<'_> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(PeripheralEnable::Hmac, true);
     }
 }

@@ -111,8 +111,9 @@ impl<'d> Ledc<'d> {
     pub fn new(_instance: impl Peripheral<P = crate::peripherals::LEDC> + 'd) -> Self {
         crate::into_ref!(_instance);
 
-        PeripheralClockControl::reset(PeripheralEnable::Ledc);
-        PeripheralClockControl::enable(PeripheralEnable::Ledc);
+        if PeripheralClockControl::enable(PeripheralEnable::Ledc, true) {
+            PeripheralClockControl::reset(PeripheralEnable::Ledc);
+        }
 
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Ledc { _instance, ledc }

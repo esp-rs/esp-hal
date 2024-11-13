@@ -59,7 +59,7 @@ use crate::{
         Interrupt,
     },
     private,
-    system::PeripheralClockControl,
+    system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
     Cpu,
@@ -273,6 +273,7 @@ pub struct I2c<'d, DM: Mode, T = AnyI2c> {
     i2c: PeripheralRef<'d, T>,
     phantom: PhantomData<DM>,
     config: Config,
+    guard: PeripheralGuard,
 }
 
 impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
@@ -352,8 +353,9 @@ where
     }
 
     fn internal_recover(&self) {
+        PeripheralClockControl::enable(self.driver().info.peripheral, false);
+        PeripheralClockControl::enable(self.driver().info.peripheral, true);
         PeripheralClockControl::reset(self.driver().info.peripheral);
-        PeripheralClockControl::enable(self.driver().info.peripheral);
 
         // We know the configuration is valid, we can ignore the result.
         _ = self.driver().setup(&self.config);
@@ -469,14 +471,14 @@ where
     pub fn new_typed(i2c: impl Peripheral<P = T> + 'd, config: Config) -> Self {
         crate::into_ref!(i2c);
 
+        let guard = PeripheralGuard::new(i2c.info().peripheral);
+
         let i2c = I2c {
             i2c,
             phantom: PhantomData,
             config,
+            guard,
         };
-
-        PeripheralClockControl::reset(i2c.driver().info.peripheral);
-        PeripheralClockControl::enable(i2c.driver().info.peripheral);
 
         unwrap!(i2c.driver().setup(&i2c.config));
         i2c
@@ -492,6 +494,7 @@ where
             i2c: self.i2c,
             phantom: PhantomData,
             config: self.config,
+            guard: self.guard,
         }
     }
 
@@ -695,6 +698,7 @@ where
             i2c: self.i2c,
             phantom: PhantomData,
             config: self.config,
+            guard: self.guard,
         }
     }
 

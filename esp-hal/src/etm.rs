@@ -75,6 +75,10 @@ impl<const C: u8> EtmChannel<C> {
         E: EtmEvent,
         T: EtmTask,
     {
+        if PeripheralClockControl::enable(crate::system::Peripheral::Etm, true) {
+            PeripheralClockControl::reset(crate::system::Peripheral::Etm);
+        }
+
         let etm = unsafe { crate::peripherals::SOC_ETM::steal() };
 
         etm.ch(C as usize)
@@ -125,8 +129,9 @@ where
     T: EtmTask,
 {
     fn drop(&mut self) {
-        debug!("drop {}", C);
+        debug!("Drop ETM channel {}", C);
         disable_channel(C);
+        PeripheralClockControl::enable(crate::system::Peripheral::Etm, false);
     }
 }
 
@@ -148,9 +153,6 @@ macro_rules! create_etm {
                 /// Creates a new `Etm` instance.
                 pub fn new(peripheral: impl Peripheral<P = crate::peripherals::SOC_ETM> + 'd) -> Self {
                     crate::into_ref!(peripheral);
-
-                    PeripheralClockControl::reset(crate::system::Peripheral::Etm);
-                    PeripheralClockControl::enable(crate::system::Peripheral::Etm);
 
                     Self {
                         _peripheral: peripheral,

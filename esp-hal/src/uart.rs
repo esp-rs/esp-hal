@@ -132,7 +132,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{uart0::RegisterBlock, Interrupt},
     private::Internal,
-    system::PeripheralClockControl,
+    system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
     InterruptConfigurable,
@@ -462,14 +462,19 @@ where
     }
 
     fn init(self, config: Config) -> Result<Uart<'d, M, T>, Error> {
+        let rx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
+        let tx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
+
         let mut serial = Uart {
             rx: UartRx {
                 uart: unsafe { self.uart.clone_unchecked() },
                 phantom: PhantomData,
+                guard: rx_guard,
             },
             tx: UartTx {
                 uart: self.uart,
                 phantom: PhantomData,
+                guard: tx_guard,
             },
         };
         serial.init(config)?;
@@ -488,12 +493,14 @@ pub struct Uart<'d, M, T = AnyUart> {
 pub struct UartTx<'d, M, T = AnyUart> {
     uart: PeripheralRef<'d, T>,
     phantom: PhantomData<M>,
+    guard: PeripheralGuard,
 }
 
 /// UART (Receive)
 pub struct UartRx<'d, M, T = AnyUart> {
     uart: PeripheralRef<'d, T>,
     phantom: PhantomData<M>,
+    guard: PeripheralGuard,
 }
 
 impl<M, T> SetConfig for Uart<'_, M, T>
@@ -698,6 +705,7 @@ where
         UartTx {
             uart: self.uart,
             phantom: PhantomData,
+            guard: self.guard,
         }
     }
 }
@@ -719,6 +727,7 @@ where
         UartTx {
             uart: self.uart,
             phantom: PhantomData,
+            guard: self.guard,
         }
     }
 }
@@ -951,6 +960,7 @@ where
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
+            guard: self.guard,
         }
     }
 }
@@ -972,6 +982,7 @@ where
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
+            guard: self.guard,
         }
     }
 }
@@ -1197,8 +1208,8 @@ where
             }
         };
 
-        PeripheralClockControl::enable(self.tx.uart.info().peripheral);
         self.uart_peripheral_reset();
+
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
 
@@ -1242,7 +1253,7 @@ where
         }
 
         fn rst_core(_reg_block: &RegisterBlock, _enable: bool) {
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(any(esp32, esp32s2, esp32c6, esp32h2)))]
             _reg_block
                 .clk_conf()
                 .modify(|_, w| w.rst_core().bit(_enable));

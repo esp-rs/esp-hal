@@ -8,6 +8,7 @@ use core::marker::PhantomData;
 
 use fugit::HertzU32;
 
+use super::PeripheralGuard;
 use crate::mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral};
 
 /// A MCPWM timer
@@ -17,12 +18,15 @@ use crate::mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral};
 /// [`Operator`](super::operator::Operator) of that peripheral
 pub struct Timer<const TIM: u8, PWM> {
     pub(super) phantom: PhantomData<PWM>,
+    _guard: PeripheralGuard,
 }
 
 impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     pub(super) fn new() -> Self {
+        let guard = PeripheralGuard::new(PWM::peripheral());
         Timer {
             phantom: PhantomData,
+            _guard: guard,
         }
     }
 

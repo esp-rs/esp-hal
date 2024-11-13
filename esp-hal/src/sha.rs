@@ -81,8 +81,9 @@ impl<'d> Sha<'d> {
     pub fn new(sha: impl Peripheral<P = SHA> + 'd) -> Self {
         crate::into_ref!(sha);
 
-        PeripheralClockControl::reset(crate::system::Peripheral::Sha);
-        PeripheralClockControl::enable(crate::system::Peripheral::Sha);
+        if PeripheralClockControl::enable(crate::system::Peripheral::Sha, true) {
+            PeripheralClockControl::reset(crate::system::Peripheral::Sha);
+        }
 
         Self { sha }
     }
@@ -101,6 +102,12 @@ impl<'d> Sha<'d> {
 }
 
 impl crate::private::Sealed for Sha<'_> {}
+
+impl Drop for Sha<'_> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(crate::system::Peripheral::Sha, false);
+    }
+}
 
 #[cfg(not(esp32))]
 impl crate::InterruptConfigurable for Sha<'_> {

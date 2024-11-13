@@ -102,8 +102,9 @@ impl<'d> Ecc<'d, crate::Blocking> {
     pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
         crate::into_ref!(ecc);
 
-        PeripheralClockControl::reset(PeripheralEnable::Ecc);
-        PeripheralClockControl::enable(PeripheralEnable::Ecc);
+        if PeripheralClockControl::enable(PeripheralEnable::Ecc, true) {
+            PeripheralClockControl::reset(PeripheralEnable::Ecc);
+        }
 
         Self {
             ecc,
@@ -962,5 +963,11 @@ impl<DM: crate::Mode> Ecc<'_, DM> {
         for (a, b) in nsrc.chunks_exact(4).zip(ndst.rchunks_exact_mut(4)) {
             b.copy_from_slice(&u32::from_be_bytes(a.try_into().unwrap()).to_ne_bytes());
         }
+    }
+}
+
+impl<DM: crate::Mode> Drop for Ecc<'_, DM> {
+    fn drop(&mut self) {
+        PeripheralClockControl::enable(PeripheralEnable::Ecc, false);
     }
 }

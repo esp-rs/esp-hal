@@ -1,11 +1,7 @@
-use crate::{
-    aes::{Aes, Aes128, Aes256, AesFlavour, ALIGN_SIZE},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
-};
+use crate::aes::{Aes, Aes128, Aes256, AesFlavour, ALIGN_SIZE};
 
 impl<'d> Aes<'d> {
     pub(super) fn init(&mut self) {
-        PeripheralClockControl::enable(PeripheralEnable::Aes);
         self.write_dma(false);
     }
 

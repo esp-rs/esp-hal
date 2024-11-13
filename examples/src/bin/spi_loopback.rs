@@ -46,8 +46,8 @@ fn main() -> ! {
         },
     )
     .with_sck(sclk)
-    .with_mosi(miso_mosi)
-    .with_miso(miso)
+    .with_miso(miso) // order matters
+    .with_mosi(miso_mosi) // order matters
     .with_cs(cs);
 
     let delay = Delay::new();

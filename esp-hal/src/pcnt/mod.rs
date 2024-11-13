@@ -25,7 +25,7 @@ use crate::{
     interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{self, Interrupt},
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
     InterruptConfigurable,
 };
 
@@ -56,6 +56,8 @@ pub struct Pcnt<'d> {
     #[cfg(esp32)]
     /// Unit 7
     pub unit7: Unit<'d, 7>,
+
+    _guard: PeripheralGuard,
 }
 
 impl<'d> Pcnt<'d> {
@@ -63,10 +65,7 @@ impl<'d> Pcnt<'d> {
     pub fn new(_instance: impl Peripheral<P = peripherals::PCNT> + 'd) -> Self {
         crate::into_ref!(_instance);
 
-        // Enable the PCNT peripherals clock in the system peripheral
-        PeripheralClockControl::reset(crate::system::Peripheral::Pcnt);
-        PeripheralClockControl::enable(crate::system::Peripheral::Pcnt);
-
+        let guard = PeripheralGuard::new(crate::system::Peripheral::Pcnt);
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
 
         // disable filter, all events, and channel settings
@@ -105,6 +104,7 @@ impl<'d> Pcnt<'d> {
             unit6: Unit::new(),
             #[cfg(esp32)]
             unit7: Unit::new(),
+            _guard: guard,
         }
     }
 }

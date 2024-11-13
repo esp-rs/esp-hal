@@ -88,7 +88,7 @@ use crate::{
     peripherals::spi2::RegisterBlock,
     private,
     spi::AnySpi,
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
     Blocking,
 };
 
@@ -102,6 +102,7 @@ pub struct Spi<'d, M, T = AnySpi> {
     #[allow(dead_code)]
     data_mode: SpiMode,
     _mode: PhantomData<M>,
+    _guard: PeripheralGuard,
 }
 
 impl<'d> Spi<'d, Blocking> {
@@ -119,14 +120,14 @@ where
     pub fn new_typed(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, M, T> {
         crate::into_ref!(spi);
 
+        let guard = PeripheralGuard::new(spi.info().peripheral);
+
         let this = Spi {
             spi,
             data_mode: mode,
             _mode: PhantomData,
+            _guard: guard,
         };
-
-        PeripheralClockControl::reset(this.spi.info().peripheral);
-        PeripheralClockControl::enable(this.spi.info().peripheral);
 
         this.spi.info().init();
         this.spi.info().set_data_mode(mode, false);
@@ -226,6 +227,7 @@ pub mod dma {
         pub(crate) channel: Channel<'d, M, T::Dma>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
+        _guard: PeripheralGuard,
     }
 
     impl<DmaMode, T> core::fmt::Debug for SpiDma<'_, DmaMode, T>
@@ -304,11 +306,14 @@ pub mod dma {
             CH: DmaChannelConvert<T::Dma>,
         {
             channel.runtime_ensure_compatible(&spi);
+            let guard = PeripheralGuard::new(spi.info().peripheral);
+
             Self {
                 spi,
                 channel: channel.degrade(),
                 rx_chain: DescriptorChain::new(rx_descriptors),
                 tx_chain: DescriptorChain::new(tx_descriptors),
+                _guard: guard,
             }
         }
 
