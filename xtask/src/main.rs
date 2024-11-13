@@ -35,6 +35,7 @@ enum Cli {
     /// Bump the version of the specified package(s).
     BumpVersion(BumpVersionArgs),
     /// Format all packages in the workspace with rustfmt
+    #[clap(alias = "format-packages")]
     FmtPackages(FmtPackagesArgs),
     /// Generate the eFuse fields source file from a CSV.
     GenerateEfuseFields(GenerateEfuseFieldsArgs),
