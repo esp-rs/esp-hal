@@ -427,7 +427,7 @@ where
         )
     }
 
-    /// Converts the SPI instance into async mode.
+    /// Converts the I2S instance into async mode.
     pub fn into_async(self) -> I2s<'d, Async, T> {
         I2s {
             i2s_rx: RxCreator {

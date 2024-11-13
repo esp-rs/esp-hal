@@ -62,6 +62,7 @@ use crate::{
     private::Internal,
     system::PeripheralGuard,
     Async,
+    Blocking,
     Mode,
 };
 
@@ -180,14 +181,11 @@ where
     _guard: PeripheralGuard,
 }
 
-impl<'d, DM> I2sParallel<'d, DM>
-where
-    DM: Mode,
-{
+impl<'d> I2sParallel<'d, Blocking> {
     /// Create a new I2S Parallel Interface
     pub fn new<CH>(
         i2s: impl Peripheral<P = impl Instance> + 'd,
-        channel: Channel<'d, DM, CH>,
+        channel: Channel<'d, Blocking, CH>,
         frequency: impl Into<fugit::HertzU32>,
         pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
@@ -199,15 +197,14 @@ where
     }
 }
 
-impl<'d, I, DM> I2sParallel<'d, DM, I>
+impl<'d, I> I2sParallel<'d, Blocking, I>
 where
     I: Instance,
-    DM: Mode,
 {
     /// Create a new I2S Parallel Interface
     pub fn new_typed<CH>(
         i2s: impl Peripheral<P = I> + 'd,
-        channel: Channel<'d, DM, CH>,
+        channel: Channel<'d, Blocking, CH>,
         frequency: impl Into<fugit::HertzU32>,
         mut pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
@@ -237,6 +234,35 @@ where
         }
     }
 
+    /// Converts the I2S instance into async mode.
+    pub fn into_async(self) -> I2sParallel<'d, Async, I> {
+        I2sParallel {
+            instance: self.instance,
+            tx_channel: self.tx_channel.into_async(),
+            _guard: self._guard,
+        }
+    }
+}
+
+impl<'d, I> I2sParallel<'d, Async, I>
+where
+    I: Instance,
+{
+    /// Converts the I2S instance into async mode.
+    pub fn into_blocking(self) -> I2sParallel<'d, Blocking, I> {
+        I2sParallel {
+            instance: self.instance,
+            tx_channel: self.tx_channel.into_blocking(),
+            _guard: self._guard,
+        }
+    }
+}
+
+impl<'d, I, DM> I2sParallel<'d, DM, I>
+where
+    I: Instance,
+    DM: Mode,
+{
     /// Write data to the I2S peripheral
     pub fn send<BUF: DmaTxBuffer>(
         mut self,

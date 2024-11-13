@@ -18,7 +18,7 @@ use embassy_executor::Spawner;
 use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaTxBuf},
+    dma::{Dma, DmaTxBuf},
     dma_buffers,
     i2s::parallel::{I2sParallel, TxEightBits},
     prelude::*,
@@ -56,15 +56,7 @@ async fn main(_spawner: Spawner) {
     );
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);
-    let mut parallel = I2sParallel::new(
-        i2s,
-        dma_channel
-            .configure(false, DmaPriority::Priority0)
-            .into_async(),
-        1.MHz(),
-        pins,
-        clock,
-    );
+    let mut parallel = I2sParallel::new(i2s, dma_channel, 1.MHz(), pins, clock).into_async();
 
     for (i, data) in tx_buffer.chunks_mut(4).enumerate() {
         let offset = i * 4;
