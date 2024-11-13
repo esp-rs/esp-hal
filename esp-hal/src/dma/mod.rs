@@ -1679,6 +1679,13 @@ where
         // channel was previously used for a mem2mem transfer.
         rx_impl.set_mem2mem_mode(false);
 
+        if let Some(interrupt) = rx_impl.peripheral_interrupt() {
+            for cpu in Cpu::all() {
+                crate::interrupt::disable(cpu, interrupt);
+            }
+        }
+        rx_impl.set_async(false);
+
         Self {
             burst_mode: false,
             rx_impl,
@@ -1962,6 +1969,13 @@ where
     CH: DmaChannel,
 {
     fn new(tx_impl: CH::Tx) -> Self {
+        if let Some(interrupt) = tx_impl.peripheral_interrupt() {
+            for cpu in Cpu::all() {
+                crate::interrupt::disable(cpu, interrupt);
+            }
+        }
+        tx_impl.set_async(false);
+
         Self {
             burst_mode: false,
             tx_impl,
