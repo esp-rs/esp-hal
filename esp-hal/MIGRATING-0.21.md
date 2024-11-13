@@ -419,3 +419,10 @@ You can use `gpio::NoPin` instead.
 In order to better comply with the Rust API Guidelines [getter names convention], we have removed the `get_` prefixes from all functions which previously had it. Due to the number of changes it's not practical to list all changes here, however if a function previous began with `get_`, you can simply remove this prefix.
 
 [getter names convention]: https://rust-lang.github.io/api-guidelines/naming.html#c-getter
+
+## The `get_core()` function has been removed in favour of `Cpu::current()`
+
+```diff
+- let core = esp_hal::get_core();
++ let core = esp_hal::Cpu::current();
+```
