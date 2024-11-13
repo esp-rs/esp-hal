@@ -1,14 +1,14 @@
-use core::{
-    cell::RefCell,
-    sync::atomic::{AtomicBool, Ordering},
-};
+//! Control over the radio clocs.
+use core::cell::RefCell;
 
 use critical_section::Mutex;
+use portable_atomic::{AtomicBool, Ordering};
 
 use crate::peripherals::RADIO_CLK;
 
 /// Enumeration of the available radio peripherals for this chip.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(any(bt, ieee802154, wifi))]
 pub enum RadioPeripherals {
     /// Represents the PHY (Physical Layer) peripheral.
@@ -50,8 +50,11 @@ pub trait RadioClockController {
 }
 
 static PHY_CLOCK_ENABLED: AtomicBool = AtomicBool::new(false);
+/// The PHY clock couldn't be disabled, because some modem clocks are still
+/// active.
 pub struct ModemClocksEnabledError;
 
+/// This struct allows shared access to the radio clocks.
 pub struct SharedRadioClockControl {
     radio_clock: Mutex<RefCell<RADIO_CLK>>,
 
@@ -63,6 +66,7 @@ pub struct SharedRadioClockControl {
     ieee802154_clock_enabled: AtomicBool,
 }
 impl SharedRadioClockControl {
+    /// Create a new [SharedRadioClockControl].
     pub const fn new(radio_clock: RADIO_CLK) -> Self {
         Self {
             radio_clock: Mutex::new(RefCell::new(radio_clock)),

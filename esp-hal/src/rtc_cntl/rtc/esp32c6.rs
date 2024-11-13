@@ -21,9 +21,9 @@ use crate::{
         XtalClock,
     },
     peripherals::TIMG0,
+    radio_clock_ctrl::RadioPeripherals,
     rtc_cntl::RtcClock,
     soc::efuse::Efuse,
-    system::RadioPeripherals,
 };
 
 const I2C_DIG_REG: u8 = 0x6d;
