@@ -384,114 +384,6 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel {
     }
 }
 
-#[doc(hidden)]
-pub struct SpiDmaChannel<C>(PhantomData<C>);
-
-impl<C> crate::private::Sealed for SpiDmaChannel<C> {}
-
-macro_rules! ImplSpiChannel {
-    ($num: literal) => {
-        paste::paste! {
-            #[doc = concat!("DMA channel suitable for SPI", $num)]
-            #[non_exhaustive]
-            pub struct [<Spi $num DmaChannel>] {}
-
-            impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
-
-            impl Peripheral for [<Spi $num DmaChannel>] {
-                type P = Self;
-
-                unsafe fn clone_unchecked(&self) -> Self::P {
-                    Self::steal()
-                }
-            }
-
-            impl [<Spi $num DmaChannel>] {
-                /// Unsafely constructs a new DMA channel.
-                ///
-                /// # Safety
-                ///
-                /// The caller must ensure that only a single instance is used.
-                pub unsafe fn steal() -> Self {
-                    Self {}
-                }
-            }
-
-            impl DmaChannel for [<Spi $num DmaChannel>] {
-                type Rx = AnySpiDmaRxChannel;
-                type Tx = AnySpiDmaTxChannel;
-
-                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
-                    (AnySpiDmaRxChannel(Self {}.into()), AnySpiDmaTxChannel(Self {}.into()))
-                }
-            }
-
-            impl DmaChannelExt for [<Spi $num DmaChannel>] {
-                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    AnySpiDmaRxChannel(Self {}.into())
-                }
-                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    AnySpiDmaTxChannel(Self {}.into())
-                }
-            }
-
-            impl PdmaChannel for [<Spi $num DmaChannel>] {
-                type RegisterBlock = SpiRegisterBlock;
-
-                fn register_block(&self) -> &SpiRegisterBlock {
-                    unsafe { &*$crate::peripherals::[<SPI $num>]::PTR }
-                }
-                fn tx_waker(&self) -> &'static AtomicWaker {
-                    static WAKER: AtomicWaker = AtomicWaker::new();
-                    &WAKER
-                }
-                fn rx_waker(&self) -> &'static AtomicWaker {
-                    static WAKER: AtomicWaker = AtomicWaker::new();
-                    &WAKER
-                }
-
-                fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-                    peripheral == DmaPeripheral::[<Spi $num>]
-                }
-
-                fn peripheral_interrupt(&self) -> Interrupt {
-                    Interrupt::[< SPI $num _DMA >]
-                }
-
-                fn async_handler(&self) -> InterruptHandler {
-                    super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]
-                }
-                fn rx_async_flag(&self) -> &'static AtomicBool {
-                    static FLAG: AtomicBool = AtomicBool::new(false);
-                    &FLAG
-                }
-                fn tx_async_flag(&self) -> &'static AtomicBool {
-                    static FLAG: AtomicBool = AtomicBool::new(false);
-                    &FLAG
-                }
-            }
-
-            impl DmaChannelConvert<AnySpiDmaChannel> for [<Spi $num DmaChannel>] {
-                fn degrade(self) -> AnySpiDmaChannel {
-                    self.into()
-                }
-            }
-
-            impl DmaChannelConvert<AnySpiDmaRxChannel> for [<Spi $num DmaChannel>] {
-                fn degrade(self) -> AnySpiDmaRxChannel {
-                    AnySpiDmaRxChannel(Self {}.into())
-                }
-            }
-
-            impl DmaChannelConvert<AnySpiDmaTxChannel> for [<Spi $num DmaChannel>] {
-                fn degrade(self) -> AnySpiDmaTxChannel {
-                    AnySpiDmaTxChannel(Self {}.into())
-                }
-            }
-        }
-    };
-}
-
 /// The RX half of an arbitrary I2S DMA channel.
 pub struct AnyI2sDmaRxChannel(AnyI2sDmaChannel);
 
@@ -857,15 +749,16 @@ impl InterruptAccess<DmaRxInterrupt> for AnyI2sDmaRxChannel {
     }
 }
 
-macro_rules! ImplI2sChannel {
-    ($num: literal) => {
+macro_rules! ImplPdmaChannel {
+    ($peri:ident, $num:literal, $int:ident) => {
         paste::paste! {
-            #[doc = concat!("DMA channel suitable for I2S", $num)]
-            pub struct [<I2s $num DmaChannel>] {}
+            #[doc = concat!("DMA channel suitable for ", stringify!([< $peri:upper >]), $num)]
+            #[non_exhaustive]
+            pub struct [<$peri $num DmaChannel>] {}
 
-            impl $crate::private::Sealed for [<I2s $num DmaChannel>] {}
+            impl $crate::private::Sealed for [<$peri $num DmaChannel>] {}
 
-            impl Peripheral for [<I2s $num DmaChannel>] {
+            impl Peripheral for [<$peri $num DmaChannel>] {
                 type P = Self;
 
                 unsafe fn clone_unchecked(&self) -> Self::P {
@@ -873,7 +766,7 @@ macro_rules! ImplI2sChannel {
                 }
             }
 
-            impl [<I2s $num DmaChannel>] {
+            impl [<$peri $num DmaChannel>] {
                 /// Unsafely constructs a new DMA channel.
                 ///
                 /// # Safety
@@ -884,29 +777,29 @@ macro_rules! ImplI2sChannel {
                 }
             }
 
-            impl DmaChannel for [<I2s $num DmaChannel>] {
-                type Rx = AnyI2sDmaRxChannel;
-                type Tx = AnyI2sDmaTxChannel;
+            impl DmaChannel for [<$peri $num DmaChannel>] {
+                type Rx = [<Any $peri DmaRxChannel>];
+                type Tx = [<Any $peri DmaTxChannel>];
 
                 unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
-                    (AnyI2sDmaRxChannel(Self {}.into()), AnyI2sDmaTxChannel(Self {}.into()))
+                    ([<Any $peri DmaRxChannel>](Self {}.into()), [<Any $peri DmaTxChannel>](Self {}.into()))
                 }
             }
 
-            impl DmaChannelExt for [<I2s $num DmaChannel>] {
+            impl DmaChannelExt for [<$peri $num DmaChannel>] {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    AnyI2sDmaRxChannel(Self {}.into())
+                    [<Any $peri DmaRxChannel>](Self {}.into())
                 }
                 fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    AnyI2sDmaTxChannel(Self {}.into())
+                    [<Any $peri DmaTxChannel>](Self {}.into())
                 }
             }
 
-            impl PdmaChannel for [<I2s $num DmaChannel>] {
-                type RegisterBlock = I2sRegisterBlock;
+            impl PdmaChannel for [<$peri $num DmaChannel>] {
+                type RegisterBlock = [<$peri RegisterBlock>];
 
-                fn register_block(&self) -> &I2sRegisterBlock {
-                    unsafe { &*crate::peripherals::[< I2S $num >]::PTR }
+                fn register_block(&self) -> &Self::RegisterBlock {
+                    unsafe { &*crate::peripherals::[< $peri:upper $num >]::PTR }
                 }
                 fn tx_waker(&self) -> &'static AtomicWaker {
                     static WAKER: AtomicWaker = AtomicWaker::new();
@@ -917,15 +810,15 @@ macro_rules! ImplI2sChannel {
                     &WAKER
                 }
                 fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-                    peripheral == DmaPeripheral::[<I2s $num>]
+                    peripheral == DmaPeripheral::[<$peri $num>]
                 }
 
                 fn peripheral_interrupt(&self) -> Interrupt {
-                    Interrupt::[< I2S $num >]
+                    Interrupt::$int
                 }
 
                 fn async_handler(&self) -> InterruptHandler {
-                    super::asynch::interrupt::[< interrupt_handler_i2s $num _dma >]
+                    super::asynch::interrupt::[< interrupt_handler_ $peri:lower $num _dma >]
                 }
                 fn rx_async_flag(&self) -> &'static AtomicBool {
                     static FLAG: AtomicBool = AtomicBool::new(false);
@@ -937,33 +830,33 @@ macro_rules! ImplI2sChannel {
                 }
             }
 
-            impl DmaChannelConvert<AnyI2sDmaChannel> for [<I2s $num DmaChannel>] {
-                fn degrade(self) -> AnyI2sDmaChannel {
+            impl DmaChannelConvert<[<Any $peri DmaChannel>]> for [<$peri $num DmaChannel>] {
+                fn degrade(self) -> [<Any $peri DmaChannel>] {
                     self.into()
                 }
             }
 
-            impl DmaChannelConvert<AnyI2sDmaRxChannel> for [<I2s $num DmaChannel>] {
-                fn degrade(self) -> AnyI2sDmaRxChannel {
-                    AnyI2sDmaRxChannel(Self {}.into())
+            impl DmaChannelConvert<[<Any $peri DmaRxChannel>]> for [<$peri $num DmaChannel>] {
+                fn degrade(self) -> [<Any $peri DmaRxChannel>] {
+                    [<Any $peri DmaRxChannel>](self.into())
                 }
             }
 
-            impl DmaChannelConvert<AnyI2sDmaTxChannel> for [<I2s $num DmaChannel>] {
-                fn degrade(self) -> AnyI2sDmaTxChannel {
-                    AnyI2sDmaTxChannel(Self {}.into())
+            impl DmaChannelConvert<[<Any $peri DmaTxChannel>]> for [<$peri $num DmaChannel>] {
+                fn degrade(self) -> [<Any $peri DmaTxChannel>] {
+                    [<Any $peri DmaTxChannel>](self.into())
                 }
             }
         }
     };
 }
 
-ImplSpiChannel!(2);
-ImplSpiChannel!(3);
+ImplPdmaChannel!(Spi, 2, SPI2_DMA);
+ImplPdmaChannel!(Spi, 3, SPI3_DMA);
 
-ImplI2sChannel!(0);
+ImplPdmaChannel!(I2s, 0, I2S0);
 #[cfg(i2s1)]
-ImplI2sChannel!(1);
+ImplPdmaChannel!(I2s, 1, I2S1);
 
 // Specific peripherals use specific channels. Note that this may be overly
 // restrictive (ESP32 allows configuring 2 SPI DMA channels between 3 different
