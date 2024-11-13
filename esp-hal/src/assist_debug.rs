@@ -136,7 +136,7 @@ impl DebugAssist<'_> {
     }
 
     /// Get SP monitoring PC value on main core.
-    pub fn get_sp_monitor_pc(&self) -> u32 {
+    pub fn sp_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_0_sp_pc()
             .read()
@@ -219,7 +219,7 @@ impl<'d> DebugAssist<'d> {
     }
 
     /// Get SP monitoring PC value on secondary core.
-    pub fn get_core1_sp_monitor_pc(&self) -> u32 {
+    pub fn core1_sp_monitor_pc(&self) -> u32 {
         self.debug_assist.core_1_sp_pc.read().core_1_sp_pc().bits()
     }
 }
@@ -382,7 +382,7 @@ impl DebugAssist<'_> {
     }
 
     /// Get region monitoring PC value on main core.
-    pub fn get_region_monitor_pc(&self) -> u32 {
+    pub fn region_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_0_area_pc()
             .read()
@@ -548,7 +548,7 @@ impl<'d> DebugAssist<'d> {
     }
 
     /// Get region monitoring PC value on secondary core.
-    pub fn get_core1_region_monitor_pc(&self) -> u32 {
+    pub fn core1_region_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_1_area_pc()
             .read()

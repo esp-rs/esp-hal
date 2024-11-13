@@ -31,7 +31,7 @@ fn main() -> ! {
 
     ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 
-    let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
+    let mut lstimer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
 
     lstimer0
         .configure(timer::config::Config {
@@ -41,7 +41,7 @@ fn main() -> ! {
         })
         .unwrap();
 
-    let mut channel0 = ledc.get_channel(channel::Number::Channel0, led);
+    let mut channel0 = ledc.channel(channel::Number::Channel0, led);
     channel0
         .configure(channel::config::Config {
             timer: &lstimer0,

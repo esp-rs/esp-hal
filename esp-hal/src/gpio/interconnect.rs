@@ -268,7 +268,7 @@ impl InputSignal {
     }
 
     /// Returns the current signal level.
-    pub fn get_level(&self) -> Level {
+    pub fn level(&self) -> Level {
         self.is_input_high(private::Internal).into()
     }
 

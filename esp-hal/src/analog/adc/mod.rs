@@ -235,17 +235,17 @@ trait AdcCalEfuse {
     /// Get ADC calibration init code
     ///
     /// Returns digital value for zero voltage for a given attenuation
-    fn get_init_code(atten: Attenuation) -> Option<u16>;
+    fn init_code(atten: Attenuation) -> Option<u16>;
 
     /// Get ADC calibration reference point voltage
     ///
     /// Returns reference voltage (millivolts) for a given attenuation
-    fn get_cal_mv(atten: Attenuation) -> u16;
+    fn cal_mv(atten: Attenuation) -> u16;
 
     /// Get ADC calibration reference point digital value
     ///
     /// Returns digital value for reference voltage for a given attenuation
-    fn get_cal_code(atten: Attenuation) -> Option<u16>;
+    fn cal_code(atten: Attenuation) -> Option<u16>;
 }
 
 macro_rules! impl_adc_interface {

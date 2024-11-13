@@ -114,7 +114,7 @@ fn main() -> ! {
 
     controller.start().unwrap();
     println!("is wifi started: {:?}", controller.is_started());
-    println!("{:?}", controller.get_capabilities());
+    println!("{:?}", controller.capabilities());
     println!("wifi_connect {:?}", controller.connect());
 
     // wait to get connected

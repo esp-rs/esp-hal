@@ -1,7 +1,7 @@
 use crate::{
     compat::timer_compat::TIMERS,
     preempt::arch_specific::task_create,
-    timer::{get_systimer_count, yield_task},
+    timer::{systimer_count, yield_task},
 };
 
 /// Initializes the `main` and `timer` tasks for the Wi-Fi driver.
@@ -17,7 +17,7 @@ pub(crate) fn init_tasks() {
 /// events.
 pub(crate) extern "C" fn timer_task(_param: *mut esp_wifi_sys::c_types::c_void) {
     loop {
-        let current_timestamp = get_systimer_count();
+        let current_timestamp = systimer_count();
         let to_run = critical_section::with(|cs| unsafe {
             let mut timers = TIMERS.borrow_ref_mut(cs);
             let to_run = timers.find_next_due(current_timestamp);

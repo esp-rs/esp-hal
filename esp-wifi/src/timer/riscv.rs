@@ -95,7 +95,7 @@ pub(crate) fn yield_task() {
 
 /// Current systimer count value
 /// A tick is 1 / 1_000_000 seconds
-pub(crate) fn get_systimer_count() -> u64 {
+pub(crate) fn systimer_count() -> u64 {
     esp_hal::time::now().ticks()
 }
 

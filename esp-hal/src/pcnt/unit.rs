@@ -243,7 +243,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     }
 
     /// Get the latest events for this unit.
-    pub fn get_events(&self) -> Events {
+    pub fn events(&self) -> Events {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let status = pcnt.u_status(NUM).read();
 
@@ -257,7 +257,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     }
 
     /// Get the mode of the last zero crossing
-    pub fn get_zero_mode(&self) -> ZeroMode {
+    pub fn zero_mode(&self) -> ZeroMode {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         pcnt.u_status(NUM).read().zero_mode().bits().into()
     }
@@ -296,7 +296,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     }
 
     /// Get the current counter value.
-    pub fn get_value(&self) -> i16 {
+    pub fn value(&self) -> i16 {
         self.counter.get()
     }
 }

@@ -109,7 +109,7 @@ fn main() -> ! {
         }
     }
 
-    println!("{:?}", controller.get_capabilities());
+    println!("{:?}", controller.capabilities());
     println!("wifi_connect {:?}", controller.connect());
 
     // wait to get connected

@@ -363,7 +363,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
     /// Get the old timestamp.
     /// The value of the timestamp will take effect according to the set
     /// [`PwmUpdateMethod`].
-    pub fn get_timestamp(&self) -> u16 {
+    pub fn timestamp(&self) -> u16 {
         // SAFETY:
         // We only read to our GENx_TSTMP_x register
         let ch = unsafe { Self::ch() };
@@ -384,7 +384,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
     }
 
     /// Get the period of the timer.
-    pub fn get_period(&self) -> u16 {
+    pub fn period(&self) -> u16 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
         let block = unsafe { &*PWM::block() };
@@ -430,12 +430,12 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal_02::PwmPin
 
     /// Get the duty of the pin
     fn get_duty(&self) -> Self::Duty {
-        self.get_timestamp()
+        self.timestamp()
     }
 
     /// Get the max duty of the pin
     fn get_max_duty(&self) -> Self::Duty {
-        self.get_period()
+        self.period()
     }
 
     /// Set the duty of the pin
@@ -457,7 +457,7 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 {
     /// Get the max duty of the PwmPin
     fn max_duty_cycle(&self) -> u16 {
-        self.get_period()
+        self.period()
     }
 
     /// Set the max duty of the PwmPin

@@ -45,7 +45,7 @@ fn main() -> ! {
     let wifi = peripherals.WIFI;
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&init, wifi).unwrap();
 
-    println!("esp-now version {}", esp_now.get_version().unwrap());
+    println!("esp-now version {}", esp_now.version().unwrap());
 
     let mut next_send_time = time::now() + Duration::secs(5);
     loop {

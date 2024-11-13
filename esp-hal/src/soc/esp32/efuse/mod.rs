@@ -82,7 +82,7 @@ impl Efuse {
     /// While ESP32 chips usually come with two mostly equivalent CPUs (protocol
     /// CPU and application CPU), the application CPU is unavailable on
     /// some.
-    pub fn get_core_count() -> u32 {
+    pub fn core_count() -> u32 {
         if Self::read_bit(DISABLE_APP_CPU) {
             1
         } else {
@@ -94,7 +94,7 @@ impl Efuse {
     ///
     /// Note that the actual clock may be lower, depending on the current power
     /// configuration of the chip, clock source, and other settings.
-    pub fn get_max_cpu_frequency() -> HertzU32 {
+    pub fn max_cpu_frequency() -> HertzU32 {
         let has_rating = Self::read_bit(CHIP_CPU_FREQ_RATED);
         let has_low_rating = Self::read_bit(CHIP_CPU_FREQ_LOW);
 
@@ -111,7 +111,7 @@ impl Efuse {
     }
 
     /// Returns the CHIP_VER_PKG eFuse value.
-    pub fn get_chip_type() -> ChipType {
+    pub fn chip_type() -> ChipType {
         let chip_ver = Self::read_field_le::<u8>(CHIP_PACKAGE)
             | Self::read_field_le::<u8>(CHIP_PACKAGE_4BIT) << 4;
 
@@ -127,7 +127,7 @@ impl Efuse {
     }
 
     /// Get status of SPI boot encryption.
-    pub fn get_flash_encryption() -> bool {
+    pub fn flash_encryption() -> bool {
         (Self::read_field_le::<u8>(FLASH_CRYPT_CNT).count_ones() % 2) != 0
     }
 }

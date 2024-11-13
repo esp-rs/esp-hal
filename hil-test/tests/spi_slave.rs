@@ -69,7 +69,7 @@ impl BitbangSpi {
         self.mosi.set_level(Level::from(bit));
         self.sclk.set_level(Level::High);
 
-        let miso = self.miso.get_level().into();
+        let miso = self.miso.level().into();
         self.sclk.set_level(Level::Low);
 
         miso

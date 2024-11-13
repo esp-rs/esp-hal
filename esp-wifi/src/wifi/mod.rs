@@ -1465,14 +1465,14 @@ static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
 };
 
 /// Get the STA MAC address
-pub fn get_sta_mac(mac: &mut [u8; 6]) {
+pub fn sta_mac(mac: &mut [u8; 6]) {
     unsafe {
         read_mac(mac as *mut u8, 0);
     }
 }
 
 /// Get the AP MAC address
-pub fn get_ap_mac(mac: &mut [u8; 6]) {
+pub fn ap_mac(mac: &mut [u8; 6]) {
     unsafe {
         read_mac(mac as *mut u8, 1);
     }
@@ -1984,7 +1984,7 @@ mod sealed {
         }
 
         fn link_state(self) -> embassy_net_driver::LinkState {
-            if matches!(get_sta_state(), WifiState::StaConnected) {
+            if matches!(sta_state(), WifiState::StaConnected) {
                 embassy_net_driver::LinkState::Up
             } else {
                 embassy_net_driver::LinkState::Down
@@ -2020,7 +2020,7 @@ mod sealed {
         }
 
         fn link_state(self) -> embassy_net_driver::LinkState {
-            if matches!(get_ap_state(), WifiState::ApStarted) {
+            if matches!(ap_state(), WifiState::ApStarted) {
                 embassy_net_driver::LinkState::Up
             } else {
                 embassy_net_driver::LinkState::Down
@@ -2052,7 +2052,7 @@ impl WifiDeviceMode for WifiStaDevice {
 
     fn mac_address(self) -> [u8; 6] {
         let mut mac = [0; 6];
-        get_sta_mac(&mut mac);
+        sta_mac(&mut mac);
         mac
     }
 }
@@ -2069,7 +2069,7 @@ impl WifiDeviceMode for WifiApDevice {
 
     fn mac_address(self) -> [u8; 6] {
         let mut mac = [0; 6];
-        get_ap_mac(&mut mac);
+        ap_mac(&mut mac);
         mac
     }
 }
@@ -2986,7 +2986,7 @@ fn apply_sta_eap_config(config: &EapClientConfiguration) -> Result<(), WifiError
 
 impl WifiController<'_> {
     /// Get the supported capabilities of the controller.
-    pub fn get_capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
+    pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
         let caps = match self.config {
             Configuration::None => unreachable!(),
             Configuration::Client(_) => enumset::enum_set! { Capability::Client },
@@ -3001,7 +3001,7 @@ impl WifiController<'_> {
     }
 
     /// Get the currently used configuration.
-    pub fn get_configuration(&self) -> Result<Configuration, WifiError> {
+    pub fn configuration(&self) -> Result<Configuration, WifiError> {
         Ok(self.config.clone())
     }
 
@@ -3071,12 +3071,12 @@ impl WifiController<'_> {
     /// WiFi has started successfully.
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
-            crate::wifi::get_sta_state(),
+            crate::wifi::sta_state(),
             WifiState::StaStarted | WifiState::StaConnected | WifiState::StaDisconnected
         ) {
             return Ok(true);
         }
-        if matches!(crate::wifi::get_ap_state(), WifiState::ApStarted) {
+        if matches!(crate::wifi::ap_state(), WifiState::ApStarted) {
             return Ok(true);
         }
         Ok(false)
@@ -3087,7 +3087,7 @@ impl WifiController<'_> {
     /// This function should be called after the `connect` method to verify if
     /// the connection was successful.
     pub fn is_connected(&self) -> Result<bool, WifiError> {
-        match crate::wifi::get_sta_state() {
+        match crate::wifi::sta_state() {
             crate::wifi::WifiState::StaConnected => Ok(true),
             crate::wifi::WifiState::StaDisconnected => Err(WifiError::Disconnected),
             // FIXME: Should any other enum value trigger an error instead of returning false?

@@ -343,13 +343,13 @@ pub trait Pin: Sealed {
     /// Enable/disable sleep-mode
     #[doc(hidden)]
     fn sleep_mode(&mut self, on: bool, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| w.slp_sel().bit(on));
+        io_mux_reg(self.number()).modify(|_, w| w.slp_sel().bit(on));
     }
 
     /// Configure the alternate function
     #[doc(hidden)]
     fn set_alternate_function(&mut self, alternate: AlternateFunction, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| unsafe { w.mcu_sel().bits(alternate as u8) });
+        io_mux_reg(self.number()).modify(|_, w| unsafe { w.mcu_sel().bits(alternate as u8) });
     }
 
     /// Enable or disable the GPIO pin output buffer.
@@ -362,7 +362,7 @@ pub trait Pin: Sealed {
     /// Enable input for the pin
     #[doc(hidden)]
     fn enable_input(&mut self, on: bool, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| w.fun_ie().bit(on));
+        io_mux_reg(self.number()).modify(|_, w| w.fun_ie().bit(on));
     }
 
     #[doc(hidden)]
@@ -382,7 +382,7 @@ pub trait Pin: Sealed {
         #[cfg(esp32)]
         crate::soc::gpio::errata36(self.degrade_pin(private::Internal), pull_up, pull_down);
 
-        get_io_mux_reg(self.number()).modify(|_, w| {
+        io_mux_reg(self.number()).modify(|_, w| {
             w.fun_wpd().bit(pull_down);
             w.fun_wpu().bit(pull_up)
         });
@@ -399,7 +399,7 @@ pub trait InputPin: Pin + Into<AnyPin> + 'static {
         #[cfg(usb_device)]
         disable_usb_pads(self.number());
 
-        get_io_mux_reg(self.number()).modify(|_, w| unsafe {
+        io_mux_reg(self.number()).modify(|_, w| unsafe {
             w.mcu_sel().bits(GPIO_FUNCTION as u8);
             w.fun_ie().set_bit();
             w.slp_sel().clear_bit()
@@ -437,7 +437,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
         #[cfg(any(esp32c3, esp32s3))]
         disable_usb_pads(self.number());
 
-        get_io_mux_reg(self.number()).modify(|_, w| unsafe {
+        io_mux_reg(self.number()).modify(|_, w| unsafe {
             w.mcu_sel().bits(alternate as u8);
             if let Some(input_enable) = input_enable {
                 w.fun_ie().bit(input_enable);
@@ -469,7 +469,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     /// Configure the [DriveStrength] of the pin
     #[doc(hidden)]
     fn set_drive_strength(&mut self, strength: DriveStrength, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| unsafe { w.fun_drv().bits(strength as u8) });
+        io_mux_reg(self.number()).modify(|_, w| unsafe { w.fun_drv().bits(strength as u8) });
     }
 
     /// Enable/disable open-drain mode
@@ -483,13 +483,13 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     /// Configure internal pull-up resistor in sleep mode
     #[doc(hidden)]
     fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| w.mcu_wpu().bit(on));
+        io_mux_reg(self.number()).modify(|_, w| w.mcu_wpu().bit(on));
     }
 
     /// Configure internal pull-down resistor in sleep mode
     #[doc(hidden)]
     fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-        get_io_mux_reg(self.number()).modify(|_, w| w.mcu_wpd().bit(on));
+        io_mux_reg(self.number()).modify(|_, w| w.mcu_wpd().bit(on));
     }
 
     /// Is the output set to high
@@ -514,11 +514,11 @@ pub trait TouchPin: Pin {
 
     /// Reads the pin's touch measurement register
     #[doc(hidden)]
-    fn get_touch_measurement(&self, _: private::Internal) -> u16;
+    fn touch_measurement(&self, _: private::Internal) -> u16;
 
     /// Maps the pin nr to the touch pad nr
     #[doc(hidden)]
-    fn get_touch_nr(&self, _: private::Internal) -> u8;
+    fn touch_nr(&self, _: private::Internal) -> u8;
 
     /// Set a pins touch threshold for interrupts.
     #[doc(hidden)]
@@ -929,7 +929,7 @@ macro_rules! io_type {
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::GPIO;
 
-                $crate::gpio::get_io_mux_reg($gpionum).modify(|_, w| unsafe {
+                $crate::gpio::io_mux_reg($gpionum).modify(|_, w| unsafe {
                     w.mcu_sel().bits(1);
                     w.fun_ie().clear_bit();
                     w.fun_wpu().clear_bit();
@@ -1195,19 +1195,19 @@ where
     /// Is the output pin set as high?
     #[inline]
     pub fn is_set_high(&self) -> bool {
-        self.get_output_level() == Level::High
+        self.output_level() == Level::High
     }
 
     /// Is the output pin set as low?
     #[inline]
     pub fn is_set_low(&self) -> bool {
-        self.get_output_level() == Level::Low
+        self.output_level() == Level::Low
     }
 
     /// What level output is set to
     #[inline]
-    pub fn get_output_level(&self) -> Level {
-        self.pin.get_output_level()
+    pub fn output_level(&self) -> Level {
+        self.pin.output_level()
     }
 
     /// Toggle pin output
@@ -1273,19 +1273,19 @@ where
     /// Get whether the pin input level is high.
     #[inline]
     pub fn is_high(&self) -> bool {
-        self.get_level() == Level::High
+        self.level() == Level::High
     }
 
     /// Get whether the pin input level is low.
     #[inline]
     pub fn is_low(&self) -> bool {
-        self.get_level() == Level::Low
+        self.level() == Level::Low
     }
 
     /// Get the current pin input level.
     #[inline]
-    pub fn get_level(&self) -> Level {
-        self.pin.get_level()
+    pub fn level(&self) -> Level {
+        self.pin.level()
     }
 
     /// Listen for interrupts
@@ -1417,19 +1417,19 @@ where
     /// Get whether the pin input level is high.
     #[inline]
     pub fn is_high(&self) -> bool {
-        self.get_level() == Level::High
+        self.level() == Level::High
     }
 
     /// Get whether the pin input level is low.
     #[inline]
     pub fn is_low(&self) -> bool {
-        self.get_level() == Level::Low
+        self.level() == Level::Low
     }
 
     /// Get the current pin input level.
     #[inline]
-    pub fn get_level(&self) -> Level {
-        self.pin.get_level()
+    pub fn level(&self) -> Level {
+        self.pin.level()
     }
 
     /// Listen for interrupts
@@ -1465,19 +1465,19 @@ where
     /// Is the output pin set as high?
     #[inline]
     pub fn is_set_high(&self) -> bool {
-        self.get_output_level() == Level::High
+        self.output_level() == Level::High
     }
 
     /// Is the output pin set as low?
     #[inline]
     pub fn is_set_low(&self) -> bool {
-        self.get_output_level() == Level::Low
+        self.output_level() == Level::Low
     }
 
     /// What level output is set to
     #[inline]
-    pub fn get_output_level(&self) -> Level {
-        self.pin.get_output_level()
+    pub fn output_level(&self) -> Level {
+        self.pin.output_level()
     }
 
     /// Toggle pin output
@@ -1552,18 +1552,18 @@ where
     /// Get whether the pin input level is high.
     #[inline]
     pub fn is_high(&self) -> bool {
-        self.get_level() == Level::High
+        self.level() == Level::High
     }
 
     /// Get whether the pin input level is low.
     #[inline]
     pub fn is_low(&self) -> bool {
-        self.get_level() == Level::Low
+        self.level() == Level::Low
     }
 
     /// Get the current pin input level.
     #[inline]
-    pub fn get_level(&self) -> Level {
+    pub fn level(&self) -> Level {
         self.pin.is_input_high(private::Internal).into()
     }
 
@@ -1659,25 +1659,25 @@ where
     /// Is the output pin set as high?
     #[inline]
     pub fn is_set_high(&self) -> bool {
-        self.get_output_level() == Level::High
+        self.output_level() == Level::High
     }
 
     /// Is the output pin set as low?
     #[inline]
     pub fn is_set_low(&self) -> bool {
-        self.get_output_level() == Level::Low
+        self.output_level() == Level::Low
     }
 
     /// What level output is set to
     #[inline]
-    pub fn get_output_level(&self) -> Level {
+    pub fn output_level(&self) -> Level {
         self.pin.is_set_high(private::Internal).into()
     }
 
     /// Toggle pin output
     #[inline]
     pub fn toggle(&mut self) {
-        let level = !self.get_output_level();
+        let level = !self.output_level();
         self.set_level(level);
     }
 

@@ -454,7 +454,7 @@ pub trait Comparator {
 
     /// Get the current mode of the comparator, which is either target or
     /// periodic.
-    fn get_mode(&self) -> ComparatorMode {
+    fn mode(&self) -> ComparatorMode {
         let tconf = unsafe {
             let systimer = &*SYSTIMER::ptr();
             systimer.target_conf(self.channel() as usize)
@@ -497,7 +497,7 @@ pub trait Comparator {
     }
 
     /// Get the actual target value of the comparator.
-    fn get_actual_target(&self) -> u64 {
+    fn actual_target(&self) -> u64 {
         let target = unsafe {
             let systimer = &*SYSTIMER::ptr();
             systimer.trgt(self.channel() as usize)
@@ -871,7 +871,7 @@ where
     }
 
     fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
-        let mode = self.comparator.get_mode();
+        let mode = self.comparator.mode();
 
         let us = value.ticks();
         let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000);

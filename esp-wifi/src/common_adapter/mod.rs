@@ -137,7 +137,7 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
 pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int {
     trace!("read_mac {:?} {}", mac, type_);
 
-    let base_mac = crate::hal::efuse::Efuse::get_mac_address();
+    let base_mac = crate::hal::efuse::Efuse::mac_address();
 
     for (i, &byte) in base_mac.iter().enumerate() {
         mac.add(i).write_volatile(byte);

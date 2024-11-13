@@ -304,7 +304,7 @@ pub(crate) mod utils {
 
     #[ram]
     pub(crate) fn psram_init(config: &PsramConfig) {
-        let chip = crate::efuse::Efuse::get_chip_type();
+        let chip = crate::efuse::Efuse::chip_type();
 
         let mode = config.cache_speed;
         let mut psram_io = PsramIo::default();
@@ -1061,7 +1061,7 @@ pub(crate) mod utils {
 
             fn configure_gpio(gpio: u8, field: Field, bits: u8) {
                 unsafe {
-                    let ptr = crate::gpio::get_io_mux_reg(gpio);
+                    let ptr = crate::gpio::io_mux_reg(gpio);
                     ptr.modify(|_, w| apply_to_field!(w, field, bits));
                 }
             }

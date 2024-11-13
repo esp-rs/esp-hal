@@ -55,19 +55,19 @@ impl Efuse {
     }
 
     /// Get status of SPI boot encryption.
-    pub fn get_flash_encryption() -> bool {
+    pub fn flash_encryption() -> bool {
         (Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT).count_ones() % 2) != 0
     }
 
     /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
-    pub fn get_rwdt_multiplier() -> u8 {
+    pub fn rwdt_multiplier() -> u8 {
         Self::read_field_le::<u8>(WDT_DELAY_SEL)
     }
 
     /// Get efuse block version
     ///
     /// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
-    pub fn get_block_version() -> (u8, u8) {
+    pub fn block_version() -> (u8, u8) {
         // see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/esp32c3/include/hal/efuse_ll.h#L70-L78>
         // <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_table.csv#L163>
         // <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_table.csv#L173>
@@ -80,8 +80,8 @@ impl Efuse {
     /// Get version of RTC calibration block
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_rtc_calib.c#L12>
-    pub fn get_rtc_calib_version() -> u8 {
-        let (major, _minor) = Self::get_block_version();
+    pub fn rtc_calib_version() -> u8 {
+        let (major, _minor) = Self::block_version();
         if major == 1 {
             1
         } else {
@@ -92,8 +92,8 @@ impl Efuse {
     /// Get ADC initial code for specified attenuation from efuse
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_rtc_calib.c#L25>
-    pub fn get_rtc_calib_init_code(_unit: u8, atten: Attenuation) -> Option<u16> {
-        let version = Self::get_rtc_calib_version();
+    pub fn rtc_calib_init_code(_unit: u8, atten: Attenuation) -> Option<u16> {
+        let version = Self::rtc_calib_version();
 
         if version != 1 {
             return None;
@@ -113,7 +113,7 @@ impl Efuse {
     /// Get ADC reference point voltage for specified attenuation in millivolts
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_rtc_calib.c#L49>
-    pub fn get_rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
+    pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
         match atten {
             Attenuation::Attenuation0dB => 400,
             Attenuation::Attenuation2p5dB => 550,
@@ -125,8 +125,8 @@ impl Efuse {
     /// Get ADC reference point digital code for specified attenuation
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_rtc_calib.c#L49>
-    pub fn get_rtc_calib_cal_code(_unit: u8, atten: Attenuation) -> Option<u16> {
-        let version = Self::get_rtc_calib_version();
+    pub fn rtc_calib_cal_code(_unit: u8, atten: Attenuation) -> Option<u16> {
+        let version = Self::rtc_calib_version();
 
         if version != 1 {
             return None;

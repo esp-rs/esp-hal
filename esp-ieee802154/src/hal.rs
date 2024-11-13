@@ -255,7 +255,7 @@ pub(crate) fn set_freq(freq: u8) {
 }
 
 #[inline(always)]
-pub(crate) fn get_freq() -> u8 {
+pub(crate) fn freq() -> u8 {
     unsafe { &*IEEE802154::PTR }.channel().read().hop().bits()
 }
 
@@ -344,7 +344,7 @@ pub(crate) fn set_tx_auto_ack(enable: bool) {
 }
 
 #[inline(always)]
-pub(crate) fn get_tx_auto_ack() -> bool {
+pub(crate) fn tx_auto_ack() -> bool {
     unsafe { &*IEEE802154::PTR }
         .ctrl_cfg()
         .read()
@@ -367,7 +367,7 @@ pub(crate) fn set_tx_enhance_ack(enable: bool) {
 }
 
 #[inline(always)]
-pub(crate) fn get_tx_enhance_ack() -> bool {
+pub(crate) fn tx_enhance_ack() -> bool {
     unsafe { &*IEEE802154::PTR }
         .ctrl_cfg()
         .read()
@@ -397,7 +397,7 @@ pub(crate) fn set_pending_mode(enable: bool) {
 }
 
 #[inline(always)]
-pub(crate) fn get_events() -> u16 {
+pub(crate) fn events() -> u16 {
     unsafe { &*IEEE802154::PTR }.event_status().read().bits() as u16
 }
 

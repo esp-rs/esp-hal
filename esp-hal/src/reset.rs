@@ -102,11 +102,11 @@ pub fn software_reset_cpu() {
 
 /// Retrieves the reason for the last reset as a SocResetReason enum value.
 /// Returns `None` if the reset reason cannot be determined.
-pub fn get_reset_reason() -> Option<SocResetReason> {
-    crate::rtc_cntl::get_reset_reason(crate::get_core())
+pub fn reset_reason() -> Option<SocResetReason> {
+    crate::rtc_cntl::reset_reason(crate::core())
 }
 
 /// Retrieves the cause of the last wakeup event as a SleepSource enum value.
-pub fn get_wakeup_cause() -> SleepSource {
-    crate::rtc_cntl::get_wakeup_cause()
+pub fn wakeup_cause() -> SleepSource {
+    crate::rtc_cntl::wakeup_cause()
 }

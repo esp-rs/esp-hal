@@ -170,7 +170,7 @@ pub struct LpUart {
 impl LpUart {
     /// Read a single byte from the UART in a non-blocking manner.
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        if self.get_rx_fifo_count() > 0 {
+        if self.rx_fifo_count() > 0 {
             let byte = self.uart.fifo().read().rxfifo_rd_byte().bits();
             Ok(byte)
         } else {
@@ -180,7 +180,7 @@ impl LpUart {
 
     /// Write a single byte to the UART in a non-blocking manner.
     pub fn write_byte(&mut self, byte: u8) -> nb::Result<(), Error> {
-        if self.get_tx_fifo_count() < UART_FIFO_SIZE {
+        if self.tx_fifo_count() < UART_FIFO_SIZE {
             self.uart
                 .fifo()
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(byte) });
@@ -210,11 +210,11 @@ impl LpUart {
         }
     }
 
-    fn get_rx_fifo_count(&mut self) -> u16 {
+    fn rx_fifo_count(&mut self) -> u16 {
         self.uart.status().read().rxfifo_cnt().bits().into()
     }
 
-    fn get_tx_fifo_count(&mut self) -> u16 {
+    fn tx_fifo_count(&mut self) -> u16 {
         self.uart.status().read().txfifo_cnt().bits().into()
     }
 
@@ -288,12 +288,12 @@ impl embedded_io::Read for LpUart {
             return Ok(0);
         }
 
-        while self.get_rx_fifo_count() == 0 {
+        while self.rx_fifo_count() == 0 {
             // Block until we have received at least one byte
         }
 
         let mut count = 0;
-        while self.get_rx_fifo_count() > 0 && count < buf.len() {
+        while self.rx_fifo_count() > 0 && count < buf.len() {
             buf[count] = self.uart.fifo().read().rxfifo_rd_byte().bits();
             count += 1;
         }
@@ -305,7 +305,7 @@ impl embedded_io::Read for LpUart {
 #[cfg(feature = "embedded-io")]
 impl embedded_io::ReadReady for LpUart {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.get_rx_fifo_count() > 0)
+        Ok(self.rx_fifo_count() > 0)
     }
 }
 

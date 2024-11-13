@@ -143,15 +143,15 @@ fn execute_write(
         unit0.clear();
         unit1.clear();
         (spi, dma_tx_buf) = transfer_write(spi, dma_tx_buf, write, command_data_mode);
-        assert_eq!(unit0.get_value() + unit1.get_value(), 8);
+        assert_eq!(unit0.value() + unit1.value(), 8);
 
         if data_on_multiple_pins {
             if command_data_mode == SpiDataMode::Single {
-                assert_eq!(unit0.get_value(), 1);
-                assert_eq!(unit1.get_value(), 7);
+                assert_eq!(unit0.value(), 1);
+                assert_eq!(unit1.value(), 7);
             } else {
-                assert_eq!(unit0.get_value(), 0);
-                assert_eq!(unit1.get_value(), 8);
+                assert_eq!(unit0.value(), 0);
+                assert_eq!(unit1.value(), 8);
             }
         }
 
@@ -161,15 +161,15 @@ fn execute_write(
         unit0.clear();
         unit1.clear();
         (spi, dma_tx_buf) = transfer_write(spi, dma_tx_buf, write, command_data_mode);
-        assert_eq!(unit0.get_value() + unit1.get_value(), 4);
+        assert_eq!(unit0.value() + unit1.value(), 4);
 
         if data_on_multiple_pins {
             if command_data_mode == SpiDataMode::Single {
-                assert_eq!(unit0.get_value(), 1);
-                assert_eq!(unit1.get_value(), 3);
+                assert_eq!(unit0.value(), 1);
+                assert_eq!(unit1.value(), 3);
             } else {
-                assert_eq!(unit0.get_value(), 0);
-                assert_eq!(unit1.get_value(), 4);
+                assert_eq!(unit0.value(), 0);
+                assert_eq!(unit1.value(), 4);
             }
         }
     }

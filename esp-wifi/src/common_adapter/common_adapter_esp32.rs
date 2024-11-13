@@ -209,8 +209,9 @@ unsafe extern "C" fn phy_exit_critical(level: u32) {
 #[ram]
 #[no_mangle]
 unsafe extern "C" fn rtc_get_xtal() -> u32 {
-    use crate::hal::clock::Clock;
-    let xtal = crate::hal::rtc_cntl::RtcClock::get_xtal_freq();
+    use esp_hal::clock::Clock;
+
+    let xtal = crate::hal::rtc_cntl::RtcClock::xtal_freq();
     xtal.mhz()
 }
 

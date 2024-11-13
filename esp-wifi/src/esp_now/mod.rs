@@ -352,7 +352,7 @@ impl EspNowManager<'_> {
     }
 
     /// Get the version of ESP-NOW.
-    pub fn get_version(&self) -> Result<u32, EspNowError> {
+    pub fn version(&self) -> Result<u32, EspNowError> {
         let mut version = 0u32;
         check_error!({ esp_now_get_version(&mut version as *mut u32) })?;
         Ok(version)
@@ -404,7 +404,7 @@ impl EspNowManager<'_> {
     }
 
     /// Get peer by MAC address.
-    pub fn get_peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
+    pub fn peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
         let mut raw_peer = esp_now_peer_info_t {
             peer_addr: [0u8; 6],
             lmk: [0u8; 16],
@@ -744,8 +744,8 @@ impl<'d> EspNow<'d> {
     }
 
     /// Get the version of ESP-NOW.
-    pub fn get_version(&self) -> Result<u32, EspNowError> {
-        self.manager.get_version()
+    pub fn version(&self) -> Result<u32, EspNowError> {
+        self.manager.version()
     }
 
     /// Add a peer to the list of known peers.
@@ -764,8 +764,8 @@ impl<'d> EspNow<'d> {
     }
 
     /// Get peer by MAC address.
-    pub fn get_peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
-        self.manager.get_peer(peer_address)
+    pub fn peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
+        self.manager.peer(peer_address)
     }
 
     /// Fetch a peer from peer list.

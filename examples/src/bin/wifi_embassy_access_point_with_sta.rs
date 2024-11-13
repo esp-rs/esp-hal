@@ -312,14 +312,14 @@ async fn main(spawner: Spawner) -> ! {
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
-    println!("Device capabilities: {:?}", controller.get_capabilities());
+    println!("Device capabilities: {:?}", controller.capabilities());
 
     println!("Starting wifi");
     controller.start_async().await.unwrap();
     println!("Wifi started!");
 
     loop {
-        match esp_wifi::wifi::get_ap_state() {
+        match esp_wifi::wifi::ap_state() {
             WifiState::ApStarted => {
                 println!("About to connect...");
 

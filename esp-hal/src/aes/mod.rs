@@ -166,7 +166,7 @@ impl<'d> Aes<'d> {
         self.set_block(block);
         self.start();
         while !(self.is_idle()) {}
-        self.get_block(block);
+        self.block(block);
     }
 
     fn set_mode(&mut self, mode: u8) {
@@ -181,7 +181,7 @@ impl<'d> Aes<'d> {
         self.write_block(block);
     }
 
-    fn get_block(&self, block: &mut [u8; 16]) {
+    fn block(&self, block: &mut [u8; 16]) {
         self.read_block(block);
     }
 

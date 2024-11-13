@@ -91,7 +91,7 @@ fn interrupt_handler() {
         let mut u0 = UNIT0.borrow_ref_mut(cs);
         let u0 = u0.as_mut().unwrap();
         if u0.interrupt_is_set() {
-            let events = u0.get_events();
+            let events = u0.events();
             if events.high_limit {
                 VALUE.fetch_add(100, Ordering::SeqCst);
             } else if events.low_limit {

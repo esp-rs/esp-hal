@@ -145,7 +145,7 @@ pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bo
 }
 
 pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
-    let systick = crate::timer::get_systimer_count();
+    let systick = crate::timer::systimer_count();
     let ticks = crate::timer::micros_to_ticks(us as u64);
 
     trace!(

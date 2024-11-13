@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 
 use embassy_executor::{raw, Spawner};
-use esp_hal::{get_core, Cpu};
+use esp_hal::{core, Cpu};
 #[cfg(multi_core)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, macros::handler};
 #[cfg(low_power_wait)]
@@ -35,7 +35,7 @@ pub(crate) fn pend_thread_mode(_core: usize) {
         // If we are pending a task on the current core, we're done. Otherwise, we
         // need to make sure the other core wakes up.
         #[cfg(multi_core)]
-        if _core != get_core() as usize {
+        if _core != core() as usize {
             // We need to clear the interrupt from software. We don't actually
             // need it to trigger and run the interrupt handler, we just need to
             // kick waiti to return.
@@ -74,7 +74,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         }
 
         Self {
-            inner: raw::Executor::new((THREAD_MODE_CONTEXT + get_core() as usize) as *mut ()),
+            inner: raw::Executor::new((THREAD_MODE_CONTEXT + core() as usize) as *mut ()),
             not_send: PhantomData,
         }
     }
@@ -103,7 +103,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         init(self.inner.spawner());
 
         #[cfg(low_power_wait)]
-        let cpu = get_core() as usize;
+        let cpu = core() as usize;
 
         loop {
             unsafe { self.inner.poll() };

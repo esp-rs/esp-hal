@@ -394,7 +394,7 @@ impl<P: TouchPin, TOUCHMODE: TouchMode, MODE: Mode> TouchPad<P, TOUCHMODE, MODE>
             .touch_meas_done()
             .bit_is_set()
         {
-            Some(self.pin.get_touch_measurement(Internal))
+            Some(self.pin.touch_measurement(Internal))
         } else {
             None
         }
@@ -420,7 +420,7 @@ impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
             .touch_meas_done()
             .bit_is_clear()
         {}
-        self.pin.get_touch_measurement(Internal)
+        self.pin.touch_measurement(Internal)
     }
 
     /// Enables the touch_pad interrupt.
@@ -439,7 +439,7 @@ impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
     /// ## Example
     pub fn enable_interrupt(&mut self, threshold: u16) {
         self.pin.set_threshold(threshold, Internal);
-        internal_enable_interrupt(self.pin.get_touch_nr(Internal))
+        internal_enable_interrupt(self.pin.touch_nr(Internal))
     }
 
     /// Disables the touch pad's interrupt.
@@ -447,7 +447,7 @@ impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
     /// If no other touch pad interrupts are active, the touch interrupt is
     /// disabled completely.
     pub fn disable_interrupt(&mut self) {
-        internal_disable_interrupt(self.pin.get_touch_nr(Internal))
+        internal_disable_interrupt(self.pin.touch_nr(Internal))
     }
 
     /// Clears a pending touch interrupt.
@@ -464,7 +464,7 @@ impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
 
     /// Checks if the pad is touched, based on the configured threshold value.
     pub fn is_interrupt_set(&mut self) -> bool {
-        internal_is_interrupt_set(self.pin.get_touch_nr(Internal))
+        internal_is_interrupt_set(self.pin.touch_nr(Internal))
     }
 }
 
@@ -587,7 +587,7 @@ mod asynch {
         /// Wait for the pad to be touched.
         pub async fn wait_for_touch(&mut self, threshold: u16) {
             self.pin.set_threshold(threshold, Internal);
-            let touch_nr = self.pin.get_touch_nr(Internal);
+            let touch_nr = self.pin.touch_nr(Internal);
             internal_enable_interrupt(touch_nr);
             TouchFuture::new(touch_nr).await;
         }
