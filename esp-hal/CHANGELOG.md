@@ -104,6 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `TaskSet`, `TaskClear`, `TaskToggle` types have been replaced with `Task` (#2427)
 - `{Spi, SpiDma, SpiDmaBus}` configuration methods (#2448)
 - `Io::new_with_priority` and `Io::new_no_bind_interrupt`. (#2486)
+- `parl_io::{no_clk_pin(), NoClkPin}` (#2531)
 
 ## [0.21.1]
 

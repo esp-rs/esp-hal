@@ -396,3 +396,19 @@ When trying to send a one-shot transmission will fail if it doesn't end with an 
 -        let transaction = channel.transmit(&data);
 +        let transaction = channel.transmit(&data).unwrap();
 ```
+
+
+## The `parl_io::NoClkPin` and `no_clk_pin()` have been removed
+
+You can use `gpio::NoPin` instead.
+
+```diff
+ use esp_hal:: {
+-   parl_io::no_clk_pin,
++   gpio::NoPin,
+ }
+
+-parl_io.rx.with_config(&mut rx_pins, no_clk_pin(), BitPackOrder::Msb, Some(0xfff))
++let mut rx_clk_pin = NoPin;
++parl_io.rx.with_config(&mut rx_pins, &mut rx_clk_pin, BitPackOrder::Msb, Some(0xfff))
+```

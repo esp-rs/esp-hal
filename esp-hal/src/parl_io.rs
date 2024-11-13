@@ -49,7 +49,10 @@ use crate::{
         Tx,
         WriteBuffer,
     },
-    gpio::interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
+    gpio::{
+        interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
+        NoPin,
+    },
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
     peripherals::{self, Interrupt, PARL_IO},
@@ -260,22 +263,15 @@ pub enum EofMode {
 }
 
 /// Used to configure no pin as clock output
-pub struct NoClkPin;
-impl TxClkPin for NoClkPin {
+impl TxClkPin for NoPin {
     fn configure(&mut self) {
-        // nothing
+        crate::gpio::OutputSignal::PARL_TX_CLK.connect_to(self);
     }
 }
-impl RxClkPin for NoClkPin {
+impl RxClkPin for NoPin {
     fn configure(&mut self) {
-        // nothing
+        crate::gpio::InputSignal::PARL_RX_CLK.connect_to(self);
     }
-}
-
-/// This can be used to pass to the `with_config` functions
-pub fn no_clk_pin() -> &'static mut NoClkPin {
-    static mut NO_CLK: NoClkPin = NoClkPin;
-    unsafe { &mut *core::ptr::addr_of_mut!(NO_CLK) }
 }
 
 /// Wraps a GPIO pin which will be used as the clock output signal
