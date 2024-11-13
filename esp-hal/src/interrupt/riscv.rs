@@ -239,8 +239,8 @@ pub fn enable_direct(
         return Err(Error::InvalidInterruptPriority);
     }
     unsafe {
-        map(crate::core(), interrupt, cpu_interrupt);
-        set_priority(crate::core(), cpu_interrupt, level);
+        map(Cpu::current(), interrupt, cpu_interrupt);
+        set_priority(Cpu::current(), cpu_interrupt, level);
         enable_cpu_interrupt(cpu_interrupt);
     }
     Ok(())
@@ -369,12 +369,12 @@ mod vectored {
     pub(crate) unsafe fn init_vectoring() {
         for (prio, num) in PRIORITY_TO_INTERRUPT.iter().enumerate() {
             set_kind(
-                crate::core(),
+                Cpu::current(),
                 core::mem::transmute::<u32, CpuInterrupt>(*num as u32),
                 InterruptKind::Level,
             );
             set_priority(
-                crate::core(),
+                Cpu::current(),
                 core::mem::transmute::<u32, CpuInterrupt>(*num as u32),
                 core::mem::transmute::<u8, Priority>((prio as u8) + 1),
             );
@@ -421,7 +421,7 @@ mod vectored {
             let cpu_interrupt = core::mem::transmute::<u32, CpuInterrupt>(
                 PRIORITY_TO_INTERRUPT[(level as usize) - 1] as u32,
             );
-            map(crate::core(), interrupt, cpu_interrupt);
+            map(Cpu::current(), interrupt, cpu_interrupt);
             enable_cpu_interrupt(cpu_interrupt);
         }
         Ok(())
@@ -453,7 +453,7 @@ mod vectored {
     #[no_mangle]
     #[ram]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
-        let core = crate::core();
+        let core = Cpu::current();
         let status = status(core);
 
         // this has no effect on level interrupts, but the interrupt may be an edge one
