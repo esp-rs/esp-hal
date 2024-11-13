@@ -79,7 +79,6 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
 
     super::dump_packet_info(data);
 
-    #[cfg(feature = "async")]
     crate::ble::controller::asynch::hci_read_data_available();
 
     0
@@ -442,6 +441,7 @@ pub(crate) fn ble_init() {
 
         API_vhci_host_register_callback(&VHCI_HOST_CALLBACK);
     }
+    crate::flags::BLE.store(true, Ordering::Release);
 }
 
 pub(crate) fn ble_deinit() {
@@ -453,6 +453,7 @@ pub(crate) fn ble_deinit() {
         btdm_controller_deinit();
         crate::common_adapter::chip_specific::phy_disable();
     }
+    crate::flags::BLE.store(false, Ordering::Release);
 }
 
 pub fn send_hci(data: &[u8]) {

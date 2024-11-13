@@ -553,10 +553,11 @@ where
             _ => unreachable!(),
         };
 
-        unsafe {
-            interrupt::bind_interrupt(interrupt, handler.handler());
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
         }
-        interrupt::enable(interrupt, handler.priority()).unwrap();
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 
     fn is_interrupt_set(&self) -> bool {
@@ -803,7 +804,7 @@ where
     fn set_divider(&self, divider: u16) {
         unsafe { Self::t() }
             .config()
-            .modify(|_, w| unsafe { w.divider().bits(divider) })
+            .modify(|_, w| unsafe { w.divider().bits(divider) });
     }
 }
 
@@ -1073,7 +1074,7 @@ where
                 MwdtStage::Stage3 => reg_block
                     .wdtconfig5()
                     .write(|w| w.wdt_stg3_hold().bits(timeout_raw)),
-            }
+            };
         }
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
@@ -1348,87 +1349,87 @@ pub mod etm {
     use crate::etm::{EtmEvent, EtmTask};
 
     /// Event Task Matrix event for a timer.
-    pub struct TimerEtmEvent {
+    pub struct Event {
         id: u8,
     }
 
     /// Event Task Matrix task for a timer.
-    pub struct TimerEtmTask {
+    pub struct Task {
         id: u8,
     }
 
-    impl EtmEvent for TimerEtmEvent {
+    impl EtmEvent for Event {
         fn id(&self) -> u8 {
             self.id
         }
     }
 
-    impl Sealed for TimerEtmEvent {}
+    impl Sealed for Event {}
 
-    impl EtmTask for TimerEtmTask {
+    impl EtmTask for Task {
         fn id(&self) -> u8 {
             self.id
         }
     }
 
-    impl Sealed for TimerEtmTask {}
+    impl Sealed for Task {}
 
     /// General purpose timer ETM events.
-    pub trait TimerEtmEvents<TG> {
+    pub trait Events<TG> {
         /// ETM event triggered on alarm
-        fn on_alarm(&self) -> TimerEtmEvent;
+        fn on_alarm(&self) -> Event;
     }
 
     /// General purpose timer ETM tasks
-    pub trait TimerEtmTasks<TG> {
+    pub trait Tasks<TG> {
         /// ETM task to start the counter
-        fn cnt_start(&self) -> TimerEtmTask;
+        fn cnt_start(&self) -> Task;
 
         /// ETM task to start the alarm
-        fn cnt_stop(&self) -> TimerEtmTask;
+        fn cnt_stop(&self) -> Task;
 
         /// ETM task to stop the counter
-        fn cnt_reload(&self) -> TimerEtmTask;
+        fn cnt_reload(&self) -> Task;
 
         /// ETM task to reload the counter
-        fn cnt_cap(&self) -> TimerEtmTask;
+        fn cnt_cap(&self) -> Task;
 
         /// ETM task to load the counter with the value stored when the last
         /// `now()` was called
-        fn alarm_start(&self) -> TimerEtmTask;
+        fn alarm_start(&self) -> Task;
     }
 
-    impl<TG> TimerEtmEvents<TG> for Timer0<TG>
+    impl<TG> Events<TG> for Timer0<TG>
     where
         TG: TimerGroupInstance,
     {
-        fn on_alarm(&self) -> TimerEtmEvent {
-            TimerEtmEvent { id: 48 + TG::id() }
+        fn on_alarm(&self) -> Event {
+            Event { id: 48 + TG::id() }
         }
     }
 
-    impl<TG> TimerEtmTasks<TG> for Timer0<TG>
+    impl<TG> Tasks<TG> for Timer0<TG>
     where
         TG: TimerGroupInstance,
     {
-        fn cnt_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 88 + TG::id() }
+        fn cnt_start(&self) -> Task {
+            Task { id: 88 + TG::id() }
         }
 
-        fn alarm_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 90 + TG::id() }
+        fn alarm_start(&self) -> Task {
+            Task { id: 90 + TG::id() }
         }
 
-        fn cnt_stop(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 92 + TG::id() }
+        fn cnt_stop(&self) -> Task {
+            Task { id: 92 + TG::id() }
         }
 
-        fn cnt_reload(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 94 + TG::id() }
+        fn cnt_reload(&self) -> Task {
+            Task { id: 94 + TG::id() }
         }
 
-        fn cnt_cap(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 96 + TG::id() }
+        fn cnt_cap(&self) -> Task {
+            Task { id: 96 + TG::id() }
         }
     }
 }

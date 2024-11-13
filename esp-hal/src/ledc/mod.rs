@@ -29,9 +29,7 @@
 //! # use esp_hal::ledc::timer;
 //! # use esp_hal::ledc::LowSpeed;
 //! # use esp_hal::ledc::channel;
-//! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let led = io.pins.gpio0;
+//! # let led = peripherals.GPIO0;
 //!
 //! let mut ledc = Ledc::new(peripherals.LEDC);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);

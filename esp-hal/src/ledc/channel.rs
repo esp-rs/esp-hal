@@ -369,6 +369,13 @@ impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
                 unsafe { w.timer_sel().bits(timer_number) }
             });
         }
+
+        // this is needed to make low duty-resolutions / high frequencies work
+        #[cfg(any(esp32h2, esp32c6))]
+        self.ledc
+            .ch_gamma_wr_addr(self.number as usize)
+            .write(|w| unsafe { w.bits(0) });
+
         self.start_duty_without_fading();
     }
 
@@ -610,8 +617,7 @@ where
                 Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
             };
 
-            self.output_pin
-                .connect_peripheral_to_output(signal, crate::private::Internal);
+            signal.connect_to(&mut self.output_pin);
         } else {
             return Err(Error::Timer);
         }

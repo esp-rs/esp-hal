@@ -21,26 +21,23 @@ pub(crate) fn get_systimer_count() -> u64 {
     esp_hal::time::now().ticks()
 }
 
-pub(crate) fn setup_timer(mut timer1: TimeBase) -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn setup_timer(mut timer1: TimeBase) {
     timer1.set_interrupt_handler(InterruptHandler::new(
         unsafe { core::mem::transmute::<*const (), extern "C" fn()>(handler as *const ()) },
         interrupt::Priority::Priority2,
     ));
-    timer1.start(TIMESLICE_FREQUENCY.into_duration())?;
+    unwrap!(timer1.start(TIMESLICE_FREQUENCY.into_duration()));
     critical_section::with(|cs| {
         timer1.enable_interrupt(true);
         TIMER.borrow_ref_mut(cs).replace(timer1);
     });
-    Ok(())
 }
 
-pub(crate) fn disable_timer() -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn disable_timer() {
     critical_section::with(|cs| {
         unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
-        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel().unwrap();
+        unwrap!(unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel());
     });
-
-    Ok(())
 }
 
 pub(crate) fn setup_multitasking() {

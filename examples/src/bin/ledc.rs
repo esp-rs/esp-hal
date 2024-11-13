@@ -11,7 +11,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     ledc::{
         channel::{self, ChannelIFace},
         timer::{self, TimerIFace},
@@ -26,8 +25,7 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let led = io.pins.gpio0;
+    let led = peripherals.GPIO0;
 
     let mut ledc = Ledc::new(peripherals.LEDC);
 

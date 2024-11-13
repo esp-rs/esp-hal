@@ -59,6 +59,7 @@ pub const NUM_PINS: usize = 47;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u16;
 pub(crate) type OutputSignalType = u16;
 pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 256;
 pub(crate) const INPUT_SIGNAL_MAX: u16 = 204;
@@ -126,7 +127,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     SPIQ              = 0,
@@ -212,7 +214,8 @@ pub enum InputSignal {
 
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum OutputSignal {
     SPIQ             = 0,
@@ -410,53 +413,6 @@ macro_rules! rtcio_analog {
             rtcio_analog!($pin_num, $pin_reg, $prefix, $hold);
         )+
     };
-}
-
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo])
-    (1, [Input, Output, Analog, RtcIo])
-    (2, [Input, Output, Analog, RtcIo])
-    (3, [Input, Output, Analog, RtcIo])
-    (4, [Input, Output, Analog, RtcIo])
-    (5, [Input, Output, Analog, RtcIo])
-    (6, [Input, Output, Analog, RtcIo])
-    (7, [Input, Output, Analog, RtcIo])
-    (8, [Input, Output, Analog, RtcIo])
-    (9, [Input, Output, Analog, RtcIo])
-    (10, [Input, Output, Analog, RtcIo])
-    (11, [Input, Output, Analog, RtcIo])
-    (12, [Input, Output, Analog, RtcIo])
-    (13, [Input, Output, Analog, RtcIo])
-    (14, [Input, Output, Analog, RtcIo])
-    (15, [Input, Output, Analog, RtcIo])
-    (16, [Input, Output, Analog, RtcIo])
-    (17, [Input, Output, Analog, RtcIo])
-    (18, [Input, Output, Analog, RtcIo])
-    (19, [Input, Output, Analog, RtcIo])
-    (20, [Input, Output, Analog, RtcIo])
-    (21, [Input, Output, Analog, RtcIo])
-
-    (26, [Input, Output])
-    (27, [Input, Output])
-    (28, [Input, Output])
-    (29, [Input, Output])
-    (30, [Input, Output])
-    (31, [Input, Output])
-    (32, [Input, Output])
-    (33, [Input, Output])
-    (34, [Input, Output])
-    (35, [Input, Output])
-    (36, [Input, Output])
-    (37, [Input, Output])
-    (38, [Input, Output])
-    (39, [Input, Output])
-    (40, [Input, Output])
-    (41, [Input, Output])
-    (42, [Input, Output])
-    (43, [Input, Output])
-    (44, [Input, Output])
-    (45, [Input, Output])
-    (46, [Input, Output])
 }
 
 rtcio_analog! {

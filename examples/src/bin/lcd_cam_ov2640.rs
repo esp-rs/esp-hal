@@ -28,9 +28,10 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_rx_stream_buffer,
-    gpio::Io,
-    i2c,
-    i2c::I2c,
+    i2c::{
+        self,
+        master::{Config, I2c},
+    },
     lcd_cam::{
         cam::{Camera, RxEightBits},
         LcdCam,
@@ -44,8 +45,6 @@ use esp_println::{print, println};
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
 
@@ -53,21 +52,21 @@ fn main() -> ! {
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 
-    let cam_siod = io.pins.gpio4;
-    let cam_sioc = io.pins.gpio5;
-    let cam_xclk = io.pins.gpio15;
-    let cam_vsync = io.pins.gpio6;
-    let cam_href = io.pins.gpio7;
-    let cam_pclk = io.pins.gpio13;
+    let cam_siod = peripherals.GPIO4;
+    let cam_sioc = peripherals.GPIO5;
+    let cam_xclk = peripherals.GPIO15;
+    let cam_vsync = peripherals.GPIO6;
+    let cam_href = peripherals.GPIO7;
+    let cam_pclk = peripherals.GPIO13;
     let cam_data_pins = RxEightBits::new(
-        io.pins.gpio11,
-        io.pins.gpio9,
-        io.pins.gpio8,
-        io.pins.gpio10,
-        io.pins.gpio12,
-        io.pins.gpio18,
-        io.pins.gpio17,
-        io.pins.gpio16,
+        peripherals.GPIO11,
+        peripherals.GPIO9,
+        peripherals.GPIO8,
+        peripherals.GPIO10,
+        peripherals.GPIO12,
+        peripherals.GPIO18,
+        peripherals.GPIO17,
+        peripherals.GPIO16,
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
@@ -80,7 +79,9 @@ fn main() -> ! {
 
     delay.delay_millis(500u32);
 
-    let i2c = I2c::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz());
+    let i2c = I2c::new(peripherals.I2C0, Config::default())
+        .with_sda(cam_siod)
+        .with_scl(cam_sioc);
 
     let mut sccb = Sccb::new(i2c);
 
@@ -170,17 +171,17 @@ pub struct Sccb<'d, T> {
 
 impl<'d, T> Sccb<'d, T>
 where
-    T: i2c::Instance,
+    T: i2c::master::Instance,
 {
     pub fn new(i2c: I2c<'d, Blocking, T>) -> Self {
         Self { i2c }
     }
 
-    pub fn probe(&mut self, address: u8) -> Result<(), i2c::Error> {
+    pub fn probe(&mut self, address: u8) -> Result<(), i2c::master::Error> {
         self.i2c.write(address, &[])
     }
 
-    pub fn read(&mut self, address: u8, reg: u8) -> Result<u8, i2c::Error> {
+    pub fn read(&mut self, address: u8, reg: u8) -> Result<u8, i2c::master::Error> {
         self.i2c.write(address, &[reg])?;
 
         let mut bytes = [0u8; 1];
@@ -188,7 +189,7 @@ where
         Ok(bytes[0])
     }
 
-    pub fn write(&mut self, address: u8, reg: u8, data: u8) -> Result<(), i2c::Error> {
+    pub fn write(&mut self, address: u8, reg: u8, data: u8) -> Result<(), i2c::master::Error> {
         self.i2c.write(address, &[reg, data])
     }
 }

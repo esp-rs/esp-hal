@@ -18,6 +18,8 @@ use crate::{
         Tx,
         WriteBuffer,
     },
+    Async,
+    Blocking,
     Mode,
 };
 
@@ -36,19 +38,18 @@ where
     peripheral: DmaPeripheral,
 }
 
-impl<'d, M> Mem2Mem<'d, M>
-where
-    M: Mode,
-{
+impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new Mem2Mem instance.
-    pub fn new<CH>(
-        channel: Channel<'d, CH, M>,
+    pub fn new<CH, DM>(
+        channel: Channel<'d, CH, DM>,
         peripheral: impl DmaEligible,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Result<Self, DmaError>
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
+        DM: Mode,
+        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
     {
         unsafe {
             Self::new_unsafe(
@@ -62,8 +63,8 @@ where
     }
 
     /// Create a new Mem2Mem instance with specific chunk size.
-    pub fn new_with_chunk_size<CH>(
-        channel: Channel<'d, CH, M>,
+    pub fn new_with_chunk_size<CH, DM>(
+        channel: Channel<'d, CH, DM>,
         peripheral: impl DmaEligible,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -71,6 +72,8 @@ where
     ) -> Result<Self, DmaError>
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
+        DM: Mode,
+        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
     {
         unsafe {
             Self::new_unsafe(
@@ -89,8 +92,8 @@ where
     ///
     /// You must ensure that your not using DMA for the same peripheral and
     /// that your the only one using the DmaPeripheral.
-    pub unsafe fn new_unsafe<CH>(
-        channel: Channel<'d, CH, M>,
+    pub unsafe fn new_unsafe<CH, DM>(
+        channel: Channel<'d, CH, DM>,
         peripheral: DmaPeripheral,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -98,6 +101,8 @@ where
     ) -> Result<Self, DmaError>
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
+        DM: Mode,
+        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
     {
         if !(1..=4092).contains(&chunk_size) {
             return Err(DmaError::InvalidChunkSize);
@@ -106,13 +111,28 @@ where
             return Err(DmaError::OutOfDescriptors);
         }
         Ok(Mem2Mem {
-            channel: channel.degrade(),
+            channel: Channel::<_, Blocking>::from(channel).degrade(),
             peripheral,
             rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
             tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
         })
     }
 
+    /// Convert Mem2Mem to an async Mem2Mem.
+    pub fn into_async(self) -> Mem2Mem<'d, Async> {
+        Mem2Mem {
+            channel: self.channel.into_async(),
+            rx_chain: self.rx_chain,
+            tx_chain: self.tx_chain,
+            peripheral: self.peripheral,
+        }
+    }
+}
+
+impl<M> Mem2Mem<'_, M>
+where
+    M: Mode,
+{
     /// Start a memory to memory transfer.
     pub fn start_transfer<'t, TXBUF, RXBUF>(
         &mut self,

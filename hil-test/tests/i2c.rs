@@ -6,9 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    gpio::Io,
-    i2c::{I2c, Operation},
-    prelude::*,
+    i2c::master::{Config, I2c, Operation},
     Async,
     Blocking,
 };
@@ -34,13 +32,14 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-        let (sda, scl) = hil_test::i2c_pins!(io);
+        let (sda, scl) = hil_test::i2c_pins!(peripherals);
 
         // Create a new peripheral object with the described wiring and standard
         // I2C clock speed:
-        let i2c = I2c::new(peripherals.I2C0, sda, scl, 100.kHz());
+        let i2c = I2c::new(peripherals.I2C0, Config::default())
+            .with_sda(sda)
+            .with_scl(scl);
 
         Context { i2c }
     }

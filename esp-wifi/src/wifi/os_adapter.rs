@@ -875,10 +875,8 @@ pub unsafe extern "C" fn event_post(
 
     super::state::update_state(event, handled);
 
-    #[cfg(feature = "async")]
     event.waker().wake();
 
-    #[cfg(feature = "embassy-net")]
     match event {
         WifiEvent::StaConnected | WifiEvent::StaDisconnected => {
             crate::wifi::embassy::STA_LINK_STATE_WAKER.wake();

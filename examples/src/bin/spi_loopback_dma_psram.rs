@@ -26,10 +26,12 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},
-    gpio::Io,
     peripheral::Peripheral,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::{
+        master::{Config, Spi},
+        SpiMode,
+    },
 };
 extern crate alloc;
 use log::*;
@@ -60,11 +62,10 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio42;
-    let mosi = io.pins.gpio48;
+    let sclk = peripherals.GPIO42;
+    let mosi = peripherals.GPIO48;
     let miso = unsafe { mosi.clone_unchecked() };
-    let cs = io.pins.gpio38;
+    let cs = peripherals.GPIO38;
 
     let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
@@ -90,12 +91,19 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     // Need to set miso first so that mosi can overwrite the
     // output connection (because we are using the same pin to loop back)
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_sck(sclk)
-        .with_miso(miso)
-        .with_mosi(mosi)
-        .with_cs(cs)
-        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+    let mut spi = Spi::new_with_config(
+        peripherals.SPI2,
+        Config {
+            frequency: 100.kHz(),
+            mode: SpiMode::Mode0,
+            ..Config::default()
+        },
+    )
+    .with_sck(sclk)
+    .with_miso(miso)
+    .with_mosi(mosi)
+    .with_cs(cs)
+    .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
     delay.delay_millis(100); // delay to let the above messages display
 

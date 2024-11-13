@@ -25,7 +25,7 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
 critical-section = "1.1.3"
 enumset = { version = "1.1.5", default-features = false, optional = true }
 embedded-io = { version = "0.6.1", default-features = false }
-embedded-io-async = { version = "0.6.1", optional = true }
+embedded-io-async = { version = "0.6.1" }
 fugit = "0.3.7"
 heapless = { version = "0.8.0", default-features = false, features = [
   "portable-atomic",
@@ -39,6 +39,7 @@ libm = "0.2.8"
 cfg-if = "1.0.0"
 portable-atomic = { version = "1.9.0", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
+rand_core           = "0.6.4"
 
 bt-hci = { version = "0.1.1", optional = true }
 esp-config = { version = "0.1.0", path = "../esp-config" }
@@ -100,24 +101,29 @@ esp32s3 = [
   "xtensa-lx-rt/float-save-restore",
 ]
 
-## Enable Async support
-async = [
-  "dep:embassy-sync",
-  "dep:embedded-io-async",
-  "dep:bt-hci",
-]
-
-## Enable `embassy-net` support
-embassy-net = ["dep:embassy-net-driver", "async"]
-
 ## Enable WiFi-BLE coexistence support
 coex = []
 
 ## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)
 sys-logs = ["esp-wifi-sys/sys-logs"]
 
-## Dumps packet info at log level info
-dump-packets = []
+## Enable support for `defmt`
+defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "heapless/defmt-03"]
+
+## Enable support for the `log` crate
+log = ["dep:log", "esp-hal/log", "esp-wifi-sys/log"]
+
+## Enable WiFi support
+wifi = ["dep:enumset", "dep:embassy-net-driver", "dep:embassy-sync"]
+
+## Enable esp-now support
+esp-now = ["wifi"]
+
+## Enable sniffer mode support
+sniffer = ["wifi"]
+
+## Enable BLE support
+ble = ["esp-hal/bluetooth", "dep:bt-hci", "dep:embassy-sync"]
 
 ## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
@@ -125,62 +131,6 @@ smoltcp = ["dep:smoltcp"]
 ## Provide utilities for smoltcp initialization. Adds smoltcp dependency
 utils = ["smoltcp"]
 
-## Enable WiFi support
-wifi = ["dep:enumset"]
-
-## Enable BLE support
-ble = ["esp-hal/bluetooth"]
-
-## See USB-SERIAL-JTAG below
-phy-enable-usb = []
-
-## Enable minimum modem sleep. Only affects STA mode
-ps-min-modem = []
-
-## Enable maximum modem sleep. Only affects STA mode
-ps-max-modem = []
-
-## Enable esp-now support
-esp-now = ["wifi"]
-
-## IPv6 support. Includes utils feature
-ipv6 = ["wifi", "utils", "smoltcp?/proto-ipv6"]
-
-## IPv4 support. Includes utils feature
-ipv4 = ["wifi", "utils", "smoltcp?/proto-ipv4"]
-
-## TCP socket support. Includes ipv4 feature
-tcp = ["ipv4", "smoltcp?/socket-tcp"]
-
-## UDP socket support. Includes ipv4 feature
-udp = ["ipv4", "smoltcp?/socket-udp"]
-
-## ICMP socket support. Includes ipv4 feature
-icmp = ["ipv4", "smoltcp?/socket-icmp"]
-
-## IGMP (multicast) support. Includes ipv4 featu
-igmp = ["ipv4", "smoltcp?/proto-igmp"]
-
-## DNS support. Includes udp feature
-dns = ["udp", "smoltcp?/proto-dns", "smoltcp?/socket-dns"]
-
-## DHCPv4 support, both creating sockets and autoconfiguring network settings. Includes utils feature
-dhcpv4 = ["wifi", "utils", "smoltcp?/proto-dhcpv4", "smoltcp?/socket-dhcpv4"]
-
-## Convenience to enable "ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"
-wifi-default = ["ipv4", "tcp", "udp", "icmp", "igmp", "dns", "dhcpv4"]
-
-## Enable support for `defmt`
-defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt"]
-
-## Enable support for the `log` crate
-log = ["dep:log", "esp-hal/log", "esp-wifi-sys/log"]
-
-## Enable sniffer mode support
-sniffer = ["wifi"]
-
-# Don't include `strchr` - not shown in docs
-have-strchr = []
 
 # Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde", "heapless/serde"]
@@ -191,8 +141,6 @@ features = [
   "wifi",
   "ble",
   "coex",
-  "async",
-  "embassy-net",
   "esp-hal/default",
 ]
 default-target = "riscv32imc-unknown-none-elf"

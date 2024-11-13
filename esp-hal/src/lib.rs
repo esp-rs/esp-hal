@@ -81,8 +81,7 @@
 //!     });
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//!     let mut led = Output::new(io.pins.gpio0, Level::High);
+//!     let mut led = Output::new(peripherals.GPIO0, Level::High);
 //!
 //!     let delay = Delay::new();
 //!
@@ -191,8 +190,6 @@ pub mod hmac;
 pub mod i2c;
 #[cfg(any(i2s0, i2s1))]
 pub mod i2s;
-#[cfg(esp32)]
-pub mod i2s_parallel;
 #[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub mod interrupt;
 #[cfg(lcd_cam)]
@@ -374,6 +371,21 @@ impl Cpu {
     pub fn current() -> Self {
         get_core()
     }
+
+    /// Returns an iterator over the "other" cores.
+    #[inline(always)]
+    pub fn other() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                match get_core() {
+                    Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
+                    Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
+                }
+            } else {
+                [].into_iter()
+            }
+        }
+    }
 }
 
 /// Which core the application is currently executing on
@@ -546,6 +558,8 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(esp32)]
     crate::time::time_init();
+
+    crate::gpio::bind_default_interrupt_handler();
 
     peripherals
 }

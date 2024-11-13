@@ -12,19 +12,14 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    gpio::{rtc_io::*, Io},
-    prelude::*,
-    ulp_core,
-};
+use esp_hal::{gpio::rtc_io::*, prelude::*, ulp_core};
 use esp_println::{print, println};
 
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let pin = LowPowerOutput::new(io.pins.gpio1);
+    let pin = LowPowerOutput::new(peripherals.GPIO1);
 
     let mut ulp_core = ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 

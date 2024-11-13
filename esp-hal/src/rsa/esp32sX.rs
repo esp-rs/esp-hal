@@ -27,7 +27,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     /// When enabled rsa peripheral would generate an interrupt when a operation
     /// is finished.
     pub fn enable_disable_interrupt(&mut self, enable: bool) {
-        self.rsa.int_ena().write(|w| w.int_ena().bit(enable))
+        self.rsa.int_ena().write(|w| w.int_ena().bit(enable));
     }
 
     fn write_mode(&mut self, mode: u32) {
@@ -53,7 +53,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
                 .rsa
                 .search_enable()
                 .write(|w| w.search_enable().clear_bit()),
-        }
+        };
     }
 
     /// Checks if the search functionality is enabled in the RSA hardware.
@@ -88,7 +88,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
                 .rsa
                 .constant_time()
                 .write(|w| w.constant_time().set_bit()),
-        }
+        };
     }
 
     /// Starts the modular exponentiation operation.

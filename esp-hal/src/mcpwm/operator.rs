@@ -298,9 +298,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin.set_actions(config.actions);
         pin.set_update_method(config.update_method);
 
-        let output_signal = PWM::output_signal::<OP, IS_A>();
-        pin.pin
-            .connect_peripheral_to_output(output_signal, private::Internal);
+        PWM::output_signal::<OP, IS_A>().connect_to(&mut pin.pin);
         pin.pin.enable_output(true, private::Internal);
 
         pin
@@ -315,7 +313,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
 
         // SAFETY:
         // `bits` is a valid bit pattern
-        ch.gen((!IS_A) as usize).write(|w| unsafe { w.bits(bits) })
+        ch.gen((!IS_A) as usize).write(|w| unsafe { w.bits(bits) });
     }
 
     /// Set how a new timestamp syncs with the timer
@@ -336,7 +334,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
             } else {
                 w.b_upmethod().bits(bits)
             }
-        })
+        });
     }
 
     /// Write a new timestamp.
@@ -349,16 +347,16 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
 
         #[cfg(esp32s3)]
         if IS_A {
-            ch.cmpr_value0().write(|w| unsafe { w.a().bits(value) })
+            ch.cmpr_value0().write(|w| unsafe { w.a().bits(value) });
         } else {
-            ch.cmpr_value1().write(|w| unsafe { w.b().bits(value) })
+            ch.cmpr_value1().write(|w| unsafe { w.b().bits(value) });
         }
 
         #[cfg(any(esp32, esp32c6, esp32h2))]
         if IS_A {
-            ch.gen_tstmp_a().write(|w| unsafe { w.a().bits(value) })
+            ch.gen_tstmp_a().write(|w| unsafe { w.a().bits(value) });
         } else {
-            ch.gen_tstmp_b().write(|w| unsafe { w.b().bits(value) })
+            ch.gen_tstmp_b().write(|w| unsafe { w.b().bits(value) });
         }
     }
 
@@ -481,8 +479,6 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// # use esp_hal::{mcpwm, prelude::*};
 /// # use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
 /// # use esp_hal::mcpwm::operator::{DeadTimeCfg, PwmPinConfig, PWMStream};
-/// # use esp_hal::gpio::Io;
-/// # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();
 /// // use PWMB as input for both outputs
@@ -499,9 +495,9 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 ///
 /// let mut pins = mcpwm.operator0.with_linked_pins(
-///     io.pins.gpio0,
+///     peripherals.GPIO0,
 ///     PwmPinConfig::UP_DOWN_ACTIVE_HIGH, // use PWMA as our main input
-///     io.pins.gpio1,
+///     peripherals.GPIO1,
 ///     PwmPinConfig::EMPTY, // keep PWMB "low"
 ///     bridge_off,
 /// );

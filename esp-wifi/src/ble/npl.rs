@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use core::{
     mem::size_of_val,
     ptr::{addr_of, addr_of_mut},
+    sync::atomic::Ordering,
 };
 
 use super::*;
@@ -1179,6 +1180,7 @@ pub(crate) fn ble_init() {
 
         debug!("The ble_controller_init was initialized");
     }
+    crate::flags::BLE.store(true, Ordering::Release);
 }
 
 pub(crate) fn ble_deinit() {
@@ -1205,6 +1207,7 @@ pub(crate) fn ble_deinit() {
 
         crate::common_adapter::chip_specific::phy_disable();
     }
+    crate::flags::BLE.store(false, Ordering::Release);
 }
 
 #[cfg(esp32c2)]
@@ -1295,7 +1298,6 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
 
     r_ble_hci_trans_buf_free(cmd);
 
-    #[cfg(feature = "async")]
     crate::ble::controller::asynch::hci_read_data_available();
 
     0
@@ -1324,7 +1326,6 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
 
     r_os_mbuf_free_chain(om as *mut _);
 
-    #[cfg(feature = "async")]
     crate::ble::controller::asynch::hci_read_data_available();
 
     0

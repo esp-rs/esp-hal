@@ -26,8 +26,11 @@ use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::RSA,
+    peripherals::{Interrupt, RSA},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    Async,
+    Blocking,
+    Cpu,
     InterruptConfigurable,
 };
 
@@ -47,29 +50,44 @@ pub struct Rsa<'d, DM: crate::Mode> {
     phantom: PhantomData<DM>,
 }
 
-impl<'d> Rsa<'d, crate::Blocking> {
+impl<'d> Rsa<'d, Blocking> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
     pub fn new(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
         Self::new_internal(rsa)
     }
-}
 
-impl crate::private::Sealed for Rsa<'_, crate::Blocking> {}
-
-impl InterruptConfigurable for Rsa<'_, crate::Blocking> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.internal_set_interrupt_handler(handler);
+    /// Reconfigures the RSA driver to operate in asynchronous mode.
+    pub fn into_async(mut self) -> Rsa<'d, Async> {
+        self.set_interrupt_handler(asynch::rsa_interrupt_handler);
+        Rsa {
+            rsa: self.rsa,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<'d> Rsa<'d, crate::Async> {
+impl crate::private::Sealed for Rsa<'_, Blocking> {}
+
+impl InterruptConfigurable for Rsa<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::RSA);
+        }
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::RSA, handler.handler()) };
+        unwrap!(crate::interrupt::enable(Interrupt::RSA, handler.priority()));
+    }
+}
+
+impl<'d> Rsa<'d, Async> {
     /// Create a new instance in [crate::Blocking] mode.
-    pub fn new_async(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
-        let mut this = Self::new_internal(rsa);
-        this.internal_set_interrupt_handler(asynch::rsa_interrupt_handler);
-        this
+    pub fn into_blocking(self) -> Rsa<'d, Blocking> {
+        crate::interrupt::disable(Cpu::current(), Interrupt::RSA);
+        Rsa {
+            rsa: self.rsa,
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -129,15 +147,6 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
             );
         }
     }
-
-    fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::RSA, handler.handler());
-            crate::interrupt::enable(crate::peripherals::Interrupt::RSA, handler.priority())
-                .unwrap();
-        }
-    }
-
     fn wait_for_idle(&mut self) {
         while !self.is_idle() {}
         self.clear_interrupt();

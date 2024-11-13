@@ -20,8 +20,7 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::Io,
-    i2s::{DataFormat, I2s, Standard},
+    i2s::master::{DataFormat, I2s, Standard},
     prelude::*,
 };
 use esp_println::println;
@@ -29,8 +28,6 @@ use esp_println::println;
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -55,13 +52,13 @@ fn main() -> ! {
     );
 
     #[cfg(not(feature = "esp32"))]
-    let i2s = i2s.with_mclk(io.pins.gpio0);
+    let i2s = i2s.with_mclk(peripherals.GPIO0);
 
     let mut i2s_rx = i2s
         .i2s_rx
-        .with_bclk(io.pins.gpio2)
-        .with_ws(io.pins.gpio4)
-        .with_din(io.pins.gpio5)
+        .with_bclk(peripherals.GPIO2)
+        .with_ws(peripherals.GPIO4)
+        .with_din(peripherals.GPIO5)
         .build();
 
     let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();

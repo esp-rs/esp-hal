@@ -20,8 +20,7 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
-    gpio::Io,
-    i2s_parallel::{I2sParallel, TxEightBits},
+    i2s::parallel::{I2sParallel, TxEightBits},
     prelude::*,
     timer::timg::TimerGroup,
 };
@@ -35,7 +34,6 @@ async fn main(_spawner: Spawner) {
     info!("Starting!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let dma = Dma::new(peripherals.DMA);
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
@@ -44,23 +42,25 @@ async fn main(_spawner: Spawner) {
 
     let dma_channel = dma.i2s1channel;
     let i2s = peripherals.I2S1;
-    let clock = io.pins.gpio25;
+    let clock = peripherals.GPIO25;
 
     let pins = TxEightBits::new(
-        io.pins.gpio16,
-        io.pins.gpio4,
-        io.pins.gpio17,
-        io.pins.gpio18,
-        io.pins.gpio5,
-        io.pins.gpio19,
-        io.pins.gpio12,
-        io.pins.gpio14,
+        peripherals.GPIO16,
+        peripherals.GPIO4,
+        peripherals.GPIO17,
+        peripherals.GPIO18,
+        peripherals.GPIO5,
+        peripherals.GPIO19,
+        peripherals.GPIO12,
+        peripherals.GPIO14,
     );
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);
     let mut parallel = I2sParallel::new(
         i2s,
-        dma_channel.configure_for_async(false, DmaPriority::Priority0),
+        dma_channel
+            .configure(false, DmaPriority::Priority0)
+            .into_async(),
         1.MHz(),
         pins,
         clock,

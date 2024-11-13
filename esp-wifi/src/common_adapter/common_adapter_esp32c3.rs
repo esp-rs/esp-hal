@@ -76,7 +76,7 @@ pub(crate) unsafe fn phy_enable() {
 
                 let init_data = &PHY_INIT_DATA_DEFAULT;
 
-                #[cfg(feature = "phy-enable-usb")]
+                #[cfg(phy_enable_usb)]
                 {
                     extern "C" {
                         fn phy_bbpll_en_usb(param: bool);

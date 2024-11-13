@@ -383,16 +383,19 @@ impl RtcClock {
         } else {
             cali_clk_sel = RtcCaliClkSel::CaliClk32k;
             match cal_clk {
-                RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => (),
-                RtcCalSel::RtcCal32kRc => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) }),
-                RtcCalSel::RtcCal32kXtal => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) }),
-                RtcCalSel::RtcCal32kOscSlow => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) }),
+                RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => {}
+                RtcCalSel::RtcCal32kRc => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) });
+                }
+                RtcCalSel::RtcCal32kXtal => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) });
+                }
+                RtcCalSel::RtcCal32kOscSlow => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) });
+                }
             }
         }
 

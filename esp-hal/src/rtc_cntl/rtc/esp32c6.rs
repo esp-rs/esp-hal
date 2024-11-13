@@ -267,7 +267,7 @@ fn modem_clock_hal_deselect_all_wifi_lpclk_source() {
                 .clear_bit()
                 .clk_wifipwr_lp_sel_xtal()
                 .clear_bit()
-        })
+        });
     }
 }
 
@@ -299,7 +299,7 @@ fn modem_lpcon_ll_set_wifi_lpclk_divisor_value(divider: u16) {
     unsafe {
         modem_lpcon()
             .wifi_lp_clk_conf()
-            .modify(|_, w| w.clk_wifipwr_lp_div_num().bits(divider))
+            .modify(|_, w| w.clk_wifipwr_lp_div_num().bits(divider));
     }
 }
 
@@ -1534,16 +1534,19 @@ impl RtcClock {
         } else {
             cali_clk_sel = RtcCaliClkSel::CaliClk32k;
             match cal_clk {
-                RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => (),
-                RtcCalSel::RtcCal32kRc => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) }),
-                RtcCalSel::RtcCal32kXtal => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) }),
-                RtcCalSel::RtcCal32kOscSlow => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) }),
+                RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => {}
+                RtcCalSel::RtcCal32kRc => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) });
+                }
+                RtcCalSel::RtcCal32kXtal => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) });
+                }
+                RtcCalSel::RtcCal32kOscSlow => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) });
+                }
             }
         }
 

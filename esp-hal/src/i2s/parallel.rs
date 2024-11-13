@@ -52,7 +52,6 @@ use crate::{
         DmaError,
         DmaPeripheral,
         DmaTxBuffer,
-        PeripheralMarker,
         Tx,
     },
     gpio::{
@@ -61,7 +60,7 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
-    private,
+    private::Internal,
     system::PeripheralClockControl,
     Async,
     Mode,
@@ -123,8 +122,8 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
         crate::into_ref!(instance);
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(instance.data_out_signal(i, bits), private::Internal);
+            pin.set_to_push_pull_output(Internal);
+            instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
 }
@@ -165,8 +164,8 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
         crate::into_ref!(instance);
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(private::Internal);
-            pin.connect_peripheral_to_output(instance.data_out_signal(i, bits), private::Internal);
+            pin.set_to_push_pull_output(Internal);
+            instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
 }
@@ -228,8 +227,8 @@ where
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
-        clock_pin.set_to_push_pull_output(private::Internal);
-        clock_pin.connect_peripheral_to_output(i2s.ws_signal(), private::Internal);
+        clock_pin.set_to_push_pull_output(Internal);
+        i2s.ws_signal().connect_to(clock_pin);
 
         pins.configure(i2s.reborrow());
         Self {
@@ -395,7 +394,7 @@ fn calculate_clock(sample_rate: impl Into<fugit::HertzU32>, data_bits: u8) -> I2
         } else {
             let mut min: u32 = !0;
 
-            for a in 2..=crate::i2s::I2S_LL_MCLK_DIVIDER_MAX {
+            for a in 2..=crate::i2s::master::I2S_LL_MCLK_DIVIDER_MAX {
                 let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
                 ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
                 mb = (mclk as u64 * (b / 10000)) as u32;
@@ -424,10 +423,9 @@ fn calculate_clock(sample_rate: impl Into<fugit::HertzU32>, data_bits: u8) -> I2
 }
 
 #[doc(hidden)]
-pub trait Instance:
-    Peripheral<P = Self> + PeripheralMarker + DmaEligible + Into<AnyI2s> + 'static
-{
+pub trait Instance: Peripheral<P = Self> + DmaEligible + Into<AnyI2s> + 'static {
     fn register_block(&self) -> &RegisterBlock;
+    fn peripheral(&self) -> crate::system::Peripheral;
     fn ws_signal(&self) -> OutputSignal;
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
 
@@ -614,6 +612,10 @@ impl Instance for I2S0 {
         unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
     }
 
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::I2s0
+    }
+
     fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S0O_WS
     }
@@ -659,6 +661,10 @@ impl Instance for I2S0 {
 impl Instance for I2S1 {
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
+    }
+
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::I2s1
     }
 
     fn ws_signal(&self) -> OutputSignal {
@@ -729,6 +735,7 @@ impl Instance for AnyI2s {
             AnyI2sInner::I2s1(i2s) => i2s,
         } {
             fn register_block(&self) -> &RegisterBlock;
+            fn peripheral(&self) -> crate::system::Peripheral;
             fn ws_signal(&self) -> OutputSignal;
             fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal ;
         }

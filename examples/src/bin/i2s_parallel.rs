@@ -18,8 +18,7 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority, DmaTxBuf},
     dma_buffers,
-    gpio::Io,
-    i2s_parallel::{I2sParallel, TxEightBits},
+    i2s::parallel::{I2sParallel, TxEightBits},
     prelude::*,
 };
 use log::info;
@@ -32,23 +31,22 @@ fn main() -> ! {
     info!("Starting!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let dma = Dma::new(peripherals.DMA);
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let delay = Delay::new();
 
     let dma_channel = dma.i2s1channel;
     let i2s = peripherals.I2S1;
-    let clock = io.pins.gpio25;
+    let clock = peripherals.GPIO25;
 
     let pins = TxEightBits::new(
-        io.pins.gpio16,
-        io.pins.gpio4,
-        io.pins.gpio17,
-        io.pins.gpio18,
-        io.pins.gpio5,
-        io.pins.gpio19,
-        io.pins.gpio12,
-        io.pins.gpio14,
+        peripherals.GPIO16,
+        peripherals.GPIO4,
+        peripherals.GPIO17,
+        peripherals.GPIO18,
+        peripherals.GPIO5,
+        peripherals.GPIO19,
+        peripherals.GPIO12,
+        peripherals.GPIO14,
     );
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);

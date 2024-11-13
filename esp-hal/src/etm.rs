@@ -23,31 +23,27 @@
 //! ## Examples
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::Io;
-//! # use esp_hal::gpio::etm::GpioEtmChannels;
+//! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
 //! # use esp_hal::etm::Etm;
-//! # use esp_hal::gpio::etm::GpioEtmInputConfig;
-//! # use esp_hal::gpio::etm::GpioEtmOutputConfig;
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
 //!
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let mut led = io.pins.gpio1;
-//! let button = io.pins.gpio9;
+//! let mut led = peripherals.GPIO1;
+//! let button = peripherals.GPIO9;
 //!
 //! // setup ETM
-//! let gpio_ext = GpioEtmChannels::new(peripherals.GPIO_SD);
+//! let gpio_ext = Channels::new(peripherals.GPIO_SD);
 //! let led_task = gpio_ext.channel0_task.toggle(
-//! &mut led,
-//! GpioEtmOutputConfig {
-//!     open_drain: false,
-//!     pull: Pull::None,
-//!     initial_state: Level::Low,
-//! },
+//!     &mut led,
+//!     OutputConfig {
+//!         open_drain: false,
+//!         pull: Pull::None,
+//!         initial_state: Level::Low,
+//!     },
 //! );
 //! let button_event = gpio_ext
 //! .channel0_event
-//! .falling_edge(button, GpioEtmInputConfig { pull: Pull::Down });
+//! .falling_edge(button, InputConfig { pull: Pull::Down });
 //!
 //! let etm = Etm::new(peripherals.SOC_ETM);
 //! let channel0 = etm.channel0;

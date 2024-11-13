@@ -16,11 +16,15 @@ use critical_section::Mutex;
 use enumset::EnumSet;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
+#[cfg(not(coex))]
+use crate::config::PowerSaveMode;
+#[cfg(csi_enable)]
+use crate::wifi::CsiConfig;
 use crate::{
     binary::include::*,
     hal::peripheral::{Peripheral, PeripheralRef},
-    wifi::{Protocol, RxControlInfo},
-    EspWifiInitialization,
+    wifi::{Protocol, RxControlInfo, WifiError},
+    EspWifiController,
 };
 
 const RECEIVE_QUEUE_SIZE: usize = 10;
@@ -113,6 +117,14 @@ pub enum EspNowError {
     SendFailed,
     /// Attempt to create `EspNow` instance twice.
     DuplicateInstance,
+    /// Initialization error
+    Initialization(WifiError),
+}
+
+impl From<WifiError> for EspNowError {
+    fn from(f: WifiError) -> Self {
+        Self::Initialization(f)
+    }
 }
 
 /// Holds the count of peers in an ESP-NOW communication context.
@@ -327,6 +339,12 @@ impl EspNowManager<'_> {
         Ok(())
     }
 
+    #[cfg(not(coex))]
+    /// Configures modem power saving
+    pub fn set_power_saving(&self, ps: PowerSaveMode) -> Result<(), WifiError> {
+        crate::wifi::apply_power_saving(ps)
+    }
+
     /// Set primary WiFi channel.
     /// Should only be used when using ESP-NOW without AP or STA.
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
@@ -351,6 +369,20 @@ impl EspNowManager<'_> {
             priv_: core::ptr::null_mut(),
         };
         check_error!({ esp_now_add_peer(&raw_peer as *const _) })
+    }
+
+    /// Set CSI configuration and register the receiving callback.
+    #[cfg(csi_enable)]
+    pub fn set_csi(
+        &mut self,
+        mut csi: CsiConfig,
+        cb: impl FnMut(crate::wifi::wifi_csi_info_t) + Send,
+    ) -> Result<(), WifiError> {
+        csi.apply_config()?;
+        csi.set_receive_cb(cb)?;
+        csi.set_csi(true)?;
+
+        Ok(())
     }
 
     /// Remove the given peer.
@@ -466,6 +498,21 @@ impl EspNowManager<'_> {
     /// Configure ESP-NOW rate.
     pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_config_espnow_rate(wifi_interface_t_WIFI_IF_STA, rate as u32,) })
+    }
+}
+
+impl<'d> Drop for EspNowManager<'d> {
+    fn drop(&mut self) {
+        if unwrap!(
+            crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+                Some(x.saturating_sub(1))
+            })
+        ) == 0
+        {
+            if let Err(e) = crate::wifi::wifi_deinit() {
+                warn!("Failed to cleanly deinit wifi: {:?}", e);
+            }
+        }
     }
 }
 
@@ -607,16 +654,16 @@ impl Drop for EspNowRc<'_> {
 /// Currently this implementation (when used together with traditional Wi-Fi)
 /// ONLY support STA mode.
 pub struct EspNow<'d> {
-    _device: Option<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
     manager: EspNowManager<'d>,
     sender: EspNowSender<'d>,
     receiver: EspNowReceiver<'d>,
+    _phantom: PhantomData<&'d ()>,
 }
 
 impl<'d> EspNow<'d> {
     /// Creates an `EspNow` instance.
     pub fn new(
-        inited: &EspWifiInitialization,
+        inited: &'d EspWifiController<'d>,
         device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     ) -> Result<EspNow<'d>, EspNowError> {
         EspNow::new_internal(inited, Some(device.into_ref()))
@@ -624,7 +671,7 @@ impl<'d> EspNow<'d> {
 
     /// Creates an `EspNow` instance with support for Wi-Fi coexistence.
     pub fn new_with_wifi(
-        inited: &EspWifiInitialization,
+        inited: &'d EspWifiController<'d>,
         _token: EspNowWithWifiCreateToken,
     ) -> Result<EspNow<'d>, EspNowError> {
         EspNow::new_internal(
@@ -634,16 +681,17 @@ impl<'d> EspNow<'d> {
     }
 
     fn new_internal(
-        inited: &EspWifiInitialization,
+        inited: &'d EspWifiController<'d>,
         device: Option<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
     ) -> Result<EspNow<'d>, EspNowError> {
-        if !inited.is_wifi() {
-            return Err(EspNowError::Error(Error::NotInitialized));
+        if !inited.wifi() {
+            // if wifi isn't already enabled, and we try to coexist - panic
+            assert!(device.is_some());
+            crate::wifi::wifi_init()?;
         }
 
         let espnow_rc = EspNowRc::new()?;
         let esp_now = EspNow {
-            _device: device,
             manager: EspNowManager {
                 _rc: espnow_rc.clone(),
             },
@@ -651,31 +699,13 @@ impl<'d> EspNow<'d> {
                 _rc: espnow_rc.clone(),
             },
             receiver: EspNowReceiver { _rc: espnow_rc },
+            _phantom: PhantomData,
         };
         check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) })?;
         check_error!({ esp_wifi_start() })?;
         check_error!({
             esp_wifi_set_inactive_time(wifi_interface_t_WIFI_IF_STA, crate::CONFIG.beacon_timeout)
         })?;
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "ps-min-modem")] {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
-                )})?;
-            } else if #[cfg(feature = "ps-max-modem")] {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM
-                )})?;
-            } else if #[cfg(coex)] {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM
-                )})?;
-            } else {
-                check_error!({esp_wifi_set_ps(
-                    crate::binary::include::wifi_ps_type_t_WIFI_PS_NONE
-                )})?;
-            }
-        };
         check_error!({ esp_now_init() })?;
         check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) })?;
         check_error!({ esp_now_register_send_cb(Some(send_cb)) })?;
@@ -799,7 +829,6 @@ unsafe extern "C" fn send_cb(_mac_addr: *const u8, status: esp_now_send_status_t
 
         ESP_NOW_SEND_CB_INVOKED.store(true, Ordering::Release);
 
-        #[cfg(feature = "async")]
         asynch::ESP_NOW_TX_WAKER.wake();
     })
 }
@@ -846,15 +875,12 @@ unsafe extern "C" fn rcv_cb(
 
         queue.push_back(ReceivedData { data, info });
 
-        #[cfg(feature = "async")]
         asynch::ESP_NOW_RX_WAKER.wake();
     });
 }
 
-#[cfg(feature = "async")]
 pub use asynch::SendFuture;
 
-#[cfg(feature = "async")]
 mod asynch {
     use core::task::{Context, Poll};
 

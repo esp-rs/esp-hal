@@ -66,12 +66,10 @@ pub(crate) fn update_state(event: WifiEvent, handled: bool) {
     }
 }
 
-#[cfg(feature = "async")]
 pub(crate) fn reset_ap_state() {
     AP_STATE.store(WifiState::Invalid, Ordering::Relaxed)
 }
 
-#[cfg(feature = "async")]
 pub(crate) fn reset_sta_state() {
     STA_STATE.store(WifiState::Invalid, Ordering::Relaxed)
 }

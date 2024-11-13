@@ -52,8 +52,9 @@ use crate::{
     gpio::interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
-    peripherals::{self, PARL_IO},
+    peripherals::{self, Interrupt, PARL_IO},
     system::PeripheralClockControl,
+    Async,
     Blocking,
     InterruptConfigurable,
     Mode,
@@ -291,10 +292,7 @@ impl<'d> ClkOutPin<'d> {
 impl TxClkPin for ClkOutPin<'_> {
     fn configure(&mut self) {
         self.pin.set_to_push_pull_output(crate::private::Internal);
-        self.pin.connect_peripheral_to_output(
-            crate::gpio::OutputSignal::PARL_TX_CLK,
-            crate::private::Internal,
-        );
+        crate::gpio::OutputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
     }
 }
 
@@ -317,10 +315,7 @@ impl TxClkPin for ClkInPin<'_> {
 
         self.pin
             .init_input(crate::gpio::Pull::None, crate::private::Internal);
-        self.pin.connect_input_to_peripheral(
-            crate::gpio::InputSignal::PARL_TX_CLK,
-            crate::private::Internal,
-        );
+        crate::gpio::InputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
     }
 }
 
@@ -347,10 +342,7 @@ impl RxClkPin for RxClkInPin<'_> {
 
         self.pin
             .init_input(crate::gpio::Pull::None, crate::private::Internal);
-        self.pin.connect_input_to_peripheral(
-            crate::gpio::InputSignal::PARL_RX_CLK,
-            crate::private::Internal,
-        );
+        crate::gpio::InputSignal::PARL_RX_CLK.connect_to(&mut self.pin);
 
         Instance::set_rx_clk_edge_sel(self.sample_edge);
     }
@@ -389,10 +381,7 @@ where
         self.tx_pins.configure()?;
         self.valid_pin
             .set_to_push_pull_output(crate::private::Internal);
-        self.valid_pin.connect_peripheral_to_output(
-            Instance::tx_valid_pin_signal(),
-            crate::private::Internal,
-        );
+        Instance::tx_valid_pin_signal().connect_to(&mut self.valid_pin);
         Instance::set_tx_hw_valid_en(true);
         Ok(())
     }
@@ -463,7 +452,7 @@ macro_rules! tx_pins {
                 fn configure(&mut self) -> Result<(), Error>{
                     $(
                         self.[< pin_ $pin:lower >].set_to_push_pull_output(crate::private::Internal);
-                        self.[< pin_ $pin:lower >].connect_peripheral_to_output(crate::gpio::OutputSignal::$signal, crate::private::Internal);
+                        crate::gpio::OutputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
                     private::Instance::set_tx_bit_width( private::WidSel::[< Bits $width >]);
@@ -583,8 +572,7 @@ where
         self.rx_pins.configure()?;
         self.valid_pin
             .init_input(crate::gpio::Pull::None, crate::private::Internal);
-        self.valid_pin
-            .connect_input_to_peripheral(Instance::rx_valid_pin_signal(), crate::private::Internal);
+        Instance::rx_valid_pin_signal().connect_to(&mut self.valid_pin);
         Instance::set_rx_sw_en(false);
         if let Some(sel) = self.enable_mode.pulse_submode_sel() {
             Instance::set_rx_pulse_submode_sel(sel);
@@ -683,7 +671,7 @@ macro_rules! rx_pins {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
                         self.[< pin_ $pin:lower >].init_input(crate::gpio::Pull::None, crate::private::Internal);
-                        self.[< pin_ $pin:lower >].connect_input_to_peripheral(crate::gpio::InputSignal::$signal, crate::private::Internal);
+                        crate::gpio::InputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
                     private::Instance::set_rx_bit_width( private::WidSel::[< Bits $width >]);
@@ -923,42 +911,52 @@ where
 fn internal_set_interrupt_handler(handler: InterruptHandler) {
     #[cfg(esp32c6)]
     {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::PARL_IO);
+        }
+        internal_listen(EnumSet::all(), false);
+        internal_clear_interrupts(EnumSet::all());
         unsafe { PARL_IO::steal() }.bind_parl_io_interrupt(handler.handler());
 
-        crate::interrupt::enable(crate::peripherals::Interrupt::PARL_IO, handler.priority())
-            .unwrap();
+        unwrap!(crate::interrupt::enable(
+            Interrupt::PARL_IO,
+            handler.priority()
+        ));
     }
     #[cfg(esp32h2)]
     {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
+            crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
+        }
+        internal_listen(EnumSet::all(), false);
+        internal_clear_interrupts(EnumSet::all());
         unsafe { PARL_IO::steal() }.bind_parl_io_tx_interrupt(handler.handler());
         unsafe { PARL_IO::steal() }.bind_parl_io_rx_interrupt(handler.handler());
 
-        crate::interrupt::enable(
-            crate::peripherals::Interrupt::PARL_IO_TX,
+        unwrap!(crate::interrupt::enable(
+            Interrupt::PARL_IO_TX,
             handler.priority(),
-        )
-        .unwrap();
-        crate::interrupt::enable(
-            crate::peripherals::Interrupt::PARL_IO_RX,
+        ));
+        unwrap!(crate::interrupt::enable(
+            Interrupt::PARL_IO_RX,
             handler.priority(),
-        )
-        .unwrap();
+        ));
     }
 }
 
 fn internal_listen(interrupts: EnumSet<ParlIoInterrupt>, enable: bool) {
     let parl_io = unsafe { PARL_IO::steal() };
-    for interrupt in interrupts {
-        match interrupt {
-            ParlIoInterrupt::TxFifoReEmpty => parl_io
-                .int_ena()
-                .modify(|_, w| w.tx_fifo_rempty().bit(enable)),
-            ParlIoInterrupt::RxFifoWOvf => parl_io
-                .int_ena()
-                .modify(|_, w| w.rx_fifo_wovf().bit(enable)),
-            ParlIoInterrupt::TxEof => parl_io.int_ena().write(|w| w.tx_eof().bit(enable)),
+    parl_io.int_ena().write(|w| {
+        for interrupt in interrupts {
+            match interrupt {
+                ParlIoInterrupt::TxFifoReEmpty => w.tx_fifo_rempty().bit(enable),
+                ParlIoInterrupt::RxFifoWOvf => w.rx_fifo_wovf().bit(enable),
+                ParlIoInterrupt::TxEof => w.tx_eof().bit(enable),
+            };
         }
-    }
+        w
+    });
 }
 
 fn internal_interrupts() -> EnumSet<ParlIoInterrupt> {
@@ -980,17 +978,16 @@ fn internal_interrupts() -> EnumSet<ParlIoInterrupt> {
 
 fn internal_clear_interrupts(interrupts: EnumSet<ParlIoInterrupt>) {
     let parl_io = unsafe { PARL_IO::steal() };
-    for interrupt in interrupts {
-        match interrupt {
-            ParlIoInterrupt::TxFifoReEmpty => parl_io
-                .int_clr()
-                .write(|w| w.tx_fifo_rempty().clear_bit_by_one()),
-            ParlIoInterrupt::RxFifoWOvf => parl_io
-                .int_clr()
-                .write(|w| w.rx_fifo_wovf().clear_bit_by_one()),
-            ParlIoInterrupt::TxEof => parl_io.int_clr().write(|w| w.tx_eof().clear_bit_by_one()),
+    parl_io.int_clr().write(|w| {
+        for interrupt in interrupts {
+            match interrupt {
+                ParlIoInterrupt::TxFifoReEmpty => w.tx_fifo_rempty().clear_bit_by_one(),
+                ParlIoInterrupt::RxFifoWOvf => w.rx_fifo_wovf().clear_bit_by_one(),
+                ParlIoInterrupt::TxEof => w.tx_eof().clear_bit_by_one(),
+            };
         }
-    }
+        w
+    });
 }
 
 /// Parallel IO in full duplex mode
@@ -1008,12 +1005,9 @@ where
     pub rx: RxCreatorFullDuplex<'d, DM>,
 }
 
-impl<'d, DM> ParlIoFullDuplex<'d, DM>
-where
-    DM: Mode,
-{
+impl<'d> ParlIoFullDuplex<'d, Blocking> {
     /// Create a new instance of [ParlIoFullDuplex]
-    pub fn new<CH>(
+    pub fn new<CH, DM>(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
         dma_channel: Channel<'d, CH, DM>,
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -1021,8 +1015,11 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
+        DM: Mode,
         CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
+        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
     {
+        let dma_channel = Channel::<'d, CH, Blocking>::from(dma_channel);
         internal_init(frequency)?;
 
         Ok(Self {
@@ -1038,9 +1035,29 @@ where
             },
         })
     }
-}
 
-impl ParlIoFullDuplex<'_, Blocking> {
+    /// Convert to an async version.
+    pub fn into_async(self) -> ParlIoFullDuplex<'d, Async> {
+        let channel = Channel {
+            tx: self.tx.tx_channel,
+            rx: self.rx.rx_channel,
+            phantom: PhantomData::<Blocking>,
+        };
+        let channel = channel.into_async();
+        ParlIoFullDuplex {
+            tx: TxCreatorFullDuplex {
+                tx_channel: channel.tx,
+                descriptors: self.tx.descriptors,
+                phantom: PhantomData,
+            },
+            rx: RxCreatorFullDuplex {
+                rx_channel: channel.rx,
+                descriptors: self.rx.descriptors,
+                phantom: PhantomData,
+            },
+        }
+    }
+
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1075,6 +1092,30 @@ impl crate::private::Sealed for ParlIoFullDuplex<'_, Blocking> {}
 impl InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoFullDuplex::set_interrupt_handler(self, handler);
+    }
+}
+
+impl<'d> ParlIoFullDuplex<'d, Async> {
+    /// Convert to a blocking version.
+    pub fn into_blocking(self) -> ParlIoFullDuplex<'d, Blocking> {
+        let channel = Channel {
+            tx: self.tx.tx_channel,
+            rx: self.rx.rx_channel,
+            phantom: PhantomData::<Async>,
+        };
+        let channel = channel.into_blocking();
+        ParlIoFullDuplex {
+            tx: TxCreatorFullDuplex {
+                tx_channel: channel.tx,
+                descriptors: self.tx.descriptors,
+                phantom: PhantomData,
+            },
+            rx: RxCreatorFullDuplex {
+                rx_channel: channel.rx,
+                descriptors: self.rx.descriptors,
+                phantom: PhantomData,
+            },
+        }
     }
 }
 

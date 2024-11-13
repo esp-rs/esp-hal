@@ -130,10 +130,7 @@ impl rand_core::RngCore for Rng {
 /// the randomness from the hardware RNG and an ADC. This struct provides
 /// methods to generate random numbers and fill buffers with random bytes.
 /// Due to pulling the entropy source from the ADC, it uses the associated
-/// regiters, so to use TRNG we need to "occupy" the ADC peripheral.
-///
-/// For now, even after calling `core::mem::drop()` on `TRNG` ADC1 will not be
-/// usable (details in esp-hal/#1750)
+/// registers, so to use TRNG we need to "occupy" the ADC peripheral.
 ///
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
@@ -141,9 +138,7 @@ impl rand_core::RngCore for Rng {
 /// # use esp_hal::peripherals::Peripherals;
 /// # use esp_hal::peripherals::ADC1;
 /// # use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
-/// # use esp_hal::gpio::Io;
 ///
-/// let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 /// let mut buf = [0u8; 16];
 ///
 /// // ADC is not available from now
@@ -152,13 +147,15 @@ impl rand_core::RngCore for Rng {
 /// let mut true_rand = trng.random();
 /// let mut rng = trng.downgrade();
 /// // ADC is available now
-#[cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]
-#[cfg_attr(not(esp32), doc = "let analog_pin = io.pins.gpio3;")]
+#[cfg_attr(esp32, doc = "let analog_pin = peripherals.GPIO32;")]
+#[cfg_attr(not(esp32), doc = "let analog_pin = peripherals.GPIO3;")]
 /// let mut adc1_config = AdcConfig::new();
-/// let mut adc1_pin = adc1_config.enable_pin(analog_pin,
-/// Attenuation::Attenuation11dB); let mut adc1 =
-/// Adc::<ADC1>::new(peripherals.ADC1, adc1_config); let pin_value: u16 =
-/// nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+/// let mut adc1_pin = adc1_config.enable_pin(
+///     analog_pin,
+///     Attenuation::Attenuation11dB
+/// );
+/// let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
+/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
 /// rng.read(&mut buf);
 /// true_rand = rng.random();
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();

@@ -7,7 +7,6 @@
 
 use embedded_hal_02::can::Frame;
 use esp_hal::{
-    gpio::Io,
     prelude::*,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
     Blocking,
@@ -28,14 +27,14 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let (loopback_pin, _) = hil_test::common_test_pins!(peripherals);
 
-        let (loopback_pin, _) = hil_test::common_test_pins!(io);
+        let (rx, tx) = loopback_pin.split();
 
         let mut config = twai::TwaiConfiguration::new(
             peripherals.TWAI0,
-            loopback_pin.peripheral_input(),
-            loopback_pin,
+            rx,
+            tx,
             twai::BaudRate::B1000K,
             TwaiMode::SelfTest,
         );

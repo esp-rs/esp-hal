@@ -23,28 +23,24 @@ pub const TICKS_PER_SECOND: u64 = 1_000_000;
 
 use super::TIMER;
 
-pub(crate) fn setup_timer(mut alarm0: TimeBase) -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn setup_timer(mut alarm0: TimeBase) {
     // make sure the scheduling won't start before everything is setup
     riscv::interrupt::disable();
 
     let cb: extern "C" fn() = unsafe { core::mem::transmute(handler as *const ()) };
     alarm0.set_interrupt_handler(InterruptHandler::new(cb, interrupt::Priority::Priority1));
-    alarm0.start(TIMESLICE_FREQUENCY.into_duration())?;
+    unwrap!(alarm0.start(TIMESLICE_FREQUENCY.into_duration()));
     critical_section::with(|cs| {
         alarm0.enable_interrupt(true);
         TIMER.borrow_ref_mut(cs).replace(alarm0);
     });
-
-    Ok(())
 }
 
-pub(crate) fn disable_timer() -> Result<(), esp_hal::timer::Error> {
+pub(crate) fn disable_timer() {
     critical_section::with(|cs| {
         unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
-        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel().unwrap();
+        unwrap!(unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel());
     });
-
-    Ok(())
 }
 
 pub(crate) fn setup_multitasking() {

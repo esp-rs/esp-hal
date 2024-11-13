@@ -5,7 +5,9 @@ use crate::{
         self,
         AlternateFunction,
         AnyPin,
+        Flex,
         InputPin,
+        InputSignalType,
         Level,
         NoPin,
         OutputPin,
@@ -34,33 +36,203 @@ pub trait PeripheralInput: Into<InputConnection> + 'static {}
 /// [`PeripheralInput`] as arguments instead of pin types.
 pub trait PeripheralOutput: Into<OutputConnection> + 'static {}
 
+// Pins
 impl<P: InputPin> PeripheralInput for P {}
 impl<P: OutputPin> PeripheralOutput for P {}
 
-impl PeripheralInput for InputSignal {}
-impl PeripheralInput for OutputSignal {}
-impl PeripheralOutput for OutputSignal {}
+// Pin drivers
+impl<P: InputPin> PeripheralInput for Flex<'static, P> {}
+impl<P: OutputPin> PeripheralOutput for Flex<'static, P> {}
 
+// Placeholders
 impl PeripheralInput for NoPin {}
 impl PeripheralOutput for NoPin {}
 
 impl PeripheralInput for Level {}
 impl PeripheralOutput for Level {}
 
-impl PeripheralInput for InputConnection {}
+// Split signals
+impl PeripheralInput for InputSignal {}
+impl PeripheralInput for OutputSignal {}
+impl PeripheralOutput for OutputSignal {}
 
+// Type-erased signals
+impl PeripheralInput for InputConnection {}
 impl PeripheralInput for OutputConnection {}
 impl PeripheralOutput for OutputConnection {}
 
-/// A configurable input signal between a peripheral and a GPIO pin.
+impl gpio::InputSignal {
+    fn can_use_gpio_matrix(self) -> bool {
+        self as InputSignalType <= INPUT_SIGNAL_MAX
+    }
+
+    /// Connects a peripheral input signal to a GPIO or a constant level.
+    ///
+    /// Note that connecting multiple GPIOs to a single peripheral input is not
+    /// possible and the previous connection will be replaced.
+    ///
+    /// Also note that a peripheral input must always be connected to something,
+    /// so if you want to disconnect it from GPIOs, you should connect it to a
+    /// constant level.
+    #[inline]
+    pub fn connect_to(self, pin: impl Peripheral<P = impl PeripheralInput>) {
+        crate::into_mapped_ref!(pin);
+
+        pin.connect_input_to_peripheral(self);
+    }
+}
+
+impl gpio::OutputSignal {
+    fn can_use_gpio_matrix(self) -> bool {
+        self as OutputSignalType <= OUTPUT_SIGNAL_MAX
+    }
+
+    /// Connects a peripheral output signal to a GPIO.
+    ///
+    /// Note that connecting multiple output signals to a single GPIO is not
+    /// possible and the previous connection will be replaced.
+    ///
+    /// Also note that it is possible to connect a peripheral output signal to
+    /// multiple GPIOs, and old connections will not be cleared automatically.
+    #[inline]
+    pub fn connect_to(self, pin: impl Peripheral<P = impl PeripheralOutput>) {
+        crate::into_mapped_ref!(pin);
+
+        pin.connect_peripheral_to_output(self);
+    }
+
+    /// Disconnects a peripheral output signal from a GPIO.
+    #[inline]
+    pub fn disconnect_from(self, pin: impl Peripheral<P = impl PeripheralOutput>) {
+        crate::into_mapped_ref!(pin);
+
+        pin.disconnect_from_peripheral_output(self);
+    }
+}
+
+/// Connects a peripheral input (`signal`, e.g. SPI MISO) to a GPIO or a
+/// constant level (`input`).
 ///
-/// Obtained by calling [`super::GpioPin::peripheral_input()`],
-/// [`super::Flex::peripheral_input()`] or [`super::Input::peripheral_input()`].
+/// - `signal`: The input signal to connect to the pin
+/// - `input`: The GPIO (or constant level) number to connect to the input
+///   signal.
+/// - `invert`: Configures whether or not to invert the input value
+/// - `use_gpio_matrix`: true to route through the GPIO matrix
+pub(crate) fn connect_input_signal(
+    signal: gpio::InputSignal,
+    input: u8,
+    invert: bool,
+    use_gpio_matrix: bool,
+) {
+    assert!(
+        signal.can_use_gpio_matrix() || !use_gpio_matrix,
+        "{:?} cannot be routed through the GPIO matrix",
+        signal
+    );
+    unsafe { GPIO::steal() }
+        .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
+        .write(|w| unsafe {
+            w.sel().bit(use_gpio_matrix);
+            w.in_inv_sel().bit(invert);
+            w.in_sel().bits(input) // Connect to GPIO or constant level
+        });
+}
+
+fn connect_pin_to_input_signal(
+    pin: &mut AnyPin,
+    signal: gpio::InputSignal,
+    is_inverted: bool,
+    force_gpio: bool,
+) {
+    let af = if is_inverted || force_gpio {
+        GPIO_FUNCTION
+    } else {
+        pin.input_signals(private::Internal)
+            .iter()
+            .find(|(_af, s)| *s == signal)
+            .map(|(af, _)| *af)
+            .unwrap_or(GPIO_FUNCTION)
+    };
+
+    pin.set_alternate_function(af, private::Internal);
+
+    connect_input_signal(signal, pin.number(), is_inverted, af == GPIO_FUNCTION);
+}
+
+fn connect_peripheral_to_output(
+    pin: &mut AnyPin,
+    signal: gpio::OutputSignal,
+    is_inverted: bool,
+    force_gpio: bool,
+    peripheral_control_output_enable: bool,
+    invert_output_enable: bool,
+) {
+    let af = if is_inverted || force_gpio {
+        GPIO_FUNCTION
+    } else {
+        pin.output_signals(private::Internal)
+            .iter()
+            .find(|(_af, s)| *s == signal)
+            .map(|(af, _)| *af)
+            .unwrap_or(GPIO_FUNCTION)
+    };
+
+    assert!(
+        signal.can_use_gpio_matrix() || af != GPIO_FUNCTION,
+        "{:?} cannot be routed through the GPIO matrix",
+        signal
+    );
+
+    pin.set_alternate_function(af, private::Internal);
+
+    // Inlined because output signals can only be connected to pins or nothing, so
+    // there is no other user.
+    unsafe { GPIO::steal() }
+        .func_out_sel_cfg(pin.number() as usize)
+        .write(|w| unsafe {
+            if af == GPIO_FUNCTION {
+                // Ignored if the signal is not routed through the GPIO matrix - alternate
+                // function selects peripheral signal directly.
+                w.out_sel().bits(signal as _);
+                w.inv_sel().bit(is_inverted);
+            }
+            w.oen_sel().bit(!peripheral_control_output_enable);
+            w.oen_inv_sel().bit(invert_output_enable)
+        });
+}
+
+fn disconnect_peripheral_output_from_pin(pin: &mut AnyPin, signal: gpio::OutputSignal) {
+    pin.set_alternate_function(GPIO_FUNCTION, private::Internal);
+
+    unsafe { GPIO::steal() }
+        .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
+        .write(|w| w.sel().clear_bit());
+}
+
+/// A configurable input signal between a peripheral and a GPIO pin.
 ///
 /// Multiple input signals can be connected to one pin.
 pub struct InputSignal {
     pin: AnyPin,
     is_inverted: bool,
+}
+
+impl<P> From<P> for InputSignal
+where
+    P: InputPin,
+{
+    fn from(input: P) -> Self {
+        Self::new(input.degrade())
+    }
+}
+
+impl<P> From<Flex<'static, P>> for InputSignal
+where
+    P: InputPin,
+{
+    fn from(input: Flex<'static, P>) -> Self {
+        Self::new(input.degrade())
+    }
 }
 
 impl Clone for InputSignal {
@@ -90,6 +262,11 @@ impl InputSignal {
         }
     }
 
+    /// Returns the GPIO number of the underlying pin.
+    pub fn number(&self) -> u8 {
+        self.pin.number()
+    }
+
     /// Returns the current signal level.
     pub fn get_level(&self) -> Level {
         self.is_input_high(private::Internal).into()
@@ -102,7 +279,7 @@ impl InputSignal {
         self.is_inverted = !self.is_inverted;
     }
 
-    /// Consumed the signal and returns a new one that inverts the peripheral's
+    /// Consumes the signal and returns a new one that inverts the peripheral's
     /// input signal.
     ///
     /// Calling this function multiple times toggles the setting.
@@ -111,66 +288,13 @@ impl InputSignal {
         self
     }
 
-    /// - signal: The input signal to connect to the pin
-    /// - invert: Configures whether or not to invert the input value
-    /// - input: The GPIO number to connect to the input signal
-    fn connect(&self, signal: usize, invert: bool, input: u8) {
-        unsafe { GPIO::steal() }
-            .func_in_sel_cfg(signal - FUNC_IN_SEL_OFFSET)
-            .modify(|_, w| unsafe {
-                w.sel().set_bit();
-                w.in_inv_sel().bit(invert);
-                w.in_sel().bits(input)
-            });
-    }
-}
-
-impl InputSignal {
     /// Connect the pin to a peripheral input signal.
     ///
     /// Since there can only be one input signal connected to a peripheral at a
     /// time, this function will disconnect any previously connected input
     /// signals.
-    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal, _: private::Internal) {
-        let signal_nr = signal as usize;
-
-        let af = if self.is_inverted {
-            GPIO_FUNCTION
-        } else {
-            self.input_signals(private::Internal)
-                .iter()
-                .find(|(_af, s)| *s == signal)
-                .map(|(af, _)| *af)
-                .unwrap_or(GPIO_FUNCTION)
-        };
-
-        if af == GPIO_FUNCTION && signal_nr > INPUT_SIGNAL_MAX as usize {
-            panic!("Cannot connect GPIO to this peripheral");
-        }
-
-        self.pin.set_alternate_function(af, private::Internal);
-
-        if signal_nr <= INPUT_SIGNAL_MAX as usize {
-            self.connect(signal_nr, self.is_inverted, self.pin.number());
-        }
-    }
-
-    /// Remove this pin from a connected peripheral input.
-    ///
-    /// Clears the entry in the GPIO matrix / Io mux that associates this input
-    /// pin with the given [input `signal`](`InputSignal`). Any other
-    /// connected signals remain intact.
-    fn disconnect_input_from_peripheral(
-        &mut self,
-        signal: gpio::InputSignal,
-        _: private::Internal,
-    ) {
-        self.pin
-            .set_alternate_function(GPIO_FUNCTION, private::Internal);
-
-        unsafe { GPIO::steal() }
-            .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
-            .modify(|_, w| w.sel().clear_bit());
+    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal) {
+        connect_pin_to_input_signal(&mut self.pin, signal, self.is_inverted, true);
     }
 
     delegate::delegate! {
@@ -181,21 +305,72 @@ impl InputSignal {
             pub fn init_input(&self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+        }
+    }
+}
+
+/// A limited, private version of [InputSignal] that allows bypassing the GPIO
+/// matrix. This is only usable when the GPIO pin connected to the signal is not
+/// split.
+struct DirectInputSignal {
+    pin: AnyPin,
+}
+
+impl Clone for DirectInputSignal {
+    fn clone(&self) -> Self {
+        Self::new(unsafe { self.pin.clone_unchecked() })
+    }
+}
+
+impl DirectInputSignal {
+    pub(crate) fn new(pin: AnyPin) -> Self {
+        Self { pin }
+    }
+
+    /// Connect the pin to a peripheral input signal.
+    ///
+    /// Since there can only be one input signal connected to a peripheral at a
+    /// time, this function will disconnect any previously connected input
+    /// signals.
+    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal) {
+        connect_pin_to_input_signal(&mut self.pin, signal, false, false);
+    }
+
+    delegate::delegate! {
+        to self.pin {
+            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
+            fn init_input(&self, pull: Pull, _internal: private::Internal);
+            fn is_input_high(&self, _internal: private::Internal) -> bool;
+            fn enable_input(&mut self, on: bool, _internal: private::Internal);
         }
     }
 }
 
 /// A configurable output signal between a peripheral and a GPIO pin.
 ///
-/// Obtained by calling [`super::GpioPin::into_peripheral_output()`],
-/// [`super::Flex::into_peripheral_output()`] or
-/// [`super::Output::into_peripheral_output()`].
-///
 /// Multiple pins can be connected to one output signal.
 pub struct OutputSignal {
     pin: AnyPin,
     is_inverted: bool,
+}
+
+impl<P> From<P> for OutputSignal
+where
+    P: OutputPin,
+{
+    fn from(input: P) -> Self {
+        Self::new(input.degrade())
+    }
+}
+
+impl<P> From<Flex<'static, P>> for OutputSignal
+where
+    P: OutputPin,
+{
+    fn from(input: Flex<'static, P>) -> Self {
+        Self::new(input.degrade())
+    }
 }
 
 impl Peripheral for OutputSignal {
@@ -219,6 +394,11 @@ impl OutputSignal {
         }
     }
 
+    /// Returns the GPIO number of the underlying pin.
+    pub fn number(&self) -> u8 {
+        self.pin.number()
+    }
+
     /// Inverts the peripheral's output signal.
     ///
     /// Calling this function multiple times toggles the setting.
@@ -226,7 +406,7 @@ impl OutputSignal {
         self.is_inverted = !self.is_inverted;
     }
 
-    /// Consumed the signal and returns a new one that inverts the peripheral's
+    /// Consumes the signal and returns a new one that inverts the peripheral's
     /// output signal.
     ///
     /// Calling this function multiple times toggles the setting.
@@ -235,141 +415,18 @@ impl OutputSignal {
         self
     }
 
-    /// - signal: The input signal to connect to the pin
-    /// - invert: Configures whether or not to invert the input value
-    /// - input: The GPIO number to connect to the input signal
-    fn connect_input(&self, signal: usize, invert: bool, input: u8) {
-        unsafe { GPIO::steal() }
-            .func_in_sel_cfg(signal - FUNC_IN_SEL_OFFSET)
-            .modify(|_, w| unsafe {
-                w.sel().set_bit();
-                w.in_inv_sel().bit(invert);
-                w.in_sel().bits(input)
-            });
-    }
-
-    /// - signal: The output signal to connect to the pin
-    /// - invert: Configures whether or not to invert the output value
-    /// - invert_enable: Configures whether or not to invert the output enable
-    ///   signal
-    /// - enable_from_gpio: Configures to select the source of output enable
-    ///   signal.
-    ///   - false: Use output enable signal from peripheral
-    ///   - true: Force the output enable signal to be sourced from bit n of
-    ///     GPIO_ENABLE_REG
-    /// - output: The GPIO number to connect to the output signal
-    fn connect_output(
-        &self,
-        signal: OutputSignalType,
-        invert: bool,
-        invert_enable: bool,
-        enable_from_gpio: bool,
-        output: u8,
-    ) {
-        unsafe { GPIO::steal() }
-            .func_out_sel_cfg(output as usize)
-            .modify(|_, w| unsafe {
-                w.out_sel().bits(signal);
-                w.inv_sel().bit(invert);
-                w.oen_sel().bit(enable_from_gpio);
-                w.oen_inv_sel().bit(invert_enable)
-            });
-    }
-}
-
-impl OutputSignal {
-    /// Connect the pin to a peripheral input signal.
-    ///
-    /// Since there can only be one signal connected to a peripheral input at a
-    /// time, this function will disconnect any previously connected input
-    /// signals.
-    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal, _: private::Internal) {
-        let signal_nr = signal as usize;
-
-        let af = if self.is_inverted {
-            GPIO_FUNCTION
-        } else {
-            self.input_signals(private::Internal)
-                .iter()
-                .find(|(_af, s)| *s == signal)
-                .map(|(af, _)| *af)
-                .unwrap_or(GPIO_FUNCTION)
-        };
-
-        if af == GPIO_FUNCTION && signal_nr > INPUT_SIGNAL_MAX as usize {
-            panic!("Cannot connect GPIO to this peripheral");
-        }
-
-        self.pin.set_alternate_function(af, private::Internal);
-
-        if signal_nr <= INPUT_SIGNAL_MAX as usize {
-            self.connect_input(signal_nr, self.is_inverted, self.pin.number());
-        }
-    }
-
-    /// Remove this pin from a connected peripheral input.
-    ///
-    /// Clears the entry in the GPIO matrix / Io mux that associates this input
-    /// pin with the given [input `signal`](`InputSignal`). Any other
-    /// connected signals remain intact.
-    fn disconnect_input_from_peripheral(
-        &mut self,
-        signal: gpio::InputSignal,
-        _: private::Internal,
-    ) {
-        self.pin
-            .set_alternate_function(GPIO_FUNCTION, private::Internal);
-
-        unsafe { GPIO::steal() }
-            .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
-            .modify(|_, w| w.sel().clear_bit());
-    }
-
     /// Connect the pin to a peripheral output signal.
-    fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal, _: private::Internal) {
-        let af = if self.is_inverted {
-            GPIO_FUNCTION
-        } else {
-            self.output_signals(private::Internal)
-                .iter()
-                .find(|(_af, s)| *s == signal)
-                .map(|(af, _)| *af)
-                .unwrap_or(GPIO_FUNCTION)
-        };
-
-        self.pin.set_alternate_function(af, private::Internal);
-
-        let clipped_signal = if signal as usize <= OUTPUT_SIGNAL_MAX as usize {
-            signal as OutputSignalType
-        } else {
-            OUTPUT_SIGNAL_MAX
-        };
-
-        self.connect_output(
-            clipped_signal,
-            self.is_inverted,
-            false,
-            false,
-            self.pin.number(),
-        );
+    fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal) {
+        connect_peripheral_to_output(&mut self.pin, signal, self.is_inverted, true, true, false);
     }
 
-    /// Remove this output pin from a connected [signal](`OutputSignal`).
+    /// Remove this output pin from a connected [signal](`gpio::OutputSignal`).
     ///
     /// Clears the entry in the GPIO matrix / Io mux that associates this output
-    /// pin with a previously connected [signal](`OutputSignal`). Any other
-    /// outputs connected to the peripheral remain intact.
-    fn disconnect_from_peripheral_output(
-        &mut self,
-        signal: gpio::OutputSignal,
-        _: private::Internal,
-    ) {
-        self.pin
-            .set_alternate_function(GPIO_FUNCTION, private::Internal);
-
-        unsafe { GPIO::steal() }
-            .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
-            .modify(|_, w| w.sel().clear_bit());
+    /// pin with a previously connected [signal](`gpio::OutputSignal`). Any
+    /// other outputs connected to the peripheral remain intact.
+    fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal) {
+        disconnect_peripheral_output_from_pin(&mut self.pin, signal);
     }
 
     delegate::delegate! {
@@ -380,7 +437,6 @@ impl OutputSignal {
             pub fn init_input(&self, pull: Pull, _internal: private::Internal);
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
 
             pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
             pub fn set_to_open_drain_output(&mut self, _internal: private::Internal);
@@ -389,7 +445,6 @@ impl OutputSignal {
             pub fn set_output_high(&mut self, on: bool, _internal: private::Internal);
             pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength, _internal: private::Internal);
             pub fn enable_open_drain(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_output_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn is_set_high(&self, _internal: private::Internal) -> bool;
@@ -397,13 +452,62 @@ impl OutputSignal {
     }
 }
 
+/// A limited, private version of [OutputSignal] that allows bypassing the GPIO
+/// matrix. This is only usable when the GPIO pin connected to the signal is not
+/// split.
+struct DirectOutputSignal {
+    pin: AnyPin,
+}
+
+impl DirectOutputSignal {
+    pub(crate) fn new(pin: AnyPin) -> Self {
+        Self { pin }
+    }
+
+    /// Connect the pin to a peripheral output signal.
+    fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal) {
+        connect_peripheral_to_output(&mut self.pin, signal, false, false, true, false);
+    }
+
+    /// Remove this output pin from a connected [signal](`gpio::OutputSignal`).
+    ///
+    /// Clears the entry in the GPIO matrix / Io mux that associates this output
+    /// pin with a previously connected [signal](`gpio::OutputSignal`). Any
+    /// other outputs connected to the peripheral remain intact.
+    fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal) {
+        disconnect_peripheral_output_from_pin(&mut self.pin, signal);
+    }
+
+    delegate::delegate! {
+        to self.pin {
+            fn pull_direction(&self, pull: Pull, _internal: private::Internal);
+            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
+            fn init_input(&self, pull: Pull, _internal: private::Internal);
+            fn is_input_high(&self, _internal: private::Internal) -> bool;
+            fn enable_input(&mut self, on: bool, _internal: private::Internal);
+
+            fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
+            fn set_to_open_drain_output(&mut self, _internal: private::Internal);
+            fn set_to_push_pull_output(&mut self, _internal: private::Internal);
+            fn enable_output(&mut self, on: bool, _internal: private::Internal);
+            fn set_output_high(&mut self, on: bool, _internal: private::Internal);
+            fn set_drive_strength(&mut self, strength: gpio::DriveStrength, _internal: private::Internal);
+            fn enable_open_drain(&mut self, on: bool, _internal: private::Internal);
+            fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
+            fn is_set_high(&self, _internal: private::Internal) -> bool;
+        }
+    }
+}
+
 #[derive(Clone)]
 enum InputConnectionInner {
     Input(InputSignal),
+    DirectInput(DirectInputSignal),
     Constant(Level),
 }
 
-/// A type-erased peripheral input signal connection.
+/// A peripheral input signal connection.
 ///
 /// This is mainly intended for internal use, but it can be used to connect
 /// peripherals within the MCU without external hardware.
@@ -441,9 +545,7 @@ where
     P: InputPin,
 {
     fn from(input: P) -> Self {
-        Self(InputConnectionInner::Input(
-            input.degrade().peripheral_input(),
-        ))
+        Self(InputConnectionInner::Input(InputSignal::from(input)))
     }
 }
 
@@ -456,12 +558,30 @@ impl From<OutputSignal> for InputConnection {
     }
 }
 
+impl From<DirectOutputSignal> for InputConnection {
+    fn from(output_signal: DirectOutputSignal) -> Self {
+        Self(InputConnectionInner::DirectInput(DirectInputSignal::new(
+            output_signal.pin,
+        )))
+    }
+}
+
 impl From<OutputConnection> for InputConnection {
     fn from(conn: OutputConnection) -> Self {
         match conn.0 {
             OutputConnectionInner::Output(inner) => inner.into(),
+            OutputConnectionInner::DirectOutput(inner) => inner.into(),
             OutputConnectionInner::Constant(inner) => inner.into(),
         }
+    }
+}
+
+impl<P> From<Flex<'static, P>> for InputConnection
+where
+    P: InputPin,
+{
+    fn from(pin: Flex<'static, P>) -> Self {
+        pin.peripheral_input().into()
     }
 }
 
@@ -472,6 +592,7 @@ impl InputConnection {
         #[doc(hidden)]
         to match &self.0 {
             InputConnectionInner::Input(pin) => pin,
+            InputConnectionInner::DirectInput(pin) => pin,
             InputConnectionInner::Constant(level) => level,
         } {
             pub fn pull_direction(&self, pull: Pull, _internal: private::Internal);
@@ -483,22 +604,22 @@ impl InputConnection {
         #[doc(hidden)]
         to match &mut self.0 {
             InputConnectionInner::Input(pin) => pin,
+            InputConnectionInner::DirectInput(pin) => pin,
             InputConnectionInner::Constant(level) => level,
         } {
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            pub fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
-            pub fn disconnect_input_from_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
+            fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal);
         }
     }
 }
 
 enum OutputConnectionInner {
     Output(OutputSignal),
+    DirectOutput(DirectOutputSignal),
     Constant(Level),
 }
 
-/// A type-erased peripheral (input and) output signal connection.
+/// A peripheral (input and) output signal connection.
 ///
 /// This is mainly intended for internal use, but it can be used to connect
 /// peripherals within the MCU without external hardware.
@@ -512,6 +633,9 @@ impl Peripheral for OutputConnection {
     unsafe fn clone_unchecked(&self) -> Self::P {
         match self {
             Self(OutputConnectionInner::Output(signal)) => Self::from(signal.clone_unchecked()),
+            Self(OutputConnectionInner::DirectOutput(signal)) => {
+                Self::from(DirectOutputSignal::new(signal.pin.clone_unchecked()))
+            }
             Self(OutputConnectionInner::Constant(level)) => Self::from(*level),
         }
     }
@@ -534,9 +658,7 @@ where
     P: OutputPin,
 {
     fn from(input: P) -> Self {
-        Self(OutputConnectionInner::Output(
-            input.degrade().into_peripheral_output(),
-        ))
+        Self(OutputConnectionInner::Output(OutputSignal::from(input)))
     }
 }
 
@@ -546,54 +668,55 @@ impl From<OutputSignal> for OutputConnection {
     }
 }
 
+impl<P> From<Flex<'static, P>> for OutputConnection
+where
+    P: OutputPin,
+{
+    fn from(pin: Flex<'static, P>) -> Self {
+        pin.into_peripheral_output().into()
+    }
+}
+
+impl From<DirectOutputSignal> for OutputConnection {
+    fn from(signal: DirectOutputSignal) -> Self {
+        Self(OutputConnectionInner::DirectOutput(signal))
+    }
+}
+
 impl OutputConnection {
     delegate::delegate! {
         #[doc(hidden)]
         to match &self.0 {
             OutputConnectionInner::Output(pin) => pin,
+            OutputConnectionInner::DirectOutput(pin) => pin,
             OutputConnectionInner::Constant(level) => level,
         } {
             pub fn is_input_high(&self, _internal: private::Internal) -> bool;
             pub fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::InputSignal)];
+
+            pub fn is_set_high(&self, _internal: private::Internal) -> bool;
+            pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
         }
         #[doc(hidden)]
         to match &mut self.0 {
             OutputConnectionInner::Output(pin) => pin,
+            OutputConnectionInner::DirectOutput(pin) => pin,
             OutputConnectionInner::Constant(level) => level,
         } {
             pub fn pull_direction(&mut self, pull: Pull, _internal: private::Internal);
             pub fn init_input(&mut self, pull: Pull, _internal: private::Internal);
             pub fn enable_input(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_input_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            pub fn connect_input_to_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
-            pub fn disconnect_input_from_peripheral(&mut self, signal: crate::gpio::InputSignal, _internal: private::Internal);
-        }
 
-        #[doc(hidden)]
-        to match &self.0 {
-            OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::Constant(level) => level,
-        } {
-            pub fn is_set_high(&self, _internal: private::Internal) -> bool;
-            pub fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, gpio::OutputSignal)];
-        }
-
-        #[doc(hidden)]
-        to match &mut self.0 {
-            OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::Constant(level) => level,
-        } {
             pub fn set_to_open_drain_output(&mut self, _internal: private::Internal);
             pub fn set_to_push_pull_output(&mut self, _internal: private::Internal);
             pub fn enable_output(&mut self, on: bool, _internal: private::Internal);
             pub fn set_output_high(&mut self, on: bool, _internal: private::Internal);
             pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength, _internal: private::Internal);
             pub fn enable_open_drain(&mut self, on: bool, _internal: private::Internal);
-            pub fn enable_output_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
             pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _internal: private::Internal);
-            pub fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal, _internal: private::Internal);
-            pub fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal, _internal: private::Internal);
+            fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal);
+            fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal);
         }
     }
 }

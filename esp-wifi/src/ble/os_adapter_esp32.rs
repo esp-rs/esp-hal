@@ -586,7 +586,6 @@ const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
 ///   true if request lock is needed, false otherwise
 ///
 /// *************************************************************************
-
 #[cfg(coex)]
 fn async_wakeup_request(event: i32) -> bool {
     let mut do_wakeup_request = false;
@@ -623,7 +622,6 @@ fn async_wakeup_request(event: i32) -> bool {
 ///   true if request lock is needed, false otherwise
 ///
 /// *************************************************************************
-
 #[cfg(coex)]
 fn async_wakeup_request_end(event: i32) {
     let request_lock = match event {

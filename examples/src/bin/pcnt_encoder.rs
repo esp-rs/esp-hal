@@ -20,7 +20,7 @@ use core::{cell::RefCell, cmp::min, sync::atomic::Ordering};
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Input, Io, Pull},
+    gpio::{Input, Pull},
     interrupt::Priority,
     pcnt::{channel, unit, Pcnt},
     prelude::*,
@@ -35,8 +35,6 @@ static VALUE: AtomicI32 = AtomicI32::new(0);
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     // Set up a pulse counter:
     println!("setup pulse counter unit 0");
     let mut pcnt = Pcnt::new(peripherals.PCNT);
@@ -49,18 +47,22 @@ fn main() -> ! {
 
     println!("setup channel 0");
     let ch0 = &u0.channel0;
-    let pin_a = Input::new(io.pins.gpio4, Pull::Up);
-    let pin_b = Input::new(io.pins.gpio5, Pull::Up);
 
-    ch0.set_ctrl_signal(pin_a.peripheral_input());
-    ch0.set_edge_signal(pin_b.peripheral_input());
+    let pin_a = Input::new(peripherals.GPIO4, Pull::Up);
+    let pin_b = Input::new(peripherals.GPIO5, Pull::Up);
+
+    let (input_a, _) = pin_a.split();
+    let (input_b, _) = pin_b.split();
+
+    ch0.set_ctrl_signal(input_a.clone());
+    ch0.set_edge_signal(input_b.clone());
     ch0.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
     ch0.set_input_mode(channel::EdgeMode::Increment, channel::EdgeMode::Decrement);
 
     println!("setup channel 1");
     let ch1 = &u0.channel1;
-    ch1.set_ctrl_signal(pin_b.peripheral_input());
-    ch1.set_edge_signal(pin_a.peripheral_input());
+    ch1.set_ctrl_signal(input_b);
+    ch1.set_edge_signal(input_a);
     ch1.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
     ch1.set_input_mode(channel::EdgeMode::Decrement, channel::EdgeMode::Increment);
 

@@ -36,10 +36,7 @@
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 
-use crate::{
-    gpio::{AlternateFunction, GpioPin},
-    peripherals::GPIO,
-};
+use crate::{gpio::AlternateFunction, peripherals::GPIO};
 
 // https://github.com/espressif/esp-idf/blob/df9310a/components/soc/esp32h2/gpio_periph.c#L42
 /// The total number of GPIO pins available.
@@ -47,6 +44,7 @@ pub const NUM_PINS: usize = 28;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u8;
 pub(crate) type OutputSignalType = u8;
 pub(crate) const OUTPUT_SIGNAL_MAX: u8 = 128;
 pub(crate) const INPUT_SIGNAL_MAX: u8 = 124;
@@ -66,7 +64,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     EXT_ADC_START       = 0,
@@ -151,7 +150,8 @@ pub enum InputSignal {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum OutputSignal {
     LEDC_LS_SIG0     = 0,
@@ -247,37 +247,6 @@ pub enum OutputSignal {
     CLK_OUT_OUT2     = 126,
     CLK_OUT_OUT3     = 127,
     GPIO             = 128,
-}
-
-crate::gpio! {
-    (0, [Input, Output, Analog] (2 => FSPIQ) (2 => FSPIQ))
-    (1, [Input, Output, Analog] (2 => FSPICS0) (2 => FSPICS0))
-    (2, [Input, Output, Analog] (2 => FSPIWP) (2 => FSPIWP))
-    (3, [Input, Output, Analog] (2 => FSPIHD) (2 => FSPIHD))
-    (4, [Input, Output, Analog] (2 => FSPICLK) (2 => FSPICLK_MUX))
-    (5, [Input, Output, Analog] (2 => FSPID) (2 => FSPID))
-    (6, [Input, Output])
-    (7, [Input, Output])
-    (8, [Input, Output])
-    (9, [Input, Output])
-    (10, [Input, Output])
-    (11, [Input, Output])
-    (12, [Input, Output])
-    (13, [Input, Output])
-    (14, [Input, Output])
-    (15, [Input, Output] () (0 => SPICS0))
-    (16, [Input, Output] (0 => SPIQ) (0 => SPIQ))
-    (17, [Input, Output] (0 => SPIWP) (0 => SPIWP))
-    (18, [Input, Output] (0 => SPIHD) (0 => SPIHD))
-    (19, [Input, Output] () (0 => SPICLK))
-    (20, [Input, Output] (0 => SPID) (0 => SPID))
-    (21, [Input, Output])
-    (22, [Input, Output])
-    (23, [Input, Output] () (2 => FSPICS1))
-    (24, [Input, Output] () (2 => FSPICS2))
-    (25, [Input, Output] () (2 => FSPICS3))
-    (26, [Input, Output] () (2 => FSPICS4))
-    (27, [Input, Output] () (2 => FSPICS5))
 }
 
 #[derive(Clone, Copy)]

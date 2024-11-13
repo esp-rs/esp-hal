@@ -23,10 +23,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::rtc_io::LowPowerOutput;
-//! # use esp_hal::gpio::Io;
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // configure GPIO 1 as ULP output pin
-//! let lp_pin = LowPowerOutput::<'static, 1>::new(io.pins.gpio1);
+//! let lp_pin = LowPowerOutput::<'static, 1>::new(peripherals.GPIO1);
 //! # }
 //! ```
 

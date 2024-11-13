@@ -44,7 +44,7 @@ pub(crate) unsafe fn phy_enable() {
 
                 // this would cause linker errors when the feature is activated - see https://github.com/esp-rs/esp-wifi/issues/457
 
-                // #[cfg(feature = "phy-enable-usb")]
+                // #[cfg(phy_enable_usb)]
                 // {
                 //     extern "C" {
                 //         pub fn phy_bbpll_en_usb(param: bool);

@@ -32,10 +32,9 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::Io,
     prelude::*,
     spi::{
-        master::{Address, Command, Spi},
+        master::{Address, Command, Config, Spi},
         SpiDataMode,
         SpiMode,
     },
@@ -46,22 +45,21 @@ use esp_println::{print, println};
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let sclk = io.pins.gpio0;
-            let miso = io.pins.gpio2;
-            let mosi = io.pins.gpio4;
-            let sio2 = io.pins.gpio5;
-            let sio3 = io.pins.gpio13;
-            let cs = io.pins.gpio14;
+            let sclk = peripherals.GPIO0;
+            let miso = peripherals.GPIO2;
+            let mosi = peripherals.GPIO4;
+            let sio2 = peripherals.GPIO5;
+            let sio3 = peripherals.GPIO13;
+            let cs = peripherals.GPIO14;
         } else {
-            let sclk = io.pins.gpio0;
-            let miso = io.pins.gpio1;
-            let mosi = io.pins.gpio2;
-            let sio2 = io.pins.gpio3;
-            let sio3 = io.pins.gpio4;
-            let cs = io.pins.gpio5;
+            let sclk = peripherals.GPIO0;
+            let miso = peripherals.GPIO1;
+            let mosi = peripherals.GPIO2;
+            let sio2 = peripherals.GPIO3;
+            let sio3 = peripherals.GPIO4;
+            let cs = peripherals.GPIO5;
         }
     }
 
@@ -79,14 +77,21 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_sck(sclk)
-        .with_mosi(mosi)
-        .with_miso(miso)
-        .with_sio2(sio2)
-        .with_sio3(sio3)
-        .with_cs(cs)
-        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+    let mut spi = Spi::new_with_config(
+        peripherals.SPI2,
+        Config {
+            frequency: 100.kHz(),
+            mode: SpiMode::Mode0,
+            ..Config::default()
+        },
+    )
+    .with_sck(sclk)
+    .with_mosi(mosi)
+    .with_miso(miso)
+    .with_sio2(sio2)
+    .with_sio3(sio3)
+    .with_cs(cs)
+    .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
     let delay = Delay::new();
 

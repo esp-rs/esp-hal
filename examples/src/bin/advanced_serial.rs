@@ -13,7 +13,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, gpio::Io, prelude::*, uart::Uart};
+use esp_hal::{delay::Delay, prelude::*, uart::Uart};
 use esp_println::println;
 use nb::block;
 
@@ -21,9 +21,7 @@ use nb::block;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    let mut serial1 = Uart::new(peripherals.UART1, io.pins.gpio4, io.pins.gpio5).unwrap();
+    let mut serial1 = Uart::new(peripherals.UART1, peripherals.GPIO4, peripherals.GPIO5).unwrap();
 
     let delay = Delay::new();
 

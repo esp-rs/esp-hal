@@ -35,7 +35,6 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
 use embedded_can::{Frame, Id};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
     timer::timg::TimerGroup,
     twai::{self, EspTwaiFrame, StandardId, TwaiMode, TwaiRx, TwaiTx},
 };
@@ -92,28 +91,27 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    let tx_pin = io.pins.gpio2;
-    // let rx_pin = io.pins.gpio0; // Uncomment if you want to use an external transceiver.
-
     // Without an external transceiver, we only need a single line between the two MCUs.
-    let rx_pin = tx_pin.peripheral_input(); // Comment this line if you want to use an external transceiver.
+    let (rx_pin, tx_pin) = peripherals.GPIO2.split();
+    // Use these if you want to use an external transceiver:
+    // let tx_pin = peripherals.GPIO2;
+    // let rx_pin = peripherals.GPIO0;
 
     // The speed of the bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
 
-    // !!! Use `new_async` when using a transceiver. `new_async_no_transceiver` sets TX to open-drain
+    // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
 
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.
-    let mut twai_config = twai::TwaiConfiguration::new_async_no_transceiver(
+    let mut twai_config = twai::TwaiConfiguration::new_no_transceiver(
         peripherals.TWAI0,
         rx_pin,
         tx_pin,
         TWAI_BAUDRATE,
         TwaiMode::Normal,
-    );
+    )
+    .into_async();
 
     // Partially filter the incoming messages to reduce overhead of receiving
     // undesired messages. Note that due to how the hardware filters messages,

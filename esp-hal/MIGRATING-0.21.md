@@ -1,27 +1,57 @@
 # Migration Guide from 0.21.x to v0.22.x
 
-## Removed `i2s` traits
+## IO changes
 
-The following traits have been removed:
-
-- `I2sWrite`
-- `I2sWriteDma`
-- `I2sRead`
-- `I2sReadDma`
-- `I2sWriteDmaAsync`
-- `I2sReadDmaAsync`
-
-You no longer have to import these to access their respective APIs. If you used these traits
-in your functions as generic parameters, you can use the `I2s` type directly instead.
-
-For example:
+### GPIO pins are now accessible via `Peripherals`
 
 ```diff
--fn foo(i2s: &mut impl I2sWrite) {
-+fn foo(i2s: &mut I2s<'_, I2S0, Blocking>) {
-     // ...
- }
+ let peripherals = esp_hal::init(Default::default());
+-let io = Io::new(peripherals.GPIO, peripherals.IOMUX);
+-let pin = io.pins.gpio5;
++let pin = peripherals.GPIO5;
 ```
+
+### `Io` constructor changes
+
+- `new_with_priority` and `new_no_bind_interrupts` have been removed.
+  Use `set_priority` to configure the GPIO interrupt priority.
+  We no longer overwrite interrupt handlers set by user code during initialization.
+- `new` no longer takes `peripherals.GPIO`
+
+## Removed `async`-specific constructors
+
+The following async-specific constuctors have been removed:
+
+- `configure_for_async` DMA channel constructors
+- `TwaiConfiguration::new_async` and `TwaiConfiguration::new_async_no_transceiver`
+- `I2c::new_async`
+- `LcdCam::new_async`
+- `UsbSerialJtag::new_async`
+- `Rsa::new_async`
+- `Rmt::new_async`
+- `Uart::new_async`, `Uart::new_async_with_config`
+- `UartRx::new_async`, `UartRx::new_async_with_config`
+- `UartTx::new_async`, `UartTx::new_async_with_config`
+
+You can use the blocking counterparts, then call `into_async` on the returned peripheral instead.
+
+```diff
+-let mut config = twai::TwaiConfiguration::new_async(
++let mut config = twai::TwaiConfiguration::new(
+     peripherals.TWAI0,
+     loopback_pin.peripheral_input(),
+     loopback_pin,
+     twai::BaudRate::B1000K,
+     TwaiMode::SelfTest,
+-);
++).into_async();
+```
+
+Some drivers were implicitly configured to the asyncness of the DMA channel used to construct them.
+This is no longer the case, and the following drivers will always be created in blocking mode:
+
+- `i2s::master::I2s`
+- `spi::master::SpiDma` and `spi::master::SpiDmaBus`
 
 ## Peripheral types are now optional
 
@@ -53,14 +83,45 @@ the peripheral instance has been moved to the last generic parameter position.
 let spi: Spi<'static, FullDuplexMode, SPI2> = Spi::new_typed(peripherals.SPI2, 1.MHz(), SpiMode::Mode0);
 ```
 
-## I2C constructor changes
+## I2C changes
 
-The `with_timeout` constructors have been removed in favour of `set_timeout` or `with_timeout`.
+The I2C master driver and related types have been moved to `esp_hal::i2c::master`.
+
+The `with_timeout` constructors have been removed. `new` and `new_typed` now take a `Config` struct
+with the available configuration options.
+
+- The default configuration is now:
+  - bus frequency: 100 kHz
+  - timeout: about 10 bus clock cycles
+
+The constructors no longer take pins. Use `with_sda` and `with_scl` instead.
 
 ```diff
+-use esp_hal::i2c::I2c;
++use esp_hal::i2c::{Config, I2c};
 -let i2c = I2c::new_with_timeout(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz(), timeout);
-+let i2c = I2c::new(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz()).with_timeout(timeout);
++I2c::new_with_config(
++    peripherals.I2C0,
++    {
++        let mut config = Config::default();
++        config.frequency = 100.kHz();
++        config.timeout = timeout;
++        config
++    },
++)
++.with_sda(io.pins.gpio4)
++.with_scl(io.pins.gpio5);
 ```
+
+### The calculation of I2C timeout has changed
+
+Previously, I2C timeouts were counted in increments of I2C peripheral clock cycles. This meant that
+the configure value meant different lengths of time depending on the device. With this update, the
+I2C configuration now expects the timeout value in number of bus clock cycles, which is consistent
+between devices.
+
+ESP32 and ESP32-S2 use an exact number of clock cycles for its timeout. Other MCUs, however, use
+the `2^timeout` value internally, and the HAL rounds up the timeout to the next appropriate value.
 
 ## Changes to half-duplex SPI
 
@@ -72,7 +133,6 @@ drivers. It is now possible to execute half-duplex and full-duplex operations on
 - The `Spi::new_half_duplex` constructor has been removed. Use `new` (or `new_typed`) instead.
 - The `with_pins` methods have been removed. Use the individual `with_*` functions instead.
 - The `with_mosi` and `with_miso` functions now take input-output peripheral signals to support half-duplex mode.
-  > TODO(danielb): this means they are currently only usable with GPIO pins, but upcoming GPIO changes should allow using any output signal.
 
 ```diff
 - let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
@@ -119,6 +179,28 @@ The `Spi<'_, SPI, HalfDuplexMode>::read` and `Spi<'_, SPI, HalfDuplexMode>::writ
      .unwrap();
 ```
 
+## Slave-mode SPI
+
+### Driver construction
+
+The constructors no longer accept pins. Use the `with_pin_name` setters instead.
+
+```diff
+ let mut spi = Spi::new(
+     peripherals.SPI2,
+-    sclk,
+-    mosi,
+-    miso,
+-    cs,
+     SpiMode::Mode0,
+-);
++)
++.with_sclk(sclk)
++.with_mosi(mosi)
++.with_miso(miso)
++.with_cs(cs);
+```
+
 ## UART event listening
 
 The following functions have been removed:
@@ -159,7 +241,40 @@ You can now listen/unlisten multiple interrupt bits at once:
 -uart0.listen_at_cmd();
 -uart0.listen_rx_fifo_full();
 +uart0.listen(UartInterrupt::AtCmd | UartConterrupt::RxFifoFull);
-```˛
+```
+
+## I2S changes
+
+### The I2S driver has been moved to `i2s::master`
+
+```diff
+-use esp_hal::i2s::{DataFormat, I2s, Standard};
++use esp_hal::i2s::master::{DataFormat, I2s, Standard};
+```
+
+### Removed `i2s` traits
+
+The following traits have been removed:
+
+- `I2sWrite`
+- `I2sWriteDma`
+- `I2sRead`
+- `I2sReadDma`
+- `I2sWriteDmaAsync`
+- `I2sReadDmaAsync`
+
+You no longer have to import these to access their respective APIs. If you used these traits
+in your functions as generic parameters, you can use the `I2s` type directly instead.
+
+For example:
+
+```diff
+-fn foo(i2s: &mut impl I2sWrite) {
++fn foo(i2s: &mut I2s<'_, I2S0, Blocking>) {
+     // ...
+ }
+```
+
 ## Circular DMA transfer's `available` returns `Result<usize, DmaError>` now
 
 In case of any error you should drop the transfer and restart it.
@@ -176,3 +291,80 @@ In case of any error you should drop the transfer and restart it.
 +            },
 +        };
 ```
+
+## Removed `peripheral_input` and `into_peripheral_output` from GPIO pin types
+
+Creating peripheral interconnect signals now consume the GPIO pin used for the connection.
+
+The previous signal function have been replaced by `split`. This change affects the following APIs:
+
+- `GpioPin`
+- `AnyPin`
+
+```diff
+-let input_signal = gpioN.peripheral_input();
+-let output_signal = gpioN.into_peripheral_output();
++let (input_signal, output_signal) = gpioN.split();
+```
+
+`into_peripheral_output`, `split` (for output pins only) and `peripheral_input` have been added to
+the GPIO drivers (`Input`, `Output`, `OutputOpenDrain` and `Flex`) instead.
+
+## ETM changes
+
+- The types are no longer prefixed with `GpioEtm`, `TimerEtm` or `SysTimerEtm`. You can still use
+  import aliasses in case you need to differentiate due to name collisions
+  (e.g. `use esp_hal::gpio::etm::Event as GpioEtmEvent`).
+- The old task and event types have been replaced by `Task` and `Event`.
+- GPIO tasks and events are no longer generic.
+
+## Changes to peripheral configuration
+
+### The `uart::config` module has been removed
+
+The module's contents have been moved into `uart`.
+
+```diff
+-use esp_hal::uart::config::Config;
++use esp_hal::uart::Config;
+```
+
+If you work with multiple configurable peripherals, you may want to import the `uart` module and
+refer to the `Config` struct as `uart::Config`.
+
+### SPI drivers can now be configured using `spi::master::Config`
+
+- The old methods to change configuration have been removed.
+- The `new` and `new_typed` constructor no longer takes `frequency` and `mode`.
+- The default configuration is now:
+  - bus frequency: 1 MHz
+  - bit order: MSB first
+  - mode: SPI mode 0
+- There are new constructors (`new_with_config`, `new_typed_with_config`) and a new `apply_config` method to apply custom configuration.
+
+```diff
+-use esp_hal::spi::{master::Spi, SpiMode};
++use esp_hal::spi::{master::{Config, Spi}, SpiMode};
+-Spi::new(SPI2, 100.kHz(), SpiMode::Mode1);
++Spi::new_with_config(
++    SPI2,
++    Config {
++        frequency: 100.kHz(),
++        mode: SpiMode::Mode0,
++        ..Config::default()
++    },
++)
+```
+
+## I8080 driver split `set_byte_order()` into `set_8bits_order()` and `set_byte_order()`.
+
+If you were using an 8-bit bus.
+```diff
+- i8080.set_byte_order(ByteOrder::default());
++ i8080.set_8bits_order(ByteOrder::default());
+```
+
+If you were using an 16-bit bus, you don't need to change anything, `set_byte_order()` now works correctly.
+
+If you were sharing the bus between an 8-bit and 16-bit device, you will have to call the corresponding method when
+you switch between devices. Be sure to read the documentation of the new methods.

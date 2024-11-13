@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
     get_core,
-    gpio::{Io, Level, Output},
+    gpio::{Level, Output},
     timer::{timg::TimerGroup, AnyTimer},
 };
 use esp_hal_embassy::Executor;
@@ -53,8 +53,6 @@ async fn control_led(
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let timer0: AnyTimer = timg0.timer0.into();
     let timer1: AnyTimer = timg0.timer1.into();
@@ -65,7 +63,7 @@ async fn main(_spawner: Spawner) {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = Output::new(io.pins.gpio0, Level::Low);
+    let led = Output::new(peripherals.GPIO0, Level::Low);
 
     let _guard = cpu_control
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {

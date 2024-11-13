@@ -20,71 +20,102 @@ pub(crate) use self::peripherals::*;
 // peripheral (no `PSRAM`, `RADIO`, etc. peripheral in the PACs), so we're
 // creating "virtual peripherals" for them.
 crate::peripherals! {
-    ADC1 <= virtual,
-    AES <= AES,
-    ASSIST_DEBUG <= ASSIST_DEBUG,
-    BT <= virtual,
-    DMA <= DMA (DMA_IN_CH0,DMA_IN_CH1,DMA_IN_CH2,DMA_OUT_CH0,DMA_OUT_CH1,DMA_OUT_CH2),
-    DS <= DS,
-    ECC <= ECC,
-    EFUSE <= EFUSE,
-    GPIO <= GPIO (GPIO,GPIO_NMI),
-    GPIO_SD <= GPIO_SD,
-    HMAC <= HMAC,
-    HP_APM <= HP_APM,
-    HP_SYS <= HP_SYS,
-    I2C0 <= I2C0,
-    I2C1 <= I2C1,
-    [I2s0] I2S0 <= I2S0 (I2S0),
-    IEEE802154 <= IEEE802154,
-    INTERRUPT_CORE0 <= INTERRUPT_CORE0,
-    INTPRI <= INTPRI,
-    IO_MUX <= IO_MUX,
-    LEDC <= LEDC,
-    LPWR <= LP_CLKRST,
-    LP_ANA <= LP_ANA,
-    LP_AON <= LP_AON,
-    LP_APM <= LP_APM,
-    LP_PERI <= LP_PERI,
-    LP_TIMER <= LP_TIMER,
-    LP_WDT <= LP_WDT,
-    MCPWM0 <= MCPWM0,
-    MEM_MONITOR <= MEM_MONITOR,
-    MODEM_LPCON <= MODEM_LPCON,
-    MODEM_SYSCON <= MODEM_SYSCON,
-    OTP_DEBUG <= OTP_DEBUG,
-    PARL_IO <= PARL_IO (PARL_IO_TX, PARL_IO_RX),
-    PAU <= PAU,
-    PCNT <= PCNT,
-    PMU <= PMU,
-    RADIO_CLK <= virtual,
-    RMT <= RMT,
-    RNG <= RNG,
-    RSA <= RSA,
-    SHA <= SHA,
-    SOC_ETM <= SOC_ETM,
-    SPI0 <= SPI0,
-    SPI1 <= SPI1,
-    [Spi2] SPI2 <= SPI2 (SPI2),
-    SYSTEM <= PCR,
-    SYSTIMER <= SYSTIMER,
-    SW_INTERRUPT <= virtual,
-    TEE <= TEE,
-    TIMG0 <= TIMG0,
-    TIMG1 <= TIMG1,
-    TRACE0 <= TRACE,
-    [Twai0] TWAI0 <= TWAI0,
-    [Uart0] UART0 <= UART0,
-    [Uart1] UART1 <= UART1,
-    UHCI0 <= UHCI0,
-    USB_DEVICE <= USB_DEVICE,
-    MEM2MEM1 <= virtual,
-    MEM2MEM4 <= virtual,
-    MEM2MEM5 <= virtual,
-    MEM2MEM10 <= virtual,
-    MEM2MEM11 <= virtual,
-    MEM2MEM12 <= virtual,
-    MEM2MEM13 <= virtual,
-    MEM2MEM14 <= virtual,
-    MEM2MEM15 <= virtual,
+    peripherals: [
+        ADC1 <= virtual,
+        AES <= AES,
+        ASSIST_DEBUG <= ASSIST_DEBUG,
+        BT <= virtual,
+        DMA <= DMA (DMA_IN_CH0,DMA_IN_CH1,DMA_IN_CH2,DMA_OUT_CH0,DMA_OUT_CH1,DMA_OUT_CH2),
+        DS <= DS,
+        ECC <= ECC,
+        EFUSE <= EFUSE,
+        GPIO_SD <= GPIO_SD,
+        HMAC <= HMAC,
+        HP_APM <= HP_APM,
+        HP_SYS <= HP_SYS,
+        I2C0 <= I2C0,
+        I2C1 <= I2C1,
+        I2S0 <= I2S0 (I2S0),
+        IEEE802154 <= IEEE802154,
+        INTERRUPT_CORE0 <= INTERRUPT_CORE0,
+        INTPRI <= INTPRI,
+        IO_MUX <= IO_MUX,
+        LEDC <= LEDC,
+        LPWR <= LP_CLKRST,
+        LP_ANA <= LP_ANA,
+        LP_AON <= LP_AON,
+        LP_APM <= LP_APM,
+        LP_PERI <= LP_PERI,
+        LP_TIMER <= LP_TIMER,
+        LP_WDT <= LP_WDT,
+        MCPWM0 <= MCPWM0,
+        MEM_MONITOR <= MEM_MONITOR,
+        MODEM_LPCON <= MODEM_LPCON,
+        MODEM_SYSCON <= MODEM_SYSCON,
+        OTP_DEBUG <= OTP_DEBUG,
+        PARL_IO <= PARL_IO (PARL_IO_TX, PARL_IO_RX),
+        PAU <= PAU,
+        PCNT <= PCNT,
+        PMU <= PMU,
+        RADIO_CLK <= virtual,
+        RMT <= RMT,
+        RNG <= RNG,
+        RSA <= RSA,
+        SHA <= SHA,
+        SOC_ETM <= SOC_ETM,
+        SPI0 <= SPI0,
+        SPI1 <= SPI1,
+        SPI2 <= SPI2 (SPI2),
+        SYSTEM <= PCR,
+        SYSTIMER <= SYSTIMER,
+        SW_INTERRUPT <= virtual,
+        TEE <= TEE,
+        TIMG0 <= TIMG0,
+        TIMG1 <= TIMG1,
+        TRACE0 <= TRACE,
+        TWAI0 <= TWAI0,
+        UART0 <= UART0,
+        UART1 <= UART1,
+        UHCI0 <= UHCI0,
+        USB_DEVICE <= USB_DEVICE,
+        MEM2MEM1 <= virtual,
+        MEM2MEM4 <= virtual,
+        MEM2MEM5 <= virtual,
+        MEM2MEM10 <= virtual,
+        MEM2MEM11 <= virtual,
+        MEM2MEM12 <= virtual,
+        MEM2MEM13 <= virtual,
+        MEM2MEM14 <= virtual,
+        MEM2MEM15 <= virtual,
+    ],
+    pins: [
+        (0, [Input, Output, Analog] (2 => FSPIQ) (2 => FSPIQ))
+        (1, [Input, Output, Analog] (2 => FSPICS0) (2 => FSPICS0))
+        (2, [Input, Output, Analog] (2 => FSPIWP) (2 => FSPIWP))
+        (3, [Input, Output, Analog] (2 => FSPIHD) (2 => FSPIHD))
+        (4, [Input, Output, Analog] (2 => FSPICLK) (2 => FSPICLK_MUX))
+        (5, [Input, Output, Analog] (2 => FSPID) (2 => FSPID))
+        (6, [Input, Output])
+        (7, [Input, Output])
+        (8, [Input, Output])
+        (9, [Input, Output])
+        (10, [Input, Output])
+        (11, [Input, Output])
+        (12, [Input, Output])
+        (13, [Input, Output])
+        (14, [Input, Output])
+        (15, [Input, Output] () (0 => SPICS0))
+        (16, [Input, Output] (0 => SPIQ) (0 => SPIQ))
+        (17, [Input, Output] (0 => SPIWP) (0 => SPIWP))
+        (18, [Input, Output] (0 => SPIHD) (0 => SPIHD))
+        (19, [Input, Output] () (0 => SPICLK))
+        (20, [Input, Output] (0 => SPID) (0 => SPID))
+        (21, [Input, Output])
+        (22, [Input, Output])
+        (23, [Input, Output] () (2 => FSPICS1))
+        (24, [Input, Output] () (2 => FSPICS2))
+        (25, [Input, Output] () (2 => FSPICS3))
+        (26, [Input, Output] () (2 => FSPICS4))
+        (27, [Input, Output] () (2 => FSPICS5))
+    ]
 }
