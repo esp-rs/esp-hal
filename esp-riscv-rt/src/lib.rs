@@ -799,7 +799,26 @@ abort:
 .option norelax
 .option norvc
 
+
+// P4: System Interrupts definitions
+// https://github.com/espressif/esp-idf/blob/master/components/riscv/vectors_clic.S#L74
 _vector_table:
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
+    j _start_trap_rust_hal
     j _start_trap
     j _start_trap1
     j _start_trap2

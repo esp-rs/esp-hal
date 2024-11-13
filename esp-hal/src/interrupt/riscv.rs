@@ -194,99 +194,100 @@ pub static RESERVED_INTERRUPTS: &[usize] = INTERRUPT_TO_PRIORITY;
 #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust_hal"]
 pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
-    // assert!(
-    //     mcause::read().is_exception(),
-    //     "Arrived into _start_trap_rust_hal but mcause is not an exception!"
-    // );
+    // FIXME: esp32p4 get here even when interrupt is not jumping to the vec
+    // handlers from esp-riscv-rt
+    assert!(
+        mcause::read().is_exception(),
+        "Arrived into _start_trap_rust_hal but mcause is not an exception!"
+    );
 
-    if riscv::register::mcause::read().is_exception() {
-        extern "C" {
-            fn ExceptionHandler(tf: *mut TrapFrame);
-        }
-        ExceptionHandler(trap_frame);
-    } else {
-        extern "C" {
-            fn interrupt1(frame: &mut TrapFrame);
-            fn interrupt2(frame: &mut TrapFrame);
-            fn interrupt3(frame: &mut TrapFrame);
-            fn interrupt4(frame: &mut TrapFrame);
-            fn interrupt5(frame: &mut TrapFrame);
-            fn interrupt6(frame: &mut TrapFrame);
-            fn interrupt7(frame: &mut TrapFrame);
-            fn interrupt8(frame: &mut TrapFrame);
-            fn interrupt9(frame: &mut TrapFrame);
-            fn interrupt10(frame: &mut TrapFrame);
-            fn interrupt11(frame: &mut TrapFrame);
-            fn interrupt12(frame: &mut TrapFrame);
-            fn interrupt13(frame: &mut TrapFrame);
-            fn interrupt14(frame: &mut TrapFrame);
-            fn interrupt15(frame: &mut TrapFrame);
-            fn interrupt16(frame: &mut TrapFrame);
-            fn interrupt17(frame: &mut TrapFrame);
-            fn interrupt18(frame: &mut TrapFrame);
-            fn interrupt19(frame: &mut TrapFrame);
-            fn interrupt20(frame: &mut TrapFrame);
-            fn interrupt21(frame: &mut TrapFrame);
-            fn interrupt22(frame: &mut TrapFrame);
-            fn interrupt23(frame: &mut TrapFrame);
-            fn interrupt24(frame: &mut TrapFrame);
-            fn interrupt25(frame: &mut TrapFrame);
-            fn interrupt26(frame: &mut TrapFrame);
-            fn interrupt27(frame: &mut TrapFrame);
-            fn interrupt28(frame: &mut TrapFrame);
-            fn interrupt29(frame: &mut TrapFrame);
-            fn interrupt30(frame: &mut TrapFrame);
-            fn interrupt31(frame: &mut TrapFrame);
-    
-            // Defined in `esp-riscv-rt`
-            pub fn DefaultHandler();
-        }
-        
-        let interrupt_priority = _handle_priority();
-
-        let code = riscv::register::mcause::read().code();
-
-        // #[cfg(clic)]
-        let code = (code & 0b1111_1111_1111) - 16 as usize;
-
-        match code {
-            1 => interrupt1(trap_frame.as_mut().unwrap()),
-            2 => interrupt2(trap_frame.as_mut().unwrap()),
-            3 => interrupt3(trap_frame.as_mut().unwrap()),
-            4 => interrupt4(trap_frame.as_mut().unwrap()),
-            5 => interrupt5(trap_frame.as_mut().unwrap()),
-            6 => interrupt6(trap_frame.as_mut().unwrap()),
-            7 => interrupt7(trap_frame.as_mut().unwrap()),
-            8 => interrupt8(trap_frame.as_mut().unwrap()),
-            9 => interrupt9(trap_frame.as_mut().unwrap()),
-            10 => interrupt10(trap_frame.as_mut().unwrap()),
-            11 => interrupt11(trap_frame.as_mut().unwrap()),
-            12 => interrupt12(trap_frame.as_mut().unwrap()),
-            13 => interrupt13(trap_frame.as_mut().unwrap()),
-            14 => interrupt14(trap_frame.as_mut().unwrap()),
-            15 => interrupt15(trap_frame.as_mut().unwrap()),
-            16 => interrupt16(trap_frame.as_mut().unwrap()),
-            17 => interrupt17(trap_frame.as_mut().unwrap()),
-            18 => interrupt18(trap_frame.as_mut().unwrap()),
-            19 => interrupt19(trap_frame.as_mut().unwrap()),
-            20 => interrupt20(trap_frame.as_mut().unwrap()),
-            21 => interrupt21(trap_frame.as_mut().unwrap()),
-            22 => interrupt22(trap_frame.as_mut().unwrap()),
-            23 => interrupt23(trap_frame.as_mut().unwrap()),
-            24 => interrupt24(trap_frame.as_mut().unwrap()),
-            25 => interrupt25(trap_frame.as_mut().unwrap()),
-            26 => interrupt26(trap_frame.as_mut().unwrap()),
-            27 => interrupt27(trap_frame.as_mut().unwrap()),
-            28 => interrupt28(trap_frame.as_mut().unwrap()),
-            29 => interrupt29(trap_frame.as_mut().unwrap()),
-            30 => interrupt30(trap_frame.as_mut().unwrap()),
-            31 => interrupt31(trap_frame.as_mut().unwrap()),
-            _ => DefaultHandler(),
-        };
-
-        _restore_priority(interrupt_priority);
+    // if riscv::register::mcause::read().is_exception() {
+    extern "C" {
+        fn ExceptionHandler(tf: *mut TrapFrame);
     }
-    
+    ExceptionHandler(trap_frame);
+    // } else {
+    //     extern "C" {
+    //         fn interrupt1(frame: &mut TrapFrame);
+    //         fn interrupt2(frame: &mut TrapFrame);
+    //         fn interrupt3(frame: &mut TrapFrame);
+    //         fn interrupt4(frame: &mut TrapFrame);
+    //         fn interrupt5(frame: &mut TrapFrame);
+    //         fn interrupt6(frame: &mut TrapFrame);
+    //         fn interrupt7(frame: &mut TrapFrame);
+    //         fn interrupt8(frame: &mut TrapFrame);
+    //         fn interrupt9(frame: &mut TrapFrame);
+    //         fn interrupt10(frame: &mut TrapFrame);
+    //         fn interrupt11(frame: &mut TrapFrame);
+    //         fn interrupt12(frame: &mut TrapFrame);
+    //         fn interrupt13(frame: &mut TrapFrame);
+    //         fn interrupt14(frame: &mut TrapFrame);
+    //         fn interrupt15(frame: &mut TrapFrame);
+    //         fn interrupt16(frame: &mut TrapFrame);
+    //         fn interrupt17(frame: &mut TrapFrame);
+    //         fn interrupt18(frame: &mut TrapFrame);
+    //         fn interrupt19(frame: &mut TrapFrame);
+    //         fn interrupt20(frame: &mut TrapFrame);
+    //         fn interrupt21(frame: &mut TrapFrame);
+    //         fn interrupt22(frame: &mut TrapFrame);
+    //         fn interrupt23(frame: &mut TrapFrame);
+    //         fn interrupt24(frame: &mut TrapFrame);
+    //         fn interrupt25(frame: &mut TrapFrame);
+    //         fn interrupt26(frame: &mut TrapFrame);
+    //         fn interrupt27(frame: &mut TrapFrame);
+    //         fn interrupt28(frame: &mut TrapFrame);
+    //         fn interrupt29(frame: &mut TrapFrame);
+    //         fn interrupt30(frame: &mut TrapFrame);
+    //         fn interrupt31(frame: &mut TrapFrame);
+
+    //         // Defined in `esp-riscv-rt`
+    //         pub fn DefaultHandler();
+    //     }
+
+    //     let interrupt_priority = _handle_priority();
+
+    //     let code = riscv::register::mcause::read().code();
+
+    //     // #[cfg(clic)]
+    //     let code = (code & 0b1111_1111_1111) - 16 as usize;
+
+    //     match code {
+    //         1 => interrupt1(trap_frame.as_mut().unwrap()),
+    //         2 => interrupt2(trap_frame.as_mut().unwrap()),
+    //         3 => interrupt3(trap_frame.as_mut().unwrap()),
+    //         4 => interrupt4(trap_frame.as_mut().unwrap()),
+    //         5 => interrupt5(trap_frame.as_mut().unwrap()),
+    //         6 => interrupt6(trap_frame.as_mut().unwrap()),
+    //         7 => interrupt7(trap_frame.as_mut().unwrap()),
+    //         8 => interrupt8(trap_frame.as_mut().unwrap()),
+    //         9 => interrupt9(trap_frame.as_mut().unwrap()),
+    //         10 => interrupt10(trap_frame.as_mut().unwrap()),
+    //         11 => interrupt11(trap_frame.as_mut().unwrap()),
+    //         12 => interrupt12(trap_frame.as_mut().unwrap()),
+    //         13 => interrupt13(trap_frame.as_mut().unwrap()),
+    //         14 => interrupt14(trap_frame.as_mut().unwrap()),
+    //         15 => interrupt15(trap_frame.as_mut().unwrap()),
+    //         16 => interrupt16(trap_frame.as_mut().unwrap()),
+    //         17 => interrupt17(trap_frame.as_mut().unwrap()),
+    //         18 => interrupt18(trap_frame.as_mut().unwrap()),
+    //         19 => interrupt19(trap_frame.as_mut().unwrap()),
+    //         20 => interrupt20(trap_frame.as_mut().unwrap()),
+    //         21 => interrupt21(trap_frame.as_mut().unwrap()),
+    //         22 => interrupt22(trap_frame.as_mut().unwrap()),
+    //         23 => interrupt23(trap_frame.as_mut().unwrap()),
+    //         24 => interrupt24(trap_frame.as_mut().unwrap()),
+    //         25 => interrupt25(trap_frame.as_mut().unwrap()),
+    //         26 => interrupt26(trap_frame.as_mut().unwrap()),
+    //         27 => interrupt27(trap_frame.as_mut().unwrap()),
+    //         28 => interrupt28(trap_frame.as_mut().unwrap()),
+    //         29 => interrupt29(trap_frame.as_mut().unwrap()),
+    //         30 => interrupt30(trap_frame.as_mut().unwrap()),
+    //         31 => interrupt31(trap_frame.as_mut().unwrap()),
+    //         _ => DefaultHandler(),
+    //     };
+
+    //     _restore_priority(interrupt_priority);
+    // }
 }
 
 #[doc(hidden)]
@@ -312,6 +313,11 @@ pub fn _setup_interrupts() {
 
         let vec_table = &_vector_table as *const _ as usize;
         mtvec::write(vec_table, mtvec::TrapMode::Vectored);
+
+        // 0x307 - MTVT address
+        unsafe {
+            core::arch::asm!("csrw 0x307, {0}", in(reg) vec_table);
+        }
 
         crate::interrupt::init_vectoring();
     };
