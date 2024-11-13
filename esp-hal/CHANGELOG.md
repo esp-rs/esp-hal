@@ -72,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed some SysTimer race conditions and panics (#2451)
 - TWAI: accept all messages by default (#2467)
 - I8080: `set_byte_order()` now works correctly in 16-bit mode (#2487)
+- ESP32-C6/ESP32-H2: Make higher LEDC frequencies work (#2520)
 
 ### Removed
 
