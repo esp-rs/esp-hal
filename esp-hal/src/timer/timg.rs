@@ -81,7 +81,7 @@ use crate::{
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
     sync::{lock, Lock},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::PeripheralClockControl,
     Async,
     Blocking,
     InterruptConfigurable,
@@ -152,7 +152,7 @@ impl TimerGroupInstance for TIMG0 {
     }
 
     fn enable_peripheral() {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
     }
 
     fn reset_peripheral() {
@@ -215,11 +215,11 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
     }
 
     fn enable_peripheral() {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
     }
 
     fn reset_peripheral() {
-        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
     }
 
     fn configure_wdt_src_clk() {
@@ -377,7 +377,6 @@ where
 {
     /// Construct a new instance of [`Timer`]
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
-        timg.enable_peripheral();
         timg.set_counter_active(true);
 
         Self {
@@ -599,7 +598,7 @@ where
 }
 
 #[doc(hidden)]
-pub trait Instance: Sealed + Enable {
+pub trait Instance: Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
     fn timer_group(&self) -> u8;
@@ -637,11 +636,6 @@ pub trait Instance: Sealed + Enable {
     fn is_interrupt_set(&self) -> bool;
 }
 
-#[doc(hidden)]
-pub trait Enable: Sealed {
-    fn enable_peripheral(&self);
-}
-
 /// A timer within a Timer Group.
 pub struct TimerX<TG, const T: u8 = 0> {
     phantom: PhantomData<TG>,
@@ -674,7 +668,6 @@ where
 impl<TG, const T: u8> Instance for TimerX<TG, T>
 where
     TG: TimerGroupInstance,
-    Self: Enable,
 {
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*TG::register_block() }
@@ -815,25 +808,6 @@ pub type Timer0<TG> = TimerX<TG, 0>;
 #[cfg(timg_timer1)]
 pub type Timer1<TG> = TimerX<TG, 1>;
 
-impl<TG> Enable for Timer0<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(PeripheralEnable::Timg0);
-    }
-}
-
-#[cfg(timg_timer1)]
-impl<TG> Enable for Timer1<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(PeripheralEnable::Timg1);
-    }
-}
-
 fn ticks_to_timeout<F>(ticks: u64, clock: F, divider: u32) -> u64
 where
     F: Into<HertzU32>,
@@ -956,7 +930,7 @@ where
     /// Construct a new instance of [`Wdt`]
     pub fn new() -> Self {
         #[cfg(lp_wdt)]
-        PeripheralClockControl::enable(PeripheralEnable::Wdt);
+        PeripheralClockControl::enable(crate::system::Peripheral::Wdt);
 
         TG::configure_wdt_src_clk();
 
