@@ -223,6 +223,7 @@ You can now use the `UartInterrupt` enum and the corresponding `listen`, `unlist
 Use `interrupts` in place of `<INTERRUPT>_interrupt_set` and `clear_interrupts` in place of the old `reset_` functions.
 
 `UartInterrupt`:
+
 - `AtCmd`
 - `TxDone`
 - `RxFifoFull`
@@ -359,6 +360,7 @@ refer to the `Config` struct as `uart::Config`.
 ## I8080 driver split `set_byte_order()` into `set_8bits_order()` and `set_byte_order()`.
 
 If you were using an 8-bit bus.
+
 ```diff
 - i8080.set_byte_order(ByteOrder::default());
 + i8080.set_8bits_order(ByteOrder::default());
@@ -368,7 +370,6 @@ If you were using an 16-bit bus, you don't need to change anything, `set_byte_or
 
 If you were sharing the bus between an 8-bit and 16-bit device, you will have to call the corresponding method when
 you switch between devices. Be sure to read the documentation of the new methods.
-
 
 ## `rmt::Channel::transmit` now returns `Result`, `PulseCode` is now `u32`
 
@@ -412,3 +413,9 @@ You can use `gpio::NoPin` instead.
 +let mut rx_clk_pin = NoPin;
 +parl_io.rx.with_config(&mut rx_pins, &mut rx_clk_pin, BitPackOrder::Msb, Some(0xfff))
 ```
+
+## `get_` prefixes have been removed from functions
+
+In order to better comply with the Rust API Guidelines [getter names convention], we have removed the `get_` prefixes from all functions which previously had it. Due to the number of changes it's not practical to list all changes here, however if a function previous began with `get_`, you can simply remove this prefix.
+
+[getter names convention]: https://rust-lang.github.io/api-guidelines/naming.html#c-getter

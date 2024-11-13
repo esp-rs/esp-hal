@@ -61,7 +61,7 @@ use esp_wifi::{
 +    let mut rng = Rng::new(peripherals.RNG);
 -    let init = init(timg0.timer0, rng, peripherals.RADIO_CLK).unwrap();
 +    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
- 
+
      let mut wifi = peripherals.WIFI;
      let mut socket_set_entries: [SocketStorage; 3] = Default::default();
 +    let (iface, device, mut controller) =
@@ -76,3 +76,9 @@ use esp_wifi::{
 ```
 
 The related features are removed from `esp-wifi`: wifi-default, ipv6, ipv4, tcp, udp, icmp, igmp, dns, dhcpv4
+
+## `get_` prefixes have been removed from functions
+
+In order to better comply with the Rust API Guidelines [getter names convention], we have removed the `get_` prefixes from all functions which previously had it. Due to the number of changes it's not practical to list all changes here, however if a function previous began with `get_`, you can simply remove this prefix.
+
+[getter names convention]: https://rust-lang.github.io/api-guidelines/naming.html#c-getter
