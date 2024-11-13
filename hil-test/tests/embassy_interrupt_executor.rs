@@ -16,7 +16,7 @@ use esp_hal::{
         software::{SoftwareInterrupt, SoftwareInterruptControl},
         Priority,
     },
-    timer::timg::TimerGroup,
+    timer::AnyTimer,
 };
 use esp_hal_embassy::InterruptExecutor;
 use hil_test as _;
@@ -56,8 +56,31 @@ mod test {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init(timg0.timer0);
+        cfg_if::cfg_if! {
+            if #[cfg(timg_timer1)] {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new(peripherals.TIMG0);
+                esp_hal_embassy::init([
+                    AnyTimer::from(timg0.timer0),
+                    AnyTimer::from(timg0.timer1),
+                ]);
+            } else if #[cfg(timg1)] {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new(peripherals.TIMG0);
+                let timg1 = TimerGroup::new(peripherals.TIMG1);
+                esp_hal_embassy::init([
+                    AnyTimer::from(timg0.timer0),
+                    AnyTimer::from(timg1.timer0),
+                ]);
+            } else if #[cfg(systimer)] {
+                use esp_hal::timer::systimer::{SystemTimer, Target};
+                let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+                esp_hal_embassy::init([
+                    AnyTimer::from(systimer.alarm0),
+                    AnyTimer::from(systimer.alarm1),
+                ]);
+            }
+        }
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         Context {

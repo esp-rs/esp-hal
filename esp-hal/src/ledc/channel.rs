@@ -189,7 +189,7 @@ where
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error> {
         let duty_exp;
         if let Some(timer) = self.timer {
-            if let Some(timer_duty) = timer.get_duty() {
+            if let Some(timer_duty) = timer.duty() {
                 duty_exp = timer_duty as u32;
             } else {
                 return Err(Error::Timer);
@@ -238,10 +238,10 @@ where
             return Err(Error::Fade(FadeError::EndDuty));
         }
         if let Some(timer) = self.timer {
-            if let Some(timer_duty) = timer.get_duty() {
-                if timer.get_frequency() > 0 {
+            if let Some(timer_duty) = timer.duty() {
+                if timer.frequency() > 0 {
                     duty_exp = timer_duty as u32;
-                    frequency = timer.get_frequency();
+                    frequency = timer.frequency();
                 } else {
                     return Err(Error::Timer);
                 }
@@ -312,7 +312,7 @@ mod ehal1 {
         }
     }
 
-    impl<'a, S: TimerSpeed> ErrorType for Channel<'a, S> {
+    impl<S: TimerSpeed> ErrorType for Channel<'_, S> {
         type Error = Error;
     }
 
@@ -323,7 +323,7 @@ mod ehal1 {
         fn max_duty_cycle(&self) -> u16 {
             let duty_exp;
 
-            if let Some(timer_duty) = self.timer.and_then(|timer| timer.get_duty()) {
+            if let Some(timer_duty) = self.timer.and_then(|timer| timer.duty()) {
                 duty_exp = timer_duty as u32;
             } else {
                 return 0;
@@ -343,7 +343,7 @@ mod ehal1 {
     }
 }
 
-impl<'a, S: crate::ledc::timer::TimerSpeed> Channel<'a, S> {
+impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
     #[cfg(esp32)]
     fn set_channel(&mut self, timer_number: u8) {
         if S::IS_HS {
@@ -369,6 +369,13 @@ impl<'a, S: crate::ledc::timer::TimerSpeed> Channel<'a, S> {
                 unsafe { w.timer_sel().bits(timer_number) }
             });
         }
+
+        // this is needed to make low duty-resolutions / high frequencies work
+        #[cfg(any(esp32h2, esp32c6))]
+        self.ledc
+            .ch_gamma_wr_addr(self.number as usize)
+            .write(|w| unsafe { w.bits(0) });
+
         self.start_duty_without_fading();
     }
 
@@ -541,7 +548,7 @@ impl<'a, S: crate::ledc::timer::TimerSpeed> Channel<'a, S> {
     }
 }
 
-impl<'a, S> ChannelHW for Channel<'a, S>
+impl<S> ChannelHW for Channel<'_, S>
 where
     S: crate::ledc::timer::TimerSpeed,
 {
@@ -564,7 +571,7 @@ where
                     .set_to_open_drain_output(crate::private::Internal),
             };
 
-            let timer_number = timer.get_number() as u8;
+            let timer_number = timer.number() as u8;
 
             self.set_channel(timer_number);
             self.update_channel();
@@ -610,8 +617,7 @@ where
                 Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
             };
 
-            self.output_pin
-                .connect_peripheral_to_output(signal, crate::private::Internal);
+            signal.connect_to(&mut self.output_pin);
         } else {
             return Err(Error::Timer);
         }

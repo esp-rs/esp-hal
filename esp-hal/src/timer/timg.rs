@@ -50,11 +50,12 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
+//! # use esp_hal::timer::timg::MwdtStage;
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut wdt = timg0.wdt;
 //!
-//! wdt.set_timeout(5_000.millis());
+//! wdt.set_timeout(MwdtStage::Stage0, 5_000.millis());
 //! wdt.enable();
 //!
 //! loop {
@@ -80,7 +81,7 @@ use crate::{
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
     sync::{lock, Lock},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::PeripheralClockControl,
     Async,
     Blocking,
     InterruptConfigurable,
@@ -151,7 +152,7 @@ impl TimerGroupInstance for TIMG0 {
     }
 
     fn enable_peripheral() {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
     }
 
     fn reset_peripheral() {
@@ -214,11 +215,11 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
     }
 
     fn enable_peripheral() {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
     }
 
     fn reset_peripheral() {
-        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
     }
 
     fn configure_wdt_src_clk() {
@@ -376,7 +377,6 @@ where
 {
     /// Construct a new instance of [`Timer`]
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
-        timg.enable_peripheral();
         timg.set_counter_active(true);
 
         Self {
@@ -552,10 +552,11 @@ where
             _ => unreachable!(),
         };
 
-        unsafe {
-            interrupt::bind_interrupt(interrupt, handler.handler());
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
         }
-        interrupt::enable(interrupt, handler.priority()).unwrap();
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 
     fn is_interrupt_set(&self) -> bool {
@@ -597,7 +598,7 @@ where
 }
 
 #[doc(hidden)]
-pub trait Instance: Sealed + Enable {
+pub trait Instance: Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
     fn timer_group(&self) -> u8;
@@ -635,11 +636,6 @@ pub trait Instance: Sealed + Enable {
     fn is_interrupt_set(&self) -> bool;
 }
 
-#[doc(hidden)]
-pub trait Enable: Sealed {
-    fn enable_peripheral(&self);
-}
-
 /// A timer within a Timer Group.
 pub struct TimerX<TG, const T: u8 = 0> {
     phantom: PhantomData<TG>,
@@ -672,7 +668,6 @@ where
 impl<TG, const T: u8> Instance for TimerX<TG, T>
 where
     TG: TimerGroupInstance,
-    Self: Enable,
 {
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*TG::register_block() }
@@ -802,7 +797,7 @@ where
     fn set_divider(&self, divider: u16) {
         unsafe { Self::t() }
             .config()
-            .modify(|_, w| unsafe { w.divider().bits(divider) })
+            .modify(|_, w| unsafe { w.divider().bits(divider) });
     }
 }
 
@@ -812,25 +807,6 @@ pub type Timer0<TG> = TimerX<TG, 0>;
 /// Timer 1 in the Timer Group.
 #[cfg(timg_timer1)]
 pub type Timer1<TG> = TimerX<TG, 1>;
-
-impl<TG> Enable for Timer0<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(PeripheralEnable::Timg0);
-    }
-}
-
-#[cfg(timg_timer1)]
-impl<TG> Enable for Timer1<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(PeripheralEnable::Timg1);
-    }
-}
 
 fn ticks_to_timeout<F>(ticks: u64, clock: F, divider: u32) -> u64
 where
@@ -911,6 +887,36 @@ where
 {
 }
 
+/// Behavior of the MWDT stage if it times out.
+#[allow(unused)]
+#[derive(Debug, Clone, Copy)]
+pub enum MwdtStageAction {
+    /// No effect on the system.
+    Off         = 0,
+    /// Trigger an interrupt.
+    Interrupt   = 1,
+    /// Reset the CPU core.
+    ResetCpu    = 2,
+    /// Reset the main system, power management unit and RTC peripherals.
+    ResetSystem = 3,
+}
+
+/// MWDT stages.
+///
+/// Timer stages allow for a timer to have a series of different timeout values
+/// and corresponding expiry action.
+#[derive(Debug, Clone, Copy)]
+pub enum MwdtStage {
+    /// MWDT stage 0.
+    Stage0,
+    /// MWDT stage 1.
+    Stage1,
+    /// MWDT stage 2.
+    Stage2,
+    /// MWDT stage 3.
+    Stage3,
+}
+
 /// Watchdog timer
 pub struct Wdt<TG> {
     phantom: PhantomData<TG>,
@@ -924,7 +930,7 @@ where
     /// Construct a new instance of [`Wdt`]
     pub fn new() -> Self {
         #[cfg(lp_wdt)]
-        PeripheralClockControl::enable(PeripheralEnable::Wdt);
+        PeripheralClockControl::enable(crate::system::Peripheral::Wdt);
 
         TG::configure_wdt_src_clk();
 
@@ -937,14 +943,14 @@ where
     pub fn enable(&mut self) {
         // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
         //         a mutable reference.
-        unsafe { Self::set_wdt_enabled(true) };
+        unsafe { self.set_wdt_enabled(true) };
     }
 
     /// Disable the watchdog timer instance
     pub fn disable(&mut self) {
         // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
         //         a mutable reference.
-        unsafe { Self::set_wdt_enabled(false) };
+        unsafe { self.set_wdt_enabled(false) };
     }
 
     /// Forcibly enable or disable the watchdog timer
@@ -954,83 +960,140 @@ where
     /// This bypasses the usual ownership rules for the peripheral, so users
     /// must take care to ensure that no driver instance is active for the
     /// timer.
-    pub unsafe fn set_wdt_enabled(enabled: bool) {
+    pub unsafe fn set_wdt_enabled(&mut self, enabled: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+        self.set_write_protection(false);
 
         if !enabled {
             reg_block.wdtconfig0().write(|w| unsafe { w.bits(0) });
         } else {
             reg_block.wdtconfig0().write(|w| w.wdt_en().bit(true));
+
+            reg_block
+                .wdtconfig0()
+                .write(|w| w.wdt_flashboot_mod_en().bit(false));
+
+            #[cfg_attr(esp32, allow(unused_unsafe))]
+            reg_block.wdtconfig0().write(|w| unsafe {
+                w.wdt_en()
+                    .bit(true)
+                    .wdt_stg0()
+                    .bits(MwdtStageAction::ResetSystem as u8)
+                    .wdt_cpu_reset_length()
+                    .bits(7)
+                    .wdt_sys_reset_length()
+                    .bits(7)
+                    .wdt_stg1()
+                    .bits(MwdtStageAction::Off as u8)
+                    .wdt_stg2()
+                    .bits(MwdtStageAction::Off as u8)
+                    .wdt_stg3()
+                    .bits(MwdtStageAction::Off as u8)
+            });
+
+            #[cfg(any(esp32c2, esp32c3, esp32c6))]
+            reg_block
+                .wdtconfig0()
+                .modify(|_, w| w.wdt_conf_update_en().set_bit());
         }
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+        self.set_write_protection(true);
     }
 
     /// Feed the watchdog timer
     pub fn feed(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+        self.set_write_protection(false);
 
         reg_block.wdtfeed().write(|w| unsafe { w.bits(1) });
 
+        self.set_write_protection(true);
+    }
+
+    fn set_write_protection(&mut self, enable: bool) {
+        let reg_block = unsafe { &*TG::register_block() };
+
+        let wkey = if enable { 0u32 } else { 0x50D8_3AA1u32 };
+
         reg_block
             .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+            .write(|w| unsafe { w.wdt_wkey().bits(wkey) });
     }
 
     /// Set the timeout, in microseconds, of the watchdog timer
-    pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
+    pub fn set_timeout(&mut self, stage: MwdtStage, timeout: MicrosDurationU64) {
         let timeout_raw = (timeout.to_nanos() * 10 / 125) as u32;
 
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+        self.set_write_protection(false);
 
         reg_block
             .wdtconfig1()
             .write(|w| unsafe { w.wdt_clk_prescale().bits(1) });
 
-        reg_block
-            .wdtconfig2()
-            .write(|w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) });
-
-        #[cfg_attr(esp32, allow(unused_unsafe))]
-        reg_block.wdtconfig0().write(|w| unsafe {
-            w.wdt_en()
-                .bit(true)
-                .wdt_stg0()
-                .bits(3)
-                .wdt_cpu_reset_length()
-                .bits(1)
-                .wdt_sys_reset_length()
-                .bits(1)
-                .wdt_stg1()
-                .bits(0)
-                .wdt_stg2()
-                .bits(0)
-                .wdt_stg3()
-                .bits(0)
-        });
+        unsafe {
+            match stage {
+                MwdtStage::Stage0 => reg_block
+                    .wdtconfig2()
+                    .write(|w| w.wdt_stg0_hold().bits(timeout_raw)),
+                MwdtStage::Stage1 => reg_block
+                    .wdtconfig3()
+                    .write(|w| w.wdt_stg1_hold().bits(timeout_raw)),
+                MwdtStage::Stage2 => reg_block
+                    .wdtconfig4()
+                    .write(|w| w.wdt_stg2_hold().bits(timeout_raw)),
+                MwdtStage::Stage3 => reg_block
+                    .wdtconfig5()
+                    .write(|w| w.wdt_stg3_hold().bits(timeout_raw)),
+            };
+        }
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
         reg_block
             .wdtconfig0()
             .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+        self.set_write_protection(true);
+    }
+
+    /// Set the stage action of the MWDT for a specific stage.
+    ///
+    /// This function modifies MWDT behavior only if a custom bootloader with
+    /// the following modifications is used:
+    /// - `ESP_TASK_WDT_EN` parameter **disabled**
+    /// - `ESP_INT_WDT` parameter **disabled**
+    pub fn set_stage_action(&mut self, stage: MwdtStage, action: MwdtStageAction) {
+        let reg_block = unsafe { &*TG::register_block() };
+
+        self.set_write_protection(false);
+
+        match stage {
+            MwdtStage::Stage0 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg0().bits(action as u8) });
+            }
+            MwdtStage::Stage1 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg1().bits(action as u8) });
+            }
+            MwdtStage::Stage2 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg2().bits(action as u8) });
+            }
+            MwdtStage::Stage3 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) });
+            }
+        }
+
+        self.set_write_protection(true);
     }
 }
 
@@ -1078,7 +1141,7 @@ where
         T: Into<Self::Time>,
     {
         self.enable();
-        self.set_timeout(period.into());
+        self.set_timeout(MwdtStage::Stage0, period.into());
     }
 }
 
@@ -1144,7 +1207,7 @@ mod asynch {
         }
     }
 
-    impl<'a, T> core::future::Future for TimerFuture<'a, T>
+    impl<T> core::future::Future for TimerFuture<'_, T>
     where
         T: Instance,
     {
@@ -1162,7 +1225,7 @@ mod asynch {
         }
     }
 
-    impl<'a, T> Drop for TimerFuture<'a, T>
+    impl<T> Drop for TimerFuture<'_, T>
     where
         T: Instance,
     {
@@ -1260,87 +1323,87 @@ pub mod etm {
     use crate::etm::{EtmEvent, EtmTask};
 
     /// Event Task Matrix event for a timer.
-    pub struct TimerEtmEvent {
+    pub struct Event {
         id: u8,
     }
 
     /// Event Task Matrix task for a timer.
-    pub struct TimerEtmTask {
+    pub struct Task {
         id: u8,
     }
 
-    impl EtmEvent for TimerEtmEvent {
+    impl EtmEvent for Event {
         fn id(&self) -> u8 {
             self.id
         }
     }
 
-    impl Sealed for TimerEtmEvent {}
+    impl Sealed for Event {}
 
-    impl EtmTask for TimerEtmTask {
+    impl EtmTask for Task {
         fn id(&self) -> u8 {
             self.id
         }
     }
 
-    impl Sealed for TimerEtmTask {}
+    impl Sealed for Task {}
 
     /// General purpose timer ETM events.
-    pub trait TimerEtmEvents<TG> {
+    pub trait Events<TG> {
         /// ETM event triggered on alarm
-        fn on_alarm(&self) -> TimerEtmEvent;
+        fn on_alarm(&self) -> Event;
     }
 
     /// General purpose timer ETM tasks
-    pub trait TimerEtmTasks<TG> {
+    pub trait Tasks<TG> {
         /// ETM task to start the counter
-        fn cnt_start(&self) -> TimerEtmTask;
+        fn cnt_start(&self) -> Task;
 
         /// ETM task to start the alarm
-        fn cnt_stop(&self) -> TimerEtmTask;
+        fn cnt_stop(&self) -> Task;
 
         /// ETM task to stop the counter
-        fn cnt_reload(&self) -> TimerEtmTask;
+        fn cnt_reload(&self) -> Task;
 
         /// ETM task to reload the counter
-        fn cnt_cap(&self) -> TimerEtmTask;
+        fn cnt_cap(&self) -> Task;
 
         /// ETM task to load the counter with the value stored when the last
         /// `now()` was called
-        fn alarm_start(&self) -> TimerEtmTask;
+        fn alarm_start(&self) -> Task;
     }
 
-    impl<TG> TimerEtmEvents<TG> for Timer0<TG>
+    impl<TG> Events<TG> for Timer0<TG>
     where
         TG: TimerGroupInstance,
     {
-        fn on_alarm(&self) -> TimerEtmEvent {
-            TimerEtmEvent { id: 48 + TG::id() }
+        fn on_alarm(&self) -> Event {
+            Event { id: 48 + TG::id() }
         }
     }
 
-    impl<TG> TimerEtmTasks<TG> for Timer0<TG>
+    impl<TG> Tasks<TG> for Timer0<TG>
     where
         TG: TimerGroupInstance,
     {
-        fn cnt_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 88 + TG::id() }
+        fn cnt_start(&self) -> Task {
+            Task { id: 88 + TG::id() }
         }
 
-        fn alarm_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 90 + TG::id() }
+        fn alarm_start(&self) -> Task {
+            Task { id: 90 + TG::id() }
         }
 
-        fn cnt_stop(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 92 + TG::id() }
+        fn cnt_stop(&self) -> Task {
+            Task { id: 92 + TG::id() }
         }
 
-        fn cnt_reload(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 94 + TG::id() }
+        fn cnt_reload(&self) -> Task {
+            Task { id: 94 + TG::id() }
         }
 
-        fn cnt_cap(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 96 + TG::id() }
+        fn cnt_cap(&self) -> Task {
+            Task { id: 96 + TG::id() }
         }
     }
 }

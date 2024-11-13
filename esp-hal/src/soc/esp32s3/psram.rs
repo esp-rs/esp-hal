@@ -379,9 +379,9 @@ pub(crate) mod utils {
     /// or `calculate_best_flash_tuning_config`
     #[ram]
     fn mspi_timing_enter_high_speed_mode(control_spi1: bool, config: &PsramConfig) {
-        let core_clock: SpiTimingConfigCoreClock = get_mspi_core_clock(config);
-        let flash_div: u32 = get_flash_clock_divider(config);
-        let psram_div: u32 = get_psram_clock_divider(config);
+        let core_clock: SpiTimingConfigCoreClock = mspi_core_clock(config);
+        let flash_div: u32 = flash_clock_divider(config);
+        let psram_div: u32 = psram_clock_divider(config);
 
         info!(
             "PSRAM core_clock {:?}, flash_div = {}, psram_div = {}",
@@ -466,17 +466,17 @@ pub(crate) mod utils {
     }
 
     #[ram]
-    fn get_mspi_core_clock(config: &PsramConfig) -> SpiTimingConfigCoreClock {
+    fn mspi_core_clock(config: &PsramConfig) -> SpiTimingConfigCoreClock {
         config.core_clock
     }
 
     #[ram]
-    fn get_flash_clock_divider(config: &PsramConfig) -> u32 {
+    fn flash_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock as u32 / config.flash_frequency as u32
     }
 
     #[ram]
-    fn get_psram_clock_divider(config: &PsramConfig) -> u32 {
+    fn psram_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock as u32 / config.ram_frequency as u32
     }
 
@@ -708,7 +708,7 @@ pub(crate) mod utils {
                 let iomux = &*esp32s3::IO_MUX::PTR;
                 iomux
                     .gpio(cs1_io as usize)
-                    .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1))
+                    .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
             }
         } else {
             unsafe {
@@ -717,7 +717,7 @@ pub(crate) mod utils {
                 let iomux = &*esp32s3::IO_MUX::PTR;
                 iomux
                     .gpio(cs1_io as usize)
-                    .modify(|_, w| w.mcu_sel().bits(PIN_FUNC_GPIO))
+                    .modify(|_, w| w.mcu_sel().bits(PIN_FUNC_GPIO));
             }
         }
 
@@ -1058,7 +1058,7 @@ pub(crate) mod utils {
 
         init_psram_mode_reg(1, &mode_reg);
         // Print PSRAM info
-        get_psram_mode_reg(1, &mut mode_reg);
+        psram_mode_reg(1, &mut mode_reg);
 
         print_psram_info(&mode_reg);
 
@@ -1156,7 +1156,7 @@ pub(crate) mod utils {
             spi.sram_cmd().modify(|_, w| w.sdout_oct().set_bit());
             spi.sram_cmd().modify(|_, w| w.sdin_oct().set_bit());
 
-            spi.cache_sctrl().modify(|_, w| w.sram_oct().set_bit())
+            spi.cache_sctrl().modify(|_, w| w.sram_oct().set_bit());
         }
     }
 
@@ -1164,7 +1164,7 @@ pub(crate) mod utils {
     fn spi_flash_set_rom_required_regs() {
         // Disable the variable dummy mode when doing timing tuning
         let spi = unsafe { &*crate::peripherals::SPI1::PTR };
-        spi.ddr().modify(|_, w| w.spi_fmem_var_dummy().clear_bit())
+        spi.ddr().modify(|_, w| w.spi_fmem_var_dummy().clear_bit());
         // STR /DTR mode setting is done every time when
         // `esp_rom_opiflash_exec_cmd` is called
         //
@@ -1199,7 +1199,7 @@ pub(crate) mod utils {
             let pins = &[27usize, 28, 31, 32, 33, 34, 35, 36, 37];
             for pin in pins {
                 let iomux = &*esp32s3::IO_MUX::PTR;
-                iomux.gpio(*pin).modify(|_, w| w.fun_drv().bits(3))
+                iomux.gpio(*pin).modify(|_, w| w.fun_drv().bits(3));
             }
         }
     }
@@ -1238,11 +1238,11 @@ pub(crate) mod utils {
     // This function should always be called after `spi_timing_flash_tuning` or
     // `calculate_best_flash_tuning_config`
     fn spi_timing_enter_mspi_high_speed_mode(control_spi1: bool, config: &PsramConfig) {
-        // spi_timing_config_core_clock_t core_clock = get_mspi_core_clock();
+        // spi_timing_config_core_clock_t core_clock = mspi_core_clock();
         let core_clock = SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m;
 
-        let flash_div: u32 = get_flash_clock_divider(config);
-        let psram_div: u32 = get_psram_clock_divider(config);
+        let flash_div: u32 = flash_clock_divider(config);
+        let psram_div: u32 = psram_clock_divider(config);
 
         // Set SPI01 core clock
         spi0_timing_config_set_core_clock(core_clock); // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
@@ -1287,7 +1287,7 @@ pub(crate) mod utils {
             let iomux = &*esp32s3::IO_MUX::PTR;
             iomux
                 .gpio(OCT_PSRAM_CS1_IO as usize)
-                .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1))
+                .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
         }
 
         // Set mspi cs1 drive strength
@@ -1295,7 +1295,7 @@ pub(crate) mod utils {
             let iomux = &*esp32s3::IO_MUX::PTR;
             iomux
                 .gpio(OCT_PSRAM_CS1_IO as usize)
-                .modify(|_, w| w.fun_drv().bits(3))
+                .modify(|_, w| w.fun_drv().bits(3));
         }
 
         // Set psram clock pin drive strength
@@ -1306,7 +1306,7 @@ pub(crate) mod utils {
         }
     }
 
-    fn get_psram_mode_reg(spi_num: u32, out_reg: &mut OpiPsramModeReg) {
+    fn psram_mode_reg(spi_num: u32, out_reg: &mut OpiPsramModeReg) {
         let mode = ESP_ROM_SPIFLASH_OPI_DTR_MODE;
         let cmd_len: u32 = 16;
         let addr_bit_len: u32 = 32;
@@ -1601,12 +1601,12 @@ pub(crate) mod utils {
     }
 
     #[ram]
-    fn get_flash_clock_divider(config: &PsramConfig) -> u32 {
+    fn flash_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock as u32 / config.flash_frequency as u32
     }
 
     #[ram]
-    fn get_psram_clock_divider(config: &PsramConfig) -> u32 {
+    fn psram_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock as u32 / config.ram_frequency as u32
     }
 }

@@ -81,8 +81,7 @@
 //!     });
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//!     let mut led = Output::new(io.pins.gpio0, Level::High);
+//!     let mut led = Output::new(peripherals.GPIO0, Level::High);
 //!
 //!     let delay = Delay::new();
 //!
@@ -374,24 +373,33 @@ impl Cpu {
     /// Returns the core the application is currently executing on
     #[inline(always)]
     pub fn current() -> Self {
-        get_core()
+        // This works for both RISCV and Xtensa because both
+        // get_raw_core functions return zero, _or_ something
+        // greater than zero; 1 in the case of RISCV and 0x2000
+        // in the case of Xtensa.
+        match raw_core() {
+            0 => Cpu::ProCpu,
+            #[cfg(all(multi_core, riscv))]
+            1 => Cpu::AppCpu,
+            #[cfg(all(multi_core, xtensa))]
+            0x2000 => Cpu::AppCpu,
+            _ => unreachable!(),
+        }
     }
-}
 
-/// Which core the application is currently executing on
-#[inline(always)]
-pub fn get_core() -> Cpu {
-    // This works for both RISCV and Xtensa because both
-    // get_raw_core functions return zero, _or_ something
-    // greater than zero; 1 in the case of RISCV and 0x2000
-    // in the case of Xtensa.
-    match get_raw_core() {
-        0 => Cpu::ProCpu,
-        #[cfg(all(multi_core, riscv))]
-        1 => Cpu::AppCpu,
-        #[cfg(all(multi_core, xtensa))]
-        0x2000 => Cpu::AppCpu,
-        _ => unreachable!(),
+    /// Returns an iterator over the "other" cores.
+    #[inline(always)]
+    pub fn other() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                match Self::current() {
+                    Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
+                    Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
+                }
+            } else {
+                [].into_iter()
+            }
+        }
     }
 }
 
@@ -400,7 +408,7 @@ pub fn get_core() -> Cpu {
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(riscv)]
 #[inline(always)]
-fn get_raw_core() -> usize {
+fn raw_core() -> usize {
     #[cfg(multi_core)]
     {
         riscv::register::mhartid::read()
@@ -419,7 +427,7 @@ fn get_raw_core() -> usize {
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(xtensa)]
 #[inline(always)]
-fn get_raw_core() -> usize {
+fn raw_core() -> usize {
     (xtensa_lx::get_processor_id() & 0x2000) as usize
 }
 
@@ -513,7 +521,8 @@ pub fn init(config: Config) -> Peripherals {
     match config.watchdog.rwdt {
         WatchdogStatus::Enabled(duration) => {
             rtc.rwdt.enable();
-            rtc.rwdt.set_timeout(duration);
+            rtc.rwdt
+                .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
         }
         WatchdogStatus::Disabled => {
             rtc.rwdt.disable();
@@ -524,7 +533,7 @@ pub fn init(config: Config) -> Peripherals {
         WatchdogStatus::Enabled(duration) => {
             let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
             timg0_wd.enable();
-            timg0_wd.set_timeout(duration);
+            timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
         }
         WatchdogStatus::Disabled => {
             crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
@@ -536,7 +545,7 @@ pub fn init(config: Config) -> Peripherals {
         WatchdogStatus::Enabled(duration) => {
             let mut timg1_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
             timg1_wd.enable();
-            timg1_wd.set_timeout(duration);
+            timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
         }
         WatchdogStatus::Disabled => {
             crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();
@@ -547,6 +556,8 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(esp32)]
     crate::time::time_init();
+
+    crate::gpio::bind_default_interrupt_handler();
 
     peripherals
 }

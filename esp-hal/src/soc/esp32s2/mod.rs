@@ -31,6 +31,12 @@ macro_rules! chip {
     };
 }
 
+/// A link to the Technical Reference Manual (TRM) for the chip.
+#[macro_export]
+macro_rules! trm_link {
+    () => { "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf" };
+}
+
 pub use chip;
 
 pub(crate) mod constants {
@@ -92,7 +98,7 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         addr_of_mut!(_rtc_slow_bss_end),
     );
     if matches!(
-        crate::reset::get_reset_reason(),
+        crate::reset::reset_reason(),
         None | Some(SocResetReason::ChipPowerOn)
     ) {
         xtensa_lx_rt::zero_bss(

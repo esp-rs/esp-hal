@@ -17,7 +17,9 @@
 use crate::{
     dma::*,
     peripheral::PeripheralRef,
+    peripherals::Interrupt,
     system::{Peripheral, PeripheralClockControl},
+    Blocking,
 };
 
 #[doc(hidden)]
@@ -33,6 +35,36 @@ impl crate::private::Sealed for AnyGdmaChannel {}
 impl DmaChannel for AnyGdmaChannel {
     type Rx = ChannelRxImpl<Self>;
     type Tx = ChannelTxImpl<Self>;
+
+    fn async_handler<M: Mode>(ch: &Channel<'_, Self, M>) -> InterruptHandler {
+        match ch.tx.tx_impl.0.number() {
+            0 => DmaChannel0::handler(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::handler(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::handler(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::handler(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::handler(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn interrupts<M: Mode>(ch: &Channel<'_, Self, M>) -> &'static [Interrupt] {
+        match ch.tx.tx_impl.0.number() {
+            0 => DmaChannel0::isrs(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::isrs(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::isrs(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::isrs(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::isrs(),
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[non_exhaustive]
@@ -142,6 +174,12 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
             .modify(|_, w| w.outlink_restart().set_bit());
     }
 
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        self.ch()
+            .out_conf1()
+            .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
+    }
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.ch()
@@ -151,6 +189,12 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
 }
 
 impl<C: GdmaChannel> TxRegisterAccess for ChannelTxImpl<C> {
+    fn set_auto_write_back(&self, enable: bool) {
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| w.out_auto_wrback().bit(enable));
+    }
+
     fn last_dscr_address(&self) -> usize {
         self.ch()
             .out_eof_des_addr()
@@ -172,7 +216,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
                 };
             }
             w
-        })
+        });
     }
 
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
@@ -206,7 +250,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
                 };
             }
             w
-        })
+        });
     }
 
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
@@ -321,6 +365,12 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
             .modify(|_, w| w.inlink_restart().set_bit());
     }
 
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        self.ch()
+            .in_conf1()
+            .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
+    }
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.ch()
@@ -388,7 +438,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
                 };
             }
             w
-        })
+        });
     }
 
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
@@ -425,10 +475,7 @@ pub struct ChannelCreator<const N: u8> {}
 
 impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
     /// Asserts that the channel is compatible with the given peripheral.
-    pub fn runtime_ensure_compatible<P: PeripheralMarker + DmaEligible>(
-        &self,
-        _peripheral: &PeripheralRef<'_, P>,
-    ) {
+    pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &PeripheralRef<'_, P>) {
         // No runtime checks; GDMA channels are compatible with any peripheral
     }
 }
@@ -442,9 +489,27 @@ macro_rules! impl_channel {
 
             impl crate::private::Sealed for [<DmaChannel $num>] {}
 
+            impl [<DmaChannel $num>] {
+                fn handler() -> InterruptHandler {
+                    $async_handler
+                }
+
+                fn isrs() -> &'static [Interrupt] {
+                    &[$(Interrupt::$interrupt),*]
+                }
+            }
+
             impl DmaChannel for [<DmaChannel $num>] {
                 type Rx = ChannelRxImpl<SpecificGdmaChannel<$num>>;
                 type Tx = ChannelTxImpl<SpecificGdmaChannel<$num>>;
+
+                fn async_handler<M: Mode>(_ch: &Channel<'_, Self, M>) -> InterruptHandler {
+                    Self::handler()
+                }
+
+                fn interrupts<M: Mode>(_ch: &Channel<'_, Self, M>,) -> &'static [Interrupt] {
+                    Self::isrs()
+                }
             }
 
             impl DmaChannelConvert<AnyGdmaChannel> for [<DmaChannel $num>] {
@@ -457,71 +522,29 @@ macro_rules! impl_channel {
             }
 
             impl DmaChannelExt for [<DmaChannel $num>] {
-                fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
+                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     ChannelRxImpl(SpecificGdmaChannel::<$num> {})
                 }
 
-                fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
+                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     ChannelTxImpl(SpecificGdmaChannel::<$num> {})
-                }
-
-                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
-                    let mut dma = unsafe { crate::peripherals::DMA::steal() };
-                    $(
-                        dma.[< bind_ $interrupt:lower _interrupt >](handler.handler());
-                        $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, handler.priority()).unwrap();
-                    )*
                 }
             }
 
             impl ChannelCreator<$num> {
-                fn do_configure<'a, M: crate::Mode>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], M> {
-                    let tx_impl = ChannelTxImpl(SpecificGdmaChannel::<$num> {});
-                    tx_impl.set_burst_mode(burst_mode);
-                    tx_impl.set_priority(priority);
-
-                    let rx_impl = ChannelRxImpl(SpecificGdmaChannel::<$num> {});
-                    rx_impl.set_burst_mode(burst_mode);
-                    rx_impl.set_priority(priority);
-                    // clear the mem2mem mode to avoid failed DMA if this
-                    // channel was previously used for a mem2mem transfer.
-                    rx_impl.set_mem2mem_mode(false);
-
-                    crate::dma::Channel {
-                        tx: ChannelTx::new(tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_impl, burst_mode),
-                        phantom: PhantomData,
-                    }
-                }
-
                 /// Configure the channel for use with blocking APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], crate::Blocking> {
-                    self.do_configure(burst_mode, priority)
-                }
+                ) -> Channel<'a, [<DmaChannel $num>], Blocking> {
+                    let mut this = Channel {
+                        tx: ChannelTx::new(ChannelTxImpl(SpecificGdmaChannel::<$num> {})),
+                        rx: ChannelRx::new(ChannelRxImpl(SpecificGdmaChannel::<$num> {})),
+                        phantom: PhantomData,
+                    };
 
-                /// Configure the channel for use with async APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                pub fn configure_for_async<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], $crate::Async> {
-                    let this = self.do_configure(burst_mode, priority);
-
-                    [<DmaChannel $num>]::set_isr($async_handler);
+                    this.configure(burst_mode, priority);
 
                     this
                 }

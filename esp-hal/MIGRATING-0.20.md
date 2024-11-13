@@ -230,7 +230,7 @@ We've replaced some usage of features with [esp-config](https://docs.rs/esp-conf
 # feature in Cargo.toml
 - esp-hal = { version = "0.20", features = ["place-spi-driver-in-ram"] }
 # key in .cargo/config.toml [env] section
-+ ESP_HAL_PLACE_SPI_DRIVER_IN_RAM=true
++ ESP_HAL_PLACE_SPI_DRIVER_IN_RAM="true"
 ```
 
 ## `Camera` driver now uses `DmaRxBuffer` and moves the driver into the transfer object.

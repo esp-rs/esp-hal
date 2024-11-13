@@ -25,14 +25,14 @@ use bleps::{
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Input, Io, Pull},
+    gpio::{Input, Pull},
     prelude::*,
     rng::Rng,
     time,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::BleConnector, init, EspWifiInitFor};
+use esp_wifi::{ble::controller::BleConnector, init};
 
 #[entry]
 fn main() -> ! {
@@ -48,20 +48,17 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
     let init = init(
-        EspWifiInitFor::Ble,
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
     )
     .unwrap();
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = Input::new(io.pins.gpio0, Pull::Down);
+            let button = Input::new(peripherals.GPIO0, Pull::Down);
         } else {
-            let button = Input::new(io.pins.gpio9, Pull::Down);
+            let button = Input::new(peripherals.GPIO9, Pull::Down);
         }
     }
 

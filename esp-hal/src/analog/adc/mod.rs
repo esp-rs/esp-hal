@@ -31,13 +31,11 @@
 //! # use esp_hal::analog::adc::Attenuation;
 //! # use esp_hal::analog::adc::Adc;
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-#![cfg_attr(esp32, doc = "let analog_pin = io.pins.gpio32;")]
-#![cfg_attr(any(esp32s2, esp32s3), doc = "let analog_pin = io.pins.gpio3;")]
+#![cfg_attr(esp32, doc = "let analog_pin = peripherals.GPIO32;")]
+#![cfg_attr(any(esp32s2, esp32s3), doc = "let analog_pin = peripherals.GPIO3;")]
 #![cfg_attr(
     not(any(esp32, esp32s2, esp32s3)),
-    doc = "let analog_pin = io.pins.gpio2;"
+    doc = "let analog_pin = peripherals.GPIO2;"
 )]
 //! let mut adc1_config = AdcConfig::new();
 //! let mut pin = adc1_config.enable_pin(
@@ -237,17 +235,17 @@ trait AdcCalEfuse {
     /// Get ADC calibration init code
     ///
     /// Returns digital value for zero voltage for a given attenuation
-    fn get_init_code(atten: Attenuation) -> Option<u16>;
+    fn init_code(atten: Attenuation) -> Option<u16>;
 
     /// Get ADC calibration reference point voltage
     ///
     /// Returns reference voltage (millivolts) for a given attenuation
-    fn get_cal_mv(atten: Attenuation) -> u16;
+    fn cal_mv(atten: Attenuation) -> u16;
 
     /// Get ADC calibration reference point digital value
     ///
     /// Returns digital value for reference voltage for a given attenuation
-    fn get_cal_code(atten: Attenuation) -> Option<u16>;
+    fn cal_code(atten: Attenuation) -> Option<u16>;
 }
 
 macro_rules! impl_adc_interface {

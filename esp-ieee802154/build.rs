@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf};
 
-use esp_config::{generate_config, Value};
+use esp_config::{generate_config, Validator, Value};
 
 fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -11,8 +11,9 @@ fn main() {
         "esp_ieee802154",
         &[(
             "rx_queue_size",
-            Value::UnsignedInteger(50),
             "Size of the RX queue in frames",
+            Value::Integer(50),
+            Some(Validator::PositiveInteger),
         )],
         true,
     );

@@ -166,7 +166,7 @@ impl<'d> Aes<'d> {
         self.set_block(block);
         self.start();
         while !(self.is_idle()) {}
-        self.get_block(block);
+        self.block(block);
     }
 
     fn set_mode(&mut self, mode: u8) {
@@ -181,7 +181,7 @@ impl<'d> Aes<'d> {
         self.write_block(block);
     }
 
-    fn get_block(&self, block: &mut [u8; 16]) {
+    fn block(&self, block: &mut [u8; 16]) {
         self.read_block(block);
     }
 
@@ -250,6 +250,7 @@ pub mod dma {
             WriteBuffer,
         },
         peripherals::AES,
+        Blocking,
     };
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
@@ -275,7 +276,7 @@ pub mod dma {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
-        channel: Channel<'d, <AES as DmaEligible>::Dma, crate::Blocking>,
+        channel: Channel<'d, <AES as DmaEligible>::Dma, Blocking>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
@@ -284,12 +285,11 @@ pub mod dma {
         /// Enable DMA for the current instance of the AES driver
         pub fn with_dma<C>(
             self,
-            channel: Channel<'d, C, crate::Blocking>,
+            channel: Channel<'d, C, Blocking>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d>
         where
-            Self: Sized,
             C: DmaChannelConvert<<AES as DmaEligible>::Dma>,
         {
             AesDma {
@@ -301,13 +301,13 @@ pub mod dma {
         }
     }
 
-    impl<'d> core::fmt::Debug for AesDma<'d> {
+    impl core::fmt::Debug for AesDma<'_> {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("AesDma").finish()
         }
     }
 
-    impl<'d> DmaSupport for AesDma<'d> {
+    impl DmaSupport for AesDma<'_> {
         fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while self.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
             && !self.channel.tx.is_done()
@@ -347,7 +347,7 @@ pub mod dma {
         }
     }
 
-    impl<'d> AesDma<'d> {
+    impl AesDma<'_> {
         /// Writes the encryption key to the AES hardware, checking that its
         /// length matches expected constraints.
         pub fn write_key<K>(&mut self, key: K)

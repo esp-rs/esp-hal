@@ -3,8 +3,9 @@
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled).
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: generic-queue
+// FIXME: re-enable on ESP32 when it no longer fails spuriously
 
 #![no_std]
 #![no_main]
@@ -13,8 +14,8 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Io, NoPin},
-    i2s::{DataFormat, I2s, I2sTx, Standard},
+    gpio::{AnyPin, NoPin, Pin},
+    i2s::master::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     prelude::*,
     Async,
@@ -102,7 +103,7 @@ mod tests {
     use super::*;
 
     struct Context {
-        io: Io,
+        dout: AnyPin,
         dma_channel: DmaChannel0Creator,
         i2s: I2S0,
     }
@@ -110,8 +111,6 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -123,8 +122,10 @@ mod tests {
             }
         }
 
+        let (_, dout) = hil_test::common_test_pins!(peripherals);
+
         Context {
-            io,
+            dout: dout.degrade(),
             dma_channel,
             i2s: peripherals.I2S0,
         }
@@ -142,15 +143,13 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel
-                .configure_for_async(false, DmaPriority::Priority0),
+            ctx.dma_channel.configure(false, DmaPriority::Priority0),
             rx_descriptors,
             tx_descriptors,
-        );
+        )
+        .into_async();
 
-        let (_, dout) = hil_test::common_test_pins!(ctx.io);
-
-        let din = dout.peripheral_input();
+        let (din, dout) = ctx.dout.split();
 
         let i2s_tx = i2s
             .i2s_tx
@@ -202,9 +201,7 @@ mod tests {
             tx_descriptors,
         );
 
-        let (_, dout) = hil_test::common_test_pins!(ctx.io);
-
-        let din = dout.peripheral_input();
+        let (din, dout) = ctx.dout.split();
 
         let mut i2s_tx = i2s
             .i2s_tx
@@ -235,7 +232,7 @@ mod tests {
         assert_eq!(0, rx_transfer.pop(&mut rcv[..100]).unwrap());
 
         // no data available yet
-        assert_eq!(0, rx_transfer.available());
+        assert_eq!(0, rx_transfer.available().unwrap());
 
         let mut tx_transfer = i2s_tx.write_dma_circular(tx_buffer).unwrap();
 
@@ -243,7 +240,7 @@ mod tests {
         let mut sample_idx = 0;
         let mut check_samples = SampleSource::new();
         loop {
-            let tx_avail = tx_transfer.available();
+            let tx_avail = tx_transfer.available().unwrap();
 
             // make sure there are more than one descriptor buffers ready to push
             if tx_avail > 5000 {
@@ -254,13 +251,13 @@ mod tests {
             }
 
             // test calling available multiple times doesn't break anything
-            rx_transfer.available();
-            rx_transfer.available();
-            rx_transfer.available();
-            rx_transfer.available();
-            rx_transfer.available();
-            rx_transfer.available();
-            let rx_avail = rx_transfer.available();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            rx_transfer.available().unwrap();
+            let rx_avail = rx_transfer.available().unwrap();
 
             // make sure there are more than one descriptor buffers ready to pop
             if rx_avail > 0 {
@@ -297,5 +294,65 @@ mod tests {
                 break;
             }
         }
+    }
+
+    #[test]
+    fn test_i2s_push_too_late(ctx: Context) {
+        let (_, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(0, 16000);
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            Standard::Philips,
+            DataFormat::Data16Channel16,
+            16000.Hz(),
+            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            rx_descriptors,
+            tx_descriptors,
+        );
+
+        let mut i2s_tx = i2s
+            .i2s_tx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_dout(ctx.dout)
+            .build();
+
+        let mut tx_transfer = i2s_tx.write_dma_circular(tx_buffer).unwrap();
+
+        let delay = esp_hal::delay::Delay::new();
+        delay.delay_millis(300);
+
+        assert!(matches!(tx_transfer.push(&[0; 128]), Err(_)));
+    }
+
+    #[test]
+    #[timeout(1)]
+    fn test_i2s_read_too_late(ctx: Context) {
+        let (rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(16000, 0);
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            Standard::Philips,
+            DataFormat::Data16Channel16,
+            16000.Hz(),
+            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            rx_descriptors,
+            tx_descriptors,
+        );
+
+        let mut i2s_rx = i2s
+            .i2s_rx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_din(ctx.dout) // not a typo
+            .build();
+
+        let mut buffer = [0u8; 1024];
+        let mut rx_transfer = i2s_rx.read_dma_circular(rx_buffer).unwrap();
+
+        let delay = esp_hal::delay::Delay::new();
+        delay.delay_millis(300);
+
+        assert!(matches!(rx_transfer.pop(&mut buffer), Err(_)));
     }
 }

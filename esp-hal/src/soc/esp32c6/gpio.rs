@@ -8,7 +8,7 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `get_io_mux_reg(gpio_num: u8) -> &'static
+//!   - `io_mux_reg(gpio_num: u8) -> &'static
 //!     crate::peripherals::io_mux::GPIO0:`:
 //!       * Returns the IO_MUX register for the specified GPIO pin number.
 //!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
@@ -46,6 +46,7 @@ pub const NUM_PINS: usize = 31;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u8;
 pub(crate) type OutputSignalType = u8;
 pub(crate) const OUTPUT_SIGNAL_MAX: u8 = 128;
 pub(crate) const INPUT_SIGNAL_MAX: u8 = 124;
@@ -55,7 +56,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
-pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
+pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
     unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
 }
 
@@ -65,7 +66,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     EXT_ADC_START       = 0,
@@ -169,7 +171,8 @@ pub enum InputSignal {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum OutputSignal {
     LEDC_LS_SIG0          = 0,
@@ -282,40 +285,6 @@ pub enum OutputSignal {
     CLK_OUT_OUT2          = 126,
     CLK_OUT_OUT3          = 127,
     GPIO                  = 128,
-}
-
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo])
-    (1, [Input, Output, Analog, RtcIo])
-    (2, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
-    (3, [Input, Output, Analog, RtcIo])
-    (4, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
-    (5, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
-    (6, [Input, Output, Analog, RtcIo] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
-    (7, [Input, Output, Analog, RtcIo] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
-    (8, [Input, Output])
-    (9, [Input, Output])
-    (10, [Input, Output])
-    (11, [Input, Output])
-    (12, [Input, Output])
-    (13, [Input, Output])
-    (14, [Input, Output])
-    (15, [Input, Output])
-    (16, [Input, Output] (0 => U0RXD) (2 => FSPICS0))
-    (17, [Input, Output] () (0 => U0TXD 2 => FSPICS1))
-    (18, [Input, Output] () (2 => FSPICS2)) //  0 => SDIO_CMD but there are no signals since it's a fixed pin
-    (19, [Input, Output] () (2 => FSPICS3)) //  0 => SDIO_CLK but there are no signals since it's a fixed pin
-    (20, [Input, Output] () (2 => FSPICS4)) // 0 => SDIO_DATA0 but there are no signals since it's a fixed pin
-    (21, [Input, Output] () (2 => FSPICS5)) // 0 => SDIO_DATA1 but there are no signals since it's a fixed pin
-    (22, [Input, Output] () ()) // 0 => SDIO_DATA2 but there are no signals since it's a fixed pin
-    (23, [Input, Output] () ()) // 0 => SDIO_DATA3 but there are no signals since it's a fixed pin
-    (24, [Input, Output] () (0 => SPICS0))
-    (25, [Input, Output] (0 => SPIQ) (0 => SPIQ))
-    (26, [Input, Output] (0 => SPIWP) (0 => SPIWP))
-    (27, [Input, Output])
-    (28, [Input, Output] (0 => SPIHD) (0 => SPIHD))
-    (29, [Input, Output] () (0 => SPICLK_MUX))
-    (30, [Input, Output] (0 => SPID) (0 => SPID))
 }
 
 crate::lp_gpio! {

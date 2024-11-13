@@ -87,7 +87,7 @@ impl self::efuse::Efuse {
     ///
     /// By default this reads the base mac address from eFuse, but it can be
     /// overridden by `set_mac_address`.
-    pub fn get_mac_address() -> [u8; 6] {
+    pub fn mac_address() -> [u8; 6] {
         if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
             unsafe { MAC_OVERRIDE }
         } else {

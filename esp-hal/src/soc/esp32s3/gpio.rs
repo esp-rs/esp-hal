@@ -8,7 +8,7 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `get_io_mux_reg(gpio_num: u8) -> &'static
+//!   - `io_mux_reg(gpio_num: u8) -> &'static
 //!     crate::peripherals::io_mux::GPIO0:`:
 //!       * Returns the IO_MUX register for the specified GPIO pin number.
 //!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
@@ -46,6 +46,7 @@ pub const NUM_PINS: usize = 49;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u16;
 pub(crate) type OutputSignalType = u16;
 pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 256;
 pub(crate) const INPUT_SIGNAL_MAX: u16 = 189;
@@ -55,7 +56,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
-pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
+pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
     unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
 }
 
@@ -65,7 +66,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     SPIQ              = 0,
@@ -203,8 +205,10 @@ pub enum InputSignal {
 
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
-#[doc(hidden)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[doc(hidden)] // TODO connection operations are now public on these, we might want to publish
+               // them
 pub enum OutputSignal {
     SPIQ            = 0,
     SPID            = 1,
@@ -345,77 +349,127 @@ pub enum OutputSignal {
     GPIO            = 256,
 }
 
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo])
-    (1, [Input, Output, Analog, RtcIo])
-    (2, [Input, Output, Analog, RtcIo])
-    (3, [Input, Output, Analog, RtcIo])
-    (4, [Input, Output, Analog, RtcIo])
-    (5, [Input, Output, Analog, RtcIo])
-    (6, [Input, Output, Analog, RtcIo])
-    (7, [Input, Output, Analog, RtcIo])
-    (8, [Input, Output, Analog, RtcIo] () (3 => SUBSPICS1))
-    (9, [Input, Output, Analog, RtcIo] (3 => SUBSPIHD 4 => FSPIHD) (3 => SUBSPIHD 4 => FSPIHD))
-    (10, [Input, Output, Analog, RtcIo] (2 => FSPIIO4 4 => FSPICS0) (2 => FSPIIO4 3 => SUBSPICS0 4 => FSPICS0))
-    (11, [Input, Output, Analog, RtcIo] (2 => FSPIIO5 3 => SUBSPID 4 => FSPID) (2 => FSPIIO5 3 => SUBSPID 4 => FSPID))
-    (12, [Input, Output, Analog, RtcIo] (2 => FSPIIO6 4 => FSPICLK) (2 => FSPIIO6 3=> SUBSPICLK 4 => FSPICLK))
-    (13, [Input, Output, Analog, RtcIo] (2 => FSPIIO7 3 => SUBSPIQ 4 => FSPIQ) (2 => FSPIIO7 3 => SUBSPIQ 4 => FSPIQ))
-    (14, [Input, Output, Analog, RtcIo] (3 => SUBSPIWP 4 => FSPIWP) (2 => FSPIDQS 3 => SUBSPIWP 4 => FSPIWP))
-    (15, [Input, Output, Analog, RtcIo] () (2 => U0RTS))
-    (16, [Input, Output, Analog, RtcIo] (2 => U0CTS) ())
-    (17, [Input, Output, Analog, RtcIo] () (2 => U1TXD))
-    (18, [Input, Output, Analog, RtcIo] (2 => U1RXD) ())
-    (19, [Input, Output, Analog, RtcIo] () (2 => U1RTS))
-    (20, [Input, Output, Analog, RtcIo] (2 => U1CTS) ())
-    (21, [Input, Output, Analog, RtcIo])
-    (26, [Input, Output])
-    (27, [Input, Output])
-    (28, [Input, Output])
-    (29, [Input, Output])
-    (30, [Input, Output])
-    (31, [Input, Output])
-    (32, [Input, Output])
-    (33, [Input, Output] (2 => FSPIHD 3 => SUBSPIHD) (2 => FSPIHD 3 => SUBSPIHD))
-    (34, [Input, Output] (2 => FSPICS0) (2 => FSPICS0 3 => SUBSPICS0))
-    (35, [Input, Output] (2 => FSPID 3 => SUBSPID) (2 => FSPID 3 => SUBSPID))
-    (36, [Input, Output] (2 => FSPICLK) (2 => FSPICLK 3 => SUBSPICLK))
-    (37, [Input, Output] (2 => FSPIQ 3 => SUBSPIQ 4 => SPIDQS) (2 => FSPIQ 3=> SUBSPIQ 4 => SPIDQS))
-    (38, [Input, Output] (2 => FSPIWP 3 => SUBSPIWP) (3 => FSPIWP 3 => SUBSPIWP))
-    (39, [Input, Output] () (4 => SUBSPICS1))
-    (40, [Input, Output])
-    (41, [Input, Output])
-    (42, [Input, Output])
-    (43, [Input, Output])
-    (44, [Input, Output])
-    (45, [Input, Output])
-    (46, [Input, Output])
-    (47, [Input, Output])
-    (48, [Input, Output])
+macro_rules! rtcio_analog {
+    ( @ignore $rue:literal ) => {};
+
+    (
+        $pin_num:expr, $pin_reg:expr, $prefix:pat, $hold:ident
+    ) => {
+        impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
+            fn rtc_number(&self) -> u8 {
+                $pin_num
+            }
+
+            /// Set the RTC properties of the pin. If `mux` is true then then pin is
+            /// routed to RTC, when false it is routed to IO_MUX.
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+                enable_iomux_clk_gate();
+
+                // disable input
+                paste::paste!{
+                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                        .$pin_reg.modify(|_,w| unsafe {
+                            w.[<$prefix fun_ie>]().bit(input_enable);
+                            w.[<$prefix mux_sel>]().bit(mux);
+                            w.[<$prefix fun_sel>]().bits(func as u8)
+                        });
+                }
+            }
+
+            fn rtcio_pad_hold(&mut self, enable: bool) {
+                unsafe { $crate::peripherals::LPWR::steal() }
+                    .pad_hold()
+                    .modify(|_, w| w.$hold().bit(enable));
+            }
+        }
+
+        impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
+        {
+            fn rtcio_pullup(&mut self, enable: bool) {
+                paste::paste! {
+                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                        .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
+                }
+            }
+
+            fn rtcio_pulldown(&mut self, enable: bool) {
+                paste::paste! {
+                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                        .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
+                }
+            }
+        }
+
+        impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
+            /// Configures the pin for analog mode.
+            fn set_analog(&self, _: $crate::private::Internal) {
+                use $crate::gpio::RtcPin;
+                enable_iomux_clk_gate();
+
+                let rtcio = unsafe{ $crate::peripherals::RTC_IO::steal() };
+
+                paste::paste! {
+                    // disable input
+                    rtcio.$pin_reg.modify(|_,w| w.[<$prefix fun_ie>]().bit(false));
+
+                    // disable output
+                    rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << self.rtc_number()) });
+
+                    // disable open drain
+                    rtcio.pin(self.rtc_number() as usize).modify(|_,w| w.pad_driver().bit(false));
+
+                    rtcio.$pin_reg.modify(|_,w| {
+                        w.[<$prefix fun_ie>]().clear_bit();
+
+                        // Connect pin to analog / RTC module instead of standard GPIO
+                        w.[<$prefix mux_sel>]().set_bit();
+
+                        // Select function "RTC function 1" (GPIO) for analog use
+                        unsafe { w.[<$prefix fun_sel>]().bits(0b00) };
+
+                        // Disable pull-up and pull-down resistors on the pin
+                        w.[<$prefix rue>]().bit(false);
+                        w.[<$prefix rde>]().bit(false);
+
+                        w
+                    });
+                }
+            }
+        }
+    };
+
+    (
+        $( ( $pin_num:expr, $pin_reg:expr, $prefix:pat, $hold:ident ) )+
+    ) => {
+        $(
+            rtcio_analog!($pin_num, $pin_reg, $prefix, $hold);
+        )+
+    };
 }
 
-crate::rtcio_analog! {
-    ( 0,  0,  touch_pad(0),   "",     touch_pad0_hold,  true)
-    ( 1,  1,  touch_pad(1),   "",     touch_pad1_hold,  true)
-    ( 2,  2,  touch_pad(2),   "",     touch_pad2_hold,  true)
-    ( 3,  3,  touch_pad(3),   "",     touch_pad3_hold,  true)
-    ( 4,  4,  touch_pad(4),   "",     touch_pad4_hold,  true)
-    ( 5,  5,  touch_pad(5),   "",     touch_pad5_hold,  true)
-    ( 6,  6,  touch_pad(6),   "",     touch_pad6_hold,  true)
-    ( 7,  7,  touch_pad(7),   "",     touch_pad7_hold,  true)
-    ( 8,  8,  touch_pad(8),   "",     touch_pad8_hold,  true)
-    ( 9,  9,  touch_pad(9),   "",     touch_pad9_hold,  true)
-    (10, 10,  touch_pad(10),  "",     touch_pad10_hold, true)
-    (11, 11,  touch_pad(11),  "",     touch_pad11_hold, true)
-    (12, 12,  touch_pad(12),  "",     touch_pad12_hold, true)
-    (13, 13,  touch_pad(13),  "",     touch_pad13_hold, true)
-    (14, 14,  touch_pad(14),  "",     touch_pad14_hold, true)
-    (15, 15,  xtal_32p_pad(), x32p_,  x32p_hold,        true)
-    (16, 16,  xtal_32n_pad(), x32n_,  x32n_hold,        true)
-    (17, 17,  pad_dac1(),     pdac1_, pdac1_hold,       true)
-    (18, 18,  pad_dac2(),     pdac2_, pdac2_hold,       true)
-    (19, 19,  rtc_pad19(),    "",     pad19_hold,       true)
-    (20, 20,  rtc_pad20(),    "",     pad20_hold,       true)
-    (21, 21,  rtc_pad21(),    "",     pad21_hold,       true)
+rtcio_analog! {
+    ( 0, touch_pad(0),   "",     touch_pad0_hold )
+    ( 1, touch_pad(1),   "",     touch_pad1_hold )
+    ( 2, touch_pad(2),   "",     touch_pad2_hold )
+    ( 3, touch_pad(3),   "",     touch_pad3_hold )
+    ( 4, touch_pad(4),   "",     touch_pad4_hold )
+    ( 5, touch_pad(5),   "",     touch_pad5_hold )
+    ( 6, touch_pad(6),   "",     touch_pad6_hold )
+    ( 7, touch_pad(7),   "",     touch_pad7_hold )
+    ( 8, touch_pad(8),   "",     touch_pad8_hold )
+    ( 9, touch_pad(9),   "",     touch_pad9_hold )
+    (10, touch_pad(10),  "",     touch_pad10_hold)
+    (11, touch_pad(11),  "",     touch_pad11_hold)
+    (12, touch_pad(12),  "",     touch_pad12_hold)
+    (13, touch_pad(13),  "",     touch_pad13_hold)
+    (14, touch_pad(14),  "",     touch_pad14_hold)
+    (15, xtal_32p_pad(), x32p_,  x32p_hold       )
+    (16, xtal_32n_pad(), x32n_,  x32n_hold       )
+    (17, pad_dac1(),     pdac1_, pdac1_hold      )
+    (18, pad_dac2(),     pdac2_, pdac2_hold      )
+    (19, rtc_pad19(),    "",     pad19_hold      )
+    (20, rtc_pad20(),    "",     pad20_hold      )
+    (21, rtc_pad21(),    "",     pad21_hold      )
 }
 
 // Whilst the S3 is a dual core chip, it shares the enable registers between
@@ -429,8 +483,8 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => unsafe { &*GPIO::PTR }.pcpu_int().read().bits(),
-            Self::Bank1 => unsafe { &*GPIO::PTR }.pcpu_int1().read().bits(),
+            Self::Bank0 => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
+            Self::Bank1 => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
         }
     }
 }
@@ -438,3 +492,9 @@ impl InterruptStatusRegisterAccess {
 // implement marker traits on USB pins
 impl crate::otg_fs::UsbDm for GpioPin<19> {}
 impl crate::otg_fs::UsbDp for GpioPin<20> {}
+
+fn enable_iomux_clk_gate() {
+    unsafe { crate::peripherals::SENS::steal() }
+        .sar_peri_clk_gate_conf()
+        .modify(|_, w| w.iomux_clk_en().set_bit());
+}

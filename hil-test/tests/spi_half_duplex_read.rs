@@ -8,10 +8,10 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Level, Output},
+    gpio::{Level, Output},
     prelude::*,
     spi::{
-        master::{Address, Command, Spi, SpiDma},
+        master::{Address, Command, Config, Spi, SpiDma},
         SpiDataMode,
         SpiMode,
     },
@@ -33,9 +33,8 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
-        let (miso, miso_mirror) = hil_test::common_test_pins!(io);
+        let sclk = peripherals.GPIO0;
+        let (miso, miso_mirror) = hil_test::common_test_pins!(peripherals);
 
         let miso_mirror = Output::new(miso_mirror, Level::High);
 
@@ -49,10 +48,17 @@ mod tests {
             }
         }
 
-        let spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_sck(sclk)
-            .with_miso(miso)
-            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+        let spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        )
+        .with_sck(sclk)
+        .with_miso(miso)
+        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         Context { spi, miso_mirror }
     }

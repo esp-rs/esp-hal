@@ -1,8 +1,4 @@
-use crate::{
-    binary::include::esp_bt_controller_config_t,
-    common_adapter::RADIO_CLOCKS,
-    hal::system::RadioClockController,
-};
+use crate::{binary::include::esp_bt_controller_config_t, hal::system::RadioClockController};
 
 pub(crate) static mut ISR_INTERRUPT_4: (
     *mut crate::binary::c_types::c_void,
@@ -103,14 +99,16 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).ble_rtc_clk_init();
-    }
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.ble_rtc_clk_init();
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).reset_rpa();
-    }
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.reset_rpa();
 }

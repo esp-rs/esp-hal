@@ -32,14 +32,12 @@
 //! # use esp_hal::twai::TwaiConfiguration;
 //! # use esp_hal::twai::BaudRate;
 //! # use esp_hal::twai::TwaiMode;
-//! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
 //! # use nb::block;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_rx_pin = io.pins.gpio3;
-//! let can_tx_pin = io.pins.gpio2;
+//! let can_rx_pin = peripherals.GPIO3;
+//! let can_tx_pin = peripherals.GPIO2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
@@ -86,14 +84,12 @@
 //! # use esp_hal::twai::EspTwaiFrame;
 //! # use esp_hal::twai::StandardId;
 //! # use esp_hal::twai::TwaiMode;
-//! # use esp_hal::gpio::Io;
 //! # use embedded_can::Frame;
 //! # use nb::block;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_rx_pin = io.pins.gpio3;
-//! let can_tx_pin = io.pins.gpio2;
+//! let can_rx_pin = peripherals.GPIO3;
+//! let can_tx_pin = peripherals.GPIO2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
@@ -129,7 +125,6 @@ use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
 use crate::{
-    dma::PeripheralMarker,
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -140,6 +135,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
     system::PeripheralClockControl,
+    twai::filter::SingleStandardFilter,
     Async,
     Blocking,
     InterruptConfigurable,
@@ -752,6 +748,7 @@ impl BaudRate {
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
 pub struct TwaiConfiguration<'d, DM: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
+    filter: Option<(FilterType, [u8; 8])>,
     phantom: PhantomData<DM>,
     mode: TwaiMode,
 }
@@ -778,9 +775,15 @@ where
 
         let mut this = TwaiConfiguration {
             twai,
+            filter: None, // We'll immediately call `set_filter`
             phantom: PhantomData,
             mode,
         };
+
+        // Accept all messages by default.
+        this.set_filter(
+            const { SingleStandardFilter::new(b"xxxxxxxxxxx", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
+        );
 
         // Set RESET bit to 1
         this.twai
@@ -806,13 +809,13 @@ where
             tx_pin.set_to_push_pull_output(crate::private::Internal);
             Pull::None
         };
-        tx_pin.connect_peripheral_to_output(this.twai.output_signal(), crate::private::Internal);
+        this.twai.output_signal().connect_to(tx_pin);
 
         // Setting up RX pin later allows us to use a single pin in tests.
         // `set_to_push_pull_output` disables input, here we re-enable it if rx_pin
         // uses the same GPIO.
         rx_pin.init_input(rx_pull, crate::private::Internal);
-        rx_pin.connect_input_to_peripheral(this.twai.input_signal(), crate::private::Internal);
+        this.twai.input_signal().connect_to(rx_pin);
 
         // Freeze REC by changing to LOM mode
         this.set_mode(TwaiMode::ListenOnly);
@@ -840,10 +843,15 @@ where
     }
 
     fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(self.twai.interrupt(), handler.handler());
-            crate::interrupt::enable(self.twai.interrupt(), handler.priority()).unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, self.twai.interrupt());
         }
+        unsafe { crate::interrupt::bind_interrupt(self.twai.interrupt(), handler.handler()) };
+
+        unwrap!(crate::interrupt::enable(
+            self.twai.interrupt(),
+            handler.priority()
+        ));
     }
 
     /// Set the bitrate of the bus.
@@ -931,22 +939,30 @@ where
     /// You may use a `const {}` block to ensure that the filter is parsed
     /// during program compilation.
     ///
+    /// The filter is not applied to the peripheral until [`Self::start`] is
+    /// called.
+    ///
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.6)
     pub fn set_filter(&mut self, filter: impl Filter) {
-        // Set or clear the rx filter mode bit depending on the filter type.
-        let filter_mode_bit = filter.filter_type() == FilterType::Single;
-        self.twai
-            .register_block()
-            .mode()
-            .modify(|_, w| w.rx_filter_mode().bit(filter_mode_bit));
+        // Convert the filter into values for the registers and store them for later
+        // use.
+        self.filter = Some((filter.filter_type(), filter.to_registers()));
+    }
 
-        // Convert the filter into values for the registers and store them to the
-        // registers.
-        let registers = filter.to_registers();
+    fn apply_filter(&self) {
+        let Some((filter_type, registers)) = self.filter.as_ref() else {
+            return;
+        };
+
+        let register_block = self.twai.register_block();
+        // Set or clear the rx filter mode bit depending on the filter type.
+        register_block
+            .mode()
+            .modify(|_, w| w.rx_filter_mode().bit(*filter_type == FilterType::Single));
 
         // Copy the filter to the peripheral.
         unsafe {
-            copy_to_data_register(self.twai.register_block().data_0().as_ptr(), &registers);
+            copy_to_data_register(register_block.data_0().as_ptr(), registers);
         }
     }
 
@@ -975,6 +991,7 @@ where
     /// Put the peripheral into Operation Mode, allowing the transmission and
     /// reception of packets using the new object.
     pub fn start(self) -> Twai<'d, DM, T> {
+        self.apply_filter();
         self.set_mode(self.mode);
 
         // Clear the TEC and REC
@@ -1026,17 +1043,6 @@ where
             twai: unsafe { self.twai.clone_unchecked() },
             phantom: PhantomData,
         }
-    }
-
-    /// Convert the configuration into an async configuration.
-    fn into_async(self) -> TwaiConfiguration<'d, Async, T> {
-        let mut this = TwaiConfiguration {
-            twai: self.twai,
-            phantom: PhantomData,
-            mode: self.mode,
-        };
-        this.internal_set_interrupt_handler(this.twai.async_handler());
-        this
     }
 }
 
@@ -1101,35 +1107,16 @@ where
     ) -> Self {
         Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode)
     }
-}
 
-impl<'d> TwaiConfiguration<'d, Async> {
-    /// Create a new instance of [TwaiConfiguration]
-    ///
-    /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new_async<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = impl Instance> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        Self::new_async_typed(peripheral.map_into(), rx_pin, tx_pin, baud_rate, mode)
-    }
-
-    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
-    /// directly
-    ///
-    /// You don't need a transceiver by following the description in the
-    /// `twai.rs` example
-    pub fn new_async_no_transceiver<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = impl Instance> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        Self::new_async_no_transceiver_typed(peripheral.map_into(), rx_pin, tx_pin, baud_rate, mode)
+    /// Convert the configuration into an async configuration.
+    pub fn into_async(mut self) -> TwaiConfiguration<'d, Async, T> {
+        self.set_interrupt_handler(self.twai.async_handler());
+        TwaiConfiguration {
+            twai: self.twai,
+            filter: self.filter,
+            phantom: PhantomData,
+            mode: self.mode,
+        }
     }
 }
 
@@ -1137,33 +1124,19 @@ impl<'d, T> TwaiConfiguration<'d, Async, T>
 where
     T: Instance,
 {
-    /// Create a new instance of [TwaiConfiguration] in async mode
-    ///
-    /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new_async_typed<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        TwaiConfiguration::new_typed(peripheral, rx_pin, tx_pin, baud_rate, mode).into_async()
-    }
+    /// Convert the configuration into a blocking configuration.
+    pub fn into_blocking(self) -> TwaiConfiguration<'d, Blocking, T> {
+        use crate::{interrupt, Cpu};
 
-    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
-    /// directly in async mode
-    ///
-    /// You don't need a transceiver by following the description in the
-    /// `twai.rs` example
-    pub fn new_async_no_transceiver_typed<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        TwaiConfiguration::new_no_transceiver_typed(peripheral, rx_pin, tx_pin, baud_rate, mode)
-            .into_async()
+        interrupt::disable(Cpu::current(), self.twai.interrupt());
+
+        // Re-create in  blocking mode
+        TwaiConfiguration {
+            twai: self.twai,
+            filter: self.filter,
+            phantom: PhantomData,
+            mode: self.mode,
+        }
     }
 }
 
@@ -1220,6 +1193,7 @@ where
 
         TwaiConfiguration {
             twai: self.twai,
+            filter: None, // filter already applied, no need to restore it
             phantom: PhantomData,
             mode,
         }
@@ -1444,7 +1418,7 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-impl<'d, DM, T> embedded_hal_02::can::Can for Twai<'d, DM, T>
+impl<DM, T> embedded_hal_02::can::Can for Twai<'_, DM, T>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1468,7 +1442,7 @@ where
     }
 }
 
-impl<'d, DM, T> embedded_can::nb::Can for Twai<'d, DM, T>
+impl<DM, T> embedded_can::nb::Can for Twai<'_, DM, T>
 where
     T: Instance,
     DM: crate::Mode,
@@ -1493,9 +1467,12 @@ where
 }
 
 /// TWAI peripheral instance.
-pub trait Instance: Peripheral<P = Self> + PeripheralMarker + Into<AnyTwai> + 'static {
+pub trait Instance: Peripheral<P = Self> + Into<AnyTwai> + 'static {
     /// The identifier number for this TWAI instance.
     fn number(&self) -> usize;
+
+    /// Returns the system peripheral marker for this instance.
+    fn peripheral(&self) -> crate::system::Peripheral;
 
     /// Input signal.
     fn input_signal(&self) -> InputSignal;
@@ -1681,6 +1658,10 @@ impl Instance for crate::peripherals::TWAI0 {
         0
     }
 
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Twai0
+    }
+
     fn input_signal(&self) -> InputSignal {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
@@ -1724,6 +1705,10 @@ impl Instance for crate::peripherals::TWAI0 {
 impl Instance for crate::peripherals::TWAI1 {
     fn number(&self) -> usize {
         1
+    }
+
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Twai1
     }
 
     fn input_signal(&self) -> InputSignal {
@@ -1772,6 +1757,7 @@ impl Instance for AnyTwai {
             AnyTwaiInner::Twai1(twai) => twai,
         } {
             fn number(&self) -> usize;
+            fn peripheral(&self) -> crate::system::Peripheral;
             fn input_signal(&self) -> InputSignal;
             fn output_signal(&self) -> OutputSignal;
             fn interrupt(&self) -> crate::peripherals::Interrupt;
@@ -1943,6 +1929,18 @@ mod asynch {
         }
 
         if intr_status.bits() & 0b11111100 > 0 {
+            let err_capture = register_block.err_code_cap().read();
+            let status = register_block.status().read();
+
+            // Read error code direction (transmitting or receiving)
+            let ecc_direction = err_capture.ecc_direction().bit_is_set();
+
+            // If the error comes from Tx and Tx request is pending
+            if !ecc_direction && !status.tx_buf_st().bit_is_set() {
+                // Cancel a pending transmission request
+                register_block.cmd().write(|w| w.abort_tx().set_bit());
+            }
+
             async_state.err_waker.wake();
         }
 

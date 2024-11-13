@@ -8,7 +8,7 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0:`:
+//!   - `io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0:`:
 //!       * This function returns a reference to the GPIO register associated
 //!         with the given GPIO number. It uses unsafe code and transmutation to
 //!         access the GPIO registers based on the provided GPIO number.
@@ -53,6 +53,7 @@ pub const NUM_PINS: usize = 40;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u16;
 pub(crate) type OutputSignalType = u16;
 pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 548;
 pub(crate) const INPUT_SIGNAL_MAX: u16 = 539;
@@ -62,7 +63,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x30;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function2;
 
-pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
+pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
     unsafe {
         let iomux = &*IO_MUX::PTR;
 
@@ -109,7 +110,7 @@ pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    match crate::get_core() {
+    match Cpu::current() {
         Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
         // this should be bits 3 & 4 respectively, according to the TRM, but it doesn't seem to
         // work. This does though.
@@ -119,7 +120,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     SPICLK                = 0,
@@ -310,7 +312,8 @@ pub enum InputSignal {
 
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum OutputSignal {
     SPICLK                   = 0,
@@ -527,46 +530,221 @@ pub enum OutputSignal {
     MTDO,
 }
 
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo, Touch] (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
-    (1, [Input, Output] (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
-    (2, [Input, Output, Analog, RtcIo, Touch] (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))
-    (3, [Input, Output] (0 => U0RXD) (1 => CLK_OUT2))
-    (4, [Input, Output, Analog, RtcIo, Touch] (1 => HSPIHD 3 => HS2_DATA1 4 => SD_DATA1 5 => EMAC_TX_ER) (3 => HS2_DATA1 4 => SD_DATA1))
-    (5, [Input, Output] (1 => VSPICS0 3 => HS1_DATA6 5 => EMAC_RX_CLK) (3 => HS1_DATA6))
-    (6, [Input, Output] (4 => U1CTS) (0 => SD_CLK 1 => SPICLK 3 => HS1_CLK))
-    (7, [Input, Output] (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0) (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0 4 => U2RTS))
-    (8, [Input, Output] (0 => SD_DATA1 1 => SPID 3 => HS1_DATA1 4 => U2CTS) (0 => SD_DATA1 1 => SPID 3 => HS1_DATA1))
-    (9, [Input, Output] (0 => SD_DATA2 1 => SPIHD 3 => HS1_DATA2 4 => U1RXD) (0 => SD_DATA2 1 => SPIHD 3 => HS1_DATA2))
-    (10, [Input, Output] ( 0 => SD_DATA3 1 => SPIWP 3 => HS1_DATA3) (0 => SD_DATA3 1 => SPIWP 3 => HS1_DATA3 4 => U1TXD))
-    (11, [Input, Output] ( 1 => SPICS0) (0 => SD_CMD 1 => SPICS0 3 => HS1_CMD 4 => U1RTS))
-    (12, [Input, Output, Analog, RtcIo, Touch] (0 => MTDI 1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2) (1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2 5 => EMAC_TXD3))
-    (13, [Input, Output, Analog, RtcIo, Touch] (0 => MTCK 1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3) (1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3 5 => EMAC_RX_ER))
-    (14, [Input, Output, Analog, RtcIo, Touch] (0 => MTMS 1 => HSPICLK) (1 => HSPICLK 3 => HS2_CLK 4 => SD_CLK 5 => EMAC_TXD2))
-    (15, [Input, Output, Analog, RtcIo, Touch] (1 => HSPICS0 5 => EMAC_RXD3) (0 => MTDO 1 => HSPICS0 3 => HS2_CMD 4 => SD_CMD))
-    (16, [Input, Output] (3 => HS1_DATA4 4 => U2RXD) (3 => HS1_DATA4 5 => EMAC_CLK_OUT))
-    (17, [Input, Output] (3 => HS1_DATA5) (3 => HS1_DATA5 4 => U2TXD 5 => EMAC_CLK_180))
-    (18, [Input, Output] (1 => VSPICLK 3 => HS1_DATA7) (1 => VSPICLK 3 => HS1_DATA7))
-    (19, [Input, Output] (1 => VSPIQ 3 => U0CTS) (1 => VSPIQ 5 => EMAC_TXD0))
-    (20, [Input, Output])
-    (21, [Input, Output] (1 => VSPIHD) (1 => VSPIHD 5 => EMAC_TX_EN))
-    (22, [Input, Output] (1 => VSPIWP) (1 => VSPIWP 3 => U0RTS 5 => EMAC_TXD1))
-    (23, [Input, Output] (1 => VSPID) (1 => VSPID 3 => HS1_STROBE))
-    (24, [Input, Output])
-    (25, [Input, Output, Analog, RtcIo] (5 => EMAC_RXD0) ())
-    (26, [Input, Output, Analog, RtcIo] (5 => EMAC_RXD1) ())
-    (27, [Input, Output, Analog, RtcIo, Touch] (5 => EMAC_RX_DV) ())
-    (32, [Input, Output, Analog, RtcIo, Touch])
-    (33, [Input, Output, Analog, RtcIo, Touch])
-    (34, [Input, Analog, RtcIoInput])
-    (35, [Input, Analog, RtcIoInput])
-    (36, [Input, Analog, RtcIoInput])
-    (37, [Input, Analog, RtcIoInput])
-    (38, [Input, Analog, RtcIoInput])
-    (39, [Input, Analog, RtcIoInput])
+macro_rules! rtcio_analog {
+    ( @ignore $rue:literal ) => {};
+
+    (
+        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
+    ) => {
+        impl $crate::gpio::RtcPin for $crate::gpio::GpioPin<$pin_num> {
+            fn rtc_number(&self) -> u8 {
+                $rtc_pin
+            }
+
+            /// Set the RTC properties of the pin. If `mux` is true then then pin is
+            /// routed to RTC, when false it is routed to IO_MUX.
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+                // disable input
+                paste::paste!{
+                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                        .$pin_reg.modify(|_,w| unsafe {
+                            w.[<$prefix fun_ie>]().bit(input_enable);
+                            w.[<$prefix mux_sel>]().bit(mux);
+                            w.[<$prefix fun_sel>]().bits(func as u8)
+                        });
+                }
+            }
+
+            fn rtcio_pad_hold(&mut self, enable: bool) {
+                unsafe { $crate::peripherals::LPWR::steal() }
+                    .hold_force()
+                    .modify(|_, w| w.$hold().bit(enable));
+            }
+        }
+
+        $(
+            // FIXME: replace with $(ignore($rue)) once stable
+            rtcio_analog!(@ignore $rue);
+            impl $crate::gpio::RtcPinWithResistors for $crate::gpio::GpioPin<$pin_num> {
+                fn rtcio_pullup(&mut self, enable: bool) {
+                    paste::paste! {
+                        unsafe { $crate::peripherals::RTC_IO::steal() }
+                            .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
+                    }
+                }
+
+                fn rtcio_pulldown(&mut self, enable: bool) {
+                    paste::paste! {
+                        unsafe { $crate::peripherals::RTC_IO::steal() }
+                            .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
+                    }
+                }
+            }
+        )?
+
+        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<$pin_num> {
+            /// Configures the pin for analog mode.
+            fn set_analog(&self, _: $crate::private::Internal) {
+                use $crate::gpio::RtcPin;
+                let rtcio = unsafe{ $crate::peripherals::RTC_IO::steal() };
+
+                paste::paste! {
+                    // disable input
+                    rtcio.$pin_reg.modify(|_,w| w.[<$prefix fun_ie>]().bit(false));
+
+                    // disable output
+                    rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << self.rtc_number()) });
+
+                    // disable open drain
+                    rtcio.pin(self.rtc_number() as usize).modify(|_,w| w.pad_driver().bit(false));
+
+                    rtcio.$pin_reg.modify(|_,w| {
+                        w.[<$prefix fun_ie>]().clear_bit();
+
+                        // Connect pin to analog / RTC module instead of standard GPIO
+                        w.[<$prefix mux_sel>]().set_bit();
+
+                        // Select function "RTC function 1" (GPIO) for analog use
+                        unsafe { w.[<$prefix fun_sel>]().bits(0b00) };
+
+                        // Disable pull-up and pull-down resistors on the pin, if it has them
+                        $(
+                            // FIXME: replace with $(ignore($rue)) once stable
+                            rtcio_analog!( @ignore $rue );
+                            w.[<$prefix rue>]().bit(false);
+                            w.[<$prefix rde>]().bit(false);
+                        )?
+
+                        w
+                    });
+                }
+            }
+        }
+    };
+
+    (
+        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal )? ) )+
+    ) => {
+        $(
+            rtcio_analog!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue )?);
+        )+
+
+        pub(crate) fn errata36(mut pin: $crate::gpio::AnyPin, pull_up: bool, pull_down: bool) {
+            use $crate::gpio::{Pin, RtcPinWithResistors};
+
+            let has_pullups = match pin.number() {
+                $(
+                    $( $pin_num => $rue, )?
+                )+
+                _ => false,
+            };
+
+            if has_pullups {
+                pin.rtcio_pullup(pull_up);
+                pin.rtcio_pulldown(pull_down);
+            }
+        }
+    };
 }
 
-crate::rtcio_analog! {
+/// Common functionality for all touch pads
+macro_rules! touch {
+    (@pin_specific $touch_num:expr, true) => {
+        paste::paste! {
+            unsafe { RTC_IO::steal() }.[< touch_pad $touch_num >]().write(|w| unsafe {
+                w.xpd().set_bit();
+                // clear input_enable
+                w.fun_ie().clear_bit();
+                // Connect pin to analog / RTC module instead of standard GPIO
+                w.mux_sel().set_bit();
+                // Disable pull-up and pull-down resistors on the pin
+                w.rue().clear_bit();
+                w.rde().clear_bit();
+                w.tie_opt().clear_bit();
+                // Select function "RTC function 1" (GPIO) for analog use
+                w.fun_sel().bits(0b00)
+            });
+        }
+    };
+
+    (@pin_specific $touch_num:expr, false) => {
+        paste::paste! {
+            unsafe { RTC_IO::steal() }.[< touch_pad $touch_num >]().write(|w| {
+                w.xpd().set_bit();
+                w.tie_opt().clear_bit()
+            });
+        }
+    };
+
+    (
+        $(
+            (
+                $touch_num:literal, $pin_num:literal, $touch_out_reg:expr, $touch_thres_reg:expr, $normal_pin:literal
+            )
+        )+
+    ) => {
+        $(
+        impl $crate::gpio::TouchPin for GpioPin<$pin_num> {
+            fn set_touch(&self, _: $crate::private::Internal) {
+                use $crate::peripherals::{GPIO, RTC_IO, SENS};
+                use $crate::gpio::RtcPin;
+
+                let gpio = unsafe { GPIO::steal() };
+                let rtcio = unsafe { RTC_IO::steal() };
+                let sens = unsafe { SENS::steal() };
+
+                // Pad to normal mode (not open-drain)
+                gpio.pin(self.rtc_number() as usize).write(|w| w.pad_driver().clear_bit());
+
+                // clear output
+                rtcio
+                    .enable_w1tc()
+                    .write(|w| unsafe { w.enable_w1tc().bits(1 << self.rtc_number()) });
+                paste::paste! {
+                    sens . $touch_thres_reg ()
+                        .write(|w| unsafe {
+                            w. [<touch_out_th $touch_num>] ().bits(
+                                0b0 // Default: 0 for esp32 gets overridden later anyway.
+                            )
+                        });
+
+                    touch!( @pin_specific $touch_num, $normal_pin );
+
+                    // enable the pin
+                    sens.sar_touch_enable().modify(|r, w| unsafe {
+                        w.touch_pad_worken().bits(
+                            r.touch_pad_worken().bits() | ( 1 << $touch_num )
+                        )
+                    });
+                }
+            }
+
+            fn touch_measurement(&self, _: $crate::private::Internal) -> u16 {
+                paste::paste! {
+                    unsafe { $crate::peripherals::SENS::steal() }
+                        . $touch_out_reg ().read()
+                        . [<touch_meas_out $touch_num>] ().bits()
+                }
+            }
+
+            fn touch_nr(&self, _: $crate::private::Internal) -> u8 {
+                $touch_num
+            }
+
+            fn set_threshold(&self, threshold: u16, _: $crate::private::Internal) {
+                paste::paste! {
+                    unsafe { $crate::peripherals::SENS::steal() }
+                        . $touch_thres_reg ()
+                        .write(|w| unsafe {
+                            w. [<touch_out_th $touch_num>] ().bits(threshold)
+                        });
+                }
+            }
+        })+
+    };
+}
+
+rtcio_analog! {
     (36, 0,  sensor_pads(),    sense1_, sense1_hold_force          )
     (37, 1,  sensor_pads(),    sense2_, sense2_hold_force          )
     (38, 2,  sensor_pads(),    sense3_, sense3_hold_force          )
@@ -587,19 +765,19 @@ crate::rtcio_analog! {
     (27, 17, touch_pad7(),     "",      touch_pad7_hold_force, true)
 }
 
-crate::touch! {
-    // touch_nr, pin_nr, rtc_pin, touch_out_reg, meas_field, touch_thres_reg, touch_thres_field, normal_pin
-    (0, 4,  10, sar_touch_out1, touch_meas_out0, sar_touch_thres1, touch_out_th0, true)
-    (1, 0,  11, sar_touch_out1, touch_meas_out1, sar_touch_thres1, touch_out_th1, true)
-    (2, 2,  12, sar_touch_out2, touch_meas_out2, sar_touch_thres2, touch_out_th2, true)
-    (3, 15, 13, sar_touch_out2, touch_meas_out3, sar_touch_thres2, touch_out_th3, true)
-    (4, 13, 14, sar_touch_out3, touch_meas_out4, sar_touch_thres3, touch_out_th4, true)
-    (5, 12, 15, sar_touch_out3, touch_meas_out5, sar_touch_thres3, touch_out_th5, true)
-    (6, 14, 16, sar_touch_out4, touch_meas_out6, sar_touch_thres4, touch_out_th6, true)
-    (7, 27, 17, sar_touch_out4, touch_meas_out7, sar_touch_thres4, touch_out_th7, true)
+touch! {
+    // touch_nr, pin_nr, touch_out_reg, touch_thres_reg, normal_pin
+    (0, 4,  sar_touch_out1, sar_touch_thres1, true)
+    (1, 0,  sar_touch_out1, sar_touch_thres1, true)
+    (2, 2,  sar_touch_out2, sar_touch_thres2, true)
+    (3, 15, sar_touch_out2, sar_touch_thres2, true)
+    (4, 13, sar_touch_out3, sar_touch_thres3, true)
+    (5, 12, sar_touch_out3, sar_touch_thres3, true)
+    (6, 14, sar_touch_out4, sar_touch_thres4, true)
+    (7, 27, sar_touch_out4, sar_touch_thres4, true)
     // ---
-    (8, 33, 8, sar_touch_out5, touch_meas_out8, sar_touch_thres5, touch_out_th8, false)
-    (9, 32, 9, sar_touch_out5, touch_meas_out9, sar_touch_thres5, touch_out_th9, false)
+    (8, 33, sar_touch_out5, sar_touch_thres5, false)
+    (9, 32, sar_touch_out5, sar_touch_thres5, false)
 }
 
 #[derive(Clone, Copy)]
@@ -611,13 +789,13 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => match crate::get_core() {
-                crate::Cpu::ProCpu => unsafe { &*GPIO::PTR }.pcpu_int().read().bits(),
-                crate::Cpu::AppCpu => unsafe { &*GPIO::PTR }.acpu_int().read().bits(),
+            Self::Bank0 => match Cpu::current() {
+                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
+                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int().read().bits(),
             },
-            Self::Bank1 => match crate::get_core() {
-                crate::Cpu::ProCpu => unsafe { &*GPIO::PTR }.pcpu_int1().read().bits(),
-                crate::Cpu::AppCpu => unsafe { &*GPIO::PTR }.acpu_int1().read().bits(),
+            Self::Bank1 => match Cpu::current() {
+                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
+                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int1().read().bits(),
             },
         }
     }

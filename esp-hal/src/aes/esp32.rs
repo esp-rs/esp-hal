@@ -56,7 +56,7 @@ impl<'d> Aes<'d> {
     }
 
     pub(super) fn write_start(&mut self) {
-        self.aes.start().write(|w| w.start().set_bit())
+        self.aes.start().write(|w| w.start().set_bit());
     }
 
     pub(super) fn read_idle(&mut self) -> bool {

@@ -27,21 +27,21 @@ use esp_backtrace as _;
 
 #[macro_export]
 macro_rules! i2c_pins {
-    ($io:expr) => {{
+    ($peripherals:expr) => {{
         // Order: (SDA, SCL)
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
-                ($io.pins.gpio2, $io.pins.gpio3)
+                ($peripherals.GPIO2, $peripherals.GPIO3)
             } else if #[cfg(esp32)] {
-                ($io.pins.gpio32, $io.pins.gpio33)
+                ($peripherals.GPIO32, $peripherals.GPIO33)
             } else if #[cfg(esp32c6)] {
-                ($io.pins.gpio6, $io.pins.gpio7)
+                ($peripherals.GPIO6, $peripherals.GPIO7)
             } else if #[cfg(esp32h2)] {
-                ($io.pins.gpio12, $io.pins.gpio22)
+                ($peripherals.GPIO12, $peripherals.GPIO22)
             } else if #[cfg(esp32c2)] {
-                ($io.pins.gpio18, $io.pins.gpio9)
+                ($peripherals.GPIO18, $peripherals.GPIO9)
             } else {
-                ($io.pins.gpio4, $io.pins.gpio5)
+                ($peripherals.GPIO4, $peripherals.GPIO5)
             }
         }
     }};
@@ -49,14 +49,14 @@ macro_rules! i2c_pins {
 
 #[macro_export]
 macro_rules! common_test_pins {
-    ($io:expr) => {{
+    ($peripherals:expr) => {{
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
-                ($io.pins.gpio9, $io.pins.gpio10)
+                ($peripherals.GPIO9, $peripherals.GPIO10)
             } else if #[cfg(esp32)] {
-                ($io.pins.gpio26, $io.pins.gpio27)
+                ($peripherals.GPIO26, $peripherals.GPIO27)
             } else {
-                ($io.pins.gpio2, $io.pins.gpio3)
+                ($peripherals.GPIO2, $peripherals.GPIO3)
             }
         }
     }};
@@ -66,18 +66,18 @@ macro_rules! common_test_pins {
 // beware: it has a pullup.
 #[macro_export]
 macro_rules! unconnected_pin {
-    ($io:expr) => {{
+    ($peripherals:expr) => {{
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2, esp32s3))] {
-                $io.pins.gpio0
+                $peripherals.GPIO0
             } else if #[cfg(esp32c6)] {
-                $io.pins.gpio9
+                $peripherals.GPIO9
             } else if #[cfg(esp32h2)] {
-                $io.pins.gpio9
+                $peripherals.GPIO9
             } else if #[cfg(esp32c2)] {
-                $io.pins.gpio8
+                $peripherals.GPIO8
             } else {
-                $io.pins.gpio9
+                $peripherals.GPIO9
             }
         }
     }};

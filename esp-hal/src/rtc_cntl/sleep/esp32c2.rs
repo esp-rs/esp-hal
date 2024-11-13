@@ -130,7 +130,7 @@ impl WakeSource for TimerWakeupSource {
     ) {
         triggers.set_timer(true);
         let rtc_cntl = unsafe { &*esp32c2::RTC_CNTL::ptr() };
-        let clock_freq = RtcClock::get_slow_freq();
+        let clock_freq = RtcClock::slow_freq();
         // TODO: maybe add sleep time adjustlemnt like idf
         // TODO: maybe add check to prevent overflow?
         let clock_hz = clock_freq.frequency().to_Hz() as u64;
@@ -157,7 +157,7 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
+impl RtcioWakeupSource<'_, '_> {
     fn apply_pin(&self, pin: &mut dyn RtcPinWithResistors, level: WakeupLevel) {
         // The pullup/pulldown part is like in gpio_deep_sleep_wakeup_prepare
         let level = match level {

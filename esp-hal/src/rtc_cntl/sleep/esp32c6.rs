@@ -3,7 +3,7 @@ use core::ops::Not;
 use crate::{
     clock::Clock,
     efuse::Efuse,
-    gpio::{Pins, RtcFunction},
+    gpio::RtcFunction,
     rtc_cntl::{
         rtc::{
             rtc_clk_cpu_freq_set_xtal,
@@ -38,7 +38,7 @@ impl WakeSource for TimerWakeupSource {
         triggers.set_timer(true);
 
         let lp_timer = unsafe { &*esp32c6::LP_TIMER::ptr() };
-        let clock_freq = RtcClock::get_slow_freq();
+        let clock_freq = RtcClock::slow_freq();
         // TODO: maybe add sleep time adjustment like idf
         // TODO: maybe add check to prevent overflow?
         let clock_hz = clock_freq.frequency().to_Hz() as u64;
@@ -71,10 +71,10 @@ impl Ext1WakeupSource<'_, '_> {
         unsafe { lp_aon().ext_wakeup_cntl().read().ext_wakeup_sel().bits() }
     }
 
-    fn wake_io_reset(pins: &mut Pins) {
-        use crate::gpio::RtcPin;
+    fn wake_io_reset() {
+        use crate::gpio::{GpioPin, RtcPin};
 
-        fn uninit_pin(pin: &mut impl RtcPin, wakeup_pins: u8) {
+        fn uninit_pin(mut pin: impl RtcPin, wakeup_pins: u8) {
             if wakeup_pins & (1 << pin.number()) != 0 {
                 pin.rtcio_pad_hold(false);
                 pin.rtc_set_config(false, false, RtcFunction::Rtc);
@@ -82,14 +82,14 @@ impl Ext1WakeupSource<'_, '_> {
         }
 
         let wakeup_pins = Ext1WakeupSource::wakeup_pins();
-        uninit_pin(&mut pins.gpio0, wakeup_pins);
-        uninit_pin(&mut pins.gpio1, wakeup_pins);
-        uninit_pin(&mut pins.gpio2, wakeup_pins);
-        uninit_pin(&mut pins.gpio3, wakeup_pins);
-        uninit_pin(&mut pins.gpio4, wakeup_pins);
-        uninit_pin(&mut pins.gpio5, wakeup_pins);
-        uninit_pin(&mut pins.gpio6, wakeup_pins);
-        uninit_pin(&mut pins.gpio7, wakeup_pins);
+        uninit_pin(unsafe { GpioPin::<0>::steal() }, wakeup_pins);
+        uninit_pin(unsafe { GpioPin::<1>::steal() }, wakeup_pins);
+        uninit_pin(unsafe { GpioPin::<2>::steal() }, wakeup_pins);
+        uninit_pin(unsafe { GpioPin::<3>::steal() }, wakeup_pins);
+        uninit_pin(unsafe { GpioPin::<4>::steal() }, wakeup_pins);
+        uninit_pin(unsafe { GpioPin::<5>::steal() }, wakeup_pins);
+        uninit_pin(unsafe { GpioPin::<6>::steal() }, wakeup_pins);
+        uninit_pin(unsafe { GpioPin::<7>::steal() }, wakeup_pins);
     }
 }
 
@@ -898,15 +898,7 @@ impl RtcSleepConfig {
 
     fn wake_io_reset() {
         // loosely based on esp_deep_sleep_wakeup_io_reset
-
-        let mut pins = unsafe {
-            // We're stealing pins to do some uninitialization after waking up from
-            // deep sleep. We have to be careful to only touch settings that were enabled
-            // by deep sleep setup.
-            Pins::steal()
-        };
-
-        Ext1WakeupSource::wake_io_reset(&mut pins);
+        Ext1WakeupSource::wake_io_reset();
     }
 
     /// Finalize power-down flags, apply configuration based on the flags.

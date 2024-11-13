@@ -80,23 +80,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         &[
             (
                 "place-spi-driver-in-ram",
-                Value::Bool(false),
                 "Places the SPI driver in RAM for better performance",
+                Value::Bool(false),
+                None
             ),
             (
                 "spi-address-workaround",
-                Value::Bool(true),
                 "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
+                Value::Bool(true),
+                None
             ),
             (
                 "place-switch-tables-in-ram",
-                Value::Bool(true),
                 "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
+                Value::Bool(true),
+                None
             ),
             (
                 "place-anon-in-ram",
-                Value::Bool(false),
                 "Places anonymous symbols into RAM - resulting in better performance at the cost of significant more RAM consumption. Best to be combined with `place-switch-tables-in-ram`.",
+                Value::Bool(false),
+                None
             ),
         ],
         true,

@@ -18,6 +18,8 @@ mod tests {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_hal_embassy::init(timg0.timer0);
 
-        _ = UsbSerialJtag::new_async(peripherals.USB_DEVICE).split();
+        _ = UsbSerialJtag::new(peripherals.USB_DEVICE)
+            .into_async()
+            .split();
     }
 }

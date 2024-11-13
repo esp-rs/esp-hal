@@ -160,12 +160,12 @@ impl<'a> Ieee802154<'a> {
     }
 
     /// Return the raw data of a received frame
-    pub fn get_raw_received(&mut self) -> Option<RawReceived> {
+    pub fn raw_received(&mut self) -> Option<RawReceived> {
         ieee802154_poll()
     }
 
     /// Get a received frame, if available
-    pub fn get_received(&mut self) -> Option<Result<ReceivedFrame, Error>> {
+    pub fn received(&mut self) -> Option<Result<ReceivedFrame, Error>> {
         if let Some(raw) = ieee802154_poll() {
             let maybe_decoded = if raw.data[0] as usize > raw.data.len() {
                 // try to decode up to data.len()
@@ -305,7 +305,7 @@ impl<'a> Ieee802154<'a> {
     }
 }
 
-impl<'a> Drop for Ieee802154<'a> {
+impl Drop for Ieee802154<'_> {
     fn drop(&mut self) {
         self.clear_tx_done_callback();
         self.clear_tx_done_callback_fn();

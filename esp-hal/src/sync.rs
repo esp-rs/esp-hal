@@ -56,13 +56,13 @@ mod single_core {
 mod multicore {
     use portable_atomic::{AtomicUsize, Ordering};
 
-    // Safety: Ensure that when adding new chips `get_raw_core` doesn't return this
+    // Safety: Ensure that when adding new chips `raw_core` doesn't return this
     // value.
     // FIXME: ensure in HIL tests this is the case!
     const UNUSED_THREAD_ID_VALUE: usize = 0x100;
 
     pub fn thread_id() -> usize {
-        crate::get_raw_core()
+        crate::raw_core()
     }
 
     pub(super) struct AtomicLock {
@@ -248,7 +248,7 @@ pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
         }
     }
 
-    impl<'a> Drop for LockGuard<'a> {
+    impl Drop for LockGuard<'_> {
         fn drop(&mut self) {
             unsafe { self.lock.release(self.token) };
         }

@@ -9,7 +9,6 @@
 #[embedded_test::tests]
 mod tests {
     use esp_hal::{
-        gpio::Io,
         prelude::*,
         uart::{UartRx, UartTx},
     };
@@ -21,9 +20,7 @@ mod tests {
     fn test_that_creating_tx_does_not_cause_a_pulse() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let (rx, mut tx) = hil_test::common_test_pins!(io);
+        let (rx, mut tx) = hil_test::common_test_pins!(peripherals);
 
         let mut rx = UartRx::new(peripherals.UART1, rx).unwrap();
 

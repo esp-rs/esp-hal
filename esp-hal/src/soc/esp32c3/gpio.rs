@@ -8,7 +8,7 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `get_io_mux_reg(gpio_num: u8) -> &'static
+//!   - `io_mux_reg(gpio_num: u8) -> &'static
 //!     crate::peripherals::io_mux::GPIO0:`:
 //!       * Returns the IO_MUX register for the specified GPIO pin number.
 //!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
@@ -46,6 +46,7 @@ pub const NUM_PINS: usize = 22;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u8;
 pub(crate) type OutputSignalType = u8;
 pub(crate) const OUTPUT_SIGNAL_MAX: u8 = 128;
 pub(crate) const INPUT_SIGNAL_MAX: u8 = 100;
@@ -55,7 +56,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x1f;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
-pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
+pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
     unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
 }
 
@@ -65,7 +66,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     SPIQ             = 0,
@@ -114,7 +116,8 @@ pub enum InputSignal {
 
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum OutputSignal {
     SPIQ             = 0,
@@ -198,33 +201,50 @@ pub enum OutputSignal {
     GPIO             = 128,
 }
 
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo])
-    (1, [Input, Output, Analog, RtcIo])
-    (2, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
-    (3, [Input, Output, Analog, RtcIo])
-    (4, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
-    (5, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
-    (6, [Input, Output] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
-    (7, [Input, Output] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
-    (8, [Input, Output])
-    (9, [Input, Output])
-    (10, [Input, Output] (2 => FSPICS0) (2 => FSPICS0))
-    (11, [Input, Output])
-    (12, [Input, Output] (0 => SPIHD) (0 => SPIHD))
-    (13, [Input, Output] (0 => SPIWP) (0 => SPIWP))
-    (14, [Input, Output] () (0 => SPICS0))
-    (15, [Input, Output] () (0 => SPICLK_MUX))
-    (16, [Input, Output] (0 => SPID) (0 => SPID))
-    (17, [Input, Output] (0 => SPIQ) (0 => SPIQ))
-    (18, [Input, Output])
-    (19, [Input, Output])
-    (20, [Input, Output] (0 => U0RXD) ())
-    (21, [Input, Output] () (0 => U0TXD))
+macro_rules! rtc_pins {
+    ( $( $pin_num:expr )+ ) => {
+        $(
+            impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
+                unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
+                    let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
+                    let gpio_wakeup = rtc_cntl.gpio_wakeup();
+
+                    paste::paste! {
+                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
+                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
+                    }
+                }
+
+                fn rtcio_pad_hold(&mut self, enable: bool) {
+                    paste::paste! {
+                        unsafe { $crate::peripherals::RTC_CNTL::steal() }
+                            .pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
+                    }
+                }
+            }
+        )+
+    };
+}
+
+impl<const N: u8> crate::gpio::RtcPinWithResistors for GpioPin<N>
+where
+    Self: crate::gpio::RtcPin,
+{
+    fn rtcio_pullup(&mut self, enable: bool) {
+        unsafe { crate::peripherals::IO_MUX::steal() }
+            .gpio(N as usize)
+            .modify(|_, w| w.fun_wpu().bit(enable));
+    }
+
+    fn rtcio_pulldown(&mut self, enable: bool) {
+        unsafe { crate::peripherals::IO_MUX::steal() }
+            .gpio(N as usize)
+            .modify(|_, w| w.fun_wpd().bit(enable));
+    }
 }
 
 // RTC pins 0 through 5 (inclusive) support GPIO wakeup
-crate::rtc_pins! {
+rtc_pins! {
     0
     1
     2

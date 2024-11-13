@@ -52,3 +52,6 @@ defmt-espflash = ["dep:defmt", "defmt?/encoding-rzcobs"]
 
 # logging sub-features
 colors = []
+
+[lints.rust]
+static_mut_refs = "allow"

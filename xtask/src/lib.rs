@@ -159,11 +159,11 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             let mut features = vec![];
             if config.contains("wifi") {
                 features.push("wifi".to_owned());
-                features.push("wifi-default".to_owned());
                 features.push("esp-now".to_owned());
                 features.push("sniffer".to_owned());
                 features.push("utils".to_owned());
-                features.push("embassy-net".to_owned());
+                features.push("smoltcp/proto-ipv4".to_owned());
+                features.push("smoltcp/proto-ipv6".to_owned());
             }
             if config.contains("ble") {
                 features.push("ble".to_owned());
@@ -171,7 +171,6 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             if config.contains("wifi") && config.contains("ble") {
                 features.push("coex".to_owned());
             }
-            features.push("async".to_owned());
             features
         }
         _ => vec![],
@@ -432,6 +431,33 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
 
     manifest["package"]["version"] = toml_edit::value(version.to_string());
     fs::write(manifest_path, manifest.to_string())?;
+
+    for pkg in
+        Package::iter().filter(|p| ![package, Package::Examples, Package::HilTest].contains(p))
+    {
+        let manifest_path = workspace.join(pkg.to_string()).join("Cargo.toml");
+        let manifest = fs::read_to_string(&manifest_path)
+            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
+
+        let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
+
+        if manifest["dependencies"]
+            .as_table()
+            .unwrap()
+            .contains_key(&package.to_string())
+        {
+            log::info!(
+                "  Bumping {package} version for package {pkg}: ({prev_version} -> {version})"
+            );
+
+            manifest["dependencies"].as_table_mut().map(|table| {
+                table[&package.to_string()]["version"] = toml_edit::value(version.to_string())
+            });
+
+            fs::write(&manifest_path, manifest.to_string())
+                .with_context(|| format!("Could not write {}", manifest_path.display()))?;
+        }
+    }
 
     Ok(())
 }
