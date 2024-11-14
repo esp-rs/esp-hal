@@ -103,16 +103,17 @@ pub enum Version {
 }
 
 /// Build the documentation for the specified package and device.
-pub fn build_documentation(
-    workspace: &Path,
-    package: Package,
-    chip: Chip,
-    target: &str,
-) -> Result<PathBuf> {
+pub fn build_documentation(workspace: &Path, package: Package, chip: Chip) -> Result<PathBuf> {
     let package_name = package.to_string();
     let package_path = windows_safe_path(&workspace.join(&package_name));
 
     log::info!("Building '{package_name}' documentation targeting '{chip}'");
+
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(package, &chip)?;
+
+    // We need `nightly` for building the docs, unfortunately:
+    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
 
     let mut features = vec![chip.to_string()];
 
@@ -122,6 +123,7 @@ pub fn build_documentation(
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
+        .toolchain(toolchain)
         .subcommand("doc")
         .target(target)
         .features(&features)
@@ -658,4 +660,13 @@ pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Ver
 /// Make the path "Windows"-safe
 pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
+}
+
+/// Return the target triple for a given package/chip pair.
+pub fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
+    if package == Package::EspLpHal {
+        chip.lp_target()
+    } else {
+        Ok(chip.target())
+    }
 }
