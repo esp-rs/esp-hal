@@ -119,8 +119,17 @@ pub trait Timer: crate::private::Sealed {
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<'d, T> {
+pub struct OneShotTimer<'d, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+}
+
+impl<'d> OneShotTimer<'d> {
+    /// Construct a new instance of [`OneShotTimer`].
+    pub fn new(
+        inner: impl Peripheral<P = impl Timer + Into<AnyTimer> + 'd> + 'd,
+    ) -> OneShotTimer<'d> {
+        Self::new_typed(inner.map_into())
+    }
 }
 
 impl<'d, T> OneShotTimer<'d, T>
@@ -128,7 +137,7 @@ where
     T: Timer,
 {
     /// Construct a new instance of [`OneShotTimer`].
-    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(inner);
 
         Self { inner }
@@ -250,16 +259,25 @@ where
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<'d, T> {
+pub struct PeriodicTimer<'d, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+}
+
+impl<'d> PeriodicTimer<'d> {
+    /// Construct a new instance of [`PeriodicTimer`].
+    pub fn new(
+        inner: impl Peripheral<P = impl Timer + Into<AnyTimer> + 'd> + 'd,
+    ) -> PeriodicTimer<'d> {
+        Self::new_typed(inner.map_into())
+    }
 }
 
 impl<'d, T> PeriodicTimer<'d, T>
 where
     T: Timer,
 {
-    /// Construct a new instance of [`PeriodicTimer`].
-    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+    /// Construct a typed instance of [`PeriodicTimer`].
+    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> PeriodicTimer<'d, T> {
         crate::into_ref!(inner);
 
         Self { inner }
@@ -365,62 +383,18 @@ where
 
 impl<T> embedded_hal_02::timer::Periodic for PeriodicTimer<'_, T> where T: Timer {}
 
-/// An enum of all timer types
-enum AnyTimerInner {
-    /// Timer 0 of the TIMG0 peripheral in blocking mode.
-    Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>>),
-    /// Timer 1 of the TIMG0 peripheral in blocking mode.
-    #[cfg(timg_timer1)]
-    Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>>),
-    /// Timer 0 of the TIMG1 peripheral in blocking mode.
-    #[cfg(timg1)]
-    Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>>),
-    /// Timer 1 of the TIMG1 peripheral in blocking mode.
-    #[cfg(all(timg1, timg_timer1))]
-    Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>>),
-    /// Systimer Alarm
-    #[cfg(systimer)]
-    SystimerAlarm(systimer::Alarm<'static>),
-}
-
-/// A type-erased timer
-///
-/// You can create an instance of this by just calling `.into()` on a timer.
-pub struct AnyTimer(AnyTimerInner);
-
-impl crate::private::Sealed for AnyTimer {}
-
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>>) -> Self {
-        Self(AnyTimerInner::Timg0Timer0(value))
-    }
-}
-
-#[cfg(timg_timer1)]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>>) -> Self {
-        Self(AnyTimerInner::Timg0Timer1(value))
-    }
-}
-
-#[cfg(timg1)]
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>>) -> Self {
-        Self(AnyTimerInner::Timg1Timer0(value))
-    }
-}
-
-#[cfg(all(timg1, timg_timer1))]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>>) -> Self {
-        Self(AnyTimerInner::Timg1Timer1(value))
-    }
-}
-
-#[cfg(systimer)]
-impl From<systimer::Alarm<'static>> for AnyTimer {
-    fn from(value: systimer::Alarm<'static>) -> Self {
-        Self(AnyTimerInner::SystimerAlarm(value))
+crate::any_peripheral! {
+    /// Any Timer peripheral.
+    pub peripheral AnyTimer {
+        Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>>),
+        #[cfg(timg_timer1)]
+        Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>>),
+        #[cfg(timg1)]
+        Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>>),
+        #[cfg(all(timg1, timg_timer1))]
+        Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>>),
+        #[cfg(systimer)]
+        SystimerAlarm(systimer::Alarm<'static>),
     }
 }
 
@@ -452,14 +426,5 @@ impl Timer for AnyTimer {
             async fn wait(&self);
             fn async_interrupt_handler(&self) -> InterruptHandler;
         }
-    }
-}
-
-impl Peripheral for AnyTimer {
-    type P = Self;
-
-    #[inline]
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        core::ptr::read(self as *const _)
     }
 }

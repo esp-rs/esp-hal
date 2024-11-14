@@ -1,6 +1,4 @@
-//! This shows how to use the TIMG peripheral interrupts.
-//!
-//! There is TIMG0 which contains a general purpose timer and a watchdog timer.
+//! This shows how to use the `PeriodicTimer` driver with the TIMG peripheral.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
@@ -12,30 +10,24 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    interrupt::{self, Priority},
-    peripherals::{Interrupt, TIMG0},
     prelude::*,
-    timer::timg::{Timer, Timer0, TimerGroup},
+    timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
 };
 
-static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =
-    Mutex::new(RefCell::new(None));
+static TIMER0: Mutex<RefCell<Option<PeriodicTimer<AnyTimer>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0 = timg0.timer0;
-    timer0.set_interrupt_handler(tg0_t0_level);
-
-    interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
-    timer0.load_value(500u64.millis()).unwrap();
-    timer0.start();
-    timer0.listen();
+    let mut timer = PeriodicTimer::new(timg0.timer0);
+    timer.set_interrupt_handler(tg0_t0_level);
+    timer.start(500.millis()).unwrap();
 
     critical_section::with(|cs| {
-        TIMER0.borrow_ref_mut(cs).replace(timer0);
+        timer.enable_interrupt(true);
+        TIMER0.borrow_ref_mut(cs).replace(timer);
     });
 
     loop {}
@@ -53,7 +45,5 @@ fn tg0_t0_level() {
         let timer0 = timer0.as_mut().unwrap();
 
         timer0.clear_interrupt();
-        timer0.load_value(500u64.millis()).unwrap();
-        timer0.start();
     });
 }
