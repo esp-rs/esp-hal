@@ -12,6 +12,7 @@ use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
+    target_triple,
     Metadata,
     Package,
     Version,
@@ -42,7 +43,8 @@ enum Cli {
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
     /// Run doctests for specified chip and package.
-    RunDocTest(ExampleArgs),
+    #[clap(alias = "run-doc-test")]
+    RunDocTests(ExampleArgs),
     /// Run the given example for the specified chip.
     RunExample(ExampleArgs),
     /// Run all applicable tests or the specified test for a specified chip.
@@ -178,7 +180,7 @@ fn main() -> Result<()> {
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
-        Cli::RunDocTest(args) => run_doctests(&workspace, args),
+        Cli::RunDocTests(args) => run_doc_tests(&workspace, args),
         Cli::RunElfs(args) => run_elfs(args),
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
         Cli::RunTests(args) => tests(&workspace, args, CargoAction::Run),
@@ -437,12 +439,9 @@ fn build_documentation_for_package(
         // Ensure that the package/chip combination provided are valid:
         validate_package_chip(&package, chip)?;
 
-        // Determine the appropriate build target for the given package and chip:
-        let target = target_triple(package, chip)?;
-
         // Build the documentation for the specified package, targeting the
         // specified chip:
-        let docs_path = xtask::build_documentation(workspace, package, *chip, target)?;
+        let docs_path = xtask::build_documentation(workspace, package, *chip)?;
 
         ensure!(
             docs_path.exists(),
@@ -459,6 +458,7 @@ fn build_documentation_for_package(
         // Create the output directory, and copy the built documentation into it:
         fs::create_dir_all(&output_path)
             .with_context(|| format!("Failed to create {}", output_path.display()))?;
+
         copy_dir_all(&docs_path, &output_path).with_context(|| {
             format!(
                 "Failed to copy {} to {}",
@@ -813,16 +813,23 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
     Ok(())
 }
 
-fn run_doctests(workspace: &Path, args: ExampleArgs) -> Result<()> {
+fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
+    let chip = args.chip;
+
     let package_name = args.package.to_string();
     let package_path = xtask::windows_safe_path(&workspace.join(&package_name));
 
-    // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(args.package, &args.chip)?;
-    let features = vec![args.chip.to_string()];
+    // Determine the appropriate build target, and cargo features for the given
+    // package and chip:
+    let target = target_triple(args.package, &chip)?;
+    let features = vec![chip.to_string()];
+
+    // We need `nightly` for building the doc tests, unfortunately:
+    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
+        .toolchain(toolchain)
         .subcommand("test")
         .arg("--doc")
         .arg("-Zdoctest-xcompile")
@@ -842,14 +849,6 @@ fn run_doctests(workspace: &Path, args: ExampleArgs) -> Result<()> {
 
 // ----------------------------------------------------------------------------
 // Helper Functions
-
-fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
-    if package == Package::EspLpHal {
-        chip.lp_target()
-    } else {
-        Ok(chip.target())
-    }
-}
 
 fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
     ensure!(
