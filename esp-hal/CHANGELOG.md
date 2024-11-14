@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `I2c` SCL timeout is now defined in bus clock cycles. (#2477)
 - Trying to send a single-shot RMT transmission will result in an error now, `RMT` deals with `u32` now, `PulseCode` is a convenience trait now (#2463)
 - Removed `get_` prefixes from functions (#2528)
+- The `Camera` and `I8080` drivers' constructors now only accepts blocking-mode DMA channels. (#2519)
 
 ### Fixed
 
@@ -180,6 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The DMA channel types have been removed from peripherals (#2261)
 - `I2C` driver renamed to `I2c` (#2320)
 - The GPIO pins are now accessible via `Peripherals` and are no longer part of the `Io` struct (#2508)
+- `dma::{ChannelRx, ChannelTx}` now have a `Mode` type parameter (#2519)
 
 ### Fixed
 

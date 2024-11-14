@@ -83,21 +83,25 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
+    Blocking,
     Mode,
 };
 
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, <LCD_CAM as DmaEligible>::Dma>,
-    _phantom: PhantomData<DM>,
+    tx_channel: ChannelTx<'d, Blocking, <LCD_CAM as DmaEligible>::Dma>,
+    _mode: PhantomData<DM>,
 }
 
-impl<'d, DM: Mode> I8080<'d, DM> {
+impl<'d, DM> I8080<'d, DM>
+where
+    DM: Mode,
+{
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P, CH>(
         lcd: Lcd<'d, DM>,
-        channel: ChannelTx<'d, CH>,
+        channel: ChannelTx<'d, Blocking, CH>,
         mut pins: P,
         frequency: HertzU32,
         config: Config,
@@ -209,12 +213,10 @@ impl<'d, DM: Mode> I8080<'d, DM> {
         Self {
             lcd_cam,
             tx_channel: channel.degrade(),
-            _phantom: PhantomData,
+            _mode: PhantomData,
         }
     }
-}
 
-impl<'d, DM: Mode> I8080<'d, DM> {
     /// Configures the byte order for data transmission in 16-bit mode.
     /// This must be set to [ByteOrder::default()] when transmitting in 8-bit
     /// mode.

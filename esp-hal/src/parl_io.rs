@@ -23,8 +23,6 @@
 //!
 //! [Parallel IO TX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_tx.rs
 
-use core::marker::PhantomData;
-
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 use peripheral::PeripheralRef;
@@ -769,7 +767,6 @@ where
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
             tx_chain: DescriptorChain::new(self.descriptors),
-            phantom: PhantomData,
         })
     }
 }
@@ -801,7 +798,6 @@ where
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
             tx_chain: DescriptorChain::new(self.descriptors),
-            phantom: PhantomData,
         })
     }
 }
@@ -811,9 +807,8 @@ pub struct ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, <PARL_IO as DmaEligible>::Dma>,
+    tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     tx_chain: DescriptorChain,
-    phantom: PhantomData<DM>,
 }
 
 impl<DM> core::fmt::Debug for ParlIoTx<'_, DM>
@@ -850,7 +845,6 @@ where
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
             rx_chain: DescriptorChain::new(self.descriptors),
-            phantom: PhantomData,
         })
     }
 }
@@ -880,7 +874,6 @@ where
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
             rx_chain: DescriptorChain::new(self.descriptors),
-            phantom: PhantomData,
         })
     }
 }
@@ -890,9 +883,8 @@ pub struct ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>,
+    rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     rx_chain: DescriptorChain,
-    phantom: PhantomData<DM>,
 }
 
 impl<DM> core::fmt::Debug for ParlIoRx<'_, DM>
@@ -1005,7 +997,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     /// Create a new instance of [ParlIoFullDuplex]
     pub fn new<CH, DM>(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        dma_channel: Channel<'d, CH, DM>,
+        dma_channel: Channel<'d, DM, CH>,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
@@ -1013,43 +1005,33 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     where
         DM: Mode,
         CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
-        Channel<'d, CH, Blocking>: From<Channel<'d, CH, DM>>,
+        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
-        let dma_channel = Channel::<'d, CH, Blocking>::from(dma_channel);
+        let dma_channel = Channel::<Blocking, CH>::from(dma_channel);
         internal_init(frequency)?;
 
         Ok(Self {
             tx: TxCreatorFullDuplex {
                 tx_channel: dma_channel.tx.degrade(),
                 descriptors: tx_descriptors,
-                phantom: PhantomData,
             },
             rx: RxCreatorFullDuplex {
                 rx_channel: dma_channel.rx.degrade(),
                 descriptors: rx_descriptors,
-                phantom: PhantomData,
             },
         })
     }
 
     /// Convert to an async version.
     pub fn into_async(self) -> ParlIoFullDuplex<'d, Async> {
-        let channel = Channel {
-            tx: self.tx.tx_channel,
-            rx: self.rx.rx_channel,
-            phantom: PhantomData::<Blocking>,
-        };
-        let channel = channel.into_async();
         ParlIoFullDuplex {
             tx: TxCreatorFullDuplex {
-                tx_channel: channel.tx,
+                tx_channel: self.tx.tx_channel.into_async(),
                 descriptors: self.tx.descriptors,
-                phantom: PhantomData,
             },
             rx: RxCreatorFullDuplex {
-                rx_channel: channel.rx,
+                rx_channel: self.rx.rx_channel.into_async(),
                 descriptors: self.rx.descriptors,
-                phantom: PhantomData,
             },
         }
     }
@@ -1094,22 +1076,14 @@ impl InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
 impl<'d> ParlIoFullDuplex<'d, Async> {
     /// Convert to a blocking version.
     pub fn into_blocking(self) -> ParlIoFullDuplex<'d, Blocking> {
-        let channel = Channel {
-            tx: self.tx.tx_channel,
-            rx: self.rx.rx_channel,
-            phantom: PhantomData::<Async>,
-        };
-        let channel = channel.into_blocking();
         ParlIoFullDuplex {
             tx: TxCreatorFullDuplex {
-                tx_channel: channel.tx,
+                tx_channel: self.tx.tx_channel.into_blocking(),
                 descriptors: self.tx.descriptors,
-                phantom: PhantomData,
             },
             rx: RxCreatorFullDuplex {
-                rx_channel: channel.rx,
+                rx_channel: self.rx.rx_channel.into_blocking(),
                 descriptors: self.rx.descriptors,
-                phantom: PhantomData,
             },
         }
     }
@@ -1133,7 +1107,7 @@ where
     // TODO: only take a TX DMA channel?
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        dma_channel: Channel<'d, CH, DM>,
+        dma_channel: Channel<'d, DM, CH>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error>
@@ -1146,7 +1120,6 @@ where
             tx: TxCreator {
                 tx_channel: dma_channel.tx.degrade(),
                 descriptors,
-                phantom: PhantomData,
             },
         })
     }
@@ -1208,7 +1181,7 @@ where
     // TODO: only take a RX DMA channel?
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        dma_channel: Channel<'d, CH, DM>,
+        dma_channel: Channel<'d, DM, CH>,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error>
@@ -1221,7 +1194,6 @@ where
             rx: RxCreator {
                 rx_channel: dma_channel.rx.degrade(),
                 descriptors,
-                phantom: PhantomData,
             },
         })
     }
@@ -1372,7 +1344,7 @@ impl<'d, DM> DmaSupportTx for ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    type TX = ChannelTx<'d, <PARL_IO as DmaEligible>::Dma>;
+    type TX = ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -1414,7 +1386,7 @@ where
     }
 
     fn start_receive_bytes_dma(
-        rx_channel: &mut ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>,
+        rx_channel: &mut ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
         rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
@@ -1468,7 +1440,7 @@ impl<'d, DM> DmaSupportRx for ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    type RX = ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>;
+    type RX = ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -1484,9 +1456,8 @@ pub struct TxCreator<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, <PARL_IO as DmaEligible>::Dma>,
+    tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
-    phantom: PhantomData<DM>,
 }
 
 /// Creates a RX channel
@@ -1494,9 +1465,8 @@ pub struct RxCreator<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>,
+    rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
-    phantom: PhantomData<DM>,
 }
 
 /// Creates a TX channel
@@ -1504,9 +1474,8 @@ pub struct TxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, <PARL_IO as DmaEligible>::Dma>,
+    tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
-    phantom: PhantomData<DM>,
 }
 
 /// Creates a RX channel
@@ -1514,9 +1483,8 @@ pub struct RxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, <PARL_IO as DmaEligible>::Dma>,
+    rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
-    phantom: PhantomData<DM>,
 }
 
 #[doc(hidden)]

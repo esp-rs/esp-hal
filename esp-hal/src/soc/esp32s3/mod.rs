@@ -33,6 +33,7 @@ macro_rules! chip {
 }
 
 /// A link to the Technical Reference Manual (TRM) for the chip.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! trm_link {
     () => { "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf" };

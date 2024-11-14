@@ -25,7 +25,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    channel: Channel<'static, AnyGdmaChannel, Blocking>,
+    channel: Channel<'static, Blocking, AnyGdmaChannel>,
     dma_peripheral: DmaPeripheralType,
 }
 

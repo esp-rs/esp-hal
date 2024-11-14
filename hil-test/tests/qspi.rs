@@ -43,7 +43,7 @@ struct Context {
     spi: Spi<'static, Blocking>,
     #[cfg(pcnt)]
     pcnt: esp_hal::peripherals::PCNT,
-    dma_channel: Channel<'static, DmaChannel0, Blocking>,
+    dma_channel: Channel<'static, Blocking, DmaChannel0>,
     gpios: [AnyPin; 3],
 }
 

@@ -45,11 +45,13 @@
 //! before proceeding. We also have a [training] that covers some common
 //! scenarios with examples.
 //!
-//! We have a template for quick starting bare-metal projects, [esp-template].
-//! The template uses [cargo-generate], so ensure that it is installed and run:
+//! We have developed a project generation tool, [esp-generate], which we
+//! recommend when starting new projects. It can be installed and run, e.g.
+//! for the ESP32-C6, as follows:
 //!
 //! ```bash
-//! cargo generate -a esp-rs/esp-template
+//! cargo install esp-generate
+//! esp-generate --chip=esp32c6 your-project
 //! ```
 //!
 //! ## Blinky
@@ -128,8 +130,7 @@
 //! [embedded-hal]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal
 //! [embedded-hal-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-async
 //! [xtask]: https://github.com/matklad/cargo-xtask
-//! [esp-template]: https://github.com/esp-rs/esp-template
-//! [cargo-generate]: https://github.com/cargo-generate/cargo-generate
+//! [esp-generate]: https://github.com/esp-rs/esp-generate
 //! [book]: https://docs.esp-rs.org/book/
 //! [training]: https://docs.esp-rs.org/no_std-training/
 //!
@@ -389,7 +390,7 @@ impl Cpu {
 
     /// Returns an iterator over the "other" cores.
     #[inline(always)]
-    pub fn other() -> impl Iterator<Item = Self> {
+    pub(crate) fn other() -> impl Iterator<Item = Self> {
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
                 match Self::current() {
@@ -398,6 +399,18 @@ impl Cpu {
                 }
             } else {
                 [].into_iter()
+            }
+        }
+    }
+
+    /// Returns an iterator over all cores.
+    #[inline(always)]
+    pub(crate) fn all() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                [Cpu::ProCpu, Cpu::AppCpu].into_iter()
+            } else {
+                [Cpu::ProCpu].into_iter()
             }
         }
     }

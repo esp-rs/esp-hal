@@ -1499,7 +1499,7 @@ pub struct Flex<'d, P = AnyPin> {
 
 impl<P> private::Sealed for Flex<'_, P> {}
 
-impl<'d, P> Peripheral for Flex<'d, P> {
+impl<P> Peripheral for Flex<'_, P> {
     type P = Self;
     unsafe fn clone_unchecked(&self) -> Self::P {
         Self {
