@@ -287,6 +287,7 @@ where
         self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
         let view = unsafe { ManuallyDrop::take(&mut self.buf_view) };
+        core::mem::forget(self);
         (i2s, BUF::from_view(view))
     }
 
