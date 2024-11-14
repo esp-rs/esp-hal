@@ -1692,7 +1692,7 @@ where
             self.set_interrupt_handler(handler);
         }
         ChannelRx {
-            burst_mode: false,
+            burst_mode: self.burst_mode,
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
         }
@@ -1725,7 +1725,7 @@ where
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
         ChannelRx {
-            burst_mode: false,
+            burst_mode: self.burst_mode,
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
         }
@@ -1973,7 +1973,7 @@ where
             self.set_interrupt_handler(handler);
         }
         ChannelTx {
-            burst_mode: false,
+            burst_mode: self.burst_mode,
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
         }
@@ -2006,7 +2006,7 @@ where
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
         ChannelTx {
-            burst_mode: false,
+            burst_mode: self.burst_mode,
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
         }
