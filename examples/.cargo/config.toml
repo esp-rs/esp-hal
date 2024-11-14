@@ -4,6 +4,7 @@ esp32c2 = "run --release --features=esp32c2 --target=riscv32imc-unknown-none-elf
 esp32c3 = "run --release --features=esp32c3 --target=riscv32imc-unknown-none-elf"
 esp32c6 = "run --release --features=esp32c6 --target=riscv32imac-unknown-none-elf"
 esp32h2 = "run --release --features=esp32h2 --target=riscv32imac-unknown-none-elf"
+esp32p4 = "run --release --features=esp32p4 --target=riscv32imafc-unknown-none-elf"
 esp32s2 = "run --release --features=esp32s2 --target=xtensa-esp32s2-none-elf"
 esp32s3 = "run --release --features=esp32s3 --target=xtensa-esp32s3-none-elf"
 

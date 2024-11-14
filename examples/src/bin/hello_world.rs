@@ -7,7 +7,7 @@
 //! the UART USB port, and not the USB-SERIAL-JTAG port. If you want to test
 //! printing over USB-SERIAL-JTAG, try the usb_serial_jtag example instead.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32p4 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -35,6 +35,8 @@ fn main() -> ! {
             let (mut tx_pin, mut rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         } else if #[cfg(feature = "esp32h2")] {
             let (mut tx_pin, mut rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
+        } else if #[cfg(feature = "esp32p4")] {
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO37, peripherals.GPIO38);
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
             let (mut tx_pin, mut rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);
         }

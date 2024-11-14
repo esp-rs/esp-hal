@@ -11,12 +11,13 @@
 //!
 //! This documentation is built for the
 #![cfg_attr(esp32, doc = "**ESP32**")]
-#![cfg_attr(esp32s2, doc = "**ESP32-S2**")]
-#![cfg_attr(esp32s3, doc = "**ESP32-S3**")]
 #![cfg_attr(esp32c2, doc = "**ESP32-C2**")]
 #![cfg_attr(esp32c3, doc = "**ESP32-C3**")]
 #![cfg_attr(esp32c6, doc = "**ESP32-C6**")]
 #![cfg_attr(esp32h2, doc = "**ESP32-H2**")]
+#![cfg_attr(esp32p4, doc = "**ESP32-P4**")]
+#![cfg_attr(esp32s2, doc = "**ESP32-S2**")]
+#![cfg_attr(esp32s3, doc = "**ESP32-S3**")]
 //! . Please ensure you are reading the correct [documentation] for your target
 //! device.
 //!
@@ -141,6 +142,7 @@
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![deny(missing_docs, rust_2018_idioms)]
 #![no_std]
+#![cfg_attr(esp32p4, allow(unused))] // TODO: Remove when all required modules are implemented for `esp32p4`.
 
 // MUST be the first module
 mod fmt;
@@ -172,9 +174,7 @@ pub mod analog;
 pub mod assist_debug;
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
-
 pub mod config;
-
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;
 #[cfg(any(gdma, pdma))]
@@ -506,8 +506,10 @@ pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 
     // RTC domain must be enabled before we try to disable
+    #[cfg(not(esp32p4))] // FIXME
     let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
 
+    #[cfg(not(esp32p4))] // FIXME
     #[cfg(not(any(esp32, esp32s2)))]
     if config.watchdog.swd {
         rtc.swd.enable();
@@ -515,6 +517,7 @@ pub fn init(config: Config) -> Peripherals {
         rtc.swd.disable();
     }
 
+    #[cfg(not(esp32p4))] // FIXME
     match config.watchdog.rwdt {
         WatchdogStatus::Enabled(duration) => {
             rtc.rwdt.enable();
@@ -526,6 +529,7 @@ pub fn init(config: Config) -> Peripherals {
         }
     }
 
+    #[cfg(not(esp32p4))] // FIXME
     match config.watchdog.timg0 {
         WatchdogStatus::Enabled(duration) => {
             let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();

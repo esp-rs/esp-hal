@@ -141,6 +141,11 @@ use crate::{
 
 const UART_FIFO_SIZE: u16 = 128;
 
+#[cfg(not(any(esp32, esp32s2)))]
+use crate::soc::constants::RC_FAST_CLK;
+#[cfg(any(esp32, esp32s2))]
+use crate::soc::constants::REF_TICK;
+
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -372,7 +377,7 @@ impl Default for Config {
             stop_bits: StopBits::STOP1,
             clock_source: {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c6, esp32h2, lp_uart))] {
+                    if #[cfg(any(esp32c6, esp32h2, esp32p4, lp_uart))] {
                         ClockSource::Xtal
                     } else {
                         ClockSource::Apb
@@ -725,10 +730,10 @@ where
 
 #[inline(always)]
 fn sync_regs(_register_block: &RegisterBlock) {
-    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
+    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32p4, esp32s3))]
     {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c6, esp32h2))] {
+            if #[cfg(any(esp32c6, esp32h2, esp32p4))] {
                 let update_reg = _register_block.reg_update();
             } else {
                 let update_reg = _register_block.id();
@@ -1104,7 +1109,7 @@ where
     pub fn set_at_cmd(&mut self, config: AtCmdConfig) {
         let register_block = self.register_block();
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(any(esp32, esp32p4, esp32s2)))] // FIXME?
         register_block
             .clk_conf()
             .modify(|_, w| w.sclk_en().clear_bit());
@@ -1132,7 +1137,7 @@ where
                 .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout as _) });
         }
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(any(esp32, esp32p4, esp32s2)))]
         register_block
             .clk_conf()
             .modify(|_, w| w.sclk_en().set_bit());
@@ -1829,7 +1834,7 @@ where
             }
 
             cfg_if::cfg_if! {
-                if #[cfg(any(esp32c6, esp32h2))] {
+                if #[cfg(any(esp32c6, esp32h2, esp32p4))] {
                     let reg_en = register_block.tout_conf();
                 } else {
                     let reg_en = register_block.conf1();
@@ -2296,13 +2301,13 @@ impl Info {
     /// `Err(Error::InvalidArgument)` if provided value exceeds maximum value
     /// for SOC :
     /// - `esp32` **0x7F**
-    /// - `esp32c6`, `esp32h2` **0xFF**
+    /// - `esp32c6`, `esp32h2`, `esp32p4` **0xFF**
     /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
     /// - `esp32s3` **0x3FF**
     fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), Error> {
         #[cfg(esp32)]
         const MAX_THRHD: u16 = 0x7F;
-        #[cfg(any(esp32c6, esp32h2))]
+        #[cfg(any(esp32c6, esp32h2, esp32p4))]
         const MAX_THRHD: u16 = 0xFF;
         #[cfg(any(esp32c3, esp32c2, esp32s2))]
         const MAX_THRHD: u16 = 0x1FF;
@@ -2330,8 +2335,9 @@ impl Info {
     /// `Err(Error::InvalidArgument)` if the provided value exceeds the maximum
     /// value for SOC :
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
-    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
-    ///   value you pass times the symbol size must be <= **0x3FF**
+    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, `esp32p4`, `esp32s2`,
+    ///   `esp32s3`: The value you pass times the symbol size must be <=
+    ///   **0x3FF**
     fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), Error> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -2358,7 +2364,7 @@ impl Info {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     let reg_thrhd = register_block.conf1();
-                } else if #[cfg(any(esp32c6, esp32h2))] {
+                } else if #[cfg(any(esp32c6, esp32h2, esp32p4))] {
                     let reg_thrhd = register_block.tout_conf();
                 } else {
                     let reg_thrhd = register_block.mem_conf();
@@ -2368,7 +2374,7 @@ impl Info {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c6, esp32h2))] {
+            if #[cfg(any(esp32c6, esp32h2, esp32p4))] {
                 let reg_en = register_block.tout_conf();
             } else {
                 let reg_en = register_block.conf1();
@@ -2387,7 +2393,7 @@ impl Info {
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
+            ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
         };
 
         if clock_source == ClockSource::RcFast {
@@ -2435,7 +2441,7 @@ impl Info {
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
+            ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
         };
 
         let max_div = 0b1111_1111_1111 - 1;
@@ -2487,12 +2493,66 @@ impl Info {
         self.sync_regs();
     }
 
+    #[cfg(esp32p4)]
+    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+        let clocks = Clocks::get();
+        let clk = match clock_source {
+            ClockSource::Apb => clocks.apb_clock.to_Hz(),
+            ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
+            ClockSource::RcFast => RC_FAST_CLK.to_Hz(),
+        };
+
+        let max_div = 0b1111_1111_1111 - 1;
+        let clk_divider = (clk + max_div * baudrate - 1) / (max_div * baudrate);
+
+        if clk_divider == 0 {
+            panic!("Division by zero in clock divider");
+        }
+
+        let baud_div = ((clk << 4) / (baudrate * clk_divider));
+        let integer_div = (baud_div >> 4) as u16;
+        let fractional_div = (baud_div & 0xF) as u8;
+
+        self.register_block().clkdiv().write(|w| unsafe {
+            w.clkdiv().bits(integer_div);
+            w.clkdiv_frag().bits(fractional_div)
+        });
+
+        let hp_sys_clkrst = unsafe { crate::peripherals::HP_SYS_CLKRST::steal() };
+
+        if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
+            hp_sys_clkrst
+                .peri_clk_ctrl111()
+                .modify(|_, w| unsafe { w.uart0_sclk_div_num().bits(clk_divider as u8 - 1) });
+        } else if self.is_instance(unsafe { crate::peripherals::UART1::steal() }) {
+            hp_sys_clkrst
+                .peri_clk_ctrl112()
+                .modify(|_, w| unsafe { w.uart1_sclk_div_num().bits(clk_divider as u8 - 1) });
+        } else if self.is_instance(unsafe { crate::peripherals::UART2::steal() }) {
+            hp_sys_clkrst
+                .peri_clk_ctrl113()
+                .modify(|_, w| unsafe { w.uart2_sclk_div_num().bits(clk_divider as u8 - 1) });
+        } else if self.is_instance(unsafe { crate::peripherals::UART3::steal() }) {
+            hp_sys_clkrst
+                .peri_clk_ctrl114()
+                .modify(|_, w| unsafe { w.uart3_sclk_div_num().bits(clk_divider as u8 - 1) });
+        } else if self.is_instance(unsafe { crate::peripherals::UART4::steal() }) {
+            hp_sys_clkrst
+                .peri_clk_ctrl115()
+                .modify(|_, w| unsafe { w.uart4_sclk_div_num().bits(clk_divider as u8 - 1) });
+        } else {
+            panic!("Unsupported UART instance");
+        }
+
+        self.sync_regs();
+    }
+
     #[cfg(any(esp32, esp32s2))]
     fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
         let clk = match clock_source {
             ClockSource::Apb => Clocks::get().apb_clock.to_Hz(),
             // ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
-            ClockSource::RefTick => crate::soc::constants::REF_TICK.to_Hz(),
+            ClockSource::RefTick => REF_TICK.to_Hz(),
         };
 
         self.register_block()
@@ -2610,6 +2670,10 @@ impl_instance!(UART0, Uart0, U0TXD, U0RXD, U0CTS, U0RTS);
 impl_instance!(UART1, Uart1, U1TXD, U1RXD, U1CTS, U1RTS);
 #[cfg(uart2)]
 impl_instance!(UART2, Uart2, U2TXD, U2RXD, U2CTS, U2RTS);
+#[cfg(uart3)]
+impl_instance!(UART3, Uart3, U3TXD, U3RXD, U3CTS, U3RTS);
+#[cfg(uart4)]
+impl_instance!(UART4, Uart4, U4TXD, U4RXD, U4CTS, U4RTS);
 
 crate::any_peripheral! {
     /// Any UART peripheral.
@@ -2620,6 +2684,10 @@ crate::any_peripheral! {
         Uart1(crate::peripherals::UART1),
         #[cfg(uart2)]
         Uart2(crate::peripherals::UART2),
+        #[cfg(uart3)]
+        Uart3(crate::peripherals::UART3),
+        #[cfg(uart4)]
+        Uart4(crate::peripherals::UART4),
     }
 }
 
@@ -2633,6 +2701,10 @@ impl Instance for AnyUart {
             AnyUartInner::Uart1(uart) => uart.parts(),
             #[cfg(uart2)]
             AnyUartInner::Uart2(uart) => uart.parts(),
+            #[cfg(uart3)]
+            AnyUartInner::Uart3(uart) => uart.parts(),
+            #[cfg(uart4)]
+            AnyUartInner::Uart4(uart) => uart.parts(),
         }
     }
 }

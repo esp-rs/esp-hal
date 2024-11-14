@@ -71,6 +71,7 @@ use crate::rtc_cntl::RtcClock;
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
 #[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
 #[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
+#[cfg_attr(esp32p4, path = "clocks_ll/esp32p4.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
 pub(crate) mod clocks_ll;
@@ -114,6 +115,10 @@ pub enum CpuClock {
     /// 240MHz CPU clock
     #[cfg(xtensa)]
     Clock240MHz = 240,
+
+    /// 400MHz CPU clock
+    #[cfg(esp32p4)]
+    Clock400Mhz = 400,
 }
 
 impl Default for CpuClock {
@@ -139,6 +144,8 @@ impl CpuClock {
                 Self::Clock160MHz
             } else if #[cfg(esp32h2)] {
                 Self::Clock96MHz
+            } else if #[cfg(esp32p4)] {
+                Self::Clock400Mhz
             } else {
                 Self::Clock240MHz
             }
@@ -524,6 +531,28 @@ impl Clocks {
             pll_48m_clock: HertzU32::MHz(48),
             crypto_clock: HertzU32::MHz(96),
             pll_96m_clock: HertzU32::MHz(96),
+        }
+    }
+}
+
+#[cfg(esp32p4)]
+impl Clocks {
+    fn measure_xtal_frequency() -> XtalClock {
+        XtalClock::RtcXtalFreq40M
+    }
+
+    /// Configure the CPU clock speed.
+    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
+        // let xtal_freq = Self::measure_xtal_frequency();
+
+        if cpu_clock_speed != CpuClock::default() {
+            panic!("Not implemented yet.")
+        }
+
+        Self {
+            cpu_clock: cpu_clock_speed.frequency(),
+            apb_clock: HertzU32::MHz(80),
+            xtal_clock: XtalClock::RtcXtalFreq40M.frequency(),
         }
     }
 }

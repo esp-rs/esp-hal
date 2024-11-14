@@ -360,6 +360,7 @@ impl<T> embedded_hal_02::timer::Periodic for PeriodicTimer<'_, T> where T: Timer
 /// An enum of all timer types
 enum AnyTimerInner {
     /// Timer 0 of the TIMG0 peripheral in blocking mode.
+    #[cfg(timg0)]
     Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>),
     /// Timer 1 of the TIMG0 peripheral in blocking mode.
     #[cfg(timg_timer1)]
@@ -385,6 +386,7 @@ pub struct AnyTimer(AnyTimerInner);
 
 impl crate::private::Sealed for AnyTimer {}
 
+#[cfg(timg0)]
 impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
     fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>) -> Self {
         Self(AnyTimerInner::Timg0Timer0(value))
@@ -429,6 +431,7 @@ impl From<systimer::Alarm<'static, systimer::Target, Blocking>> for AnyTimer {
 impl Timer for AnyTimer {
     delegate::delegate! {
         to match &self.0 {
+            #[cfg(timg0)]
             AnyTimerInner::Timg0Timer0(inner) => inner,
             #[cfg(timg_timer1)]
             AnyTimerInner::Timg0Timer1(inner) => inner,

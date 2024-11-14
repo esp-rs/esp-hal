@@ -106,12 +106,14 @@ impl<C: GdmaChannel> ChannelTxImpl<C> {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.int_ch(self.0.number() as usize)
     }
-    #[inline(always)]
+
     #[cfg(any(esp32c6, esp32h2))]
+    #[inline(always)]
     fn int(&self) -> &crate::peripherals::dma::out_int_ch::OUT_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.out_int_ch(self.0.number() as usize)
     }
+
     #[cfg(esp32s3)]
     #[inline(always)]
     fn int(&self) -> &crate::peripherals::dma::ch::out_int::OUT_INT {
@@ -298,8 +300,8 @@ impl<C: GdmaChannel> ChannelRxImpl<C> {
         dma.int_ch(self.0.number() as usize)
     }
 
-    #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
+    #[inline(always)]
     fn int(&self) -> &crate::peripherals::dma::in_int_ch::IN_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.in_int_ch(self.0.number() as usize)

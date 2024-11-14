@@ -7,7 +7,7 @@
 //! - LED => GPIO2
 //! - BUTTON => GPIO0 (ESP32, ESP32-S2, ESP32-S3) / GPIO9
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32p4 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -37,6 +37,8 @@ fn main() -> ! {
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
             let button = peripherals.GPIO0;
+        } else if #[cfg(feature = "esp32p4")] {
+            let button = peripherals.GPIO35;
         } else {
             let button = peripherals.GPIO9;
         }

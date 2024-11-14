@@ -2,7 +2,7 @@
 //!
 //! It's an additional timer besides the TIMG peripherals.
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32p4 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]

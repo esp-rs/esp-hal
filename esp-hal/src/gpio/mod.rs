@@ -529,7 +529,7 @@ pub trait TouchPin: Pin {
 #[derive(Clone, Copy)]
 pub enum GpioRegisterAccess {
     Bank0,
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
     Bank1,
 }
 
@@ -556,7 +556,7 @@ impl GpioRegisterAccess {
     fn write_out_en_clear(self, word: u32) {
         match self {
             Self::Bank0 => Bank0GpioRegisterAccess::write_out_en_clear(word),
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
             Self::Bank1 => Bank1GpioRegisterAccess::write_out_en_clear(word),
         }
     }
@@ -564,7 +564,7 @@ impl GpioRegisterAccess {
     fn write_out_en_set(self, word: u32) {
         match self {
             Self::Bank0 => Bank0GpioRegisterAccess::write_out_en_set(word),
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
             Self::Bank1 => Bank1GpioRegisterAccess::write_out_en_set(word),
         }
     }
@@ -572,7 +572,7 @@ impl GpioRegisterAccess {
     fn read_input(self) -> u32 {
         match self {
             Self::Bank0 => Bank0GpioRegisterAccess::read_input(),
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
             Self::Bank1 => Bank1GpioRegisterAccess::read_input(),
         }
     }
@@ -580,7 +580,7 @@ impl GpioRegisterAccess {
     fn read_output(self) -> u32 {
         match self {
             Self::Bank0 => Bank0GpioRegisterAccess::read_output(),
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
             Self::Bank1 => Bank1GpioRegisterAccess::read_output(),
         }
     }
@@ -588,7 +588,7 @@ impl GpioRegisterAccess {
     fn read_interrupt_status(self) -> u32 {
         match self {
             Self::Bank0 => Bank0GpioRegisterAccess::read_interrupt_status(),
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
             Self::Bank1 => Bank1GpioRegisterAccess::read_interrupt_status(),
         }
     }
@@ -596,7 +596,7 @@ impl GpioRegisterAccess {
     fn write_interrupt_status_clear(self, word: u32) {
         match self {
             Self::Bank0 => Bank0GpioRegisterAccess::write_interrupt_status_clear(word),
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
             Self::Bank1 => Bank1GpioRegisterAccess::write_interrupt_status_clear(word),
         }
     }
@@ -612,7 +612,7 @@ impl GpioRegisterAccess {
     fn write_output_set(self, word: u32) {
         match self {
             Self::Bank0 => Bank0GpioRegisterAccess::write_output_set(word),
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
             Self::Bank1 => Bank1GpioRegisterAccess::write_output_set(word),
         }
     }
@@ -620,7 +620,7 @@ impl GpioRegisterAccess {
     fn write_output_clear(self, word: u32) {
         match self {
             Self::Bank0 => Bank0GpioRegisterAccess::write_output_clear(word),
-            #[cfg(any(esp32, esp32s2, esp32s3))]
+            #[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
             Self::Bank1 => Bank1GpioRegisterAccess::write_output_clear(word),
         }
     }
@@ -672,10 +672,10 @@ impl Bank0GpioRegisterAccess {
     }
 }
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
 struct Bank1GpioRegisterAccess;
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(any(esp32, esp32p4, esp32s2, esp32s3))]
 impl Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
         unsafe { GPIO::steal() }
