@@ -276,7 +276,9 @@ For example:
  }
 ```
 
-## Circular DMA transfer's `available` returns `Result<usize, DmaError>` now
+## DMA related changes
+
+### Circular DMA transfer's `available` returns `Result<usize, DmaError>` now
 
 In case of any error you should drop the transfer and restart it.
 
@@ -291,6 +293,22 @@ In case of any error you should drop the transfer and restart it.
 +                continue;
 +            },
 +        };
+```
+
+### Channel, ChannelRx and ChannelTx types have changed
+
+- `Channel`'s `Async`/`Blocking` mode has been moved before the channel instance parameter.
+- `ChannelRx` and `ChannelTx` have gained a new `Async`/`Blocking` mode parameter.
+
+```diff
+-Channel<'d, DmaChannel0, Async>
++Channel<'d, Async, DmaChannel0>
+
+-ChannelRx<'d, DmaChannel0>
++ChannelRx<'d, Async, DmaChannel0>
+
+-ChannelTx<'d, DmaChannel0>
++ChannelTx<'d, Async, DmaChannel0>
 ```
 
 ## Removed `peripheral_input` and `into_peripheral_output` from GPIO pin types
@@ -357,7 +375,9 @@ refer to the `Config` struct as `uart::Config`.
 +)
 ```
 
-## I8080 driver split `set_byte_order()` into `set_8bits_order()` and `set_byte_order()`.
+## LCD_CAM changes
+
+### I8080 driver split `set_byte_order()` into `set_8bits_order()` and `set_byte_order()`.
 
 If you were using an 8-bit bus.
 
@@ -370,6 +390,29 @@ If you were using an 16-bit bus, you don't need to change anything, `set_byte_or
 
 If you were sharing the bus between an 8-bit and 16-bit device, you will have to call the corresponding method when
 you switch between devices. Be sure to read the documentation of the new methods.
+
+### Mixed mode constructors
+
+It is no longer possible to construct `I8080` or `Camera` with an async-mode DMA channel.
+Convert the DMA channel into blocking before passing it to these constructors.
+
+```diff
+ let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+ let channel = ctx
+     .dma
+     .channel0
+-    .configure(false, DmaPriority::Priority0)
+-    .into_async();
++    .configure(false, DmaPriority::Priority0);
+
+ let i8080 = I8080::new(
+     lcd_cam.lcd,
+     channel.tx,
+     pins,
+     20.MHz(),
+     Config::default(),
+ );
+```
 
 ## `rmt::Channel::transmit` now returns `Result`, `PulseCode` is now `u32`
 

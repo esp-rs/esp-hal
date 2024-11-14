@@ -118,3 +118,16 @@ macro_rules! any_peripheral {
         }
     };
 }
+
+/// Macro to choose between two expressions. Useful for implementing "else" for
+/// `$()?` macro syntax.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! if_set {
+    (, $not_set:expr) => {
+        $not_set
+    };
+    ($set:expr, $not_set:expr) => {
+        $set
+    };
+}

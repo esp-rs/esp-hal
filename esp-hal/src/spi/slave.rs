@@ -202,14 +202,14 @@ pub mod dma {
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
         pub fn with_dma<CH, DM>(
             self,
-            channel: Channel<'d, CH, DM>,
+            channel: Channel<'d, DM, CH>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, M, T>
         where
             CH: DmaChannelConvert<T::Dma>,
             DM: Mode,
-            Channel<'d, CH, M>: From<Channel<'d, CH, DM>>,
+            Channel<'d, M, CH>: From<Channel<'d, DM, CH>>,
         {
             self.spi.info().set_data_mode(self.data_mode, true);
             SpiDma::new(self.spi, channel.into(), rx_descriptors, tx_descriptors)
@@ -223,7 +223,7 @@ pub mod dma {
         M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, T::Dma, M>,
+        pub(crate) channel: Channel<'d, M, T::Dma>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
@@ -262,7 +262,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, T::Dma>;
+        type TX = ChannelTx<'d, DmaMode, T::Dma>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -278,7 +278,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, T::Dma>;
+        type RX = ChannelRx<'d, DmaMode, T::Dma>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -296,7 +296,7 @@ pub mod dma {
     {
         fn new<CH>(
             spi: PeripheralRef<'d, T>,
-            channel: Channel<'d, CH, DmaMode>,
+            channel: Channel<'d, DmaMode, CH>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Self

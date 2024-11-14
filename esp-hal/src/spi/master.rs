@@ -474,11 +474,11 @@ where
     /// This method prepares the SPI instance for DMA transfers using SPI
     /// and returns an instance of `SpiDma` that supports DMA
     /// operations.
-    pub fn with_dma<CH, DM>(self, channel: Channel<'d, CH, DM>) -> SpiDma<'d, M, T>
+    pub fn with_dma<CH, DM>(self, channel: Channel<'d, DM, CH>) -> SpiDma<'d, M, T>
     where
         CH: DmaChannelConvert<T::Dma>,
         DM: Mode,
-        Channel<'d, CH, M>: From<Channel<'d, CH, DM>>,
+        Channel<'d, M, CH>: From<Channel<'d, DM, CH>>,
     {
         SpiDma::new(self.spi, channel.into())
     }
@@ -880,7 +880,7 @@ mod dma {
         M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, T::Dma, M>,
+        pub(crate) channel: Channel<'d, M, T::Dma>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
@@ -990,7 +990,7 @@ mod dma {
         T: Instance,
         M: Mode,
     {
-        pub(super) fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, CH, M>) -> Self
+        pub(super) fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, M, CH>) -> Self
         where
             CH: DmaChannelConvert<T::Dma>,
         {
@@ -3003,10 +3003,10 @@ macro_rules! spi_instance {
                         cs: OutputSignal::$cs,
                         sio0_input: InputSignal::$mosi,
                         sio1_output: OutputSignal::$miso,
-                        sio2_output: if_set!($(Some(OutputSignal::$sio2))?, None),
-                        sio2_input: if_set!($(Some(InputSignal::$sio2))?, None),
-                        sio3_output: if_set!($(Some(OutputSignal::$sio3))?, None),
-                        sio3_input: if_set!($(Some(InputSignal::$sio3))?, None),
+                        sio2_output: $crate::if_set!($(Some(OutputSignal::$sio2))?, None),
+                        sio2_input: $crate::if_set!($(Some(InputSignal::$sio2))?, None),
+                        sio3_output: $crate::if_set!($(Some(OutputSignal::$sio3))?, None),
+                        sio3_input: $crate::if_set!($(Some(InputSignal::$sio3))?, None),
                     };
 
                     &INFO
@@ -3020,17 +3020,6 @@ macro_rules! spi_instance {
             )?
         }
     }
-}
-
-/// Macro to choose between two expressions. Useful for implementing "else" for
-/// `$()?` macro syntax.
-macro_rules! if_set {
-    (, $not_set:expr) => {
-        $not_set
-    };
-    ($set:expr, $not_set:expr) => {
-        $set
-    };
 }
 
 #[cfg(spi2)]

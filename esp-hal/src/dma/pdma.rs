@@ -32,6 +32,9 @@ pub trait PdmaChannel: crate::private::Sealed {
     fn tx_waker(&self) -> &'static AtomicWaker;
     fn rx_waker(&self) -> &'static AtomicWaker;
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
+
+    fn peripheral_interrupt(&self) -> Interrupt;
+    fn async_handler(&self) -> InterruptHandler;
 }
 
 #[doc(hidden)]
@@ -106,6 +109,14 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> TxRegisterAccess for SpiD
     fn last_dscr_address(&self) -> usize {
         let spi = self.0.register_block();
         spi.out_eof_des_addr().read().dma_out_eof_des_addr().bits() as usize
+    }
+
+    fn peripheral_interrupt(&self) -> Option<Interrupt> {
+        None
+    }
+
+    fn async_handler(&self) -> Option<InterruptHandler> {
+        None
     }
 }
 
@@ -241,7 +252,15 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RxRegisterAccess for SpiDmaRxChannelImpl<C> {}
+impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RxRegisterAccess for SpiDmaRxChannelImpl<C> {
+    fn peripheral_interrupt(&self) -> Option<Interrupt> {
+        Some(self.0.peripheral_interrupt())
+    }
+
+    fn async_handler(&self) -> Option<InterruptHandler> {
+        Some(self.0.async_handler())
+    }
+}
 
 impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaRxInterrupt>
     for SpiDmaRxChannelImpl<C>
@@ -343,27 +362,9 @@ macro_rules! ImplSpiChannel {
             #[non_exhaustive]
             pub struct [<Spi $num DmaChannel>] {}
 
-            impl [<Spi $num DmaChannel>] {
-                fn handler() -> InterruptHandler {
-                    super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]
-                }
-
-                fn isrs() -> &'static [Interrupt] {
-                    &[Interrupt::[< SPI $num _DMA >]]
-                }
-            }
-
             impl DmaChannel for [<Spi $num DmaChannel>] {
                 type Rx = SpiDmaRxChannelImpl<Self>;
                 type Tx = SpiDmaTxChannelImpl<Self>;
-
-                fn async_handler<M: Mode>(_ch: &Channel<'_, Self, M>) -> InterruptHandler {
-                    Self::handler()
-                }
-
-                fn interrupts<M: Mode>(_ch: &Channel<'_, Self, M>) -> &'static [Interrupt] {
-                    Self::isrs()
-                }
             }
 
             impl DmaChannelExt for [<Spi $num DmaChannel>] {
@@ -393,6 +394,14 @@ macro_rules! ImplSpiChannel {
                 fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
                     peripheral == DmaPeripheral::[<Spi $num>]
                 }
+
+                fn peripheral_interrupt(&self) -> Interrupt {
+                    Interrupt::[< SPI $num _DMA >]
+                }
+
+                fn async_handler(&self) -> InterruptHandler {
+                    super::asynch::interrupt::[< interrupt_handler_spi $num _dma >]
+                }
             }
 
             impl DmaChannelConvert<AnySpiDmaChannel> for [<Spi $num DmaChannel>] {
@@ -416,11 +425,10 @@ macro_rules! ImplSpiChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, [<Spi $num DmaChannel>], Blocking> {
+                ) -> Channel<'a, Blocking, [<Spi $num DmaChannel>]> {
                     let mut this = Channel {
                         tx: ChannelTx::new(SpiDmaTxChannelImpl([<Spi $num DmaChannel>] {})),
                         rx: ChannelRx::new(SpiDmaRxChannelImpl([<Spi $num DmaChannel>] {})),
-                        phantom: PhantomData,
                     };
 
                     this.configure(burst_mode, priority);
@@ -517,6 +525,14 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> TxRegisterAccess for I2sD
             .read()
             .out_eof_des_addr()
             .bits() as usize
+    }
+
+    fn peripheral_interrupt(&self) -> Option<Interrupt> {
+        None
+    }
+
+    fn async_handler(&self) -> Option<InterruptHandler> {
+        None
     }
 }
 
@@ -658,7 +674,15 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RxRegisterAccess for I2sDmaRxChannelImpl<C> {}
+impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RxRegisterAccess for I2sDmaRxChannelImpl<C> {
+    fn peripheral_interrupt(&self) -> Option<Interrupt> {
+        Some(self.0.peripheral_interrupt())
+    }
+
+    fn async_handler(&self) -> Option<InterruptHandler> {
+        Some(self.0.async_handler())
+    }
+}
 
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaRxInterrupt>
     for I2sDmaRxChannelImpl<C>
@@ -756,27 +780,9 @@ macro_rules! ImplI2sChannel {
 
             impl $crate::private::Sealed for [<I2s $num DmaChannel>] {}
 
-            impl [<I2s $num DmaChannel>] {
-                fn handler() -> InterruptHandler {
-                    super::asynch::interrupt::[< interrupt_handler_i2s $num _dma >]
-                }
-
-                fn isrs() -> &'static [Interrupt] {
-                    &[Interrupt::[< I2S $num >]]
-                }
-            }
-
             impl DmaChannel for [<I2s $num DmaChannel>] {
                 type Rx = I2sDmaRxChannelImpl<Self>;
                 type Tx = I2sDmaTxChannelImpl<Self>;
-
-                fn async_handler<M: Mode>(_ch: &Channel<'_, Self, M>) -> InterruptHandler {
-                    Self::handler()
-                }
-
-                fn interrupts<M: Mode>(_ch: &Channel<'_, Self, M>) -> &'static [Interrupt] {
-                    Self::isrs()
-                }
             }
 
             impl DmaChannelExt for [<I2s $num DmaChannel>] {
@@ -805,6 +811,14 @@ macro_rules! ImplI2sChannel {
                 fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
                     peripheral == DmaPeripheral::[<I2s $num>]
                 }
+
+                fn peripheral_interrupt(&self) -> Interrupt {
+                    Interrupt::[< I2S $num >]
+                }
+
+                fn async_handler(&self) -> InterruptHandler {
+                    super::asynch::interrupt::[< interrupt_handler_i2s $num _dma >]
+                }
             }
 
             impl DmaChannelConvert<AnyI2sDmaChannel> for [<I2s $num DmaChannel>] {
@@ -825,11 +839,10 @@ macro_rules! ImplI2sChannel {
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> Channel<'a, [<I2s $num DmaChannel>], Blocking> {
+                ) -> Channel<'a, Blocking, [<I2s $num DmaChannel>]> {
                     let mut this = Channel {
                         tx: ChannelTx::new(I2sDmaTxChannelImpl([<I2s $num DmaChannel>] {})),
                         rx: ChannelRx::new(I2sDmaRxChannelImpl([<I2s $num DmaChannel>] {})),
-                        phantom: PhantomData,
                     };
 
                     this.configure(burst_mode, priority);
@@ -904,9 +917,10 @@ impl<'d> Dma<'d> {
     }
 }
 
-impl<'d, C, M: Mode> Channel<'d, C, M>
+impl<'d, CH, M> Channel<'d, M, CH>
 where
-    C: DmaChannel,
+    CH: DmaChannel,
+    M: Mode,
 {
     /// Asserts that the channel is compatible with the given peripheral.
     pub fn runtime_ensure_compatible(&self, peripheral: &PeripheralRef<'_, impl DmaEligible>) {
@@ -928,20 +942,6 @@ impl crate::private::Sealed for AnySpiDmaChannel {}
 impl DmaChannel for AnySpiDmaChannel {
     type Rx = SpiDmaRxChannelImpl<AnySpiDmaChannelInner>;
     type Tx = SpiDmaTxChannelImpl<AnySpiDmaChannelInner>;
-
-    fn async_handler<M: Mode>(ch: &Channel<'_, Self, M>) -> InterruptHandler {
-        match &ch.tx.tx_impl.0 {
-            AnySpiDmaChannelInner::Spi2(_) => Spi2DmaChannel::handler(),
-            AnySpiDmaChannelInner::Spi3(_) => Spi3DmaChannel::handler(),
-        }
-    }
-
-    fn interrupts<M: Mode>(ch: &Channel<'_, Self, M>) -> &'static [Interrupt] {
-        match &ch.tx.tx_impl.0 {
-            AnySpiDmaChannelInner::Spi2(_) => Spi2DmaChannel::isrs(),
-            AnySpiDmaChannelInner::Spi3(_) => Spi3DmaChannel::isrs(),
-        }
-    }
 }
 
 crate::any_enum! {
@@ -966,6 +966,8 @@ impl PdmaChannel for AnySpiDmaChannelInner {
             fn tx_waker(&self) -> &'static AtomicWaker;
             fn rx_waker(&self) -> &'static AtomicWaker;
             fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
+            fn peripheral_interrupt(&self) -> Interrupt;
+            fn async_handler(&self) -> InterruptHandler;
         }
     }
 }
@@ -978,22 +980,6 @@ impl crate::private::Sealed for AnyI2sDmaChannel {}
 impl DmaChannel for AnyI2sDmaChannel {
     type Rx = I2sDmaRxChannelImpl<AnyI2sDmaChannelInner>;
     type Tx = I2sDmaTxChannelImpl<AnyI2sDmaChannelInner>;
-
-    fn async_handler<M: Mode>(ch: &Channel<'_, Self, M>) -> InterruptHandler {
-        match &ch.tx.tx_impl.0 {
-            AnyI2sDmaChannelInner::I2s0(_) => I2s0DmaChannel::handler(),
-            #[cfg(i2s1)]
-            AnyI2sDmaChannelInner::I2s1(_) => I2s1DmaChannel::handler(),
-        }
-    }
-
-    fn interrupts<M: Mode>(ch: &Channel<'_, Self, M>) -> &'static [Interrupt] {
-        match &ch.tx.tx_impl.0 {
-            AnyI2sDmaChannelInner::I2s0(_) => I2s0DmaChannel::isrs(),
-            #[cfg(i2s1)]
-            AnyI2sDmaChannelInner::I2s1(_) => I2s1DmaChannel::isrs(),
-        }
-    }
 }
 
 crate::any_enum! {
@@ -1020,6 +1006,8 @@ impl PdmaChannel for AnyI2sDmaChannelInner {
             fn tx_waker(&self) -> &'static AtomicWaker;
             fn rx_waker(&self) -> &'static AtomicWaker;
             fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
+            fn peripheral_interrupt(&self) -> Interrupt;
+            fn async_handler(&self) -> InterruptHandler;
         }
     }
 }
