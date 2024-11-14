@@ -9,7 +9,6 @@ use crate::peripherals::RADIO_CLK;
 /// Enumeration of the available radio peripherals for this chip.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(any(bt, ieee802154, wifi))]
 pub enum RadioPeripherals {
     /// Represents the PHY (Physical Layer) peripheral.
     Phy,
