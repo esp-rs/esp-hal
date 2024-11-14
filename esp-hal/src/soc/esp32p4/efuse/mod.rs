@@ -57,12 +57,12 @@ impl Efuse {
     }
 
     /// Get status of SPI boot encryption.
-    pub fn get_flash_encryption() -> bool {
+    pub fn flash_encryption() -> bool {
         todo!()
     }
 
     /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
-    pub fn get_rwdt_multiplier() -> u8 {
+    pub fn rwdt_multiplier() -> u8 {
         todo!()
     }
 }

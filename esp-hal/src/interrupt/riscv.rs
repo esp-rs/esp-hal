@@ -831,7 +831,7 @@ mod clic {
     /// Get pointer to interrupt control register for the given core and CPU
     /// interrupt number
     fn intr_cntrl(core: Cpu, cpu_interrupt_number: usize) -> *mut u32 {
-        let offset = if core == crate::get_core() {
+        let offset = if core == crate::core() {
             0
         } else {
             DUALCORE_CLIC_CTRL_OFF
@@ -850,7 +850,7 @@ mod clic {
     /// Make sure there is an interrupt handler registered.
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as usize;
-        let intr_cntrl = intr_cntrl(crate::get_core(), cpu_interrupt_number);
+        let intr_cntrl = intr_cntrl(crate::core(), cpu_interrupt_number);
 
         unsafe {
             let mut val = InterruptControl(intr_cntrl.read_volatile());
@@ -910,7 +910,7 @@ mod clic {
 
     /// Get interrupt priority
     #[inline]
-    pub(super) fn get_priority_by_core(core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
+    pub(super) fn priority_by_core(core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
         let cpu_interrupt_number = cpu_interrupt as usize;
 
         unsafe {
@@ -923,7 +923,7 @@ mod clic {
 
     /// Get interrupt priority - called by assembly code
     #[inline]
-    pub(super) unsafe extern "C" fn get_priority(cpu_interrupt: CpuInterrupt) -> Priority {
+    pub(super) unsafe extern "C" fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let clic = &*crate::peripherals::CLIC::PTR;
         let prio = clic
             .int_ctrl(cpu_interrupt as usize)
