@@ -12,16 +12,122 @@
 //!
 //! ## Examples
 //! ### Initialization for RX
-//! See the [Parallel IO RX] example to learn how to initialize the RX and
-//! reading data.
 //!
-//! [Parallel IO RX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_rx.rs
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::gpio::NoPin;
+//! # use esp_hal::parl_io::{BitPackOrder, ParlIoRxOnly, RxFourBits};
 //!
+//! // Initialize DMA buffer and descriptors for data reception
+//! let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
+//! let dma = Dma::new(peripherals.DMA);
+//! let dma_channel = dma.channel0;
+//!
+//! // Configure the 4-bit input pins and clock pin
+//! let mut rx_pins = RxFourBits::new(
+//!     peripherals.GPIO1,
+//!     peripherals.GPIO2,
+//!     peripherals.GPIO3,
+//!     peripherals.GPIO4,
+//! );
+//! let mut rx_clk_pin = NoPin;
+//!
+//! // Set up Parallel IO for 1MHz data input, with DMA and bit packing
+//! configuration let parl_io = ParlIoRxOnly::new(
+//!     peripherals.PARL_IO,
+//!     dma_channel.configure(false, DmaPriority::Priority0),
+//!     rx_descriptors,
+//!     1.MHz(),
+//! )
+//! .unwrap();
+//!
+//! let mut parl_io_rx = parl_io
+//!     .rx
+//!     .with_config(
+//!         &mut rx_pins,
+//!         &mut rx_clk_pin,
+//!         BitPackOrder::Msb,
+//!         Some(0xfff),
+//!     )
+//!     .unwrap();
+//!
+//! // Initialize the buffer and delay
+//! let mut buffer = rx_buffer;
+//! buffer.fill(0u8);
+//! let delay = Delay::new();
+//!
+//! loop {
+//!     // Read data via DMA and print received values
+//!     let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
+//!     transfer.wait().unwrap();
+//!     // println!("Received: {:02x?} ...", &buffer[..30]);
+//!
+//!     delay.delay_millis(500);
+//! }
+//! # }
+//! ```
+//! 
 //! ### Initialization for TX
-//! See the [Parallel IO TX] example to learn how to initialize the TX and
-//! transferring data.
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::parl_io::{BitPackOrder, ParlIoTxOnly, TxFourBits, SampleEdge, ClkOutPin, TxPinConfigWithValidPin};
 //!
-//! [Parallel IO TX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_tx.rs
+//! // Initialize DMA buffer and descriptors for data reception
+//! let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
+//! let dma = Dma::new(peripherals.DMA);
+//! let dma_channel = dma.channel0;
+//!
+//! // Configure the 4-bit input pins and clock pin
+//! let tx_pins = TxFourBits::new(
+//!     peripherals.GPIO1,
+//!     peripherals.GPIO2,
+//!     peripherals.GPIO3,
+//!     peripherals.GPIO4,
+//! );
+//!
+//! let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, peripherals.GPIO5);
+//!
+//! // Set up Parallel IO for 1MHz data input, with DMA and bit packing
+//! configuration let parl_io = ParlIoTxOnly::new(
+//!     peripherals.PARL_IO,
+//!     dma_channel.configure(false, DmaPriority::Priority0),
+//!     tx_descriptors,
+//!     1.MHz(),
+//! )
+//! .unwrap();
+//!
+//! let mut clock_pin = ClkOutPin::new(peripherals.GPIO6);
+//! let mut parl_io_tx = parl_io
+//!     .tx
+//!     .with_config(
+//!         &mut pin_conf,
+//!         &mut clock_pin,
+//!         0,
+//!         SampleEdge::Normal,
+//!         BitPackOrder::Msb,
+//!     )
+//! .unwrap();
+//!
+//! let buffer = tx_buffer;
+//! for i in 0..buffer.len() {
+//!      buffer[i] = (i % 255) as u8;
+//! }
+//!
+//! let delay = Delay::new();
+//! loop {
+//!     let transfer = parl_io_tx.write_dma(&buffer).unwrap();
+//!     transfer.wait().unwrap();
+//!     //println!("Transferred {} bytes", buffer.len());
+//!     delay.delay_millis(500);
+//! }
+//! # }
+//! ```
 
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;

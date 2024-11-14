@@ -9,7 +9,7 @@
 //!
 //! The SPI slave driver allows using full-duplex and can only be used with DMA.
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### SPI Slave with DMA
 //!

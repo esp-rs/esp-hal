@@ -45,7 +45,7 @@
 //! channels are indicated by n which is used as a placeholder for the channel
 //! number, and by m for RX channels.
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### Initialization
 //!

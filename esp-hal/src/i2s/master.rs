@@ -23,9 +23,9 @@
 //!   - `DMA`
 //!   - `system` (to configure and enable the I2S peripheral)
 //!
-//! ## Example
+//! ## Examples
 //!
-//! ### Initialization
+//! ### I2S Read
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]

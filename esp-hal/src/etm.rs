@@ -21,6 +21,8 @@
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/etm.html)")]
 //! ## Examples
+//!
+//! ### Control LED by the button via ETM
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
@@ -53,6 +55,48 @@
 //! let _configured_channel = channel0.setup(&button_event, &led_task);
 //!
 //! // the LED is controlled by the button without involving the CPU
+//! loop {}
+//! # }
+//! ```
+//! 
+//! ### Control LED by the systimer via ETM
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
+//! # use esp_hal::etm::Etm;
+//! # use esp_hal::gpio::Pull;
+//! # use esp_hal::gpio::Level;
+//! # use esp_hal::timer::systimer::{etm::Event, Periodic, SystemTimer};
+//! # use fugit::ExtU32;
+//!
+//! let syst = SystemTimer::new(peripherals.SYSTIMER);
+//! let syst_alarms = syst.split::<Periodic>();
+//! let mut alarm0 = syst_alarms.alarm0;
+//! alarm0.set_period(1u32.secs());
+//!
+//! let mut led = peripherals.GPIO1;
+//!
+//! // setup ETM
+//! let gpio_ext = Channels::new(peripherals.GPIO_SD);
+//! let led_task = gpio_ext.channel0_task.toggle(
+//!     &mut led,
+//!     OutputConfig {
+//!         open_drain: false,
+//!         pull: Pull::None,
+//!         initial_state: Level::Low,
+//!     },
+//! );
+//!
+//! let timer_event = Event::new(&mut alarm0);
+//!
+//! let etm = Etm::new(peripherals.SOC_ETM);
+//! let channel0 = etm.channel0;
+//!
+//! // make sure the configured channel doesn't get dropped - dropping it will
+//! // disable the channel
+//! let _configured_channel = channel0.setup(&timer_event, &led_task);
+//!
+//! // the LED is controlled by the timer without involving the CPU
 //! loop {}
 //! # }
 //! ```

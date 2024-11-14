@@ -14,9 +14,9 @@
 //! The `Efuse` struct represents the eFuse peripheral and is responsible for
 //! reading various eFuse fields and values.
 //!
-//! ## Example
+//! ## Examples
 //!
-//! ### Read chip's MAC address from the eFuse storage.
+//! ### Read data from the eFuse storage.
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -24,9 +24,10 @@
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let mut serial_tx = Uart::new(peripherals.UART0, peripherals.GPIO4, peripherals.GPIO5).unwrap();
-//! let mac_address = Efuse::read_base_mac_address();
-//! writeln!(
+//!
+//! let mut serial_tx = Uart::new(peripherals.UART0, peripherals.GPIO4,
+//! peripherals.GPIO5).unwrap(); let mac_address =
+//! Efuse::read_base_mac_address(); writeln!(
 //!     serial_tx,
 //!     "MAC: {:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}",
 //!     mac_address[0],
@@ -36,6 +37,10 @@
 //!     mac_address[4],
 //!     mac_address[5]
 //! );
+//!
+//! // Or just
+//! // writeln!(serial_tx, "MAC address {:02x?}", Efuse::mac_address());
+//! writeln!(serial_tx, "Flash Encryption {:?}", Efuse::flash_encryption());
 //! # }
 //! ```
 

@@ -33,7 +33,7 @@
 //! The module implements several third-party traits from embedded-hal@0.2.x,
 //! embedded-hal@1.x.x and embassy-embedded-hal
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### SPI Initialization
 //! ```rust, no_run

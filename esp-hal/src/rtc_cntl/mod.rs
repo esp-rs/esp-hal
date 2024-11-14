@@ -16,7 +16,7 @@
 //!    * Low-Power Management
 //!    * Handling Watchdog Timers
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]

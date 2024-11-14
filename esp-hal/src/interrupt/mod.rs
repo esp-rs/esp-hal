@@ -24,7 +24,7 @@
 //! We reserve a number of CPU interrupts, which cannot be used; see
 //! [`RESERVED_INTERRUPTS`].
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### Using the peripheral driver to register an interrupt handler
 //!
