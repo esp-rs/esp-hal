@@ -1,7 +1,7 @@
 //! Embassy "async" version of ead calibration data from BMP180 sensor
 //!
-//! This example dumps the calibration data from a BMP180 sensor by reading by reading
-//! with the direct I2C API and the embedded-hal-async I2C API.
+//! This example dumps the calibration data from a BMP180 sensor by reading by
+//! reading with the direct I2C API and the embedded-hal-async I2C API.
 //!
 //! Following pins are used:
 //! - SDA => GPIO4
@@ -9,10 +9,9 @@
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
-//!
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy embassy-generic-timers
+//% FEATURES: embassy-generic-timers
 
 #![no_std]
 #![no_main]
