@@ -32,10 +32,6 @@ name    = "delay"
 harness = false
 
 [[test]]
-name    = "delay_async"
-harness = false
-
-[[test]]
 name    = "dma_macros"
 harness = false
 

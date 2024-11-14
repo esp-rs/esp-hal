@@ -7,66 +7,6 @@
 //! timer which can be used, for example, to generate tick interrupts for an
 //! operating system, or simply as a general-purpose timer.
 //!
-//! ## Configuration
-//!
-//! The timer consists of two counters, `UNIT0` and `UNIT1`. The counter values
-//! can be monitored by 3 comparators, `COMP0`, `COMP1`, and `COMP2`.
-//!
-//! [Alarm]s can be configured in two modes: [Target] (one-shot) and [Periodic].
-//!
-//! ## Examples
-//!
-//! ### Splitting up the System Timer into three alarms
-//!
-//! Use the [split][SystemTimer::split] method to create three alarms from the
-//!  System Timer, contained in a [SysTimerAlarms] struct.
-//!
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! use esp_hal::timer::systimer::{
-//!     SystemTimer,
-//!     Periodic,
-//! };
-//!
-//! let systimer = SystemTimer::new(
-//!     peripherals.SYSTIMER,
-//! ).split::<Periodic>();
-//!
-//! // Reconfigure a periodic alarm to be a target alarm
-//! let target_alarm = systimer.alarm0.into_target();
-//! # }
-//! ```
-//! 
-//! ### General-purpose Timer
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! use esp_hal::timer::systimer::{
-//!     Alarm,
-//!     FrozenUnit,
-//!     SpecificUnit,
-//!     SystemTimer,
-//! };
-//!
-//! let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
-//!
-//! // Get the current tick count:
-//! let now = SystemTimer::now();
-//!
-//! let frozen_unit = FrozenUnit::new(&mut systimer.unit0);
-//! let alarm0 = Alarm::new(systimer.comparator0, &frozen_unit);
-//!
-//! alarm0.set_target(
-//!     SystemTimer::now() + SystemTimer::ticks_per_second() * 2
-//! );
-//! alarm0.enable_interrupt(true);
-//!
-//! while !alarm0.is_interrupt_set() {
-//!     // Wait for the interrupt to be set
-//! }
-//!
-//! alarm0.clear_interrupt();
-//! # }
-//! ```
 
 use core::{
     fmt::{Debug, Formatter},
@@ -90,20 +30,20 @@ use crate::{
 /// System Timer driver.
 pub struct SystemTimer<'d> {
     /// Unit 0
-    pub unit0: SpecificUnit<'d, 0>,
+    pub unit0: AnyUnit<'d>,
 
     #[cfg(not(esp32s2))]
     /// Unit 1
-    pub unit1: SpecificUnit<'d, 1>,
+    pub unit1: AnyUnit<'d>,
 
     /// Comparator 0.
-    pub comparator0: SpecificComparator<'d, 0>,
+    pub comparator0: AnyComparator<'d>,
 
     /// Comparator 1.
-    pub comparator1: SpecificComparator<'d, 1>,
+    pub comparator1: AnyComparator<'d>,
 
     /// Comparator 2.
-    pub comparator2: SpecificComparator<'d, 2>,
+    pub comparator2: AnyComparator<'d>,
 }
 
 impl<'d> SystemTimer<'d> {
@@ -151,12 +91,12 @@ impl<'d> SystemTimer<'d> {
         etm::enable_etm();
 
         Self {
-            unit0: SpecificUnit::new(),
+            unit0: SpecificUnit::<'_, 0>::new().into(),
             #[cfg(not(esp32s2))]
-            unit1: SpecificUnit::new(),
-            comparator0: SpecificComparator::new(),
-            comparator1: SpecificComparator::new(),
-            comparator2: SpecificComparator::new(),
+            unit1: SpecificUnit::<'_, 1>::new().into(),
+            comparator0: SpecificComparator::<'_, 0>::new().into(),
+            comparator1: SpecificComparator::<'_, 1>::new().into(),
+            comparator2: SpecificComparator::<'_, 2>::new().into(),
         }
     }
 
@@ -184,7 +124,7 @@ pub struct SysTimerAlarms {
     ///
     /// Leftover unit which wasn't used to create the three alarms.
     #[cfg(not(esp32s2))]
-    pub unit1: SpecificUnit<'static, 1>,
+    pub unit1: AnyUnit<'static>,
 }
 
 impl SystemTimer<'static> {
