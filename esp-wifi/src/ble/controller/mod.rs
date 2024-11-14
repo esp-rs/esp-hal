@@ -11,7 +11,7 @@ pub struct BleConnector<'d> {
     _device: PeripheralRef<'d, crate::hal::peripherals::BT>,
 }
 
-impl<'d> Drop for BleConnector<'d> {
+impl Drop for BleConnector<'_> {
     fn drop(&mut self) {
         crate::ble::ble_deinit();
     }

@@ -233,7 +233,7 @@ pub struct EspWifiController<'d> {
     _inner: PhantomData<&'d ()>,
 }
 
-impl<'d> EspWifiController<'d> {
+impl EspWifiController<'_> {
     /// Is the WiFi part of the radio running
     pub fn wifi(&self) -> bool {
         crate::flags::WIFI.load(Ordering::Acquire) > 0
@@ -261,7 +261,7 @@ impl<'d> EspWifiController<'d> {
     }
 }
 
-impl<'d> Drop for EspWifiController<'d> {
+impl Drop for EspWifiController<'_> {
     fn drop(&mut self) {
         if crate::flags::ESP_WIFI_INITIALIZED.load(Ordering::Acquire) {
             // safety: no other driver can be using this if this is callable

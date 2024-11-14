@@ -2399,7 +2399,7 @@ pub struct WifiController<'d> {
     sniffer_taken: AtomicBool,
 }
 
-impl<'d> Drop for WifiController<'d> {
+impl Drop for WifiController<'_> {
     fn drop(&mut self) {
         if unwrap!(
             crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {

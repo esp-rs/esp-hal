@@ -816,7 +816,7 @@ where
     }
 }
 
-impl<'d, T> embedded_hal_async::i2c::I2c for I2c<'d, Async, T>
+impl<T> embedded_hal_async::i2c::I2c for I2c<'_, Async, T>
 where
     T: Instance,
 {
