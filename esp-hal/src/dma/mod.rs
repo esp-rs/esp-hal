@@ -3075,7 +3075,6 @@ pub(crate) mod asynch {
         use crate::{interrupt::Priority, macros::handler};
 
         // Single interrupt handler for IN and OUT
-        // TODO: add a global flag to only call the half that is configured for async
         #[cfg(any(esp32c2, esp32c3))]
         macro_rules! interrupt_handler {
             ($ch:literal) => {
@@ -3123,7 +3122,6 @@ pub(crate) mod asynch {
         use crate::{interrupt::Priority, macros::handler};
 
         // Single interrupt handler for IN and OUT
-        // TODO: add a global flag to only call the half that is configured for async
         macro_rules! interrupt_handler {
             ($ch:ident) => {
                 paste::paste! {
