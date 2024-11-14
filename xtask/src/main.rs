@@ -812,7 +812,7 @@ fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    // Execute `cargo publish --dry-run` from the package root:
+    // Execute `cargo publish` command from the package root:
     xtask::cargo::run(&args, &package_path)?;
 
     Ok(())
