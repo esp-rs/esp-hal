@@ -82,10 +82,7 @@ use crate::{
     private::Sealed,
     sync::{lock, Lock},
     system::PeripheralClockControl,
-    Async,
-    Blocking,
     InterruptConfigurable,
-    Mode,
 };
 
 const NUM_TIMG: usize = 1 + cfg!(timg1) as usize;
@@ -96,17 +93,16 @@ static INT_ENA_LOCK: [Lock; NUM_TIMG] = [const { Lock::new() }; NUM_TIMG];
 #[cfg_attr(not(timg_timer1), doc = "a general purpose timer")]
 #[cfg_attr(timg_timer1, doc = "2 timers")]
 /// and a watchdog timer.
-pub struct TimerGroup<'d, T, DM>
+pub struct TimerGroup<'d, T>
 where
     T: TimerGroupInstance,
-    DM: Mode,
 {
     _timer_group: PeripheralRef<'d, T>,
     /// Timer 0
-    pub timer0: Timer<Timer0<T>, DM>,
+    pub timer0: Timer<Timer0<T>>,
     /// Timer 1
     #[cfg(timg_timer1)]
-    pub timer1: Timer<Timer1<T>, DM>,
+    pub timer1: Timer<Timer1<T>>,
     /// Watchdog timer
     pub wdt: Wdt<T>,
 }
@@ -240,13 +236,12 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
     }
 }
 
-impl<'d, T, DM> TimerGroup<'d, T, DM>
+impl<'d, T> TimerGroup<'d, T>
 where
     T: TimerGroupInstance,
-    DM: Mode,
 {
     /// Construct a new instance of [`TimerGroup`] in blocking mode
-    pub fn new_inner(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
+    pub fn new(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(_timer_group);
 
         T::reset_peripheral();
@@ -289,101 +284,24 @@ where
     }
 }
 
-impl<'d, T> TimerGroup<'d, T, Blocking>
-where
-    T: TimerGroupInstance,
-{
-    /// Construct a new instance of [`TimerGroup`] in blocking mode
-    pub fn new(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
-        Self::new_inner(_timer_group)
-    }
-}
-
-impl<'d, T> TimerGroup<'d, T, Async>
-where
-    T: TimerGroupInstance,
-{
-    /// Construct a new instance of [`TimerGroup`] in asynchronous mode
-    pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
-        match T::id() {
-            0 => {
-                use crate::timer::timg::asynch::timg0_timer0_handler;
-                unsafe {
-                    interrupt::bind_interrupt(
-                        Interrupt::TG0_T0_LEVEL,
-                        timg0_timer0_handler.handler(),
-                    );
-                    interrupt::enable(Interrupt::TG0_T0_LEVEL, timg0_timer0_handler.priority())
-                        .unwrap();
-
-                    #[cfg(timg_timer1)]
-                    {
-                        use crate::timer::timg::asynch::timg0_timer1_handler;
-
-                        interrupt::bind_interrupt(
-                            Interrupt::TG0_T1_LEVEL,
-                            timg0_timer1_handler.handler(),
-                        );
-                        interrupt::enable(Interrupt::TG0_T1_LEVEL, timg0_timer1_handler.priority())
-                            .unwrap();
-                    }
-                }
-            }
-            #[cfg(timg1)]
-            1 => {
-                use crate::timer::timg::asynch::timg1_timer0_handler;
-                unsafe {
-                    {
-                        interrupt::bind_interrupt(
-                            Interrupt::TG1_T0_LEVEL,
-                            timg1_timer0_handler.handler(),
-                        );
-                        interrupt::enable(Interrupt::TG1_T0_LEVEL, timg1_timer0_handler.priority())
-                            .unwrap();
-                    }
-                    #[cfg(timg_timer1)]
-                    {
-                        use crate::timer::timg::asynch::timg1_timer1_handler;
-                        interrupt::bind_interrupt(
-                            Interrupt::TG1_T1_LEVEL,
-                            timg1_timer1_handler.handler(),
-                        );
-                        interrupt::enable(Interrupt::TG1_T1_LEVEL, timg1_timer1_handler.priority())
-                            .unwrap();
-                    }
-                }
-            }
-            _ => unreachable!(),
-        }
-
-        Self::new_inner(_timer_group)
-    }
-}
-
 /// General-purpose timer.
-pub struct Timer<T, DM>
+pub struct Timer<T>
 where
-    DM: Mode,
+    T: Instance,
 {
     timg: T,
     apb_clk_freq: HertzU32,
-    phantom: PhantomData<DM>,
 }
 
-impl<T, DM> Timer<T, DM>
+impl<T> Timer<T>
 where
     T: Instance,
-    DM: Mode,
 {
     /// Construct a new instance of [`Timer`]
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
         timg.set_counter_active(true);
 
-        Self {
-            timg,
-            apb_clk_freq,
-            phantom: PhantomData,
-        }
+        Self { timg, apb_clk_freq }
     }
 
     /// Check if the timer has elapsed
@@ -408,10 +326,9 @@ where
     }
 }
 
-impl<T, DM> Deref for Timer<T, DM>
+impl<T> Deref for Timer<T>
 where
     T: Instance,
-    DM: Mode,
 {
     type Target = T;
 
@@ -420,27 +337,20 @@ where
     }
 }
 
-impl<T, DM> DerefMut for Timer<T, DM>
+impl<T> DerefMut for Timer<T>
 where
     T: Instance,
-    DM: Mode,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.timg
     }
 }
 
-impl<T, DM> Sealed for Timer<T, DM>
-where
-    T: Instance,
-    DM: Mode,
-{
-}
+impl<T> Sealed for Timer<T> where T: Instance {}
 
-impl<T, DM> super::Timer for Timer<T, DM>
+impl<T> super::Timer for Timer<T>
 where
     T: Instance,
-    DM: Mode,
 {
     fn start(&self) {
         self.timg.set_counter_active(false);
@@ -567,6 +477,23 @@ where
             .bit_is_set()
     }
 
+    async fn wait(&self) {
+        asynch::TimerFuture::new(&self).await
+    }
+
+    fn async_interrupt_handler(&self) -> InterruptHandler {
+        match (self.timer_group(), self.timer_number()) {
+            (0, 0) => asynch::timg0_timer0_handler,
+            #[cfg(timg_timer1)]
+            (0, 1) => asynch::timg0_timer1_handler,
+            #[cfg(timg1)]
+            (1, 0) => asynch::timg1_timer0_handler,
+            #[cfg(all(timg_timer1, timg1))]
+            (1, 1) => asynch::timg1_timer1_handler,
+            _ => unreachable!(),
+        }
+    }
+
     fn set_alarm_active(&self, state: bool) {
         self.register_block()
             .t(self.timer_number().into())
@@ -575,7 +502,7 @@ where
     }
 }
 
-impl<T> InterruptConfigurable for Timer<T, Blocking>
+impl<T> InterruptConfigurable for Timer<T>
 where
     T: Instance,
 {
@@ -584,10 +511,9 @@ where
     }
 }
 
-impl<T, DM> Peripheral for Timer<T, DM>
+impl<T> Peripheral for Timer<T>
 where
     T: Instance,
-    DM: Mode,
 {
     type P = Self;
 
@@ -836,57 +762,6 @@ where
     (1_000_000 * micros / period as u64) as u64
 }
 
-impl<T, DM> embedded_hal_02::timer::CountDown for Timer<T, DM>
-where
-    T: Instance + super::Timer,
-    DM: Mode,
-{
-    type Time = MicrosDurationU64;
-
-    fn start<Time>(&mut self, timeout: Time)
-    where
-        Time: Into<Self::Time>,
-    {
-        self.timg.load_value(timeout.into()).unwrap();
-        self.timg.start();
-    }
-
-    fn wait(&mut self) -> nb::Result<(), void::Void> {
-        if self.has_elapsed() {
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
-    }
-}
-
-impl<T, DM> embedded_hal_02::timer::Cancel for Timer<T, DM>
-where
-    T: Instance + super::Timer,
-    DM: Mode,
-{
-    type Error = super::Error;
-
-    fn cancel(&mut self) -> Result<(), super::Error> {
-        if !self.timg.is_counter_active() {
-            return Err(super::Error::TimerInactive);
-        } else if !self.timg.is_alarm_active() {
-            return Err(super::Error::AlarmInactive);
-        }
-
-        self.timg.set_counter_active(false);
-
-        Ok(())
-    }
-}
-
-impl<T, DM> embedded_hal_02::timer::Periodic for Timer<T, DM>
-where
-    T: Instance + super::Timer,
-    DM: Mode,
-{
-}
-
 /// Behavior of the MWDT stage if it times out.
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
@@ -1121,39 +996,6 @@ where
     }
 }
 
-impl<TG> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn disable(&mut self) {
-        self.disable();
-    }
-}
-
-impl<TG> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG>
-where
-    TG: TimerGroupInstance,
-{
-    type Time = MicrosDurationU64;
-
-    fn start<T>(&mut self, period: T)
-    where
-        T: Into<Self::Time>,
-    {
-        self.enable();
-        self.set_timeout(MwdtStage::Stage0, period.into());
-    }
-}
-
-impl<TG> embedded_hal_02::watchdog::Watchdog for Wdt<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn feed(&mut self) {
-        self.feed();
-    }
-}
-
 // Async functionality of the timer groups.
 mod asynch {
     use core::{
@@ -1182,14 +1024,14 @@ mod asynch {
     where
         T: Instance,
     {
-        timer: &'a Timer<T, crate::Async>,
+        timer: &'a Timer<T>,
     }
 
     impl<'a, T> TimerFuture<'a, T>
     where
         T: Instance,
     {
-        pub(crate) fn new(timer: &'a Timer<T, crate::Async>) -> Self {
+        pub(crate) fn new(timer: &'a Timer<T>) -> Self {
             use crate::timer::Timer;
 
             timer.enable_interrupt(true);
@@ -1231,22 +1073,6 @@ mod asynch {
     {
         fn drop(&mut self) {
             self.timer.clear_interrupt();
-        }
-    }
-
-    impl<T> embedded_hal_async::delay::DelayNs for Timer<T, crate::Async>
-    where
-        T: Instance,
-    {
-        async fn delay_ns(&mut self, ns: u32) {
-            use crate::timer::Timer as _;
-
-            let period = MicrosDurationU64::from_ticks(ns.div_ceil(1000) as u64);
-            self.load_value(period).unwrap();
-            self.start();
-            self.listen();
-
-            TimerFuture::new(self).await;
         }
     }
 

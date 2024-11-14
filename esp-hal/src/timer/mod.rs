@@ -45,7 +45,6 @@ use fugit::{ExtU64, Instant, MicrosDurationU64};
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    Blocking,
     InterruptConfigurable,
 };
 
@@ -104,6 +103,15 @@ pub trait Timer: crate::private::Sealed {
 
     /// Has the timer triggered?
     fn is_interrupt_set(&self) -> bool;
+
+    /// Asynchronously wait for the timer interrupt to fire.
+    ///
+    /// Requires the correct `InterruptHandler` to be installed to function
+    /// correctly.
+    async fn wait(&self);
+
+    /// Returns the HAL provided async interrupt handler
+    fn async_interrupt_handler(&self) -> InterruptHandler;
 
     // NOTE: This is an unfortunate implementation detail of `TIMGx`
     #[doc(hidden)]
@@ -360,22 +368,19 @@ impl<T> embedded_hal_02::timer::Periodic for PeriodicTimer<'_, T> where T: Timer
 /// An enum of all timer types
 enum AnyTimerInner {
     /// Timer 0 of the TIMG0 peripheral in blocking mode.
-    Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>),
+    Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>>),
     /// Timer 1 of the TIMG0 peripheral in blocking mode.
     #[cfg(timg_timer1)]
-    Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>),
+    Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>>),
     /// Timer 0 of the TIMG1 peripheral in blocking mode.
     #[cfg(timg1)]
-    Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>),
+    Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>>),
     /// Timer 1 of the TIMG1 peripheral in blocking mode.
     #[cfg(all(timg1, timg_timer1))]
-    Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>),
-    /// Systimer Alarm in periodic mode with blocking behavior.
+    Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>>),
+    /// Systimer Alarm
     #[cfg(systimer)]
-    SystimerAlarmPeriodic(systimer::Alarm<'static, systimer::Periodic, Blocking>),
-    /// Systimer Target in periodic mode with blocking behavior.
-    #[cfg(systimer)]
-    SystimerAlarmTarget(systimer::Alarm<'static, systimer::Target, Blocking>),
+    SystimerAlarm(systimer::Alarm<'static>),
 }
 
 /// A type-erased timer
@@ -385,44 +390,37 @@ pub struct AnyTimer(AnyTimerInner);
 
 impl crate::private::Sealed for AnyTimer {}
 
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>) -> Self {
+impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>>> for AnyTimer {
+    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>>) -> Self {
         Self(AnyTimerInner::Timg0Timer0(value))
     }
 }
 
 #[cfg(timg_timer1)]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>) -> Self {
+impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>>> for AnyTimer {
+    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>>) -> Self {
         Self(AnyTimerInner::Timg0Timer1(value))
     }
 }
 
 #[cfg(timg1)]
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>) -> Self {
+impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>>> for AnyTimer {
+    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>>) -> Self {
         Self(AnyTimerInner::Timg1Timer0(value))
     }
 }
 
 #[cfg(all(timg1, timg_timer1))]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>) -> Self {
+impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>>> for AnyTimer {
+    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>>) -> Self {
         Self(AnyTimerInner::Timg1Timer1(value))
     }
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Periodic, Blocking>> for AnyTimer {
-    fn from(value: systimer::Alarm<'static, systimer::Periodic, Blocking>) -> Self {
-        Self(AnyTimerInner::SystimerAlarmPeriodic(value))
-    }
-}
-
-#[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Target, Blocking>> for AnyTimer {
-    fn from(value: systimer::Alarm<'static, systimer::Target, Blocking>) -> Self {
-        Self(AnyTimerInner::SystimerAlarmTarget(value))
+impl From<systimer::Alarm<'static>> for AnyTimer {
+    fn from(value: systimer::Alarm<'static>) -> Self {
+        Self(AnyTimerInner::SystimerAlarm(value))
     }
 }
 
@@ -437,9 +435,7 @@ impl Timer for AnyTimer {
             #[cfg(all(timg1,timg_timer1))]
             AnyTimerInner::Timg1Timer1(inner) => inner,
             #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarmPeriodic(inner) => inner,
-            #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarmTarget(inner) => inner,
+            AnyTimerInner::SystimerAlarm(inner) => inner,
         } {
             fn start(&self);
             fn stop(&self);
@@ -453,6 +449,8 @@ impl Timer for AnyTimer {
             fn set_interrupt_handler(&self, handler: InterruptHandler);
             fn is_interrupt_set(&self) -> bool;
             fn set_alarm_active(&self, state: bool);
+            async fn wait(&self);
+            fn async_interrupt_handler(&self) -> InterruptHandler;
         }
     }
 }
