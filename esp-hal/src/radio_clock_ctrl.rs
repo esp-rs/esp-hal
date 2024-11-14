@@ -96,8 +96,8 @@ impl SharedRadioClockControl {
 
         any_clocks_enabled
     }
-    /// Enable or disable the clock.
-    fn set_clock_status(&self, enabled: bool, radio_peripheral: RadioPeripherals) {
+    /// Enable or disable the clock, without changing the PHY clock status.
+    fn set_clock_status_raw(&self, enabled: bool, radio_peripheral: RadioPeripherals) {
         critical_section::with(|cs| {
             let mut radio_clock = self.radio_clock.borrow_ref_mut(cs);
             if enabled {
@@ -126,8 +126,21 @@ impl SharedRadioClockControl {
         {
             return Ok(());
         }
-        self.set_clock_status(enabled, RadioPeripherals::Phy);
+        self.set_clock_status_raw(enabled, RadioPeripherals::Phy);
         Ok(())
+    }
+    /// Set the status of the modem clock, enabling or disabling the PHY if
+    /// needed.
+    fn set_modem_clock_status_internal(&self, enabled: bool, radio_peripheral: RadioPeripherals) {
+        // Depending on if we're enabling or disabling, we need to set the PHY and modem
+        // clock status in a different order.
+        if enabled {
+            let _ = self.set_phy_clock_status(true);
+            self.set_clock_status_raw(true, radio_peripheral);
+        } else {
+            self.set_clock_status_raw(false, radio_peripheral);
+            let _ = self.set_phy_clock_status(false);
+        }
     }
     /// Enable or disable a modem clock.
     ///
@@ -152,19 +165,11 @@ impl SharedRadioClockControl {
         };
         // If the states already match, we return. Otherwise the new state is stored.
         if modem_clock_enabled
-            .compare_exchange(!enabled, !enabled, Ordering::Relaxed, Ordering::Relaxed)
+            .compare_exchange(!enabled, enabled, Ordering::Relaxed, Ordering::Relaxed)
             .is_err()
         {
             return;
         }
-
-        if enabled {
-            // If the PHY clock isn't enabled yet, we disable it.
-            let _ = self.set_phy_clock_status(true);
-            self.set_clock_status(true, radio_peripheral);
-        } else {
-            self.set_clock_status(false, radio_peripheral);
-            let _ = self.set_phy_clock_status(false);
-        }
+        self.set_modem_clock_status_internal(enabled, radio_peripheral);
     }
 }
