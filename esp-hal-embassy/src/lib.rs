@@ -75,20 +75,10 @@ trait IntoAnyTimer: Into<AnyTimer> {}
 
 impl IntoAnyTimer for AnyTimer {}
 
-impl<T, DM> IntoAnyTimer for TimgTimer<T, DM>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl<T: esp_hal::timer::timg::Instance> IntoAnyTimer for TimgTimer<T> where Self: Into<AnyTimer> {}
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> IntoAnyTimer for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for Alarm<'_> where Self: Into<AnyTimer> {}
 
 impl<T> TimerCollection for T
 where

@@ -478,7 +478,7 @@ where
     }
 
     async fn wait(&self) {
-        asynch::TimerFuture::new(&self).await
+        asynch::TimerFuture::new(self).await
     }
 
     fn async_interrupt_handler(&self) -> InterruptHandler {
@@ -993,6 +993,39 @@ where
 {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<TG> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG>
+where
+    TG: TimerGroupInstance,
+{
+    fn disable(&mut self) {
+        self.disable();
+    }
+}
+
+impl<TG> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG>
+where
+    TG: TimerGroupInstance,
+{
+    type Time = MicrosDurationU64;
+
+    fn start<T>(&mut self, period: T)
+    where
+        T: Into<Self::Time>,
+    {
+        self.enable();
+        self.set_timeout(MwdtStage::Stage0, period.into());
+    }
+}
+
+impl<TG> embedded_hal_02::watchdog::Watchdog for Wdt<TG>
+where
+    TG: TimerGroupInstance,
+{
+    fn feed(&mut self) {
+        self.feed();
     }
 }
 

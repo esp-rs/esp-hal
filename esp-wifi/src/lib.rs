@@ -285,20 +285,10 @@ pub trait EspWifiTimerSource: private::Sealed {
 /// conflicting implementations.
 trait IntoAnyTimer: Into<AnyTimer> {}
 
-impl<T, DM> IntoAnyTimer for TimgTimer<T, DM>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl<T: esp_hal::timer::timg::Instance> IntoAnyTimer for TimgTimer<T> where Self: Into<AnyTimer> {}
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> IntoAnyTimer for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for Alarm<'_> where Self: Into<AnyTimer> {}
 
 impl IntoAnyTimer for AnyTimer {}
 
@@ -318,19 +308,14 @@ impl EspWifiTimerSource for TimeBase {
 }
 
 impl private::Sealed for TimeBase {}
-impl<T, DM> private::Sealed for TimgTimer<T, DM>
+impl<T> private::Sealed for TimgTimer<T>
 where
-    DM: esp_hal::Mode,
+    T: esp_hal::timer::timg::Instance,
     Self: Into<AnyTimer>,
 {
 }
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> private::Sealed for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl private::Sealed for Alarm<'_> where Self: Into<AnyTimer> {}
 
 /// A marker trait for suitable Rng sources for esp-wifi
 pub trait EspWifiRngSource: rand_core::RngCore + private::Sealed {}

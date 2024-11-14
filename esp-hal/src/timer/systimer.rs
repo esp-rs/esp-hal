@@ -71,6 +71,7 @@
 use core::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
+    ptr::addr_of_mut,
 };
 
 use fugit::{Instant, MicrosDurationU64};
@@ -167,6 +168,45 @@ impl<'d> SystemTimer<'d> {
 
         let unit = unsafe { SpecificUnit::<'_, 0>::conjure() };
         unit.read_count()
+    }
+}
+
+/// Alarms created from the System Timer peripheral.
+pub struct SysTimerAlarms {
+    /// Alarm 0
+    pub alarm0: Alarm<'static>,
+    /// Alarm 1
+    pub alarm1: Alarm<'static>,
+    /// Alarm 2
+    pub alarm2: Alarm<'static>,
+
+    /// Unit 1
+    ///
+    /// Leftover unit which wasn't used to create the three alarms.
+    #[cfg(not(esp32s2))]
+    pub unit1: SpecificUnit<'static, 1>,
+}
+
+impl SystemTimer<'static> {
+    /// Split the System Timer into three alarms.
+    ///
+    /// This is a convenience method to create `'static` alarms of the same
+    /// type. You are encouraged to use [Alarm::new] over this very specific
+    /// helper.
+    pub fn split(self) -> SysTimerAlarms {
+        static mut UNIT0: Option<AnyUnit<'static>> = None;
+        let unit0 = unsafe { &mut *addr_of_mut!(UNIT0) };
+
+        let unit0 = unit0.insert(self.unit0.into());
+        let unit = FrozenUnit::new(unit0);
+
+        SysTimerAlarms {
+            alarm0: Alarm::new(self.comparator0.into(), &unit),
+            alarm1: Alarm::new(self.comparator1.into(), &unit),
+            alarm2: Alarm::new(self.comparator2.into(), &unit),
+            #[cfg(not(esp32s2))]
+            unit1: self.unit1,
+        }
     }
 }
 
@@ -942,26 +982,26 @@ pub mod etm {
     use super::*;
 
     /// An ETM controlled SYSTIMER event
-    pub struct Event<'a, 'd, M, DM: crate::Mode> {
-        alarm: &'a mut Alarm<'d, M>,
+    pub struct Event<'a, 'd> {
+        alarm: &'a mut Alarm<'d>,
     }
 
-    impl<'a, 'd, M, DM: crate::Mode> Event<'a, 'd, M> {
+    impl<'a, 'd> Event<'a, 'd> {
         /// Creates an ETM event from the given [Alarm]
-        pub fn new(alarm: &'a mut Alarm<'d, M>) -> Self {
+        pub fn new(alarm: &'a mut Alarm<'d>) -> Self {
             Self { alarm }
         }
 
         /// Execute closure f with mutable access to the wrapped [Alarm].
-        pub fn with<R>(&self, f: impl FnOnce(&&'a mut Alarm<'d, M>) -> R) -> R {
+        pub fn with<R>(&self, f: impl FnOnce(&&'a mut Alarm<'d>) -> R) -> R {
             let alarm = &self.alarm;
             f(alarm)
         }
     }
 
-    impl<M, DM: crate::Mode> crate::private::Sealed for Event<'_, '_, M> {}
+    impl crate::private::Sealed for Event<'_, '_> {}
 
-    impl<M, DM: crate::Mode> crate::etm::EtmEvent for Event<'_, '_, M> {
+    impl crate::etm::EtmEvent for Event<'_, '_> {
         fn id(&self) -> u8 {
             50 + self.alarm.comparator.channel()
         }

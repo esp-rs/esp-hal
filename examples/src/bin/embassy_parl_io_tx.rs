@@ -38,7 +38,7 @@ async fn main(_spawner: Spawner) {
     esp_println::println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+    let systimer = SystemTimer::new(peripherals.SYSTIMER).split();
     esp_hal_embassy::init(systimer.alarm0);
 
     let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
