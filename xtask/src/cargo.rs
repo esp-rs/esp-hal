@@ -113,6 +113,17 @@ impl CargoArgsBuilder {
         self
     }
 
+    #[must_use]
+    pub fn args<S>(mut self, args: &[S]) -> Self
+    where
+        S: Clone + Into<String>,
+    {
+        for arg in args {
+            self.args.push(arg.clone().into());
+        }
+        self
+    }
+
     pub fn add_arg<S>(&mut self, arg: S) -> &mut Self
     where
         S: Into<String>,
