@@ -1780,69 +1780,12 @@ where
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.rx_impl.set_priority(priority);
     }
-}
 
-impl<M, CH> crate::private::Sealed for ChannelRx<'_, M, CH>
-where
-    M: Mode,
-    CH: DmaChannel,
-{
-}
-
-impl<M, CH> Rx for ChannelRx<'_, M, CH>
-where
-    M: Mode,
-    CH: DmaChannel,
-{
-    unsafe fn prepare_transfer_without_start(
+    fn do_prepare(
         &mut self,
+        preparation: Preparation,
         peri: DmaPeripheral,
-        chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        // if self.burst_mode
-        //    && chain
-        //        .descriptors
-        //        .iter()
-        //        .any(|d| d.len() % 4 != 0 || d.buffer as u32 % 4 != 0)
-        //{
-        //    return Err(DmaError::InvalidAlignment);
-        //}
-
-        // for esp32s3 we check each descriptor buffer that points to psram for
-        // alignment and invalidate the cache for that buffer
-        // NOTE: for RX the `buffer` and `size` need to be aligned but the `len` does
-        // not. TRM section 3.4.9
-        #[cfg(esp32s3)]
-        for des in chain.descriptors.iter() {
-            // we are forcing the DMA alignment to the cache line size
-            // required when we are using dcache
-            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
-            if crate::soc::is_valid_psram_address(des.buffer as usize) {
-                // both the size and address of the buffer must be aligned
-                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
-                    return Err(DmaError::InvalidAlignment);
-                }
-                crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
-            }
-        }
-
-        compiler_fence(core::sync::atomic::Ordering::SeqCst);
-
-        self.rx_impl.clear_all();
-        self.rx_impl.reset();
-        self.rx_impl.set_link_addr(chain.first() as u32);
-        self.rx_impl.set_peripheral(peri as u8);
-
-        Ok(())
-    }
-
-    unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
-        &mut self,
-        peri: DmaPeripheral,
-        buffer: &mut BUF,
-    ) -> Result<(), DmaError> {
-        let preparation = buffer.prepare();
-
         debug_assert_eq!(preparation.direction, TransferDirection::In);
 
         self.rx_impl.set_burst_mode(preparation.burst_transfer);
@@ -1857,6 +1800,68 @@ where
         self.rx_impl.set_peripheral(peri as u8);
 
         Ok(())
+    }
+}
+
+impl<M, CH> crate::private::Sealed for ChannelRx<'_, M, CH>
+where
+    M: Mode,
+    CH: DmaChannel,
+{
+}
+
+impl<M, CH> Rx for ChannelRx<'_, M, CH>
+where
+    M: Mode,
+    CH: DmaChannel,
+{
+    // TODO: used by I2S, which should be rewritten to use the Preparation-based
+    // API.
+    unsafe fn prepare_transfer_without_start(
+        &mut self,
+        peri: DmaPeripheral,
+        chain: &DescriptorChain,
+    ) -> Result<(), DmaError> {
+        // For ESP32-S3 we check each descriptor buffer that points to PSRAM for
+        // alignment and invalidate the cache for that buffer.
+        // NOTE: for RX the `buffer` and `size` need to be aligned but the `len` does
+        // not. TRM section 3.4.9
+        // Note that DmaBuffer implementations are required to do this for us.
+        #[cfg(esp32s3)]
+        for des in chain.descriptors.iter() {
+            // we are forcing the DMA alignment to the cache line size
+            // required when we are using dcache
+            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+            if crate::soc::is_valid_psram_address(des.buffer as usize) {
+                // both the size and address of the buffer must be aligned
+                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
+                    return Err(DmaError::InvalidAlignment);
+                }
+                crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
+            }
+        }
+
+        self.do_prepare(
+            Preparation {
+                start: chain.first().cast_mut(),
+                #[cfg(esp32s3)]
+                external_memory_block_size: None,
+                direction: TransferDirection::In,
+                burst_transfer: BurstTransfer::Disabled,
+                check_owner: Some(false),
+            },
+            peri,
+        )
+    }
+
+    unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
+        &mut self,
+        peri: DmaPeripheral,
+        buffer: &mut BUF,
+    ) -> Result<(), DmaError> {
+        let preparation = buffer.prepare();
+
+        self.do_prepare(preparation, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -2065,64 +2070,12 @@ where
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx_impl.set_priority(priority);
     }
-}
 
-impl<M, CH> crate::private::Sealed for ChannelTx<'_, M, CH>
-where
-    M: Mode,
-    CH: DmaChannel,
-{
-}
-
-impl<M, CH> Tx for ChannelTx<'_, M, CH>
-where
-    M: Mode,
-    CH: DmaChannel,
-{
-    unsafe fn prepare_transfer_without_start(
+    fn do_prepare(
         &mut self,
+        preparation: Preparation,
         peri: DmaPeripheral,
-        chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        // Based on the ESP32-S3 TRM the alignment check is not needed for TX
-
-        // For esp32s3 we check each descriptor buffer that points to PSRAM for
-        // alignment and writeback the cache for that buffer
-        #[cfg(esp32s3)]
-        for des in chain.descriptors.iter() {
-            // we are forcing the DMA alignment to the cache line size
-            // required when we are using dcache
-            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
-            if crate::soc::is_valid_psram_address(des.buffer as usize) {
-                // both the size and address of the buffer must be aligned
-                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
-                    return Err(DmaError::InvalidAlignment);
-                }
-                crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
-            }
-        }
-
-        compiler_fence(core::sync::atomic::Ordering::SeqCst);
-
-        self.tx_impl.clear_all();
-        self.tx_impl.reset();
-        self.tx_impl.set_link_addr(chain.first() as u32);
-        self.tx_impl.set_peripheral(peri as u8);
-
-        // enable descriptor write back in circular mode
-        self.tx_impl
-            .set_auto_write_back(!(*chain.last()).next.is_null());
-
-        Ok(())
-    }
-
-    unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
-        &mut self,
-        peri: DmaPeripheral,
-        buffer: &mut BUF,
-    ) -> Result<(), DmaError> {
-        let preparation = buffer.prepare();
-
         debug_assert_eq!(preparation.direction, TransferDirection::Out);
 
         #[cfg(esp32s3)]
@@ -2142,6 +2095,74 @@ where
         self.tx_impl.set_peripheral(peri as u8);
 
         Ok(())
+    }
+}
+
+impl<M, CH> crate::private::Sealed for ChannelTx<'_, M, CH>
+where
+    M: Mode,
+    CH: DmaChannel,
+{
+}
+
+impl<M, CH> Tx for ChannelTx<'_, M, CH>
+where
+    M: Mode,
+    CH: DmaChannel,
+{
+    // TODO: used by I2S, which should be rewritten to use the Preparation-based
+    // API.
+    unsafe fn prepare_transfer_without_start(
+        &mut self,
+        peri: DmaPeripheral,
+        chain: &DescriptorChain,
+    ) -> Result<(), DmaError> {
+        // Based on the ESP32-S3 TRM the alignment check is not needed for TX
+
+        // For esp32s3 we check each descriptor buffer that points to PSRAM for
+        // alignment and writeback the cache for that buffer.
+        // Note that DmaBuffer implementations are required to do this for us.
+        #[cfg(esp32s3)]
+        for des in chain.descriptors.iter() {
+            // we are forcing the DMA alignment to the cache line size
+            // required when we are using dcache
+            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+            if crate::soc::is_valid_psram_address(des.buffer as usize) {
+                // both the size and address of the buffer must be aligned
+                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
+                    return Err(DmaError::InvalidAlignment);
+                }
+                crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
+            }
+        }
+
+        self.do_prepare(
+            Preparation {
+                start: chain.first().cast_mut(),
+                #[cfg(esp32s3)]
+                external_memory_block_size: None,
+                direction: TransferDirection::Out,
+                burst_transfer: BurstTransfer::Disabled,
+                check_owner: Some(false),
+            },
+            peri,
+        )?;
+
+        // enable descriptor write back in circular mode
+        self.tx_impl
+            .set_auto_write_back(!(*chain.last()).next.is_null());
+
+        Ok(())
+    }
+
+    unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
+        &mut self,
+        peri: DmaPeripheral,
+        buffer: &mut BUF,
+    ) -> Result<(), DmaError> {
+        let preparation = buffer.prepare();
+
+        self.do_prepare(preparation, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {

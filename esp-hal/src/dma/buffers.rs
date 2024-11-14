@@ -45,8 +45,15 @@ pub struct Preparation {
 
     /// Block size for PSRAM transfers.
     ///
-    /// The implementation of the buffer must provide a block size if the data
-    /// is in PSRAM.
+    /// If the buffer is in PSRAM, the implementation must ensure the following:
+    ///
+    /// - The implementation of the buffer must provide a non-`None` block size.
+    /// - For [`TransferDirection::In`] transfers, the implementation of the
+    ///   buffer must invalidate the cache that contains the buffer before the
+    ///   DMA starts.
+    /// - For [`TransferDirection::Out`] transfers, the implementation of the
+    ///   buffer must write back the cache that contains the buffer before the
+    ///   DMA starts.
     #[cfg(esp32s3)]
     pub external_memory_block_size: Option<DmaBufBlkSize>,
 
@@ -55,9 +62,10 @@ pub struct Preparation {
     /// The implementation of the buffer must ensure that burst mode is only
     /// enabled when alignment requirements are met.
     ///
-    /// There are no additional alignment requirements for TX burst transfers,
-    /// but RX transfers require all descriptors to have buffer pointers and
-    /// sizes that are a multiple of 4 (word aligned).
+    /// There are no additional alignment requirements for
+    /// [`TransferDirection::Out`] burst transfers, but
+    /// [`TransferDirection::In`] transfers require all descriptors to have
+    /// buffer pointers and sizes that are a multiple of 4 (word aligned).
     pub burst_transfer: BurstTransfer,
 
     /// Configures the "check owner" feature of the DMA channel.
