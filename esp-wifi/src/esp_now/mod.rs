@@ -501,7 +501,7 @@ impl EspNowManager<'_> {
     }
 }
 
-impl<'d> Drop for EspNowManager<'d> {
+impl Drop for EspNowManager<'_> {
     fn drop(&mut self) {
         if unwrap!(
             crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {

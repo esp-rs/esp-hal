@@ -1138,7 +1138,7 @@ pub trait TxChannelAsync: TxChannelInternal<Async> {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn transmit<'a>(&mut self, data: &'a [u32]) -> Result<(), Error>
+    async fn transmit(&mut self, data: &[u32]) -> Result<(), Error>
     where
         Self: Sized,
     {
@@ -1201,7 +1201,7 @@ pub trait RxChannelAsync: RxChannelInternal<Async> {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn receive<'a, T: From<u32> + Copy>(&mut self, data: &'a mut [T]) -> Result<(), Error>
+    async fn receive<T: From<u32> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
     where
         Self: Sized,
     {
