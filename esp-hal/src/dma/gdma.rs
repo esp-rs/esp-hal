@@ -169,10 +169,10 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
         conf0.modify(|_, w| w.out_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, burst_mode: bool) {
+    fn set_burst_mode(&self, burst_mode: BurstTransfer) {
         self.ch()
             .out_conf0()
-            .modify(|_, w| w.out_data_burst_en().bit(burst_mode));
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
@@ -393,10 +393,10 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
         conf0.modify(|_, w| w.in_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, burst_mode: bool) {
+    fn set_burst_mode(&self, burst_mode: BurstTransfer) {
         self.ch()
             .in_conf0()
-            .modify(|_, w| w.in_data_burst_en().bit(burst_mode));
+            .modify(|_, w| w.in_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {

@@ -1843,7 +1843,9 @@ where
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
 
-        self.rx_impl.set_burst_mode(false);
+        debug_assert_eq!(preparation.direction, TransferDirection::In);
+
+        self.rx_impl.set_burst_mode(preparation.burst_transfer);
         self.rx_impl.set_descr_burst_mode(true);
         self.rx_impl.set_check_owner(preparation.check_owner);
 
@@ -2082,8 +2084,9 @@ where
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        // TODO: based on the ESP32-S3 TRM the alignment check is not needed for TX!
-        // for esp32s3 we check each descriptor buffer that points to psram for
+        // Based on the ESP32-S3 TRM the alignment check is not needed for TX
+
+        // For esp32s3 we check each descriptor buffer that points to PSRAM for
         // alignment and writeback the cache for that buffer
         #[cfg(esp32s3)]
         for des in chain.descriptors.iter() {
@@ -2119,20 +2122,15 @@ where
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
-        cfg_if::cfg_if!(
-            if #[cfg(esp32s3)] {
-                if let Some(block_size) = preparation.block_size {
-                    self.set_ext_mem_block_size(block_size.into());
-                }
-            } else {
-                // we ensure that block_size is some only for PSRAM addresses
-                if preparation.block_size.is_some() {
-                    return Err(DmaError::UnsupportedMemoryRegion);
-                }
-            }
-        );
 
-        self.tx_impl.set_burst_mode(false);
+        debug_assert_eq!(preparation.direction, TransferDirection::Out);
+
+        #[cfg(esp32s3)]
+        if let Some(block_size) = preparation.external_memory_block_size {
+            self.set_ext_mem_block_size(block_size.into());
+        }
+
+        self.tx_impl.set_burst_mode(preparation.burst_transfer);
         self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);
 
@@ -2208,7 +2206,7 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     /// Enable/Disable INCR burst transfer for channel reading
     /// accessing data in internal RAM.
-    fn set_burst_mode(&self, burst_mode: bool);
+    fn set_burst_mode(&self, burst_mode: BurstTransfer);
 
     /// Enable/Disable burst transfer for channel reading
     /// descriptors in internal RAM.

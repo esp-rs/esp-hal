@@ -57,10 +57,10 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         spi.dma_conf().modify(|_, w| w.out_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, burst_mode: bool) {
+    fn set_burst_mode(&self, burst_mode: BurstTransfer) {
         let spi = self.0.register_block();
         spi.dma_conf()
-            .modify(|_, w| w.out_data_burst_en().bit(burst_mode));
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
@@ -222,7 +222,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         spi.dma_conf().modify(|_, w| w.in_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, _burst_mode: bool) {}
+    fn set_burst_mode(&self, _burst_mode: BurstTransfer) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         let spi = self.0.register_block();
@@ -480,11 +480,11 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
         reg_block.lc_conf().modify(|_, w| w.out_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, burst_mode: bool) {
+    fn set_burst_mode(&self, burst_mode: BurstTransfer) {
         let reg_block = self.0.register_block();
         reg_block
             .lc_conf()
-            .modify(|_, w| w.out_data_burst_en().bit(burst_mode));
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
@@ -659,7 +659,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
         reg_block.lc_conf().modify(|_, w| w.in_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, _burst_mode: bool) {}
+    fn set_burst_mode(&self, _burst_mode: BurstTransfer) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         let reg_block = self.0.register_block();
