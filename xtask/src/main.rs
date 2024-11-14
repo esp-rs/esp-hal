@@ -42,6 +42,8 @@ enum Cli {
     GenerateEfuseFields(GenerateEfuseFieldsArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
+    /// Attempt to publish the specified package.
+    Publish(PublishArgs),
     /// Run doctests for specified chip and package.
     #[clap(alias = "run-doc-test")]
     RunDocTests(ExampleArgs),
@@ -152,6 +154,17 @@ struct LintPackagesArgs {
 }
 
 #[derive(Debug, Args)]
+struct PublishArgs {
+    /// Package to publish (performs a dry-run by default).
+    #[arg(value_enum)]
+    package: Package,
+
+    /// Do not pass the `--dry-run` argument, actually try to publish.
+    #[arg(long)]
+    no_dry_run: bool,
+}
+
+#[derive(Debug, Args)]
 struct RunElfArgs {
     /// Which chip to run the tests for.
     #[arg(value_enum)]
@@ -164,9 +177,7 @@ struct RunElfArgs {
 // Application
 
 fn main() -> Result<()> {
-    env_logger::Builder::new()
-        .filter_module("xtask", log::LevelFilter::Info)
-        .init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let workspace = std::env::current_dir()?;
 
@@ -180,6 +191,7 @@ fn main() -> Result<()> {
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
+        Cli::Publish(args) => publish(&workspace, args),
         Cli::RunDocTests(args) => run_doc_tests(&workspace, args),
         Cli::RunElfs(args) => run_elfs(args),
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
@@ -768,6 +780,42 @@ fn lint_package(path: &Path, args: &[&str], fix: bool) -> Result<()> {
     let cargo_args = cargo_args.build();
 
     xtask::cargo::run(&cargo_args, path)
+}
+
+fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
+    let package_name = args.package.to_string();
+    let package_path = xtask::windows_safe_path(&workspace.join(&package_name));
+
+    use Package::*;
+    let mut publish_args = match args.package {
+        Examples | HilTest => {
+            bail!(
+                "Invalid package '{}' specified, this package should not be published!",
+                args.package
+            )
+        }
+
+        EspBacktrace | EspHal | EspHalEmbassy | EspIeee802154 | EspLpHal | EspPrintln
+        | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
+
+        _ => vec![],
+    };
+
+    if !args.no_dry_run {
+        publish_args.push("--dry-run");
+    }
+
+    let builder = CargoArgsBuilder::default()
+        .subcommand("publish")
+        .args(&publish_args);
+
+    let args = builder.build();
+    log::debug!("{args:#?}");
+
+    // Execute `cargo publish` command from the package root:
+    xtask::cargo::run(&args, &package_path)?;
+
+    Ok(())
 }
 
 fn run_elfs(args: RunElfArgs) -> Result<()> {
