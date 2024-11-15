@@ -4,9 +4,9 @@ use core::{
 };
 
 use super::*;
-#[cfg(psram_dma)]
-use crate::soc::is_valid_psram_address;
 use crate::soc::{is_slice_in_dram, is_slice_in_psram};
+#[cfg(psram_dma)]
+use crate::soc::{is_valid_psram_address, is_valid_ram_address};
 
 cfg_if::cfg_if! {
     if #[cfg(psram_dma)] {
@@ -270,6 +270,10 @@ pub struct Preparation {
     /// The direction of the DMA transfer.
     pub direction: TransferDirection,
 
+    /// Must be `true` if any of the DMA descriptors contain data in PSRAM.
+    #[cfg(psram_dma)]
+    pub accesses_psram: bool,
+
     /// Configures the DMA to transfer data in bursts.
     ///
     /// The implementation of the buffer must ensure that buffer size
@@ -528,19 +532,26 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
             desc.reset_for_tx(desc.next.is_null());
         }
 
-        #[cfg(psram_dma)]
-        if is_valid_psram_address(self.buffer.as_ptr() as usize) {
-            unsafe {
-                crate::soc::cache_writeback_addr(
-                    self.buffer.as_ptr() as u32,
-                    self.buffer.len() as u32,
-                )
-            };
+        cfg_if::cfg_if! {
+            if #[cfg(psram_dma)] {
+                // Optimization: avoid locking for PSRAM range.
+                let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
+                if is_data_in_psram {
+                    unsafe {
+                        crate::soc::cache_writeback_addr(
+                            self.buffer.as_ptr() as u32,
+                            self.buffer.len() as u32,
+                        )
+                    };
+                }
+            }
         }
 
         Preparation {
             start: self.descriptors.head(),
             direction: TransferDirection::Out,
+            #[cfg(psram_dma)]
+            accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
         }
@@ -708,9 +719,26 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
             desc.reset_for_rx();
         }
 
+        cfg_if::cfg_if! {
+            if #[cfg(psram_dma)] {
+                // Optimization: avoid locking for PSRAM range.
+                let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
+                if is_data_in_psram {
+                    unsafe {
+                        crate::soc::cache_invalidate_addr(
+                            self.buffer.as_ptr() as u32,
+                            self.buffer.len() as u32,
+                        )
+                    };
+                }
+            }
+        }
+
         Preparation {
             start: self.descriptors.head(),
             direction: TransferDirection::In,
+            #[cfg(psram_dma)]
+            accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
         }
@@ -867,9 +895,26 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             desc.reset_for_tx(desc.next.is_null());
         }
 
+        cfg_if::cfg_if! {
+            if #[cfg(psram_dma)] {
+                // Optimization: avoid locking for PSRAM range.
+                let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
+                if is_data_in_psram {
+                    unsafe {
+                        crate::soc::cache_writeback_addr(
+                            self.buffer.as_ptr() as u32,
+                            self.buffer.len() as u32,
+                        )
+                    };
+                }
+            }
+        }
+
         Preparation {
             start: self.tx_descriptors.head(),
             direction: TransferDirection::Out,
+            #[cfg(psram_dma)]
+            accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
         }
@@ -892,9 +937,26 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             desc.reset_for_rx();
         }
 
+        cfg_if::cfg_if! {
+            if #[cfg(psram_dma)] {
+                // Optimization: avoid locking for PSRAM range.
+                let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
+                if is_data_in_psram {
+                    unsafe {
+                        crate::soc::cache_invalidate_addr(
+                            self.buffer.as_ptr() as u32,
+                            self.buffer.len() as u32,
+                        )
+                    };
+                }
+            }
+        }
+
         Preparation {
             start: self.rx_descriptors.head(),
             direction: TransferDirection::In,
+            #[cfg(psram_dma)]
+            accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
         }
@@ -1031,6 +1093,8 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
         Preparation {
             start: self.descriptors.as_mut_ptr(),
             direction: TransferDirection::In,
+            #[cfg(psram_dma)]
+            accesses_psram: false,
             burst_transfer: self.burst,
 
             // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
@@ -1238,6 +1302,8 @@ unsafe impl DmaTxBuffer for EmptyBuf {
         Preparation {
             start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
             direction: TransferDirection::Out,
+            #[cfg(psram_dma)]
+            accesses_psram: false,
             burst_transfer: BurstConfig::default(),
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
@@ -1263,6 +1329,8 @@ unsafe impl DmaRxBuffer for EmptyBuf {
         Preparation {
             start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
             direction: TransferDirection::In,
+            #[cfg(psram_dma)]
+            accesses_psram: false,
             burst_transfer: BurstConfig::default(),
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
@@ -1335,6 +1403,8 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
     fn prepare(&mut self) -> Preparation {
         Preparation {
             start: self.descriptor,
+            #[cfg(psram_dma)]
+            accesses_psram: false,
             direction: TransferDirection::Out,
             burst_transfer: BurstConfig::default(),
             // The DMA must not check the owner bit, as it is never set.

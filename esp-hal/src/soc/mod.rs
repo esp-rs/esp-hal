@@ -27,7 +27,7 @@ mod psram_common;
 #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 static mut MAPPED_PSRAM: MappedPsram = MappedPsram { memory_range: 0..0 };
 
-fn psram_range_internal() -> Range<usize> {
+pub(crate) fn psram_range() -> Range<usize> {
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "quad-psram", feature = "octal-psram"))] {
             unsafe { MAPPED_PSRAM.memory_range.clone() }
@@ -112,12 +112,12 @@ pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
 
 #[allow(unused)]
 pub(crate) fn is_valid_psram_address(address: usize) -> bool {
-    addr_in_range(address, psram_range_internal())
+    addr_in_range(address, psram_range())
 }
 
 #[allow(unused)]
 pub(crate) fn is_slice_in_psram<T>(slice: &[T]) -> bool {
-    slice_in_range(slice, psram_range_internal())
+    slice_in_range(slice, psram_range())
 }
 
 #[allow(unused)]
@@ -135,6 +135,6 @@ fn slice_in_range<T>(slice: &[T], range: Range<usize>) -> bool {
     addr_in_range(start, range.clone()) && end <= range.end
 }
 
-fn addr_in_range(addr: usize, range: Range<usize>) -> bool {
+pub(crate) fn addr_in_range(addr: usize, range: Range<usize>) -> bool {
     range.contains(&addr)
 }

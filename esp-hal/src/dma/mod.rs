@@ -60,8 +60,6 @@ pub use self::gdma::*;
 pub use self::m2m::*;
 #[cfg(pdma)]
 pub use self::pdma::*;
-#[cfg(psram_dma)]
-use crate::soc::is_valid_psram_address;
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -1920,6 +1918,11 @@ where
         debug_assert_eq!(preparation.direction, TransferDirection::In);
 
         #[cfg(psram_dma)]
+        if preparation.accesses_psram && !self.rx_impl.can_access_psram() {
+            return Err(DmaError::UnsupportedMemoryRegion);
+        }
+
+        #[cfg(psram_dma)]
         self.set_ext_mem_block_size(preparation.burst_transfer.external.into());
         self.rx_impl.set_burst_mode(preparation.burst_transfer);
         self.rx_impl.set_descr_burst_mode(true);
@@ -1960,23 +1963,31 @@ where
         // NOTE: for RX the `buffer` and `size` need to be aligned but the `len` does
         // not. TRM section 3.4.9
         // Note that DmaBuffer implementations are required to do this for us.
-        #[cfg(psram_dma)]
-        for des in chain.descriptors.iter() {
-            // we are forcing the DMA alignment to the cache line size
-            // required when we are using dcache
-            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
-            if is_valid_psram_address(des.buffer as usize) {
-                // both the size and address of the buffer must be aligned
-                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
-                    return Err(DmaError::InvalidAlignment);
+        cfg_if::cfg_if! {
+            if #[cfg(psram_dma)] {
+                let mut uses_psram = false;
+                let psram_range = crate::soc::psram_range();
+                for des in chain.descriptors.iter() {
+                    // we are forcing the DMA alignment to the cache line size
+                    // required when we are using dcache
+                    let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+                    if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
+                        uses_psram = true;
+                        // both the size and address of the buffer must be aligned
+                        if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment);
+                        }
+                        crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
+                    }
                 }
-                crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
             }
         }
 
         let preparation = Preparation {
             start: chain.first().cast_mut(),
             direction: TransferDirection::In,
+            #[cfg(psram_dma)]
+            accesses_psram: uses_psram,
             burst_transfer: BurstConfig::default(),
             check_owner: Some(false),
         };
@@ -2202,6 +2213,11 @@ where
         debug_assert_eq!(preparation.direction, TransferDirection::Out);
 
         #[cfg(psram_dma)]
+        if preparation.accesses_psram && !self.tx_impl.can_access_psram() {
+            return Err(DmaError::UnsupportedMemoryRegion);
+        }
+
+        #[cfg(psram_dma)]
         self.set_ext_mem_block_size(preparation.burst_transfer.external.into());
         self.tx_impl.set_burst_mode(preparation.burst_transfer);
         self.tx_impl.set_descr_burst_mode(true);
@@ -2243,22 +2259,31 @@ where
         // alignment and writeback the cache for that buffer.
         // Note that DmaBuffer implementations are required to do this for us.
         #[cfg(psram_dma)]
-        for des in chain.descriptors.iter() {
-            // we are forcing the DMA alignment to the cache line size
-            // required when we are using dcache
-            let alignment = crate::soc::cache_get_dcache_line_size() as usize;
-            if crate::soc::is_valid_psram_address(des.buffer as usize) {
-                // both the size and address of the buffer must be aligned
-                if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
-                    return Err(DmaError::InvalidAlignment);
+        cfg_if::cfg_if! {
+            if #[cfg(psram_dma)] {
+                let mut uses_psram = false;
+                let psram_range = crate::soc::psram_range();
+                for des in chain.descriptors.iter() {
+                    // we are forcing the DMA alignment to the cache line size
+                    // required when we are using dcache
+                    let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+                    if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
+                        uses_psram = true;
+                        // both the size and address of the buffer must be aligned
+                        if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment);
+                        }
+                        crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
+                    }
                 }
-                crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
             }
         }
 
         let preparation = Preparation {
             start: chain.first().cast_mut(),
             direction: TransferDirection::Out,
+            #[cfg(psram_dma)]
+            accesses_psram: uses_psram,
             burst_transfer: BurstConfig::default(),
             check_owner: Some(false),
         };
