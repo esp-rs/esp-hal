@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
 - `esp_hal::asynch::AtomicWaker` that does not hold a global critical section (#2555)
 - `esp_hal::sync::RawMutex` for embassy-sync. (#2555)
+- ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526)
+- Added PSRAM configuration to `esp_hal::Config` if `quad-psram` or `octal-psram` is enabled (#2546)
+- Added `esp_hal::psram::psram_raw_parts` (#2546)
 
 ### Changed
 
@@ -31,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
 - `SystemTimer`s `Alarm`s are now type erased (#2576)
 - `TimerGroup` `Timer`s are now type erased (#2581)
+- PSRAM is now initialized automatically if `quad-psram` or `octal-psram` is enabled (#2546)
 
 ### Fixed
 
@@ -40,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The DMA channel objects no longer have `tx` and `rx` fields. (#2526)
 - `SysTimerAlarms` has been removed, alarms are now part of the `SystemTimer` struct (#2576)
 - `FrozenUnit`, `AnyUnit`, `SpecificUnit`, `SpecificComparator`, `AnyComparator` have been removed from `systimer` (#2576)
+- `esp_hal::psram::psram_range` (#2546)
 
 ## [0.22.0] - 2024-11-20
 

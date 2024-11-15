@@ -508,8 +508,13 @@ use crate::{
 pub struct Config {
     /// The CPU clock configuration.
     pub cpu_clock: CpuClock,
+
     /// Enable watchdog timer(s).
     pub watchdog: WatchdogConfig,
+
+    /// PSRAM configuration.
+    #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+    pub psram: psram::PsramConfig,
 }
 
 /// Initialize the system.
@@ -571,6 +576,9 @@ pub fn init(config: Config) -> Peripherals {
     crate::time::time_init();
 
     crate::gpio::bind_default_interrupt_handler();
+
+    #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+    crate::psram::init_psram(config.psram);
 
     peripherals
 }

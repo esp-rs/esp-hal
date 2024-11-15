@@ -42,8 +42,8 @@ macro_rules! dma_alloc_buffer {
     }};
 }
 
-fn init_heap(psram: esp_hal::peripherals::PSRAM) {
-    let (start, size) = esp_hal::psram::init_psram(psram, esp_hal::psram::PsramConfig::default());
+fn init_heap(psram: &esp_hal::peripherals::PSRAM) {
+    let (start, size) = esp_hal::psram::psram_raw_parts(psram);
     info!("init_heap: start: {:p}", start);
     unsafe {
         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
@@ -59,8 +59,8 @@ fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    init_heap(&peripherals.PSRAM);
 
-    init_heap(peripherals.PSRAM);
     let delay = Delay::new();
 
     let mut extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);

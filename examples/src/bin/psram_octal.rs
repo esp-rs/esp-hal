@@ -35,7 +35,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
+    let (start, size) = psram::psram_raw_parts(&peripherals.PSRAM);
     init_psram_heap(start, size);
 
     println!("Going to access PSRAM");

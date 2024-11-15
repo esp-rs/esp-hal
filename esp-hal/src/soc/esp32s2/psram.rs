@@ -41,7 +41,7 @@ pub struct PsramConfig {
 ///
 /// Returns the start of the mapped memory and the size
 #[procmacros::ram]
-pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -> (*mut u8, usize) {
+pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
     utils::psram_init(&mut config);
 
@@ -65,7 +65,7 @@ pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -
         ///
         /// [`sram0_layout`]: u32 the usage of first 8KB internal memory block,
         /// can be CACHE_MEMORY_INVALID,
-        /// CACHE_MEMORY_ICACHE_LOW,                   
+        /// CACHE_MEMORY_ICACHE_LOW,
         /// CACHE_MEMORY_ICACHE_HIGH, CACHE_MEMORY_DCACHE_LOW and
         /// CACHE_MEMORY_DCACHE_HIGH
         /// [`sram1_layout`]: the usage of second 8KB internal memory block,
@@ -141,11 +141,9 @@ pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -
         });
     }
 
-    crate::soc::MAPPED_PSRAM.with(|mapped_psram| {
-        mapped_psram.memory_range = EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get();
-    });
-
-    (EXTMEM_ORIGIN as *mut u8, config.size.get())
+    unsafe {
+        crate::soc::MAPPED_PSRAM.memory_range = EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get();
+    }
 }
 
 pub(crate) mod utils {
@@ -366,6 +364,7 @@ pub(crate) mod utils {
         miso_bit_len: u32,
     ) {
         #[repr(C)]
+        #[allow(non_camel_case_types)]
         struct esp_rom_spi_cmd_t {
             cmd: u16,             // Command value
             cmd_bit_len: u16,     // Command byte length

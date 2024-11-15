@@ -125,3 +125,22 @@ Timer group timers have been type erased.
 - timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>
 + timg::Timer
 ```
+
+## PSRAM is now initialized automatically
+
+Calling `esp_hal::initialize` will now configure PSRAM if either the `quad-psram` or `octal-psram`
+is enabled. To retrieve the address and size of the initialized external memory, use
+`esp_hal::psram::psram_raw_parts`, which returns a pointer and a length.
+
+```diff
+-let peripherals = esp_hal::init(esp_hal::Config::default());
+-let (start, size) = esp_hal::psram::init_psram(peripherals.PSRAM, psram_config);
++let peripherals = esp_hal::init({
++    let mut config = esp_hal::Config::default();
++    config.psram = psram_config;
++    config
++});
++let (start, size) = esp_hal::psram::psram_raw_parts(&peripherals.PSRAM, psram);
+```
+
+The usage of `esp_alloc::psram_allocator!` remains unchanged.
