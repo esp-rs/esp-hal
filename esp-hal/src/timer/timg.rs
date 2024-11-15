@@ -494,6 +494,19 @@ where
         }
     }
 
+    fn peripheral_interrupt(&self) -> Interrupt {
+        match (self.timer_group(), self.timer_number()) {
+            (0, 0) => Interrupt::TG0_T0_LEVEL,
+            #[cfg(timg_timer1)]
+            (0, 1) => Interrupt::TG0_T1_LEVEL,
+            #[cfg(timg1)]
+            (1, 0) => Interrupt::TG1_T0_LEVEL,
+            #[cfg(all(timg_timer1, timg1))]
+            (1, 1) => Interrupt::TG1_T1_LEVEL,
+            _ => unreachable!(),
+        }
+    }
+
     fn set_alarm_active(&self, state: bool) {
         self.register_block()
             .t(self.timer_number().into())

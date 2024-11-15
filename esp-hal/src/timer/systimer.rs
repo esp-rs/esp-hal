@@ -618,6 +618,15 @@ impl super::Timer for Alarm<'_> {
             _ => unreachable!(),
         }
     }
+
+    fn peripheral_interrupt(&self) -> Interrupt {
+        match self.comparator.channel() {
+            0 => Interrupt::SYSTIMER_TARGET0,
+            1 => Interrupt::SYSTIMER_TARGET1,
+            2 => Interrupt::SYSTIMER_TARGET2,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl Peripheral for Alarm<'_> {
