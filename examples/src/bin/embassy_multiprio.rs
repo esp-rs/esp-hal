@@ -81,7 +81,7 @@ async fn main(low_prio_spawner: Spawner) {
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32c2")] {
             use esp_hal::timer::systimer::SystemTimer;
-            let systimer = SystemTimer::new(peripherals.SYSTIMER).split();
+            let systimer = SystemTimer::new(peripherals.SYSTIMER, Default::default()).split();
             let timer1: AnyTimer = systimer.alarm0.into();
         } else {
             let timg1 = TimerGroup::new(peripherals.TIMG1);

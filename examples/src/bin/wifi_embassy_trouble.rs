@@ -72,7 +72,9 @@ async fn main(_s: Spawner) {
 
     #[cfg(not(feature = "esp32"))]
     {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER).split();
+        let systimer =
+            esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER, Default::default())
+                .split();
         esp_hal_embassy::init(systimer.alarm0);
     }
 

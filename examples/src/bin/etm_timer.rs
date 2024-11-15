@@ -23,8 +23,7 @@ use esp_hal::{
     },
 };
 
-static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =
-    Mutex::new(RefCell::new(None));
+static TIMER0: Mutex<RefCell<Option<Timer<Timer0<TIMG0>>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {

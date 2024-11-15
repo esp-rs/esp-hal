@@ -118,7 +118,7 @@ async fn main(spawner: Spawner) -> ! {
             esp_hal_embassy::init(timg1.timer0);
         } else {
             use esp_hal::timer::systimer::SystemTimer;
-            let systimer = SystemTimer::new(peripherals.SYSTIMER).split();
+            let systimer = SystemTimer::new(peripherals.SYSTIMER, Default::default()).split();
             esp_hal_embassy::init(systimer.alarm0);
         }
     }

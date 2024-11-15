@@ -14,23 +14,21 @@ use esp_hal::{
     delay::Delay,
     prelude::*,
     timer::{
-        systimer::{Alarm, AnyComparator, AnyUnit, FrozenUnit, SystemTimer},
+        systimer::{Alarm, AnyComparator, SystemTimer},
         OneShotTimer,
         PeriodicTimer,
     },
 };
 use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};
-use static_cell::StaticCell;
 
 static ALARM_TARGET: Mutex<RefCell<Option<OneShotTimer<'static>>>> = Mutex::new(RefCell::new(None));
 static ALARM_PERIODIC: Mutex<RefCell<Option<PeriodicTimer<'static>>>> =
     Mutex::new(RefCell::new(None));
 
 struct Context {
-    unit: FrozenUnit<'static, AnyUnit<'static>>,
-    comparator0: AnyComparator<'static>,
-    comparator1: AnyComparator<'static>,
+    comparator0: AnyComparator,
+    comparator1: AnyComparator,
 }
 
 #[handler(priority = esp_hal::interrupt::Priority::min())]
@@ -95,14 +93,9 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let systimer = SystemTimer::new(peripherals.SYSTIMER);
-        static UNIT0: StaticCell<AnyUnit<'static>> = StaticCell::new();
-
-        let unit0 = UNIT0.init(systimer.unit0.into());
-        let frozen_unit = FrozenUnit::new(unit0);
+        let systimer = SystemTimer::new(peripherals.SYSTIMER, Default::default());
 
         Context {
-            unit: frozen_unit,
             comparator0: systimer.comparator0.into(),
             comparator1: systimer.comparator1.into(),
         }
@@ -111,7 +104,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn target_interrupt_is_handled(ctx: Context) {
-        let mut alarm0 = OneShotTimer::new(Alarm::new(ctx.comparator0, &ctx.unit));
+        let mut alarm0 = OneShotTimer::new(Alarm::new(ctx.comparator0));
 
         critical_section::with(|cs| {
             alarm0.set_interrupt_handler(pass_test_if_called);
@@ -128,8 +121,8 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn target_interrupt_is_handled_once(ctx: Context) {
-        let mut alarm0 = OneShotTimer::new(Alarm::new(ctx.comparator0, &ctx.unit));
-        let mut alarm1 = PeriodicTimer::new(Alarm::new(ctx.comparator1, &ctx.unit));
+        let mut alarm0 = OneShotTimer::new(Alarm::new(ctx.comparator0));
+        let mut alarm1 = PeriodicTimer::new(Alarm::new(ctx.comparator1));
 
         COUNTER.store(0, Ordering::Relaxed);
 
@@ -153,7 +146,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn periodic_interrupt_is_handled(ctx: Context) {
-        let mut alarm1 = PeriodicTimer::new(Alarm::new(ctx.comparator1, &ctx.unit));
+        let mut alarm1 = PeriodicTimer::new(Alarm::new(ctx.comparator1));
 
         COUNTER.store(0, Ordering::Relaxed);
 

@@ -12,7 +12,7 @@ use embassy_time::{Duration, Ticker, Timer};
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     interrupt::Priority,
-    timer::systimer::SystemTimer,
+    timer::systimer::{Alarm, SystemTimer},
     timer::AnyTimer,
 };
 use esp_hal::{
@@ -63,8 +63,8 @@ mod test_cases {
         );
     }
 
-    pub fn run_test_periodic_timer<T: esp_hal::timer::Timer + Into<AnyTimer>>(timer: impl Peripheral<P = T>) {
-        let mut periodic = PeriodicTimer::new(timer);
+    pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
+        let mut periodic = PeriodicTimer::new_typed(timer);
 
         let t1 = esp_hal::time::now();
         periodic.start(100.millis()).unwrap();
@@ -80,8 +80,8 @@ mod test_cases {
         );
     }
 
-    pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer + Into<AnyTimer>>(timer: impl Peripheral<P = T>) {
-        let timer = OneShotTimer::new(timer);
+    pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
+        let timer = OneShotTimer::new_typed(timer);
 
         let t1 = esp_hal::time::now();
         timer.delay_millis(50);
@@ -117,7 +117,7 @@ fn set_up_embassy_with_timg0(peripherals: Peripherals) {
 
 #[cfg(not(feature = "esp32"))]
 fn set_up_embassy_with_systimer(peripherals: Peripherals) {
-    let systimer = SystemTimer::new(peripherals.SYSTIMER).split();
+    let systimer = SystemTimer::new(peripherals.SYSTIMER, Default::default()).split();
     esp_hal_embassy::init(systimer.alarm0);
 }
 
@@ -163,7 +163,7 @@ mod test {
     #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_systimer(peripherals: Peripherals) {
-        let systimer = SystemTimer::new(peripherals.SYSTIMER).split();
+        let systimer = SystemTimer::new(peripherals.SYSTIMER, Default::default()).split();
 
         run_test_periodic_timer(systimer.alarm0);
     }
@@ -178,21 +178,22 @@ mod test {
         run_test_oneshot_timer(&mut timg0.timer0);
     }
 
-    // FIXME (mabez)
-    // #[test]
-    // #[timeout(3)]
-    // #[cfg(not(feature = "esp32"))]
-    // fn test_periodic_oneshot_systimer(mut peripherals: Peripherals) {
-    //     let mut systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
-    //     let unit = FrozenUnit::new(&mut systimer.unit0);
-    //     let mut alarm = Alarm::new(systimer.comparator0, &unit);
-    //     run_test_periodic_timer(&mut alarm);
+    #[test]
+    #[timeout(3)]
+    #[cfg(not(feature = "esp32"))]
+    fn test_periodic_oneshot_systimer(peripherals: Peripherals) {
+        let systimer = SystemTimer::new(peripherals.SYSTIMER, Default::default());
+        let mut comparator = systimer.comparator0;
+        {
+            let mut alarm = Alarm::new(&mut comparator);
+            run_test_periodic_timer(&mut alarm);
+        }
 
-    //     let mut systimer = SystemTimer::new(&mut peripherals.SYSTIMER);
-    //     let unit = FrozenUnit::new(&mut systimer.unit0);
-    //     let mut alarm = Alarm::new(systimer.comparator0, &unit);
-    //     run_test_oneshot_timer(&mut alarm);
-    // }
+        {
+            let mut alarm = Alarm::new(&mut comparator);
+            run_test_oneshot_timer(&mut alarm);
+        }
+    }
 
     #[test]
     #[timeout(3)]
@@ -219,7 +220,7 @@ mod test {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         let timer0: AnyTimer = timg0.timer0.into();
 
-        let systimer = SystemTimer::new(peripherals.SYSTIMER).split();
+        let systimer = SystemTimer::new(peripherals.SYSTIMER, Default::default()).split();
         let alarm0: AnyTimer = systimer.alarm0.into();
 
         esp_hal_embassy::init([timer0, alarm0]);

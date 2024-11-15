@@ -51,9 +51,10 @@ mod tests {
     fn test_current_time_construct_systimer(ctx: Context) {
         time_moves_forward_during(ctx, |_| {
             // construct the timer in between calls to current_time
-            let _ = esp_hal::timer::systimer::SystemTimer::new(unsafe {
-                esp_hal::peripherals::SYSTIMER::steal()
-            });
+            let _ = esp_hal::timer::systimer::SystemTimer::new(
+                unsafe { esp_hal::peripherals::SYSTIMER::steal() },
+                Default::default(),
+            );
         })
     }
 

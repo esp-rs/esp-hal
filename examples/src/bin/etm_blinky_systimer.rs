@@ -17,18 +17,20 @@ use esp_hal::{
         Pull,
     },
     prelude::*,
-    timer::systimer::{etm::Event, Periodic, SystemTimer},
+    timer::systimer::{etm::Event, SystemTimer},
 };
-use fugit::ExtU32;
 
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let syst = SystemTimer::new(peripherals.SYSTIMER);
-    let syst_alarms = syst.split::<Periodic>();
-    let mut alarm0 = syst_alarms.alarm0;
-    alarm0.set_period(1u32.secs());
+    let syst = SystemTimer::new(peripherals.SYSTIMER, Default::default());
+    let alarms = syst.split();
+    let mut alarm0 = alarms.alarm0;
+
+    alarm0.enable_auto_reload(true);
+    alarm0.load_value(1u64.secs()).unwrap();
+    alarm0.start();
 
     let mut led = peripherals.GPIO1;
 

@@ -88,7 +88,7 @@ mod test {
         cfg_if::cfg_if! {
             if #[cfg(systimer)] {
                 use esp_hal::timer::systimer::SystemTimer;
-                let systimer = SystemTimer::new(peripherals.SYSTIMER).split();
+                let systimer = SystemTimer::new(peripherals.SYSTIMER, Default::default()).split();
                 esp_hal_embassy::init([
                     AnyTimer::from(systimer.alarm0),
                     AnyTimer::from(systimer.alarm1),
@@ -261,8 +261,8 @@ mod test {
 
         cfg_if::cfg_if! {
             if #[cfg(systimer)] {
-                use esp_hal::timer::systimer::{SystemTimer, Target};
-                let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+                use esp_hal::timer::systimer::SystemTimer;
+                let systimer = SystemTimer::new(peripherals.SYSTIMER, Default::default()).split();
                 esp_hal_embassy::init([
                     AnyTimer::from(systimer.alarm0),
                     AnyTimer::from(systimer.alarm1),
