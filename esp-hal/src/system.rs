@@ -155,10 +155,8 @@ pub(crate) struct PeripheralGuard {
 
 impl PeripheralGuard {
     pub(crate) fn new(p: Peripheral) -> Self {
-        if !KEEP_ENABLED.contains(&p) {
-            if PeripheralClockControl::enable(p, true) {
-                PeripheralClockControl::reset(p);
-            }
+        if !KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p, true) {
+            PeripheralClockControl::reset(p);
         }
 
         Self { peripheral: p }
@@ -200,7 +198,7 @@ impl PeripheralClockControl {
             if !enable {
                 Self::reset(peripheral);
             }
-            
+
             let system = unsafe { &*SYSTEM::PTR };
 
             #[cfg(esp32)]
@@ -973,7 +971,6 @@ impl PeripheralClockControl {
     }
 }
 
-
 impl PeripheralClockControl {
     /// Enables/disables the given peripheral.
     ///
@@ -982,7 +979,7 @@ impl PeripheralClockControl {
     /// gets disabled when the number of enable/disable attempts is balanced.
     ///
     /// Returns `true` if it actually enabled/disabled the peripheral.
-    /// 
+    ///
     /// Before disabling a peripheral it will also get reset
     pub(crate) fn enable(peripheral: Peripheral, enable: bool) -> bool {
         Self::enable_forced(peripheral, enable, false)

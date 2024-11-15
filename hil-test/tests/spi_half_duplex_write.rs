@@ -113,7 +113,7 @@ mod tests {
             .map_err(|e| e.0)
             .unwrap();
         // dropping SPI would make us see an additional edge - so let's keep SPI alive
-        let (_spi,_) = transfer.wait();
+        let (_spi, _) = transfer.wait();
 
         assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }
