@@ -144,8 +144,6 @@ impl<'d> Camera<'d> {
         CH: DmaChannelConvert<<LCD_CAM as DmaEligible>::Dma>,
         P: RxPins,
     {
-        let guard = PeripheralGuard::new(crate::system::Peripheral::LcdCam);
-
         let lcd_cam = cam.lcd_cam;
 
         let clocks = Clocks::get();
@@ -192,7 +190,7 @@ impl<'d> Camera<'d> {
         Self {
             lcd_cam,
             rx_channel: channel.degrade(),
-            _guard: guard,
+            _guard: cam._guard,
         }
     }
 }
