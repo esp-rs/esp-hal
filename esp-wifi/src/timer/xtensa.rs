@@ -27,16 +27,17 @@ pub(crate) fn setup_timer(mut timer1: TimeBase) {
         interrupt::Priority::Priority2,
     ));
     unwrap!(timer1.start(TIMESLICE_FREQUENCY.into_duration()));
-    critical_section::with(|cs| {
+    TIMER.with(|timer| {
         timer1.enable_interrupt(true);
-        TIMER.borrow_ref_mut(cs).replace(timer1);
+        timer.replace(timer1);
     });
 }
 
 pub(crate) fn disable_timer() {
-    critical_section::with(|cs| {
-        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
-        unwrap!(unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel());
+    TIMER.with(|timer| {
+        let timer = unwrap!(timer.as_mut());
+        timer.enable_interrupt(false);
+        unwrap!(timer.cancel());
     });
 }
 
@@ -58,8 +59,7 @@ pub(crate) fn disable_multitasking() {
 }
 
 fn do_task_switch(context: &mut TrapFrame) {
-    critical_section::with(|cs| {
-        let mut timer = TIMER.borrow_ref_mut(cs);
+    TIMER.with(|timer| {
         let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
     });

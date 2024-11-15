@@ -17,6 +17,7 @@ pub(crate) fn chip_ints_off(mask: u32) {
 pub(crate) unsafe extern "C" fn wifi_int_disable(
     wifi_int_mux: *mut crate::binary::c_types::c_void,
 ) -> u32 {
+    // FIXME: would it be enough to disable a single core's interrupts?
     core::mem::transmute(critical_section::acquire())
 }
 

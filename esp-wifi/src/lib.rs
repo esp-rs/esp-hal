@@ -419,7 +419,7 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     shutdown_timer_isr();
     crate::preempt::delete_all_tasks();
 
-    critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take());
+    crate::timer::TIMER.with(|timer| timer.take());
 
     crate::flags::ESP_WIFI_INITIALIZED.store(false, Ordering::Release);
 

@@ -9,8 +9,8 @@ pub(crate) mod os_adapter_chip_specific;
 
 use core::{cell::RefCell, ptr::addr_of_mut};
 
-use critical_section::Mutex;
 use enumset::EnumSet;
+use esp_hal::sync::Locked;
 
 use super::WifiEvent;
 use crate::{
@@ -39,8 +39,8 @@ static mut QUEUE_HANDLE: *mut ConcurrentQueue = core::ptr::null_mut();
 
 // useful for waiting for events - clear and wait for the event bit to be set
 // again
-pub(crate) static WIFI_EVENTS: Mutex<RefCell<EnumSet<WifiEvent>>> =
-    Mutex::new(RefCell::new(enumset::enum_set!()));
+pub(crate) static WIFI_EVENTS: Locked<RefCell<EnumSet<WifiEvent>>> =
+    Locked::new(RefCell::new(enumset::enum_set!()));
 
 /// **************************************************************************
 /// Name: wifi_env_is_chip
@@ -869,8 +869,10 @@ pub unsafe extern "C" fn event_post(
 
     let mut handled = false;
     critical_section::with(|cs| {
-        WIFI_EVENTS.borrow_ref_mut(cs).insert(event);
-        handled = super::event::dispatch_event_handler(cs, event, event_data, event_data_size);
+        WIFI_EVENTS.with_cs(cs, |events| {
+            events.borrow_mut().insert(event);
+            handled = super::event::dispatch_event_handler(cs, event, event_data, event_data_size);
+        });
     });
 
     super::state::update_state(event, handled);

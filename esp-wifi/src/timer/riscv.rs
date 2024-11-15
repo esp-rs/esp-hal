@@ -30,16 +30,17 @@ pub(crate) fn setup_timer(mut alarm0: TimeBase) {
     let cb: extern "C" fn() = unsafe { core::mem::transmute(handler as *const ()) };
     alarm0.set_interrupt_handler(InterruptHandler::new(cb, interrupt::Priority::Priority1));
     unwrap!(alarm0.start(TIMESLICE_FREQUENCY.into_duration()));
-    critical_section::with(|cs| {
+    TIMER.with(|timer| {
         alarm0.enable_interrupt(true);
-        TIMER.borrow_ref_mut(cs).replace(alarm0);
+        timer.replace(alarm0);
     });
 }
 
 pub(crate) fn disable_timer() {
-    critical_section::with(|cs| {
-        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).enable_interrupt(false);
-        unwrap!(unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).cancel());
+    TIMER.with(|timer| {
+        let timer = unwrap!(timer.as_mut());
+        timer.enable_interrupt(false);
+        unwrap!(timer.cancel());
     });
 }
 
@@ -60,8 +61,8 @@ pub(crate) fn disable_multitasking() {
 
 extern "C" fn handler(trap_frame: &mut TrapFrame) {
     // clear the systimer intr
-    critical_section::with(|cs| {
-        unwrap!(TIMER.borrow_ref_mut(cs).as_mut()).clear_interrupt();
+    TIMER.with(|timer| {
+        unwrap!(timer.as_mut()).clear_interrupt();
     });
 
     task_switch(trap_frame);
@@ -76,8 +77,7 @@ extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
             .modify(|_, w| w.cpu_intr_from_cpu_3().clear_bit());
     }
 
-    critical_section::with(|cs| {
-        let mut alarm0 = TIMER.borrow_ref_mut(cs);
+    TIMER.with(|alarm0| {
         let alarm0 = unwrap!(alarm0.as_mut());
         alarm0.clear_interrupt();
     });
