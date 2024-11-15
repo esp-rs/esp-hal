@@ -349,6 +349,6 @@ impl<'d> Hmac<'d> {
 
 impl Drop for Hmac<'_> {
     fn drop(&mut self) {
-        PeripheralClockControl::enable(PeripheralEnable::Hmac, true);
+        PeripheralClockControl::enable(PeripheralEnable::Hmac, false);
     }
 }

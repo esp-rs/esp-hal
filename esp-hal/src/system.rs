@@ -193,6 +193,8 @@ impl PeripheralClockControl {
                         return false;
                     }
                 };
+            } else if !enable {
+                PERIPHERAL_REF_COUNT[peripheral as usize].store(0, Ordering::Relaxed);
             }
 
             if !enable {
@@ -600,6 +602,8 @@ impl PeripheralClockControl {
                         return false;
                     }
                 };
+            } else if !enable {
+                PERIPHERAL_REF_COUNT[peripheral as usize].store(0, Ordering::Relaxed);
             }
 
             if !enable {
