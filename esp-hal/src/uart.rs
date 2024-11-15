@@ -108,6 +108,107 @@
 //! # }
 //! ```
 //! 
+//! ### Operation with interrupts that by UART/Serial
+//! Notice, that in practice a proper serial terminal to connect to the board (espmonitor and
+//! espflash won't work)
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::uart::{AtCmdConfig, Config, Uart, UartInterrupt};
+//! # use esp_hal::prelude::*;
+//! let delay = Delay::new();
+//!
+//! // Default pins for UART/Serial communication
+#![cfg_attr(
+    esp32,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);"
+)]
+#![cfg_attr(
+    esp32c2,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);"
+)]
+#![cfg_attr(
+    esp32c3,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);"
+)]
+#![cfg_attr(
+    esp32c6,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);"
+)]
+#![cfg_attr(
+    esp32h2,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);"
+)]
+#![cfg_attr(
+    any(esp32s2, esp32s3),
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);"
+)]
+//! let config = Config::default().rx_fifo_full_threshold(30);
+//!
+//! let mut uart0 = Uart::new_with_config(
+//!     peripherals.UART0,
+//!     config,
+//!     tx_pin,
+//!     rx_pin
+//! ).unwrap();
+//!
+//! uart0.set_interrupt_handler(interrupt_handler);
+//!
+//! critical_section::with(|cs| {
+//!     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
+//!     uart0.listen(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
+//!
+//!     SERIAL.borrow_ref_mut(cs).replace(uart0);
+//! });
+//!
+//! loop {
+//!     critical_section::with(|cs| {
+//!         let mut serial = SERIAL.borrow_ref_mut(cs);
+//!         let serial = serial.as_mut().unwrap();
+//!         writeln!(serial,
+//!             "Hello World! Send a single `#` character or send
+//!                 at least 30 characters to trigger interrupts.")
+//!         .ok();     
+//!     });
+//!     delay.delay(1.secs());
+//! }
+//! # }
+//!
+//! # use core::cell::RefCell;
+//! # use critical_section::Mutex;
+//! # use esp_hal::uart::Uart;
+//! static SERIAL: Mutex<RefCell<Option<Uart<esp_hal::Blocking>>>> =
+//!     Mutex::new(RefCell::new(None));
+//!
+//! # use esp_hal::uart::UartInterrupt;
+//! # use core::fmt::Write;
+//! #[handler]
+//! fn interrupt_handler() {
+//!     critical_section::with(|cs| {
+//!         let mut serial = SERIAL.borrow_ref_mut(cs);
+//!         let serial = serial.as_mut().unwrap();
+//!
+//!         let mut cnt = 0;
+//!         while let nb::Result::Ok(_c) = serial.read_byte() {
+//!             cnt += 1;
+//!         }
+//!         writeln!(serial, "Read {} bytes", cnt).ok();
+//!
+//!         let pending_interrupts = serial.interrupts();
+//!         writeln!(
+//!             serial,
+//!             "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
+//!             pending_interrupts.contains(UartInterrupt::AtCmd),
+//!             pending_interrupts.contains(UartInterrupt::RxFifoFull),
+//!         ).ok();
+//!
+//!         serial.clear_interrupts(
+//!             UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
+//!         );
+//!     });
+//! }
+//! ```
+//! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
