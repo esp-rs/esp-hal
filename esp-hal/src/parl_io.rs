@@ -36,7 +36,8 @@
 //! let mut rx_clk_pin = NoPin;
 //!
 //! // Set up Parallel IO for 1MHz data input, with DMA and bit packing
-//! configuration let parl_io = ParlIoRxOnly::new(
+//! //  configuration
+//!  let parl_io = ParlIoRxOnly::new(
 //!     peripherals.PARL_IO,
 //!     dma_channel.configure(false, DmaPriority::Priority0),
 //!     rx_descriptors,
@@ -63,7 +64,7 @@
 //!     // Read data via DMA and print received values
 //!     let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
 //!     transfer.wait().unwrap();
-//!     // println!("Received: {:02x?} ...", &buffer[..30]);
+//!     // esp_println::println!("Received: {:02x?} ...", &buffer[..30]);
 //!
 //!     delay.delay_millis(500);
 //! }
@@ -94,7 +95,8 @@
 //! let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, peripherals.GPIO5);
 //!
 //! // Set up Parallel IO for 1MHz data input, with DMA and bit packing
-//! configuration let parl_io = ParlIoTxOnly::new(
+//! //  configuration
+//!  let parl_io = ParlIoTxOnly::new(
 //!     peripherals.PARL_IO,
 //!     dma_channel.configure(false, DmaPriority::Priority0),
 //!     tx_descriptors,

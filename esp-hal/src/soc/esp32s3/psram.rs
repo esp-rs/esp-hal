@@ -48,13 +48,13 @@
 //!     large_vec.push((i & 0xff) as u32);
 //! }
 //!
-//! // println!("vec size = {} bytes", large_vec.len() * 4);
-//! // println!("vec address = {:p}", large_vec.as_ptr());
-//! // println!("vec[..100] = {:?}", &large_vec[..100]);
+//! // esp_println::println!("vec size = {} bytes", large_vec.len() * 4);
+//! // esp_println::println!("vec address = {:p}", large_vec.as_ptr());
+//! // esp_println::println!("vec[..100] = {:?}", &large_vec[..100]);
 //!
 //! let string = String::from("A string allocated in PSRAM");
-//! // println!("'{}' allocated at {:p}", &string, string.as_ptr());
-//! # }
+//! // esp_println::println!("'{}' allocated at {:p}", &string,
+//! string.as_ptr()); # }
 //! ```
 
 pub use crate::soc::psram_common::*;

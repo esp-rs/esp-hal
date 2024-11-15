@@ -28,9 +28,13 @@
 //! # use core::writeln;
 //! # use core::fmt::Write;
 //!
-//! let mut serial_tx = Uart::new(peripherals.UART0, peripherals.GPIO4,
-//! peripherals.GPIO5).unwrap(); let mac_address =
-//! Efuse::read_base_mac_address(); writeln!(
+//! let mut serial_tx =
+//!     Uart::new(peripherals.UART0, peripherals.GPIO4,
+//!         peripherals.GPIO5).unwrap();
+//!
+//! let mac_address = Efuse::read_base_mac_address();
+//!
+//! writeln!(
 //!     serial_tx,
 //!     "MAC: {:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}",
 //!     mac_address[0],
