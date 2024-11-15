@@ -122,6 +122,18 @@ impl RegisterAccess for AnySpiDmaTxChannel {
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
         self.0.is_compatible_with(peripheral)
     }
+
+    #[cfg(psram_dma)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        let spi = self.0.register_block();
+        spi.dma_conf()
+            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
+    }
+
+    #[cfg(psram_dma)]
+    fn can_access_psram(&self) -> bool {
+        matches!(self.0, AnySpiDmaChannel(AnySpiDmaChannelInner::Spi2(_)))
+    }
 }
 
 impl TxRegisterAccess for AnySpiDmaTxChannel {
@@ -279,6 +291,18 @@ impl RegisterAccess for AnySpiDmaRxChannel {
 
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
         self.0.is_compatible_with(peripheral)
+    }
+
+    #[cfg(psram_dma)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        let spi = self.0.register_block();
+        spi.dma_conf()
+            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
+    }
+
+    #[cfg(psram_dma)]
+    fn can_access_psram(&self) -> bool {
+        matches!(self.0, AnySpiDmaChannel(AnySpiDmaChannelInner::Spi2(_)))
     }
 }
 
@@ -475,6 +499,18 @@ impl RegisterAccess for AnyI2sDmaTxChannel {
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
         self.0.is_compatible_with(peripheral)
     }
+
+    #[cfg(psram_dma)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        let spi = self.0.register_block();
+        spi.lc_conf()
+            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
+    }
+
+    #[cfg(psram_dma)]
+    fn can_access_psram(&self) -> bool {
+        matches!(self.0, AnyI2sDmaChannel(AnyI2sDmaChannelInner::I2s0(_)))
+    }
 }
 
 impl TxRegisterAccess for AnyI2sDmaTxChannel {
@@ -644,6 +680,18 @@ impl RegisterAccess for AnyI2sDmaRxChannel {
 
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
         self.0.is_compatible_with(peripheral)
+    }
+
+    #[cfg(psram_dma)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        let spi = self.0.register_block();
+        spi.lc_conf()
+            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
+    }
+
+    #[cfg(psram_dma)]
+    fn can_access_psram(&self) -> bool {
+        matches!(self.0, AnyI2sDmaChannel(AnyI2sDmaChannelInner::I2s0(_)))
     }
 }
 

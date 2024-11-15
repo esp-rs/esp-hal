@@ -133,3 +133,33 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 pub extern "Rust" fn __init_data() -> bool {
     false
 }
+
+/// Write back a specific range of data in the cache.
+#[doc(hidden)]
+#[link_section = ".rwtext"]
+pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
+    extern "C" {
+        fn Cache_WriteBack_Addr(addr: u32, size: u32);
+    }
+    Cache_WriteBack_Addr(addr, size);
+}
+
+/// Invalidate a specific range of addresses in the cache.
+#[doc(hidden)]
+#[link_section = ".rwtext"]
+pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    extern "C" {
+        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+    }
+    Cache_Invalidate_Addr(addr, size);
+}
+
+/// Get the size of a cache line in the DCache.
+#[doc(hidden)]
+#[link_section = ".rwtext"]
+pub unsafe fn cache_get_dcache_line_size() -> u32 {
+    extern "C" {
+        fn Cache_Get_DCache_Line_Size() -> u32;
+    }
+    Cache_Get_DCache_Line_Size()
+}

@@ -25,7 +25,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{DmaBufBlkSize, DmaRxBuf, DmaTxBuf},
+    dma::{BurstConfig, DmaRxBuf, DmaTxBuf, ExternalBurstSize},
     peripheral::Peripheral,
     prelude::*,
     spi::{
@@ -51,7 +51,7 @@ macro_rules! dma_alloc_buffer {
 }
 
 const DMA_BUFFER_SIZE: usize = 8192;
-const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size64;
+const DMA_ALIGNMENT: ExternalBurstSize = ExternalBurstSize::Size64;
 const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
 #[entry]
@@ -76,8 +76,15 @@ fn main() -> ! {
         tx_buffer.len(),
         tx_descriptors.len()
     );
-    let mut dma_tx_buf =
-        DmaTxBuf::new_with_block_size(tx_descriptors, tx_buffer, Some(DMA_ALIGNMENT)).unwrap();
+    let mut dma_tx_buf = DmaTxBuf::new_with_config(
+        tx_descriptors,
+        tx_buffer,
+        BurstConfig {
+            external: DMA_ALIGNMENT,
+            ..BurstConfig::default()
+        },
+    )
+    .unwrap();
     let (rx_buffer, rx_descriptors, _, _) = esp_hal::dma_buffers!(DMA_BUFFER_SIZE, 0);
     info!(
         "RX: {:p} len {} ({} descripters)",
