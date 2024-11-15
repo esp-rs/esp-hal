@@ -66,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Trying to send a single-shot RMT transmission will result in an error now, `RMT` deals with `u32` now, `PulseCode` is a convenience trait now (#2463)
 - Removed `get_` prefixes from functions (#2528)
 - The `Camera` and `I8080` drivers' constructors now only accepts blocking-mode DMA channels. (#2519)
+- `OneShotTimer` & `PeriodicTimer` are now type erased by default (#2542)
+- `Systimer` has a new config constructor parameter (#2542)
+- `Systimer` No longer implements `Peripheral` (its subtypes do instead) (#2542)
 
 ### Fixed
 
@@ -109,6 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Io::new_with_priority` and `Io::new_no_bind_interrupt`. (#2486)
 - `parl_io::{no_clk_pin(), NoClkPin}` (#2531)
 - Removed `get_core` function in favour of `Cpu::current` (#2533)
+- The `timer::systimer`'s `SpecificComparator`, `FrozenUnit`, `SpecificUnit` and `AnyUnit` types have been removed. (#2542)
+- embedded-hal traits on the low level timers have been removed (#2542)
 
 ## [0.21.1]
 

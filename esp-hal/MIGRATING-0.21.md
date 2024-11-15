@@ -469,3 +469,39 @@ In order to better comply with the Rust API Guidelines [getter names convention]
 - let core = esp_hal::get_core();
 + let core = esp_hal::Cpu::current();
 ```
+
+## Changes to timers
+
+Timers are now "dumb", and all the logic for driving them has moved to `OneShotTimer` & `Periodic` timer. Instead of using the driver directly, pass it into one of the drivers instead.
+
+### Systimer
+
+The `SpecificComparator`, `FrozenUnit`, `SpecificUnit` and `AnyUnit` types have been removed. `Unit` is now an enum which can be passed to an alarm to tell the comparator to use a different unit. By default every alarm uses `Unit::Unit0`.
+
+There is a new config parameter for SYSTIMER which affects the `Unit`.
+
+```diff
+- SystemTimer::new(peripherals.SYSTIMER)
++ SystemTimer::new(peripherals.SYSTIMER, Default::default())
+```
+
+```diff
+- let timers = systimer.split::<Target>();
++ let timers = systimer.split();
+```
+
+```diff
+- let timer = systimer.alarm0;
+- let mut timer = timer.into_periodic();
++ let mut timer = PeriodicTimer::new(systimer.alarm0)
+```
+
+### TIMG
+
+```diff
+- let mut timer = timg0.timer0;
+- timer.load_value(1.millis()).unwrap();
+- timer.start();
++ let mut timer = PeriodicTimer::new(timg0.timer0);
++ timer.start(1.millis()).unwrap();
+```
