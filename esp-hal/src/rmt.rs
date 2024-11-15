@@ -620,7 +620,6 @@ mod impl_for_chip {
         /// RMT Channel 3.
         pub channel3: ChannelCreator<M, 3>,
         phantom: PhantomData<M>,
-        _guard: PeripheralGuard,
     }
 
     impl<'d, M> Rmt<'d, M>
@@ -631,8 +630,6 @@ mod impl_for_chip {
             peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         ) -> Self {
             crate::into_ref!(peripheral);
-
-            let guard = PeripheralGuard::new(crate::system::Peripheral::Rmt);
 
             Self {
                 peripheral,
@@ -653,7 +650,6 @@ mod impl_for_chip {
                     _guard: PeripheralGuard::new(crate::system::Peripheral::Rmt),
                 },
                 phantom: PhantomData,
-                _guard: guard,
             }
         }
     }
@@ -712,7 +708,6 @@ mod impl_for_chip {
         /// RMT Channel 7.
         pub channel7: ChannelCreator<M, 7>,
         phantom: PhantomData<M>,
-        _guard: PeripheralGuard,
     }
 
     impl<'d, M> Rmt<'d, M>
@@ -723,8 +718,6 @@ mod impl_for_chip {
             peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         ) -> Self {
             crate::into_ref!(peripheral);
-            let guard = PeripheralGuard::new(crate::system::Peripheral::Rmt);
-
             Self {
                 peripheral,
                 channel0: ChannelCreator {
@@ -760,7 +753,6 @@ mod impl_for_chip {
                     _guard: PeripheralGuard::new(crate::system::Peripheral::Rmt),
                 },
                 phantom: PhantomData,
-                _guard: guard,
             }
         }
     }
@@ -835,7 +827,6 @@ mod impl_for_chip {
         /// RMT Channel 3.
         pub channel3: ChannelCreator<M, 3>,
         phantom: PhantomData<M>,
-        _guard: PeripheralGuard,
     }
 
     impl<'d, M> Rmt<'d, M>
@@ -866,7 +857,6 @@ mod impl_for_chip {
                     _guard: PeripheralGuard::new(crate::system::Peripheral::Rmt),
                 },
                 phantom: PhantomData,
-                _guard: PeripheralGuard::new(crate::system::Peripheral::Rmt),
             }
         }
     }
@@ -933,7 +923,6 @@ mod impl_for_chip {
         /// RMT Channel 7.
         pub channel7: ChannelCreator<M, 7>,
         phantom: PhantomData<M>,
-        _guard: PeripheralGuard,
     }
 
     impl<'d, M> Rmt<'d, M>
@@ -980,7 +969,6 @@ mod impl_for_chip {
                     _guard: PeripheralGuard::new(crate::system::Peripheral::Rmt),
                 },
                 phantom: PhantomData,
-                _guard: PeripheralGuard::new(crate::system::Peripheral::Rmt),
             }
         }
     }
