@@ -18,12 +18,14 @@ use esp_hal::{
         OneShotTimer,
         PeriodicTimer,
     },
+    Blocking,
 };
 use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};
 
-static ALARM_TARGET: Mutex<RefCell<Option<OneShotTimer<'static>>>> = Mutex::new(RefCell::new(None));
-static ALARM_PERIODIC: Mutex<RefCell<Option<PeriodicTimer<'static>>>> =
+static ALARM_TARGET: Mutex<RefCell<Option<OneShotTimer<'static, Blocking>>>> =
+    Mutex::new(RefCell::new(None));
+static ALARM_PERIODIC: Mutex<RefCell<Option<PeriodicTimer<'static, Blocking>>>> =
     Mutex::new(RefCell::new(None));
 
 struct Context {

@@ -12,9 +12,11 @@ use esp_backtrace as _;
 use esp_hal::{
     prelude::*,
     timer::{timg::TimerGroup, AnyTimer, PeriodicTimer},
+    Blocking,
 };
 
-static TIMER0: Mutex<RefCell<Option<PeriodicTimer<AnyTimer>>>> = Mutex::new(RefCell::new(None));
+static TIMER0: Mutex<RefCell<Option<PeriodicTimer<Blocking, AnyTimer>>>> =
+    Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {

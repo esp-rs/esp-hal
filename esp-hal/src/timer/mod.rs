@@ -40,12 +40,16 @@
 //! # }
 //! ```
 
+use core::marker::PhantomData;
+
 use fugit::{ExtU64, Instant, MicrosDurationU64};
 
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
+    Blocking,
     InterruptConfigurable,
+    Mode,
 };
 
 #[cfg(systimer)]
@@ -119,20 +123,21 @@ pub trait Timer: crate::private::Sealed {
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<'d, T = AnyTimer> {
+pub struct OneShotTimer<'d, M, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+    _ph: PhantomData<M>,
 }
 
-impl<'d> OneShotTimer<'d> {
+impl<'d> OneShotTimer<'d, Blocking> {
     /// Construct a new instance of [`OneShotTimer`].
     pub fn new(
         inner: impl Peripheral<P = impl Timer + Into<AnyTimer> + 'd> + 'd,
-    ) -> OneShotTimer<'d> {
+    ) -> OneShotTimer<'d, Blocking> {
         Self::new_typed(inner.map_into())
     }
 }
 
-impl<'d, T> OneShotTimer<'d, T>
+impl<'d, T> OneShotTimer<'d, Blocking, T>
 where
     T: Timer,
 {
@@ -140,9 +145,18 @@ where
     pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(inner);
 
-        Self { inner }
+        Self {
+            inner,
+            _ph: PhantomData,
+        }
     }
+}
 
+impl<'d, M, T> OneShotTimer<'d, M, T>
+where
+    T: Timer,
+    M: Mode,
+{
     /// Pauses execution for *at least* `ms` milliseconds.
     pub fn delay_millis(&self, ms: u32) {
         self.delay((ms as u64).millis());
@@ -218,9 +232,14 @@ where
     }
 }
 
-impl<T> crate::private::Sealed for OneShotTimer<'_, T> where T: Timer {}
+impl<M, T> crate::private::Sealed for OneShotTimer<'_, M, T>
+where
+    T: Timer,
+    M: Mode,
+{
+}
 
-impl<T> InterruptConfigurable for OneShotTimer<'_, T>
+impl<T> InterruptConfigurable for OneShotTimer<'_, Blocking, T>
 where
     T: Timer,
 {
@@ -229,7 +248,7 @@ where
     }
 }
 
-impl<T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<'_, T>
+impl<T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<'_, Blocking, T>
 where
     T: Timer,
     UXX: Into<u32>,
@@ -239,7 +258,7 @@ where
     }
 }
 
-impl<T, UXX> embedded_hal_02::blocking::delay::DelayUs<UXX> for OneShotTimer<'_, T>
+impl<T, UXX> embedded_hal_02::blocking::delay::DelayUs<UXX> for OneShotTimer<'_, Blocking, T>
 where
     T: Timer,
     UXX: Into<u32>,
@@ -249,9 +268,10 @@ where
     }
 }
 
-impl<T> embedded_hal::delay::DelayNs for OneShotTimer<'_, T>
+impl<M, T> embedded_hal::delay::DelayNs for OneShotTimer<'_, M, T>
 where
     T: Timer,
+    M: Mode,
 {
     fn delay_ns(&mut self, ns: u32) {
         self.delay_nanos(ns);
@@ -259,30 +279,40 @@ where
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<'d, T = AnyTimer> {
+pub struct PeriodicTimer<'d, M, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+    _ph: PhantomData<M>,
 }
 
-impl<'d> PeriodicTimer<'d> {
+impl<'d> PeriodicTimer<'d, Blocking> {
     /// Construct a new instance of [`PeriodicTimer`].
     pub fn new(
         inner: impl Peripheral<P = impl Timer + Into<AnyTimer> + 'd> + 'd,
-    ) -> PeriodicTimer<'d> {
+    ) -> PeriodicTimer<'d, Blocking> {
         Self::new_typed(inner.map_into())
     }
 }
 
-impl<'d, T> PeriodicTimer<'d, T>
+impl<'d, T> PeriodicTimer<'d, Blocking, T>
 where
     T: Timer,
 {
     /// Construct a typed instance of [`PeriodicTimer`].
-    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> PeriodicTimer<'d, T> {
+    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(inner);
 
-        Self { inner }
+        Self {
+            inner,
+            _ph: PhantomData,
+        }
     }
+}
 
+impl<'d, M, T> PeriodicTimer<'d, M, T>
+where
+    T: Timer,
+    M: Mode,
+{
     /// Start a new count down.
     pub fn start(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
         if self.inner.is_running() {
@@ -341,9 +371,14 @@ where
     }
 }
 
-impl<T> crate::private::Sealed for PeriodicTimer<'_, T> where T: Timer {}
+impl<M, T> crate::private::Sealed for PeriodicTimer<'_, M, T>
+where
+    T: Timer,
+    M: Mode,
+{
+}
 
-impl<T> InterruptConfigurable for PeriodicTimer<'_, T>
+impl<T> InterruptConfigurable for PeriodicTimer<'_, Blocking, T>
 where
     T: Timer,
 {
@@ -352,7 +387,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::timer::CountDown for PeriodicTimer<'_, T>
+impl<T> embedded_hal_02::timer::CountDown for PeriodicTimer<'_, Blocking, T>
 where
     T: Timer,
 {
@@ -370,7 +405,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::timer::Cancel for PeriodicTimer<'_, T>
+impl<T> embedded_hal_02::timer::Cancel for PeriodicTimer<'_, Blocking, T>
 where
     T: Timer,
 {
@@ -381,7 +416,7 @@ where
     }
 }
 
-impl<T> embedded_hal_02::timer::Periodic for PeriodicTimer<'_, T> where T: Timer {}
+impl<T> embedded_hal_02::timer::Periodic for PeriodicTimer<'_, Blocking, T> where T: Timer {}
 
 crate::any_peripheral! {
     /// Any Timer peripheral.
