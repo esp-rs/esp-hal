@@ -153,6 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Io::new_with_priority` and `Io::new_no_bind_interrupt`. (#2486)
 - `parl_io::{no_clk_pin(), NoClkPin}` (#2531)
 - Removed `get_core` function in favour of `Cpu::current` (#2533)
+- Remove more examples. Update doctests. (#2547)
 
 ## [0.21.1]
 
