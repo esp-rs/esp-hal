@@ -176,7 +176,6 @@ pub(crate) struct PeripheralClockControl;
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
-
     fn enable_internal(peripheral: Peripheral, enable: bool) {
         debug!("Enable {:?} {}", peripheral, enable);
 
