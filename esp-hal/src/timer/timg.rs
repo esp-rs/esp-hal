@@ -788,10 +788,10 @@ mod asynch {
         task::{Context, Poll},
     };
 
-    use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::handler;
 
     use super::*;
+    use crate::asynch::AtomicWaker;
 
     cfg_if::cfg_if! {
         if #[cfg(all(timg1, timg_timer1))] {

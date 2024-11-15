@@ -45,11 +45,11 @@ use core::{
 };
 
 use embassy_embedded_hal::SetConfig;
-use embassy_sync::waitqueue::AtomicWaker;
 use embedded_hal::i2c::Operation as EhalOperation;
 use fugit::HertzU32;
 
 use crate::{
+    asynch::AtomicWaker,
     clock::Clocks,
     gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
     interrupt::InterruptHandler,

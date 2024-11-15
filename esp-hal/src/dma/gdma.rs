@@ -83,7 +83,7 @@ impl DmaChannelConvert<AnyGdmaTxChannel> for AnyGdmaTxChannel {
     }
 }
 
-use embassy_sync::waitqueue::AtomicWaker;
+use crate::asynch::AtomicWaker;
 
 static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
 static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];

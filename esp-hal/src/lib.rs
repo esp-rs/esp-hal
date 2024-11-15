@@ -572,3 +572,41 @@ pub fn init(config: Config) -> Peripherals {
 
     peripherals
 }
+
+/// Asynchronous utilities.
+pub mod asynch {
+    use core::task::Waker;
+
+    use crate::sync::Locked;
+
+    /// Utility struct to register and wake a waker.
+    pub struct AtomicWaker {
+        waker: Locked<Option<Waker>>,
+    }
+
+    impl AtomicWaker {
+        /// Create a new `AtomicWaker`.
+        pub const fn new() -> Self {
+            Self {
+                waker: Locked::new(None),
+            }
+        }
+
+        /// Register a waker. Overwrites the previous waker, if any.
+        pub fn register(&self, w: &Waker) {
+            self.waker.with(|waker| match waker {
+                Some(w2) if w2.will_wake(w) => {}
+                _ => *waker = Some(w.clone()),
+            })
+        }
+
+        /// Wake the registered waker, if any.
+        pub fn wake(&self) {
+            self.waker.with(|waker| {
+                if let Some(w) = waker {
+                    w.wake_by_ref();
+                }
+            })
+        }
+    }
+}

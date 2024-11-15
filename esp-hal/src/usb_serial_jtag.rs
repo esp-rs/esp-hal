@@ -77,10 +77,10 @@
 
 use core::{convert::Infallible, marker::PhantomData, task::Poll};
 
-use embassy_sync::waitqueue::AtomicWaker;
 use procmacros::handler;
 
 use crate::{
+    asynch::AtomicWaker,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{usb_device::RegisterBlock, Interrupt, USB_DEVICE},
     system::PeripheralClockControl,

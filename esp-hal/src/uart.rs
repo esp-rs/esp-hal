@@ -116,11 +116,11 @@
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
 use embassy_embedded_hal::SetConfig;
-use embassy_sync::waitqueue::AtomicWaker;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
 use crate::{
+    asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},

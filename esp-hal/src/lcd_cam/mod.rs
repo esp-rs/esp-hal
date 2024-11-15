@@ -10,9 +10,8 @@ pub mod lcd;
 
 use core::marker::PhantomData;
 
-use embassy_sync::waitqueue::AtomicWaker;
-
 use crate::{
+    asynch::AtomicWaker,
     interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
     macros::handler,

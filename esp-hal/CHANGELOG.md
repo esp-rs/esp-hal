@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `into_async` and `into_blocking` functions for `ParlIoTxOnly`, `ParlIoRxOnly` (#2526)
 - ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526, #2532)
 - DMA: `PeripheralDmaChannel` type aliasses and `DmaChannelFor` traits to improve usability. (#2532)
+- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
+- `esp_hal::asynch::AtomicWaker` that does not hold a global critical section (#2555)
 
 ### Changed
 

@@ -93,7 +93,7 @@ pub(crate) mod asynch {
         HostToControllerPacket,
         WriteHci,
     };
-    use embassy_sync::waitqueue::AtomicWaker;
+    use esp_hal::asynch::AtomicWaker;
 
     use super::*;
     use crate::ble::have_hci_read_data;
