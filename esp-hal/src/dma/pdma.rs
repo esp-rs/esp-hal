@@ -20,7 +20,6 @@ use crate::{
     macros::handler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
-    system::{self, PeripheralClockControl},
 };
 
 type SpiRegisterBlock = crate::peripherals::spi2::RegisterBlock;
@@ -876,52 +875,18 @@ crate::impl_dma_eligible!([I2s0DmaChannel] I2S0 => I2s0);
 #[cfg(i2s1)]
 crate::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
 
-/// DMA Peripheral
-///
-/// This offers the available DMA channels.
-pub struct Dma<'d> {
-    _inner: PeripheralRef<'d, crate::peripherals::DMA>,
-    /// DMA channel for SPI2
-    pub spi2channel: Spi2DmaChannel,
-    /// DMA channel for SPI3
-    pub spi3channel: Spi3DmaChannel,
-    /// DMA channel for I2S0
-    pub i2s0channel: I2s0DmaChannel,
-    /// DMA channel for I2S1
-    #[cfg(i2s1)]
-    pub i2s1channel: I2s1DmaChannel,
-}
-
-impl<'d> Dma<'d> {
-    /// Create a DMA instance.
-    pub fn new(dma: impl Peripheral<P = crate::peripherals::DMA> + 'd) -> Dma<'d> {
-        if PeripheralClockControl::enable(system::Peripheral::Dma) {
-            PeripheralClockControl::reset(system::Peripheral::Dma);
-        }
-
-        #[cfg(esp32)]
-        {
-            // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
-            // This assignes the DMA channels to the SPI peripherals, which is more
-            // restrictive than necessary but we currently support the same
-            // number of SPI peripherals as SPI DMA channels so it's not a big
-            // deal.
-            let dport = unsafe { &*crate::peripherals::DPORT::PTR };
-            dport.spi_dma_chan_sel().modify(|_, w| unsafe {
-                w.spi2_dma_chan_sel().bits(1).spi3_dma_chan_sel().bits(2)
-            });
-        }
-
-        unsafe {
-            Dma {
-                _inner: dma.into_ref(),
-                spi2channel: Spi2DmaChannel::steal(),
-                spi3channel: Spi3DmaChannel::steal(),
-                i2s0channel: I2s0DmaChannel::steal(),
-                #[cfg(i2s1)]
-                i2s1channel: I2s1DmaChannel::steal(),
-            }
-        }
+pub(super) fn init_dma() {
+    #[cfg(esp32)]
+    {
+        // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
+        // This assignes the DMA channels to the SPI peripherals, which is more
+        // restrictive than necessary but we currently support the same
+        // number of SPI peripherals as SPI DMA channels so it's not a big
+        // deal.
+        let dport = unsafe { crate::peripherals::DPORT::steal() };
+        dport
+            .spi_dma_chan_sel()
+            .modify(|_, w| unsafe { w.spi2_dma_chan_sel().bits(1).spi3_dma_chan_sel().bits(2) });
     }
 }
 

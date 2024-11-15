@@ -19,10 +19,8 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::{master::{Config, Spi}, SpiMode};
-//! # use esp_hal::dma::Dma;
-//! let dma = Dma::new(peripherals.DMA);
-#![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
-#![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
+#![cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
+#![cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO2;
 //! let mosi = peripherals.GPIO4;
@@ -70,6 +68,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     soc::is_slice_in_dram,
+    system,
     Async,
     Blocking,
     Cpu,
@@ -1665,7 +1664,7 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 #[cfg_attr(pdma, doc = "")]
 #[cfg_attr(
     pdma,
-    doc = "Note that using mismatching channels (e.g. trying to use `spi2channel` with SPI3) may compile, but will panic in runtime."
+    doc = "Note that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime."
 )]
 #[cfg_attr(pdma, doc = "")]
 /// ## Example
@@ -1679,7 +1678,6 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// use esp_hal::dma::DmaChannelFor;
 /// use esp_hal::peripheral::Peripheral;
 /// use esp_hal::Blocking;
-/// use esp_hal::dma::Dma;
 ///
 /// fn configures_spi_dma<'d, S, CH>(
 ///     spi: Spi<'d, Blocking, S>,
@@ -1691,10 +1689,8 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 ///  {
 ///     spi.with_dma(channel)
 /// }
-///
-/// let dma = Dma::new(peripherals.DMA);
-#[cfg_attr(pdma, doc = "let dma_channel = dma.spi2channel;")]
-#[cfg_attr(gdma, doc = "let dma_channel = dma.channel0;")]
+#[cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
+#[cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
 #[doc = ""]
 /// let spi = Spi::new_with_config(
 ///     peripherals.SPI2,
@@ -1802,6 +1798,21 @@ pub trait Rx: crate::private::Sealed {
     fn waker(&self) -> &'static crate::asynch::AtomicWaker;
 }
 
+// NOTE(p4): because the P4 has two different GDMAs, we won't be able to use
+// `GenericPeripheralGuard`.
+cfg_if::cfg_if! {
+    if #[cfg(pdma)] {
+        type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Dma as u8}>;
+    } else {
+        type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Gdma as u8}>;
+    }
+}
+
+fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
+    // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
+    system::GenericPeripheralGuard::new_with(init_dma)
+}
+
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
@@ -1812,6 +1823,7 @@ where
 {
     pub(crate) rx_impl: PeripheralRef<'a, CH>,
     pub(crate) _phantom: PhantomData<M>,
+    pub(crate) _guard: PeripheralGuard,
 }
 
 impl<'a, CH> ChannelRx<'a, Blocking, CH>
@@ -1821,6 +1833,9 @@ where
     /// Creates a new RX channel half.
     pub fn new(rx_impl: impl Peripheral<P = CH> + 'a) -> Self {
         crate::into_ref!(rx_impl);
+
+        let _guard = create_guard(&*rx_impl);
+
         #[cfg(gdma)]
         // clear the mem2mem mode to avoid failed DMA if this
         // channel was previously used for a mem2mem transfer.
@@ -1836,6 +1851,7 @@ where
         Self {
             rx_impl,
             _phantom: PhantomData,
+            _guard,
         }
     }
 
@@ -1848,6 +1864,7 @@ where
         ChannelRx {
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 
@@ -1878,6 +1895,7 @@ where
         ChannelRx {
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 }
@@ -2095,6 +2113,7 @@ where
 {
     pub(crate) tx_impl: PeripheralRef<'a, CH>,
     pub(crate) _phantom: PhantomData<M>,
+    pub(crate) _guard: PeripheralGuard,
 }
 
 impl<'a, CH> ChannelTx<'a, Blocking, CH>
@@ -2104,6 +2123,9 @@ where
     /// Creates a new TX channel half.
     pub fn new(tx_impl: impl Peripheral<P = CH> + 'a) -> Self {
         crate::into_ref!(tx_impl);
+
+        let _guard = create_guard(&*tx_impl);
+
         if let Some(interrupt) = tx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
                 crate::interrupt::disable(cpu, interrupt);
@@ -2113,6 +2135,7 @@ where
         Self {
             tx_impl,
             _phantom: PhantomData,
+            _guard,
         }
     }
 
@@ -2125,6 +2148,7 @@ where
         ChannelTx {
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 
@@ -2155,6 +2179,7 @@ where
         ChannelTx {
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 }

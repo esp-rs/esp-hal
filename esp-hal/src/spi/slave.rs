@@ -18,10 +18,8 @@
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::slave::Spi;
-//! # use esp_hal::dma::Dma;
-//! let dma = Dma::new(peripherals.DMA);
-#![cfg_attr(pdma, doc = "let dma_channel = dma.spi2channel;")]
-#![cfg_attr(gdma, doc = "let dma_channel = dma.channel0;")]
+#![cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
+#![cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO1;
 //! let mosi = peripherals.GPIO2;

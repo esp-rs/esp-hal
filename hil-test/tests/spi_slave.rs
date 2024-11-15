@@ -9,7 +9,6 @@
 #![no_main]
 
 use esp_hal::{
-    dma::Dma,
     dma_buffers,
     gpio::{Input, Level, Output, Pull},
     peripheral::Peripheral,
@@ -107,13 +106,11 @@ mod tests {
         let (sclk_pin, _) = hil_test::common_test_pins!(peripherals);
         let cs_pin = hil_test::unconnected_pin!(peripherals);
 
-        let dma = Dma::new(peripherals.DMA);
-
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let dma_channel = dma.spi2channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 

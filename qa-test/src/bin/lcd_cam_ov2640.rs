@@ -28,7 +28,6 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::Dma,
     dma_rx_stream_buffer,
     i2c::{
         self,
@@ -46,8 +45,6 @@ use esp_println::{print, println};
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let dma = Dma::new(peripherals.DMA);
 
     let dma_rx_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
 
@@ -69,7 +66,7 @@ fn main() -> ! {
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let camera = Camera::new(lcd_cam.cam, dma.channel0, cam_data_pins, 20u32.MHz())
+    let camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, cam_data_pins, 20u32.MHz())
         .with_master_clock(cam_xclk)
         .with_pixel_clock(cam_pclk)
         .with_ctrl_pins(cam_vsync, cam_href);

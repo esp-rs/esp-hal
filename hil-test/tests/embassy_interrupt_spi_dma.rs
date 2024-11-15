@@ -9,7 +9,7 @@
 
 use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::{
-    dma::{Dma, DmaRxBuf, DmaTxBuf},
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     interrupt::{software::SoftwareInterruptControl, Priority},
     peripheral::Peripheral,
@@ -83,7 +83,6 @@ mod test {
     #[timeout(3)]
     async fn dma_does_not_lock_up_when_used_in_different_executors() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
             if #[cfg(systimer)] {
@@ -104,12 +103,12 @@ mod test {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
-                let dma_channel1 = dma.spi2channel;
-                let dma_channel2 = dma.spi3channel;
+            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+                let dma_channel1 = peripherals.DMA_SPI2;
+                let dma_channel2 = peripherals.DMA_SPI3;
             } else {
-                let dma_channel1 = dma.channel0;
-                let dma_channel2 = dma.channel1;
+                let dma_channel1 = peripherals.DMA_CH0;
+                let dma_channel2 = peripherals.DMA_CH1;
             }
         }
 
@@ -253,7 +252,6 @@ mod test {
         }
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
             if #[cfg(systimer)] {
@@ -275,9 +273,9 @@ mod test {
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
-                let dma_channel = dma.spi2channel;
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 

@@ -30,7 +30,6 @@ crate::peripherals! {
         CPU_CTRL <= virtual,
         DAC1 <= virtual,
         DAC2 <= virtual,
-        DMA <= virtual,
         EFUSE <= EFUSE,
         FLASH_ENCRYPTION <= FLASH_ENCRYPTION,
         FRC_TIMER <= FRC_TIMER,
@@ -112,5 +111,11 @@ crate::peripherals! {
         (37, [Input, Analog, RtcIoInput])
         (38, [Input, Analog, RtcIoInput])
         (39, [Input, Analog, RtcIoInput])
+    ],
+    dma_channels: [
+        DMA_SPI2: Spi2DmaChannel,
+        DMA_SPI3: Spi3DmaChannel,
+        DMA_I2S0: I2s0DmaChannel,
+        DMA_I2S1: I2s1DmaChannel,
     ]
 }

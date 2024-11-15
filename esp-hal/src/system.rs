@@ -166,12 +166,17 @@ pub(crate) struct PeripheralGuard {
 }
 
 impl PeripheralGuard {
-    pub(crate) fn new(p: Peripheral) -> Self {
+    pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
         if !KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p) {
             PeripheralClockControl::reset(p);
+            init();
         }
 
         Self { peripheral: p }
+    }
+
+    pub(crate) fn new(p: Peripheral) -> Self {
+        Self::new_with(p, || {})
     }
 }
 
@@ -187,13 +192,18 @@ impl Drop for PeripheralGuard {
 pub(crate) struct GenericPeripheralGuard<const P: u8> {}
 
 impl<const P: u8> GenericPeripheralGuard<P> {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new_with(init: fn()) -> Self {
         let peripheral = unwrap!(Peripheral::try_from(P));
         if !KEEP_ENABLED.contains(&peripheral) && PeripheralClockControl::enable(peripheral) {
             PeripheralClockControl::reset(peripheral);
+            init();
         }
 
         Self {}
+    }
+
+    pub(crate) fn new() -> Self {
+        Self::new_with(|| {})
     }
 }
 

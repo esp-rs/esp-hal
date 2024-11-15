@@ -22,7 +22,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    dma::*,
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     prelude::*,
     spi::{
@@ -45,13 +45,11 @@ async fn main(_spawner: Spawner) {
     let mosi = peripherals.GPIO4;
     let cs = peripherals.GPIO5;
 
-    let dma = Dma::new(peripherals.DMA);
-
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let dma_channel = dma.spi2channel;
+            let dma_channel = peripherals.DMA_SPI2;
         } else {
-            let dma_channel = dma.channel0;
+            let dma_channel = peripherals.DMA_CH0;
         }
     }
 

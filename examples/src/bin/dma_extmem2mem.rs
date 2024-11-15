@@ -9,12 +9,7 @@
 use aligned::{Aligned, A64};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    delay::Delay,
-    dma::{Dma, Mem2Mem},
-    dma_descriptors_chunk_size,
-    prelude::*,
-};
+use esp_hal::{delay::Delay, dma::Mem2Mem, dma_descriptors_chunk_size, prelude::*};
 use log::{error, info};
 extern crate alloc;
 
@@ -67,11 +62,10 @@ fn main() -> ! {
     let mut intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
-    let dma = Dma::new(peripherals.DMA);
     let dma_peripheral = peripherals.SPI2;
 
     let mut mem2mem = Mem2Mem::new_with_chunk_size(
-        dma.channel0,
+        peripherals.DMA_CH0,
         dma_peripheral,
         rx_descriptors,
         tx_descriptors,

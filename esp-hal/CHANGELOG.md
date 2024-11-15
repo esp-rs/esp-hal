@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- DMA channel objects now implement `Peripheral` (#2526)
+- In addition to taking by value, peripheral drivers can now mutably borrow DMA channel objects. (#2526)
 - DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
 - The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
 - `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SystemTimer`s `Alarm`s are now type erased (#2576)
 - `TimerGroup` `Timer`s are now type erased (#2581)
 - PSRAM is now initialized automatically if `quad-psram` or `octal-psram` is enabled (#2546)
+- DMA channels are now available via the `Peripherals` struct, and have been renamed accordingly. (#2545)
 
 ### Fixed
 
@@ -46,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SysTimerAlarms` has been removed, alarms are now part of the `SystemTimer` struct (#2576)
 - `FrozenUnit`, `AnyUnit`, `SpecificUnit`, `SpecificComparator`, `AnyComparator` have been removed from `systimer` (#2576)
 - `esp_hal::psram::psram_range` (#2546)
+- The `Dma` structure has been removed. (#2545)
 
 ## [0.22.0] - 2024-11-20
 

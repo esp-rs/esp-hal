@@ -20,7 +20,6 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    dma::Dma,
     dma_buffers,
     i2s::master::{DataFormat, I2s, Standard},
     prelude::*,
@@ -36,11 +35,13 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let dma = Dma::new(peripherals.DMA);
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-    let dma_channel = dma.i2s0channel;
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-    let dma_channel = dma.channel0;
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            let dma_channel = peripherals.DMA_I2S0;
+        } else {
+            let dma_channel = peripherals.DMA_CH0;
+        }
+    }
 
     let (rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(4092 * 4, 0);
 

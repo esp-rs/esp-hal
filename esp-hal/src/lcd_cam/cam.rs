@@ -19,10 +19,6 @@
 //! # use esp_hal::lcd_cam::{cam::{Camera, RxEightBits}, LcdCam};
 //! # use fugit::RateExtU32;
 //! # use esp_hal::dma_rx_stream_buffer;
-//! # use esp_hal::dma::Dma;
-//!
-//! # let dma = Dma::new(peripherals.DMA);
-//! # let channel = dma.channel0;
 //!
 //! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
 //!
@@ -44,7 +40,7 @@
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //! let mut camera = Camera::new(
 //!     lcd_cam.cam,
-//!     channel,
+//!     peripherals.DMA_CH0,
 //!     data_pins,
 //!     20u32.MHz(),
 //! )
