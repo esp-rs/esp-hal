@@ -1016,6 +1016,7 @@ mod impl_for_chip {
 }
 
 /// RMT Channel
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct Channel<M, const CHANNEL: u8>
 where
@@ -1023,12 +1024,6 @@ where
 {
     phantom: PhantomData<M>,
     _guard: PeripheralGuard,
-}
-
-impl<M: crate::Mode, const CHANNEL: u8> core::fmt::Debug for Channel<M, CHANNEL> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Rmt Channel {}", CHANNEL)
-    }
 }
 
 /// Channel in TX mode

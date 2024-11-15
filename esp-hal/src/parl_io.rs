@@ -1005,8 +1005,6 @@ where
     /// The receiver (RX) channel responsible for handling DMA transfers in the
     /// parallel I/O full-duplex operation.
     pub rx: RxCreatorFullDuplex<'d, DM>,
-
-    _guard: PeripheralGuard,
 }
 
 impl<'d> ParlIoFullDuplex<'d, Blocking> {
@@ -1023,7 +1021,8 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
         CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
         Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
-        let guard = PeripheralGuard::new(crate::system::Peripheral::ParlIo);
+        let tx_guard = PeripheralGuard::new(crate::system::Peripheral::ParlIo);
+        let rx_guard = PeripheralGuard::new(crate::system::Peripheral::ParlIo);
         let dma_channel = Channel::<Blocking, CH>::from(dma_channel);
         internal_init(frequency)?;
 
@@ -1031,14 +1030,13 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
             tx: TxCreatorFullDuplex {
                 tx_channel: dma_channel.tx.degrade(),
                 descriptors: tx_descriptors,
-                _guard: PeripheralGuard::new(crate::system::Peripheral::ParlIo),
+                _guard: tx_guard,
             },
             rx: RxCreatorFullDuplex {
                 rx_channel: dma_channel.rx.degrade(),
                 descriptors: rx_descriptors,
-                _guard: PeripheralGuard::new(crate::system::Peripheral::ParlIo),
+                _guard: rx_guard,
             },
-            _guard: guard,
         })
     }
 
@@ -1055,7 +1053,6 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
                 descriptors: self.rx.descriptors,
                 _guard: self.rx._guard,
             },
-            _guard: self._guard,
         }
     }
 
@@ -1110,7 +1107,6 @@ impl<'d> ParlIoFullDuplex<'d, Async> {
                 descriptors: self.rx.descriptors,
                 _guard: self.rx._guard,
             },
-            _guard: self._guard,
         }
     }
 }
@@ -1123,7 +1119,6 @@ where
     /// The transmitter (TX) channel responsible for handling DMA transfers in
     /// the parallel I/O operation.
     pub tx: TxCreator<'d, DM>,
-    _guard: PeripheralGuard,
 }
 
 impl<'d, DM> ParlIoTxOnly<'d, DM>
@@ -1148,8 +1143,8 @@ where
             tx: TxCreator {
                 tx_channel: dma_channel.tx.degrade(),
                 descriptors,
+                _guard: guard,
             },
-            _guard: guard,
         })
     }
 }
@@ -1200,8 +1195,6 @@ where
     /// The receiver (RX) channel responsible for handling DMA transfers in the
     /// parallel I/O operation.
     pub rx: RxCreator<'d, DM>,
-
-    _guard: PeripheralGuard,
 }
 
 impl<'d, DM> ParlIoRxOnly<'d, DM>
@@ -1226,8 +1219,8 @@ where
             rx: RxCreator {
                 rx_channel: dma_channel.rx.degrade(),
                 descriptors,
+                _guard: guard,
             },
-            _guard: guard,
         })
     }
 }
@@ -1488,6 +1481,7 @@ where
 {
     tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
+    _guard: PeripheralGuard,
 }
 
 /// Creates a RX channel
@@ -1497,6 +1491,7 @@ where
 {
     rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
+    _guard: PeripheralGuard,
 }
 
 /// Creates a TX channel

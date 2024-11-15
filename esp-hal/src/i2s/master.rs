@@ -259,7 +259,6 @@ where
     pub i2s_rx: RxCreator<'d, M, T>,
     /// Handles the transmission (TX) side of the I2S peripheral.
     pub i2s_tx: TxCreator<'d, M, T>,
-    guard: PeripheralGuard,
 }
 
 impl<'d, DmaMode, T> I2s<'d, DmaMode, T>
@@ -287,7 +286,8 @@ where
 
         // make sure the peripheral is enabled before configuring it
         let peripheral = i2s.peripheral();
-        let guard = PeripheralGuard::new(peripheral);
+        let rx_guard = PeripheralGuard::new(peripheral);
+        let tx_guard = PeripheralGuard::new(peripheral);
 
         i2s.set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));
         i2s.configure(&standard, &data_format);
@@ -300,15 +300,14 @@ where
                 i2s: unsafe { i2s.clone_unchecked() },
                 rx_channel: channel.rx,
                 descriptors: rx_descriptors,
-                guard,
+                guard: rx_guard,
             },
             i2s_tx: TxCreator {
                 i2s,
                 tx_channel: channel.tx,
                 descriptors: tx_descriptors,
-                guard: PeripheralGuard::new(peripheral),
+                guard: tx_guard,
             },
-            guard: PeripheralGuard::new(peripheral),
         }
     }
 }
@@ -446,7 +445,6 @@ where
                 descriptors: self.i2s_tx.descriptors,
                 guard: self.i2s_tx.guard,
             },
-            guard: self.guard,
         }
     }
 }

@@ -150,6 +150,7 @@ pub(crate) fn disable_peripherals() {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct PeripheralGuard {
     peripheral: Peripheral,
 }
