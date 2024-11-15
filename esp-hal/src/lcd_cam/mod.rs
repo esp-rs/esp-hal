@@ -31,8 +31,6 @@ pub struct LcdCam<'d, DM: crate::Mode> {
     pub lcd: Lcd<'d, DM>,
     /// The Camera interface.
     pub cam: Cam<'d>,
-
-    _guard: PeripheralGuard,
 }
 
 impl<'d> LcdCam<'d, Blocking> {
@@ -40,15 +38,19 @@ impl<'d> LcdCam<'d, Blocking> {
     pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
         crate::into_ref!(lcd_cam);
 
-        let guard = PeripheralGuard::new(system::Peripheral::LcdCam);
+        let lcd_guard = PeripheralGuard::new(system::Peripheral::LcdCam);
+        let cam_guard = PeripheralGuard::new(system::Peripheral::LcdCam);
 
         Self {
             lcd: Lcd {
                 lcd_cam: unsafe { lcd_cam.clone_unchecked() },
                 _mode: PhantomData,
+                _guard: lcd_guard,
             },
-            cam: Cam { lcd_cam },
-            _guard: guard,
+            cam: Cam {
+                lcd_cam,
+                _guard: cam_guard,
+            },
         }
     }
 
@@ -59,9 +61,9 @@ impl<'d> LcdCam<'d, Blocking> {
             lcd: Lcd {
                 lcd_cam: self.lcd.lcd_cam,
                 _mode: PhantomData,
+                _guard: self.lcd._guard,
             },
             cam: self.cam,
-            _guard: self._guard,
         }
     }
 }
@@ -90,9 +92,9 @@ impl<'d> LcdCam<'d, Async> {
             lcd: Lcd {
                 lcd_cam: self.lcd.lcd_cam,
                 _mode: PhantomData,
+                _guard: self.lcd._guard,
             },
             cam: self.cam,
-            _guard: self._guard,
         }
     }
 }
