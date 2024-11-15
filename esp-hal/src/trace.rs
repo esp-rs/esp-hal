@@ -22,8 +22,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::trace::Trace;
-//! let mut trace = Trace::new(peripherals.TRACE0);
 //! let mut buffer = [0_u8; 1024];
+//! let mut trace = Trace::new(peripherals.TRACE0);
 //! trace.start_trace(&mut buffer);
 //! // traced code
 //!
