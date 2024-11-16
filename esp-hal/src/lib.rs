@@ -575,38 +575,50 @@ pub fn init(config: Config) -> Peripherals {
 
 /// Asynchronous utilities.
 pub mod asynch {
-    use core::task::Waker;
+    use core::{
+        ptr,
+        task::{RawWaker, RawWakerVTable, Waker},
+    };
 
     use crate::sync::Locked;
 
     /// Utility struct to register and wake a waker.
     pub struct AtomicWaker {
-        waker: Locked<Option<Waker>>,
+        waker: Locked<Waker>,
     }
 
     impl AtomicWaker {
         /// Create a new `AtomicWaker`.
         pub const fn new() -> Self {
+            // TODO: replace with `Waker::noop` once stable
+            // A no-op vtable used to initialize an AtomicWaker.
+            const NOOP: RawWaker = {
+                const VTABLE: RawWakerVTable = RawWakerVTable::new(
+                    // Cloning just returns a new no-op raw waker
+                    |_| NOOP,
+                    // `wake` does nothing
+                    |_| {},
+                    // `wake_by_ref` does nothing
+                    |_| {},
+                    // Dropping does nothing as we don't allocate anything
+                    |_| {},
+                );
+                RawWaker::new(ptr::null(), &VTABLE)
+            };
+            let waker = unsafe { Waker::from_raw(NOOP) };
             Self {
-                waker: Locked::new(None),
+                waker: Locked::new(waker),
             }
         }
 
         /// Register a waker. Overwrites the previous waker, if any.
         pub fn register(&self, w: &Waker) {
-            self.waker.with(|waker| match waker {
-                Some(w2) if w2.will_wake(w) => {}
-                _ => *waker = Some(w.clone()),
-            })
+            self.waker.with(|waker| waker.clone_from(w))
         }
 
         /// Wake the registered waker, if any.
         pub fn wake(&self) {
-            self.waker.with(|waker| {
-                if let Some(w) = waker {
-                    w.wake_by_ref();
-                }
-            })
+            self.waker.with(|waker| waker.wake_by_ref())
         }
     }
 }
