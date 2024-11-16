@@ -38,16 +38,16 @@ pub(crate) static STA_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::I
 pub(crate) static AP_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::Invalid);
 
 /// Get the current state of the AP
-pub fn get_ap_state() -> WifiState {
+pub fn ap_state() -> WifiState {
     AP_STATE.load(Ordering::Relaxed)
 }
 
 /// Get the current state of the STA
-pub fn get_sta_state() -> WifiState {
+pub fn sta_state() -> WifiState {
     STA_STATE.load(Ordering::Relaxed)
 }
 
-pub(crate) fn update_state(event: WifiEvent) {
+pub(crate) fn update_state(event: WifiEvent, handled: bool) {
     match event {
         WifiEvent::StaConnected
         | WifiEvent::StaDisconnected
@@ -58,29 +58,31 @@ pub(crate) fn update_state(event: WifiEvent) {
             AP_STATE.store(WifiState::from(event), Ordering::Relaxed)
         }
 
-        other => debug!("Unhandled event: {:?}", other),
+        other => {
+            if !handled {
+                debug!("Unhandled event: {:?}", other)
+            }
+        }
     }
 }
 
-#[cfg(feature = "async")]
 pub(crate) fn reset_ap_state() {
     AP_STATE.store(WifiState::Invalid, Ordering::Relaxed)
 }
 
-#[cfg(feature = "async")]
 pub(crate) fn reset_sta_state() {
     STA_STATE.store(WifiState::Invalid, Ordering::Relaxed)
 }
 
 /// Returns the current state of the WiFi stack.
 ///
-/// This does not support AP-STA mode. Use one of `get_sta_state` or
-/// `get_ap_state` instead.
-pub fn get_wifi_state() -> WifiState {
+/// This does not support AP-STA mode. Use one of `sta_state` or
+/// `ap_state` instead.
+pub fn wifi_state() -> WifiState {
     use super::WifiMode;
     match WifiMode::current() {
-        Ok(WifiMode::Sta) => get_sta_state(),
-        Ok(WifiMode::Ap) => get_ap_state(),
+        Ok(WifiMode::Sta) => sta_state(),
+        Ok(WifiMode::Ap) => ap_state(),
         _ => WifiState::Invalid,
     }
 }

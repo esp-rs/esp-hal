@@ -244,7 +244,7 @@ pub(crate) fn set_tx_addr(addr: *const u8) {
 pub(crate) fn set_cmd(cmd: Command) {
     unsafe { &*IEEE802154::PTR }
         .command()
-        .modify(|_, w| unsafe { w.opcode().bits(cmd as u8) })
+        .modify(|_, w| unsafe { w.opcode().bits(cmd as u8) });
 }
 
 #[inline(always)]
@@ -255,7 +255,7 @@ pub(crate) fn set_freq(freq: u8) {
 }
 
 #[inline(always)]
-pub(crate) fn get_freq() -> u8 {
+pub(crate) fn freq() -> u8 {
     unsafe { &*IEEE802154::PTR }.channel().read().hop().bits()
 }
 
@@ -271,7 +271,7 @@ pub(crate) fn set_multipan_enable_mask(mask: u8) {
     // apparently the REGS are garbage and the struct is right?
     unsafe { &*IEEE802154::PTR }
         .ctrl_cfg()
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b1111 << 29) | (mask as u32) << 29) })
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b1111 << 29) | (mask as u32) << 29) });
 }
 
 #[inline(always)]
@@ -333,7 +333,7 @@ pub(crate) fn set_cca_mode(cca_mode: CcaMode) {
 pub(crate) fn set_cca_threshold(cca_threshold: i8) {
     unsafe { &*IEEE802154::PTR }
         .ed_scan_cfg()
-        .modify(|_, w| unsafe { w.cca_ed_threshold().bits(cca_threshold as u8) })
+        .modify(|_, w| unsafe { w.cca_ed_threshold().bits(cca_threshold as u8) });
 }
 
 #[inline(always)]
@@ -344,7 +344,7 @@ pub(crate) fn set_tx_auto_ack(enable: bool) {
 }
 
 #[inline(always)]
-pub(crate) fn get_tx_auto_ack() -> bool {
+pub(crate) fn tx_auto_ack() -> bool {
     unsafe { &*IEEE802154::PTR }
         .ctrl_cfg()
         .read()
@@ -367,7 +367,7 @@ pub(crate) fn set_tx_enhance_ack(enable: bool) {
 }
 
 #[inline(always)]
-pub(crate) fn get_tx_enhance_ack() -> bool {
+pub(crate) fn tx_enhance_ack() -> bool {
     unsafe { &*IEEE802154::PTR }
         .ctrl_cfg()
         .read()
@@ -397,7 +397,7 @@ pub(crate) fn set_pending_mode(enable: bool) {
 }
 
 #[inline(always)]
-pub(crate) fn get_events() -> u16 {
+pub(crate) fn events() -> u16 {
     unsafe { &*IEEE802154::PTR }.event_status().read().bits() as u16
 }
 

@@ -26,7 +26,7 @@
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::ASSIST_DEBUG,
+    peripherals::{Interrupt, ASSIST_DEBUG},
     InterruptConfigurable,
 };
 
@@ -47,26 +47,23 @@ impl<'d> DebugAssist<'d> {
     }
 }
 
-impl<'d> crate::private::Sealed for DebugAssist<'d> {}
+impl crate::private::Sealed for DebugAssist<'_> {}
 
-impl<'d> InterruptConfigurable for DebugAssist<'d> {
+impl InterruptConfigurable for DebugAssist<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(
-                crate::peripherals::Interrupt::ASSIST_DEBUG,
-                handler.handler(),
-            );
-            crate::interrupt::enable(
-                crate::peripherals::Interrupt::ASSIST_DEBUG,
-                handler.priority(),
-            )
-            .unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::ASSIST_DEBUG);
         }
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::ASSIST_DEBUG, handler.handler()) };
+        unwrap!(crate::interrupt::enable(
+            Interrupt::ASSIST_DEBUG,
+            handler.priority()
+        ));
     }
 }
 
 #[cfg(assist_debug_sp_monitor)]
-impl<'d> DebugAssist<'d> {
+impl DebugAssist<'_> {
     /// Enable SP monitoring on main core. When the SP exceeds the
     /// `lower_bound` or `upper_bound` threshold, the module will record the PC
     /// pointer and generate an interrupt.
@@ -139,7 +136,7 @@ impl<'d> DebugAssist<'d> {
     }
 
     /// Get SP monitoring PC value on main core.
-    pub fn get_sp_monitor_pc(&self) -> u32 {
+    pub fn sp_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_0_sp_pc()
             .read()
@@ -222,13 +219,13 @@ impl<'d> DebugAssist<'d> {
     }
 
     /// Get SP monitoring PC value on secondary core.
-    pub fn get_core1_sp_monitor_pc(&self) -> u32 {
+    pub fn core1_sp_monitor_pc(&self) -> u32 {
         self.debug_assist.core_1_sp_pc.read().core_1_sp_pc().bits()
     }
 }
 
 #[cfg(assist_debug_region_monitor)]
-impl<'d> DebugAssist<'d> {
+impl DebugAssist<'_> {
     /// Enable region monitoring of read/write performed by the main CPU in a
     /// certain memory region0. Whenever the bus reads or writes in the
     /// specified memory region, an interrupt will be triggered. Two memory
@@ -385,7 +382,7 @@ impl<'d> DebugAssist<'d> {
     }
 
     /// Get region monitoring PC value on main core.
-    pub fn get_region_monitor_pc(&self) -> u32 {
+    pub fn region_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_0_area_pc()
             .read()
@@ -551,7 +548,7 @@ impl<'d> DebugAssist<'d> {
     }
 
     /// Get region monitoring PC value on secondary core.
-    pub fn get_core1_region_monitor_pc(&self) -> u32 {
+    pub fn core1_region_monitor_pc(&self) -> u32 {
         self.debug_assist
             .core_1_area_pc()
             .read()

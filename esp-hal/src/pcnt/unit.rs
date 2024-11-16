@@ -84,7 +84,7 @@ pub struct Unit<'d, const NUM: usize> {
     pub channel1: Channel<'d, NUM, 1>,
 }
 
-impl<'d, const NUM: usize> Unit<'d, NUM> {
+impl<const NUM: usize> Unit<'_, NUM> {
     /// return a new Unit
     pub(super) fn new() -> Self {
         Self {
@@ -243,7 +243,7 @@ impl<'d, const NUM: usize> Unit<'d, NUM> {
     }
 
     /// Get the latest events for this unit.
-    pub fn get_events(&self) -> Events {
+    pub fn events(&self) -> Events {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         let status = pcnt.u_status(NUM).read();
 
@@ -257,7 +257,7 @@ impl<'d, const NUM: usize> Unit<'d, NUM> {
     }
 
     /// Get the mode of the last zero crossing
-    pub fn get_zero_mode(&self) -> ZeroMode {
+    pub fn zero_mode(&self) -> ZeroMode {
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
         pcnt.u_status(NUM).read().zero_mode().bits().into()
     }
@@ -296,19 +296,19 @@ impl<'d, const NUM: usize> Unit<'d, NUM> {
     }
 
     /// Get the current counter value.
-    pub fn get_value(&self) -> i16 {
+    pub fn value(&self) -> i16 {
         self.counter.get()
     }
 }
 
-impl<'d, const NUM: usize> Drop for Unit<'d, NUM> {
+impl<const NUM: usize> Drop for Unit<'_, NUM> {
     fn drop(&mut self) {
         // This is here to prevent the destructuring of Unit.
     }
 }
 
 // The entire Unit is Send but the individual channels are not.
-unsafe impl<'d, const NUM: usize> Send for Unit<'d, NUM> {}
+unsafe impl<const NUM: usize> Send for Unit<'_, NUM> {}
 
 /// Represents the counter within a pulse counter unit.
 #[derive(Clone)]
@@ -316,7 +316,7 @@ pub struct Counter<'d, const NUM: usize> {
     _phantom: PhantomData<&'d ()>,
 }
 
-impl<'d, const NUM: usize> Counter<'d, NUM> {
+impl<const NUM: usize> Counter<'_, NUM> {
     fn new() -> Self {
         Self {
             _phantom: PhantomData,

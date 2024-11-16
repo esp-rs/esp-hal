@@ -6,7 +6,6 @@
 #![no_main]
 
 use esp_hal::{
-    gpio::Io,
     prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
 };
@@ -15,6 +14,8 @@ use hil_test as _;
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    use esp_hal::rmt::Error;
+
     use super::*;
 
     #[init]
@@ -24,8 +25,6 @@ mod tests {
     #[timeout(1)]
     fn rmt_loopback() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32h2")] {
@@ -37,7 +36,7 @@ mod tests {
 
         let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
-        let (rx, tx) = hil_test::common_test_pins!(io);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let tx_config = TxChannelConfig {
             clk_divider: 255,
@@ -79,30 +78,15 @@ mod tests {
             }
         }
 
-        let mut tx_data = [PulseCode {
-            level1: true,
-            length1: 200,
-            level2: false,
-            length2: 50,
-        }; 20];
+        let mut tx_data = [PulseCode::new(true, 200, false, 50); 20];
 
-        tx_data[tx_data.len() - 2] = PulseCode {
-            level1: true,
-            length1: 3000,
-            level2: false,
-            length2: 500,
-        };
-        tx_data[tx_data.len() - 1] = PulseCode::default();
+        tx_data[tx_data.len() - 2] = PulseCode::new(true, 3000, false, 500);
+        tx_data[tx_data.len() - 1] = PulseCode::empty();
 
-        let mut rcv_data = [PulseCode {
-            level1: false,
-            length1: 0,
-            level2: false,
-            length2: 0,
-        }; 20];
+        let mut rcv_data: [u32; 20] = [PulseCode::empty(); 20];
 
         let rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
-        let tx_transaction = tx_channel.transmit(&tx_data);
+        let tx_transaction = tx_channel.transmit(&tx_data).unwrap();
 
         rx_transaction.wait().unwrap();
         tx_transaction.wait().unwrap();
@@ -110,5 +94,40 @@ mod tests {
         // the last two pulse-codes are the ones which wait for the timeout so
         // they can't be equal
         assert_eq!(&tx_data[..18], &rcv_data[..18]);
+    }
+
+    #[test]
+    #[timeout(1)]
+    fn rmt_single_shot_fails_without_end_marker() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32h2")] {
+                let freq = 32.MHz();
+            } else {
+                let freq = 80.MHz();
+            }
+        };
+
+        let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+
+        let (_, tx) = hil_test::common_test_pins!(peripherals);
+
+        let tx_config = TxChannelConfig {
+            clk_divider: 255,
+            ..TxChannelConfig::default()
+        };
+
+        let tx_channel = {
+            use esp_hal::rmt::TxChannelCreator;
+            rmt.channel0.configure(tx, tx_config).unwrap()
+        };
+
+        let tx_data = [PulseCode::new(true, 200, false, 50); 20];
+
+        let tx_transaction = tx_channel.transmit(&tx_data);
+
+        assert!(tx_transaction.is_err());
+        assert!(matches!(tx_transaction, Err(Error::EndMarkerMissing)));
     }
 }

@@ -9,10 +9,7 @@ use crate::{
 pub(crate) fn init() {}
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(
-        RtcClock::get_xtal_freq(),
-        XtalClock::RtcXtalFreq40M
-    ));
+    assert!(matches!(RtcClock::xtal_freq(), XtalClock::RtcXtalFreq40M));
 
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
 

@@ -283,7 +283,7 @@ impl<'d> Rtc<'d> {
     pub fn time_since_boot(&self) -> MicrosDurationU64 {
         MicrosDurationU64::micros(
             self.time_since_boot_raw() * 1_000_000
-                / RtcClock::get_slow_freq().frequency().to_Hz() as u64,
+                / RtcClock::slow_freq().frequency().to_Hz() as u64,
         )
     }
 
@@ -430,27 +430,22 @@ impl<'d> Rtc<'d> {
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
     }
 }
-impl<'d> crate::private::Sealed for Rtc<'d> {}
+impl crate::private::Sealed for Rtc<'_> {}
 
-impl<'d> InterruptConfigurable for Rtc<'d> {
+impl InterruptConfigurable for Rtc<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            interrupt::bind_interrupt(
-                #[cfg(any(esp32c6, esp32h2))]
-                Interrupt::LP_WDT,
-                #[cfg(not(any(esp32c6, esp32h2)))]
-                Interrupt::RTC_CORE,
-                handler.handler(),
-            );
-            interrupt::enable(
-                #[cfg(any(esp32c6, esp32h2))]
-                Interrupt::LP_WDT,
-                #[cfg(not(any(esp32c6, esp32h2)))]
-                Interrupt::RTC_CORE,
-                handler.priority(),
-            )
-            .unwrap();
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c6, esp32h2))] {
+                let interrupt = Interrupt::LP_WDT;
+            } else {
+                let interrupt = Interrupt::RTC_CORE;
+            }
         }
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
+        }
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 }
 
@@ -521,7 +516,7 @@ impl RtcClock {
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
     #[cfg(not(any(esp32c6, esp32h2)))]
-    pub fn get_xtal_freq() -> XtalClock {
+    pub fn xtal_freq() -> XtalClock {
         match Self::read_xtal_freq_mhz() {
             None | Some(40) => XtalClock::RtcXtalFreq40M,
             #[cfg(any(esp32c3, esp32s3))]
@@ -534,7 +529,7 @@ impl RtcClock {
 
     /// Get the RTC_SLOW_CLK source.
     #[cfg(not(any(esp32c6, esp32h2)))]
-    pub fn get_slow_freq() -> RtcSlowClock {
+    pub fn slow_freq() -> RtcSlowClock {
         let rtc_cntl = unsafe { &*LPWR::PTR };
         let slow_freq = rtc_cntl.clk_conf().read().ana_clk_rtc_sel().bits();
         match slow_freq {
@@ -595,7 +590,7 @@ impl RtcClock {
         // The following code emulates ESP32 behavior for the other chips:
         #[cfg(not(esp32))]
         let cal_clk = match cal_clk {
-            RtcCalSel::RtcCalRtcMux => match RtcClock::get_slow_freq() {
+            RtcCalSel::RtcCalRtcMux => match RtcClock::slow_freq() {
                 RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                 RtcSlowClock::RtcSlowClock8mD256 => RtcCalSel::RtcCal8mD256,
                 _ => cal_clk,
@@ -730,7 +725,7 @@ impl RtcClock {
 
     /// Measure ratio between XTAL frequency and RTC slow clock frequency.
     #[cfg(not(any(esp32c6, esp32h2)))]
-    fn get_calibration_ratio(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
+    fn calibration_ratio(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
         let ratio = (xtal_cycles << RtcClock::CAL_FRACT) / slowclk_cycles as u64;
 
@@ -746,7 +741,7 @@ impl RtcClock {
     /// issue, or lack of 32 XTAL on board).
     #[cfg(not(any(esp32c6, esp32h2)))]
     fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        let xtal_freq = RtcClock::get_xtal_freq();
+        let xtal_freq = RtcClock::xtal_freq();
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
         let divider = xtal_freq.mhz() as u64 * slowclk_cycles as u64;
         let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
@@ -758,7 +753,7 @@ impl RtcClock {
     #[cfg(not(any(esp32c6, esp32h2)))]
     fn cycles_to_1ms() -> u16 {
         let period_13q19 = RtcClock::calibrate(
-            match RtcClock::get_slow_freq() {
+            match RtcClock::slow_freq() {
                 RtcSlowClock::RtcSlowClockRtc => RtcCalSel::RtcCalRtcMux,
                 RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                 #[cfg(not(any(esp32c6, esp32h2)))]
@@ -787,7 +782,7 @@ impl RtcClock {
             RtcClock::enable_8m(true, true);
         }
 
-        let ratio = RtcClock::get_calibration_ratio(RtcCalSel::RtcCal8mD256, XTAL_FREQ_EST_CYCLES);
+        let ratio = RtcClock::calibration_ratio(RtcCalSel::RtcCal8mD256, XTAL_FREQ_EST_CYCLES);
         let freq_mhz =
             ((ratio as u64 * RtcFastClock::RtcFastClock8m.hz() as u64 / 1_000_000u64 / 256u64)
                 >> RtcClock::CAL_FRACT) as u32;
@@ -988,47 +983,47 @@ impl Rwdt {
                 RwdtStage::Stage3 => rtc_cntl
                     .wdtconfig4()
                     .modify(|_, w| w.wdt_stg3_hold().bits(timeout_raw)),
-            }
+            };
 
             #[cfg(any(esp32c6, esp32h2))]
             match stage {
                 RwdtStage::Stage0 => rtc_cntl.config1().modify(|_, w| {
                     w.wdt_stg0_hold()
-                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
                 }),
                 RwdtStage::Stage1 => rtc_cntl.config2().modify(|_, w| {
                     w.wdt_stg1_hold()
-                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
                 }),
                 RwdtStage::Stage2 => rtc_cntl.config3().modify(|_, w| {
                     w.wdt_stg2_hold()
-                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
                 }),
                 RwdtStage::Stage3 => rtc_cntl.config4().modify(|_, w| {
                     w.wdt_stg3_hold()
-                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
                 }),
-            }
+            };
 
             #[cfg(not(any(esp32, esp32c6, esp32h2)))]
             match stage {
                 RwdtStage::Stage0 => rtc_cntl.wdtconfig1().modify(|_, w| {
                     w.wdt_stg0_hold()
-                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
                 }),
                 RwdtStage::Stage1 => rtc_cntl.wdtconfig2().modify(|_, w| {
                     w.wdt_stg1_hold()
-                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
                 }),
                 RwdtStage::Stage2 => rtc_cntl.wdtconfig3().modify(|_, w| {
                     w.wdt_stg2_hold()
-                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
                 }),
                 RwdtStage::Stage3 => rtc_cntl.wdtconfig4().modify(|_, w| {
                     w.wdt_stg3_hold()
-                        .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
                 }),
-            }
+            };
         }
 
         self.set_write_protection(true);
@@ -1053,7 +1048,7 @@ impl Rwdt {
             RwdtStage::Stage3 => rtc_cntl
                 .wdtconfig0()
                 .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) }),
-        }
+        };
 
         self.set_write_protection(true);
     }
@@ -1144,15 +1139,15 @@ impl embedded_hal_02::watchdog::WatchdogDisable for Swd {
 }
 
 /// Return reset reason.
-pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
+pub fn reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     let reason = crate::rom::rtc_get_reset_reason(cpu as u32);
 
     SocResetReason::from_repr(reason as usize)
 }
 
 /// Return wakeup reason.
-pub fn get_wakeup_cause() -> SleepSource {
-    if get_reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep) {
+pub fn wakeup_cause() -> SleepSource {
+    if reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep) {
         return SleepSource::Undefined;
     }
 
@@ -1226,6 +1221,6 @@ pub fn get_wakeup_cause() -> SleepSource {
 // so that either ieee or esp-wifi gets it for free without duplicating in both
 #[no_mangle]
 extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
-    let xtal = RtcClock::get_xtal_freq();
+    let xtal = RtcClock::xtal_freq();
     xtal.mhz() as i32
 }

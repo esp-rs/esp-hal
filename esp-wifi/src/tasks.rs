@@ -1,8 +1,7 @@
 use crate::{
-    compat::{queue::SimpleQueue, timer_compat::TIMERS},
-    memory_fence::memory_fence,
+    compat::timer_compat::TIMERS,
     preempt::arch_specific::task_create,
-    timer::{get_systimer_count, yield_task},
+    timer::{systimer_count, yield_task},
 };
 
 /// Initializes the `main` and `timer` tasks for the Wi-Fi driver.
@@ -18,34 +17,31 @@ pub(crate) fn init_tasks() {
 /// events.
 pub(crate) extern "C" fn timer_task(_param: *mut esp_wifi_sys::c_types::c_void) {
     loop {
-        let mut to_run = SimpleQueue::<_, 20>::new();
+        let current_timestamp = systimer_count();
+        let to_run = critical_section::with(|cs| unsafe {
+            let mut timers = TIMERS.borrow_ref_mut(cs);
+            let to_run = timers.find_next_due(current_timestamp);
 
-        let current_timestamp = get_systimer_count();
-        critical_section::with(|_| unsafe {
-            memory_fence();
-            for timer in TIMERS.iter_mut() {
-                if timer.active
-                    && crate::timer::time_diff(timer.started, current_timestamp) >= timer.timeout
-                {
-                    trace!("timer is due.... {:x}", timer.id());
+            if let Some(to_run) = to_run {
+                to_run.active = to_run.periodic;
 
-                    if to_run.enqueue(timer.callback).is_err() {
-                        break;
-                    }
+                if to_run.periodic {
+                    to_run.started = current_timestamp;
+                }
 
-                    timer.active = timer.periodic;
-                };
+                Some(to_run.callback)
+            } else {
+                None
             }
-            memory_fence();
         });
 
-        // run the due timer callbacks NOT in an interrupt free context
-        while let Some(callback) = to_run.dequeue() {
+        // run the due timer callback NOT in an interrupt free context
+        if let Some(to_run) = to_run {
             trace!("trigger timer....");
-            callback.call();
+            to_run.call();
             trace!("timer callback called");
+        } else {
+            yield_task();
         }
-
-        yield_task();
     }
 }

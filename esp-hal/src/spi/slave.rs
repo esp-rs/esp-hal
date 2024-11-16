@@ -20,29 +20,32 @@
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::slave::Spi;
 //! # use esp_hal::dma::Dma;
-//! # use esp_hal::gpio::Io;
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(pdma, doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(gdma, doc = "let dma_channel = dma.channel0;")]
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let sclk = io.pins.gpio0;
-//! let miso = io.pins.gpio1;
-//! let mosi = io.pins.gpio2;
-//! let cs = io.pins.gpio3;
+//! let sclk = peripherals.GPIO0;
+//! let miso = peripherals.GPIO1;
+//! let mosi = peripherals.GPIO2;
+//! let cs = peripherals.GPIO3;
 //!
 //! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-//! dma_buffers!(32000); let mut spi = Spi::new(
+//! dma_buffers!(32000);
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     sclk,
-//!     mosi,
-//!     miso,
-//!     cs,
 //!     SpiMode::Mode0,
 //! )
-//! .with_dma(dma_channel.configure(
-//!     false,
-//!     DmaPriority::Priority0,
-//! ), rx_descriptors, tx_descriptors);
+//! .with_sck(sclk)
+//! .with_mosi(mosi)
+//! .with_miso(miso)
+//! .with_cs(cs)
+//! .with_dma(
+//!     dma_channel.configure(
+//!         false,
+//!         DmaPriority::Priority0,
+//!     ),
+//!     rx_descriptors,
+//!     tx_descriptors,
+//! );
 //!
 //! let mut receive = rx_buffer;
 //! let mut send = tx_buffer;
@@ -70,12 +73,15 @@
 //!
 //! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
 
+use core::marker::PhantomData;
+
 use super::{Error, SpiMode};
 use crate::{
-    dma::{DescriptorChain, DmaChannelConvert, DmaEligible, PeripheralMarker, Rx, Tx},
+    dma::{DmaChannelConvert, DmaEligible},
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
+        NoPin,
         OutputSignal,
     },
     peripheral::{Peripheral, PeripheralRef},
@@ -83,6 +89,7 @@ use crate::{
     private,
     spi::AnySpi,
     system::PeripheralClockControl,
+    Blocking,
 };
 
 const MAX_DMA_SIZE: usize = 32768 - 32;
@@ -90,84 +97,76 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 /// SPI peripheral driver.
 ///
 /// See the [module-level documentation][self] for more details.
-pub struct Spi<'d, T = AnySpi> {
+pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     #[allow(dead_code)]
     data_mode: SpiMode,
+    _mode: PhantomData<M>,
 }
 
-impl<'d> Spi<'d> {
+impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<
-        SCK: PeripheralInput,
-        MOSI: PeripheralInput,
-        MISO: PeripheralOutput,
-        CS: PeripheralInput,
-    >(
-        spi: impl Peripheral<P = impl Instance> + 'd,
-        sclk: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
-        mode: SpiMode,
-    ) -> Spi<'d> {
-        Self::new_typed(spi.map_into(), sclk, mosi, miso, cs, mode)
+    pub fn new(spi: impl Peripheral<P = impl Instance> + 'd, mode: SpiMode) -> Spi<'d, Blocking> {
+        Self::new_typed(spi.map_into(), mode)
     }
 }
 
-impl<'d, T> Spi<'d, T>
+impl<'d, M, T> Spi<'d, M, T>
 where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_typed<
-        SCK: PeripheralInput,
-        MOSI: PeripheralInput,
-        MISO: PeripheralOutput,
-        CS: PeripheralInput,
-    >(
-        spi: impl Peripheral<P = T> + 'd,
-        sclk: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
-        mode: SpiMode,
-    ) -> Spi<'d, T> {
-        crate::into_mapped_ref!(sclk, mosi, miso, cs);
-
-        let this = Self::new_internal(spi, mode);
-
-        // TODO: with_pins et. al.
-        sclk.enable_input(true, private::Internal);
-        sclk.connect_input_to_peripheral(this.spi.sclk_signal(), private::Internal);
-
-        mosi.enable_input(true, private::Internal);
-        mosi.connect_input_to_peripheral(this.spi.mosi_signal(), private::Internal);
-
-        miso.set_to_push_pull_output(private::Internal);
-        miso.connect_peripheral_to_output(this.spi.miso_signal(), private::Internal);
-
-        cs.enable_input(true, private::Internal);
-        cs.connect_input_to_peripheral(this.spi.cs_signal(), private::Internal);
-
-        this
-    }
-
-    pub(crate) fn new_internal(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, T> {
+    pub fn new_typed(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, M, T> {
         crate::into_ref!(spi);
 
-        let mut spi = Spi {
+        let this = Spi {
             spi,
             data_mode: mode,
+            _mode: PhantomData,
         };
 
-        PeripheralClockControl::reset(spi.spi.peripheral());
-        PeripheralClockControl::enable(spi.spi.peripheral());
+        PeripheralClockControl::reset(this.spi.info().peripheral);
+        PeripheralClockControl::enable(this.spi.info().peripheral);
 
-        spi.spi.init();
-        spi.spi.set_data_mode(mode, false);
+        this.spi.info().init();
+        this.spi.info().set_data_mode(mode, false);
 
-        spi
+        this.with_mosi(NoPin)
+            .with_miso(NoPin)
+            .with_sck(NoPin)
+            .with_cs(NoPin)
+    }
+
+    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    pub fn with_sck(self, sclk: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(sclk);
+        sclk.enable_input(true, private::Internal);
+        self.spi.info().sclk.connect_to(sclk);
+        self
+    }
+
+    /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
+    pub fn with_mosi(self, mosi: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(mosi);
+        mosi.enable_input(true, private::Internal);
+        self.spi.info().mosi.connect_to(mosi);
+        self
+    }
+
+    /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
+    pub fn with_miso(self, miso: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        crate::into_mapped_ref!(miso);
+        miso.set_to_push_pull_output(private::Internal);
+        self.spi.info().miso.connect_to(miso);
+        self
+    }
+
+    /// Assign the CS (Chip Select) pin for the SPI instance.
+    pub fn with_cs(self, cs: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(cs);
+        cs.enable_input(true, private::Internal);
+        self.spi.info().cs.connect_to(cs);
+        self
     }
 }
 
@@ -193,41 +192,43 @@ pub mod dma {
         Mode,
     };
 
-    impl<'d, T> Spi<'d, T>
+    impl<'d, M, T> Spi<'d, M, T>
     where
         T: InstanceDma,
+        M: Mode,
     {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-        pub fn with_dma<CH, DmaMode>(
-            mut self,
-            channel: Channel<'d, CH, DmaMode>,
+        pub fn with_dma<CH, DM>(
+            self,
+            channel: Channel<'d, DM, CH>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, DmaMode, T>
+        ) -> SpiDma<'d, M, T>
         where
             CH: DmaChannelConvert<T::Dma>,
-            DmaMode: Mode,
+            DM: Mode,
+            Channel<'d, M, CH>: From<Channel<'d, DM, CH>>,
         {
-            self.spi.set_data_mode(self.data_mode, true);
-            SpiDma::new(self.spi, channel, rx_descriptors, tx_descriptors)
+            self.spi.info().set_data_mode(self.data_mode, true);
+            SpiDma::new(self.spi, channel.into(), rx_descriptors, tx_descriptors)
         }
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, DmaMode, T = AnySpi>
+    pub struct SpiDma<'d, M, T = AnySpi>
     where
         T: InstanceDma,
-        DmaMode: Mode,
+        M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, T::Dma, DmaMode>,
+        pub(crate) channel: Channel<'d, M, T::Dma>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
 
-    impl<'d, DmaMode, T> core::fmt::Debug for SpiDma<'d, DmaMode, T>
+    impl<DmaMode, T> core::fmt::Debug for SpiDma<'_, DmaMode, T>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -237,7 +238,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, DmaMode, T> DmaSupport for SpiDma<'d, DmaMode, T>
+    impl<DmaMode, T> DmaSupport for SpiDma<'_, DmaMode, T>
     where
         T: InstanceDma,
         DmaMode: Mode,
@@ -245,10 +246,10 @@ pub mod dma {
         fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
             while !((!is_tx || self.channel.tx.is_done())
                 && (!is_rx || self.channel.rx.is_done())
-                && !self.spi.is_bus_busy())
+                && !self.spi.info().is_bus_busy())
             {}
 
-            self.spi.flush().ok();
+            self.spi.info().flush().ok();
         }
 
         fn peripheral_dma_stop(&mut self) {
@@ -261,7 +262,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, T::Dma>;
+        type TX = ChannelTx<'d, DmaMode, T::Dma>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -277,7 +278,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, T::Dma>;
+        type RX = ChannelRx<'d, DmaMode, T::Dma>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -295,7 +296,7 @@ pub mod dma {
     {
         fn new<CH>(
             spi: PeripheralRef<'d, T>,
-            channel: Channel<'d, CH, DmaMode>,
+            channel: Channel<'d, DmaMode, CH>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Self
@@ -310,6 +311,14 @@ pub mod dma {
                 tx_chain: DescriptorChain::new(tx_descriptors),
             }
         }
+
+        fn driver(&self) -> DmaDriver {
+            DmaDriver {
+                info: self.spi.info(),
+                dma_peripheral: self.spi.dma_peripheral(),
+            }
+        }
+
         /// Register a buffer for a DMA write.
         ///
         /// This will return a [DmaTransferTx]. The maximum amount of data to be
@@ -330,7 +339,7 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
+                self.driver()
                     .start_transfer_dma(
                         &mut self.rx_chain,
                         &mut self.tx_chain,
@@ -365,7 +374,7 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
+                self.driver()
                     .start_transfer_dma(
                         &mut self.rx_chain,
                         &mut self.tx_chain,
@@ -404,7 +413,7 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
+                self.driver()
                     .start_transfer_dma(
                         &mut self.rx_chain,
                         &mut self.tx_chain,
@@ -419,163 +428,200 @@ pub mod dma {
             }
         }
     }
-}
 
-#[doc(hidden)]
-pub trait InstanceDma: Instance + DmaEligible {
-    #[allow(clippy::too_many_arguments)]
-    unsafe fn start_transfer_dma<RX, TX>(
-        &mut self,
-        rx_chain: &mut DescriptorChain,
-        tx_chain: &mut DescriptorChain,
-        read_buffer_ptr: *mut u8,
-        read_buffer_len: usize,
-        write_buffer_ptr: *const u8,
-        write_buffer_len: usize,
-        rx: &mut RX,
-        tx: &mut TX,
-    ) -> Result<(), Error>
-    where
-        RX: Rx,
-        TX: Tx,
-    {
-        let reg_block = self.register_block();
-
-        self.enable_dma();
-
-        reset_spi(reg_block);
-
-        if read_buffer_len > 0 {
-            rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
-            rx.prepare_transfer_without_start(self.dma_peripheral(), rx_chain)?;
-        }
-
-        if write_buffer_len > 0 {
-            tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
-            tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain)?;
-        }
-
-        #[cfg(esp32)]
-        self.prepare_length_and_lines(read_buffer_len, write_buffer_len);
-
-        reset_dma_before_usr_cmd(reg_block);
-
-        #[cfg(not(esp32))]
-        reg_block
-            .dma_conf()
-            .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
-
-        self.clear_dma_interrupts();
-        self.setup_for_flush();
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
-
-        if read_buffer_len > 0 {
-            rx.start_transfer()?;
-        }
-
-        if write_buffer_len > 0 {
-            tx.start_transfer()?;
-        }
-
-        Ok(())
+    struct DmaDriver {
+        info: &'static Info,
+        dma_peripheral: crate::dma::DmaPeripheral,
     }
 
-    fn enable_dma(&self) {
-        let reg_block = self.register_block();
-        #[cfg(gdma)]
+    impl DmaDriver {
+        #[allow(clippy::too_many_arguments)]
+        unsafe fn start_transfer_dma<RX, TX>(
+            &self,
+            rx_chain: &mut DescriptorChain,
+            tx_chain: &mut DescriptorChain,
+            read_buffer_ptr: *mut u8,
+            read_buffer_len: usize,
+            write_buffer_ptr: *const u8,
+            write_buffer_len: usize,
+            rx: &mut RX,
+            tx: &mut TX,
+        ) -> Result<(), Error>
+        where
+            RX: Rx,
+            TX: Tx,
         {
+            self.enable_dma();
+
+            self.info.reset_spi();
+
+            if read_buffer_len > 0 {
+                rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
+                rx.prepare_transfer_without_start(self.dma_peripheral, rx_chain)?;
+            }
+
+            if write_buffer_len > 0 {
+                tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
+                tx.prepare_transfer_without_start(self.dma_peripheral, tx_chain)?;
+            }
+
+            #[cfg(esp32)]
+            self.info
+                .prepare_length_and_lines(read_buffer_len, write_buffer_len);
+
+            self.reset_dma_before_usr_cmd();
+
+            let reg_block = self.info.register_block();
+            #[cfg(not(esp32))]
+            reg_block
+                .dma_conf()
+                .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
+
+            self.clear_dma_interrupts();
+            self.info.setup_for_flush();
+            reg_block.cmd().modify(|_, w| w.usr().set_bit());
+
+            if read_buffer_len > 0 {
+                rx.start_transfer()?;
+            }
+
+            if write_buffer_len > 0 {
+                tx.start_transfer()?;
+            }
+
+            Ok(())
+        }
+
+        fn reset_dma_before_usr_cmd(&self) {
+            let reg_block = self.info.register_block();
+            #[cfg(gdma)]
             reg_block.dma_conf().modify(|_, w| {
-                w.dma_tx_ena().set_bit();
-                w.dma_rx_ena().set_bit();
-                w.rx_eof_en().clear_bit()
+                w.rx_afifo_rst().set_bit();
+                w.buf_afifo_rst().set_bit();
+                w.dma_afifo_rst().set_bit()
+            });
+
+            #[cfg(pdma)]
+            let _ = reg_block;
+        }
+
+        fn enable_dma(&self) {
+            let reg_block = self.info.register_block();
+            #[cfg(gdma)]
+            {
+                reg_block.dma_conf().modify(|_, w| {
+                    w.dma_tx_ena().set_bit();
+                    w.dma_rx_ena().set_bit();
+                    w.rx_eof_en().clear_bit()
+                });
+            }
+
+            #[cfg(pdma)]
+            {
+                fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
+                    reg_block.dma_conf().modify(|_, w| {
+                        w.in_rst().bit(bit);
+                        w.out_rst().bit(bit);
+                        w.ahbm_fifo_rst().bit(bit);
+                        w.ahbm_rst().bit(bit)
+                    });
+
+                    #[cfg(esp32s2)]
+                    reg_block
+                        .dma_conf()
+                        .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
+                }
+                set_rst_bit(reg_block, true);
+                set_rst_bit(reg_block, false);
+            }
+        }
+
+        fn clear_dma_interrupts(&self) {
+            let reg_block = self.info.register_block();
+
+            #[cfg(gdma)]
+            reg_block.dma_int_clr().write(|w| {
+                w.dma_infifo_full_err().clear_bit_by_one();
+                w.dma_outfifo_empty_err().clear_bit_by_one();
+                w.trans_done().clear_bit_by_one();
+                w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+            });
+
+            #[cfg(pdma)]
+            reg_block.dma_int_clr().write(|w| {
+                w.inlink_dscr_empty().clear_bit_by_one();
+                w.outlink_dscr_error().clear_bit_by_one();
+                w.inlink_dscr_error().clear_bit_by_one();
+                w.in_done().clear_bit_by_one();
+                w.in_err_eof().clear_bit_by_one();
+                w.in_suc_eof().clear_bit_by_one();
+                w.out_done().clear_bit_by_one();
+                w.out_eof().clear_bit_by_one();
+                w.out_total_eof().clear_bit_by_one()
             });
         }
-
-        #[cfg(pdma)]
-        {
-            fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
-                reg_block.dma_conf().modify(|_, w| {
-                    w.in_rst().bit(bit);
-                    w.out_rst().bit(bit);
-                    w.ahbm_fifo_rst().bit(bit);
-                    w.ahbm_rst().bit(bit)
-                });
-
-                #[cfg(esp32s2)]
-                reg_block
-                    .dma_conf()
-                    .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
-            }
-            set_rst_bit(reg_block, true);
-            set_rst_bit(reg_block, false);
-        }
-    }
-
-    fn clear_dma_interrupts(&self) {
-        let reg_block = self.register_block();
-
-        #[cfg(gdma)]
-        reg_block.dma_int_clr().write(|w| {
-            w.dma_infifo_full_err().clear_bit_by_one();
-            w.dma_outfifo_empty_err().clear_bit_by_one();
-            w.trans_done().clear_bit_by_one();
-            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
-            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
-        });
-
-        #[cfg(pdma)]
-        reg_block.dma_int_clr().write(|w| {
-            w.inlink_dscr_empty().clear_bit_by_one();
-            w.outlink_dscr_error().clear_bit_by_one();
-            w.inlink_dscr_error().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_suc_eof().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_eof().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one()
-        });
     }
 }
 
-fn reset_spi(reg_block: &RegisterBlock) {
-    #[cfg(esp32)]
-    {
-        reg_block.slave().modify(|_, w| w.sync_reset().set_bit());
-        reg_block.slave().modify(|_, w| w.sync_reset().clear_bit());
-    }
-
-    #[cfg(not(esp32))]
-    {
-        reg_block.slave().modify(|_, w| w.soft_reset().set_bit());
-        reg_block.slave().modify(|_, w| w.soft_reset().clear_bit());
-    }
+/// SPI peripheral instance.
+pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + 'static {
+    /// Returns the peripheral data describing this SPI instance.
+    fn info(&self) -> &'static Info;
 }
 
-fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
-    #[cfg(gdma)]
-    reg_block.dma_conf().modify(|_, w| {
-        w.rx_afifo_rst().set_bit();
-        w.buf_afifo_rst().set_bit();
-        w.dma_afifo_rst().set_bit()
-    });
-
-    #[cfg(pdma)]
-    let _ = reg_block;
-}
+/// A marker for DMA-capable SPI peripheral instances.
+pub trait InstanceDma: Instance + DmaEligible {}
 
 impl InstanceDma for crate::peripherals::SPI2 {}
 #[cfg(spi3)]
 impl InstanceDma for crate::peripherals::SPI3 {}
 
-#[doc(hidden)]
-pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'static {
-    fn register_block(&self) -> &RegisterBlock;
+/// Peripheral data describing a particular SPI instance.
+#[non_exhaustive]
+pub struct Info {
+    /// Pointer to the register block for this SPI instance.
+    ///
+    /// Use [Self::register_block] to access the register block.
+    pub register_block: *const RegisterBlock,
 
-    fn sclk_signal(&self) -> InputSignal;
-    fn mosi_signal(&self) -> InputSignal;
-    fn miso_signal(&self) -> OutputSignal;
-    fn cs_signal(&self) -> InputSignal;
+    /// System peripheral marker.
+    pub peripheral: crate::system::Peripheral,
+
+    /// SCLK signal.
+    pub sclk: InputSignal,
+
+    /// MOSI signal.
+    pub mosi: InputSignal,
+
+    /// MISO signal.
+    pub miso: OutputSignal,
+
+    /// Chip select signal.
+    pub cs: InputSignal,
+}
+
+impl Info {
+    /// Returns the register block for this SPI instance.
+    pub fn register_block(&self) -> &RegisterBlock {
+        unsafe { &*self.register_block }
+    }
+
+    fn reset_spi(&self) {
+        let reg_block = self.register_block();
+
+        #[cfg(esp32)]
+        {
+            reg_block.slave().modify(|_, w| w.sync_reset().set_bit());
+            reg_block.slave().modify(|_, w| w.sync_reset().clear_bit());
+        }
+
+        #[cfg(not(esp32))]
+        {
+            reg_block.slave().modify(|_, w| w.soft_reset().set_bit());
+            reg_block.slave().modify(|_, w| w.soft_reset().clear_bit());
+        }
+    }
 
     #[cfg(esp32)]
     fn prepare_length_and_lines(&self, rx_len: usize, tx_len: usize) {
@@ -596,7 +642,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     }
 
     /// Initialize for full-duplex 1 bit mode
-    fn init(&mut self) {
+    fn init(&self) {
         let reg_block = self.register_block();
 
         reg_block.clock().write(|w| unsafe { w.bits(0) });
@@ -609,7 +655,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
 
             w.mode().set_bit()
         });
-        reset_spi(reg_block);
+        self.reset_spi();
 
         reg_block.user().modify(|_, w| {
             w.doutdin().set_bit();
@@ -620,7 +666,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
         reg_block.misc().write(|w| unsafe { w.bits(0) });
     }
 
-    fn set_data_mode(&mut self, data_mode: SpiMode, dma: bool) -> &mut Self {
+    fn set_data_mode(&self, data_mode: SpiMode, dma: bool) {
         let reg_block = self.register_block();
         #[cfg(esp32)]
         {
@@ -691,8 +737,6 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
                     .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode3))
             });
         }
-
-        self
     }
 
     fn is_bus_busy(&self) -> bool {
@@ -709,7 +753,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
-    fn flush(&mut self) -> Result<(), Error> {
+    fn flush(&self) -> Result<(), Error> {
         while self.is_bus_busy() {
             // Wait for bus to be clear
         }
@@ -730,107 +774,47 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + PeripheralMarker + 'st
     }
 }
 
-#[cfg(spi2)]
-impl Instance for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::HSPICLK
-            } else {
-                InputSignal::FSPICLK
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::HSPID
-            } else {
-                InputSignal::FSPID
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                OutputSignal::HSPIQ
-            } else {
-                OutputSignal::FSPIQ
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::HSPICS0
-            } else {
-                InputSignal::FSPICS0
-            }
-        }
+impl PartialEq for Info {
+    fn eq(&self, other: &Self) -> bool {
+        self.register_block == other.register_block
     }
 }
 
-#[cfg(spi3)]
-impl Instance for crate::peripherals::SPI3 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
+unsafe impl Sync for Info {}
 
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::VSPICLK
-            } else {
-                InputSignal::SPI3_CLK
+macro_rules! spi_instance {
+    ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
+        paste::paste! {
+            impl Instance for crate::peripherals::[<SPI $num>] {
+                #[inline(always)]
+                fn info(&self) -> &'static Info {
+                    static INFO: Info = Info {
+                        register_block: crate::peripherals::[<SPI $num>]::PTR,
+                        peripheral: crate::system::Peripheral::[<Spi $num>],
+                        sclk: InputSignal::$sclk,
+                        mosi: InputSignal::$mosi,
+                        miso: OutputSignal::$miso,
+                        cs: InputSignal::$cs,
+                    };
+
+                    &INFO
+                }
             }
         }
-    }
+    };
+}
 
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::VSPID
-            } else {
-                InputSignal::SPI3_D
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                OutputSignal::VSPIQ
-            } else {
-                OutputSignal::SPI3_Q
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                InputSignal::VSPICS0
-            } else {
-                InputSignal::SPI3_CS0
-            }
-        }
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        #[cfg(spi2)]
+        spi_instance!(2, HSPICLK, HSPID, HSPIQ, HSPICS0);
+        #[cfg(spi3)]
+        spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0);
+    } else {
+        #[cfg(spi2)]
+        spi_instance!(2, FSPICLK, FSPID, FSPIQ, FSPICS0);
+        #[cfg(spi3)]
+        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0);
     }
 }
 
@@ -841,11 +825,7 @@ impl Instance for super::AnySpi {
             #[cfg(spi3)]
             super::AnySpiInner::Spi3(spi) => spi,
         } {
-            fn register_block(&self) -> &RegisterBlock;
-            fn sclk_signal(&self) -> InputSignal;
-            fn mosi_signal(&self) -> InputSignal;
-            fn miso_signal(&self) -> OutputSignal;
-            fn cs_signal(&self) -> InputSignal;
+            fn info(&self) -> &'static Info;
         }
     }
 }

@@ -48,19 +48,12 @@
 //! Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in
 //! your application you are not using this CPU timer.
 //!
-//! ## USB-SERIAL-JTAG
-//!
-//! When using USB-SERIAL-JTAG (for example by selecting `jtag-serial` in [`esp-println`](https://crates.io/crates/esp-println)) you have to activate the feature `phy-enable-usb`.
-//!
-//! Don't use this feature if you are _not_ using USB-SERIAL-JTAG as it might
-//! reduce WiFi performance.
-//!
 //! # Features flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
 //! (and thus, `coex`) is not available on ESP32-S2.
 //!
-//! When using the `dump-packets` feature you can use the extcap in
+//! When using the `dump_packets` config you can use the extcap in
 //! `extras/esp-wifishark` to analyze the frames in Wireshark.
 //! For more information see
 //! [extras/esp-wifishark/README.md](../extras/esp-wifishark/README.md)
@@ -93,32 +86,26 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
-use common_adapter::{
-    chip_specific::phy_mem_init,
-    deinit_radio_clock_control,
-    init_radio_clock_control,
-    RADIO_CLOCKS,
-};
+use core::marker::PhantomData;
+
+use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 use esp_hal as hal;
+use esp_hal::peripheral::Peripheral;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
 use fugit::MegahertzU32;
 use hal::{
     clock::Clocks,
+    rng::{Rng, Trng},
     system::RadioClockController,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
 };
-#[cfg(feature = "wifi")]
-use num_traits::FromPrimitive;
+use portable_atomic::Ordering;
 
 #[cfg(feature = "wifi")]
+use crate::wifi::WifiError;
 use crate::{
-    binary::include::{self, esp_supplicant_deinit, esp_wifi_deinit_internal, esp_wifi_stop},
-    wifi::WifiError,
-};
-use crate::{
-    common_adapter::init_rng,
     tasks::init_tasks,
     timer::{setup_timer_isr, shutdown_timer_isr},
 };
@@ -140,23 +127,14 @@ pub mod ble;
 #[cfg(feature = "esp-now")]
 pub mod esp_now;
 
+pub mod config;
+
 pub(crate) mod common_adapter;
 
 #[doc(hidden)]
 pub mod tasks;
 
 pub(crate) mod memory_fence;
-
-#[cfg(all(feature = "wifi", any(feature = "tcp", feature = "udp")))]
-pub mod wifi_interface;
-
-// [esp_hal::time::now()] as a smoltcp [`Instant]`
-#[cfg(feature = "smoltcp")]
-fn timestamp() -> smoltcp::time::Instant {
-    smoltcp::time::Instant::from_micros(
-        esp_hal::time::now().duration_since_epoch().to_micros() as i64
-    )
-}
 
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
@@ -186,6 +164,7 @@ struct Config {
     dynamic_rx_buf_num: usize,
     static_tx_buf_num: usize,
     dynamic_tx_buf_num: usize,
+    csi_enable: bool,
     ampdu_rx_enable: bool,
     ampdu_tx_enable: bool,
     amsdu_tx_enable: bool,
@@ -202,13 +181,14 @@ struct Config {
     scan_method: u32,
 }
 
-pub(crate) const CONFIG: Config = Config {
+pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
     rx_queue_size: esp_config_int!(usize, "ESP_WIFI_RX_QUEUE_SIZE"),
     tx_queue_size: esp_config_int!(usize, "ESP_WIFI_TX_QUEUE_SIZE"),
     static_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_RX_BUF_NUM"),
     dynamic_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_RX_BUF_NUM"),
     static_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_TX_BUF_NUM"),
     dynamic_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_TX_BUF_NUM"),
+    csi_enable: esp_config_bool!("ESP_WIFI_CSI_ENABLE"),
     ampdu_rx_enable: esp_config_bool!("ESP_WIFI_AMPDU_RX_ENABLE"),
     ampdu_tx_enable: esp_config_bool!("ESP_WIFI_AMPDU_TX_ENABLE"),
     amsdu_tx_enable: esp_config_bool!("ESP_WIFI_AMSDU_TX_ENABLE"),
@@ -239,73 +219,53 @@ const _: () = {
 
 type TimeBase = PeriodicTimer<'static, AnyTimer>;
 
-#[derive(Debug, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-/// An internal struct designed to make [`EspWifiInitialization`] uncreatable
-/// outside of this crate.
-pub struct EspWifiInitializationInternal;
+pub(crate) mod flags {
+    use portable_atomic::{AtomicBool, AtomicUsize};
 
-#[derive(Debug, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Initialized the driver for WiFi, Bluetooth or both.
-pub enum EspWifiInitialization {
-    #[cfg(feature = "wifi")]
-    Wifi(EspWifiInitializationInternal),
-    #[cfg(feature = "ble")]
-    Ble(EspWifiInitializationInternal),
-    #[cfg(coex)]
-    WifiBle(EspWifiInitializationInternal),
-}
-
-impl EspWifiInitialization {
-    #[allow(unused)]
-    fn is_wifi(&self) -> bool {
-        match self {
-            #[cfg(feature = "ble")]
-            EspWifiInitialization::Ble(_) => false,
-            _ => true,
-        }
-    }
-
-    #[allow(unused)]
-    fn is_ble(&self) -> bool {
-        match self {
-            #[cfg(feature = "wifi")]
-            EspWifiInitialization::Wifi(_) => false,
-            _ => true,
-        }
-    }
+    pub(crate) static ESP_WIFI_INITIALIZED: AtomicBool = AtomicBool::new(false);
+    pub(crate) static WIFI: AtomicUsize = AtomicUsize::new(0);
+    pub(crate) static BLE: AtomicBool = AtomicBool::new(false);
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Initialize the driver for WiFi, Bluetooth or both.
-pub enum EspWifiInitFor {
-    #[cfg(feature = "wifi")]
-    Wifi,
-    #[cfg(feature = "ble")]
-    Ble,
-    #[cfg(coex)]
-    WifiBle,
+pub struct EspWifiController<'d> {
+    _inner: PhantomData<&'d ()>,
 }
 
-impl EspWifiInitFor {
-    #[allow(unused)]
-    fn is_wifi(&self) -> bool {
-        match self {
-            #[cfg(feature = "ble")]
-            EspWifiInitFor::Ble => false,
-            _ => true,
+impl EspWifiController<'_> {
+    /// Is the WiFi part of the radio running
+    pub fn wifi(&self) -> bool {
+        crate::flags::WIFI.load(Ordering::Acquire) > 0
+    }
+
+    /// Is the BLE part of the radio running
+    pub fn ble(&self) -> bool {
+        crate::flags::BLE.load(Ordering::Acquire)
+    }
+
+    /// De-initialize the radio
+    pub fn deinit(self) -> Result<(), InitializationError> {
+        if crate::flags::ESP_WIFI_INITIALIZED.load(Ordering::Acquire) {
+            // safety: no other driver can be using this if this is callable
+            unsafe { deinit_unchecked() }
+        } else {
+            Ok(())
         }
     }
 
-    #[allow(unused)]
-    fn is_ble(&self) -> bool {
-        match self {
-            #[cfg(feature = "wifi")]
-            EspWifiInitFor::Wifi => false,
-            _ => true,
+    pub(crate) unsafe fn conjure() -> Self {
+        Self {
+            _inner: PhantomData,
+        }
+    }
+}
+
+impl Drop for EspWifiController<'_> {
+    fn drop(&mut self) {
+        if crate::flags::ESP_WIFI_INITIALIZED.load(Ordering::Acquire) {
+            // safety: no other driver can be using this if this is callable
+            unsafe { deinit_unchecked().ok() };
         }
     }
 }
@@ -314,7 +274,7 @@ impl EspWifiInitFor {
 ///
 /// This trait is meant to be used only for the `init` function.
 /// Calling `timers()` multiple times may panic.
-pub trait EspWifiTimerSource {
+pub trait EspWifiTimerSource: private::Sealed {
     /// Returns the timer source.
     fn timer(self) -> TimeBase;
 }
@@ -344,7 +304,7 @@ impl IntoAnyTimer for AnyTimer {}
 
 impl<T> EspWifiTimerSource for T
 where
-    T: IntoAnyTimer,
+    T: IntoAnyTimer + private::Sealed,
 {
     fn timer(self) -> TimeBase {
         TimeBase::new(self.into()).timer()
@@ -356,6 +316,29 @@ impl EspWifiTimerSource for TimeBase {
         self
     }
 }
+
+impl private::Sealed for TimeBase {}
+impl<T, DM> private::Sealed for TimgTimer<T, DM>
+where
+    DM: esp_hal::Mode,
+    Self: Into<AnyTimer>,
+{
+}
+#[cfg(not(feature = "esp32"))]
+impl<T, DM, COMP, UNIT> private::Sealed for Alarm<'_, T, DM, COMP, UNIT>
+where
+    DM: esp_hal::Mode,
+    Self: Into<AnyTimer>,
+{
+}
+
+/// A marker trait for suitable Rng sources for esp-wifi
+pub trait EspWifiRngSource: rand_core::RngCore + private::Sealed {}
+
+impl EspWifiRngSource for Rng {}
+impl private::Sealed for Rng {}
+impl EspWifiRngSource for Trng<'_> {}
+impl private::Sealed for Trng<'_> {}
 
 /// Initialize for using WiFi and or BLE.
 ///
@@ -374,11 +357,9 @@ impl EspWifiTimerSource for TimeBase {
 /// ```rust, no_run
 #[doc = esp_hal::before_snippet!()]
 /// use esp_hal::{rng::Rng, timg::TimerGroup};
-/// use esp_wifi::EspWifiInitFor;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// let init = esp_wifi::init(
-///     EspWifiInitFor::Wifi,
 ///     timg0.timer0,
 ///     Rng::new(peripherals.RNG),
 ///     peripherals.RADIO_CLK,
@@ -386,12 +367,11 @@ impl EspWifiTimerSource for TimeBase {
 /// .unwrap();
 /// # }
 /// ```
-pub fn init(
-    init_for: EspWifiInitFor,
-    timer: impl EspWifiTimerSource,
-    rng: hal::rng::Rng,
-    radio_clocks: hal::peripherals::RADIO_CLK,
-) -> Result<EspWifiInitialization, InitializationError> {
+pub fn init<'d, T: EspWifiTimerSource>(
+    timer: impl Peripheral<P = T> + 'd,
+    _rng: impl EspWifiRngSource,
+    _radio_clocks: impl Peripheral<P = hal::peripherals::RADIO_CLK> + 'd,
+) -> Result<EspWifiController<'d>, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
     const MIN_CLOCK: u32 = 80;
     let clocks = Clocks::get();
@@ -402,10 +382,8 @@ pub fn init(
     info!("esp-wifi configuration {:?}", crate::CONFIG);
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
     phy_mem_init();
-    init_radio_clock_control(radio_clocks);
-    init_rng(rng);
     init_tasks();
-    setup_timer_isr(timer.timer())?;
+    setup_timer_isr(unsafe { timer.clone_unchecked() }.timer());
 
     wifi_set_log_verbose();
     init_clocks();
@@ -416,60 +394,23 @@ pub fn init(
         error => return Err(InitializationError::General(error)),
     }
 
-    #[cfg(feature = "wifi")]
-    if init_for.is_wifi() {
-        debug!("wifi init");
-        // wifi init
-        crate::wifi::wifi_init()?;
-    }
+    crate::flags::ESP_WIFI_INITIALIZED.store(true, Ordering::Release);
 
-    #[cfg(feature = "ble")]
-    if init_for.is_ble() {
-        // ble init
-        // for some reason things don't work when initializing things the other way
-        // around while the original implementation in NuttX does it like that
-        debug!("ble init");
-        crate::ble::ble_init();
-    }
-
-    match init_for {
-        #[cfg(feature = "wifi")]
-        EspWifiInitFor::Wifi => Ok(EspWifiInitialization::Wifi(EspWifiInitializationInternal)),
-        #[cfg(feature = "ble")]
-        EspWifiInitFor::Ble => Ok(EspWifiInitialization::Ble(EspWifiInitializationInternal)),
-        #[cfg(coex)]
-        EspWifiInitFor::WifiBle => Ok(EspWifiInitialization::WifiBle(
-            EspWifiInitializationInternal,
-        )),
-    }
+    Ok(EspWifiController {
+        _inner: PhantomData,
+    })
 }
 
-/// Deinitializes WiFi and/or BLE
+/// Deinitializes the entire radio stack
 ///
-/// After user calls this function, WiFi and/or BLE (depending on what has been
-/// initialized) are fully stopped and deinitialized. After that, they should
-/// not be used until they have been reinitialized with the `init` function.
-///
-/// The function also disables the corresponding interrupts, deinitializes
-/// the timer and radio clock, freeing these resources and returning them.
-///
-/// Calling this while still using WiFi/BLE will cause crashes or undefined
-/// behavior.
+/// This can be useful to shutdown the stack before going to sleep for example.
 ///
 /// # Safety
-/// Actual implementation assumes that the user takes responsibility for how the
-/// function is used. For example, after using this function, user should not
-/// use BLE or WiFi stack or controller instances (it is possible to
-/// reinitialize communication using the `init` function), not to call
-/// `deinit_unsafe` before the first initialization, and so on. Also, there is
-/// currently no way to track whether a peripheral has been initialized,
-/// so deinitialization is done based on the activated feature (`wifi`, `ble`
-/// and/or `coex`).
-/// Before deinitializing, chips with NPL bluetooth (esp32c2, esp32c6, esp32h2)
-///  users must make sure to stop BLE advertising before.
-pub unsafe fn deinit_unchecked(
-    init: EspWifiInitialization,
-) -> Result<(TimeBase, hal::peripherals::RADIO_CLK), InitializationError> {
+///
+/// The user must ensure that any use of the radio via the WIFI/BLE/ESP-NOW
+/// drivers are complete, else undefined behavour may occur within those
+/// drivers.
+pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     // Disable coexistence
     #[cfg(coex)]
     {
@@ -477,34 +418,35 @@ pub unsafe fn deinit_unchecked(
         unsafe { crate::wifi::os_adapter::coex_deinit() };
     }
 
-    // Deinitialize WiFi
-    #[cfg(feature = "wifi")]
-    if init.is_wifi() {
-        esp_wifi_result!(unsafe { esp_wifi_stop() })?;
-        esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
-        esp_wifi_result!(esp_supplicant_deinit())?;
+    let controller = unsafe { EspWifiController::conjure() };
+
+    // Peripheral drivers should already take care of shutting these down
+    // we have to check this in the case where a user calls `deinit_unchecked`
+    // directly.
+    if controller.wifi() {
+        #[cfg(feature = "wifi")]
+        crate::wifi::wifi_deinit()?;
+        crate::flags::WIFI.store(0, Ordering::Release);
     }
 
-    // Deinitialize BLE
-    #[cfg(feature = "ble")]
-    if init.is_ble() {
-        #[cfg(any(esp32, esp32c3, esp32s3))]
-        crate::ble::btdm::ble_deinit();
-
-        #[cfg(any(esp32c2, esp32c6, esp32h2))]
-        crate::ble::npl::ble_deinit();
+    if controller.ble() {
+        #[cfg(feature = "ble")]
+        crate::ble::ble_deinit();
+        crate::flags::BLE.store(false, Ordering::Release);
     }
 
-    shutdown_timer_isr().unwrap();
+    shutdown_timer_isr();
     crate::preempt::delete_all_tasks();
 
-    let timer = critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take())
-        .ok_or(InitializationError::TimerUnavailable)?;
+    critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take());
 
-    let radio_clocks =
-        deinit_radio_clock_control().ok_or(InitializationError::RadioClockUnavailable)?;
+    crate::flags::ESP_WIFI_INITIALIZED.store(false, Ordering::Release);
 
-    Ok((timer, radio_clocks))
+    Ok(())
+}
+
+pub(crate) mod private {
+    pub trait Sealed {}
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -515,15 +457,6 @@ pub enum InitializationError {
     #[cfg(feature = "wifi")]
     WifiError(WifiError),
     WrongClockConfig,
-    Timer(hal::timer::Error),
-    TimerUnavailable,
-    RadioClockUnavailable,
-}
-
-impl From<hal::timer::Error> for InitializationError {
-    fn from(value: hal::timer::Error) -> Self {
-        InitializationError::Timer(value)
-    }
 }
 
 #[cfg(feature = "wifi")]
@@ -548,7 +481,6 @@ pub fn wifi_set_log_verbose() {
 }
 
 fn init_clocks() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).init_clocks();
-    }
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.init_clocks();
 }

@@ -17,12 +17,74 @@
 use crate::{
     dma::*,
     peripheral::PeripheralRef,
+    peripherals::Interrupt,
     system::{Peripheral, PeripheralClockControl},
+    Blocking,
 };
 
 #[doc(hidden)]
 pub trait GdmaChannel {
     fn number(&self) -> u8;
+
+    fn async_handler_out(&self) -> Option<InterruptHandler> {
+        match self.number() {
+            0 => DmaChannel0::handler_out(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::handler_out(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::handler_out(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::handler_out(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::handler_out(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn peripheral_interrupt_out(&self) -> Option<Interrupt> {
+        match self.number() {
+            0 => DmaChannel0::isr_out(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::isr_out(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::isr_out(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::isr_out(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::isr_out(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn async_handler_in(&self) -> Option<InterruptHandler> {
+        match self.number() {
+            0 => DmaChannel0::handler_in(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::handler_in(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::handler_in(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::handler_in(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::handler_in(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn peripheral_interrupt_in(&self) -> Option<Interrupt> {
+        match self.number() {
+            0 => DmaChannel0::isr_in(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::isr_in(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::isr_in(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::isr_in(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::isr_in(),
+            _ => unreachable!(),
+        }
+    }
 }
 
 /// An arbitrary GDMA channel
@@ -58,6 +120,14 @@ use embassy_sync::waitqueue::AtomicWaker;
 
 static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
 static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
+
+cfg_if::cfg_if! {
+    if #[cfg(any(esp32c2, esp32c3))] {
+        use portable_atomic::AtomicBool;
+        static TX_IS_ASYNC: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
+        static RX_IS_ASYNC: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
+    }
+}
 
 impl<C: GdmaChannel> crate::private::Sealed for ChannelTxImpl<C> {}
 
@@ -142,6 +212,12 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
             .modify(|_, w| w.outlink_restart().set_bit());
     }
 
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        self.ch()
+            .out_conf1()
+            .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
+    }
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.ch()
@@ -164,6 +240,14 @@ impl<C: GdmaChannel> TxRegisterAccess for ChannelTxImpl<C> {
             .out_eof_des_addr()
             .bits() as _
     }
+
+    fn async_handler(&self) -> Option<InterruptHandler> {
+        self.0.async_handler_out()
+    }
+
+    fn peripheral_interrupt(&self) -> Option<Interrupt> {
+        self.0.peripheral_interrupt_out()
+    }
 }
 
 impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
@@ -178,7 +262,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
                 };
             }
             w
-        })
+        });
     }
 
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
@@ -212,7 +296,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
                 };
             }
             w
-        })
+        });
     }
 
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
@@ -237,6 +321,24 @@ impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
 
     fn waker(&self) -> &'static AtomicWaker {
         &TX_WAKERS[self.0.number() as usize]
+    }
+
+    fn is_async(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                TX_IS_ASYNC[self.0.number() as usize].load(portable_atomic::Ordering::Acquire)
+            } else {
+                true
+            }
+        }
+    }
+
+    fn set_async(&self, _is_async: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                TX_IS_ASYNC[self.0.number() as usize].store(_is_async, portable_atomic::Ordering::Release);
+            }
+        }
     }
 }
 
@@ -327,6 +429,12 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
             .modify(|_, w| w.inlink_restart().set_bit());
     }
 
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        self.ch()
+            .in_conf1()
+            .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
+    }
+
     #[cfg(esp32s3)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.ch()
@@ -340,6 +448,14 @@ impl<C: GdmaChannel> RxRegisterAccess for ChannelRxImpl<C> {
         self.ch()
             .in_conf0()
             .modify(|_, w| w.mem_trans_en().bit(value));
+    }
+
+    fn async_handler(&self) -> Option<InterruptHandler> {
+        self.0.async_handler_in()
+    }
+
+    fn peripheral_interrupt(&self) -> Option<Interrupt> {
+        self.0.peripheral_interrupt_in()
     }
 }
 
@@ -394,7 +510,7 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
                 };
             }
             w
-        })
+        });
     }
 
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
@@ -423,30 +539,63 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
     fn waker(&self) -> &'static AtomicWaker {
         &RX_WAKERS[self.0.number() as usize]
     }
+
+    fn is_async(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                RX_IS_ASYNC[self.0.number() as usize].load(portable_atomic::Ordering::Acquire)
+            } else {
+                true
+            }
+        }
+    }
+
+    fn set_async(&self, _is_async: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                RX_IS_ASYNC[self.0.number() as usize].store(_is_async, portable_atomic::Ordering::Release);
+            }
+        }
+    }
 }
 
 /// A Channel can be created from this
 #[non_exhaustive]
 pub struct ChannelCreator<const N: u8> {}
 
-impl<CH: DmaChannel, M: Mode> Channel<'_, CH, M> {
+impl<CH: DmaChannel, M: Mode> Channel<'_, M, CH> {
     /// Asserts that the channel is compatible with the given peripheral.
-    pub fn runtime_ensure_compatible<P: PeripheralMarker + DmaEligible>(
-        &self,
-        _peripheral: &PeripheralRef<'_, P>,
-    ) {
+    pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &PeripheralRef<'_, P>) {
         // No runtime checks; GDMA channels are compatible with any peripheral
     }
 }
 
 macro_rules! impl_channel {
-    ($num: literal, $async_handler: path, $($interrupt: ident),* ) => {
+    ($num:literal, $interrupt_in:ident, $async_handler:path $(, $interrupt_out:ident , $async_handler_out:path)? ) => {
         paste::paste! {
             /// A description of a specific GDMA channel
             #[non_exhaustive]
             pub struct [<DmaChannel $num>] {}
 
             impl crate::private::Sealed for [<DmaChannel $num>] {}
+
+            impl [<DmaChannel $num>] {
+                fn handler_in() -> Option<InterruptHandler> {
+                    Some($async_handler)
+                }
+
+                fn isr_in() -> Option<Interrupt> {
+                    Some(Interrupt::$interrupt_in)
+                }
+
+                fn handler_out() -> Option<InterruptHandler> {
+                    $crate::if_set! { $(Some($async_handler_out))?, None }
+                }
+
+                fn isr_out() -> Option<Interrupt> {
+                    $crate::if_set! { $(Some(Interrupt::$interrupt_out))?, None }
+                }
+            }
 
             impl DmaChannel for [<DmaChannel $num>] {
                 type Rx = ChannelRxImpl<SpecificGdmaChannel<$num>>;
@@ -463,71 +612,28 @@ macro_rules! impl_channel {
             }
 
             impl DmaChannelExt for [<DmaChannel $num>] {
-                fn get_rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
+                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     ChannelRxImpl(SpecificGdmaChannel::<$num> {})
                 }
 
-                fn get_tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
+                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
                     ChannelTxImpl(SpecificGdmaChannel::<$num> {})
-                }
-
-                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
-                    let mut dma = unsafe { crate::peripherals::DMA::steal() };
-                    $(
-                        dma.[< bind_ $interrupt:lower _interrupt >](handler.handler());
-                        $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, handler.priority()).unwrap();
-                    )*
                 }
             }
 
             impl ChannelCreator<$num> {
-                fn do_configure<'a, M: crate::Mode>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], M> {
-                    let tx_impl = ChannelTxImpl(SpecificGdmaChannel::<$num> {});
-                    tx_impl.set_burst_mode(burst_mode);
-                    tx_impl.set_priority(priority);
-
-                    let rx_impl = ChannelRxImpl(SpecificGdmaChannel::<$num> {});
-                    rx_impl.set_burst_mode(burst_mode);
-                    rx_impl.set_priority(priority);
-                    // clear the mem2mem mode to avoid failed DMA if this
-                    // channel was previously used for a mem2mem transfer.
-                    rx_impl.set_mem2mem_mode(false);
-
-                    crate::dma::Channel {
-                        tx: ChannelTx::new(tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_impl, burst_mode),
-                        phantom: PhantomData,
-                    }
-                }
-
                 /// Configure the channel for use with blocking APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], crate::Blocking> {
-                    self.do_configure(burst_mode, priority)
-                }
+                ) -> Channel<'a, Blocking, [<DmaChannel $num>]> {
+                    let mut this = Channel {
+                        tx: ChannelTx::new(ChannelTxImpl(SpecificGdmaChannel::<$num> {})),
+                        rx: ChannelRx::new(ChannelRxImpl(SpecificGdmaChannel::<$num> {})),
+                    };
 
-                /// Configure the channel for use with async APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                pub fn configure_for_async<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], $crate::Async> {
-                    let this = self.do_configure(burst_mode, priority);
-
-                    [<DmaChannel $num>]::set_isr($async_handler);
+                    this.configure(burst_mode, priority);
 
                     this
                 }
@@ -536,27 +642,29 @@ macro_rules! impl_channel {
     };
 }
 
+use super::asynch::interrupt as asynch_handler;
+
 cfg_if::cfg_if! {
     if #[cfg(esp32c2)] {
         const CHANNEL_COUNT: usize = 1;
-        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
+        impl_channel!(0, DMA_CH0, asynch_handler::interrupt_handler_ch0);
     } else if #[cfg(esp32c3)] {
         const CHANNEL_COUNT: usize = 3;
-        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
-        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_CH1);
-        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_CH2);
+        impl_channel!(0, DMA_CH0, asynch_handler::interrupt_handler_ch0);
+        impl_channel!(1, DMA_CH1, asynch_handler::interrupt_handler_ch1);
+        impl_channel!(2, DMA_CH2, asynch_handler::interrupt_handler_ch2);
     } else if #[cfg(any(esp32c6, esp32h2))] {
         const CHANNEL_COUNT: usize = 3;
-        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
-        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
-        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
+        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_in_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_out_ch0);
+        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_in_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_out_ch1);
+        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_in_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_out_ch2);
     } else if #[cfg(esp32s3)] {
         const CHANNEL_COUNT: usize = 5;
-        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
-        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
-        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
-        impl_channel!(3, super::asynch::interrupt::interrupt_handler_ch3, DMA_IN_CH3, DMA_OUT_CH3);
-        impl_channel!(4, super::asynch::interrupt::interrupt_handler_ch4, DMA_IN_CH4, DMA_OUT_CH4);
+        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_in_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_out_ch0);
+        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_in_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_out_ch1);
+        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_in_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_out_ch2);
+        impl_channel!(3, DMA_IN_CH3, asynch_handler::interrupt_handler_in_ch3, DMA_OUT_CH3, asynch_handler::interrupt_handler_out_ch3);
+        impl_channel!(4, DMA_IN_CH4, asynch_handler::interrupt_handler_in_ch4, DMA_OUT_CH4, asynch_handler::interrupt_handler_out_ch4);
     }
 }
 

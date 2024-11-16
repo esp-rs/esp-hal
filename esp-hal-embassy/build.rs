@@ -43,8 +43,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "esp_hal_embassy",
         &[(
             "low-power-wait",
-            Value::Bool(true),
             "Enables the lower-power wait if no tasks are ready to run on the thread-mode executor. This allows the MCU to use less power if the workload allows. Recommended for battery-powered systems. May impact analog performance.",
+            Value::Bool(true),
+            None
         )],
         true,
     );

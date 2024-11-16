@@ -62,10 +62,11 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
             _ => unreachable!(),
         };
 
-        unsafe {
-            crate::interrupt::bind_interrupt(interrupt, handler.handler());
-            crate::interrupt::enable(interrupt, handler.priority()).unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
         }
+        unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
     }
 
     /// Trigger this software-interrupt
@@ -92,7 +93,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
                 .cpu_intr_from_cpu_3()
                 .write(|w| w.cpu_intr_from_cpu_3().set_bit()),
             _ => unreachable!(),
-        }
+        };
     }
 
     /// Resets this software-interrupt
@@ -119,7 +120,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
                 .cpu_intr_from_cpu_3()
                 .write(|w| w.cpu_intr_from_cpu_3().clear_bit()),
             _ => unreachable!(),
-        }
+        };
     }
 
     /// Unsafely create an instance of this peripheral out of thin air.

@@ -45,11 +45,13 @@
 //! before proceeding. We also have a [training] that covers some common
 //! scenarios with examples.
 //!
-//! We have a template for quick starting bare-metal projects, [esp-template].
-//! The template uses [cargo-generate], so ensure that it is installed and run:
+//! We have developed a project generation tool, [esp-generate], which we
+//! recommend when starting new projects. It can be installed and run, e.g.
+//! for the ESP32-C6, as follows:
 //!
 //! ```bash
-//! cargo generate -a esp-rs/esp-template
+//! cargo install esp-generate
+//! esp-generate --chip=esp32c6 your-project
 //! ```
 //!
 //! ## Blinky
@@ -81,8 +83,7 @@
 //!     });
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//!     let mut led = Output::new(io.pins.gpio0, Level::High);
+//!     let mut led = Output::new(peripherals.GPIO0, Level::High);
 //!
 //!     let delay = Delay::new();
 //!
@@ -129,8 +130,7 @@
 //! [embedded-hal]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal
 //! [embedded-hal-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-async
 //! [xtask]: https://github.com/matklad/cargo-xtask
-//! [esp-template]: https://github.com/esp-rs/esp-template
-//! [cargo-generate]: https://github.com/cargo-generate/cargo-generate
+//! [esp-generate]: https://github.com/esp-rs/esp-generate
 //! [book]: https://docs.esp-rs.org/book/
 //! [training]: https://docs.esp-rs.org/no_std-training/
 //!
@@ -191,8 +191,6 @@ pub mod hmac;
 pub mod i2c;
 #[cfg(any(i2s0, i2s1))]
 pub mod i2s;
-#[cfg(all(esp32, any(i2s0, i2s1)))]
-pub mod i2s_parallel;
 #[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub mod interrupt;
 #[cfg(lcd_cam)]
@@ -372,24 +370,45 @@ impl Cpu {
     /// Returns the core the application is currently executing on
     #[inline(always)]
     pub fn current() -> Self {
-        get_core()
+        // This works for both RISCV and Xtensa because both
+        // get_raw_core functions return zero, _or_ something
+        // greater than zero; 1 in the case of RISCV and 0x2000
+        // in the case of Xtensa.
+        match raw_core() {
+            0 => Cpu::ProCpu,
+            #[cfg(all(multi_core, riscv))]
+            1 => Cpu::AppCpu,
+            #[cfg(all(multi_core, xtensa))]
+            0x2000 => Cpu::AppCpu,
+            _ => unreachable!(),
+        }
     }
-}
 
-/// Which core the application is currently executing on
-#[inline(always)]
-pub fn get_core() -> Cpu {
-    // This works for both RISCV and Xtensa because both
-    // get_raw_core functions return zero, _or_ something
-    // greater than zero; 1 in the case of RISCV and 0x2000
-    // in the case of Xtensa.
-    match get_raw_core() {
-        0 => Cpu::ProCpu,
-        #[cfg(all(multi_core, riscv))]
-        1 => Cpu::AppCpu,
-        #[cfg(all(multi_core, xtensa))]
-        0x2000 => Cpu::AppCpu,
-        _ => unreachable!(),
+    /// Returns an iterator over the "other" cores.
+    #[inline(always)]
+    pub(crate) fn other() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                match Self::current() {
+                    Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
+                    Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
+                }
+            } else {
+                [].into_iter()
+            }
+        }
+    }
+
+    /// Returns an iterator over all cores.
+    #[inline(always)]
+    pub(crate) fn all() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                [Cpu::ProCpu, Cpu::AppCpu].into_iter()
+            } else {
+                [Cpu::ProCpu].into_iter()
+            }
+        }
     }
 }
 
@@ -398,7 +417,7 @@ pub fn get_core() -> Cpu {
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(riscv)]
 #[inline(always)]
-fn get_raw_core() -> usize {
+fn raw_core() -> usize {
     #[cfg(multi_core)]
     {
         riscv::register::mhartid::read()
@@ -417,7 +436,7 @@ fn get_raw_core() -> usize {
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(xtensa)]
 #[inline(always)]
-fn get_raw_core() -> usize {
+fn raw_core() -> usize {
     (xtensa_lx::get_processor_id() & 0x2000) as usize
 }
 
@@ -546,6 +565,8 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(esp32)]
     crate::time::time_init();
+
+    crate::gpio::bind_default_interrupt_handler();
 
     peripherals
 }

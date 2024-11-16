@@ -7,9 +7,8 @@
 
 use embedded_hal_02::serial::{Read, Write};
 use esp_hal::{
-    gpio::Io,
     prelude::*,
-    uart::{ClockSource, Uart},
+    uart::{self, ClockSource, Uart},
     Blocking,
 };
 use hil_test as _;
@@ -28,16 +27,11 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let (_, pin) = hil_test::common_test_pins!(peripherals);
 
-        let (_, pin) = hil_test::common_test_pins!(io);
+        let (rx, tx) = pin.split();
 
-        let uart = Uart::new(
-            peripherals.UART1,
-            pin.peripheral_input(),
-            pin.into_peripheral_output(),
-        )
-        .unwrap();
+        let uart = Uart::new(peripherals.UART1, rx, tx).unwrap();
 
         Context { uart }
     }
@@ -94,8 +88,14 @@ mod tests {
         ];
 
         let mut byte_to_write = 0xA5;
-        for (baud, clock_source) in &configs {
-            ctx.uart.change_baud(*baud, *clock_source);
+        for (baudrate, clock_source) in configs {
+            ctx.uart
+                .apply_config(&uart::Config {
+                    baudrate,
+                    clock_source,
+                    ..Default::default()
+                })
+                .unwrap();
             ctx.uart.write(byte_to_write).ok();
             let read = block!(ctx.uart.read());
             assert_eq!(read, Ok(byte_to_write));

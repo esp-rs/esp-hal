@@ -15,11 +15,9 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::dma::{Dma, DmaPriority, DmaTxBuf};
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
@@ -32,14 +30,14 @@
 //! # );
 //!
 //! let tx_pins = TxEightBits::new(
-//!     io.pins.gpio9,
-//!     io.pins.gpio46,
-//!     io.pins.gpio3,
-//!     io.pins.gpio8,
-//!     io.pins.gpio18,
-//!     io.pins.gpio17,
-//!     io.pins.gpio16,
-//!     io.pins.gpio15,
+//!     peripherals.GPIO9,
+//!     peripherals.GPIO46,
+//!     peripherals.GPIO3,
+//!     peripherals.GPIO8,
+//!     peripherals.GPIO18,
+//!     peripherals.GPIO17,
+//!     peripherals.GPIO16,
+//!     peripherals.GPIO15,
 //! );
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
@@ -50,7 +48,7 @@
 //!     20.MHz(),
 //!     Config::default(),
 //! )
-//! .with_ctrl_pins(io.pins.gpio0, io.pins.gpio47);
+//! .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
 //!
 //! dma_buf.fill(&[0x55]);
 //! let transfer = i8080.send(0x3Au8, 0, dma_buf).unwrap(); // RGB565
@@ -75,30 +73,35 @@ use crate::{
         OutputSignal,
     },
     lcd_cam::{
-        asynch::LCD_DONE_WAKER,
-        lcd::{i8080::private::TxPins, ClockMode, DelayMode, Phase, Polarity},
-        private::{calculate_clkm, Instance},
+        calculate_clkm,
+        lcd::{ClockMode, DelayMode, Phase, Polarity},
         BitOrder,
         ByteOrder,
+        Instance,
         Lcd,
+        LCD_DONE_WAKER,
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
+    Blocking,
     Mode,
 };
 
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, <LCD_CAM as DmaEligible>::Dma>,
-    _phantom: PhantomData<DM>,
+    tx_channel: ChannelTx<'d, Blocking, <LCD_CAM as DmaEligible>::Dma>,
+    _mode: PhantomData<DM>,
 }
 
-impl<'d, DM: Mode> I8080<'d, DM> {
+impl<'d, DM> I8080<'d, DM>
+where
+    DM: Mode,
+{
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P, CH>(
         lcd: Lcd<'d, DM>,
-        channel: ChannelTx<'d, CH>,
+        channel: ChannelTx<'d, Blocking, CH>,
         mut pins: P,
         frequency: HertzU32,
         config: Config,
@@ -210,19 +213,29 @@ impl<'d, DM: Mode> I8080<'d, DM> {
         Self {
             lcd_cam,
             tx_channel: channel.degrade(),
-            _phantom: PhantomData,
+            _mode: PhantomData,
         }
     }
-}
 
-impl<'d, DM: Mode> I8080<'d, DM> {
-    /// Configures the byte order for data transmission.
+    /// Configures the byte order for data transmission in 16-bit mode.
+    /// This must be set to [ByteOrder::default()] when transmitting in 8-bit
+    /// mode.
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
-        self.lcd_cam.lcd_user().modify(|_, w| {
-            w.lcd_byte_order().bit(is_inverted);
-            w.lcd_8bits_order().bit(is_inverted)
-        });
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_byte_order().bit(is_inverted));
+        self
+    }
+
+    /// Configures the byte order for data transmission in 8-bit mode.
+    /// This must be set to [ByteOrder::default()] when transmitting in 16-bit
+    /// mode.
+    pub fn set_8bits_order(&mut self, byte_order: ByteOrder) -> &mut Self {
+        let is_inverted = byte_order != ByteOrder::default();
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_8bits_order().bit(is_inverted));
         self
     }
 
@@ -238,7 +251,7 @@ impl<'d, DM: Mode> I8080<'d, DM> {
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
         cs.set_to_push_pull_output(crate::private::Internal);
-        cs.connect_peripheral_to_output(OutputSignal::LCD_CS, crate::private::Internal);
+        OutputSignal::LCD_CS.connect_to(cs);
 
         self
     }
@@ -252,10 +265,10 @@ impl<'d, DM: Mode> I8080<'d, DM> {
         crate::into_mapped_ref!(dc, wrx);
 
         dc.set_to_push_pull_output(crate::private::Internal);
-        dc.connect_peripheral_to_output(OutputSignal::LCD_DC, crate::private::Internal);
+        OutputSignal::LCD_DC.connect_to(dc);
 
         wrx.set_to_push_pull_output(crate::private::Internal);
-        wrx.connect_peripheral_to_output(OutputSignal::LCD_PCLK, crate::private::Internal);
+        OutputSignal::LCD_PCLK.connect_to(wrx);
 
         self
     }
@@ -627,9 +640,9 @@ impl<'d> TxPins for TxEightBits<'d> {
             OutputSignal::LCD_DATA_7,
         ];
 
-        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.iter()) {
+        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.into_iter()) {
             pin.set_to_push_pull_output(crate::private::Internal);
-            pin.connect_peripheral_to_output(*signal, crate::private::Internal);
+            signal.connect_to(pin);
         }
     }
 }
@@ -696,15 +709,14 @@ impl<'d> TxPins for TxSixteenBits<'d> {
             OutputSignal::LCD_DATA_15,
         ];
 
-        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.iter()) {
+        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.into_iter()) {
             pin.set_to_push_pull_output(crate::private::Internal);
-            pin.connect_peripheral_to_output(*signal, crate::private::Internal);
+            signal.connect_to(pin);
         }
     }
 }
 
-mod private {
-    pub trait TxPins {
-        fn configure(&mut self);
-    }
+#[doc(hidden)]
+pub trait TxPins {
+    fn configure(&mut self);
 }

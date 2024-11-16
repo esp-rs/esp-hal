@@ -14,7 +14,6 @@ use enumset::EnumSet;
 
 use super::WifiEvent;
 use crate::{
-    common_adapter::RADIO_CLOCKS,
     compat::{
         common::{
             create_queue,
@@ -27,6 +26,7 @@ use crate::{
             str_from_c,
             thread_sem_get,
             unlock_mutex,
+            ConcurrentQueue,
         },
         malloc::calloc,
     },
@@ -35,7 +35,7 @@ use crate::{
     timer::yield_task,
 };
 
-static mut QUEUE_HANDLE: *mut crate::binary::c_types::c_void = core::ptr::null_mut();
+static mut QUEUE_HANDLE: *mut ConcurrentQueue = core::ptr::null_mut();
 
 // useful for waiting for events - clear and wait for the event bit to be set
 // again
@@ -391,7 +391,7 @@ pub unsafe extern "C" fn queue_create(
         (3, 8)
     };
 
-    create_queue(queue_len as i32, item_size as i32)
+    create_queue(queue_len as i32, item_size as i32).cast()
 }
 
 /// **************************************************************************
@@ -408,7 +408,7 @@ pub unsafe extern "C" fn queue_create(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn queue_delete(queue: *mut crate::binary::c_types::c_void) {
-    delete_queue(queue);
+    delete_queue(queue.cast());
 }
 
 /// **************************************************************************
@@ -431,7 +431,7 @@ pub unsafe extern "C" fn queue_send(
     item: *mut crate::binary::c_types::c_void,
     block_time_tick: u32,
 ) -> i32 {
-    send_queued(queue, item, block_time_tick)
+    send_queued(queue.cast(), item, block_time_tick)
 }
 
 /// **************************************************************************
@@ -526,7 +526,7 @@ pub unsafe extern "C" fn queue_recv(
     item: *mut crate::binary::c_types::c_void,
     block_time_tick: u32,
 ) -> i32 {
-    receive_queued(queue, item, block_time_tick)
+    receive_queued(queue.cast(), item, block_time_tick)
 }
 
 /// **************************************************************************
@@ -543,7 +543,7 @@ pub unsafe extern "C" fn queue_recv(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn queue_msg_waiting(queue: *mut crate::binary::c_types::c_void) -> u32 {
-    number_of_messages_in_queue(queue)
+    number_of_messages_in_queue(queue.cast())
 }
 
 /// **************************************************************************
@@ -734,7 +734,7 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut crate::binary::c_types::c
 /// *************************************************************************
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    let start_time = crate::timer::get_systimer_count();
+    let start_time = crate::timer::systimer_count();
     while crate::timer::elapsed_time_since(start_time) < tick as u64 {
         yield_task();
     }
@@ -866,14 +866,17 @@ pub unsafe extern "C" fn event_post(
 
     let event = unwrap!(WifiEvent::from_i32(event_id));
     trace!("EVENT: {:?}", event);
-    critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).insert(event));
 
-    super::state::update_state(event);
+    let mut handled = false;
+    critical_section::with(|cs| {
+        WIFI_EVENTS.borrow_ref_mut(cs).insert(event);
+        handled = super::event::dispatch_event_handler(cs, event, event_data, event_data_size);
+    });
 
-    #[cfg(feature = "async")]
+    super::state::update_state(event, handled);
+
     event.waker().wake();
 
-    #[cfg(feature = "embassy-net")]
     match event {
         WifiEvent::StaConnected | WifiEvent::StaDisconnected => {
             crate::wifi::embassy::STA_LINK_STATE_WAKER.wake();
@@ -1040,7 +1043,10 @@ pub unsafe extern "C" fn phy_update_country_info(
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
-    unwrap!(RADIO_CLOCKS.as_mut()).reset_mac();
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.reset_mac();
 }
 
 /// **************************************************************************
@@ -1058,7 +1064,10 @@ pub unsafe extern "C" fn wifi_reset_mac() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
-    unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Wifi);
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.enable(RadioPeripherals::Wifi);
 }
 
 /// **************************************************************************
@@ -1076,7 +1085,10 @@ pub unsafe extern "C" fn wifi_clock_enable() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
-    unwrap!(RADIO_CLOCKS.as_mut()).disable(RadioPeripherals::Wifi);
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.disable(RadioPeripherals::Wifi);
 }
 
 /// **************************************************************************
@@ -1114,7 +1126,7 @@ pub unsafe extern "C" fn wifi_rtc_disable_iso() {
 #[no_mangle]
 pub unsafe extern "C" fn esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
-    crate::timer::ticks_to_micros(crate::timer::get_systimer_count()) as i64
+    crate::timer::ticks_to_micros(crate::timer::systimer_count()) as i64
 }
 
 /// **************************************************************************
@@ -1394,18 +1406,8 @@ pub unsafe extern "C" fn nvs_erase_key(
 /// *************************************************************************
 pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::c_types::c_int {
     trace!("get_random");
-    if let Some(ref mut rng) = crate::common_adapter::RANDOM_GENERATOR {
-        let buffer = unsafe { core::slice::from_raw_parts_mut(buf, len) };
-
-        for chunk in buffer.chunks_mut(4) {
-            let bytes = rng.random().to_le_bytes();
-            chunk.copy_from_slice(&bytes[..chunk.len()]);
-        }
-
-        0
-    } else {
-        -1
-    }
+    crate::common_adapter::esp_fill_random(buf, len as u32);
+    0
 }
 
 /// **************************************************************************

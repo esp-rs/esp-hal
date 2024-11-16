@@ -109,13 +109,14 @@ impl<'d> Pcnt<'d> {
     }
 }
 
-impl<'d> crate::private::Sealed for Pcnt<'d> {}
+impl crate::private::Sealed for Pcnt<'_> {}
 
-impl<'d> InterruptConfigurable for Pcnt<'d> {
+impl InterruptConfigurable for Pcnt<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            interrupt::bind_interrupt(Interrupt::PCNT, handler.handler());
-            interrupt::enable(Interrupt::PCNT, handler.priority()).unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::PCNT);
         }
+        unsafe { interrupt::bind_interrupt(Interrupt::PCNT, handler.handler()) };
+        unwrap!(interrupt::enable(Interrupt::PCNT, handler.priority()));
     }
 }

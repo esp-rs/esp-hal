@@ -56,6 +56,10 @@ name    = "gpio"
 harness = false
 
 [[test]]
+name    = "gpio_custom_handler"
+harness = false
+
+[[test]]
 name    = "interrupt"
 harness = false
 
@@ -253,21 +257,18 @@ esp32c3 = [
     "esp-hal/esp32c3",
     "esp-hal-embassy?/esp32c3",
     "esp-wifi?/esp32c3",
-    "esp-wifi?/phy-enable-usb",
 ]
 esp32c6 = [
     "esp-backtrace/esp32c6",
     "esp-hal/esp32c6",
     "esp-hal-embassy?/esp32c6",
     "esp-wifi?/esp32c6",
-    "esp-wifi?/phy-enable-usb",
 ]
 esp32h2 = [
     "esp-backtrace/esp32h2",
     "esp-hal/esp32h2",
     "esp-hal-embassy?/esp32h2",
     "esp-wifi?/esp32h2",
-    "esp-wifi?/phy-enable-usb",
 ]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
@@ -282,7 +283,6 @@ esp32s3 = [
     "esp-hal/esp32s3",
     "esp-hal-embassy?/esp32s3",
     "esp-wifi?/esp32s3",
-    "esp-wifi?/phy-enable-usb",
 ]
 # Async & Embassy:
 embassy = [

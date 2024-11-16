@@ -103,16 +103,17 @@ pub enum Version {
 }
 
 /// Build the documentation for the specified package and device.
-pub fn build_documentation(
-    workspace: &Path,
-    package: Package,
-    chip: Chip,
-    target: &str,
-) -> Result<PathBuf> {
+pub fn build_documentation(workspace: &Path, package: Package, chip: Chip) -> Result<PathBuf> {
     let package_name = package.to_string();
     let package_path = windows_safe_path(&workspace.join(&package_name));
 
     log::info!("Building '{package_name}' documentation targeting '{chip}'");
+
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(package, &chip)?;
+
+    // We need `nightly` for building the docs, unfortunately:
+    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
 
     let mut features = vec![chip.to_string()];
 
@@ -122,6 +123,7 @@ pub fn build_documentation(
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
+        .toolchain(toolchain)
         .subcommand("doc")
         .target(target)
         .features(&features)
@@ -159,11 +161,11 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             let mut features = vec![];
             if config.contains("wifi") {
                 features.push("wifi".to_owned());
-                features.push("wifi-default".to_owned());
                 features.push("esp-now".to_owned());
                 features.push("sniffer".to_owned());
                 features.push("utils".to_owned());
-                features.push("embassy-net".to_owned());
+                features.push("smoltcp/proto-ipv4".to_owned());
+                features.push("smoltcp/proto-ipv6".to_owned());
             }
             if config.contains("ble") {
                 features.push("ble".to_owned());
@@ -171,7 +173,6 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             if config.contains("wifi") && config.contains("ble") {
                 features.push("coex".to_owned());
             }
-            features.push("async".to_owned());
             features
         }
         _ => vec![],
@@ -433,6 +434,33 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
     manifest["package"]["version"] = toml_edit::value(version.to_string());
     fs::write(manifest_path, manifest.to_string())?;
 
+    for pkg in
+        Package::iter().filter(|p| ![package, Package::Examples, Package::HilTest].contains(p))
+    {
+        let manifest_path = workspace.join(pkg.to_string()).join("Cargo.toml");
+        let manifest = fs::read_to_string(&manifest_path)
+            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
+
+        let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
+
+        if manifest["dependencies"]
+            .as_table()
+            .unwrap()
+            .contains_key(&package.to_string())
+        {
+            log::info!(
+                "  Bumping {package} version for package {pkg}: ({prev_version} -> {version})"
+            );
+
+            manifest["dependencies"].as_table_mut().map(|table| {
+                table[&package.to_string()]["version"] = toml_edit::value(version.to_string())
+            });
+
+            fs::write(&manifest_path, manifest.to_string())
+                .with_context(|| format!("Could not write {}", manifest_path.display()))?;
+        }
+    }
+
     Ok(())
 }
 
@@ -632,4 +660,13 @@ pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Ver
 /// Make the path "Windows"-safe
 pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
+}
+
+/// Return the target triple for a given package/chip pair.
+pub fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
+    if package == Package::EspLpHal {
+        chip.lp_target()
+    } else {
+        Ok(chip.target())
+    }
 }

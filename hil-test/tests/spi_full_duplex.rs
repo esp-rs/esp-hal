@@ -14,10 +14,11 @@ use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
     dma::{Dma, DmaDescriptor, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Level, NoPin},
+    gpio::{Level, NoPin},
     peripheral::Peripheral,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::master::{Config, Spi},
+    Blocking,
 };
 #[cfg(pcnt)]
 use esp_hal::{
@@ -35,7 +36,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static>,
+    spi: Spi<'static, Blocking>,
     dma_channel: DmaChannelCreator,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
@@ -57,9 +58,8 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
-        let (_, mosi) = hil_test::common_test_pins!(io);
+        let sclk = peripherals.GPIO0;
+        let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -72,13 +72,19 @@ mod tests {
         }
 
         #[cfg(pcnt)]
-        let mosi_loopback_pcnt = mosi.peripheral_input();
+        let (mosi_loopback_pcnt, mosi) = mosi.split();
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
-        let spi = Spi::new(peripherals.SPI2, 10000.kHz(), SpiMode::Mode0)
-            .with_sck(sclk)
-            .with_miso(unsafe { mosi.clone_unchecked() })
-            .with_mosi(mosi);
+        let spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 10.MHz(),
+                ..Config::default()
+            },
+        )
+        .with_sck(sclk)
+        .with_miso(unsafe { mosi.clone_unchecked() })
+        .with_mosi(mosi);
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
@@ -137,7 +143,7 @@ mod tests {
         // Flush because we're not reading, so the write may happen in the background
         ctx.spi.flush().expect("Flush failed");
 
-        assert_eq!(unit.get_value(), 9);
+        assert_eq!(unit.value(), 9);
     }
 
     #[test]
@@ -156,7 +162,7 @@ mod tests {
         // Flush because we're not reading, so the write may happen in the background
         ctx.spi.flush().expect("Flush failed");
 
-        assert_eq!(unit.get_value(), 9);
+        assert_eq!(unit.value(), 9);
     }
 
     #[test]
@@ -217,7 +223,7 @@ mod tests {
 
             let transfer = spi.write(dma_tx_buf).map_err(|e| e.0).unwrap();
             (spi, dma_tx_buf) = transfer.wait();
-            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 
@@ -253,7 +259,7 @@ mod tests {
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-            assert_eq!(unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 
@@ -392,11 +398,9 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let mut spi = ctx
             .spi
-            .with_dma(
-                ctx.dma_channel
-                    .configure_for_async(false, DmaPriority::Priority0),
-            )
-            .with_buffers(dma_rx_buf, dma_tx_buf);
+            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_rx_buf, dma_tx_buf)
+            .into_async();
 
         ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
         ctx.pcnt_unit
@@ -414,7 +418,7 @@ mod tests {
             assert_eq!(receive, [0, 0, 0, 0, 0]);
 
             SpiBusAsync::write(&mut spi, &transmit).await.unwrap();
-            assert_eq!(ctx.pcnt_unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 
@@ -428,11 +432,9 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let mut spi = ctx
             .spi
-            .with_dma(
-                ctx.dma_channel
-                    .configure_for_async(false, DmaPriority::Priority0),
-            )
-            .with_buffers(dma_rx_buf, dma_tx_buf);
+            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_rx_buf, dma_tx_buf)
+            .into_async();
 
         ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
         ctx.pcnt_unit
@@ -452,7 +454,7 @@ mod tests {
             SpiBusAsync::transfer(&mut spi, &mut receive, &transmit)
                 .await
                 .unwrap();
-            assert_eq!(ctx.pcnt_unit.get_value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
         }
     }
 
@@ -494,7 +496,12 @@ mod tests {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         // This means that without working cancellation, the test case should
         // fail.
-        ctx.spi.change_bus_frequency(80.kHz());
+        ctx.spi
+            .apply_config(&Config {
+                frequency: 80.kHz(),
+                ..Config::default()
+            })
+            .unwrap();
 
         // Set up a large buffer that would trigger a timeout
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
@@ -517,7 +524,12 @@ mod tests {
     #[timeout(3)]
     fn can_transmit_after_cancel(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
-        ctx.spi.change_bus_frequency(80.kHz());
+        ctx.spi
+            .apply_config(&Config {
+                frequency: 80.kHz(),
+                ..Config::default()
+            })
+            .unwrap();
 
         // Set up a large buffer that would trigger a timeout
         let mut dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
@@ -535,7 +547,11 @@ mod tests {
         transfer.cancel();
         (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
 
-        spi.change_bus_frequency(10000.kHz());
+        spi.apply_config(&Config {
+            frequency: 10.MHz(),
+            ..Config::default()
+        })
+        .unwrap();
 
         let transfer = spi
             .transfer(dma_rx_buf, dma_tx_buf)
@@ -557,10 +573,10 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
 
-        let spi = ctx.spi.with_dma(
-            ctx.dma_channel
-                .configure_for_async(false, DmaPriority::Priority0),
-        );
+        let spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0))
+            .into_async();
 
         let mut transfer = spi
             .transfer(dma_rx_buf, dma_tx_buf)

@@ -17,7 +17,6 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
-use esp_wifi::{init, EspWifiInitFor};
 use hil_test as _;
 
 #[inline(never)]
@@ -101,8 +100,7 @@ mod tests {
     #[timeout(3)]
     fn fpu_stays_enabled_with_wifi(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let _init = init(
-            EspWifiInitFor::Wifi,
+        let _init = esp_wifi::init(
             timg0.timer1,
             Rng::new(peripherals.RNG),
             peripherals.RADIO_CLK,
@@ -138,8 +136,7 @@ mod tests {
                 unsafe { &mut *core::ptr::addr_of_mut!(APP_CORE_STACK) },
                 move || {
                     let timg0 = TimerGroup::new(peripherals.TIMG0);
-                    let _init = init(
-                        EspWifiInitFor::Wifi,
+                    let _init = esp_wifi::init(
                         timg0.timer1,
                         Rng::new(peripherals.RNG),
                         peripherals.RADIO_CLK,

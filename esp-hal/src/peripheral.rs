@@ -82,7 +82,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     }
 }
 
-impl<'a, T> Deref for PeripheralRef<'a, T> {
+impl<T> Deref for PeripheralRef<'_, T> {
     type Target = T;
 
     #[inline]
@@ -91,7 +91,7 @@ impl<'a, T> Deref for PeripheralRef<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for PeripheralRef<'a, T> {
+impl<T> DerefMut for PeripheralRef<'_, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
@@ -121,14 +121,14 @@ impl<'a, T> DerefMut for PeripheralRef<'a, T> {
 /// live forever (`'static`):
 ///
 /// ```rust, ignore
-/// let mut uart: Uart<'static, ...> = Uart::new(p.UART0, pins.gpio0, pins.gpio1);
+/// let mut uart: Uart<'static, ...> = Uart::new(p.UART0, p.GPIO0, p.GPIO1);
 /// ```
 ///
 /// Or you may call it with borrowed peripherals, which yields an instance that
 /// can only live for as long as the borrows last:
 ///
 /// ```rust, ignore
-/// let mut uart: Uart<'_, ...> = Uart::new(&mut p.UART0, &mut pins.gpio0, &mut pins.gpio1);
+/// let mut uart: Uart<'_, ...> = Uart::new(&mut p.UART0, &mut p.GPIO0, &mut p.GPIO1);
 /// ```
 ///
 /// # Implementation details, for HAL authors
@@ -210,10 +210,7 @@ mod peripheral_macros {
     /// Creates a new `Peripherals` struct and its associated methods.
     ///
     /// The macro has a few fields doing different things, in the form of
-    /// `[first] second <= third (fourth)`.
-    /// - The first field is the name of the `Peripherals` enum variant. This is
-    ///   optional and used to create `PeripheralMarker` implementations for
-    ///   DMA-eligible peripherals.
+    /// `second <= third (fourth)`.
     /// - The second field is the name of the peripheral, as it appears in the
     ///   `Peripherals` struct.
     /// - The third field is the name of the peripheral as it appears in the
@@ -225,55 +222,77 @@ mod peripheral_macros {
     #[macro_export]
     macro_rules! peripherals {
         (
-            $(
-                $([$enum_variant:ident])? $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
-            ), *$(,)?
+            peripherals: [
+                $(
+                    $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
+                ), *$(,)?
+            ],
+            pins: [
+                $( ( $pin:literal, $($pin_tokens:tt)* ) )*
+            ]
         ) => {
 
             /// Contains the generated peripherals which implement [`Peripheral`]
             mod peripherals {
                 pub use super::pac::*;
                 $(
-                    $crate::create_peripheral!($([$enum_variant])? $name <= $from_pac);
+                    $crate::create_peripheral!($name <= $from_pac);
                 )*
             }
 
-            /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
-            #[allow(non_snake_case)]
-            pub struct Peripherals {
-                $(
-                    /// Each field represents a hardware peripheral.
-                    pub $name: peripherals::$name,
-                )*
+            pub(crate) mod gpio {
+                $crate::gpio! {
+                    $( ($pin, $($pin_tokens)* ) )*
+                }
             }
 
-            impl Peripherals {
-                /// Returns all the peripherals *once*
-                #[inline]
-                pub(crate) fn take() -> Self {
-                    #[no_mangle]
-                    static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
+            paste::paste! {
+                /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
+                #[allow(non_snake_case)]
+                pub struct Peripherals {
+                    $(
+                        #[doc = concat!("The ", stringify!($name), " peripheral.")]
+                        pub $name: peripherals::$name,
+                    )*
 
-                    critical_section::with(|_| unsafe {
-                        if _ESP_HAL_DEVICE_PERIPHERALS {
-                            panic!("init called more than once!")
-                        }
-                        _ESP_HAL_DEVICE_PERIPHERALS = true;
-                        Self::steal()
-                    })
+                    $(
+                        #[doc = concat!("GPIO", stringify!($pin))]
+                        pub [<GPIO $pin>]: $crate::gpio::GpioPin<$pin>,
+                    )*
                 }
 
-                /// Unsafely create an instance of this peripheral out of thin air.
-                ///
-                /// # Safety
-                ///
-                /// You must ensure that you're only using one instance of this type at a time.
-                #[inline]
-                pub unsafe fn steal() -> Self {
-                    Self {
-                        $(
-                            $name: peripherals::$name::steal(),
-                        )*
+                impl Peripherals {
+                    /// Returns all the peripherals *once*
+                    #[inline]
+                    pub(crate) fn take() -> Self {
+                        #[no_mangle]
+                        static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
+
+                        critical_section::with(|_| unsafe {
+                            if _ESP_HAL_DEVICE_PERIPHERALS {
+                                panic!("init called more than once!")
+                            }
+                            _ESP_HAL_DEVICE_PERIPHERALS = true;
+                            Self::steal()
+                        })
+                    }
+
+                    /// Unsafely create an instance of this peripheral out of thin air.
+                    ///
+                    /// # Safety
+                    ///
+                    /// You must ensure that you're only using one instance of this type at a time.
+                    #[inline]
+                    pub unsafe fn steal() -> Self {
+                        Self {
+                            $(
+                                $name: peripherals::$name::steal(),
+                            )*
+
+                            $(
+                                [<GPIO $pin>]: $crate::gpio::GpioPin::<$pin>::steal(),
+                            )*
+                        }
                     }
                 }
             }
@@ -297,8 +316,7 @@ mod peripheral_macros {
                     }
                 )*
             )*
-
-        }
+        };
     }
 
     #[doc(hidden)]
@@ -327,7 +345,7 @@ mod peripheral_macros {
     #[macro_export]
     /// Macro to create a peripheral structure.
     macro_rules! create_peripheral {
-        ($([$enum_variant:ident])? $name:ident <= virtual) => {
+        ($name:ident <= virtual) => {
             #[derive(Debug)]
             #[allow(non_camel_case_types)]
             /// Represents a virtual peripheral with no associated hardware.
@@ -358,15 +376,6 @@ mod peripheral_macros {
             }
 
             impl $crate::private::Sealed for $name {}
-
-            $(
-                impl $crate::dma::PeripheralMarker for $crate::peripherals::$name {
-                    #[inline(always)]
-                    fn peripheral(&self) -> $crate::system::Peripheral {
-                        $crate::system::Peripheral::$enum_variant
-                    }
-                }
-            )?
         };
 
         ($([$enum_variant:ident])? $name:ident <= $base:ident) => {

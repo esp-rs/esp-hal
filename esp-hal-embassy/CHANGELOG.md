@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Alarm interrupts are now handled on the core that allocated them. (For executors created on the second core after calling `esp_hal_embassy::init`) (#2451)
+
 ### Removed
 
 ## 0.4.0 - 2024-10-10

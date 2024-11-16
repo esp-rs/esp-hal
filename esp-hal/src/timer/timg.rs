@@ -81,7 +81,7 @@ use crate::{
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
     sync::{lock, Lock},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::PeripheralClockControl,
     Async,
     Blocking,
     InterruptConfigurable,
@@ -152,7 +152,7 @@ impl TimerGroupInstance for TIMG0 {
     }
 
     fn enable_peripheral() {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
     }
 
     fn reset_peripheral() {
@@ -215,11 +215,11 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
     }
 
     fn enable_peripheral() {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
     }
 
     fn reset_peripheral() {
-        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
     }
 
     fn configure_wdt_src_clk() {
@@ -377,7 +377,6 @@ where
 {
     /// Construct a new instance of [`Timer`]
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
-        timg.enable_peripheral();
         timg.set_counter_active(true);
 
         Self {
@@ -553,10 +552,11 @@ where
             _ => unreachable!(),
         };
 
-        unsafe {
-            interrupt::bind_interrupt(interrupt, handler.handler());
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
         }
-        interrupt::enable(interrupt, handler.priority()).unwrap();
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 
     fn is_interrupt_set(&self) -> bool {
@@ -598,7 +598,7 @@ where
 }
 
 #[doc(hidden)]
-pub trait Instance: Sealed + Enable {
+pub trait Instance: Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
     fn timer_group(&self) -> u8;
@@ -636,11 +636,6 @@ pub trait Instance: Sealed + Enable {
     fn is_interrupt_set(&self) -> bool;
 }
 
-#[doc(hidden)]
-pub trait Enable: Sealed {
-    fn enable_peripheral(&self);
-}
-
 /// A timer within a Timer Group.
 pub struct TimerX<TG, const T: u8 = 0> {
     phantom: PhantomData<TG>,
@@ -673,7 +668,6 @@ where
 impl<TG, const T: u8> Instance for TimerX<TG, T>
 where
     TG: TimerGroupInstance,
-    Self: Enable,
 {
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*TG::register_block() }
@@ -803,7 +797,7 @@ where
     fn set_divider(&self, divider: u16) {
         unsafe { Self::t() }
             .config()
-            .modify(|_, w| unsafe { w.divider().bits(divider) })
+            .modify(|_, w| unsafe { w.divider().bits(divider) });
     }
 }
 
@@ -813,25 +807,6 @@ pub type Timer0<TG> = TimerX<TG, 0>;
 /// Timer 1 in the Timer Group.
 #[cfg(timg_timer1)]
 pub type Timer1<TG> = TimerX<TG, 1>;
-
-impl<TG> Enable for Timer0<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(PeripheralEnable::Timg0);
-    }
-}
-
-#[cfg(timg_timer1)]
-impl<TG> Enable for Timer1<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(PeripheralEnable::Timg1);
-    }
-}
 
 fn ticks_to_timeout<F>(ticks: u64, clock: F, divider: u32) -> u64
 where
@@ -955,7 +930,7 @@ where
     /// Construct a new instance of [`Wdt`]
     pub fn new() -> Self {
         #[cfg(lp_wdt)]
-        PeripheralClockControl::enable(PeripheralEnable::Wdt);
+        PeripheralClockControl::enable(crate::system::Peripheral::Wdt);
 
         TG::configure_wdt_src_clk();
 
@@ -1073,7 +1048,7 @@ where
                 MwdtStage::Stage3 => reg_block
                     .wdtconfig5()
                     .write(|w| w.wdt_stg3_hold().bits(timeout_raw)),
-            }
+            };
         }
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
@@ -1232,7 +1207,7 @@ mod asynch {
         }
     }
 
-    impl<'a, T> core::future::Future for TimerFuture<'a, T>
+    impl<T> core::future::Future for TimerFuture<'_, T>
     where
         T: Instance,
     {
@@ -1250,7 +1225,7 @@ mod asynch {
         }
     }
 
-    impl<'a, T> Drop for TimerFuture<'a, T>
+    impl<T> Drop for TimerFuture<'_, T>
     where
         T: Instance,
     {
@@ -1348,87 +1323,87 @@ pub mod etm {
     use crate::etm::{EtmEvent, EtmTask};
 
     /// Event Task Matrix event for a timer.
-    pub struct TimerEtmEvent {
+    pub struct Event {
         id: u8,
     }
 
     /// Event Task Matrix task for a timer.
-    pub struct TimerEtmTask {
+    pub struct Task {
         id: u8,
     }
 
-    impl EtmEvent for TimerEtmEvent {
+    impl EtmEvent for Event {
         fn id(&self) -> u8 {
             self.id
         }
     }
 
-    impl Sealed for TimerEtmEvent {}
+    impl Sealed for Event {}
 
-    impl EtmTask for TimerEtmTask {
+    impl EtmTask for Task {
         fn id(&self) -> u8 {
             self.id
         }
     }
 
-    impl Sealed for TimerEtmTask {}
+    impl Sealed for Task {}
 
     /// General purpose timer ETM events.
-    pub trait TimerEtmEvents<TG> {
+    pub trait Events<TG> {
         /// ETM event triggered on alarm
-        fn on_alarm(&self) -> TimerEtmEvent;
+        fn on_alarm(&self) -> Event;
     }
 
     /// General purpose timer ETM tasks
-    pub trait TimerEtmTasks<TG> {
+    pub trait Tasks<TG> {
         /// ETM task to start the counter
-        fn cnt_start(&self) -> TimerEtmTask;
+        fn cnt_start(&self) -> Task;
 
         /// ETM task to start the alarm
-        fn cnt_stop(&self) -> TimerEtmTask;
+        fn cnt_stop(&self) -> Task;
 
         /// ETM task to stop the counter
-        fn cnt_reload(&self) -> TimerEtmTask;
+        fn cnt_reload(&self) -> Task;
 
         /// ETM task to reload the counter
-        fn cnt_cap(&self) -> TimerEtmTask;
+        fn cnt_cap(&self) -> Task;
 
         /// ETM task to load the counter with the value stored when the last
         /// `now()` was called
-        fn alarm_start(&self) -> TimerEtmTask;
+        fn alarm_start(&self) -> Task;
     }
 
-    impl<TG> TimerEtmEvents<TG> for Timer0<TG>
+    impl<TG> Events<TG> for Timer0<TG>
     where
         TG: TimerGroupInstance,
     {
-        fn on_alarm(&self) -> TimerEtmEvent {
-            TimerEtmEvent { id: 48 + TG::id() }
+        fn on_alarm(&self) -> Event {
+            Event { id: 48 + TG::id() }
         }
     }
 
-    impl<TG> TimerEtmTasks<TG> for Timer0<TG>
+    impl<TG> Tasks<TG> for Timer0<TG>
     where
         TG: TimerGroupInstance,
     {
-        fn cnt_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 88 + TG::id() }
+        fn cnt_start(&self) -> Task {
+            Task { id: 88 + TG::id() }
         }
 
-        fn alarm_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 90 + TG::id() }
+        fn alarm_start(&self) -> Task {
+            Task { id: 90 + TG::id() }
         }
 
-        fn cnt_stop(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 92 + TG::id() }
+        fn cnt_stop(&self) -> Task {
+            Task { id: 92 + TG::id() }
         }
 
-        fn cnt_reload(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 94 + TG::id() }
+        fn cnt_reload(&self) -> Task {
+            Task { id: 94 + TG::id() }
         }
 
-        fn cnt_cap(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 96 + TG::id() }
+        fn cnt_cap(&self) -> Task {
+            Task { id: 96 + TG::id() }
         }
     }
 }

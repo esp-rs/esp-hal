@@ -22,7 +22,7 @@ pub struct Channel<'d, const UNIT: usize, const NUM: usize> {
     _not_send: PhantomData<*const ()>,
 }
 
-impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
+impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// return a new Channel
     pub(super) fn new() -> Self {
         Self {
@@ -118,7 +118,7 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
             crate::into_mapped_ref!(source);
             source.enable_input(true, crate::private::Internal);
-            source.connect_input_to_peripheral(signal, crate::private::Internal);
+            signal.connect_to(source);
         }
         self
     }
@@ -176,7 +176,7 @@ impl<'d, const UNIT: usize, const NUM: usize> Channel<'d, UNIT, NUM> {
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
             crate::into_mapped_ref!(source);
             source.enable_input(true, crate::private::Internal);
-            source.connect_input_to_peripheral(signal, crate::private::Internal);
+            signal.connect_to(source);
         }
         self
     }

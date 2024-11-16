@@ -8,7 +8,7 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0:`:
+//!   - `io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0:`:
 //!       * This function returns a reference to the GPIO register associated
 //!         with the given GPIO number. It uses unsafe code and transmutation to
 //!         access the GPIO registers based on the provided GPIO number.
@@ -53,6 +53,7 @@ pub const NUM_PINS: usize = 40;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u16;
 pub(crate) type OutputSignalType = u16;
 pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 548;
 pub(crate) const INPUT_SIGNAL_MAX: u16 = 539;
@@ -62,7 +63,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x30;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function2;
 
-pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
+pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
     unsafe {
         let iomux = &*IO_MUX::PTR;
 
@@ -109,7 +110,7 @@ pub(crate) fn get_io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    match crate::get_core() {
+    match Cpu::current() {
         Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
         // this should be bits 3 & 4 respectively, according to the TRM, but it doesn't seem to
         // work. This does though.
@@ -119,7 +120,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     SPICLK                = 0,
@@ -310,7 +312,8 @@ pub enum InputSignal {
 
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum OutputSignal {
     SPICLK                   = 0,
@@ -533,7 +536,7 @@ macro_rules! rtcio_analog {
     (
         $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
     ) => {
-        impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
+        impl $crate::gpio::RtcPin for $crate::gpio::GpioPin<$pin_num> {
             fn rtc_number(&self) -> u8 {
                 $rtc_pin
             }
@@ -562,7 +565,7 @@ macro_rules! rtcio_analog {
         $(
             // FIXME: replace with $(ignore($rue)) once stable
             rtcio_analog!(@ignore $rue);
-            impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num> {
+            impl $crate::gpio::RtcPinWithResistors for $crate::gpio::GpioPin<$pin_num> {
                 fn rtcio_pullup(&mut self, enable: bool) {
                     paste::paste! {
                         unsafe { $crate::peripherals::RTC_IO::steal() }
@@ -579,7 +582,7 @@ macro_rules! rtcio_analog {
             }
         )?
 
-        impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
+        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<$pin_num> {
             /// Configures the pin for analog mode.
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::gpio::RtcPin;
@@ -626,7 +629,7 @@ macro_rules! rtcio_analog {
             rtcio_analog!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue )?);
         )+
 
-        pub(crate) fn errata36(mut pin: AnyPin, pull_up: bool, pull_down: bool) {
+        pub(crate) fn errata36(mut pin: $crate::gpio::AnyPin, pull_up: bool, pull_down: bool) {
             use $crate::gpio::{Pin, RtcPinWithResistors};
 
             let has_pullups = match pin.number() {
@@ -716,7 +719,7 @@ macro_rules! touch {
                 }
             }
 
-            fn get_touch_measurement(&self, _: $crate::private::Internal) -> u16 {
+            fn touch_measurement(&self, _: $crate::private::Internal) -> u16 {
                 paste::paste! {
                     unsafe { $crate::peripherals::SENS::steal() }
                         . $touch_out_reg ().read()
@@ -724,7 +727,7 @@ macro_rules! touch {
                 }
             }
 
-            fn get_touch_nr(&self, _: $crate::private::Internal) -> u8 {
+            fn touch_nr(&self, _: $crate::private::Internal) -> u8 {
                 $touch_num
             }
 
@@ -739,45 +742,6 @@ macro_rules! touch {
             }
         })+
     };
-}
-
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo, Touch] (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
-    (1, [Input, Output] (5 => EMAC_RXD2) (0 => U0TXD 1 => CLK_OUT3))
-    (2, [Input, Output, Analog, RtcIo, Touch] (1 => HSPIWP 3 => HS2_DATA0 4 => SD_DATA0) (3 => HS2_DATA0 4 => SD_DATA0))
-    (3, [Input, Output] (0 => U0RXD) (1 => CLK_OUT2))
-    (4, [Input, Output, Analog, RtcIo, Touch] (1 => HSPIHD 3 => HS2_DATA1 4 => SD_DATA1 5 => EMAC_TX_ER) (3 => HS2_DATA1 4 => SD_DATA1))
-    (5, [Input, Output] (1 => VSPICS0 3 => HS1_DATA6 5 => EMAC_RX_CLK) (3 => HS1_DATA6))
-    (6, [Input, Output] (4 => U1CTS) (0 => SD_CLK 1 => SPICLK 3 => HS1_CLK))
-    (7, [Input, Output] (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0) (0 => SD_DATA0 1 => SPIQ 3 => HS1_DATA0 4 => U2RTS))
-    (8, [Input, Output] (0 => SD_DATA1 1 => SPID 3 => HS1_DATA1 4 => U2CTS) (0 => SD_DATA1 1 => SPID 3 => HS1_DATA1))
-    (9, [Input, Output] (0 => SD_DATA2 1 => SPIHD 3 => HS1_DATA2 4 => U1RXD) (0 => SD_DATA2 1 => SPIHD 3 => HS1_DATA2))
-    (10, [Input, Output] ( 0 => SD_DATA3 1 => SPIWP 3 => HS1_DATA3) (0 => SD_DATA3 1 => SPIWP 3 => HS1_DATA3 4 => U1TXD))
-    (11, [Input, Output] ( 1 => SPICS0) (0 => SD_CMD 1 => SPICS0 3 => HS1_CMD 4 => U1RTS))
-    (12, [Input, Output, Analog, RtcIo, Touch] (0 => MTDI 1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2) (1 => HSPIQ 3 => HS2_DATA2 4 => SD_DATA2 5 => EMAC_TXD3))
-    (13, [Input, Output, Analog, RtcIo, Touch] (0 => MTCK 1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3) (1 => HSPID 3 => HS2_DATA3 4 => SD_DATA3 5 => EMAC_RX_ER))
-    (14, [Input, Output, Analog, RtcIo, Touch] (0 => MTMS 1 => HSPICLK) (1 => HSPICLK 3 => HS2_CLK 4 => SD_CLK 5 => EMAC_TXD2))
-    (15, [Input, Output, Analog, RtcIo, Touch] (1 => HSPICS0 5 => EMAC_RXD3) (0 => MTDO 1 => HSPICS0 3 => HS2_CMD 4 => SD_CMD))
-    (16, [Input, Output] (3 => HS1_DATA4 4 => U2RXD) (3 => HS1_DATA4 5 => EMAC_CLK_OUT))
-    (17, [Input, Output] (3 => HS1_DATA5) (3 => HS1_DATA5 4 => U2TXD 5 => EMAC_CLK_180))
-    (18, [Input, Output] (1 => VSPICLK 3 => HS1_DATA7) (1 => VSPICLK 3 => HS1_DATA7))
-    (19, [Input, Output] (1 => VSPIQ 3 => U0CTS) (1 => VSPIQ 5 => EMAC_TXD0))
-    (20, [Input, Output])
-    (21, [Input, Output] (1 => VSPIHD) (1 => VSPIHD 5 => EMAC_TX_EN))
-    (22, [Input, Output] (1 => VSPIWP) (1 => VSPIWP 3 => U0RTS 5 => EMAC_TXD1))
-    (23, [Input, Output] (1 => VSPID) (1 => VSPID 3 => HS1_STROBE))
-    (24, [Input, Output])
-    (25, [Input, Output, Analog, RtcIo] (5 => EMAC_RXD0) ())
-    (26, [Input, Output, Analog, RtcIo] (5 => EMAC_RXD1) ())
-    (27, [Input, Output, Analog, RtcIo, Touch] (5 => EMAC_RX_DV) ())
-    (32, [Input, Output, Analog, RtcIo, Touch])
-    (33, [Input, Output, Analog, RtcIo, Touch])
-    (34, [Input, Analog, RtcIoInput])
-    (35, [Input, Analog, RtcIoInput])
-    (36, [Input, Analog, RtcIoInput])
-    (37, [Input, Analog, RtcIoInput])
-    (38, [Input, Analog, RtcIoInput])
-    (39, [Input, Analog, RtcIoInput])
 }
 
 rtcio_analog! {
@@ -825,13 +789,13 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => match crate::get_core() {
-                crate::Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
-                crate::Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int().read().bits(),
+            Self::Bank0 => match Cpu::current() {
+                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
+                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int().read().bits(),
             },
-            Self::Bank1 => match crate::get_core() {
-                crate::Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
-                crate::Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int1().read().bits(),
+            Self::Bank1 => match Cpu::current() {
+                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
+                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int1().read().bits(),
             },
         }
     }

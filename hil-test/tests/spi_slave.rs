@@ -11,8 +11,10 @@
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{interconnect::InputSignal, Io, Level, Output},
+    gpio::{Input, Level, Output, Pull},
+    peripheral::Peripheral,
     spi::{slave::Spi, SpiMode},
+    Blocking,
 };
 use hil_test as _;
 
@@ -25,7 +27,7 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    spi: Spi<'static>,
+    spi: Spi<'static, Blocking>,
     dma_channel: DmaChannelCreator,
     bitbang_spi: BitbangSpi,
 }
@@ -33,7 +35,7 @@ struct Context {
 struct BitbangSpi {
     sclk: Output<'static>,
     mosi: Output<'static>,
-    miso: InputSignal,
+    miso: Input<'static>,
     cs: Output<'static>,
 }
 
@@ -41,7 +43,7 @@ impl BitbangSpi {
     fn new(
         sclk: Output<'static>,
         mosi: Output<'static>,
-        miso: InputSignal,
+        miso: Input<'static>,
         cs: Output<'static>,
     ) -> Self {
         Self {
@@ -67,7 +69,7 @@ impl BitbangSpi {
         self.mosi.set_level(Level::from(bit));
         self.sclk.set_level(Level::High);
 
-        let miso = self.miso.get_level().into();
+        let miso = self.miso.level().into();
         self.sclk.set_level(Level::Low);
 
         miso
@@ -101,11 +103,9 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let (mosi_pin, miso_pin) = hil_test::i2c_pins!(io);
-        let (sclk_pin, sclk_gpio) = hil_test::common_test_pins!(io);
-        let cs_pin = hil_test::unconnected_pin!(io);
+        let (mosi_pin, miso_pin) = hil_test::i2c_pins!(peripherals);
+        let (sclk_pin, _) = hil_test::common_test_pins!(peripherals);
+        let cs_pin = hil_test::unconnected_pin!(peripherals);
 
         let dma = Dma::new(peripherals.DMA);
 
@@ -117,30 +117,24 @@ mod tests {
             }
         }
 
-        let cs = cs_pin.peripheral_input();
-        let mosi = mosi_pin.peripheral_input();
-        let mut miso = miso_pin.peripheral_input();
-        let sclk_signal = sclk_pin.peripheral_input();
-
         let mosi_gpio = Output::new(mosi_pin, Level::Low);
         let cs_gpio = Output::new(cs_pin, Level::High);
-        let sclk_gpio = Output::new(sclk_gpio, Level::Low);
+        let sclk_gpio = Output::new(sclk_pin, Level::Low);
+        let miso_gpio = Input::new(miso_pin, Pull::None);
 
-        let spi = Spi::new(
-            peripherals.SPI2,
-            sclk_signal,
-            mosi,
-            miso_pin,
-            cs,
-            SpiMode::Mode1,
-        );
-
-        miso.enable_input(true, unsafe { esp_hal::Internal::conjure() });
+        let cs = cs_gpio.peripheral_input();
+        let sclk = sclk_gpio.peripheral_input();
+        let mosi = mosi_gpio.peripheral_input();
+        let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
 
         Context {
-            spi,
+            spi: Spi::new(peripherals.SPI2, SpiMode::Mode1)
+                .with_sck(sclk)
+                .with_mosi(mosi)
+                .with_miso(miso)
+                .with_cs(cs),
+            bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso_gpio, cs_gpio),
             dma_channel,
-            bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso, cs_gpio),
         }
     }
 

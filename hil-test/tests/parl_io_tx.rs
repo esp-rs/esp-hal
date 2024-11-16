@@ -8,7 +8,10 @@
 use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
     dma::{ChannelCreator, Dma, DmaPriority},
-    gpio::{interconnect::InputSignal, AnyPin, Io, NoPin},
+    gpio::{
+        interconnect::{InputSignal, OutputSignal},
+        NoPin,
+    },
     parl_io::{
         BitPackOrder,
         ClkOutPin,
@@ -30,8 +33,8 @@ use hil_test as _;
 struct Context {
     parl_io: PARL_IO,
     dma_channel: ChannelCreator<0>,
-    clock: AnyPin,
-    valid: AnyPin,
+    clock: OutputSignal,
+    valid: OutputSignal,
     clock_loopback: InputSignal,
     valid_loopback: InputSignal,
     pcnt_unit: Unit<'static, 0>,
@@ -48,12 +51,10 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let (clock, _) = hil_test::common_test_pins!(io);
-        let valid = io.pins.gpio0.degrade();
-        let clock_loopback = clock.peripheral_input();
-        let valid_loopback = valid.peripheral_input();
-        let clock = clock.degrade();
+        let (clock, _) = hil_test::common_test_pins!(peripherals);
+        let valid = hil_test::unconnected_pin!(peripherals);
+        let (clock_loopback, clock) = clock.split();
+        let (valid_loopback, valid) = valid.split();
         let pcnt = Pcnt::new(peripherals.PCNT);
         let pcnt_unit = pcnt.unit0;
         let dma = Dma::new(peripherals.DMA);
@@ -121,8 +122,8 @@ mod tests {
             clock_unit.clear();
             let xfer = pio.write_dma(&tx_buffer).unwrap();
             xfer.wait().unwrap();
-            info!("clock count: {}", clock_unit.get_value());
-            assert_eq!(clock_unit.get_value(), BUFFER_SIZE as _);
+            info!("clock count: {}", clock_unit.value());
+            assert_eq!(clock_unit.value(), BUFFER_SIZE as _);
         }
     }
 
@@ -188,8 +189,8 @@ mod tests {
             clock_unit.clear();
             let xfer = pio.write_dma(&tx_buffer).unwrap();
             xfer.wait().unwrap();
-            info!("clock count: {}", clock_unit.get_value());
-            assert_eq!(clock_unit.get_value(), BUFFER_SIZE as _);
+            info!("clock count: {}", clock_unit.value());
+            assert_eq!(clock_unit.value(), BUFFER_SIZE as _);
         }
     }
 }

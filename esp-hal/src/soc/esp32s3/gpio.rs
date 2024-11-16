@@ -8,7 +8,7 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `get_io_mux_reg(gpio_num: u8) -> &'static
+//!   - `io_mux_reg(gpio_num: u8) -> &'static
 //!     crate::peripherals::io_mux::GPIO0:`:
 //!       * Returns the IO_MUX register for the specified GPIO pin number.
 //!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
@@ -46,6 +46,7 @@ pub const NUM_PINS: usize = 49;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u16;
 pub(crate) type OutputSignalType = u16;
 pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 256;
 pub(crate) const INPUT_SIGNAL_MAX: u16 = 189;
@@ -55,7 +56,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
-pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
+pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
     unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
 }
 
@@ -65,7 +66,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     SPIQ              = 0,
@@ -203,8 +205,10 @@ pub enum InputSignal {
 
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
-#[doc(hidden)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[doc(hidden)] // TODO connection operations are now public on these, we might want to publish
+               // them
 pub enum OutputSignal {
     SPIQ            = 0,
     SPID            = 1,
@@ -441,54 +445,6 @@ macro_rules! rtcio_analog {
             rtcio_analog!($pin_num, $pin_reg, $prefix, $hold);
         )+
     };
-}
-
-crate::gpio! {
-    (0, [Input, Output, Analog, RtcIo])
-    (1, [Input, Output, Analog, RtcIo])
-    (2, [Input, Output, Analog, RtcIo])
-    (3, [Input, Output, Analog, RtcIo])
-    (4, [Input, Output, Analog, RtcIo])
-    (5, [Input, Output, Analog, RtcIo])
-    (6, [Input, Output, Analog, RtcIo])
-    (7, [Input, Output, Analog, RtcIo])
-    (8, [Input, Output, Analog, RtcIo] () (3 => SUBSPICS1))
-    (9, [Input, Output, Analog, RtcIo] (3 => SUBSPIHD 4 => FSPIHD) (3 => SUBSPIHD 4 => FSPIHD))
-    (10, [Input, Output, Analog, RtcIo] (2 => FSPIIO4 4 => FSPICS0) (2 => FSPIIO4 3 => SUBSPICS0 4 => FSPICS0))
-    (11, [Input, Output, Analog, RtcIo] (2 => FSPIIO5 3 => SUBSPID 4 => FSPID) (2 => FSPIIO5 3 => SUBSPID 4 => FSPID))
-    (12, [Input, Output, Analog, RtcIo] (2 => FSPIIO6 4 => FSPICLK) (2 => FSPIIO6 3=> SUBSPICLK 4 => FSPICLK))
-    (13, [Input, Output, Analog, RtcIo] (2 => FSPIIO7 3 => SUBSPIQ 4 => FSPIQ) (2 => FSPIIO7 3 => SUBSPIQ 4 => FSPIQ))
-    (14, [Input, Output, Analog, RtcIo] (3 => SUBSPIWP 4 => FSPIWP) (2 => FSPIDQS 3 => SUBSPIWP 4 => FSPIWP))
-    (15, [Input, Output, Analog, RtcIo] () (2 => U0RTS))
-    (16, [Input, Output, Analog, RtcIo] (2 => U0CTS) ())
-    (17, [Input, Output, Analog, RtcIo] () (2 => U1TXD))
-    (18, [Input, Output, Analog, RtcIo] (2 => U1RXD) ())
-    (19, [Input, Output, Analog, RtcIo] () (2 => U1RTS))
-    (20, [Input, Output, Analog, RtcIo] (2 => U1CTS) ())
-    (21, [Input, Output, Analog, RtcIo])
-    (26, [Input, Output])
-    (27, [Input, Output])
-    (28, [Input, Output])
-    (29, [Input, Output])
-    (30, [Input, Output])
-    (31, [Input, Output])
-    (32, [Input, Output])
-    (33, [Input, Output] (2 => FSPIHD 3 => SUBSPIHD) (2 => FSPIHD 3 => SUBSPIHD))
-    (34, [Input, Output] (2 => FSPICS0) (2 => FSPICS0 3 => SUBSPICS0))
-    (35, [Input, Output] (2 => FSPID 3 => SUBSPID) (2 => FSPID 3 => SUBSPID))
-    (36, [Input, Output] (2 => FSPICLK) (2 => FSPICLK 3 => SUBSPICLK))
-    (37, [Input, Output] (2 => FSPIQ 3 => SUBSPIQ 4 => SPIDQS) (2 => FSPIQ 3=> SUBSPIQ 4 => SPIDQS))
-    (38, [Input, Output] (2 => FSPIWP 3 => SUBSPIWP) (3 => FSPIWP 3 => SUBSPIWP))
-    (39, [Input, Output] () (4 => SUBSPICS1))
-    (40, [Input, Output])
-    (41, [Input, Output])
-    (42, [Input, Output])
-    (43, [Input, Output])
-    (44, [Input, Output])
-    (45, [Input, Output])
-    (46, [Input, Output])
-    (47, [Input, Output])
-    (48, [Input, Output])
 }
 
 rtcio_analog! {

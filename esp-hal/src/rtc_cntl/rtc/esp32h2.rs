@@ -120,10 +120,7 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(
-        RtcClock::get_xtal_freq(),
-        XtalClock::RtcXtalFreq32M
-    ));
+    assert!(matches!(RtcClock::xtal_freq(), XtalClock::RtcXtalFreq32M));
 
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
 
@@ -270,7 +267,7 @@ impl RtcClock {
     /// Get main XTAL frequency.
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
-    pub fn get_xtal_freq() -> XtalClock {
+    pub fn xtal_freq() -> XtalClock {
         match Self::read_xtal_freq_mhz() {
             None | Some(32) => XtalClock::RtcXtalFreq32M,
             Some(other) => XtalClock::RtcXtalFreqOther(other),
@@ -309,7 +306,7 @@ impl RtcClock {
     }
 
     /// Get the RTC_SLOW_CLK source
-    pub fn get_slow_freq() -> RtcSlowClock {
+    pub fn slow_freq() -> RtcSlowClock {
         let lp_clrst = unsafe { &*LPWR::ptr() };
 
         let slow_freq = lp_clrst.lp_clk_conf().read().slow_clk_sel().bits();
@@ -323,7 +320,7 @@ impl RtcClock {
     }
 
     fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        let xtal_freq = RtcClock::get_xtal_freq();
+        let xtal_freq = RtcClock::xtal_freq();
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
         let divider = xtal_freq.mhz() as u64 * slowclk_cycles as u64;
         let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
@@ -341,7 +338,7 @@ impl RtcClock {
 
         if cal_clk == RtcCalSel::RtcCalRtcMux {
             cal_clk = match cal_clk {
-                RtcCalSel::RtcCalRtcMux => match RtcClock::get_slow_freq() {
+                RtcCalSel::RtcCalRtcMux => match RtcClock::slow_freq() {
                     RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                     RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
                     _ => cal_clk,
@@ -355,7 +352,7 @@ impl RtcClock {
         let pcr = unsafe { &*PCR::ptr() };
         let pmu = unsafe { &*PMU::ptr() };
 
-        let clk_src = RtcClock::get_slow_freq();
+        let clk_src = RtcClock::slow_freq();
 
         if cal_clk == RtcCalSel::RtcCalRtcMux {
             cal_clk = match clk_src {
@@ -383,16 +380,19 @@ impl RtcClock {
         } else {
             cali_clk_sel = RtcCaliClkSel::CaliClk32k;
             match cal_clk {
-                RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => (),
-                RtcCalSel::RtcCal32kRc => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) }),
-                RtcCalSel::RtcCal32kXtal => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) }),
-                RtcCalSel::RtcCal32kOscSlow => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) }),
+                RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => {}
+                RtcCalSel::RtcCal32kRc => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) });
+                }
+                RtcCalSel::RtcCal32kXtal => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) });
+                }
+                RtcCalSel::RtcCal32kOscSlow => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) });
+                }
             }
         }
 
@@ -584,7 +584,7 @@ impl RtcClock {
 
     pub(crate) fn cycles_to_1ms() -> u16 {
         let period_13q19 = RtcClock::calibrate(
-            match RtcClock::get_slow_freq() {
+            match RtcClock::slow_freq() {
                 RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRtcMux,
                 RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                 RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,

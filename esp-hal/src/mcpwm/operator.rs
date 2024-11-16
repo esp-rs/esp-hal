@@ -298,9 +298,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin.set_actions(config.actions);
         pin.set_update_method(config.update_method);
 
-        let output_signal = PWM::output_signal::<OP, IS_A>();
-        pin.pin
-            .connect_peripheral_to_output(output_signal, private::Internal);
+        PWM::output_signal::<OP, IS_A>().connect_to(&mut pin.pin);
         pin.pin.enable_output(true, private::Internal);
 
         pin
@@ -315,7 +313,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
 
         // SAFETY:
         // `bits` is a valid bit pattern
-        ch.gen((!IS_A) as usize).write(|w| unsafe { w.bits(bits) })
+        ch.gen((!IS_A) as usize).write(|w| unsafe { w.bits(bits) });
     }
 
     /// Set how a new timestamp syncs with the timer
@@ -336,7 +334,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
             } else {
                 w.b_upmethod().bits(bits)
             }
-        })
+        });
     }
 
     /// Write a new timestamp.
@@ -349,23 +347,23 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
 
         #[cfg(esp32s3)]
         if IS_A {
-            ch.cmpr_value0().write(|w| unsafe { w.a().bits(value) })
+            ch.cmpr_value0().write(|w| unsafe { w.a().bits(value) });
         } else {
-            ch.cmpr_value1().write(|w| unsafe { w.b().bits(value) })
+            ch.cmpr_value1().write(|w| unsafe { w.b().bits(value) });
         }
 
         #[cfg(any(esp32, esp32c6, esp32h2))]
         if IS_A {
-            ch.gen_tstmp_a().write(|w| unsafe { w.a().bits(value) })
+            ch.gen_tstmp_a().write(|w| unsafe { w.a().bits(value) });
         } else {
-            ch.gen_tstmp_b().write(|w| unsafe { w.b().bits(value) })
+            ch.gen_tstmp_b().write(|w| unsafe { w.b().bits(value) });
         }
     }
 
     /// Get the old timestamp.
     /// The value of the timestamp will take effect according to the set
     /// [`PwmUpdateMethod`].
-    pub fn get_timestamp(&self) -> u16 {
+    pub fn timestamp(&self) -> u16 {
         // SAFETY:
         // We only read to our GENx_TSTMP_x register
         let ch = unsafe { Self::ch() };
@@ -386,7 +384,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
     }
 
     /// Get the period of the timer.
-    pub fn get_period(&self) -> u16 {
+    pub fn period(&self) -> u16 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
         let block = unsafe { &*PWM::block() };
@@ -413,8 +411,8 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
     }
 }
 
-impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal_02::PwmPin
-    for PwmPin<'d, PWM, OP, IS_A>
+impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal_02::PwmPin
+    for PwmPin<'_, PWM, OP, IS_A>
 {
     type Duty = u16;
 
@@ -432,12 +430,12 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal_02::Pw
 
     /// Get the duty of the pin
     fn get_duty(&self) -> Self::Duty {
-        self.get_timestamp()
+        self.timestamp()
     }
 
     /// Get the max duty of the pin
     fn get_max_duty(&self) -> Self::Duty {
-        self.get_period()
+        self.period()
     }
 
     /// Set the duty of the pin
@@ -447,19 +445,19 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal_02::Pw
 }
 
 /// Implement no error type for the PwmPin because the method are infallible
-impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::ErrorType
-    for PwmPin<'d, PWM, OP, IS_A>
+impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::ErrorType
+    for PwmPin<'_, PWM, OP, IS_A>
 {
     type Error = core::convert::Infallible;
 }
 
 /// Implement the trait SetDutyCycle for PwmPin
-impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetDutyCycle
-    for PwmPin<'d, PWM, OP, IS_A>
+impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetDutyCycle
+    for PwmPin<'_, PWM, OP, IS_A>
 {
     /// Get the max duty of the PwmPin
     fn max_duty_cycle(&self) -> u16 {
-        self.get_period()
+        self.period()
     }
 
     /// Set the max duty of the PwmPin
@@ -481,8 +479,6 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::
 /// # use esp_hal::{mcpwm, prelude::*};
 /// # use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
 /// # use esp_hal::mcpwm::operator::{DeadTimeCfg, PwmPinConfig, PWMStream};
-/// # use esp_hal::gpio::Io;
-/// # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();
 /// // use PWMB as input for both outputs
@@ -499,9 +495,9 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::
 /// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 ///
 /// let mut pins = mcpwm.operator0.with_linked_pins(
-///     io.pins.gpio0,
+///     peripherals.GPIO0,
 ///     PwmPinConfig::UP_DOWN_ACTIVE_HIGH, // use PWMA as our main input
-///     io.pins.gpio1,
+///     peripherals.GPIO1,
 ///     PwmPinConfig::EMPTY, // keep PWMB "low"
 ///     bridge_off,
 /// );

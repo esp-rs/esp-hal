@@ -562,31 +562,31 @@ where
 
 #[cfg(esp32s3)]
 impl super::AdcCalEfuse for crate::peripherals::ADC1 {
-    fn get_init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::get_rtc_calib_init_code(1, atten)
+    fn init_code(atten: Attenuation) -> Option<u16> {
+        Efuse::rtc_calib_init_code(1, atten)
     }
 
-    fn get_cal_mv(atten: Attenuation) -> u16 {
-        Efuse::get_rtc_calib_cal_mv(1, atten)
+    fn cal_mv(atten: Attenuation) -> u16 {
+        Efuse::rtc_calib_cal_mv(1, atten)
     }
 
-    fn get_cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::get_rtc_calib_cal_code(1, atten)
+    fn cal_code(atten: Attenuation) -> Option<u16> {
+        Efuse::rtc_calib_cal_code(1, atten)
     }
 }
 
 #[cfg(esp32s3)]
 impl super::AdcCalEfuse for crate::peripherals::ADC2 {
-    fn get_init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::get_rtc_calib_init_code(2, atten)
+    fn init_code(atten: Attenuation) -> Option<u16> {
+        Efuse::rtc_calib_init_code(2, atten)
     }
 
-    fn get_cal_mv(atten: Attenuation) -> u16 {
-        Efuse::get_rtc_calib_cal_mv(2, atten)
+    fn cal_mv(atten: Attenuation) -> u16 {
+        Efuse::rtc_calib_cal_mv(2, atten)
     }
 
-    fn get_cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::get_rtc_calib_cal_code(2, atten)
+    fn cal_code(atten: Attenuation) -> Option<u16> {
+        Efuse::rtc_calib_cal_code(2, atten)
     }
 }
 

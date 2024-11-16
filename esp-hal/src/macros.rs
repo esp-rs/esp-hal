@@ -27,6 +27,23 @@ macro_rules! before_snippet {
 }
 
 #[doc(hidden)]
+#[macro_export]
+macro_rules! trm_markdown_link {
+    () => {
+        concat!("[Technical Reference Manual](", $crate::trm_link!(), ")")
+    };
+    ($anchor:literal) => {
+        concat!(
+            "[Technical Reference Manual](",
+            $crate::trm_link!(),
+            "#",
+            $anchor,
+            ")"
+        )
+    };
+}
+
+#[doc(hidden)]
 /// Shorthand to define enums with From implementations.
 #[macro_export]
 macro_rules! any_enum {
@@ -70,18 +87,6 @@ macro_rules! any_peripheral {
             $vis struct $name([< $name Inner >]);
             impl $crate::private::Sealed for $name {}
 
-            impl $crate::dma::PeripheralMarker for $name {
-                #[inline(always)]
-                fn peripheral(&self) -> $crate::system::Peripheral {
-                    match &self.0 {
-                        $(
-                            $(#[cfg($variant_meta)])*
-                            [<$name Inner>]::$variant(inner) => inner.peripheral(),
-                        )*
-                    }
-                }
-            }
-
             impl $crate::peripheral::Peripheral for $name {
                 type P = $name;
 
@@ -111,5 +116,18 @@ macro_rules! any_peripheral {
                 }
             )*
         }
+    };
+}
+
+/// Macro to choose between two expressions. Useful for implementing "else" for
+/// `$()?` macro syntax.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! if_set {
+    (, $not_set:expr) => {
+        $not_set
+    };
+    ($set:expr, $not_set:expr) => {
+        $set
     };
 }

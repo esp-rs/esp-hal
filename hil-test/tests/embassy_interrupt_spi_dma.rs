@@ -1,6 +1,6 @@
 //! Reproduction and regression test for a sneaky issue.
 
-//% CHIPS: esp32 esp32s2 esp32s3
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6 esp32h2
 //% FEATURES: integrated-timers
 //% FEATURES: generic-queue
 
@@ -12,16 +12,18 @@ use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     interrupt::{software::SoftwareInterruptControl, Priority},
+    peripheral::Peripheral,
     prelude::*,
     spi::{
-        master::{Spi, SpiDma},
+        master::{Config, Spi},
         SpiMode,
     },
-    timer::{timg::TimerGroup, AnyTimer},
+    timer::AnyTimer,
     Async,
 };
 use esp_hal_embassy::InterruptExecutor;
 use hil_test as _;
+use portable_atomic::AtomicBool;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -32,8 +34,11 @@ macro_rules! mk_static {
     }};
 }
 
+static INTERRUPT_TASK_WORKING: AtomicBool = AtomicBool::new(false);
+
+#[cfg(any(esp32, esp32s2, esp32s3))]
 #[embassy_executor::task]
-async fn interrupt_driven_task(spi: SpiDma<'static, Async>) {
+async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Async>) {
     let mut ticker = Ticker::every(Duration::from_millis(1));
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);
@@ -45,7 +50,25 @@ async fn interrupt_driven_task(spi: SpiDma<'static, Async>) {
     loop {
         let mut buffer: [u8; 8] = [0; 8];
 
+        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Release);
         spi.transfer_in_place_async(&mut buffer).await.unwrap();
+        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
+
+        ticker.next().await;
+    }
+}
+
+#[cfg(not(any(esp32, esp32s2, esp32s3)))]
+#[embassy_executor::task]
+async fn interrupt_driven_task(mut i2s_tx: esp_hal::i2s::master::I2sTx<'static, Async>) {
+    let mut ticker = Ticker::every(Duration::from_millis(1));
+
+    loop {
+        let mut buffer: [u8; 8] = [0; 8];
+
+        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Release);
+        i2s_tx.write_dma_async(&mut buffer).await.unwrap();
+        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
 
         ticker.next().await;
     }
@@ -60,11 +83,25 @@ mod test {
     #[timeout(3)]
     async fn dma_does_not_lock_up_when_used_in_different_executors() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init([AnyTimer::from(timg0.timer0), AnyTimer::from(timg0.timer1)]);
-
         let dma = Dma::new(peripherals.DMA);
+
+        cfg_if::cfg_if! {
+            if #[cfg(systimer)] {
+                use esp_hal::timer::systimer::{SystemTimer, Target};
+                let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+                esp_hal_embassy::init([
+                    AnyTimer::from(systimer.alarm0),
+                    AnyTimer::from(systimer.alarm1),
+                ]);
+            } else {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new(peripherals.TIMG0);
+                esp_hal_embassy::init([
+                    AnyTimer::from(timg0.timer0),
+                    AnyTimer::from(timg0.timer1),
+                ]);
+            }
+        }
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
@@ -80,12 +117,53 @@ mod test {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_dma(dma_channel1.configure_for_async(false, DmaPriority::Priority0))
-            .with_buffers(dma_rx_buf, dma_tx_buf);
+        let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
-        let spi2 = Spi::new(peripherals.SPI3, 100.kHz(), SpiMode::Mode0)
-            .with_dma(dma_channel2.configure_for_async(false, DmaPriority::Priority0));
+        let mut spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        )
+        .with_miso(unsafe { mosi.clone_unchecked() })
+        .with_mosi(mosi)
+        .with_dma(dma_channel1.configure(false, DmaPriority::Priority0))
+        .with_buffers(dma_rx_buf, dma_tx_buf)
+        .into_async();
+
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        let other_peripheral = Spi::new_with_config(
+            peripherals.SPI3,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        )
+        .with_dma(dma_channel2.configure(false, DmaPriority::Priority0))
+        .into_async();
+
+        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+        let other_peripheral = {
+            let (_, rx_descriptors, _, tx_descriptors) = dma_buffers!(128);
+
+            let other_peripheral = esp_hal::i2s::master::I2s::new(
+                peripherals.I2S0,
+                esp_hal::i2s::master::Standard::Philips,
+                esp_hal::i2s::master::DataFormat::Data8Channel8,
+                8u32.kHz(),
+                dma_channel2.configure(false, DmaPriority::Priority0),
+                rx_descriptors,
+                tx_descriptors,
+            )
+            .into_async()
+            .i2s_tx
+            .build();
+
+            other_peripheral
+        };
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -96,16 +174,28 @@ mod test {
 
         let spawner = interrupt_executor.start(Priority::Priority3);
 
-        spawner.spawn(interrupt_driven_task(spi2)).unwrap();
+        spawner
+            .spawn(interrupt_driven_task(other_peripheral))
+            .unwrap();
 
         let start = Instant::now();
         let mut buffer: [u8; 1024] = [0; 1024];
+        let mut dst_buffer: [u8; 1024] = [0; 1024];
+        let mut i = 0;
         loop {
-            spi.transfer_in_place_async(&mut buffer).await.unwrap();
+            buffer.fill(i);
+            dst_buffer.fill(i.wrapping_add(1));
+            spi.transfer_async(&mut dst_buffer, &buffer).await.unwrap();
+            // make sure the transfer didn't end prematurely
+            assert!(dst_buffer.iter().all(|&v| v == i));
 
             if start.elapsed() > Duration::from_secs(1) {
+                // make sure the other peripheral didn't get stuck
+                while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Acquire) {}
                 break;
             }
+
+            i = i.wrapping_add(1);
         }
     }
 
@@ -140,13 +230,21 @@ mod test {
             let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
             let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-            let mut spi = Spi::new(peripherals.spi, 100.kHz(), SpiMode::Mode0)
-                .with_dma(
-                    peripherals
-                        .dma_channel
-                        .configure_for_async(false, DmaPriority::Priority0),
-                )
-                .with_buffers(dma_rx_buf, dma_tx_buf);
+            let mut spi = Spi::new_with_config(
+                peripherals.spi,
+                Config {
+                    frequency: 100.kHz(),
+                    mode: SpiMode::Mode0,
+                    ..Config::default()
+                },
+            )
+            .with_dma(
+                peripherals
+                    .dma_channel
+                    .configure(false, DmaPriority::Priority0),
+            )
+            .with_buffers(dma_rx_buf, dma_tx_buf)
+            .into_async();
 
             let send_buffer = mk_static!([u8; BUFFER_SIZE], [0u8; BUFFER_SIZE]);
             loop {
@@ -161,8 +259,23 @@ mod test {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let dma = Dma::new(peripherals.DMA);
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init(timg0.timer0);
+        cfg_if::cfg_if! {
+            if #[cfg(systimer)] {
+                use esp_hal::timer::systimer::{SystemTimer, Target};
+                let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+                esp_hal_embassy::init([
+                    AnyTimer::from(systimer.alarm0),
+                    AnyTimer::from(systimer.alarm1),
+                ]);
+            } else {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new(peripherals.TIMG0);
+                esp_hal_embassy::init([
+                    AnyTimer::from(timg0.timer0),
+                    AnyTimer::from(timg0.timer1),
+                ]);
+            }
+        }
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {

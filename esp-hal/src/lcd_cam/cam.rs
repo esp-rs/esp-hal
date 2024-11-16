@@ -16,12 +16,10 @@
 //! master mode.
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::lcd_cam::{cam::{Camera, RxEightBits}, LcdCam};
 //! # use fugit::RateExtU32;
 //! # use esp_hal::dma_rx_stream_buffer;
 //! # use esp_hal::dma::{Dma, DmaPriority};
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
@@ -33,19 +31,19 @@
 //! #     DmaPriority::Priority0,
 //! # );
 //!
-//! let mclk_pin = io.pins.gpio15;
-//! let vsync_pin = io.pins.gpio6;
-//! let href_pin = io.pins.gpio7;
-//! let pclk_pin = io.pins.gpio13;
+//! let mclk_pin = peripherals.GPIO15;
+//! let vsync_pin = peripherals.GPIO6;
+//! let href_pin = peripherals.GPIO7;
+//! let pclk_pin = peripherals.GPIO13;
 //! let data_pins = RxEightBits::new(
-//!     io.pins.gpio11,
-//!     io.pins.gpio9,
-//!     io.pins.gpio8,
-//!     io.pins.gpio10,
-//!     io.pins.gpio12,
-//!     io.pins.gpio18,
-//!     io.pins.gpio17,
-//!     io.pins.gpio16,
+//!     peripherals.GPIO11,
+//!     peripherals.GPIO9,
+//!     peripherals.GPIO8,
+//!     peripherals.GPIO10,
+//!     peripherals.GPIO12,
+//!     peripherals.GPIO18,
+//!     peripherals.GPIO17,
+//!     peripherals.GPIO16,
 //! );
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
@@ -81,9 +79,10 @@ use crate::{
         OutputSignal,
         Pull,
     },
-    lcd_cam::{cam::private::RxPins, private::calculate_clkm, BitOrder, ByteOrder},
+    lcd_cam::{calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
+    Blocking,
 };
 
 /// Generation of GDMA SUC EOF
@@ -127,14 +126,14 @@ pub struct Cam<'d> {
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    rx_channel: ChannelRx<'d, <LCD_CAM as DmaEligible>::Dma>,
+    rx_channel: ChannelRx<'d, Blocking, <LCD_CAM as DmaEligible>::Dma>,
 }
 
 impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
     pub fn new<P, CH>(
         cam: Cam<'d>,
-        channel: ChannelRx<'d, CH>,
+        channel: ChannelRx<'d, Blocking, CH>,
         _pins: P,
         frequency: HertzU32,
     ) -> Self
@@ -243,8 +242,10 @@ impl<'d> Camera<'d> {
         mclk: impl Peripheral<P = MCLK> + 'd,
     ) -> Self {
         crate::into_mapped_ref!(mclk);
+
         mclk.set_to_push_pull_output(crate::private::Internal);
-        mclk.connect_peripheral_to_output(OutputSignal::CAM_CLK, crate::private::Internal);
+        OutputSignal::CAM_CLK.connect_to(mclk);
+
         self
     }
 
@@ -256,7 +257,7 @@ impl<'d> Camera<'d> {
         crate::into_mapped_ref!(pclk);
 
         pclk.init_input(Pull::None, crate::private::Internal);
-        pclk.connect_input_to_peripheral(InputSignal::CAM_PCLK, crate::private::Internal);
+        InputSignal::CAM_PCLK.connect_to(pclk);
 
         self
     }
@@ -271,9 +272,9 @@ impl<'d> Camera<'d> {
         crate::into_mapped_ref!(vsync, h_enable);
 
         vsync.init_input(Pull::None, crate::private::Internal);
-        vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
+        InputSignal::CAM_V_SYNC.connect_to(vsync);
         h_enable.init_input(Pull::None, crate::private::Internal);
-        h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
+        InputSignal::CAM_H_ENABLE.connect_to(h_enable);
 
         self.lcd_cam
             .cam_ctrl1()
@@ -297,11 +298,11 @@ impl<'d> Camera<'d> {
         crate::into_mapped_ref!(vsync, hsync, h_enable);
 
         vsync.init_input(Pull::None, crate::private::Internal);
-        vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC, crate::private::Internal);
+        InputSignal::CAM_V_SYNC.connect_to(vsync);
         hsync.init_input(Pull::None, crate::private::Internal);
-        hsync.connect_input_to_peripheral(InputSignal::CAM_H_SYNC, crate::private::Internal);
+        InputSignal::CAM_H_SYNC.connect_to(hsync);
         h_enable.init_input(Pull::None, crate::private::Internal);
-        h_enable.connect_input_to_peripheral(InputSignal::CAM_H_ENABLE, crate::private::Internal);
+        InputSignal::CAM_H_ENABLE.connect_to(h_enable);
 
         self.lcd_cam
             .cam_ctrl1()
@@ -514,9 +515,9 @@ impl RxEightBits {
             (pin_7, InputSignal::CAM_DATA_7),
         ];
 
-        for (mut pin, signal) in pairs.into_iter() {
+        for (pin, signal) in pairs.into_iter() {
             pin.init_input(Pull::None, crate::private::Internal);
-            pin.connect_input_to_peripheral(signal, crate::private::Internal);
+            signal.connect_to(pin);
         }
 
         Self { _pins: () }
@@ -591,9 +592,9 @@ impl RxSixteenBits {
             (pin_15, InputSignal::CAM_DATA_15),
         ];
 
-        for (mut pin, signal) in pairs.into_iter() {
+        for (pin, signal) in pairs.into_iter() {
             pin.init_input(Pull::None, crate::private::Internal);
-            pin.connect_input_to_peripheral(signal, crate::private::Internal);
+            signal.connect_to(pin);
         }
 
         Self { _pins: () }
@@ -604,8 +605,7 @@ impl RxPins for RxSixteenBits {
     const BUS_WIDTH: usize = 2;
 }
 
-mod private {
-    pub trait RxPins {
-        const BUS_WIDTH: usize;
-    }
+#[doc(hidden)]
+pub trait RxPins {
+    const BUS_WIDTH: usize;
 }

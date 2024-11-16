@@ -11,7 +11,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     entry,
-    rtc_cntl::{get_reset_reason, get_wakeup_cause, sleep::TimerWakeupSource, Rtc, SocResetReason},
+    rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason},
     Cpu,
 };
 use esp_println::println;
@@ -24,9 +24,9 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     println!("up and runnning!");
-    let reason = get_reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
+    let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
-    let wake_reason = get_wakeup_cause();
+    let wake_reason = wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
     let timer = TimerWakeupSource::new(Duration::from_secs(5));
