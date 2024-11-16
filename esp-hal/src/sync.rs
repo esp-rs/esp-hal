@@ -254,15 +254,6 @@ impl<T> Locked<T> {
     pub fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
         lock(&self.lock_state, || f(unsafe { &mut *self.data.get() }))
     }
-
-    /// Provide exclusive access to the protected data to the given closure.
-    pub fn with_cs<R>(
-        &self,
-        _cs: critical_section::CriticalSection<'_>,
-        f: impl FnOnce(&T) -> R,
-    ) -> R {
-        f(unsafe { &*self.data.get() })
-    }
 }
 
 unsafe impl<T> Sync for Locked<T> {}
