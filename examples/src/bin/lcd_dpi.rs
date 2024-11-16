@@ -3,7 +3,7 @@
 //! This example fills the screen with every color.
 //!
 //! The following wiring is assumed:
-//! - LCD_VYSNC  => GPIO3
+//! - LCD_VSYNC  => GPIO3
 //! - LCD_HSYNC  => GPIO46
 //! - LCD_DE     => GPIO17
 //! - LCD_PCLK   => GPIO9
@@ -36,9 +36,9 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_loop_buffer,
-    gpio::{Io, Level, Output},
+    gpio::{Level, Output},
     i2c,
-    i2c::I2c,
+    i2c::master::I2c,
     lcd_cam::{
         lcd::{
             dpi::{Config, Dpi, Format, FrameTiming},
@@ -48,6 +48,7 @@ use esp_hal::{
         },
         LcdCam,
     },
+    peripherals::Peripherals,
     prelude::*,
     Blocking,
 };
@@ -57,11 +58,18 @@ use esp_println::println;
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
 
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals: Peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let i2c = I2c::new(
+        peripherals.I2C0,
+        i2c::master::Config {
+            frequency: 400.kHz(),
+            ..Default::default()
+        },
+    )
+    .with_sda(peripherals.GPIO47)
+    .with_scl(peripherals.GPIO48);
 
-    let i2c = I2c::new(peripherals.I2C0, io.pins.gpio47, io.pins.gpio48, 400.kHz());
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel2.configure(true, DmaPriority::Priority0);
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
@@ -110,7 +118,7 @@ fn main() -> ! {
         expander.write_output_reg(output).unwrap();
     };
 
-    let mut vsync_pin = io.pins.gpio3;
+    let mut vsync_pin = peripherals.GPIO3;
 
     let vsync_must_be_high_during_setup = Output::new(&mut vsync_pin, Level::High);
     for &init in INIT_CMDS.iter() {
@@ -161,28 +169,29 @@ fn main() -> ! {
     };
 
     let mut dpi = Dpi::new(lcd_cam.lcd, channel.tx, 16.MHz(), config)
-        .with_ctrl_pins(vsync_pin, io.pins.gpio46, io.pins.gpio17, io.pins.gpio9)
-        .with_data_pins(
-            // Blue
-            io.pins.gpio10,
-            io.pins.gpio11,
-            io.pins.gpio12,
-            io.pins.gpio13,
-            io.pins.gpio14,
-            // Green
-            io.pins.gpio21,
-            io.pins.gpio8,
-            io.pins.gpio18,
-            io.pins.gpio45,
-            io.pins.gpio38,
-            io.pins.gpio39,
-            // Red
-            io.pins.gpio40,
-            io.pins.gpio41,
-            io.pins.gpio42,
-            io.pins.gpio2,
-            io.pins.gpio1,
-        );
+        .with_vsync(vsync_pin)
+        .with_hsync(peripherals.GPIO46)
+        .with_de(peripherals.GPIO17)
+        .with_pclk(peripherals.GPIO9)
+        // Blue
+        .with_data0(peripherals.GPIO10)
+        .with_data1(peripherals.GPIO11)
+        .with_data2(peripherals.GPIO12)
+        .with_data3(peripherals.GPIO13)
+        .with_data4(peripherals.GPIO14)
+        // Green
+        .with_data5(peripherals.GPIO21)
+        .with_data6(peripherals.GPIO8)
+        .with_data7(peripherals.GPIO18)
+        .with_data8(peripherals.GPIO45)
+        .with_data9(peripherals.GPIO38)
+        .with_data10(peripherals.GPIO39)
+        // Red
+        .with_data11(peripherals.GPIO40)
+        .with_data12(peripherals.GPIO41)
+        .with_data13(peripherals.GPIO42)
+        .with_data14(peripherals.GPIO2)
+        .with_data15(peripherals.GPIO1);
 
     const MAX_RED: u16 = (1 << 5) - 1;
     const MAX_GREEN: u16 = (1 << 6) - 1;
@@ -231,11 +240,11 @@ impl Tca9554 {
         Self { i2c, address: 0x20 }
     }
 
-    pub fn write_direction_reg(&mut self, value: u8) -> Result<(), i2c::Error> {
+    pub fn write_direction_reg(&mut self, value: u8) -> Result<(), i2c::master::Error> {
         self.i2c.write(self.address, &[0x03, value])
     }
 
-    pub fn write_output_reg(&mut self, value: u8) -> Result<(), i2c::Error> {
+    pub fn write_output_reg(&mut self, value: u8) -> Result<(), i2c::master::Error> {
         self.i2c.write(self.address, &[0x01, value])
     }
 }

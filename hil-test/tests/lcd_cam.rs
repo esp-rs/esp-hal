@@ -9,14 +9,7 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{
-        interconnect::{InputSignal, OutputSignal},
-        GpioPin,
-        Io,
-        Level,
-        NoPin,
-        OutputPin,
-    },
+    gpio::Level,
     lcd_cam::{
         cam::{Camera, RxEightBits},
         lcd::{
@@ -28,15 +21,13 @@ use esp_hal::{
         },
         LcdCam,
     },
-    Blocking,
+    peripherals::Peripherals,
 };
 use fugit::RateExtU32;
 use hil_test as _;
 
 struct Context {
-    io: Io,
-    dma: Dma<'static>,
-    lcd_cam: LcdCam<'static, Blocking>,
+    peripherals: Peripherals,
     dma_tx_buf: DmaTxBuf,
     dma_rx_buf: DmaRxBuf,
 }
@@ -49,18 +40,13 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let dma = Dma::new(peripherals.DMA);
-        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(50 * 50);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         Context {
-            io,
-            dma,
-            lcd_cam,
+            peripherals,
             dma_tx_buf,
             dma_rx_buf,
         }
@@ -68,72 +54,71 @@ mod tests {
 
     #[test]
     fn test_camera_can_receive_from_rgb(ctx: Context) {
-        let channel = ctx.dma.channel2.configure(false, DmaPriority::Priority0);
+        let peripherals = ctx.peripherals;
 
-        fn split_pin<const NUM: u8>(pin: GpioPin<NUM>) -> (InputSignal, OutputSignal)
-        where
-            GpioPin<NUM>: OutputPin,
-        {
-            let input = pin.peripheral_input();
-            let output = pin.into_peripheral_output();
-            (input, output)
-        }
+        let dma = Dma::new(peripherals.DMA);
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 
-        let (vsync_in, vsync_out) = split_pin(ctx.io.pins.gpio6);
-        let (hsync_in, hsync_out) = split_pin(ctx.io.pins.gpio7);
-        let (de_in, de_out) = split_pin(ctx.io.pins.gpio14);
-        let (pclk_in, pclk_out) = split_pin(ctx.io.pins.gpio13);
-        let (d0_in, d0_out) = split_pin(ctx.io.pins.gpio11);
-        let (d1_in, d1_out) = split_pin(ctx.io.pins.gpio9);
-        let (d2_in, d2_out) = split_pin(ctx.io.pins.gpio8);
-        let (d3_in, d3_out) = split_pin(ctx.io.pins.gpio47);
-        let (d4_in, d4_out) = split_pin(ctx.io.pins.gpio12);
-        let (d5_in, d5_out) = split_pin(ctx.io.pins.gpio18);
-        let (d6_in, d6_out) = split_pin(ctx.io.pins.gpio17);
-        let (d7_in, d7_out) = split_pin(ctx.io.pins.gpio16);
+        let channel = dma.channel2.configure(false, DmaPriority::Priority0);
 
-        let dpi = Dpi::new(
-            ctx.lcd_cam.lcd,
-            channel.tx,
-            500u32.kHz(),
-            dpi::Config {
-                clock_mode: ClockMode {
-                    polarity: Polarity::IdleHigh,
-                    phase: Phase::ShiftLow,
-                },
-                format: Format {
-                    enable_2byte_mode: false,
-                    ..Default::default()
-                },
-                // Send a 50x50 video
-                timing: FrameTiming {
-                    horizontal_total_width: 65,
-                    hsync_width: 5,
-                    horizontal_blank_front_porch: 10,
-                    horizontal_active_width: 50,
+        let (vsync_in, vsync_out) = peripherals.GPIO6.split();
+        let (hsync_in, hsync_out) = peripherals.GPIO7.split();
+        let (de_in, de_out) = peripherals.GPIO14.split();
+        let (pclk_in, pclk_out) = peripherals.GPIO13.split();
+        let (d0_in, d0_out) = peripherals.GPIO11.split();
+        let (d1_in, d1_out) = peripherals.GPIO9.split();
+        let (d2_in, d2_out) = peripherals.GPIO8.split();
+        let (d3_in, d3_out) = peripherals.GPIO47.split();
+        let (d4_in, d4_out) = peripherals.GPIO12.split();
+        let (d5_in, d5_out) = peripherals.GPIO18.split();
+        let (d6_in, d6_out) = peripherals.GPIO17.split();
+        let (d7_in, d7_out) = peripherals.GPIO16.split();
 
-                    vertical_total_height: 65,
-                    vsync_width: 5,
-                    vertical_blank_front_porch: 10,
-                    vertical_active_height: 50,
-
-                    hsync_position: 0,
-                },
-                vsync_idle_level: Level::High,
-                hsync_idle_level: Level::High,
-                de_idle_level: Level::Low,
-                disable_black_region: false,
+        let config = dpi::Config {
+            clock_mode: ClockMode {
+                polarity: Polarity::IdleHigh,
+                phase: Phase::ShiftLow,
+            },
+            format: Format {
+                enable_2byte_mode: false,
                 ..Default::default()
             },
-        )
-        .with_ctrl_pins(vsync_out, hsync_out, de_out, pclk_out)
-        .with_data_pins(
-            d0_out, d1_out, d2_out, d3_out, d4_out, d5_out, d6_out, d7_out, NoPin, NoPin, NoPin,
-            NoPin, NoPin, NoPin, NoPin, NoPin,
-        );
+            // Send a 50x50 video
+            timing: FrameTiming {
+                horizontal_total_width: 65,
+                hsync_width: 5,
+                horizontal_blank_front_porch: 10,
+                horizontal_active_width: 50,
+
+                vertical_total_height: 65,
+                vsync_width: 5,
+                vertical_blank_front_porch: 10,
+                vertical_active_height: 50,
+
+                hsync_position: 0,
+            },
+            vsync_idle_level: Level::High,
+            hsync_idle_level: Level::High,
+            de_idle_level: Level::Low,
+            disable_black_region: false,
+            ..Default::default()
+        };
+        let dpi = Dpi::new(lcd_cam.lcd, channel.tx, 500u32.kHz(), config)
+            .with_vsync(vsync_out)
+            .with_hsync(hsync_out)
+            .with_de(de_out)
+            .with_pclk(pclk_out)
+            .with_data0(d0_out)
+            .with_data1(d1_out)
+            .with_data2(d2_out)
+            .with_data3(d3_out)
+            .with_data4(d4_out)
+            .with_data5(d5_out)
+            .with_data6(d6_out)
+            .with_data7(d7_out);
 
         let camera = Camera::new(
-            ctx.lcd_cam.cam,
+            lcd_cam.cam,
             channel.rx,
             RxEightBits::new(d0_in, d1_in, d2_in, d3_in, d4_in, d5_in, d6_in, d7_in),
             1u32.MHz(),

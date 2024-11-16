@@ -1106,6 +1106,8 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
             start: self.descriptor,
             block_size: None,
             is_burstable: true,
+            // The DMA must not check the owner bit, as it is never set.
+            check_owner: Some(false),
         }
     }
 
