@@ -5,23 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
+
+### Added
+
+- Added `serde` support through the `serde` feature (#2346)
+- Added `PowerSaveMode` and `set_power_saving` methods on `EspNowManager` & `WifiController` (#2446)
+- Added CSI support (#2422)
+- Enable setting event handlers for wifi events (#2453)
+
+### Changed
+
+- `esp_wifi::init` no longer requires `EspWifiInitFor`, and now returns `EspWifiController`, see the migration guide for more details (#2301)
+- No need to add `rom_functions.x` manually anymore (#2374)
+- esp-now: Data is now private in `ReceivedData` - use `data()`(#2396)
+- Changed the async APIs to have a `_async` postfix to avoid name collisions (#2446)
+- `phy_enable_usb` is enabled by default (#2446)
+- Removed `get_` prefixes from functions (#2528)
+
+### Fixed
+
+- Fixed a possible crash when parsing results from a radius server (#2380)
+- Fixed `async fn WifiController::disconnect` hanging forever when awaited if not connected when called (#2392).
+
+### Removed
+
+- Feature `have-strchr` is removed (#2462)
+- Features `async`, `embassy-net` have been removed (#2446)
+- Features `phy-enable-usb` & `dump-packets` have been turned into configuration options `phy_enable_usb` & `dump_packets` (#2446)
+- Features `ps-min-modem` & `ps-max-modem` have been removed in favour of a runtime config (#2446)
+
+- The blocking networking stack is removed (#2488)
+
+## 0.10.1 - 2024-10-10
+
+### Changed
+
+- Bumped esp-wifi-sys to `v0.6.0`
+
+## 0.10.0 - 2024-10-10 - YANKED
 
 ### Added
 
 - Added `have-strchr` feature to disable including `strchr` (#2096)
+- Adding a way to deinitialize the WiFi stack (#2187)
 
 ### Changed
 
 - esp-wifi now allocates memory from the global allocator provided by `esp-alloc` (#2099)
+- Renamed the `wifi-logs` feature to `sys-logs` for consistency (#2183)
+- Updated drivers to v5.3.1 (#2239)
+- Rename `initialize` to `init` (#2295)
+- `esp-wifi` no longer enables features on `esp-hal-embassy` (like `esp-hal-embassy/esp32c6`) (#2306)
 
 ### Fixed
 
-- Feature `wifi-logs` doesn't break the build anymore (#2117)
+- Feature `sys-logs` doesn't break the build anymore (#2117)
+- Fixed a panic when overflow-checks are enabled (#2164)
+- Create mutexes in heap memory, fixes running out of mutexes when connecting and disconnecting to a WPA2-ENTERPRISE ap multiple times (#2202)
 
 ### Removed
 
 - Removed the `clocks` parameter from `esp_wifi::initialize` (#1999)
+- `cfg_toml` configuration system has been removed in favour of [esp-config](https://docs.rs/esp-config) (#2156)
+- Removed the `embedded-svc` traits and feature (#2235)
+- Removed the `log` feature from default features (#2253)
+- Removed the `enumset` feature (#2297)
+- Removed `esp_wifi::current_millis` (#2304)
 
 ## 0.9.1 - 2024-09-03
 
@@ -139,3 +189,5 @@ Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2
 ## 0.1.0 - 2023-11-27
 
 Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6
+
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2024-10-10

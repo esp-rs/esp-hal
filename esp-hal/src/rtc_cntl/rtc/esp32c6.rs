@@ -21,6 +21,7 @@ use crate::{
         XtalClock,
     },
     peripherals::TIMG0,
+    rtc_cntl::RtcClock,
     soc::efuse::Efuse,
     system::RadioPeripherals,
 };
@@ -266,7 +267,7 @@ fn modem_clock_hal_deselect_all_wifi_lpclk_source() {
                 .clear_bit()
                 .clk_wifipwr_lp_sel_xtal()
                 .clear_bit()
-        })
+        });
     }
 }
 
@@ -298,7 +299,7 @@ fn modem_lpcon_ll_set_wifi_lpclk_divisor_value(divider: u16) {
     unsafe {
         modem_lpcon()
             .wifi_lp_clk_conf()
-            .modify(|_, w| w.clk_wifipwr_lp_div_num().bits(divider))
+            .modify(|_, w| w.clk_wifipwr_lp_div_num().bits(divider));
     }
 }
 
@@ -1199,10 +1200,7 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(
-        RtcClock::get_xtal_freq(),
-        XtalClock::RtcXtalFreq40M
-    ));
+    assert!(matches!(RtcClock::xtal_freq(), XtalClock::RtcXtalFreq40M));
 
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
 
@@ -1372,7 +1370,7 @@ impl Clock for RtcFastClock {
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 /// RTC SLOW_CLK frequency values
-pub(crate) enum RtcSlowClock {
+pub enum RtcSlowClock {
     /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
     RtcSlowClockRcSlow  = 0,
     /// Select XTAL32K_CLK as RTC_SLOW_CLK source
@@ -1418,44 +1416,26 @@ pub(crate) enum RtcCaliClkSel {
     CaliClkRcFast = 1,
     CaliClk32k    = 2,
 }
-/// RTC Watchdog Timer
-pub struct RtcClock;
 
 /// RTC Watchdog Timer driver
 impl RtcClock {
-    const CAL_FRACT: u32 = 19;
-
     // rtc_clk_xtal_freq_get
-    fn get_xtal_freq_mhz() -> u32 {
-        let xtal_freq_reg = unsafe { lp_aon().store4().read().bits() };
-
-        // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
-        // lower and upper 16-bit halves. These are the routines to work with such a
-        // representation.
-        let clk_val_is_valid = |val| {
-            (val & 0xffffu32) == ((val >> 16u32) & 0xffffu32) && val != 0u32 && val != u32::MAX
-        };
-        let reg_val_to_clk_val = |val| val & u16::MAX as u32;
-
-        if !clk_val_is_valid(xtal_freq_reg) {
-            return 40;
-        }
-
-        reg_val_to_clk_val(xtal_freq_reg)
+    pub(crate) fn xtal_freq_mhz() -> u32 {
+        Self::read_xtal_freq_mhz().unwrap_or(40)
     }
 
     /// Get main XTAL frequency
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
-    fn get_xtal_freq() -> XtalClock {
-        match Self::get_xtal_freq_mhz() {
+    pub fn xtal_freq() -> XtalClock {
+        match Self::xtal_freq_mhz() {
             40 => XtalClock::RtcXtalFreq40M,
             other => XtalClock::RtcXtalFreqOther(other),
         }
     }
 
     /// Get the RTC_SLOW_CLK source
-    pub(crate) fn get_slow_freq() -> RtcSlowClock {
+    pub fn slow_freq() -> RtcSlowClock {
         let lp_clrst = unsafe { lp_clkrst() };
 
         let slow_freq = lp_clrst.lp_clk_conf().read().slow_clk_sel().bits();
@@ -1509,7 +1489,7 @@ impl RtcClock {
 
         if cal_clk == RtcCalSel::RtcCalRtcMux {
             cal_clk = match cal_clk {
-                RtcCalSel::RtcCalRtcMux => match RtcClock::get_slow_freq() {
+                RtcCalSel::RtcCalRtcMux => match RtcClock::slow_freq() {
                     RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                     RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
                     _ => cal_clk,
@@ -1523,7 +1503,7 @@ impl RtcClock {
         let pcr = unsafe { pcr() };
         let pmu = unsafe { pmu() };
 
-        let clk_src = RtcClock::get_slow_freq();
+        let clk_src = RtcClock::slow_freq();
 
         if cal_clk == RtcCalSel::RtcCalRtcMux {
             cal_clk = match clk_src {
@@ -1551,16 +1531,19 @@ impl RtcClock {
         } else {
             cali_clk_sel = RtcCaliClkSel::CaliClk32k;
             match cal_clk {
-                RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => (),
-                RtcCalSel::RtcCal32kRc => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) }),
-                RtcCalSel::RtcCal32kXtal => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) }),
-                RtcCalSel::RtcCal32kOscSlow => pcr
-                    .ctrl_32k_conf()
-                    .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) }),
+                RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => {}
+                RtcCalSel::RtcCal32kRc => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) });
+                }
+                RtcCalSel::RtcCal32kXtal => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) });
+                }
+                RtcCalSel::RtcCal32kOscSlow => {
+                    pcr.ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) });
+                }
             }
         }
 
@@ -1770,7 +1753,7 @@ impl RtcClock {
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
     fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        let xtal_freq = RtcClock::get_xtal_freq();
+        let xtal_freq = RtcClock::xtal_freq();
 
         let mut slowclk_cycles = slowclk_cycles;
 
@@ -1791,7 +1774,7 @@ impl RtcClock {
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
     pub(crate) fn cycles_to_1ms() -> u16 {
         let period_13q19 = RtcClock::calibrate(
-            match RtcClock::get_slow_freq() {
+            match RtcClock::slow_freq() {
                 RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRtcMux,
                 RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                 RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
@@ -1835,7 +1818,7 @@ impl RtcClock {
 
 pub(crate) fn rtc_clk_cpu_freq_set_xtal() {
     // rtc_clk_cpu_set_to_default_config
-    let freq = RtcClock::get_xtal_freq_mhz();
+    let freq = RtcClock::xtal_freq_mhz();
 
     esp32c6_rtc_update_to_xtal_raw(freq, 1);
 
@@ -1903,7 +1886,7 @@ impl SavedClockConfig {
         match source {
             CpuClockSource::Xtal => {
                 div = esp32c6_cpu_get_ls_divider();
-                source_freq_mhz = RtcClock::get_xtal_freq_mhz();
+                source_freq_mhz = RtcClock::xtal_freq_mhz();
             }
             CpuClockSource::Pll => {
                 div = esp32c6_cpu_get_hs_divider();
@@ -1937,7 +1920,7 @@ impl SavedClockConfig {
                 if old_source != CpuClockSource::Pll {
                     rtc_clk_bbpll_enable();
                     esp32c6_rtc_bbpll_configure_raw(
-                        RtcClock::get_xtal_freq_mhz(),
+                        RtcClock::xtal_freq_mhz(),
                         self.source_freq_mhz,
                     );
                 }

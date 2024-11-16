@@ -6,8 +6,6 @@
 #![no_main]
 
 use esp_hal::{
-    gpio::Io,
-    peripherals::{UART0, UART1},
     prelude::*,
     uart::{UartRx, UartTx},
     Blocking,
@@ -16,24 +14,20 @@ use hil_test as _;
 use nb::block;
 
 struct Context {
-    rx: UartRx<'static, UART1, Blocking>,
-    tx: UartTx<'static, UART0, Blocking>,
+    rx: UartRx<'static, Blocking>,
+    tx: UartTx<'static, Blocking>,
 }
 
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::assert_eq;
-
     use super::*;
 
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let (rx, tx) = hil_test::common_test_pins!(io);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let tx = UartTx::new(peripherals.UART0, tx).unwrap();
         let rx = UartRx::new(peripherals.UART1, rx).unwrap();

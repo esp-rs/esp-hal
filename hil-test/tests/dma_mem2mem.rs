@@ -1,12 +1,12 @@
 //! DMA Mem2Mem Tests
 
-//% CHIPS: esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
+//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
 
 #![no_std]
 #![no_main]
 
 use esp_hal::{
-    dma::{Channel, Dma, DmaChannel0, DmaError, DmaPriority, Mem2Mem},
+    dma::{AnyGdmaChannel, Channel, Dma, DmaError, DmaPriority, Mem2Mem},
     dma_buffers,
     dma_buffers_chunk_size,
     dma_descriptors,
@@ -17,23 +17,21 @@ use hil_test as _;
 const DATA_SIZE: usize = 1024 * 10;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
-        type DmaPeripheralType = esp_hal::peripherals::SPI2;
-    } else {
+    if #[cfg(any(esp32c2, esp32c6, esp32h2))] {
         type DmaPeripheralType = esp_hal::peripherals::MEM2MEM1;
+    } else {
+        type DmaPeripheralType = esp_hal::peripherals::SPI2;
     }
 }
 
 struct Context {
-    channel: Channel<'static, DmaChannel0, Blocking>,
+    channel: Channel<'static, Blocking, AnyGdmaChannel>,
     dma_peripheral: DmaPeripheralType,
 }
 
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::assert_eq;
-
     use super::*;
 
     #[init]
@@ -41,18 +39,20 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let dma = Dma::new(peripherals.DMA);
-        let channel = dma.channel0.configure(false, DmaPriority::Priority0);
+        let dma_channel = dma.channel0;
 
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
-                let dma_peripheral = peripherals.SPI2;
-            } else {
+            if #[cfg(any(esp32c2, esp32c6, esp32h2))] {
                 let dma_peripheral = peripherals.MEM2MEM1;
+            } else {
+                let dma_peripheral = peripherals.SPI2;
             }
         }
 
         Context {
-            channel,
+            channel: dma_channel
+                .configure(false, DmaPriority::Priority0)
+                .degrade(),
             dma_peripheral,
         }
     }

@@ -8,13 +8,11 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{interconnect::InputSignal, Io},
+    gpio::interconnect::InputSignal,
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
-    peripherals::SPI2,
     prelude::*,
     spi::{
-        master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
-        HalfDuplexMode,
+        master::{Address, Command, Config, Spi, SpiDma},
         SpiDataMode,
         SpiMode,
     },
@@ -22,19 +20,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(any(
-        feature = "esp32",
-        feature = "esp32s2",
-    ))] {
-        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
-    } else {
-        use esp_hal::dma::DmaChannel0;
-    }
-}
-
 struct Context {
-    spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, Blocking>,
     pcnt_unit: Unit<'static, 0>,
     pcnt_source: InputSignal,
 }
@@ -42,20 +29,14 @@ struct Context {
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    // defmt::* is load-bearing, it ensures that the assert in dma_buffers! is not
-    // using defmt's non-const assert. Doing so would result in a compile error.
-    #[allow(unused_imports)]
-    use defmt::{assert_eq, *};
-
     use super::*;
 
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
-        let (mosi, _) = hil_test::common_test_pins!(io);
+        let sclk = peripherals.GPIO0;
+        let (mosi, _) = hil_test::common_test_pins!(peripherals);
 
         let pcnt = Pcnt::new(peripherals.PCNT);
         let dma = Dma::new(peripherals.DMA);
@@ -68,12 +49,19 @@ mod tests {
             }
         }
 
-        let mosi_loopback = mosi.peripheral_input();
+        let (mosi_loopback, mosi) = mosi.split();
 
-        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_sck(sclk)
-            .with_mosi(mosi)
-            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+        let spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        )
+        .with_sck(sclk)
+        .with_mosi(mosi)
+        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         Context {
             spi,
@@ -101,7 +89,7 @@ mod tests {
         dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
 
         let transfer = spi
-            .write(
+            .half_duplex_write(
                 SpiDataMode::Single,
                 Command::None,
                 Address::None,
@@ -112,10 +100,10 @@ mod tests {
             .unwrap();
         (spi, dma_tx_buf) = transfer.wait();
 
-        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
+        assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
         let transfer = spi
-            .write(
+            .half_duplex_write(
                 SpiDataMode::Single,
                 Command::None,
                 Address::None,
@@ -126,7 +114,7 @@ mod tests {
             .unwrap();
         transfer.wait();
 
-        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
+        assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }
 
     #[test]
@@ -147,7 +135,7 @@ mod tests {
 
         let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
         // Write the buffer where each byte has 3 pos edges.
-        spi.write(
+        spi.half_duplex_write(
             SpiDataMode::Single,
             Command::None,
             Address::None,
@@ -156,9 +144,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(unit.get_value(), (3 * DMA_BUFFER_SIZE) as _);
+        assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
-        spi.write(
+        spi.half_duplex_write(
             SpiDataMode::Single,
             Command::None,
             Address::None,
@@ -167,6 +155,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(unit.get_value(), (6 * DMA_BUFFER_SIZE) as _);
+        assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }
 }

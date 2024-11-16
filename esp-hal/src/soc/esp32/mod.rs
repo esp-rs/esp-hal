@@ -13,7 +13,7 @@ pub mod cpu_control;
 pub mod efuse;
 pub mod gpio;
 pub mod peripherals;
-#[cfg(psram)]
+#[cfg(feature = "quad-psram")]
 pub mod psram;
 pub mod radio_clocks;
 pub mod trng;
@@ -24,6 +24,13 @@ macro_rules! chip {
     () => {
         "esp32"
     };
+}
+
+/// A link to the Technical Reference Manual (TRM) for the chip.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! trm_link {
+    () => { "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf" };
 }
 
 pub use chip;
@@ -38,9 +45,9 @@ pub(crate) mod constants {
     /// The size, in bytes, of each RMT channel's dedicated RAM.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 64;
     /// The lower bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_LOW: u32 = 0x3FFA_E000;
+    pub const SOC_DRAM_LOW: usize = 0x3FFA_E000;
     /// The upper bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_HIGH: u32 = 0x4000_0000;
+    pub const SOC_DRAM_HIGH: usize = 0x4000_0000;
     /// A reference clock tick of 1 MHz.
     pub const REF_TICK: fugit::HertzU32 = fugit::HertzU32::MHz(1);
 }
@@ -87,7 +94,7 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         addr_of_mut!(_rtc_slow_bss_end),
     );
     if matches!(
-        crate::reset::get_reset_reason(),
+        crate::reset::reset_reason(),
         None | Some(SocResetReason::ChipPowerOn)
     ) {
         xtensa_lx_rt::zero_bss(
@@ -107,8 +114,10 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         stack_chk_guard.write_volatile(0xdeadbabe);
     }
 
+    crate::interrupt::setup_interrupts();
+
     // continue with default reset handler
-    xtensa_lx_rt::Reset();
+    xtensa_lx_rt::Reset()
 }
 
 /// The ESP32 has a first stage bootloader that handles loading program data

@@ -13,7 +13,6 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
     prelude::*,
     rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator},
 };
@@ -21,8 +20,6 @@ use esp_hal::{
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
@@ -39,27 +36,19 @@ fn main() -> ! {
         ..TxChannelConfig::default()
     };
 
-    let mut channel = rmt.channel0.configure(io.pins.gpio4, tx_config).unwrap();
+    let mut channel = rmt
+        .channel0
+        .configure(peripherals.GPIO4, tx_config)
+        .unwrap();
 
     let delay = Delay::new();
 
-    let mut data = [PulseCode {
-        level1: true,
-        length1: 200,
-        level2: false,
-        length2: 50,
-    }; 20];
-
-    data[data.len() - 2] = PulseCode {
-        level1: true,
-        length1: 3000,
-        level2: false,
-        length2: 500,
-    };
-    data[data.len() - 1] = PulseCode::default();
+    let mut data = [PulseCode::new(true, 200, false, 50); 20];
+    data[data.len() - 2] = PulseCode::new(true, 3000, false, 500);
+    data[data.len() - 1] = PulseCode::empty();
 
     loop {
-        let transaction = channel.transmit(&data);
+        let transaction = channel.transmit(&data).unwrap();
         channel = transaction.wait().unwrap();
         delay.delay_millis(500);
     }

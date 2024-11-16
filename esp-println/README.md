@@ -76,8 +76,7 @@ init_logger_from_env();
 
 In this case the following environment variables are used:
 
-- `ESP_LOGLEVEL` sets the log level, use values like `trace`, `info` etc.
-- `ESP_LOGTARGETS` if set you should provide the crate names of crates (optionally with a path e.g. `esp_wifi::compat::common`) which should get logged, separated by `,` and no additional whitespace between
+- `ESP_LOG` log messages you want to show, similar to `RUST_LOG`. RegEx is not supported. e.g. `warn,test::foo=info,test::foo::bar=debug`
 
 If this simple logger implementation isn't sufficient for your needs, you can implement your own logger on top of `esp-println`. See [Implementing a Logger section log documentaion]
 

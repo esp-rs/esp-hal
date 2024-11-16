@@ -1,15 +1,10 @@
 use core::ptr::addr_of;
 
 use esp_wifi_sys::include::timeval;
-use hal::{macros::ram, rng::Rng};
+use hal::macros::ram;
 
 use crate::{
-    binary::include::{
-        esp_event_base_t,
-        esp_timer_create_args_t,
-        esp_timer_get_time,
-        esp_timer_handle_t,
-    },
+    binary::include::{esp_event_base_t, esp_timer_get_time},
     compat::{common::*, timer_compat::*},
     hal,
 };
@@ -31,18 +26,6 @@ pub(crate) mod chip_specific;
 #[cfg_attr(esp32s3, path = "phy_init_data_esp32s3.rs")]
 #[cfg_attr(esp32s2, path = "phy_init_data_esp32s2.rs")]
 pub(crate) mod phy_init_data;
-
-pub(crate) static mut RANDOM_GENERATOR: Option<Rng> = None;
-
-pub(crate) static mut RADIO_CLOCKS: Option<hal::peripherals::RADIO_CLK> = None;
-
-pub(crate) fn init_rng(rng: Rng) {
-    unsafe { RANDOM_GENERATOR = Some(rng) };
-}
-
-pub(crate) fn init_radio_clock_control(rcc: hal::peripherals::RADIO_CLK) {
-    unsafe { RADIO_CLOCKS = Some(rcc) };
-}
 
 /// **************************************************************************
 /// Name: esp_semphr_create
@@ -132,11 +115,9 @@ pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void
 pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
     trace!("random");
 
-    if let Some(ref mut rng) = RANDOM_GENERATOR {
-        rng.random()
-    } else {
-        0
-    }
+    // stealing RNG is safe since we own it (passed into `init`)
+    let mut rng = esp_hal::rng::Rng::new(unsafe { esp_hal::peripherals::RNG::steal() });
+    rng.random()
 }
 
 /// **************************************************************************
@@ -156,7 +137,7 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
 pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int {
     trace!("read_mac {:?} {}", mac, type_);
 
-    let base_mac = crate::hal::efuse::Efuse::get_mac_address();
+    let base_mac = crate::hal::efuse::Efuse::mac_address();
 
     for (i, &byte) in base_mac.iter().enumerate() {
         mac.add(i).write_volatile(byte);
@@ -217,52 +198,6 @@ pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *cons
 pub unsafe extern "C" fn puts(s: *const u8) {
     let cstr = str_from_c(s);
     info!("{}", cstr);
-}
-
-#[cfg(feature = "wifi-logs")]
-mod log {
-    #[no_mangle]
-    pub unsafe extern "C" fn rtc_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn phy_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn coexist_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn net80211_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn pp_printf(s: *const u8, args: ...) {
-        crate::compat::syslog::syslog(0, s, args);
-    }
-}
-
-#[cfg(not(feature = "wifi-logs"))]
-mod log {
-    #[no_mangle]
-    pub unsafe extern "C" fn rtc_printf(_s: *const u8, _args: *const ()) {}
-
-    #[no_mangle]
-    pub unsafe extern "C" fn phy_printf(_s: *const u8, _args: *const ()) {}
-
-    #[no_mangle]
-    pub unsafe extern "C" fn coexist_printf(_s: *const u8, _args: *const ()) {}
-
-    #[no_mangle]
-    pub unsafe extern "C" fn net80211_printf(_s: *const u8, _args: *const ()) {}
-
-    #[no_mangle]
-    pub unsafe extern "C" fn pp_printf(_s: *const u8, _args: *const ()) {}
 }
 
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
@@ -355,35 +290,12 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
     trace!("esp_fill_random");
     let dst = core::slice::from_raw_parts_mut(dst, len as usize);
 
-    if let Some(ref mut rng) = RANDOM_GENERATOR {
-        for chunk in dst.chunks_mut(4) {
-            let bytes = rng.random().to_le_bytes();
-            chunk.copy_from_slice(&bytes[..chunk.len()]);
-        }
+    // stealing RNG is safe since we own it (passed into `init`)
+    let mut rng = esp_hal::rng::Rng::new(unsafe { esp_hal::peripherals::RNG::steal() });
+    for chunk in dst.chunks_mut(4) {
+        let bytes = rng.random().to_le_bytes();
+        chunk.copy_from_slice(&bytes[..chunk.len()]);
     }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn esp_timer_stop(_handle: *mut ()) {
-    todo!("esp_timer_stop");
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn esp_timer_delete(_handle: *mut ()) {
-    todo!("esp_timer_delete");
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn esp_timer_start_once(_handle: *mut (), _timeout_us: u64) -> i32 {
-    todo!("esp_timer_start_once");
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn esp_timer_create(
-    args: *const esp_timer_create_args_t,
-    out_handle: *mut esp_timer_handle_t,
-) -> i32 {
-    compat_esp_timer_create(args, out_handle)
 }
 
 #[no_mangle]

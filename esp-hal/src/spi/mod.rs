@@ -9,10 +9,9 @@
 //! more information on these modes, please refer to the documentation in their
 //! respective modules.
 
-use crate::dma::DmaError;
+use crate::dma::{DmaEligible, DmaError};
 
 pub mod master;
-#[cfg(not(esp32))]
 pub mod slave;
 
 /// SPI errors
@@ -77,9 +76,6 @@ pub enum SpiBitOrder {
     LSBFirst,
 }
 
-/// Trait marker for defining SPI duplex modes.
-pub trait DuplexMode: crate::private::Sealed {}
-
 /// SPI data mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -92,12 +88,28 @@ pub enum SpiDataMode {
     Quad,
 }
 
-/// Full-duplex operation
-pub struct FullDuplexMode {}
-impl DuplexMode for FullDuplexMode {}
-impl crate::private::Sealed for FullDuplexMode {}
+crate::any_peripheral! {
+    /// Any SPI peripheral.
+    pub peripheral AnySpi {
+        #[cfg(spi2)]
+        Spi2(crate::peripherals::SPI2),
+        #[cfg(spi3)]
+        Spi3(crate::peripherals::SPI3),
+    }
+}
 
-/// Half-duplex operation
-pub struct HalfDuplexMode {}
-impl DuplexMode for HalfDuplexMode {}
-impl crate::private::Sealed for HalfDuplexMode {}
+impl DmaEligible for AnySpi {
+    #[cfg(gdma)]
+    type Dma = crate::dma::AnyGdmaChannel;
+    #[cfg(pdma)]
+    type Dma = crate::dma::AnySpiDmaChannel;
+
+    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+        match &self.0 {
+            #[cfg(spi2)]
+            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            #[cfg(spi3)]
+            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+        }
+    }
+}

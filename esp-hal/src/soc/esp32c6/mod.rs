@@ -25,6 +25,13 @@ macro_rules! chip {
     };
 }
 
+/// A link to the Technical Reference Manual (TRM) for the chip.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! trm_link {
+    () => { "https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf" };
+}
+
 pub use chip;
 
 #[allow(unused)]
@@ -54,9 +61,9 @@ pub(crate) mod constants {
     pub const PARL_IO_SCLK: u32 = 240_000_000;
 
     /// The lower address boundary for system DRAM.
-    pub const SOC_DRAM_LOW: u32 = 0x4080_0000;
+    pub const SOC_DRAM_LOW: usize = 0x4080_0000;
     /// The upper address boundary for system DRAM.
-    pub const SOC_DRAM_HIGH: u32 = 0x4088_0000;
+    pub const SOC_DRAM_HIGH: usize = 0x4088_0000;
 
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17_500);

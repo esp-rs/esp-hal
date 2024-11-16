@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     fs::{self, File},
     io::Write as _,
     path::{Path, PathBuf},
@@ -9,7 +9,7 @@ use std::{
 use anyhow::{bail, Context, Result};
 use cargo::CargoAction;
 use clap::ValueEnum;
-use esp_metadata::Chip;
+use esp_metadata::{Chip, Config};
 use strum::{Display, EnumIter, IntoEnumIterator as _};
 
 use self::cargo::CargoArgsBuilder;
@@ -36,10 +36,10 @@ pub enum Package {
     EspAlloc,
     EspBacktrace,
     EspBuild,
+    EspConfig,
     EspHal,
     EspHalEmbassy,
     EspHalProcmacros,
-    EspHalSmartled,
     EspIeee802154,
     EspLpHal,
     EspMetadata,
@@ -53,24 +53,18 @@ pub enum Package {
     XtensaLxRt,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Metadata {
     example_path: PathBuf,
-    chips: Vec<Chip>,
+    chip: Chip,
     feature_set: Vec<String>,
 }
 
 impl Metadata {
-    pub fn new(example_path: &Path, chips: Vec<Chip>, feature_set: Vec<String>) -> Self {
-        let chips = if chips.is_empty() {
-            Chip::iter().collect()
-        } else {
-            chips
-        };
-
+    pub fn new(example_path: &Path, chip: Chip, feature_set: Vec<String>) -> Self {
         Self {
             example_path: example_path.to_path_buf(),
-            chips,
+            chip,
             feature_set,
         }
     }
@@ -96,7 +90,7 @@ impl Metadata {
 
     /// If the specified chip is in the list of chips, then it is supported.
     pub fn supports_chip(&self, chip: Chip) -> bool {
-        self.chips.contains(&chip)
+        self.chip == chip
     }
 }
 
@@ -109,25 +103,27 @@ pub enum Version {
 }
 
 /// Build the documentation for the specified package and device.
-pub fn build_documentation(
-    workspace: &Path,
-    package: Package,
-    chip: Chip,
-    target: &str,
-) -> Result<PathBuf> {
+pub fn build_documentation(workspace: &Path, package: Package, chip: Chip) -> Result<PathBuf> {
     let package_name = package.to_string();
     let package_path = windows_safe_path(&workspace.join(&package_name));
 
     log::info!("Building '{package_name}' documentation targeting '{chip}'");
 
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(package, &chip)?;
+
+    // We need `nightly` for building the docs, unfortunately:
+    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
+
     let mut features = vec![chip.to_string()];
 
-    if matches!(package, Package::EspHal) {
-        features.push("ci".to_owned())
-    }
+    let chip = Config::for_chip(&chip);
+
+    features.extend(apply_feature_rules(&package, chip));
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
+        .toolchain(toolchain)
         .subcommand("doc")
         .target(target)
         .features(&features)
@@ -153,6 +149,36 @@ pub fn build_documentation(
     Ok(docs_path)
 }
 
+fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
+    let chip_name = &config.name();
+
+    match (package, chip_name.as_str()) {
+        (Package::EspHal, "esp32") => vec!["quad-psram".to_owned(), "ci".to_owned()],
+        (Package::EspHal, "esp32s2") => vec!["quad-psram".to_owned(), "ci".to_owned()],
+        (Package::EspHal, "esp32s3") => vec!["quad-psram".to_owned(), "ci".to_owned()],
+        (Package::EspHal, _) => vec!["ci".to_owned()],
+        (Package::EspWifi, _) => {
+            let mut features = vec![];
+            if config.contains("wifi") {
+                features.push("wifi".to_owned());
+                features.push("esp-now".to_owned());
+                features.push("sniffer".to_owned());
+                features.push("utils".to_owned());
+                features.push("smoltcp/proto-ipv4".to_owned());
+                features.push("smoltcp/proto-ipv6".to_owned());
+            }
+            if config.contains("ble") {
+                features.push("ble".to_owned());
+            }
+            if config.contains("wifi") && config.contains("ble") {
+                features.push("coex".to_owned());
+            }
+            features
+        }
+        _ => vec![],
+    }
+}
+
 /// Load all examples at the given path, and parse their metadata.
 pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
@@ -162,38 +188,56 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
         let text = fs::read_to_string(&path)
             .with_context(|| format!("Could not read {}", path.display()))?;
 
-        let mut chips = Vec::new();
+        let mut chips = Chip::iter().collect::<Vec<_>>();
         let mut feature_sets = Vec::new();
+        let mut chip_features = HashMap::new();
 
         // We will indicate metadata lines using the `//%` prefix:
         for line in text.lines().filter(|line| line.starts_with("//%")) {
-            let mut split = line
-                .trim_start_matches("//%")
-                .trim()
-                .split_ascii_whitespace()
-                .map(|s| s.to_string())
-                .collect::<Vec<_>>();
+            let Some((key, value)) = line.trim_start_matches("//%").split_once(':') else {
+                bail!("Metadata line is missing ':': {}", line);
+            };
 
-            if split.len() < 2 {
-                bail!(
-                    "Expected at least two elements (key, value), found {}",
-                    split.len()
-                );
-            }
-
-            // The trailing ':' on metadata keys is optional :)
-            let key = split.swap_remove(0);
-            let key = key.trim_end_matches(':');
+            let key = key.trim();
 
             if key == "CHIPS" {
-                chips = split
-                    .iter()
+                chips = value
+                    .split_ascii_whitespace()
                     .map(|s| Chip::from_str(s, false).unwrap())
                     .collect::<Vec<_>>();
             } else if key == "FEATURES" {
+                // Base feature set required to run the example.
+                // If multiple are specified, we compile the same example multiple times.
+                let mut values = value
+                    .split_ascii_whitespace()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+
                 // Sort the features so they are in a deterministic order:
-                split.sort();
-                feature_sets.push(split);
+                values.sort();
+
+                feature_sets.push(values);
+            } else if key.starts_with("CHIP-FEATURES(") {
+                // Additional features required for specific chips.
+                // These are appended to the base feature set(s).
+                // If multiple are specified, the last entry wins.
+                let chips = key
+                    .trim_start_matches("CHIP-FEATURES(")
+                    .trim_end_matches(')');
+
+                let chips = chips
+                    .split_ascii_whitespace()
+                    .map(|s| Chip::from_str(s, false).unwrap())
+                    .collect::<Vec<_>>();
+
+                let values = value
+                    .split_ascii_whitespace()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+
+                for chip in chips {
+                    chip_features.insert(chip, values.clone());
+                }
             } else {
                 log::warn!("Unrecognized metadata key '{key}', ignoring");
             }
@@ -209,7 +253,17 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
             feature_sets.truncate(1);
         }
         for feature_set in feature_sets {
-            examples.push(Metadata::new(&path, chips.clone(), feature_set));
+            for chip in &chips {
+                let mut feature_set = feature_set.clone();
+                if let Some(chip_features) = chip_features.get(chip) {
+                    feature_set.extend(chip_features.iter().cloned());
+
+                    // Sort the features so they are in a deterministic order:
+                    feature_set.sort();
+                }
+
+                examples.push(Metadata::new(&path, *chip, feature_set.clone()));
+            }
         }
     }
 
@@ -379,6 +433,33 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
 
     manifest["package"]["version"] = toml_edit::value(version.to_string());
     fs::write(manifest_path, manifest.to_string())?;
+
+    for pkg in
+        Package::iter().filter(|p| ![package, Package::Examples, Package::HilTest].contains(p))
+    {
+        let manifest_path = workspace.join(pkg.to_string()).join("Cargo.toml");
+        let manifest = fs::read_to_string(&manifest_path)
+            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
+
+        let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
+
+        if manifest["dependencies"]
+            .as_table()
+            .unwrap()
+            .contains_key(&package.to_string())
+        {
+            log::info!(
+                "  Bumping {package} version for package {pkg}: ({prev_version} -> {version})"
+            );
+
+            manifest["dependencies"].as_table_mut().map(|table| {
+                table[&package.to_string()]["version"] = toml_edit::value(version.to_string())
+            });
+
+            fs::write(&manifest_path, manifest.to_string())
+                .with_context(|| format!("Could not write {}", manifest_path.display()))?;
+        }
+    }
 
     Ok(())
 }
@@ -579,4 +660,13 @@ pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Ver
 /// Make the path "Windows"-safe
 pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
+}
+
+/// Return the target triple for a given package/chip pair.
+pub fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
+    if package == Package::EspLpHal {
+        chip.lp_target()
+    } else {
+        Ok(chip.target())
+    }
 }

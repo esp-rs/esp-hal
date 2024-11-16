@@ -6,77 +6,67 @@
 // polluting the main module.
 
 use super::*;
+use crate::gpio::interconnect::connect_input_signal;
 
-impl PeripheralSignal for Level {
-    fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
+impl crate::peripheral::Peripheral for Level {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        *self
+    }
 }
 
-impl PeripheralInput for Level {
-    fn input_signals(&self, _: private::Internal) -> [Option<InputSignal>; 6] {
-        [None; 6]
+impl Level {
+    pub(crate) fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
+
+    pub(crate) fn input_signals(
+        &self,
+        _: private::Internal,
+    ) -> &[(AlternateFunction, InputSignal)] {
+        &[]
     }
 
-    fn init_input(&self, _pull: Pull, _: private::Internal) {}
+    pub(crate) fn init_input(&self, _pull: Pull, _: private::Internal) {}
 
-    fn enable_input(&mut self, _on: bool, _: private::Internal) {}
+    pub(crate) fn enable_input(&mut self, _on: bool, _: private::Internal) {}
 
-    fn enable_input_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
-
-    fn is_input_high(&self, _: private::Internal) -> bool {
+    pub(crate) fn is_input_high(&self, _: private::Internal) -> bool {
         *self == Level::High
     }
 
-    fn connect_input_to_peripheral(&mut self, signal: InputSignal, _: private::Internal) {
+    #[doc(hidden)]
+    pub(crate) fn connect_input_to_peripheral(&mut self, signal: InputSignal) {
         let value = match self {
             Level::High => ONE_INPUT,
             Level::Low => ZERO_INPUT,
         };
 
-        unsafe { &*GPIO::PTR }
-            .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
-            .modify(|_, w| unsafe {
-                w.sel()
-                    .set_bit()
-                    .in_inv_sel()
-                    .bit(false)
-                    .in_sel()
-                    .bits(value)
-            });
+        connect_input_signal(signal, value, false, true);
     }
 
-    fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _: private::Internal) {}
-}
+    pub(crate) fn set_to_open_drain_output(&mut self, _: private::Internal) {}
+    pub(crate) fn set_to_push_pull_output(&mut self, _: private::Internal) {}
+    pub(crate) fn enable_output(&mut self, _on: bool, _: private::Internal) {}
+    pub(crate) fn set_output_high(&mut self, _on: bool, _: private::Internal) {}
+    pub(crate) fn set_drive_strength(&mut self, _strength: DriveStrength, _: private::Internal) {}
+    pub(crate) fn enable_open_drain(&mut self, _on: bool, _: private::Internal) {}
+    pub(crate) fn internal_pull_up_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
+    pub(crate) fn internal_pull_down_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
 
-impl PeripheralOutput for Level {
-    fn set_to_open_drain_output(&mut self, _: private::Internal) {}
-
-    fn set_to_push_pull_output(&mut self, _: private::Internal) {}
-
-    fn enable_output(&mut self, _on: bool, _: private::Internal) {}
-
-    fn set_output_high(&mut self, _on: bool, _: private::Internal) {}
-
-    fn set_drive_strength(&mut self, _strength: DriveStrength, _: private::Internal) {}
-
-    fn enable_open_drain(&mut self, _on: bool, _: private::Internal) {}
-
-    fn enable_output_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
-
-    fn internal_pull_up_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
-
-    fn internal_pull_down_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
-
-    fn is_set_high(&self, _: private::Internal) -> bool {
+    pub(crate) fn is_set_high(&self, _: private::Internal) -> bool {
         false
     }
 
-    fn output_signals(&self, _: private::Internal) -> [Option<OutputSignal>; 6] {
-        [None; 6]
+    pub(crate) fn output_signals(
+        &self,
+        _: private::Internal,
+    ) -> &[(AlternateFunction, OutputSignal)] {
+        &[]
     }
 
-    fn connect_peripheral_to_output(&mut self, _signal: OutputSignal, _: private::Internal) {}
+    pub(crate) fn connect_peripheral_to_output(&mut self, _signal: OutputSignal) {}
 
-    fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal, _: private::Internal) {}
+    pub(crate) fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal) {}
 }
 
 /// Placeholder pin, used when no pin is required when using a peripheral.
@@ -88,50 +78,12 @@ pub struct NoPin;
 impl crate::peripheral::Peripheral for NoPin {
     type P = Self;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         Self
     }
 }
 
 impl private::Sealed for NoPin {}
-
-impl PeripheralSignal for NoPin {
-    fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
-}
-
-impl PeripheralInput for NoPin {
-    delegate::delegate! {
-        to Level::Low {
-            fn init_input(&self, _pull: Pull, _internal: private::Internal);
-            fn enable_input(&mut self, _on: bool, _internal: private::Internal);
-            fn enable_input_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
-            fn is_input_high(&self, _internal: private::Internal) -> bool;
-            fn connect_input_to_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
-            fn disconnect_input_from_peripheral(&mut self, _signal: InputSignal, _internal: private::Internal);
-            fn input_signals(&self, _internal: private::Internal) -> [Option<InputSignal>; 6];
-        }
-    }
-}
-
-impl PeripheralOutput for NoPin {
-    delegate::delegate! {
-        to Level::Low {
-            fn set_to_open_drain_output(&mut self, _internal: private::Internal);
-            fn set_to_push_pull_output(&mut self, _internal: private::Internal);
-            fn enable_output(&mut self, _on: bool, _internal: private::Internal);
-            fn set_output_high(&mut self, _on: bool, _internal: private::Internal);
-            fn set_drive_strength(&mut self, _strength: DriveStrength, _internal: private::Internal);
-            fn enable_open_drain(&mut self, _on: bool, _internal: private::Internal);
-            fn enable_output_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
-            fn internal_pull_up_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
-            fn internal_pull_down_in_sleep_mode(&mut self, _on: bool, _internal: private::Internal);
-            fn is_set_high(&self, _internal: private::Internal) -> bool;
-            fn output_signals(&self, _internal: private::Internal) -> [Option<OutputSignal>; 6];
-            fn connect_peripheral_to_output(&mut self, _signal: OutputSignal, _internal: private::Internal);
-            fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal, _internal: private::Internal);
-        }
-    }
-}
 
 impl embedded_hal_02::digital::v2::OutputPin for NoPin {
     type Error = core::convert::Infallible;

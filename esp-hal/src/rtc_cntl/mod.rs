@@ -26,7 +26,7 @@
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::rtc_cntl::Rtc;
 //! # use esp_hal::rtc_cntl::Rwdt;
-//! # use crate::esp_hal::prelude::_fugit_ExtU64;
+//! # use esp_hal::rtc_cntl::RwdtStage;
 //! # use crate::esp_hal::InterruptConfigurable;
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 //! let mut delay = Delay::new();
@@ -34,7 +34,7 @@
 //! let mut rtc = Rtc::new(peripherals.LPWR);
 //!
 //! rtc.set_interrupt_handler(interrupt_handler);
-//! rtc.rwdt.set_timeout(2000.millis());
+//! rtc.rwdt.set_timeout(RwdtStage::Stage0, 2000.millis());
 //! rtc.rwdt.listen();
 //!
 //! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
@@ -45,6 +45,7 @@
 //!
 //! # use critical_section::Mutex;
 //! # use esp_hal::rtc_cntl::Rwdt;
+//! # use esp_hal::rtc_cntl::RwdtStage;
 //!
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 //!
@@ -60,7 +61,7 @@
 //!
 //!         // esp_println::println!("Restarting in 5 seconds...");
 //!
-//!         rwdt.set_timeout(5000u64.millis());
+//!         rwdt.set_timeout(RwdtStage::Stage0, 5000u64.millis());
 //!         rwdt.unlisten();
 //!     });
 //! }
@@ -91,7 +92,7 @@ use crate::{
     Cpu,
     InterruptConfigurable,
 };
-// only include sleep where its been implemented
+// only include sleep where it's been implemented
 #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
 pub mod sleep;
 
@@ -105,7 +106,34 @@ pub mod sleep;
 pub(crate) mod rtc;
 
 #[cfg(any(esp32c6, esp32h2))]
-pub use rtc::RtcClock;
+unsafe fn lp_aon<'a>() -> &'a <LP_AON as core::ops::Deref>::Target {
+    &*LP_AON::PTR
+}
+
+#[cfg(not(any(esp32c6, esp32h2)))]
+unsafe fn lp_aon<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
+    &*LPWR::PTR
+}
+
+#[cfg(any(esp32c6, esp32h2))]
+unsafe fn lp_timer<'a>() -> &'a <LP_TIMER as core::ops::Deref>::Target {
+    &*LP_TIMER::PTR
+}
+
+#[cfg(not(any(esp32c6, esp32h2)))]
+unsafe fn lp_timer<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
+    &*LPWR::PTR
+}
+
+#[cfg(any(esp32c6, esp32h2))]
+unsafe fn lp_wdt<'a>() -> &'a <LP_WDT as core::ops::Deref>::Target {
+    &*LP_WDT::PTR
+}
+
+#[cfg(not(any(esp32c6, esp32h2)))]
+unsafe fn lp_wdt<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
+    &*LPWR::PTR
+}
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 #[allow(unused)]
@@ -199,7 +227,7 @@ impl<'d> Rtc<'d> {
 
         let this = Self {
             _inner: rtc_cntl.into_ref(),
-            rwdt: Rwdt::default(),
+            rwdt: Rwdt::new(),
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             swd: Swd::new(),
         };
@@ -217,10 +245,7 @@ impl<'d> Rtc<'d> {
 
     /// Get the time since boot in the raw register units.
     fn time_since_boot_raw(&self) -> u64 {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::ptr() };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_TIMER::ptr() };
+        let rtc_cntl = unsafe { lp_timer() };
 
         #[cfg(esp32)]
         let (l, h) = {
@@ -258,7 +283,7 @@ impl<'d> Rtc<'d> {
     pub fn time_since_boot(&self) -> MicrosDurationU64 {
         MicrosDurationU64::micros(
             self.time_since_boot_raw() * 1_000_000
-                / RtcClock::get_slow_freq().frequency().to_Hz() as u64,
+                / RtcClock::slow_freq().frequency().to_Hz() as u64,
         )
     }
 
@@ -279,10 +304,7 @@ impl<'d> Rtc<'d> {
 
         // For registers and peripherals used in esp-idf, see https://github.com/search?q=repo%3Aespressif%2Fesp-idf+RTC_BOOT_TIME_LOW_REG+RTC_BOOT_TIME_HIGH_REG+path%3A**%2Frtc.h&type=code
 
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::ptr() };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_AON::ptr() };
+        let rtc_cntl = unsafe { lp_aon() };
 
         let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
 
@@ -298,10 +320,7 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::ptr() };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_AON::ptr() };
+        let rtc_cntl = unsafe { lp_aon() };
 
         let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
 
@@ -392,36 +411,47 @@ impl<'d> Rtc<'d> {
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();
     }
-}
-impl<'d> crate::private::Sealed for Rtc<'d> {}
 
-impl<'d> InterruptConfigurable for Rtc<'d> {
+    const RTC_DISABLE_ROM_LOG: u32 = 1;
+
+    /// Temporarily disable log messages of the ROM bootloader.
+    ///
+    /// If you need to permanently disable the ROM bootloader messages, you'll
+    /// need to set the corresponding eFuse.
+    #[cfg(any(esp32s3, esp32h2))]
+    pub fn disable_rom_message_printing(&self) {
+        // Corresponding documentation:
+        // ESP32-S3: TRM v1.5 chapter 8.3
+        // ESP32-H2: TRM v0.5 chapter 8.2.3
+
+        let rtc_cntl = unsafe { lp_aon() };
+        rtc_cntl
+            .store4()
+            .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
+    }
+}
+impl crate::private::Sealed for Rtc<'_> {}
+
+impl InterruptConfigurable for Rtc<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            interrupt::bind_interrupt(
-                #[cfg(any(esp32c6, esp32h2))]
-                Interrupt::LP_WDT,
-                #[cfg(not(any(esp32c6, esp32h2)))]
-                Interrupt::RTC_CORE,
-                handler.handler(),
-            );
-            interrupt::enable(
-                #[cfg(any(esp32c6, esp32h2))]
-                Interrupt::LP_WDT,
-                #[cfg(not(any(esp32c6, esp32h2)))]
-                Interrupt::RTC_CORE,
-                handler.priority(),
-            )
-            .unwrap();
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c6, esp32h2))] {
+                let interrupt = Interrupt::LP_WDT;
+            } else {
+                let interrupt = Interrupt::RTC_CORE;
+            }
         }
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
+        }
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 }
 
-#[cfg(not(any(esp32c6, esp32h2)))]
 /// RTC Watchdog Timer.
 pub struct RtcClock;
 
-#[cfg(not(any(esp32c6, esp32h2)))]
 /// RTC Watchdog Timer driver.
 impl RtcClock {
     const CAL_FRACT: u32 = 19;
@@ -466,37 +496,40 @@ impl RtcClock {
         }
     }
 
+    pub(crate) fn read_xtal_freq_mhz() -> Option<u32> {
+        let xtal_freq_reg = unsafe { lp_aon() }.store4().read().bits();
+
+        // RTC_XTAL_FREQ is stored as two copies in lower and upper 16-bit halves
+        // need to mask out the RTC_DISABLE_ROM_LOG bit which is also stored in the same
+        // register
+        let xtal_freq = (xtal_freq_reg & !Rtc::RTC_DISABLE_ROM_LOG) as u16;
+        let xtal_freq_copy = (xtal_freq_reg >> 16) as u16;
+
+        if xtal_freq == xtal_freq_copy && xtal_freq != 0 && xtal_freq != u16::MAX {
+            Some(xtal_freq as u32)
+        } else {
+            None
+        }
+    }
+
     /// Get main XTAL frequency.
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
-    pub fn get_xtal_freq() -> XtalClock {
-        let xtal_freq_reg = unsafe { &*LPWR::PTR }.store4().read().bits();
-
-        // Values of RTC_XTAL_FREQ_REG and RTC_APB_FREQ_REG are stored as two copies in
-        // lower and upper 16-bit halves. These are the routines to work with such a
-        // representation.
-        let clk_val_is_valid = |val| {
-            (val & 0xffffu32) == ((val >> 16u32) & 0xffffu32) && val != 0u32 && val != u32::MAX
-        };
-        let reg_val_to_clk_val = |val| val & u16::MAX as u32;
-
-        if !clk_val_is_valid(xtal_freq_reg) {
-            return XtalClock::RtcXtalFreq40M;
-        }
-
-        match reg_val_to_clk_val(xtal_freq_reg) {
-            40 => XtalClock::RtcXtalFreq40M,
+    #[cfg(not(any(esp32c6, esp32h2)))]
+    pub fn xtal_freq() -> XtalClock {
+        match Self::read_xtal_freq_mhz() {
+            None | Some(40) => XtalClock::RtcXtalFreq40M,
             #[cfg(any(esp32c3, esp32s3))]
-            32 => XtalClock::RtcXtalFreq32M,
+            Some(32) => XtalClock::RtcXtalFreq32M,
             #[cfg(any(esp32, esp32c2))]
-            26 => XtalClock::RtcXtalFreq26M,
-            other => XtalClock::RtcXtalFreqOther(other),
+            Some(26) => XtalClock::RtcXtalFreq26M,
+            Some(other) => XtalClock::RtcXtalFreqOther(other),
         }
     }
 
     /// Get the RTC_SLOW_CLK source.
     #[cfg(not(any(esp32c6, esp32h2)))]
-    pub fn get_slow_freq() -> RtcSlowClock {
+    pub fn slow_freq() -> RtcSlowClock {
         let rtc_cntl = unsafe { &*LPWR::PTR };
         let slow_freq = rtc_cntl.clk_conf().read().ana_clk_rtc_sel().bits();
         match slow_freq {
@@ -557,7 +590,7 @@ impl RtcClock {
         // The following code emulates ESP32 behavior for the other chips:
         #[cfg(not(esp32))]
         let cal_clk = match cal_clk {
-            RtcCalSel::RtcCalRtcMux => match RtcClock::get_slow_freq() {
+            RtcCalSel::RtcCalRtcMux => match RtcClock::slow_freq() {
                 RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                 RtcSlowClock::RtcSlowClock8mD256 => RtcCalSel::RtcCal8mD256,
                 _ => cal_clk,
@@ -691,7 +724,8 @@ impl RtcClock {
     }
 
     /// Measure ratio between XTAL frequency and RTC slow clock frequency.
-    fn get_calibration_ratio(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
+    #[cfg(not(any(esp32c6, esp32h2)))]
+    fn calibration_ratio(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
         let ratio = (xtal_cycles << RtcClock::CAL_FRACT) / slowclk_cycles as u64;
 
@@ -705,8 +739,9 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
+    #[cfg(not(any(esp32c6, esp32h2)))]
     fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        let xtal_freq = RtcClock::get_xtal_freq();
+        let xtal_freq = RtcClock::xtal_freq();
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
         let divider = xtal_freq.mhz() as u64 * slowclk_cycles as u64;
         let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
@@ -715,9 +750,10 @@ impl RtcClock {
     }
 
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
+    #[cfg(not(any(esp32c6, esp32h2)))]
     fn cycles_to_1ms() -> u16 {
         let period_13q19 = RtcClock::calibrate(
-            match RtcClock::get_slow_freq() {
+            match RtcClock::slow_freq() {
                 RtcSlowClock::RtcSlowClockRtc => RtcCalSel::RtcCalRtcMux,
                 RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
                 #[cfg(not(any(esp32c6, esp32h2)))]
@@ -746,7 +782,7 @@ impl RtcClock {
             RtcClock::enable_8m(true, true);
         }
 
-        let ratio = RtcClock::get_calibration_ratio(RtcCalSel::RtcCal8mD256, XTAL_FREQ_EST_CYCLES);
+        let ratio = RtcClock::calibration_ratio(RtcCalSel::RtcCal8mD256, XTAL_FREQ_EST_CYCLES);
         let freq_mhz =
             ((ratio as u64 * RtcFastClock::RtcFastClock8m.hz() as u64 / 1_000_000u64 / 256u64)
                 >> RtcClock::CAL_FRACT) as u32;
@@ -760,36 +796,55 @@ impl RtcClock {
 /// Behavior of the RWDT stage if it times out.
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
-enum RwdtStageAction {
+pub enum RwdtStageAction {
+    /// No effect on the system.
     Off         = 0,
+    /// Trigger an interrupt.
     Interrupt   = 1,
+    /// Reset the CPU core.
     ResetCpu    = 2,
-    ResetSystem = 3,
-    ResetRtc    = 4,
+    /// Reset the main system.
+    /// The power management unit and RTC peripherals will not be reset.
+    ResetCore   = 3,
+    /// Reset the main system, power management unit and RTC peripherals.
+    ResetSystem = 4,
+}
+
+/// RWDT stages.
+///
+/// Timer stages allow for a timer to have a series of different timeout values
+/// and corresponding expiry action.
+#[derive(Debug, Clone, Copy)]
+pub enum RwdtStage {
+    /// RWDT stage 0.
+    Stage0,
+    /// RWDT stage 1.
+    Stage1,
+    /// RWDT stage 2.
+    Stage2,
+    /// RWDT stage 3.
+    Stage3,
 }
 
 /// RTC Watchdog Timer.
-pub struct Rwdt {
-    stg0_action: RwdtStageAction,
-    stg1_action: RwdtStageAction,
-    stg2_action: RwdtStageAction,
-    stg3_action: RwdtStageAction,
-}
+pub struct Rwdt;
 
 impl Default for Rwdt {
     fn default() -> Self {
-        Self {
-            stg0_action: RwdtStageAction::ResetRtc,
-            stg1_action: RwdtStageAction::Off,
-            stg2_action: RwdtStageAction::Off,
-            stg3_action: RwdtStageAction::Off,
-        }
+        Self::new()
     }
 }
 
 /// RTC Watchdog Timer driver.
 impl Rwdt {
+    /// Create a new RTC watchdog timer instance
+    pub fn new() -> Self {
+        Self
+    }
+
     /// Enable the watchdog timer instance.
+    /// Watchdog starts with default settings (`stage 0` resets the system, the
+    /// others are deactivated)
     pub fn enable(&mut self) {
         self.set_enabled(true);
     }
@@ -799,42 +854,32 @@ impl Rwdt {
         self.set_enabled(false);
     }
 
-    /// Listen for interrupts.
+    /// Listen for interrupts on stage 0.
     pub fn listen(&mut self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
-
-        self.stg0_action = RwdtStageAction::Interrupt;
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
 
         // Configure STAGE0 to trigger an interrupt upon expiration
         rtc_cntl
             .wdtconfig0()
-            .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
+            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::Interrupt as u8) });
 
         rtc_cntl.int_ena().modify(|_, w| w.wdt().set_bit());
 
         self.set_write_protection(true);
     }
 
-    /// Stop listening for interrupts.
+    /// Stop listening for interrupts on stage 0.
     pub fn unlisten(&mut self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
-
-        self.stg0_action = RwdtStageAction::ResetRtc;
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
 
         // Configure STAGE0 to reset the main system and the RTC upon expiration.
         rtc_cntl
             .wdtconfig0()
-            .modify(|_, w| unsafe { w.wdt_stg0().bits(self.stg0_action as u8) });
+            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8) });
 
         rtc_cntl.int_ena().modify(|_, w| w.wdt().clear_bit());
 
@@ -843,10 +888,7 @@ impl Rwdt {
 
     /// Clear interrupt.
     pub fn clear_interrupt(&mut self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
 
@@ -857,20 +899,14 @@ impl Rwdt {
 
     /// Check if the interrupt is set.
     pub fn is_interrupt_set(&self) -> bool {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         rtc_cntl.int_st().read().wdt().bit_is_set()
     }
 
     /// Feed the watchdog timer.
     pub fn feed(&mut self) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
         rtc_cntl.wdtfeed().write(|w| w.wdt_feed().set_bit());
@@ -878,10 +914,7 @@ impl Rwdt {
     }
 
     fn set_write_protection(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
@@ -889,65 +922,133 @@ impl Rwdt {
     }
 
     fn set_enabled(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
 
-        rtc_cntl
-            .wdtconfig0()
-            .modify(|_, w| w.wdt_en().bit(enable).wdt_flashboot_mod_en().bit(enable));
+        if !enable {
+            rtc_cntl.wdtconfig0().modify(|_, w| unsafe { w.bits(0) });
+        } else {
+            rtc_cntl
+                .wdtconfig0()
+                .write(|w| w.wdt_flashboot_mod_en().bit(false));
+
+            rtc_cntl
+                .wdtconfig0()
+                .modify(|_, w| w.wdt_en().bit(enable).wdt_pause_in_slp().bit(enable));
+
+            // Apply default settings for WDT
+            unsafe {
+                rtc_cntl.wdtconfig0().modify(|_, w| {
+                    w.wdt_stg0()
+                        .bits(RwdtStageAction::ResetSystem as u8)
+                        .wdt_cpu_reset_length()
+                        .bits(7)
+                        .wdt_sys_reset_length()
+                        .bits(7)
+                        .wdt_stg1()
+                        .bits(RwdtStageAction::Off as u8)
+                        .wdt_stg2()
+                        .bits(RwdtStageAction::Off as u8)
+                        .wdt_stg3()
+                        .bits(RwdtStageAction::Off as u8)
+                        .wdt_en()
+                        .set_bit()
+                });
+            }
+        }
 
         self.set_write_protection(true);
     }
 
-    /// Configure timeout value in ms.
-    pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+    /// Configure timeout value in ms for the selected stage.
+    pub fn set_timeout(&mut self, stage: RwdtStage, timeout: MicrosDurationU64) {
+        let rtc_cntl = unsafe { lp_wdt() };
 
         let timeout_raw = (timeout.to_millis() * (RtcClock::cycles_to_1ms() as u64)) as u32;
         self.set_write_protection(false);
 
         unsafe {
             #[cfg(esp32)]
-            rtc_cntl
-                .wdtconfig1()
-                .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw));
+            match stage {
+                RwdtStage::Stage0 => rtc_cntl
+                    .wdtconfig1()
+                    .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw)),
+                RwdtStage::Stage1 => rtc_cntl
+                    .wdtconfig2()
+                    .modify(|_, w| w.wdt_stg1_hold().bits(timeout_raw)),
+                RwdtStage::Stage2 => rtc_cntl
+                    .wdtconfig3()
+                    .modify(|_, w| w.wdt_stg2_hold().bits(timeout_raw)),
+                RwdtStage::Stage3 => rtc_cntl
+                    .wdtconfig4()
+                    .modify(|_, w| w.wdt_stg3_hold().bits(timeout_raw)),
+            };
 
             #[cfg(any(esp32c6, esp32h2))]
-            rtc_cntl.config1().modify(|_, w| {
-                w.wdt_stg0_hold()
-                    .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
-            });
+            match stage {
+                RwdtStage::Stage0 => rtc_cntl.config1().modify(|_, w| {
+                    w.wdt_stg0_hold()
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
+                }),
+                RwdtStage::Stage1 => rtc_cntl.config2().modify(|_, w| {
+                    w.wdt_stg1_hold()
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
+                }),
+                RwdtStage::Stage2 => rtc_cntl.config3().modify(|_, w| {
+                    w.wdt_stg2_hold()
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
+                }),
+                RwdtStage::Stage3 => rtc_cntl.config4().modify(|_, w| {
+                    w.wdt_stg3_hold()
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
+                }),
+            };
 
             #[cfg(not(any(esp32, esp32c6, esp32h2)))]
-            rtc_cntl.wdtconfig1().modify(|_, w| {
-                w.wdt_stg0_hold()
-                    .bits(timeout_raw >> (1 + Efuse::get_rwdt_multiplier()))
-            });
-
-            rtc_cntl.wdtconfig0().modify(|_, w| {
-                w.wdt_stg0()
-                    .bits(self.stg0_action as u8)
-                    .wdt_cpu_reset_length()
-                    .bits(7)
-                    .wdt_sys_reset_length()
-                    .bits(7)
-                    .wdt_stg1()
-                    .bits(self.stg1_action as u8)
-                    .wdt_stg2()
-                    .bits(self.stg2_action as u8)
-                    .wdt_stg3()
-                    .bits(self.stg3_action as u8)
-                    .wdt_en()
-                    .set_bit()
-            });
+            match stage {
+                RwdtStage::Stage0 => rtc_cntl.wdtconfig1().modify(|_, w| {
+                    w.wdt_stg0_hold()
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
+                }),
+                RwdtStage::Stage1 => rtc_cntl.wdtconfig2().modify(|_, w| {
+                    w.wdt_stg1_hold()
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
+                }),
+                RwdtStage::Stage2 => rtc_cntl.wdtconfig3().modify(|_, w| {
+                    w.wdt_stg2_hold()
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
+                }),
+                RwdtStage::Stage3 => rtc_cntl.wdtconfig4().modify(|_, w| {
+                    w.wdt_stg3_hold()
+                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
+                }),
+            };
         }
+
+        self.set_write_protection(true);
+    }
+
+    /// Set the action for a specific stage.
+    pub fn set_stage_action(&mut self, stage: RwdtStage, action: RwdtStageAction) {
+        let rtc_cntl = unsafe { lp_wdt() };
+
+        self.set_write_protection(false);
+
+        match stage {
+            RwdtStage::Stage0 => rtc_cntl
+                .wdtconfig0()
+                .modify(|_, w| unsafe { w.wdt_stg0().bits(action as u8) }),
+            RwdtStage::Stage1 => rtc_cntl
+                .wdtconfig0()
+                .modify(|_, w| unsafe { w.wdt_stg1().bits(action as u8) }),
+            RwdtStage::Stage2 => rtc_cntl
+                .wdtconfig0()
+                .modify(|_, w| unsafe { w.wdt_stg2().bits(action as u8) }),
+            RwdtStage::Stage3 => rtc_cntl
+                .wdtconfig0()
+                .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) }),
+        };
 
         self.set_write_protection(true);
     }
@@ -966,7 +1067,7 @@ impl embedded_hal_02::watchdog::WatchdogEnable for Rwdt {
     where
         T: Into<Self::Time>,
     {
-        self.set_timeout(period.into());
+        self.set_timeout(RwdtStage::Stage0, period.into());
     }
 }
 
@@ -988,6 +1089,11 @@ impl Swd {
         Self
     }
 
+    /// Enable the watchdog timer instance
+    pub fn enable(&mut self) {
+        self.set_enabled(true);
+    }
+
     /// Disable the watchdog timer instance
     pub fn disable(&mut self) {
         self.set_enabled(false);
@@ -995,10 +1101,7 @@ impl Swd {
 
     /// Enable/disable write protection for WDT registers
     fn set_write_protection(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         #[cfg(not(any(esp32c6, esp32h2)))]
         let wkey = if enable { 0u32 } else { 0x8F1D_312A };
@@ -1011,10 +1114,7 @@ impl Swd {
     }
 
     fn set_enabled(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        #[cfg(any(esp32c6, esp32h2))]
-        let rtc_cntl = unsafe { &*LP_WDT::PTR };
+        let rtc_cntl = unsafe { lp_wdt() };
 
         self.set_write_protection(false);
         rtc_cntl
@@ -1039,15 +1139,15 @@ impl embedded_hal_02::watchdog::WatchdogDisable for Swd {
 }
 
 /// Return reset reason.
-pub fn get_reset_reason(cpu: Cpu) -> Option<SocResetReason> {
+pub fn reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     let reason = crate::rom::rtc_get_reset_reason(cpu as u32);
 
     SocResetReason::from_repr(reason as usize)
 }
 
 /// Return wakeup reason.
-pub fn get_wakeup_cause() -> SleepSource {
-    if get_reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep) {
+pub fn wakeup_cause() -> SleepSource {
+    if reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep) {
         return SleepSource::Undefined;
     }
 
@@ -1115,4 +1215,12 @@ pub fn get_wakeup_cause() -> SleepSource {
     }
 
     SleepSource::Undefined
+}
+
+// libphy.a can pull this in on some chips, we provide it here in the hal
+// so that either ieee or esp-wifi gets it for free without duplicating in both
+#[no_mangle]
+extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
+    let xtal = RtcClock::xtal_freq();
+    xtal.mhz() as i32
 }

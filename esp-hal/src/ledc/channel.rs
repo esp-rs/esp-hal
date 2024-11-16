@@ -11,7 +11,10 @@
 
 use super::timer::{TimerIFace, TimerSpeed};
 use crate::{
-    gpio::{OutputSignal, PeripheralOutput},
+    gpio::{
+        interconnect::{OutputConnection, PeripheralOutput},
+        OutputSignal,
+    },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::ledc::RegisterBlock,
 };
@@ -95,9 +98,9 @@ pub mod config {
 }
 
 /// Channel interface
-pub trait ChannelIFace<'a, S: TimerSpeed + 'a, O: PeripheralOutput + 'a>
+pub trait ChannelIFace<'a, S: TimerSpeed + 'a>
 where
-    Channel<'a, S, O>: ChannelHW<O>,
+    Channel<'a, S>: ChannelHW,
 {
     /// Configure channel
     fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error>;
@@ -118,7 +121,7 @@ where
 }
 
 /// Channel HW interface
-pub trait ChannelHW<O: PeripheralOutput> {
+pub trait ChannelHW {
     /// Configure Channel HW except for the duty which is set via
     /// [`Self::set_duty_hw`].
     fn configure_hw(&mut self) -> Result<(), Error>;
@@ -144,17 +147,20 @@ pub trait ChannelHW<O: PeripheralOutput> {
 }
 
 /// Channel struct
-pub struct Channel<'a, S: TimerSpeed, O: PeripheralOutput> {
+pub struct Channel<'a, S: TimerSpeed> {
     ledc: &'a RegisterBlock,
     timer: Option<&'a dyn TimerIFace<S>>,
     number: Number,
-    output_pin: PeripheralRef<'a, O>,
+    output_pin: PeripheralRef<'a, OutputConnection>,
 }
 
-impl<'a, S: TimerSpeed, O: PeripheralOutput> Channel<'a, S, O> {
+impl<'a, S: TimerSpeed> Channel<'a, S> {
     /// Return a new channel
-    pub fn new(number: Number, output_pin: impl Peripheral<P = O> + 'a) -> Self {
-        crate::into_ref!(output_pin);
+    pub fn new(
+        number: Number,
+        output_pin: impl Peripheral<P = impl PeripheralOutput> + 'a,
+    ) -> Self {
+        crate::into_mapped_ref!(output_pin);
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Channel {
             ledc,
@@ -165,9 +171,9 @@ impl<'a, S: TimerSpeed, O: PeripheralOutput> Channel<'a, S, O> {
     }
 }
 
-impl<'a, S: TimerSpeed, O: PeripheralOutput> ChannelIFace<'a, S, O> for Channel<'a, S, O>
+impl<'a, S: TimerSpeed> ChannelIFace<'a, S> for Channel<'a, S>
 where
-    Channel<'a, S, O>: ChannelHW<O>,
+    Channel<'a, S>: ChannelHW,
 {
     /// Configure channel
     fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error> {
@@ -183,7 +189,7 @@ where
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error> {
         let duty_exp;
         if let Some(timer) = self.timer {
-            if let Some(timer_duty) = timer.get_duty() {
+            if let Some(timer_duty) = timer.duty() {
                 duty_exp = timer_duty as u32;
             } else {
                 return Err(Error::Timer);
@@ -232,10 +238,10 @@ where
             return Err(Error::Fade(FadeError::EndDuty));
         }
         if let Some(timer) = self.timer {
-            if let Some(timer_duty) = timer.get_duty() {
-                if timer.get_frequency() > 0 {
+            if let Some(timer_duty) = timer.duty() {
+                if timer.frequency() > 0 {
                     duty_exp = timer_duty as u32;
-                    frequency = timer.get_frequency();
+                    frequency = timer.frequency();
                 } else {
                     return Err(Error::Timer);
                 }
@@ -298,7 +304,7 @@ mod ehal1 {
     use embedded_hal::pwm::{self, ErrorKind, ErrorType, SetDutyCycle};
 
     use super::{Channel, ChannelHW, Error};
-    use crate::{gpio::OutputPin, ledc::timer::TimerSpeed};
+    use crate::ledc::timer::TimerSpeed;
 
     impl pwm::Error for Error {
         fn kind(&self) -> pwm::ErrorKind {
@@ -306,18 +312,18 @@ mod ehal1 {
         }
     }
 
-    impl<'a, S: TimerSpeed, O: OutputPin> ErrorType for Channel<'a, S, O> {
+    impl<S: TimerSpeed> ErrorType for Channel<'_, S> {
         type Error = Error;
     }
 
-    impl<'a, S: TimerSpeed, O: OutputPin> SetDutyCycle for Channel<'a, S, O>
+    impl<'a, S: TimerSpeed> SetDutyCycle for Channel<'a, S>
     where
-        Channel<'a, S, O>: ChannelHW<O>,
+        Channel<'a, S>: ChannelHW,
     {
         fn max_duty_cycle(&self) -> u16 {
             let duty_exp;
 
-            if let Some(timer_duty) = self.timer.and_then(|timer| timer.get_duty()) {
+            if let Some(timer_duty) = self.timer.and_then(|timer| timer.duty()) {
                 duty_exp = timer_duty as u32;
             } else {
                 return 0;
@@ -337,7 +343,7 @@ mod ehal1 {
     }
 }
 
-impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, O> {
+impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
     #[cfg(esp32)]
     fn set_channel(&mut self, timer_number: u8) {
         if S::IS_HS {
@@ -363,6 +369,13 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
                 unsafe { w.timer_sel().bits(timer_number) }
             });
         }
+
+        // this is needed to make low duty-resolutions / high frequencies work
+        #[cfg(any(esp32h2, esp32c6))]
+        self.ledc
+            .ch_gamma_wr_addr(self.number as usize)
+            .write(|w| unsafe { w.bits(0) });
+
         self.start_duty_without_fading();
     }
 
@@ -535,9 +548,8 @@ impl<'a, O: PeripheralOutput, S: crate::ledc::timer::TimerSpeed> Channel<'a, S, 
     }
 }
 
-impl<'a, O, S> ChannelHW<O> for Channel<'a, S, O>
+impl<S> ChannelHW for Channel<'_, S>
 where
-    O: PeripheralOutput,
     S: crate::ledc::timer::TimerSpeed,
 {
     /// Configure Channel HW
@@ -559,7 +571,7 @@ where
                     .set_to_open_drain_output(crate::private::Internal),
             };
 
-            let timer_number = timer.get_number() as u8;
+            let timer_number = timer.number() as u8;
 
             self.set_channel(timer_number);
             self.update_channel();
@@ -605,8 +617,7 @@ where
                 Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
             };
 
-            self.output_pin
-                .connect_peripheral_to_output(signal, crate::private::Internal);
+            signal.connect_to(&mut self.output_pin);
         } else {
             return Err(Error::Timer);
         }

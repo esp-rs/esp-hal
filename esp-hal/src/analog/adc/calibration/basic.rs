@@ -36,7 +36,7 @@ where
     fn new_cal(atten: Attenuation) -> Self {
         // Try to get init code (Dout0) from efuse
         // Dout0 means mean raw ADC value when zero voltage applied to input.
-        let cal_val = ADCI::get_init_code(atten).unwrap_or_else(|| {
+        let cal_val = ADCI::init_code(atten).unwrap_or_else(|| {
             // As a fallback try to calibrate via connecting input to ground internally.
             AdcConfig::<ADCI>::adc_calibrate(atten, AdcCalSource::Gnd)
         });

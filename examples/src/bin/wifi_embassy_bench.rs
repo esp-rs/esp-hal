@@ -10,9 +10,10 @@
 //! Because of the huge task-arena size configured this won't work on ESP32-S2 and ESP32-C2
 //!
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6
 
+#![allow(static_mut_refs)]
 #![no_std]
 #![no_main]
 
@@ -25,7 +26,7 @@ use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
-    initialize,
+    init,
     wifi::{
         ClientConfiguration,
         Configuration,
@@ -35,7 +36,7 @@ use esp_wifi::{
         WifiStaDevice,
         WifiState,
     },
-    EspWifiInitFor,
+    EspWifiController,
 };
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
@@ -97,13 +98,15 @@ async fn main(spawner: Spawner) -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = initialize(
-        EspWifiInitFor::Wifi,
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let init = &*mk_static!(
+        EspWifiController<'static>,
+        init(
+            timg0.timer0,
+            Rng::new(peripherals.RNG),
+            peripherals.RADIO_CLK,
+        )
+        .unwrap()
+    );
 
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
@@ -172,9 +175,9 @@ async fn main(spawner: Spawner) -> ! {
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
-    println!("Device capabilities: {:?}", controller.get_capabilities());
+    println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_wifi::wifi::get_wifi_state() {
+        match esp_wifi::wifi::wifi_state() {
             WifiState::StaConnected => {
                 // wait until we're no longer connected
                 controller.wait_for_event(WifiEvent::StaDisconnected).await;
@@ -190,12 +193,12 @@ async fn connection(mut controller: WifiController<'static>) {
             });
             controller.set_configuration(&client_config).unwrap();
             println!("Starting wifi");
-            controller.start().await.unwrap();
+            controller.start_async().await.unwrap();
             println!("Wifi started!");
         }
         println!("About to connect...");
 
-        match controller.connect().await {
+        match controller.connect_async().await {
             Ok(_) => println!("Wifi connected!"),
             Err(e) => {
                 println!("Failed to connect to wifi: {e:?}");

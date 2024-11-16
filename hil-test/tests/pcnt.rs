@@ -7,7 +7,7 @@
 
 use esp_hal::{
     delay::Delay,
-    gpio::{AnyPin, Input, Io, Level, Output, Pin, Pull},
+    gpio::{AnyPin, Input, Level, Output, Pin, Pull},
     pcnt::{channel::EdgeMode, Pcnt},
 };
 use hil_test as _;
@@ -28,9 +28,7 @@ mod tests {
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-        let (din, dout) = hil_test::common_test_pins!(io);
+        let (din, dout) = hil_test::common_test_pins!(peripherals);
 
         let din = din.degrade();
         let dout = dout.degrade();
@@ -57,27 +55,27 @@ mod tests {
 
         unit.resume();
 
-        assert_eq!(0, unit.get_value());
+        assert_eq!(0, unit.value());
 
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(1, unit.get_value());
+        assert_eq!(1, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(1, unit.get_value());
+        assert_eq!(1, unit.value());
 
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(2, unit.get_value());
+        assert_eq!(2, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(2, unit.get_value());
+        assert_eq!(2, unit.value());
     }
 
     #[test]
@@ -94,27 +92,27 @@ mod tests {
 
         unit.resume();
 
-        assert_eq!(0, unit.get_value());
+        assert_eq!(0, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(1, unit.get_value());
+        assert_eq!(1, unit.value());
 
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(1, unit.get_value());
+        assert_eq!(1, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(2, unit.get_value());
+        assert_eq!(2, unit.value());
 
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(2, unit.get_value());
+        assert_eq!(2, unit.value());
     }
 
     #[test]
@@ -133,29 +131,29 @@ mod tests {
 
         unit.resume();
 
-        assert_eq!(0, unit.get_value());
+        assert_eq!(0, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(1, unit.get_value());
+        assert_eq!(1, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(2, unit.get_value());
+        assert_eq!(2, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(0, unit.get_value());
-        assert!(unit.get_events().high_limit);
+        assert_eq!(0, unit.value());
+        assert!(unit.events().high_limit);
         assert!(unit.interrupt_is_set());
 
         output.set_low();
@@ -163,16 +161,16 @@ mod tests {
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(1, unit.get_value());
+        assert_eq!(1, unit.value());
 
         // high limit event remains after next increment.
-        assert!(unit.get_events().high_limit);
+        assert!(unit.events().high_limit);
 
         unit.reset_interrupt();
         assert!(!unit.interrupt_is_set());
 
         // high limit event remains after interrupt is cleared.
-        assert!(unit.get_events().high_limit);
+        assert!(unit.events().high_limit);
     }
 
     #[test]
@@ -194,27 +192,27 @@ mod tests {
 
         unit.resume();
 
-        assert_eq!(0, unit.get_value());
+        assert_eq!(0, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(1, unit.get_value());
+        assert_eq!(1, unit.value());
         assert!(!unit.interrupt_is_set());
-        assert!(!unit.get_events().threshold0);
-        assert!(!unit.get_events().threshold1);
+        assert!(!unit.events().threshold0);
+        assert!(!unit.events().threshold1);
 
         output.set_low();
         ctx.delay.delay_micros(1);
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(2, unit.get_value());
+        assert_eq!(2, unit.value());
         assert!(unit.interrupt_is_set());
-        assert!(unit.get_events().threshold0);
-        assert!(!unit.get_events().threshold1);
+        assert!(unit.events().threshold0);
+        assert!(!unit.events().threshold1);
 
         unit.reset_interrupt();
 
@@ -223,22 +221,22 @@ mod tests {
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(3, unit.get_value());
+        assert_eq!(3, unit.value());
         assert!(!unit.interrupt_is_set());
         // threshold event remains after next increment and after interrupt is cleared.
-        assert!(unit.get_events().threshold0);
-        assert!(!unit.get_events().threshold1);
+        assert!(unit.events().threshold0);
+        assert!(!unit.events().threshold1);
 
         output.set_low();
         ctx.delay.delay_micros(1);
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(4, unit.get_value());
+        assert_eq!(4, unit.value());
         assert!(unit.interrupt_is_set());
         // threshold event cleared after new event occurs.
-        assert!(!unit.get_events().threshold0);
-        assert!(unit.get_events().threshold1);
+        assert!(!unit.events().threshold0);
+        assert!(unit.events().threshold1);
     }
 
     #[test]
@@ -259,29 +257,29 @@ mod tests {
 
         unit.resume();
 
-        assert_eq!(0, unit.get_value());
+        assert_eq!(0, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(-1, unit.get_value());
+        assert_eq!(-1, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(-2, unit.get_value());
+        assert_eq!(-2, unit.value());
 
         output.set_low();
         ctx.delay.delay_micros(1);
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(0, unit.get_value());
-        assert!(unit.get_events().low_limit);
+        assert_eq!(0, unit.value());
+        assert!(unit.events().low_limit);
         assert!(unit.interrupt_is_set());
 
         output.set_low();
@@ -289,16 +287,16 @@ mod tests {
         output.set_high();
         ctx.delay.delay_micros(1);
 
-        assert_eq!(-1, unit.get_value());
+        assert_eq!(-1, unit.value());
 
         // low limit event remains after next increment.
-        assert!(unit.get_events().low_limit);
+        assert!(unit.events().low_limit);
 
         unit.reset_interrupt();
         assert!(!unit.interrupt_is_set());
 
         // low limit event remains after interrupt is cleared.
-        assert!(unit.get_events().low_limit);
+        assert!(unit.events().low_limit);
     }
 
     #[test]
@@ -315,10 +313,10 @@ mod tests {
 
         unit.resume();
 
-        assert_eq!(0, unit.get_value());
+        assert_eq!(0, unit.value());
 
         for i in (0..=i16::MAX).chain(i16::MIN..0) {
-            assert_eq!(i, unit.get_value());
+            assert_eq!(i, unit.value());
 
             output.set_low();
             ctx.delay.delay_micros(1);
@@ -326,14 +324,14 @@ mod tests {
             ctx.delay.delay_micros(1);
         }
 
-        assert_eq!(0, unit.get_value());
+        assert_eq!(0, unit.value());
 
         // Channel 1 should now decrement.
         unit.channel1
             .set_input_mode(EdgeMode::Decrement, EdgeMode::Hold);
 
         for i in (0..=i16::MAX).chain(i16::MIN..=0).rev() {
-            assert_eq!(i, unit.get_value());
+            assert_eq!(i, unit.value());
 
             output.set_low();
             ctx.delay.delay_micros(1);

@@ -13,15 +13,8 @@ use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io,
-    peripherals::UART0,
     timer::timg::TimerGroup,
-    uart::{
-        config::{AtCmdConfig, Config},
-        Uart,
-        UartRx,
-        UartTx,
-    },
+    uart::{AtCmdConfig, Config, Uart, UartRx, UartTx},
     Async,
 };
 use static_cell::StaticCell;
@@ -32,10 +25,7 @@ const READ_BUF_SIZE: usize = 64;
 const AT_CMD: u8 = 0x04;
 
 #[embassy_executor::task]
-async fn writer(
-    mut tx: UartTx<'static, UART0, Async>,
-    signal: &'static Signal<NoopRawMutex, usize>,
-) {
+async fn writer(mut tx: UartTx<'static, Async>, signal: &'static Signal<NoopRawMutex, usize>) {
     use core::fmt::Write;
     embedded_io_async::Write::write(
         &mut tx,
@@ -53,10 +43,7 @@ async fn writer(
 }
 
 #[embassy_executor::task]
-async fn reader(
-    mut rx: UartRx<'static, UART0, Async>,
-    signal: &'static Signal<NoopRawMutex, usize>,
-) {
+async fn reader(mut rx: UartRx<'static, Async>, signal: &'static Signal<NoopRawMutex, usize>) {
     const MAX_BUFFER_SIZE: usize = 10 * READ_BUF_SIZE + 16;
 
     let mut rbuf: [u8; MAX_BUFFER_SIZE] = [0u8; MAX_BUFFER_SIZE];
@@ -83,28 +70,28 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio1, io.pins.gpio3);
+            let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);
         } else if #[cfg(feature = "esp32c2")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio20, io.pins.gpio19);
+            let (tx_pin, rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);
         } else if #[cfg(feature = "esp32c3")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio21, io.pins.gpio20);
+            let (tx_pin, rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);
         } else if #[cfg(feature = "esp32c6")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio16, io.pins.gpio17);
+            let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         } else if #[cfg(feature = "esp32h2")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio24, io.pins.gpio23);
+            let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
-            let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
+            let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);
         }
     }
 
     let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
 
-    let mut uart0 = Uart::new_async_with_config(peripherals.UART0, config, rx_pin, tx_pin).unwrap();
+    let mut uart0 = Uart::new_with_config(peripherals.UART0, config, rx_pin, tx_pin)
+        .unwrap()
+        .into_async();
     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, AT_CMD, None));
 
     let (rx, tx) = uart0.split();

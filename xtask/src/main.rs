@@ -12,6 +12,7 @@ use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
+    target_triple,
     Metadata,
     Package,
     Version,
@@ -23,6 +24,8 @@ use xtask::{
 #[derive(Debug, Parser)]
 enum Cli {
     /// Build documentation for the specified chip.
+    BuildDocumentationIndex(BuildDocumentationArgs),
+    /// Build documentation for the specified chip.
     BuildDocumentation(BuildDocumentationArgs),
     /// Build all examples for the specified chip.
     BuildExamples(ExampleArgs),
@@ -33,13 +36,17 @@ enum Cli {
     /// Bump the version of the specified package(s).
     BumpVersion(BumpVersionArgs),
     /// Format all packages in the workspace with rustfmt
+    #[clap(alias = "format-packages")]
     FmtPackages(FmtPackagesArgs),
     /// Generate the eFuse fields source file from a CSV.
     GenerateEfuseFields(GenerateEfuseFieldsArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
+    /// Attempt to publish the specified package.
+    Publish(PublishArgs),
     /// Run doctests for specified chip and package.
-    RunDocTest(ExampleArgs),
+    #[clap(alias = "run-doc-test")]
+    RunDocTests(ExampleArgs),
     /// Run the given example for the specified chip.
     RunExample(ExampleArgs),
     /// Run all applicable tests or the specified test for a specified chip.
@@ -140,6 +147,21 @@ struct LintPackagesArgs {
     /// Lint for a specific chip
     #[arg(long, value_enum, default_values_t = Chip::iter())]
     chips: Vec<Chip>,
+
+    /// Automatically apply fixes
+    #[arg(long)]
+    fix: bool,
+}
+
+#[derive(Debug, Args)]
+struct PublishArgs {
+    /// Package to publish (performs a dry-run by default).
+    #[arg(value_enum)]
+    package: Package,
+
+    /// Do not pass the `--dry-run` argument, actually try to publish.
+    #[arg(long)]
+    no_dry_run: bool,
 }
 
 #[derive(Debug, Args)]
@@ -155,14 +177,13 @@ struct RunElfArgs {
 // Application
 
 fn main() -> Result<()> {
-    env_logger::Builder::new()
-        .filter_module("xtask", log::LevelFilter::Info)
-        .init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let workspace = std::env::current_dir()?;
 
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
+        Cli::BuildDocumentationIndex(args) => build_documentation_index(&workspace, args),
         Cli::BuildExamples(args) => examples(&workspace, args, CargoAction::Build),
         Cli::BuildPackage(args) => build_package(&workspace, args),
         Cli::BuildTests(args) => tests(&workspace, args, CargoAction::Build),
@@ -170,7 +191,8 @@ fn main() -> Result<()> {
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
-        Cli::RunDocTest(args) => run_doctests(&workspace, args),
+        Cli::Publish(args) => publish(&workspace, args),
+        Cli::RunDocTests(args) => run_doc_tests(&workspace, args),
         Cli::RunElfs(args) => run_elfs(args),
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
         Cli::RunTests(args) => tests(&workspace, args, CargoAction::Run),
@@ -360,7 +382,6 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
 
 fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
     let output_path = workspace.join("docs");
-    let resources = workspace.join("resources");
 
     fs::create_dir_all(&output_path)
         .with_context(|| format!("Failed to create {}", output_path.display()))?;
@@ -373,6 +394,31 @@ fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result
         );
     }
 
+    generate_index(workspace, &packages)?;
+
+    Ok(())
+}
+
+fn build_documentation_index(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
+    let mut packages = HashMap::new();
+    for package in args.packages {
+        packages.insert(
+            package,
+            generate_documentation_meta_for_package(workspace, package, &args.chips)?,
+        );
+    }
+
+    generate_index(workspace, &packages)?;
+
+    Ok(())
+}
+
+fn generate_index(workspace: &Path, packages: &HashMap<Package, Vec<Value>>) -> Result<()> {
+    let output_path = workspace.join("docs");
+    let resources = workspace.join("resources");
+
+    fs::create_dir_all(&output_path)
+        .with_context(|| format!("Failed to create {}", output_path.display()))?;
     // Copy any additional assets to the documentation's output path:
     fs::copy(resources.join("esp-rs.svg"), output_path.join("esp-rs.svg"))
         .context("Failed to copy esp-rs.svg")?;
@@ -401,18 +447,13 @@ fn build_documentation_for_package(
 
     let version = xtask::package_version(workspace, package)?;
 
-    let mut metadata = Vec::new();
-
     for chip in chips {
         // Ensure that the package/chip combination provided are valid:
         validate_package_chip(&package, chip)?;
 
-        // Determine the appropriate build target for the given package and chip:
-        let target = target_triple(package, chip)?;
-
         // Build the documentation for the specified package, targeting the
         // specified chip:
-        let docs_path = xtask::build_documentation(workspace, package, *chip, target)?;
+        let docs_path = xtask::build_documentation(workspace, package, *chip)?;
 
         ensure!(
             docs_path.exists(),
@@ -429,6 +470,7 @@ fn build_documentation_for_package(
         // Create the output directory, and copy the built documentation into it:
         fs::create_dir_all(&output_path)
             .with_context(|| format!("Failed to create {}", output_path.display()))?;
+
         copy_dir_all(&docs_path, &output_path).with_context(|| {
             format!(
                 "Failed to copy {} to {}",
@@ -436,6 +478,25 @@ fn build_documentation_for_package(
                 output_path.display()
             )
         })?;
+    }
+
+    Ok(generate_documentation_meta_for_package(
+        workspace, package, chips,
+    )?)
+}
+
+fn generate_documentation_meta_for_package(
+    workspace: &Path,
+    package: Package,
+    chips: &[Chip],
+) -> Result<Vec<Value>> {
+    let version = xtask::package_version(workspace, package)?;
+
+    let mut metadata = Vec::new();
+
+    for chip in chips {
+        // Ensure that the package/chip combination provided are valid:
+        validate_package_chip(&package, chip)?;
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:
@@ -541,6 +602,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},defmt"),
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -556,7 +618,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
                     if device.contains("psram") {
                         // TODO this doesn't test octal psram as it would require a separate build
-                        features.push_str(",psram-4m,psram-80mhz")
+                        features.push_str(",quad-psram")
                     }
                     if matches!(chip, Chip::Esp32c6 | Chip::Esp32h2) {
                         features.push_str(",flip-link")
@@ -569,6 +631,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &features,
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -580,18 +643,21 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},executors,defmt,integrated-timers"),
                         ],
+                        args.fix,
                     )?;
                 }
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
+                        let features = format!("--features={chip},sys-logs");
                         lint_package(
                             &path,
                             &[
                                 "-Zbuild-std=core",
                                 &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
+                                &features,
                             ],
+                            args.fix,
                         )?;
                     }
                 }
@@ -604,18 +670,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                                 &format!("--target={}", chip.lp_target().unwrap()),
                                 &format!("--features={chip},embedded-io"),
                             ],
-                        )?;
-                    }
-                }
-                Package::EspHalSmartled => {
-                    if device.contains("rmt") {
-                        lint_package(
-                            &path,
-                            &[
-                                "-Zbuild-std=core",
-                                &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
-                            ],
+                            args.fix,
                         )?;
                     }
                 }
@@ -628,6 +683,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},defmt-espflash"),
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -636,6 +692,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         lint_package(
                             &path,
                             &["-Zbuild-std=core", &format!("--target={}", chip.target())],
+                            args.fix,
                         )?;
                     }
                 }
@@ -648,16 +705,15 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},storage,nor-flash,low-level"),
                         ],
+                        args.fix,
                     )?;
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!(
-                        "--features={chip},async,ps-min-modem,defmt,dump-packets,wifi-logs"
-                    );
+                    let mut features = format!("--features={chip},defmt,sys-logs");
 
                     if device.contains("wifi") {
-                        features.push_str(",wifi-default,esp-now,embedded-svc,embassy-net,sniffer")
+                        features.push_str(",esp-now,sniffer")
                     }
                     if device.contains("bt") {
                         features.push_str(",ble")
@@ -673,6 +729,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             "--no-default-features",
                             &features,
                         ],
+                        args.fix,
                     )?;
                 }
 
@@ -685,6 +742,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                                 &format!("--target={}", chip.target()),
                                 &format!("--features={chip}"),
                             ],
+                            args.fix,
                         )?
                     }
                 }
@@ -694,7 +752,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::Examples | Package::HilTest => {}
 
                 // By default, no `clippy` arguments are required:
-                _ => lint_package(&path, &[])?,
+                _ => lint_package(&path, &[], args.fix)?,
             }
         }
     }
@@ -702,7 +760,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     Ok(())
 }
 
-fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
+fn lint_package(path: &Path, args: &[&str], fix: bool) -> Result<()> {
     log::info!("Linting package: {}", path.display());
 
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
@@ -712,14 +770,52 @@ fn lint_package(path: &Path, args: &[&str]) -> Result<()> {
     }
 
     // build in release to reuse example artifacts
-    let cargo_args = builder
-        .arg("--release")
-        .arg("--")
-        .arg("-D")
-        .arg("warnings")
-        .build();
+    let cargo_args = builder.arg("--release");
+    let cargo_args = if fix {
+        cargo_args.arg("--fix").arg("--lib")
+    } else {
+        cargo_args.arg("--").arg("-D").arg("warnings")
+    };
+
+    let cargo_args = cargo_args.build();
 
     xtask::cargo::run(&cargo_args, path)
+}
+
+fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
+    let package_name = args.package.to_string();
+    let package_path = xtask::windows_safe_path(&workspace.join(&package_name));
+
+    use Package::*;
+    let mut publish_args = match args.package {
+        Examples | HilTest => {
+            bail!(
+                "Invalid package '{}' specified, this package should not be published!",
+                args.package
+            )
+        }
+
+        EspBacktrace | EspHal | EspHalEmbassy | EspIeee802154 | EspLpHal | EspPrintln
+        | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
+
+        _ => vec![],
+    };
+
+    if !args.no_dry_run {
+        publish_args.push("--dry-run");
+    }
+
+    let builder = CargoArgsBuilder::default()
+        .subcommand("publish")
+        .args(&publish_args);
+
+    let args = builder.build();
+    log::debug!("{args:#?}");
+
+    // Execute `cargo publish` command from the package root:
+    xtask::cargo::run(&args, &package_path)?;
+
+    Ok(())
 }
 
 fn run_elfs(args: RunElfArgs) -> Result<()> {
@@ -744,6 +840,8 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
             command.arg("--speed").arg("15000");
         };
 
+        command.arg("--verify");
+
         let mut command = command.spawn().context("Failed to execute probe-rs")?;
         let status = command
             .wait()
@@ -763,16 +861,23 @@ fn run_elfs(args: RunElfArgs) -> Result<()> {
     Ok(())
 }
 
-fn run_doctests(workspace: &Path, args: ExampleArgs) -> Result<()> {
+fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
+    let chip = args.chip;
+
     let package_name = args.package.to_string();
     let package_path = xtask::windows_safe_path(&workspace.join(&package_name));
 
-    // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(args.package, &args.chip)?;
-    let features = vec![args.chip.to_string()];
+    // Determine the appropriate build target, and cargo features for the given
+    // package and chip:
+    let target = target_triple(args.package, &chip)?;
+    let features = vec![chip.to_string()];
+
+    // We need `nightly` for building the doc tests, unfortunately:
+    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
+        .toolchain(toolchain)
         .subcommand("test")
         .arg("--doc")
         .arg("-Zdoctest-xcompile")
@@ -792,14 +897,6 @@ fn run_doctests(workspace: &Path, args: ExampleArgs) -> Result<()> {
 
 // ----------------------------------------------------------------------------
 // Helper Functions
-
-fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
-    if package == Package::EspLpHal {
-        chip.lp_target()
-    } else {
-        Ok(chip.target())
-    }
-}
 
 fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
     ensure!(

@@ -12,13 +12,13 @@
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
-#![cfg_attr(feature = "binary-logs", feature(c_variadic))]
 #![no_std]
 
 use core::{cell::RefCell, marker::PhantomData};
 
 use byte::{BytesExt, TryRead};
 use critical_section::Mutex;
+use esp_config::*;
 use esp_hal::peripherals::{IEEE802154, RADIO_CLK};
 use heapless::Vec;
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
@@ -34,7 +34,7 @@ pub use self::{
     raw::RawReceived,
 };
 
-mod compat;
+mod fmt;
 mod frame;
 mod hal;
 mod pib;
@@ -58,6 +58,14 @@ impl From<byte::Error> for Error {
         }
     }
 }
+
+struct QueueConfig {
+    rx_queue_size: usize,
+}
+
+pub(crate) const CONFIG: QueueConfig = QueueConfig {
+    rx_queue_size: esp_config_int!(usize, "ESP_IEEE802154_RX_QUEUE_SIZE"),
+};
 
 /// IEEE 802.15.4 driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,8 +115,8 @@ pub struct Ieee802154<'a> {
 
 impl<'a> Ieee802154<'a> {
     /// Construct a new driver, enabling the IEEE 802.15.4 radio in the process
-    pub fn new(_radio: IEEE802154, radio_clocks: &mut RADIO_CLK) -> Self {
-        esp_ieee802154_enable(radio_clocks);
+    pub fn new(_radio: IEEE802154, mut radio_clocks: RADIO_CLK) -> Self {
+        esp_ieee802154_enable(&mut radio_clocks);
 
         Self {
             _align: 0,
@@ -152,12 +160,12 @@ impl<'a> Ieee802154<'a> {
     }
 
     /// Return the raw data of a received frame
-    pub fn get_raw_received(&mut self) -> Option<RawReceived> {
+    pub fn raw_received(&mut self) -> Option<RawReceived> {
         ieee802154_poll()
     }
 
     /// Get a received frame, if available
-    pub fn get_received(&mut self) -> Option<Result<ReceivedFrame, Error>> {
+    pub fn received(&mut self) -> Option<Result<ReceivedFrame, Error>> {
         if let Some(raw) = ieee802154_poll() {
             let maybe_decoded = if raw.data[0] as usize > raw.data.len() {
                 // try to decode up to data.len()
@@ -297,7 +305,7 @@ impl<'a> Ieee802154<'a> {
     }
 }
 
-impl<'a> Drop for Ieee802154<'a> {
+impl Drop for Ieee802154<'_> {
     fn drop(&mut self) {
         self.clear_tx_done_callback();
         self.clear_tx_done_callback_fn();
@@ -335,7 +343,7 @@ static TX_DONE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::n
 static RX_AVAILABLE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::new(None));
 
 fn tx_done() {
-    log::trace!("tx_done callback");
+    trace!("tx_done callback");
 
     critical_section::with(|cs| {
         let mut tx_done_callback = TX_DONE_CALLBACK.borrow_ref_mut(cs);
@@ -355,7 +363,7 @@ fn tx_done() {
 }
 
 fn rx_available() {
-    log::trace!("rx available callback");
+    trace!("rx available callback");
 
     critical_section::with(|cs| {
         let mut rx_available_callback = RX_AVAILABLE_CALLBACK.borrow_ref_mut(cs);
@@ -372,9 +380,4 @@ fn rx_available() {
             rx_available_callback_fn();
         }
     });
-}
-
-#[no_mangle]
-extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
-    0
 }

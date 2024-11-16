@@ -1,6 +1,7 @@
 use std::{error::Error, str::FromStr};
 
 use esp_build::assert_unique_used_features;
+use esp_config::{generate_config, Validator, Value};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -78,8 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("cargo:rustc-cfg={}", device_name);
-
+    println!("cargo:rustc-check-cfg=cfg(coex)");
     #[cfg(feature = "coex")]
     {
         #[cfg(all(feature = "wifi", feature = "ble"))]
@@ -92,56 +92,146 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:warning=coex is enabled but ble is not");
     }
 
-    let version_output = std::process::Command::new(
-        std::env::var_os("RUSTC").unwrap_or_else(|| std::ffi::OsString::from("rustc")),
-    )
-    .arg("-V")
-    .output()
-    .unwrap()
-    .stdout;
-    let version_string = String::from_utf8_lossy(&version_output);
-
-    if version_string.contains("nightly") {
-        println!("cargo:rustc-cfg=nightly");
-    }
-
-    // HACK: we detect the xtensa-enabled compiler by existence of the second
-    // version string in parens
-    // - upstream output format: rustc 1.75.0-nightly (cae0791da 2023-10-05)
-    // - xtensa output format: rustc 1.73.0-nightly (9163a2087 2023-10-03)
-    //   (1.73.0.0)
-    // - gentoo format (non-xtensa): rustc 1.73.0-nightly (cc66ad468 2023-10-03)
-    //   (gentoo)
-    if version_string.chars().filter(|&c| c == '(').count() == 2 {
-        let version = version_string
-            .split('(')
-            .last()
-            .unwrap()
-            .split(')')
-            .next()
-            .unwrap();
-        if let Some(version) = try_read_xtensa_rustc_version(version) {
-            if version >= Version4(1, 73, 0, 1)
-                // Patch accidentally missing from 1.74.0.0
-                && version != Version4(1, 74, 0, 0)
-            {
-                println!("cargo:rustc-cfg=xtensa_has_vaarg");
-            }
-        }
-    }
+    // emit config
+    //
+    // keep the defaults aligned with `esp_wifi_sys::include::*` e.g.
+    // `esp_wifi_sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM`
+    generate_config(
+        "esp_wifi",
+        &[
+            ("rx_queue_size", "Size of the RX queue in frames", Value::Integer(5), Some(Validator::PositiveInteger)),
+            ("tx_queue_size", "Size of the TX queue in frames", Value::Integer(3), Some(Validator::PositiveInteger)),
+            (
+                "static_rx_buf_num",
+                "WiFi static RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                Value::Integer(10),
+                None
+            ),
+            (
+                "dynamic_rx_buf_num",
+                "WiFi dynamic RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                Value::Integer(32),
+                None
+            ),
+            (
+                "static_tx_buf_num",
+                "WiFi static TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                Value::Integer(0),
+                None
+            ),
+            (
+                "dynamic_tx_buf_num",
+                "WiFi dynamic TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                Value::Integer(32),
+                None
+            ),
+            (
+                "csi_enable",
+                "WiFi channel state information enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                Value::Bool(false),
+                None
+            ),
+            (
+                "ampdu_rx_enable",
+                "WiFi AMPDU RX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                Value::Bool(true),
+                None
+            ),
+            (
+                "ampdu_tx_enable",
+                "WiFi AMPDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                Value::Bool(true),
+                None
+            ),
+            (
+                "amsdu_tx_enable",
+                "WiFi AMSDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                Value::Bool(false),
+                None
+            ),
+            (
+                "rx_ba_win",
+                "WiFi Block Ack RX window size. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                Value::Integer(6),
+                None
+            ),
+            (
+                "max_burst_size",
+                "See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)",
+                Value::Integer(1),
+                None
+            ),
+            (
+                "country_code",
+                "Country code. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
+                Value::String("CN".to_owned()),
+                None
+            ),
+            (
+                "country_code_operating_class",
+                "If not 0: Operating Class table number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
+                Value::Integer(0),
+                None
+            ),
+            (
+                "mtu",
+                "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)",
+                Value::Integer(1492),
+                None
+            ),
+            (
+                "tick_rate_hz",
+                "Tick rate of the internal task scheduler in hertz",
+                Value::Integer(100),
+                None
+            ),
+            (
+                "listen_interval",
+                "Interval for station to listen to beacon from AP. The unit of listen interval is one beacon interval. For example, if beacon interval is 100 ms and listen interval is 3, the interval for station to listen to beacon is 300 ms",
+                Value::Integer(3),
+                None
+            ),
+            (
+                "beacon_timeout",
+                "For Station, If the station does not receive a beacon frame from the connected SoftAP during the  inactive time, disconnect from SoftAP. Default 6s. Range 6-30",
+                Value::Integer(6),
+                None
+            ),
+            (
+                "ap_beacon_timeout",
+                "For SoftAP, If the SoftAP doesn't receive any data from the connected STA during inactive time, the SoftAP will force deauth the STA. Default is 300s",
+                Value::Integer(300),
+                None
+            ),
+            (
+                "failure_retry_cnt",
+                "Number of connection retries station will do before moving to next AP. scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config. Note: Enabling this may cause connection time to increase incase best AP doesn't behave properly. Defaults to 1",
+                Value::Integer(1),
+                None
+            ),
+            (
+                "scan_method",
+                "0 = WIFI_FAST_SCAN, 1 = WIFI_ALL_CHANNEL_SCAN, defaults to 0",
+                Value::Integer(0),
+                None
+            ),
+            (
+                "dump_packets",
+                "Dump packets via an info log statement",
+                Value::Bool(false),
+                None
+            ),
+            (
+                "phy_enable_usb",
+                "Keeps USB running when using WiFi. This allows debugging and log messages via USB Serial JTAG. Turn off for best WiFi performance.",
+                Value::Bool(true),
+                None
+            ),
+        ],
+        true
+    );
 
     Ok(())
-}
-
-fn try_read_xtensa_rustc_version(version: &str) -> Option<Version4> {
-    let mut version = version.trim_start_matches('v').split('.');
-
-    let major = version.next()?.parse::<u32>().ok()?;
-    let minor = version.next()?.parse::<u32>().ok()?;
-    let patch = version.next()?.parse::<u32>().ok()?;
-    let release = version.next()?.parse::<u32>().ok()?;
-
-    Some(Version4(major, minor, patch, release))
 }
 
 #[cfg(not(any(
@@ -155,29 +245,6 @@ fn try_read_xtensa_rustc_version(version: &str) -> Option<Version4> {
 )))]
 fn main() {
     panic!("Select a chip via it's cargo feature");
-}
-
-use std::cmp::Ordering;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct Version4(u32, u32, u32, u32);
-
-impl PartialOrd for Version4 {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.0.partial_cmp(&other.0) {
-            Some(Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.1.partial_cmp(&other.1) {
-            Some(Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.2.partial_cmp(&other.2) {
-            Some(Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.3.partial_cmp(&other.3)
-    }
 }
 
 fn print_warning(message: impl core::fmt::Display) {

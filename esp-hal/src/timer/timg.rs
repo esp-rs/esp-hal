@@ -50,11 +50,12 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::timer::timg::TimerGroup;
+//! # use esp_hal::timer::timg::MwdtStage;
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut wdt = timg0.wdt;
 //!
-//! wdt.set_timeout(5_000.millis());
+//! wdt.set_timeout(MwdtStage::Stage0, 5_000.millis());
 //! wdt.enable();
 //!
 //! loop {
@@ -71,29 +72,30 @@ use core::{
 use fugit::{HertzU32, Instant, MicrosDurationU64};
 
 use super::Error;
-#[cfg(timg1)]
-use crate::peripherals::TIMG1;
 #[cfg(any(esp32c6, esp32h2))]
 use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
     interrupt::{self, InterruptHandler},
-    lock,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    sync::{lock, Lock},
+    system::PeripheralClockControl,
     Async,
     Blocking,
     InterruptConfigurable,
-    LockState,
     Mode,
 };
 
-static INT_ENA_LOCK: LockState = LockState::new();
+const NUM_TIMG: usize = 1 + cfg!(timg1) as usize;
 
-/// A timer group consisting of up to 2 timers (chip dependent) and a watchdog
-/// timer.
+static INT_ENA_LOCK: [Lock; NUM_TIMG] = [const { Lock::new() }; NUM_TIMG];
+
+/// A timer group consisting of
+#[cfg_attr(not(timg_timer1), doc = "a general purpose timer")]
+#[cfg_attr(timg_timer1, doc = "2 timers")]
+/// and a watchdog timer.
 pub struct TimerGroup<'d, T, DM>
 where
     T: TimerGroupInstance,
@@ -106,7 +108,7 @@ where
     #[cfg(timg_timer1)]
     pub timer1: Timer<Timer1<T>, DM>,
     /// Watchdog timer
-    pub wdt: Wdt<T, DM>,
+    pub wdt: Wdt<T>,
 }
 
 #[doc(hidden)]
@@ -117,6 +119,7 @@ pub trait TimerGroupInstance {
     fn enable_peripheral();
     fn reset_peripheral();
     fn configure_wdt_src_clk();
+    fn wdt_interrupt() -> Interrupt;
 }
 
 impl TimerGroupInstance for TIMG0 {
@@ -126,134 +129,121 @@ impl TimerGroupInstance for TIMG0 {
 
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
-        TIMG0::PTR
+        Self::PTR
     }
 
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
     fn configure_src_clk() {
-        unsafe { &*crate::peripherals::PCR::PTR }
-            .timergroup0_timer_clk_conf()
-            .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
-    }
-
-    #[inline(always)]
-    #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
-    fn configure_src_clk() {
-        unsafe {
-            (*Self::register_block())
-                .t(0)
-                .config()
-                .modify(|_, w| w.use_xtal().clear_bit())
-        };
-    }
-
-    #[inline(always)]
-    #[cfg(esp32)]
-    fn configure_src_clk() {
-        // ESP32 has only APB clock source, do nothing
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                // ESP32 has only APB clock source, do nothing
+            } else if #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))] {
+                unsafe {
+                    (*Self::register_block())
+                        .t(0)
+                        .config()
+                        .modify(|_, w| w.use_xtal().clear_bit());
+                }
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                unsafe { &*crate::peripherals::PCR::PTR }
+                    .timergroup0_timer_clk_conf()
+                    .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
+            }
+        }
     }
 
     fn enable_peripheral() {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg0)
     }
 
     fn reset_peripheral() {
-        // for TIMG0 do nothing for now because the reset breaks `time::now`
+        // FIXME: for TIMG0 do nothing for now because the reset breaks
+        // `time::now`
     }
 
-    #[inline(always)]
-    #[cfg(any(esp32c2, esp32c3))]
     fn configure_wdt_src_clk() {
-        unsafe {
-            (*Self::register_block())
-                .wdtconfig0()
-                .modify(|_, w| w.wdt_use_xtal().clear_bit())
-        };
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
+            } else if #[cfg(any(esp32c2, esp32c3))] {
+                unsafe {
+                    (*Self::register_block())
+                        .wdtconfig0()
+                        .modify(|_, w| w.wdt_use_xtal().clear_bit());
+                }
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                unsafe { &*crate::peripherals::PCR::PTR }
+                    .timergroup0_wdt_clk_conf()
+                    .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
+            }
+        }
     }
 
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
-    fn configure_wdt_src_clk() {
-        unsafe { &*crate::peripherals::PCR::PTR }
-            .timergroup0_wdt_clk_conf()
-            .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
-    }
-
-    #[inline(always)]
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    fn configure_wdt_src_clk() {
-        // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
+    fn wdt_interrupt() -> Interrupt {
+        Interrupt::TG0_WDT_LEVEL
     }
 }
 
 #[cfg(timg1)]
-impl TimerGroupInstance for TIMG1 {
+impl TimerGroupInstance for crate::peripherals::TIMG1 {
     fn id() -> u8 {
         1
     }
 
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
-        TIMG1::PTR
+        Self::PTR
     }
 
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
     fn configure_src_clk() {
-        unsafe { &*crate::peripherals::PCR::PTR }
-            .timergroup1_timer_clk_conf()
-            .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32c2, esp32c3))] {
+                // ESP32 has only APB clock source, do nothing
+                // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                unsafe { &*crate::peripherals::PCR::PTR }
+                    .timergroup1_timer_clk_conf()
+                    .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
+            } else if #[cfg(any(esp32s2, esp32s3))] {
+                unsafe {
+                    (*Self::register_block())
+                        .t(1)
+                        .config()
+                        .modify(|_, w| w.use_xtal().clear_bit());
+                }
+            }
+        }
     }
 
-    #[inline(always)]
-    #[cfg(any(esp32s2, esp32s3))]
-    fn configure_src_clk() {
-        unsafe {
-            (*Self::register_block())
-                .t(1)
-                .config()
-                .modify(|_, w| w.use_xtal().clear_bit())
-        };
-    }
-
-    #[inline(always)]
-    #[cfg(any(esp32, esp32c2, esp32c3))]
-    fn configure_src_clk() {
-        // ESP32 has only APB clock source, do nothing
-        // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
-    }
-
-    #[inline(always)]
     fn enable_peripheral() {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg1)
     }
 
-    #[inline(always)]
     fn reset_peripheral() {
-        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
     }
 
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
     fn configure_wdt_src_clk() {
-        unsafe { &*crate::peripherals::PCR::PTR }
-            .timergroup1_wdt_clk_conf()
-            .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(1) });
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))] {
+                // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
+                // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                unsafe { &*crate::peripherals::PCR::PTR }
+                    .timergroup1_wdt_clk_conf()
+                    .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(1) });
+            }
+        }
     }
 
-    #[inline(always)]
-    #[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
-    fn configure_wdt_src_clk() {
-        // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
-        // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
+    fn wdt_interrupt() -> Interrupt {
+        Interrupt::TG1_WDT_LEVEL
     }
 }
 
 impl<'d, T, DM> TimerGroup<'d, T, DM>
 where
     T: TimerGroupInstance,
-    DM: crate::Mode,
+    DM: Mode,
 {
     /// Construct a new instance of [`TimerGroup`] in blocking mode
     pub fn new_inner(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
@@ -315,6 +305,57 @@ where
 {
     /// Construct a new instance of [`TimerGroup`] in asynchronous mode
     pub fn new_async(_timer_group: impl Peripheral<P = T> + 'd) -> Self {
+        match T::id() {
+            0 => {
+                use crate::timer::timg::asynch::timg0_timer0_handler;
+                unsafe {
+                    interrupt::bind_interrupt(
+                        Interrupt::TG0_T0_LEVEL,
+                        timg0_timer0_handler.handler(),
+                    );
+                    interrupt::enable(Interrupt::TG0_T0_LEVEL, timg0_timer0_handler.priority())
+                        .unwrap();
+
+                    #[cfg(timg_timer1)]
+                    {
+                        use crate::timer::timg::asynch::timg0_timer1_handler;
+
+                        interrupt::bind_interrupt(
+                            Interrupt::TG0_T1_LEVEL,
+                            timg0_timer1_handler.handler(),
+                        );
+                        interrupt::enable(Interrupt::TG0_T1_LEVEL, timg0_timer1_handler.priority())
+                            .unwrap();
+                    }
+                }
+            }
+            #[cfg(timg1)]
+            1 => {
+                use crate::timer::timg::asynch::timg1_timer0_handler;
+                unsafe {
+                    {
+                        interrupt::bind_interrupt(
+                            Interrupt::TG1_T0_LEVEL,
+                            timg1_timer0_handler.handler(),
+                        );
+                        interrupt::enable(Interrupt::TG1_T0_LEVEL, timg1_timer0_handler.priority())
+                            .unwrap();
+                    }
+                    #[cfg(timg_timer1)]
+                    {
+                        use crate::timer::timg::asynch::timg1_timer1_handler;
+                        interrupt::bind_interrupt(
+                            Interrupt::TG1_T1_LEVEL,
+                            timg1_timer1_handler.handler(),
+                        );
+                        interrupt::enable(Interrupt::TG1_T1_LEVEL, timg1_timer1_handler.priority())
+                            .unwrap();
+                    }
+                }
+            }
+            _ => unreachable!(),
+        }
+
         Self::new_inner(_timer_group)
     }
 }
@@ -336,7 +377,6 @@ where
 {
     /// Construct a new instance of [`Timer`]
     pub fn new(timg: T, apb_clk_freq: HertzU32) -> Self {
-        timg.enable_peripheral();
         timg.set_counter_active(true);
 
         Self {
@@ -487,7 +527,7 @@ where
             .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
             self.register_block()
                 .int_ena()
                 .modify(|_, w| w.t(self.timer_number()).bit(state));
@@ -512,10 +552,11 @@ where
             _ => unreachable!(),
         };
 
-        unsafe {
-            interrupt::bind_interrupt(interrupt, handler.handler());
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
         }
-        interrupt::enable(interrupt, handler.priority()).unwrap();
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 
     fn is_interrupt_set(&self) -> bool {
@@ -551,13 +592,13 @@ where
     type P = Self;
 
     #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         core::ptr::read(self as *const _)
     }
 }
 
 #[doc(hidden)]
-pub trait Instance: Sealed + Enable {
+pub trait Instance: Sealed {
     fn register_block(&self) -> &RegisterBlock;
 
     fn timer_group(&self) -> u8;
@@ -595,22 +636,10 @@ pub trait Instance: Sealed + Enable {
     fn is_interrupt_set(&self) -> bool;
 }
 
-#[doc(hidden)]
-pub trait Enable: Sealed {
-    fn enable_peripheral(&self);
-}
-
 /// A timer within a Timer Group.
 pub struct TimerX<TG, const T: u8 = 0> {
     phantom: PhantomData<TG>,
 }
-
-/// Timer 0 in the Timer Group.
-pub type Timer0<TG> = TimerX<TG, 0>;
-
-/// Timer 1 in the Timer Group.
-#[cfg(timg_timer1)]
-pub type Timer1<TG> = TimerX<TG, 1>;
 
 impl<TG, const T: u8> Sealed for TimerX<TG, T> {}
 
@@ -624,7 +653,6 @@ where
     ///
     /// You must ensure that you're only using one instance of this type at a
     /// time.
-    #[allow(unused)]
     pub unsafe fn steal() -> Self {
         Self {
             phantom: PhantomData,
@@ -640,7 +668,6 @@ where
 impl<TG, const T: u8> Instance for TimerX<TG, T>
 where
     TG: TimerGroupInstance,
-    Self: Enable,
 {
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*TG::register_block() }
@@ -714,7 +741,7 @@ where
             .config()
             .modify(|_, w| w.level_int_en().set_bit());
 
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
             self.register_block()
                 .int_ena()
                 .modify(|_, w| w.t(T).set_bit());
@@ -722,7 +749,7 @@ where
     }
 
     fn unlisten(&self) {
-        lock(&INT_ENA_LOCK, || {
+        lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
             self.register_block()
                 .int_ena()
                 .modify(|_, w| w.t(T).clear_bit());
@@ -770,28 +797,16 @@ where
     fn set_divider(&self, divider: u16) {
         unsafe { Self::t() }
             .config()
-            .modify(|_, w| unsafe { w.divider().bits(divider) })
+            .modify(|_, w| unsafe { w.divider().bits(divider) });
     }
 }
 
-impl<TG> Enable for Timer0<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(PeripheralEnable::Timg0);
-    }
-}
+/// Timer 0 in the Timer Group.
+pub type Timer0<TG> = TimerX<TG, 0>;
 
+/// Timer 1 in the Timer Group.
 #[cfg(timg_timer1)]
-impl<TG> Enable for Timer1<TG>
-where
-    TG: TimerGroupInstance,
-{
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(PeripheralEnable::Timg1);
-    }
-}
+pub type Timer1<TG> = TimerX<TG, 1>;
 
 fn ticks_to_timeout<F>(ticks: u64, clock: F, divider: u32) -> u64
 where
@@ -872,21 +887,50 @@ where
 {
 }
 
+/// Behavior of the MWDT stage if it times out.
+#[allow(unused)]
+#[derive(Debug, Clone, Copy)]
+pub enum MwdtStageAction {
+    /// No effect on the system.
+    Off         = 0,
+    /// Trigger an interrupt.
+    Interrupt   = 1,
+    /// Reset the CPU core.
+    ResetCpu    = 2,
+    /// Reset the main system, power management unit and RTC peripherals.
+    ResetSystem = 3,
+}
+
+/// MWDT stages.
+///
+/// Timer stages allow for a timer to have a series of different timeout values
+/// and corresponding expiry action.
+#[derive(Debug, Clone, Copy)]
+pub enum MwdtStage {
+    /// MWDT stage 0.
+    Stage0,
+    /// MWDT stage 1.
+    Stage1,
+    /// MWDT stage 2.
+    Stage2,
+    /// MWDT stage 3.
+    Stage3,
+}
+
 /// Watchdog timer
-pub struct Wdt<TG, DM> {
-    phantom: PhantomData<(TG, DM)>,
+pub struct Wdt<TG> {
+    phantom: PhantomData<TG>,
 }
 
 /// Watchdog driver
-impl<TG, DM> Wdt<TG, DM>
+impl<TG> Wdt<TG>
 where
     TG: TimerGroupInstance,
-    DM: Mode,
 {
     /// Construct a new instance of [`Wdt`]
     pub fn new() -> Self {
         #[cfg(lp_wdt)]
-        PeripheralClockControl::enable(PeripheralEnable::Wdt);
+        PeripheralClockControl::enable(crate::system::Peripheral::Wdt);
 
         TG::configure_wdt_src_clk();
 
@@ -899,14 +943,14 @@ where
     pub fn enable(&mut self) {
         // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
         //         a mutable reference.
-        unsafe { Self::set_wdt_enabled(true) };
+        unsafe { self.set_wdt_enabled(true) };
     }
 
     /// Disable the watchdog timer instance
     pub fn disable(&mut self) {
         // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
         //         a mutable reference.
-        unsafe { Self::set_wdt_enabled(false) };
+        unsafe { self.set_wdt_enabled(false) };
     }
 
     /// Forcibly enable or disable the watchdog timer
@@ -916,104 +960,151 @@ where
     /// This bypasses the usual ownership rules for the peripheral, so users
     /// must take care to ensure that no driver instance is active for the
     /// timer.
-    pub unsafe fn set_wdt_enabled(enabled: bool) {
+    pub unsafe fn set_wdt_enabled(&mut self, enabled: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+        self.set_write_protection(false);
 
         if !enabled {
             reg_block.wdtconfig0().write(|w| unsafe { w.bits(0) });
         } else {
             reg_block.wdtconfig0().write(|w| w.wdt_en().bit(true));
+
+            reg_block
+                .wdtconfig0()
+                .write(|w| w.wdt_flashboot_mod_en().bit(false));
+
+            #[cfg_attr(esp32, allow(unused_unsafe))]
+            reg_block.wdtconfig0().write(|w| unsafe {
+                w.wdt_en()
+                    .bit(true)
+                    .wdt_stg0()
+                    .bits(MwdtStageAction::ResetSystem as u8)
+                    .wdt_cpu_reset_length()
+                    .bits(7)
+                    .wdt_sys_reset_length()
+                    .bits(7)
+                    .wdt_stg1()
+                    .bits(MwdtStageAction::Off as u8)
+                    .wdt_stg2()
+                    .bits(MwdtStageAction::Off as u8)
+                    .wdt_stg3()
+                    .bits(MwdtStageAction::Off as u8)
+            });
+
+            #[cfg(any(esp32c2, esp32c3, esp32c6))]
+            reg_block
+                .wdtconfig0()
+                .modify(|_, w| w.wdt_conf_update_en().set_bit());
         }
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+        self.set_write_protection(true);
     }
 
     /// Feed the watchdog timer
     pub fn feed(&mut self) {
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+        self.set_write_protection(false);
 
         reg_block.wdtfeed().write(|w| unsafe { w.bits(1) });
 
+        self.set_write_protection(true);
+    }
+
+    fn set_write_protection(&mut self, enable: bool) {
+        let reg_block = unsafe { &*TG::register_block() };
+
+        let wkey = if enable { 0u32 } else { 0x50D8_3AA1u32 };
+
         reg_block
             .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+            .write(|w| unsafe { w.wdt_wkey().bits(wkey) });
     }
 
     /// Set the timeout, in microseconds, of the watchdog timer
-    pub fn set_timeout(&mut self, timeout: MicrosDurationU64) {
+    pub fn set_timeout(&mut self, stage: MwdtStage, timeout: MicrosDurationU64) {
         let timeout_raw = (timeout.to_nanos() * 10 / 125) as u32;
 
         let reg_block = unsafe { &*TG::register_block() };
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1u32) });
+        self.set_write_protection(false);
 
         reg_block
             .wdtconfig1()
             .write(|w| unsafe { w.wdt_clk_prescale().bits(1) });
 
-        reg_block
-            .wdtconfig2()
-            .write(|w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) });
-
-        #[cfg_attr(esp32, allow(unused_unsafe))]
-        reg_block.wdtconfig0().write(|w| unsafe {
-            w.wdt_en()
-                .bit(true)
-                .wdt_stg0()
-                .bits(3)
-                .wdt_cpu_reset_length()
-                .bits(1)
-                .wdt_sys_reset_length()
-                .bits(1)
-                .wdt_stg1()
-                .bits(0)
-                .wdt_stg2()
-                .bits(0)
-                .wdt_stg3()
-                .bits(0)
-        });
+        unsafe {
+            match stage {
+                MwdtStage::Stage0 => reg_block
+                    .wdtconfig2()
+                    .write(|w| w.wdt_stg0_hold().bits(timeout_raw)),
+                MwdtStage::Stage1 => reg_block
+                    .wdtconfig3()
+                    .write(|w| w.wdt_stg1_hold().bits(timeout_raw)),
+                MwdtStage::Stage2 => reg_block
+                    .wdtconfig4()
+                    .write(|w| w.wdt_stg2_hold().bits(timeout_raw)),
+                MwdtStage::Stage3 => reg_block
+                    .wdtconfig5()
+                    .write(|w| w.wdt_stg3_hold().bits(timeout_raw)),
+            };
+        }
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
         reg_block
             .wdtconfig0()
             .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
-        reg_block
-            .wdtwprotect()
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+        self.set_write_protection(true);
+    }
+
+    /// Set the stage action of the MWDT for a specific stage.
+    ///
+    /// This function modifies MWDT behavior only if a custom bootloader with
+    /// the following modifications is used:
+    /// - `ESP_TASK_WDT_EN` parameter **disabled**
+    /// - `ESP_INT_WDT` parameter **disabled**
+    pub fn set_stage_action(&mut self, stage: MwdtStage, action: MwdtStageAction) {
+        let reg_block = unsafe { &*TG::register_block() };
+
+        self.set_write_protection(false);
+
+        match stage {
+            MwdtStage::Stage0 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg0().bits(action as u8) });
+            }
+            MwdtStage::Stage1 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg1().bits(action as u8) });
+            }
+            MwdtStage::Stage2 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg2().bits(action as u8) });
+            }
+            MwdtStage::Stage3 => {
+                reg_block
+                    .wdtconfig0()
+                    .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) });
+            }
+        }
+
+        self.set_write_protection(true);
     }
 }
 
-impl<TG, DM> crate::private::Sealed for Wdt<TG, DM>
-where
-    TG: TimerGroupInstance,
-    DM: Mode,
-{
-}
+impl<TG> crate::private::Sealed for Wdt<TG> where TG: TimerGroupInstance {}
 
-impl<TG> InterruptConfigurable for Wdt<TG, Blocking>
+impl<TG> InterruptConfigurable for Wdt<TG>
 where
     TG: TimerGroupInstance,
 {
     fn set_interrupt_handler(&mut self, handler: interrupt::InterruptHandler) {
-        let interrupt = match TG::id() {
-            0 => Interrupt::TG0_WDT_LEVEL,
-            #[cfg(timg1)]
-            1 => Interrupt::TG1_WDT_LEVEL,
-            _ => unreachable!(),
-        };
+        let interrupt = TG::wdt_interrupt();
         unsafe {
             interrupt::bind_interrupt(interrupt, handler.handler());
             interrupt::enable(interrupt, handler.priority()).unwrap();
@@ -1021,30 +1112,27 @@ where
     }
 }
 
-impl<TG, DM> Default for Wdt<TG, DM>
+impl<TG> Default for Wdt<TG>
 where
     TG: TimerGroupInstance,
-    DM: Mode,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TG, DM> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG, DM>
+impl<TG> embedded_hal_02::watchdog::WatchdogDisable for Wdt<TG>
 where
     TG: TimerGroupInstance,
-    DM: Mode,
 {
     fn disable(&mut self) {
         self.disable();
     }
 }
 
-impl<TG, DM> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG, DM>
+impl<TG> embedded_hal_02::watchdog::WatchdogEnable for Wdt<TG>
 where
     TG: TimerGroupInstance,
-    DM: Mode,
 {
     type Time = MicrosDurationU64;
 
@@ -1053,17 +1141,178 @@ where
         T: Into<Self::Time>,
     {
         self.enable();
-        self.set_timeout(period.into());
+        self.set_timeout(MwdtStage::Stage0, period.into());
     }
 }
 
-impl<TG, DM> embedded_hal_02::watchdog::Watchdog for Wdt<TG, DM>
+impl<TG> embedded_hal_02::watchdog::Watchdog for Wdt<TG>
 where
     TG: TimerGroupInstance,
-    DM: Mode,
 {
     fn feed(&mut self) {
         self.feed();
+    }
+}
+
+// Async functionality of the timer groups.
+mod asynch {
+    use core::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use embassy_sync::waitqueue::AtomicWaker;
+    use procmacros::handler;
+
+    use super::*;
+
+    cfg_if::cfg_if! {
+        if #[cfg(all(timg1, timg_timer1))] {
+            const NUM_WAKERS: usize = 4;
+        } else if #[cfg(timg1)] {
+            const NUM_WAKERS: usize = 2;
+        } else {
+            const NUM_WAKERS: usize = 1;
+        }
+    }
+
+    static WAKERS: [AtomicWaker; NUM_WAKERS] = [const { AtomicWaker::new() }; NUM_WAKERS];
+
+    pub(crate) struct TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        timer: &'a Timer<T, crate::Async>,
+    }
+
+    impl<'a, T> TimerFuture<'a, T>
+    where
+        T: Instance,
+    {
+        pub(crate) fn new(timer: &'a Timer<T, crate::Async>) -> Self {
+            use crate::timer::Timer;
+
+            timer.enable_interrupt(true);
+
+            Self { timer }
+        }
+
+        fn event_bit_is_clear(&self) -> bool {
+            self.timer
+                .register_block()
+                .int_ena()
+                .read()
+                .t(self.timer.timer_number())
+                .bit_is_clear()
+        }
+    }
+
+    impl<T> core::future::Future for TimerFuture<'_, T>
+    where
+        T: Instance,
+    {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+            let index = (self.timer.timer_number() << 1) | self.timer.timer_group();
+            WAKERS[index as usize].register(ctx.waker());
+
+            if self.event_bit_is_clear() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<T> Drop for TimerFuture<'_, T>
+    where
+        T: Instance,
+    {
+        fn drop(&mut self) {
+            self.timer.clear_interrupt();
+        }
+    }
+
+    impl<T> embedded_hal_async::delay::DelayNs for Timer<T, crate::Async>
+    where
+        T: Instance,
+    {
+        async fn delay_ns(&mut self, ns: u32) {
+            use crate::timer::Timer as _;
+
+            let period = MicrosDurationU64::from_ticks(ns.div_ceil(1000) as u64);
+            self.load_value(period).unwrap();
+            self.start();
+            self.listen();
+
+            TimerFuture::new(self).await;
+        }
+    }
+
+    // INT_ENA means that when the interrupt occurs, it will show up in the INT_ST.
+    // Clearing INT_ENA that it won't show up on INT_ST but if interrupt is
+    // already there, it won't clear it - that's why we need to clear the INT_CLR as
+    // well.
+    #[handler]
+    pub(crate) fn timg0_timer0_handler() {
+        lock(&INT_ENA_LOCK[0], || {
+            unsafe { &*crate::peripherals::TIMG0::PTR }
+                .int_ena()
+                .modify(|_, w| w.t(0).clear_bit())
+        });
+
+        unsafe { &*crate::peripherals::TIMG0::PTR }
+            .int_clr()
+            .write(|w| w.t(0).clear_bit_by_one());
+
+        WAKERS[0].wake();
+    }
+
+    #[cfg(timg1)]
+    #[handler]
+    pub(crate) fn timg1_timer0_handler() {
+        lock(&INT_ENA_LOCK[1], || {
+            unsafe { &*crate::peripherals::TIMG1::PTR }
+                .int_ena()
+                .modify(|_, w| w.t(0).clear_bit())
+        });
+        unsafe { &*crate::peripherals::TIMG1::PTR }
+            .int_clr()
+            .write(|w| w.t(0).clear_bit_by_one());
+
+        WAKERS[1].wake();
+    }
+
+    #[cfg(timg_timer1)]
+    #[handler]
+    pub(crate) fn timg0_timer1_handler() {
+        lock(&INT_ENA_LOCK[0], || {
+            unsafe { &*crate::peripherals::TIMG0::PTR }
+                .int_ena()
+                .modify(|_, w| w.t(1).clear_bit())
+        });
+        unsafe { &*crate::peripherals::TIMG0::PTR }
+            .int_clr()
+            .write(|w| w.t(1).clear_bit_by_one());
+
+        WAKERS[2].wake();
+    }
+
+    #[cfg(all(timg1, timg_timer1))]
+    #[handler]
+    pub(crate) fn timg1_timer1_handler() {
+        lock(&INT_ENA_LOCK[1], || {
+            unsafe { &*crate::peripherals::TIMG1::PTR }
+                .int_ena()
+                .modify(|_, w| w.t(1).clear_bit())
+        });
+
+        unsafe { &*crate::peripherals::TIMG1::PTR }
+            .int_clr()
+            .write(|w| w.t(1).clear_bit_by_one());
+
+        WAKERS[3].wake();
     }
 }
 
@@ -1074,87 +1323,87 @@ pub mod etm {
     use crate::etm::{EtmEvent, EtmTask};
 
     /// Event Task Matrix event for a timer.
-    pub struct TimerEtmEvent {
+    pub struct Event {
         id: u8,
     }
 
     /// Event Task Matrix task for a timer.
-    pub struct TimerEtmTask {
+    pub struct Task {
         id: u8,
     }
 
-    impl EtmEvent for TimerEtmEvent {
+    impl EtmEvent for Event {
         fn id(&self) -> u8 {
             self.id
         }
     }
 
-    impl Sealed for TimerEtmEvent {}
+    impl Sealed for Event {}
 
-    impl EtmTask for TimerEtmTask {
+    impl EtmTask for Task {
         fn id(&self) -> u8 {
             self.id
         }
     }
 
-    impl Sealed for TimerEtmTask {}
+    impl Sealed for Task {}
 
     /// General purpose timer ETM events.
-    pub trait TimerEtmEvents<TG> {
+    pub trait Events<TG> {
         /// ETM event triggered on alarm
-        fn on_alarm(&self) -> TimerEtmEvent;
+        fn on_alarm(&self) -> Event;
     }
 
     /// General purpose timer ETM tasks
-    pub trait TimerEtmTasks<TG> {
+    pub trait Tasks<TG> {
         /// ETM task to start the counter
-        fn cnt_start(&self) -> TimerEtmTask;
+        fn cnt_start(&self) -> Task;
 
         /// ETM task to start the alarm
-        fn cnt_stop(&self) -> TimerEtmTask;
+        fn cnt_stop(&self) -> Task;
 
         /// ETM task to stop the counter
-        fn cnt_reload(&self) -> TimerEtmTask;
+        fn cnt_reload(&self) -> Task;
 
         /// ETM task to reload the counter
-        fn cnt_cap(&self) -> TimerEtmTask;
+        fn cnt_cap(&self) -> Task;
 
         /// ETM task to load the counter with the value stored when the last
         /// `now()` was called
-        fn alarm_start(&self) -> TimerEtmTask;
+        fn alarm_start(&self) -> Task;
     }
 
-    impl<TG> TimerEtmEvents<TG> for Timer0<TG>
+    impl<TG> Events<TG> for Timer0<TG>
     where
         TG: TimerGroupInstance,
     {
-        fn on_alarm(&self) -> TimerEtmEvent {
-            TimerEtmEvent { id: 48 + TG::id() }
+        fn on_alarm(&self) -> Event {
+            Event { id: 48 + TG::id() }
         }
     }
 
-    impl<TG> TimerEtmTasks<TG> for Timer0<TG>
+    impl<TG> Tasks<TG> for Timer0<TG>
     where
         TG: TimerGroupInstance,
     {
-        fn cnt_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 88 + TG::id() }
+        fn cnt_start(&self) -> Task {
+            Task { id: 88 + TG::id() }
         }
 
-        fn alarm_start(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 90 + TG::id() }
+        fn alarm_start(&self) -> Task {
+            Task { id: 90 + TG::id() }
         }
 
-        fn cnt_stop(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 92 + TG::id() }
+        fn cnt_stop(&self) -> Task {
+            Task { id: 92 + TG::id() }
         }
 
-        fn cnt_reload(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 94 + TG::id() }
+        fn cnt_reload(&self) -> Task {
+            Task { id: 94 + TG::id() }
         }
 
-        fn cnt_cap(&self) -> TimerEtmTask {
-            TimerEtmTask { id: 96 + TG::id() }
+        fn cnt_cap(&self) -> Task {
+            Task { id: 96 + TG::id() }
         }
     }
 }

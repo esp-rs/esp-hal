@@ -1,8 +1,10 @@
-use core::{cell::RefCell, ptr::addr_of};
+use alloc::boxed::Box;
+use core::ptr::{addr_of, addr_of_mut};
 
-use critical_section::Mutex;
+use esp_wifi_sys::c_types::c_void;
 use portable_atomic::{AtomicBool, Ordering};
 
+use super::ReceivedPacket;
 use crate::{
     binary::include::*,
     ble::{
@@ -10,10 +12,8 @@ use crate::{
         HciOutCollector,
         HCI_OUT_COLLECTOR,
     },
-    compat::{common::str_from_c, queue::SimpleQueue},
+    compat::common::{self, str_from_c, ConcurrentQueue},
     hal::macros::ram,
-    memory_fence::memory_fence,
-    timer::yield_task,
 };
 
 #[cfg_attr(esp32c3, path = "os_adapter_esp32c3.rs")]
@@ -21,23 +21,10 @@ use crate::{
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
-static BT_RECEIVE_QUEUE: Mutex<RefCell<SimpleQueue<ReceivedPacket, 10>>> =
-    Mutex::new(RefCell::new(SimpleQueue::new()));
-
-#[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ReceivedPacket {
-    pub len: u8,
-    pub data: [u8; 256],
-}
-
-static BT_INTERNAL_QUEUE: Mutex<RefCell<SimpleQueue<[u8; 8], 10>>> =
-    Mutex::new(RefCell::new(SimpleQueue::new()));
-
 static PACKET_SENT: AtomicBool = AtomicBool::new(true);
 
 #[repr(C)]
-struct vhci_host_callback_s {
+struct VhciHostCallbacks {
     notify_host_send_available: extern "C" fn(), /* callback used to notify that the host can
                                                   * send packet to controller */
     notify_host_recv: extern "C" fn(*mut u8, u16) -> i32, /* callback used to notify that the
@@ -62,10 +49,10 @@ extern "C" {
 
     fn API_vhci_host_check_send_available() -> bool;
     fn API_vhci_host_send_packet(data: *const u8, len: u16);
-    fn API_vhci_host_register_callback(vhci_host_callbac: *const vhci_host_callback_s) -> i32;
+    fn API_vhci_host_register_callback(vhci_host_callbac: *const VhciHostCallbacks) -> i32;
 }
 
-static VHCI_HOST_CALLBACK: vhci_host_callback_s = vhci_host_callback_s {
+static VHCI_HOST_CALLBACK: VhciHostCallbacks = VhciHostCallbacks {
     notify_host_send_available,
     notify_host_recv,
 };
@@ -79,27 +66,20 @@ extern "C" fn notify_host_send_available() {
 extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     trace!("notify_host_recv {:?} {}", data, len);
 
-    unsafe {
-        let mut buf = [0u8; 256];
-        buf[..len as usize].copy_from_slice(core::slice::from_raw_parts(data, len as usize));
+    let data = unsafe { core::slice::from_raw_parts(data, len as usize) };
 
-        let packet = ReceivedPacket {
-            len: len as u8,
-            data: buf,
-        };
+    let packet = ReceivedPacket {
+        data: Box::from(data),
+    };
 
-        critical_section::with(|cs| {
-            let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-            if queue.enqueue(packet).is_err() {
-                warn!("Dropping BLE packet");
-            }
-        });
+    critical_section::with(|cs| {
+        let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+        queue.push_back(packet);
+    });
 
-        dump_packet_info(core::slice::from_raw_parts(data as *const u8, len as usize));
+    super::dump_packet_info(data);
 
-        #[cfg(feature = "async")]
-        crate::ble::controller::asynch::hci_read_data_available();
-    }
+    crate::ble::controller::asynch::hci_read_data_available();
 
     0
 }
@@ -178,38 +158,21 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
 }
 
 unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
-    if len != 5 && item_size != 8 {
-        panic!("Unexpected queue spec {} {}", len, item_size);
-    }
-    &BT_INTERNAL_QUEUE as *const _ as *const ()
+    let ptr = common::create_queue(len as i32, item_size as i32);
+    ptr.cast()
 }
 
 unsafe extern "C" fn queue_delete(queue: *const ()) {
-    trace!("Unimplemented queue_delete {:?}", queue);
+    common::delete_queue(queue as *mut ConcurrentQueue)
 }
 
 #[ram]
-unsafe extern "C" fn queue_send(queue: *const (), item: *const (), _block_time_ms: u32) -> i32 {
-    if queue == &BT_INTERNAL_QUEUE as *const _ as *const () {
-        critical_section::with(|_| {
-            // assume the size is 8 - shouldn't rely on that
-            let message = item as *const u8;
-            let mut data = [0u8; 8];
-            for (i, data) in data.iter_mut().enumerate() {
-                *data = *message.add(i);
-            }
-            trace!("queue posting {:?}", data);
-
-            critical_section::with(|cs| {
-                let mut queue = BT_INTERNAL_QUEUE.borrow_ref_mut(cs);
-                unwrap!(queue.enqueue(data));
-            });
-            memory_fence();
-        });
-    } else {
-        panic!("Unknown queue");
-    }
-    1
+unsafe extern "C" fn queue_send(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
+    common::send_queued(
+        queue as *mut ConcurrentQueue,
+        item as *mut c_void,
+        block_time_ms,
+    )
 }
 
 #[ram]
@@ -225,53 +188,11 @@ unsafe extern "C" fn queue_send_from_isr(
 }
 
 unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
-    trace!(
-        "queue_recv {:?} item {:?} block_time_tick {}",
-        queue,
-        item,
-        block_time_ms
-    );
-
-    let forever = block_time_ms == OSI_FUNCS_TIME_BLOCKING;
-    let start = crate::timer::get_systimer_count();
-    let block_ticks = crate::timer::millis_to_ticks(block_time_ms as u64);
-
-    // handle the BT_QUEUE
-    if queue == &BT_INTERNAL_QUEUE as *const _ as *const () {
-        loop {
-            let res = critical_section::with(|_| {
-                memory_fence();
-
-                critical_section::with(|cs| {
-                    let mut queue = BT_INTERNAL_QUEUE.borrow_ref_mut(cs);
-                    if let Some(message) = queue.dequeue() {
-                        let item = item as *mut u8;
-                        for i in 0..8 {
-                            item.offset(i).write_volatile(message[i as usize]);
-                        }
-                        trace!("received {:?}", message);
-                        1
-                    } else {
-                        0
-                    }
-                })
-            });
-
-            if res == 1 {
-                trace!("queue_recv returns");
-                return res;
-            }
-
-            if !forever && crate::timer::elapsed_time_since(start) > block_ticks {
-                trace!("queue_recv returns with timeout");
-                return -1;
-            }
-
-            yield_task();
-        }
-    } else {
-        panic!("Unknown queue to handle in queue_recv");
-    }
+    common::receive_queued(
+        queue as *mut ConcurrentQueue,
+        item as *mut c_void,
+        block_time_ms,
+    )
 }
 
 #[ram]
@@ -316,8 +237,15 @@ unsafe extern "C" fn task_create(
     1
 }
 
-unsafe extern "C" fn task_delete(_task: *const ()) {
-    todo!();
+unsafe extern "C" fn task_delete(task: *const ()) {
+    trace!("task delete called for {:?}", task);
+
+    let task = if task.is_null() {
+        crate::preempt::current_task()
+    } else {
+        task as *mut _
+    };
+    crate::preempt::schedule_task_deletion(task);
 }
 
 #[ram]
@@ -365,7 +293,7 @@ unsafe extern "C" fn btdm_hus_2_lpcycles(us: u32) -> u32 {
 
     // Converts a duration in half us into a number of low power clock cycles.
     let cycles: u64 = (us as u64) << (g_btdm_lpcycle_us_frac as u64 / g_btdm_lpcycle_us as u64);
-    debug!("*** NOT implemented btdm_hus_2_lpcycles {} {}", us, cycles);
+    trace!("btdm_hus_2_lpcycles {} {}", us, cycles);
     // probably not right ... NX returns half of the values we calculate here
 
     cycles as u32
@@ -396,13 +324,13 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
 }
 
 unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
-    debug!("coex_schm_status_bit_set {} {}", _typ, status);
+    trace!("coex_schm_status_bit_set {} {}", _typ, status);
     #[cfg(coex)]
     crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32);
 }
 
 unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
-    debug!("coex_schm_status_bit_clear {} {}", _typ, status);
+    trace!("coex_schm_status_bit_clear {} {}", _typ, status);
     #[cfg(coex)]
     crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32);
 }
@@ -437,9 +365,10 @@ unsafe extern "C" fn custom_queue_create(
 
 pub(crate) fn ble_init() {
     unsafe {
-        *(HCI_OUT_COLLECTOR.as_mut_ptr()) = HciOutCollector::new();
+        (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
         // turn on logging
-        #[cfg(feature = "wifi-logs")]
+        #[allow(static_mut_refs)]
+        #[cfg(feature = "sys-logs")]
         {
             extern "C" {
                 static mut g_bt_plf_log_level: u32;
@@ -512,69 +441,23 @@ pub(crate) fn ble_init() {
 
         API_vhci_host_register_callback(&VHCI_HOST_CALLBACK);
     }
+    crate::flags::BLE.store(true, Ordering::Release);
 }
 
-static mut BLE_HCI_READ_DATA: [u8; 256] = [0u8; 256];
-static mut BLE_HCI_READ_DATA_INDEX: usize = 0;
-static mut BLE_HCI_READ_DATA_LEN: usize = 0;
-
-#[cfg(feature = "async")]
-pub fn have_hci_read_data() -> bool {
-    critical_section::with(|cs| {
-        let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        !queue.is_empty()
-            || unsafe {
-                BLE_HCI_READ_DATA_LEN > 0 && (BLE_HCI_READ_DATA_LEN >= BLE_HCI_READ_DATA_INDEX)
-            }
-    })
-}
-
-pub(crate) fn read_next(data: &mut [u8]) -> usize {
-    critical_section::with(|cs| {
-        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-
-        match queue.dequeue() {
-            Some(packet) => {
-                data[..packet.len as usize].copy_from_slice(&packet.data[..packet.len as usize]);
-                packet.len as usize
-            }
-            None => 0,
-        }
-    })
-}
-
-pub fn read_hci(data: &mut [u8]) -> usize {
-    unsafe {
-        if BLE_HCI_READ_DATA_LEN == 0 {
-            critical_section::with(|cs| {
-                let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-
-                if let Some(packet) = queue.dequeue() {
-                    BLE_HCI_READ_DATA[..packet.len as usize]
-                        .copy_from_slice(&packet.data[..packet.len as usize]);
-                    BLE_HCI_READ_DATA_LEN = packet.len as usize;
-                    BLE_HCI_READ_DATA_INDEX = 0;
-                }
-            });
-        }
-
-        if BLE_HCI_READ_DATA_LEN > 0 {
-            data[0] = BLE_HCI_READ_DATA[BLE_HCI_READ_DATA_INDEX];
-            BLE_HCI_READ_DATA_INDEX += 1;
-
-            if BLE_HCI_READ_DATA_INDEX >= BLE_HCI_READ_DATA_LEN {
-                BLE_HCI_READ_DATA_LEN = 0;
-                BLE_HCI_READ_DATA_INDEX = 0;
-            }
-            return 1;
-        }
+pub(crate) fn ble_deinit() {
+    extern "C" {
+        fn btdm_controller_deinit();
     }
 
-    0
+    unsafe {
+        btdm_controller_deinit();
+        crate::common_adapter::chip_specific::phy_disable();
+    }
+    crate::flags::BLE.store(false, Ordering::Release);
 }
 
 pub fn send_hci(data: &[u8]) {
-    let hci_out = unsafe { &mut *HCI_OUT_COLLECTOR.as_mut_ptr() };
+    let hci_out = unsafe { (*addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
     hci_out.push(data);
 
     if hci_out.is_ready() {
@@ -593,7 +476,7 @@ pub fn send_hci(data: &[u8]) {
                 API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
                 trace!("sent vhci host packet");
 
-                dump_packet_info(packet);
+                super::dump_packet_info(packet);
 
                 break;
             }
@@ -604,14 +487,4 @@ pub fn send_hci(data: &[u8]) {
 
         hci_out.reset();
     }
-}
-
-#[allow(unreachable_code, unused_variables)]
-fn dump_packet_info(buffer: &[u8]) {
-    #[cfg(not(feature = "dump-packets"))]
-    return;
-
-    critical_section::with(|cs| {
-        info!("@HCIFRAME {:?}", buffer);
-    });
 }

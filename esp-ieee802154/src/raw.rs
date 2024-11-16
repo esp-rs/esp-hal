@@ -1,4 +1,4 @@
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of};
 
 use critical_section::Mutex;
 use esp_hal::{
@@ -33,7 +33,8 @@ use crate::{
 const PHY_ENABLE_VERSION_PRINT: u32 = 1;
 
 static mut RX_BUFFER: [u8; FRAME_SIZE] = [0u8; FRAME_SIZE];
-static RX_QUEUE: Mutex<RefCell<Queue<RawReceived, 20>>> = Mutex::new(RefCell::new(Queue::new()));
+static RX_QUEUE: Mutex<RefCell<Queue<RawReceived, { crate::CONFIG.rx_queue_size }>>> =
+    Mutex::new(RefCell::new(Queue::new()));
 static STATE: Mutex<RefCell<Ieee802154State>> = Mutex::new(RefCell::new(Ieee802154State::Idle));
 
 extern "C" {
@@ -85,7 +86,7 @@ pub(crate) fn esp_ieee802154_enable(radio_clock_control: &mut RADIO_CLK) {
     ieee802154_mac_init();
 
     unsafe { phy_version_print() }; // libphy.a
-    log::info!("date={:x}", mac_date());
+    info!("date={:x}", mac_date());
 }
 
 fn esp_phy_enable() {
@@ -251,14 +252,15 @@ fn enable_rx() {
 }
 
 fn stop_current_operation() {
-    let events = get_events();
+    let events = events();
     set_cmd(Command::Stop);
     clear_events(events);
 }
 
 fn set_next_rx_buffer() {
+    #[allow(unused_unsafe)] // stable compiler needs unsafe, nightly complains about it
     unsafe {
-        set_rx_addr(RX_BUFFER.as_mut_ptr());
+        set_rx_addr(core::ptr::addr_of_mut!(RX_BUFFER).cast());
     }
 }
 
@@ -355,48 +357,48 @@ fn next_operation() {
 
 #[handler(priority = "Priority::Priority1")]
 fn ZB_MAC() {
-    log::trace!("ZB_MAC interrupt");
+    trace!("ZB_MAC interrupt");
 
-    let events = get_events();
+    let events = events();
     clear_events(events);
 
-    log::trace!("events = {:032b}", events);
+    trace!("events = {:032b}", events);
 
     if events & Event::RxSfdDone != 0 {
         // IEEE802154_STATE_TX && IEEE802154_STATE_TX_CCA && IEEE802154_STATE_TX_ENH_ACK
         // for isr processing delay
-        log::trace!("rx sfd done");
+        trace!("rx sfd done");
     }
 
     if events & Event::TxSfdDone != 0 {
         // IEEE802154_STATE_RX for isr processing delay, only 821
         // IEEE802154_STATE_TX_ACK for workaround jira ZB-81.
-        log::trace!("tx sfd done");
+        trace!("tx sfd done");
     }
 
     if events & Event::TxDone != 0 {
-        log::trace!("tx done");
+        trace!("tx done");
         next_operation();
     }
 
     if events & Event::RxDone != 0 {
-        log::trace!("rx done");
+        trace!("rx done");
         unsafe {
-            log::trace!("Received raw {:x?}", RX_BUFFER);
+            trace!("Received raw {:x?}", &*addr_of!(RX_BUFFER));
             critical_section::with(|cs| {
                 let mut queue = RX_QUEUE.borrow_ref_mut(cs);
                 if !queue.is_full() {
                     let item = RawReceived {
                         data: RX_BUFFER,
-                        channel: freq_to_channel(get_freq()),
+                        channel: freq_to_channel(freq()),
                     };
                     queue.enqueue(item).ok();
                 } else {
-                    log::warn!("Receive queue full");
+                    warn!("Receive queue full");
                 }
 
                 let frm = if RX_BUFFER[0] >= FRAME_SIZE as u8 {
-                    log::warn!("RX_BUFFER[0] {:} is larger than frame size", RX_BUFFER[0]);
+                    warn!("RX_BUFFER[0] {:} is larger than frame size", RX_BUFFER[0]);
                     &RX_BUFFER[1..][..FRAME_SIZE - 1]
                 } else {
                     &RX_BUFFER[1..][..RX_BUFFER[0] as usize]
@@ -414,21 +416,21 @@ fn ZB_MAC() {
     }
 
     if events & Event::AckRxDone != 0 {
-        log::info!("EventAckRxDone");
+        info!("EventAckRxDone");
     }
 
     if events & Event::AckTxDone != 0 {
-        log::trace!("EventAckTxDone");
+        trace!("EventAckTxDone");
         next_operation();
     }
 
     if events & Event::TxAbort != 0 {
-        log::trace!("TxAbort");
+        trace!("TxAbort");
         abort_tx();
     }
 
     if events & Event::RxAbort != 0 {
-        log::trace!("RxAbort");
+        trace!("RxAbort");
         abort_rx();
     }
 }
@@ -438,11 +440,9 @@ fn freq_to_channel(freq: u8) -> u8 {
 }
 
 fn will_auto_send_ack(frame: &[u8]) -> bool {
-    frame_is_ack_required(frame) && frame_get_version(frame) <= FRAME_VERSION_1 && get_tx_auto_ack()
+    frame_is_ack_required(frame) && frame_get_version(frame) <= FRAME_VERSION_1 && tx_auto_ack()
 }
 
 fn should_send_enhanced_ack(frame: &[u8]) -> bool {
-    frame_is_ack_required(frame)
-        && frame_get_version(frame) <= FRAME_VERSION_2
-        && get_tx_enhance_ack()
+    frame_is_ack_required(frame) && frame_get_version(frame) <= FRAME_VERSION_2 && tx_enhance_ack()
 }

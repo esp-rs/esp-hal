@@ -7,35 +7,29 @@
 #![no_main]
 
 use esp_hal::{
-    gpio::Io,
-    peripherals::{UART0, UART1},
     uart::{UartRx, UartTx},
     Async,
 };
 use hil_test as _;
 
 struct Context {
-    rx: UartRx<'static, UART1, Async>,
-    tx: UartTx<'static, UART0, Async>,
+    rx: UartRx<'static, Async>,
+    tx: UartTx<'static, Async>,
 }
 
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
-    use defmt::assert_eq;
-
     use super::*;
 
     #[init]
     async fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let (rx, tx) = hil_test::common_test_pins!(io);
-
-        let tx = UartTx::new_async(peripherals.UART0, tx).unwrap();
-        let rx = UartRx::new_async(peripherals.UART1, rx).unwrap();
+        let tx = UartTx::new(peripherals.UART0, tx).unwrap().into_async();
+        let rx = UartRx::new(peripherals.UART1, rx).unwrap().into_async();
 
         Context { rx, tx }
     }

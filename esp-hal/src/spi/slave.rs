@@ -18,37 +18,40 @@
 //! # use esp_hal::dma::DmaPriority;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::SpiMode;
-//! # use esp_hal::spi::slave::{prelude::*, Spi};
+//! # use esp_hal::spi::slave::Spi;
 //! # use esp_hal::dma::Dma;
-//! # use esp_hal::gpio::Io;
 //! let dma = Dma::new(peripherals.DMA);
-#![cfg_attr(esp32s2, doc = "let dma_channel = dma.spi2channel;")]
-#![cfg_attr(not(esp32s2), doc = "let dma_channel = dma.channel0;")]
-//! let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! let sclk = io.pins.gpio0;
-//! let miso = io.pins.gpio1;
-//! let mosi = io.pins.gpio2;
-//! let cs = io.pins.gpio3;
+#![cfg_attr(pdma, doc = "let dma_channel = dma.spi2channel;")]
+#![cfg_attr(gdma, doc = "let dma_channel = dma.channel0;")]
+//! let sclk = peripherals.GPIO0;
+//! let miso = peripherals.GPIO1;
+//! let mosi = peripherals.GPIO2;
+//! let cs = peripherals.GPIO3;
 //!
 //! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-//! dma_buffers!(32000); let mut spi = Spi::new(
+//! dma_buffers!(32000);
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     sclk,
-//!     mosi,
-//!     miso,
-//!     cs,
 //!     SpiMode::Mode0,
 //! )
-//! .with_dma(dma_channel.configure(
-//!     false,
-//!     DmaPriority::Priority0,
-//! ), rx_descriptors, tx_descriptors);
+//! .with_sck(sclk)
+//! .with_mosi(mosi)
+//! .with_miso(miso)
+//! .with_cs(cs)
+//! .with_dma(
+//!     dma_channel.configure(
+//!         false,
+//!         DmaPriority::Priority0,
+//!     ),
+//!     rx_descriptors,
+//!     tx_descriptors,
+//! );
 //!
 //! let mut receive = rx_buffer;
 //! let mut send = tx_buffer;
 //!
 //! let transfer = spi
-//!     .dma_transfer(&mut receive, &mut send)
+//!     .transfer(&mut receive, &mut send)
 //!     .unwrap();
 //!
 //! transfer.wait().unwrap();
@@ -58,107 +61,118 @@
 //! ## Implementation State
 //!
 //! There are several options for working with the SPI peripheral in slave mode,
-//! but the code currently only supports single transfers (not segmented
-//! transfers), full duplex, single bit (not dual or quad SPI), and DMA mode
-//! (not CPU mode). It also does not support blocking operations, as the actual
+//! but the code currently only supports:
+//! - Single transfers (not segmented transfers)
+//! - Full duplex, single bit (not dual or quad SPI)
+//! - DMA mode (not CPU mode).
+#![cfg_attr(esp32, doc = "- ESP32 only supports SPI mode 1 and 3.\n\n")]
+//! It also does not support blocking operations, as the actual
 //! transfer is controlled by the SPI master; if these are necessary,
-//! then the DmaTransfer trait instance can be wait()ed on or polled for
-//! is_done().
-//! - ESP32 does not support SPI Slave. See [tracking issue].
+//! then the `DmaTransfer` object can be `wait()`ed on or polled for
+//! `is_done()`.
 //!
-//! [tracking issue]: https://github.com/esp-rs/esp-hal/issues/469
+//! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
 
 use core::marker::PhantomData;
 
-use super::{Error, FullDuplexMode, SpiMode};
+use super::{Error, SpiMode};
 use crate::{
-    dma::{DescriptorChain, DmaPeripheral, Rx, Tx},
-    gpio::{InputSignal, OutputSignal, PeripheralInput, PeripheralOutput, Pull},
+    dma::{DmaChannelConvert, DmaEligible},
+    gpio::{
+        interconnect::{PeripheralInput, PeripheralOutput},
+        InputSignal,
+        NoPin,
+        OutputSignal,
+    },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
+    spi::AnySpi,
     system::PeripheralClockControl,
+    Blocking,
 };
-
-/// Prelude for the SPI (Slave) driver
-pub mod prelude {
-    #[cfg(spi3)]
-    pub use super::dma::WithDmaSpi3 as _esp_hal_spi_slave_dma_WithDmaSpi3;
-    pub use super::{
-        dma::WithDmaSpi2 as _esp_hal_spi_slave_dma_WithDmaSpi2,
-        Instance as _esp_hal_spi_slave_Instance,
-        InstanceDma as _esp_hal_spi_slave_InstanceDma,
-    };
-}
 
 const MAX_DMA_SIZE: usize = 32768 - 32;
 
-/// SPI peripheral driver
-pub struct Spi<'d, T, M> {
+/// SPI peripheral driver.
+///
+/// See the [module-level documentation][self] for more details.
+pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     #[allow(dead_code)]
     data_mode: SpiMode,
     _mode: PhantomData<M>,
 }
 
-impl<'d, T> Spi<'d, T, FullDuplexMode>
+impl<'d> Spi<'d, Blocking> {
+    /// Constructs an SPI instance in 8bit dataframe mode.
+    pub fn new(spi: impl Peripheral<P = impl Instance> + 'd, mode: SpiMode) -> Spi<'d, Blocking> {
+        Self::new_typed(spi.map_into(), mode)
+    }
+}
+
+impl<'d, M, T> Spi<'d, M, T>
 where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new<
-        SCK: PeripheralInput,
-        MOSI: PeripheralInput,
-        MISO: PeripheralOutput,
-        CS: PeripheralInput,
-    >(
-        spi: impl Peripheral<P = T> + 'd,
-        sclk: impl Peripheral<P = SCK> + 'd,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-        miso: impl Peripheral<P = MISO> + 'd,
-        cs: impl Peripheral<P = CS> + 'd,
-        mode: SpiMode,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        crate::into_ref!(spi, sclk, mosi, miso, cs);
+    pub fn new_typed(spi: impl Peripheral<P = T> + 'd, mode: SpiMode) -> Spi<'d, M, T> {
+        crate::into_ref!(spi);
 
-        sclk.init_input(Pull::None, private::Internal);
-        sclk.connect_input_to_peripheral(spi.sclk_signal(), private::Internal);
-
-        mosi.init_input(Pull::None, private::Internal);
-        mosi.connect_input_to_peripheral(spi.mosi_signal(), private::Internal);
-
-        miso.set_to_push_pull_output(private::Internal);
-        miso.connect_peripheral_to_output(spi.miso_signal(), private::Internal);
-
-        cs.init_input(Pull::None, private::Internal);
-        cs.connect_input_to_peripheral(spi.cs_signal(), private::Internal);
-
-        Self::new_internal(spi, mode)
-    }
-
-    pub(crate) fn new_internal(
-        spi: PeripheralRef<'d, T>,
-        mode: SpiMode,
-    ) -> Spi<'d, T, FullDuplexMode> {
-        spi.enable_peripheral();
-
-        let mut spi = Spi {
+        let this = Spi {
             spi,
             data_mode: mode,
             _mode: PhantomData,
         };
-        spi.spi.init();
-        spi.spi.set_data_mode(mode);
 
-        spi
+        PeripheralClockControl::reset(this.spi.info().peripheral);
+        PeripheralClockControl::enable(this.spi.info().peripheral);
+
+        this.spi.info().init();
+        this.spi.info().set_data_mode(mode, false);
+
+        this.with_mosi(NoPin)
+            .with_miso(NoPin)
+            .with_sck(NoPin)
+            .with_cs(NoPin)
+    }
+
+    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    pub fn with_sck(self, sclk: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(sclk);
+        sclk.enable_input(true, private::Internal);
+        self.spi.info().sclk.connect_to(sclk);
+        self
+    }
+
+    /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
+    pub fn with_mosi(self, mosi: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(mosi);
+        mosi.enable_input(true, private::Internal);
+        self.spi.info().mosi.connect_to(mosi);
+        self
+    }
+
+    /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
+    pub fn with_miso(self, miso: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        crate::into_mapped_ref!(miso);
+        miso.set_to_push_pull_output(private::Internal);
+        self.spi.info().miso.connect_to(miso);
+        self
+    }
+
+    /// Assign the CS (Chip Select) pin for the SPI instance.
+    pub fn with_cs(self, cs: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(cs);
+        cs.enable_input(true, private::Internal);
+        self.spi.info().cs.connect_to(cs);
+        self
     }
 }
 
 /// DMA (Direct Memory Access) functionality (Slave).
 pub mod dma {
     use super::*;
-    #[cfg(spi3)]
-    use crate::dma::Spi3Peripheral;
     use crate::{
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
@@ -166,122 +180,57 @@ pub mod dma {
             ChannelRx,
             ChannelTx,
             DescriptorChain,
-            DmaChannel,
             DmaDescriptor,
             DmaTransferRx,
             DmaTransferRxTx,
             DmaTransferTx,
             ReadBuffer,
-            RxPrivate,
-            Spi2Peripheral,
-            SpiPeripheral,
-            TxPrivate,
+            Rx,
+            Tx,
             WriteBuffer,
         },
         Mode,
     };
 
-    /// Trait for configuring DMA with SPI2 peripherals in slave mode.
-    pub trait WithDmaSpi2<'d, C, DmaMode>
+    impl<'d, M, T> Spi<'d, M, T>
     where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
-    {
-        /// Configures the SPI2 peripheral with the provided DMA channel and
-        /// descriptors.
-        fn with_dma(
-            self,
-            channel: Channel<'d, C, DmaMode>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode>;
-    }
-
-    /// Trait for configuring DMA with SPI3 peripherals in slave mode.
-    #[cfg(spi3)]
-    pub trait WithDmaSpi3<'d, C, DmaMode>
-    where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
+        T: InstanceDma,
+        M: Mode,
     {
         /// Configures the SPI3 peripheral with the provided DMA channel and
         /// descriptors.
-        fn with_dma(
+        #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
+        pub fn with_dma<CH, DM>(
             self,
-            channel: Channel<'d, C, DmaMode>,
+            channel: Channel<'d, DM, CH>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode>;
-    }
-
-    impl<'d, C, DmaMode> WithDmaSpi2<'d, C, DmaMode>
-        for Spi<'d, crate::peripherals::SPI2, FullDuplexMode>
-    where
-        C: DmaChannel,
-        C::P: SpiPeripheral + Spi2Peripheral,
-        DmaMode: Mode,
-    {
-        fn with_dma(
-            self,
-            mut channel: Channel<'d, C, DmaMode>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI2, C, DmaMode> {
-            channel.tx.init_channel(); // no need to call this for both, TX and RX
-
-            SpiDma {
-                spi: self.spi,
-                channel,
-                rx_chain: DescriptorChain::new(rx_descriptors),
-                tx_chain: DescriptorChain::new(tx_descriptors),
-            }
-        }
-    }
-
-    #[cfg(spi3)]
-    impl<'d, C, DmaMode> WithDmaSpi3<'d, C, DmaMode>
-        for Spi<'d, crate::peripherals::SPI3, FullDuplexMode>
-    where
-        C: DmaChannel,
-        C::P: SpiPeripheral + Spi3Peripheral,
-        DmaMode: Mode,
-    {
-        fn with_dma(
-            self,
-            mut channel: Channel<'d, C, DmaMode>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, crate::peripherals::SPI3, C, DmaMode> {
-            channel.tx.init_channel(); // no need to call this for both, TX and RX
-
-            SpiDma {
-                spi: self.spi,
-                channel,
-                rx_chain: DescriptorChain::new(rx_descriptors),
-                tx_chain: DescriptorChain::new(tx_descriptors),
-            }
+        ) -> SpiDma<'d, M, T>
+        where
+            CH: DmaChannelConvert<T::Dma>,
+            DM: Mode,
+            Channel<'d, M, CH>: From<Channel<'d, DM, CH>>,
+        {
+            self.spi.info().set_data_mode(self.data_mode, true);
+            SpiDma::new(self.spi, channel.into(), rx_descriptors, tx_descriptors)
         }
     }
 
     /// A DMA capable SPI instance.
-    pub struct SpiDma<'d, T, C, DmaMode>
+    pub struct SpiDma<'d, M, T = AnySpi>
     where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
-        DmaMode: Mode,
+        T: InstanceDma,
+        M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, C, DmaMode>,
+        pub(crate) channel: Channel<'d, M, T::Dma>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
 
-    impl<'d, T, C, DmaMode> core::fmt::Debug for SpiDma<'d, T, C, DmaMode>
+    impl<DmaMode, T> core::fmt::Debug for SpiDma<'_, DmaMode, T>
     where
-        C: DmaChannel,
-        C::P: SpiPeripheral,
+        T: InstanceDma,
         DmaMode: Mode,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -289,20 +238,18 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> DmaSupport for SpiDma<'d, T, C, DmaMode>
+    impl<DmaMode, T> DmaSupport for SpiDma<'_, DmaMode, T>
     where
-        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
-        C: DmaChannel,
-        C::P: SpiPeripheral,
+        T: InstanceDma,
         DmaMode: Mode,
     {
         fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
             while !((!is_tx || self.channel.tx.is_done())
                 && (!is_rx || self.channel.rx.is_done())
-                && !self.spi.is_bus_busy())
+                && !self.spi.info().is_bus_busy())
             {}
 
-            self.spi.flush().ok();
+            self.spi.info().flush().ok();
         }
 
         fn peripheral_dma_stop(&mut self) {
@@ -310,14 +257,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> DmaSupportTx for SpiDma<'d, T, C, DmaMode>
+    impl<'d, DmaMode, T> DmaSupportTx for SpiDma<'d, DmaMode, T>
     where
-        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
-        C: DmaChannel,
-        C::P: SpiPeripheral,
+        T: InstanceDma,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, C>;
+        type TX = ChannelTx<'d, DmaMode, T::Dma>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -328,14 +273,12 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> DmaSupportRx for SpiDma<'d, T, C, DmaMode>
+    impl<'d, DmaMode, T> DmaSupportRx for SpiDma<'d, DmaMode, T>
     where
-        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
-        C: DmaChannel,
-        C::P: SpiPeripheral,
+        T: InstanceDma,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, C>;
+        type RX = ChannelRx<'d, DmaMode, T::Dma>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -346,20 +289,43 @@ pub mod dma {
         }
     }
 
-    impl<'d, T, C, DmaMode> SpiDma<'d, T, C, DmaMode>
+    impl<'d, DmaMode, T> SpiDma<'d, DmaMode, T>
     where
-        T: InstanceDma<ChannelRx<'d, C>, ChannelTx<'d, C>>,
-        C: DmaChannel,
-        C::P: SpiPeripheral,
+        T: InstanceDma,
         DmaMode: Mode,
     {
+        fn new<CH>(
+            spi: PeripheralRef<'d, T>,
+            channel: Channel<'d, DmaMode, CH>,
+            rx_descriptors: &'static mut [DmaDescriptor],
+            tx_descriptors: &'static mut [DmaDescriptor],
+        ) -> Self
+        where
+            CH: DmaChannelConvert<T::Dma>,
+        {
+            channel.runtime_ensure_compatible(&spi);
+            Self {
+                spi,
+                channel: channel.degrade(),
+                rx_chain: DescriptorChain::new(rx_descriptors),
+                tx_chain: DescriptorChain::new(tx_descriptors),
+            }
+        }
+
+        fn driver(&self) -> DmaDriver {
+            DmaDriver {
+                info: self.spi.info(),
+                dma_peripheral: self.spi.dma_peripheral(),
+            }
+        }
+
         /// Register a buffer for a DMA write.
         ///
         /// This will return a [DmaTransferTx]. The maximum amount of data to be
         /// sent is 32736 bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
-        pub fn dma_write<'t, TXBUF>(
+        pub fn write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
         ) -> Result<DmaTransferTx<'t, Self>, Error>
@@ -373,8 +339,17 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
-                    .start_write_bytes_dma(&mut self.tx_chain, ptr, len, &mut self.channel.tx)
+                self.driver()
+                    .start_transfer_dma(
+                        &mut self.rx_chain,
+                        &mut self.tx_chain,
+                        core::ptr::null_mut(),
+                        0,
+                        ptr,
+                        len,
+                        &mut self.channel.rx,
+                        &mut self.channel.tx,
+                    )
                     .map(move |_| DmaTransferTx::new(self))
             }
         }
@@ -385,7 +360,7 @@ pub mod dma {
         /// received is 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
-        pub fn dma_read<'t, RXBUF>(
+        pub fn read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
         ) -> Result<DmaTransferRx<'t, Self>, Error>
@@ -399,8 +374,17 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
-                    .start_read_bytes_dma(&mut self.rx_chain, ptr, len, &mut self.channel.rx)
+                self.driver()
+                    .start_transfer_dma(
+                        &mut self.rx_chain,
+                        &mut self.tx_chain,
+                        ptr,
+                        len,
+                        core::ptr::null(),
+                        0,
+                        &mut self.channel.rx,
+                        &mut self.channel.tx,
+                    )
                     .map(move |_| DmaTransferRx::new(self))
             }
         }
@@ -412,10 +396,10 @@ pub mod dma {
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.
-        pub fn dma_transfer<'t, RXBUF, TXBUF>(
+        pub fn transfer<'t, RXBUF, TXBUF>(
             &'t mut self,
-            words: &'t TXBUF,
             read_buffer: &'t mut RXBUF,
+            words: &'t TXBUF,
         ) -> Result<DmaTransferRxTx<'t, Self>, Error>
         where
             RXBUF: WriteBuffer,
@@ -429,7 +413,7 @@ pub mod dma {
             }
 
             unsafe {
-                self.spi
+                self.driver()
                     .start_transfer_dma(
                         &mut self.rx_chain,
                         &mut self.tx_chain,
@@ -444,395 +428,332 @@ pub mod dma {
             }
         }
     }
+
+    struct DmaDriver {
+        info: &'static Info,
+        dma_peripheral: crate::dma::DmaPeripheral,
+    }
+
+    impl DmaDriver {
+        #[allow(clippy::too_many_arguments)]
+        unsafe fn start_transfer_dma<RX, TX>(
+            &self,
+            rx_chain: &mut DescriptorChain,
+            tx_chain: &mut DescriptorChain,
+            read_buffer_ptr: *mut u8,
+            read_buffer_len: usize,
+            write_buffer_ptr: *const u8,
+            write_buffer_len: usize,
+            rx: &mut RX,
+            tx: &mut TX,
+        ) -> Result<(), Error>
+        where
+            RX: Rx,
+            TX: Tx,
+        {
+            self.enable_dma();
+
+            self.info.reset_spi();
+
+            if read_buffer_len > 0 {
+                rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
+                rx.prepare_transfer_without_start(self.dma_peripheral, rx_chain)?;
+            }
+
+            if write_buffer_len > 0 {
+                tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
+                tx.prepare_transfer_without_start(self.dma_peripheral, tx_chain)?;
+            }
+
+            #[cfg(esp32)]
+            self.info
+                .prepare_length_and_lines(read_buffer_len, write_buffer_len);
+
+            self.reset_dma_before_usr_cmd();
+
+            let reg_block = self.info.register_block();
+            #[cfg(not(esp32))]
+            reg_block
+                .dma_conf()
+                .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
+
+            self.clear_dma_interrupts();
+            self.info.setup_for_flush();
+            reg_block.cmd().modify(|_, w| w.usr().set_bit());
+
+            if read_buffer_len > 0 {
+                rx.start_transfer()?;
+            }
+
+            if write_buffer_len > 0 {
+                tx.start_transfer()?;
+            }
+
+            Ok(())
+        }
+
+        fn reset_dma_before_usr_cmd(&self) {
+            let reg_block = self.info.register_block();
+            #[cfg(gdma)]
+            reg_block.dma_conf().modify(|_, w| {
+                w.rx_afifo_rst().set_bit();
+                w.buf_afifo_rst().set_bit();
+                w.dma_afifo_rst().set_bit()
+            });
+
+            #[cfg(pdma)]
+            let _ = reg_block;
+        }
+
+        fn enable_dma(&self) {
+            let reg_block = self.info.register_block();
+            #[cfg(gdma)]
+            {
+                reg_block.dma_conf().modify(|_, w| {
+                    w.dma_tx_ena().set_bit();
+                    w.dma_rx_ena().set_bit();
+                    w.rx_eof_en().clear_bit()
+                });
+            }
+
+            #[cfg(pdma)]
+            {
+                fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
+                    reg_block.dma_conf().modify(|_, w| {
+                        w.in_rst().bit(bit);
+                        w.out_rst().bit(bit);
+                        w.ahbm_fifo_rst().bit(bit);
+                        w.ahbm_rst().bit(bit)
+                    });
+
+                    #[cfg(esp32s2)]
+                    reg_block
+                        .dma_conf()
+                        .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
+                }
+                set_rst_bit(reg_block, true);
+                set_rst_bit(reg_block, false);
+            }
+        }
+
+        fn clear_dma_interrupts(&self) {
+            let reg_block = self.info.register_block();
+
+            #[cfg(gdma)]
+            reg_block.dma_int_clr().write(|w| {
+                w.dma_infifo_full_err().clear_bit_by_one();
+                w.dma_outfifo_empty_err().clear_bit_by_one();
+                w.trans_done().clear_bit_by_one();
+                w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+            });
+
+            #[cfg(pdma)]
+            reg_block.dma_int_clr().write(|w| {
+                w.inlink_dscr_empty().clear_bit_by_one();
+                w.outlink_dscr_error().clear_bit_by_one();
+                w.inlink_dscr_error().clear_bit_by_one();
+                w.in_done().clear_bit_by_one();
+                w.in_err_eof().clear_bit_by_one();
+                w.in_suc_eof().clear_bit_by_one();
+                w.out_done().clear_bit_by_one();
+                w.out_eof().clear_bit_by_one();
+                w.out_total_eof().clear_bit_by_one()
+            });
+        }
+    }
 }
 
-#[doc(hidden)]
-pub trait InstanceDma<RX, TX>: Instance
-where
-    RX: Rx,
-    TX: Tx,
-{
-    #[allow(clippy::too_many_arguments)]
-    unsafe fn start_transfer_dma(
-        &mut self,
-        rx_chain: &mut DescriptorChain,
-        tx_chain: &mut DescriptorChain,
-        read_buffer_ptr: *mut u8,
-        read_buffer_len: usize,
-        write_buffer_ptr: *const u8,
-        write_buffer_len: usize,
-        rx: &mut RX,
-        tx: &mut TX,
-    ) -> Result<(), Error> {
-        let reg_block = self.register_block();
+/// SPI peripheral instance.
+pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + 'static {
+    /// Returns the peripheral data describing this SPI instance.
+    fn info(&self) -> &'static Info;
+}
 
-        rx.is_done();
-        tx.is_done();
+/// A marker for DMA-capable SPI peripheral instances.
+pub trait InstanceDma: Instance + DmaEligible {}
 
-        self.enable_dma();
+impl InstanceDma for crate::peripherals::SPI2 {}
+#[cfg(spi3)]
+impl InstanceDma for crate::peripherals::SPI3 {}
 
-        reset_dma_before_load_dma_dscr(reg_block);
+/// Peripheral data describing a particular SPI instance.
+#[non_exhaustive]
+pub struct Info {
+    /// Pointer to the register block for this SPI instance.
+    ///
+    /// Use [Self::register_block] to access the register block.
+    pub register_block: *const RegisterBlock,
 
-        rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
-        rx.prepare_transfer_without_start(self.dma_peripheral(), rx_chain)?;
+    /// System peripheral marker.
+    pub peripheral: crate::system::Peripheral,
 
-        tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
-        tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain)?;
+    /// SCLK signal.
+    pub sclk: InputSignal,
 
-        reset_dma_before_usr_cmd(reg_block);
+    /// MOSI signal.
+    pub mosi: InputSignal,
 
-        reg_block
-            .dma_conf()
-            .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
+    /// MISO signal.
+    pub miso: OutputSignal,
 
-        self.clear_dma_interrupts();
-        self.setup_for_flush();
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+    /// Chip select signal.
+    pub cs: InputSignal,
+}
 
-        rx.start_transfer()?;
-        tx.start_transfer()?;
-
-        Ok(())
+impl Info {
+    /// Returns the register block for this SPI instance.
+    pub fn register_block(&self) -> &RegisterBlock {
+        unsafe { &*self.register_block }
     }
 
-    unsafe fn start_write_bytes_dma(
-        &mut self,
-        tx_chain: &mut DescriptorChain,
-        ptr: *const u8,
-        len: usize,
-        tx: &mut TX,
-    ) -> Result<(), Error> {
+    fn reset_spi(&self) {
         let reg_block = self.register_block();
 
-        tx.is_done();
+        #[cfg(esp32)]
+        {
+            reg_block.slave().modify(|_, w| w.sync_reset().set_bit());
+            reg_block.slave().modify(|_, w| w.sync_reset().clear_bit());
+        }
 
-        self.enable_dma();
-
-        reset_dma_before_load_dma_dscr(reg_block);
-
-        tx_chain.fill_for_tx(false, ptr, len)?;
-        tx.prepare_transfer_without_start(self.dma_peripheral(), tx_chain)?;
-
-        reset_dma_before_usr_cmd(reg_block);
-
-        reg_block
-            .dma_conf()
-            .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
-
-        self.clear_dma_interrupts();
-        self.setup_for_flush();
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
-
-        tx.start_transfer()?;
-
-        Ok(())
-    }
-
-    unsafe fn start_read_bytes_dma(
-        &mut self,
-        rx_chain: &mut DescriptorChain,
-        ptr: *mut u8,
-        len: usize,
-        rx: &mut RX,
-    ) -> Result<(), Error> {
-        let reg_block = self.register_block();
-
-        rx.is_done();
-
-        self.enable_dma();
-
-        reset_dma_before_load_dma_dscr(reg_block);
-        rx_chain.fill_for_rx(false, ptr, len)?;
-        rx.prepare_transfer_without_start(self.dma_peripheral(), rx_chain)?;
-
-        reset_dma_before_usr_cmd(reg_block);
-
-        reg_block
-            .dma_conf()
-            .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
-
-        self.clear_dma_interrupts();
-        self.setup_for_flush();
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
-
-        rx.start_transfer()?;
-
-        Ok(())
-    }
-
-    fn dma_peripheral(&self) -> DmaPeripheral {
-        match self.spi_num() {
-            2 => DmaPeripheral::Spi2,
-            #[cfg(spi3)]
-            3 => DmaPeripheral::Spi3,
-            _ => panic!("Illegal SPI instance"),
+        #[cfg(not(esp32))]
+        {
+            reg_block.slave().modify(|_, w| w.soft_reset().set_bit());
+            reg_block.slave().modify(|_, w| w.soft_reset().clear_bit());
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-    fn enable_dma(&self) {
+    #[cfg(esp32)]
+    fn prepare_length_and_lines(&self, rx_len: usize, tx_len: usize) {
         let reg_block = self.register_block();
-        reg_block.dma_conf().modify(|_, w| {
-            w.dma_tx_ena()
-                .set_bit()
-                .dma_rx_ena()
-                .set_bit()
-                .rx_eof_en()
-                .clear_bit()
+
+        reg_block
+            .slv_rdbuf_dlen()
+            .write(|w| unsafe { w.bits((rx_len as u32 * 8).saturating_sub(1)) });
+        reg_block
+            .slv_wrbuf_dlen()
+            .write(|w| unsafe { w.bits((tx_len as u32 * 8).saturating_sub(1)) });
+
+        // SPI Slave mode on ESP32 requires MOSI/MISO enable
+        reg_block.user().modify(|_, w| {
+            w.usr_mosi().bit(rx_len > 0);
+            w.usr_miso().bit(tx_len > 0)
         });
     }
-
-    #[cfg(esp32s2)]
-    fn enable_dma(&self) {
-        // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
-    }
-
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-    fn clear_dma_interrupts(&self) {
-        let reg_block = self.register_block();
-        reg_block.dma_int_clr().write(|w| {
-            w.dma_infifo_full_err()
-                .clear_bit_by_one()
-                .dma_outfifo_empty_err()
-                .clear_bit_by_one()
-                .trans_done()
-                .clear_bit_by_one()
-                .mst_rx_afifo_wfull_err()
-                .clear_bit_by_one()
-                .mst_tx_afifo_rempty_err()
-                .clear_bit_by_one()
-        });
-    }
-
-    #[cfg(esp32s2)]
-    fn clear_dma_interrupts(&self) {
-        let reg_block = self.register_block();
-        reg_block.dma_int_clr().write(|w| {
-            w.inlink_dscr_empty()
-                .clear_bit_by_one()
-                .outlink_dscr_error()
-                .clear_bit_by_one()
-                .inlink_dscr_error()
-                .clear_bit_by_one()
-                .in_done()
-                .clear_bit_by_one()
-                .in_err_eof()
-                .clear_bit_by_one()
-                .in_suc_eof()
-                .clear_bit_by_one()
-                .out_done()
-                .clear_bit_by_one()
-                .out_eof()
-                .clear_bit_by_one()
-                .out_total_eof()
-                .clear_bit_by_one()
-        });
-    }
-}
-
-#[cfg(not(esp32s2))]
-fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
-    reg_block.dma_conf().modify(|_, w| {
-        w.rx_afifo_rst()
-            .set_bit()
-            .buf_afifo_rst()
-            .set_bit()
-            .dma_afifo_rst()
-            .set_bit()
-    });
-}
-
-#[cfg(esp32s2)]
-fn reset_dma_before_usr_cmd(reg_block: &RegisterBlock) {
-    reg_block.slave().modify(|_, w| w.soft_reset().set_bit());
-    reg_block.slave().modify(|_, w| w.soft_reset().clear_bit());
-}
-
-#[cfg(not(esp32s2))]
-fn reset_dma_before_load_dma_dscr(_reg_block: &RegisterBlock) {}
-
-#[cfg(esp32s2)]
-fn reset_dma_before_load_dma_dscr(reg_block: &RegisterBlock) {
-    reg_block.dma_conf().modify(|_, w| {
-        w.out_rst()
-            .set_bit()
-            .in_rst()
-            .set_bit()
-            .ahbm_fifo_rst()
-            .set_bit()
-            .ahbm_rst()
-            .set_bit()
-    });
-
-    #[cfg(esp32s2)]
-    reg_block
-        .dma_conf()
-        .modify(|_, w| w.dma_infifo_full_clr().set_bit());
-
-    reg_block.dma_conf().modify(|_, w| {
-        w.out_rst()
-            .clear_bit()
-            .in_rst()
-            .clear_bit()
-            .ahbm_fifo_rst()
-            .clear_bit()
-            .ahbm_rst()
-            .clear_bit()
-    });
-
-    #[cfg(esp32s2)]
-    reg_block
-        .dma_conf()
-        .modify(|_, w| w.dma_infifo_full_clr().clear_bit());
-}
-
-impl<TX, RX> InstanceDma<RX, TX> for crate::peripherals::SPI2
-where
-    RX: Rx,
-    TX: Tx,
-{
-}
-
-#[cfg(spi3)]
-impl<TX, RX> InstanceDma<RX, TX> for crate::peripherals::SPI3
-where
-    RX: Rx,
-    TX: Tx,
-{
-}
-
-#[doc(hidden)]
-pub trait Instance: private::Sealed {
-    fn register_block(&self) -> &RegisterBlock;
-
-    fn sclk_signal(&self) -> InputSignal;
-
-    fn mosi_signal(&self) -> InputSignal;
-
-    fn miso_signal(&self) -> OutputSignal;
-
-    fn cs_signal(&self) -> InputSignal;
-
-    fn enable_peripheral(&self);
-
-    fn spi_num(&self) -> u8;
 
     /// Initialize for full-duplex 1 bit mode
-    fn init(&mut self) {
+    fn init(&self) {
         let reg_block = self.register_block();
 
         reg_block.clock().write(|w| unsafe { w.bits(0) });
         reg_block.user().write(|w| unsafe { w.bits(0) });
         reg_block.ctrl().write(|w| unsafe { w.bits(0) });
 
-        reg_block.slave().write(|w| w.mode().set_bit());
+        reg_block.slave().write(|w| {
+            #[cfg(esp32)]
+            w.slv_wr_rd_buf_en().set_bit();
+
+            w.mode().set_bit()
+        });
+        self.reset_spi();
 
         reg_block.user().modify(|_, w| {
-            w.usr_miso_highpart()
-                .clear_bit()
-                .doutdin()
-                .set_bit()
-                .usr_miso()
-                .clear_bit()
-                .usr_mosi()
-                .clear_bit()
-                .usr_dummy_idle()
-                .clear_bit()
-                .usr_addr()
-                .clear_bit()
-                .usr_command()
-                .clear_bit()
-                .sio()
-                .clear_bit()
+            w.doutdin().set_bit();
+            w.sio().clear_bit()
         });
 
-        #[cfg(not(esp32s2))]
-        reg_block.clk_gate().modify(|_, w| {
-            w.clk_en()
-                .clear_bit()
-                .mst_clk_active()
-                .clear_bit()
-                .mst_clk_sel()
-                .clear_bit()
-        });
-
-        #[cfg(not(esp32s2))]
-        reg_block.ctrl().modify(|_, w| {
-            w.q_pol()
-                .clear_bit()
-                .d_pol()
-                .clear_bit()
-                .hold_pol()
-                .clear_bit()
-        });
-
-        #[cfg(esp32s2)]
-        reg_block
-            .ctrl()
-            .modify(|_, w| w.q_pol().clear_bit().d_pol().clear_bit().wp().clear_bit());
-
+        #[cfg(not(esp32))]
         reg_block.misc().write(|w| unsafe { w.bits(0) });
     }
 
-    fn set_data_mode(&mut self, data_mode: SpiMode) -> &mut Self {
+    fn set_data_mode(&self, data_mode: SpiMode, dma: bool) {
         let reg_block = self.register_block();
+        #[cfg(esp32)]
+        {
+            reg_block.pin().modify(|_, w| {
+                w.ck_idle_edge()
+                    .bit(matches!(data_mode, SpiMode::Mode0 | SpiMode::Mode1))
+            });
+            reg_block.user().modify(|_, w| {
+                w.ck_i_edge()
+                    .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode2))
+            });
+            reg_block.ctrl2().modify(|_, w| unsafe {
+                match data_mode {
+                    SpiMode::Mode0 => {
+                        w.miso_delay_mode().bits(0);
+                        w.miso_delay_num().bits(0);
+                        w.mosi_delay_mode().bits(2);
+                        w.mosi_delay_num().bits(2)
+                    }
+                    SpiMode::Mode1 => {
+                        w.miso_delay_mode().bits(2);
+                        w.miso_delay_num().bits(0);
+                        w.mosi_delay_mode().bits(0);
+                        w.mosi_delay_num().bits(0)
+                    }
+                    SpiMode::Mode2 => {
+                        w.miso_delay_mode().bits(0);
+                        w.miso_delay_num().bits(0);
+                        w.mosi_delay_mode().bits(1);
+                        w.mosi_delay_num().bits(2)
+                    }
+                    SpiMode::Mode3 => {
+                        w.miso_delay_mode().bits(1);
+                        w.miso_delay_num().bits(0);
+                        w.mosi_delay_mode().bits(0);
+                        w.mosi_delay_num().bits(0)
+                    }
+                }
+            });
 
-        match data_mode {
-            SpiMode::Mode0 => {
-                reg_block
-                    .user()
-                    .modify(|_, w| w.tsck_i_edge().clear_bit().rsck_i_edge().clear_bit());
-                #[cfg(esp32s2)]
-                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().clear_bit());
-                #[cfg(not(esp32s2))]
-                reg_block.slave().modify(|_, w| w.clk_mode_13().clear_bit());
-            }
-            SpiMode::Mode1 => {
-                reg_block
-                    .user()
-                    .modify(|_, w| w.tsck_i_edge().set_bit().rsck_i_edge().set_bit());
-                #[cfg(esp32s2)]
-                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().set_bit());
-                #[cfg(not(esp32s2))]
-                reg_block.slave().modify(|_, w| w.clk_mode_13().set_bit());
-            }
-            SpiMode::Mode2 => {
-                reg_block
-                    .user()
-                    .modify(|_, w| w.tsck_i_edge().set_bit().rsck_i_edge().set_bit());
-                #[cfg(esp32s2)]
-                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().clear_bit());
-                #[cfg(not(esp32s2))]
-                reg_block.slave().modify(|_, w| w.clk_mode_13().clear_bit());
-            }
-            SpiMode::Mode3 => {
-                reg_block
-                    .user()
-                    .modify(|_, w| w.tsck_i_edge().clear_bit().rsck_i_edge().clear_bit());
-                #[cfg(esp32s2)]
-                reg_block.ctrl1().modify(|_, w| w.clk_mode_13().set_bit());
-                #[cfg(not(esp32s2))]
-                reg_block.slave().modify(|_, w| w.clk_mode_13().set_bit());
+            if dma {
+                assert!(
+                    matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode3),
+                    "Mode {:?} is not supported with DMA",
+                    data_mode
+                );
             }
         }
-        self
+
+        #[cfg(not(esp32))]
+        {
+            _ = dma;
+            cfg_if::cfg_if! {
+                if #[cfg(esp32s2)] {
+                    let ctrl1_reg = reg_block.ctrl1();
+                } else {
+                    let ctrl1_reg = reg_block.slave();
+                }
+            }
+            reg_block.user().modify(|_, w| {
+                w.tsck_i_edge()
+                    .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode2));
+                w.rsck_i_edge()
+                    .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode2))
+            });
+            ctrl1_reg.modify(|_, w| {
+                w.clk_mode_13()
+                    .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode3))
+            });
+        }
     }
 
     fn is_bus_busy(&self) -> bool {
         let reg_block = self.register_block();
 
-        #[cfg(esp32s2)]
+        #[cfg(pdma)]
         {
             reg_block.slave().read().trans_done().bit_is_clear()
         }
-        #[cfg(not(esp32s2))]
+        #[cfg(gdma)]
         {
             reg_block.dma_int_raw().read().trans_done().bit_is_clear()
         }
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
-    fn flush(&mut self) -> Result<(), Error> {
+    fn flush(&self) -> Result<(), Error> {
         while self.is_bus_busy() {
             // Wait for bus to be clear
         }
@@ -842,127 +763,71 @@ pub trait Instance: private::Sealed {
     // Clear the transaction-done interrupt flag so flush() can work properly. Not
     // used in DMA mode.
     fn setup_for_flush(&self) {
-        #[cfg(esp32s2)]
+        #[cfg(pdma)]
         self.register_block()
             .slave()
             .modify(|_, w| w.trans_done().clear_bit());
-        #[cfg(not(esp32s2))]
+        #[cfg(gdma)]
         self.register_block()
             .dma_int_clr()
             .write(|w| w.trans_done().clear_bit_by_one());
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-impl Instance for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        InputSignal::FSPICLK
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        InputSignal::FSPID
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        OutputSignal::FSPIQ
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        InputSignal::FSPICS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi2);
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
+impl PartialEq for Info {
+    fn eq(&self, other: &Self) -> bool {
+        self.register_block == other.register_block
     }
 }
 
-#[cfg(any(esp32s2, esp32s3))]
-impl Instance for crate::peripherals::SPI2 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
+unsafe impl Sync for Info {}
 
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        InputSignal::FSPICLK
-    }
+macro_rules! spi_instance {
+    ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
+        paste::paste! {
+            impl Instance for crate::peripherals::[<SPI $num>] {
+                #[inline(always)]
+                fn info(&self) -> &'static Info {
+                    static INFO: Info = Info {
+                        register_block: crate::peripherals::[<SPI $num>]::PTR,
+                        peripheral: crate::system::Peripheral::[<Spi $num>],
+                        sclk: InputSignal::$sclk,
+                        mosi: InputSignal::$mosi,
+                        miso: OutputSignal::$miso,
+                        cs: InputSignal::$cs,
+                    };
 
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        InputSignal::FSPID
-    }
+                    &INFO
+                }
+            }
+        }
+    };
+}
 
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        OutputSignal::FSPIQ
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        InputSignal::FSPICS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi2)
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        2
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        #[cfg(spi2)]
+        spi_instance!(2, HSPICLK, HSPID, HSPIQ, HSPICS0);
+        #[cfg(spi3)]
+        spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0);
+    } else {
+        #[cfg(spi2)]
+        spi_instance!(2, FSPICLK, FSPID, FSPIQ, FSPICS0);
+        #[cfg(spi3)]
+        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0);
     }
 }
 
-#[cfg(any(esp32s2, esp32s3))]
-impl Instance for crate::peripherals::SPI3 {
-    #[inline(always)]
-    fn register_block(&self) -> &RegisterBlock {
-        self
-    }
-
-    #[inline(always)]
-    fn sclk_signal(&self) -> InputSignal {
-        InputSignal::SPI3_CLK
-    }
-
-    #[inline(always)]
-    fn mosi_signal(&self) -> InputSignal {
-        InputSignal::SPI3_D
-    }
-
-    #[inline(always)]
-    fn miso_signal(&self) -> OutputSignal {
-        OutputSignal::SPI3_Q
-    }
-
-    #[inline(always)]
-    fn cs_signal(&self) -> InputSignal {
-        InputSignal::SPI3_CS0
-    }
-
-    #[inline(always)]
-    fn enable_peripheral(&self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Spi3)
-    }
-
-    #[inline(always)]
-    fn spi_num(&self) -> u8 {
-        3
+impl Instance for super::AnySpi {
+    delegate::delegate! {
+        to match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn info(&self) -> &'static Info;
+        }
     }
 }
+
+impl InstanceDma for super::AnySpi {}

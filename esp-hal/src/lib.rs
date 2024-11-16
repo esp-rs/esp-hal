@@ -45,14 +45,16 @@
 //! before proceeding. We also have a [training] that covers some common
 //! scenarios with examples.
 //!
-//! We have a template for quick starting bare-metal projects, [esp-template].
-//! The template uses [cargo-generate], so ensure that it is installed and run:
+//! We have developed a project generation tool, [esp-generate], which we
+//! recommend when starting new projects. It can be installed and run, e.g.
+//! for the ESP32-C6, as follows:
 //!
 //! ```bash
-//! cargo generate -a esp-rs/esp-template
+//! cargo install esp-generate
+//! esp-generate --chip=esp32c6 your-project
 //! ```
 //!
-//! ## Commonly Used Setup
+//! ## Blinky
 //!
 //! Some minimal code to blink an LED looks like this:
 //!
@@ -73,11 +75,15 @@
 //!
 //! #[entry]
 //! fn main() -> ! {
-//!     let peripherals = esp_hal::init(esp_hal::Config::default());
+//!     let peripherals = esp_hal::init({
+//!         let mut config = esp_hal::Config::default();
+//!         // Configure the CPU to run at the maximum frequency.
+//!         config.cpu_clock = CpuClock::max();
+//!         config
+//!     });
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//!     let mut led = Output::new(io.pins.gpio0, Level::High);
+//!     let mut led = Output::new(peripherals.GPIO0, Level::High);
 //!
 //!     let delay = Delay::new();
 //!
@@ -88,31 +94,33 @@
 //! }
 //! ```
 //!
-//! The steps here are:
-//! - Call [`init`] with the desired [`CpuClock`] configuration
-//! - Create [`gpio::Io`] which provides access to the GPIO pins
-//! - Create an [`gpio::Output`] pin driver which lets us control the logical
-//!   level of an output pin
-//! - Create a [`delay::Delay`] driver
-//! - In a loop, toggle the output pin's logical level with a delay of 1000 ms
+//! ## Additional configuration
 //!
-//! ## `PeripheralRef` Pattern
+//! We've exposed some configuration options that don't fit into cargo
+//! features. These can be set via environment variables, or via cargo's `[env]`
+//! section inside `.cargo/config.toml`. Below is a table of tunable parameters
+//! for this crate:
+#![doc = ""]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_hal_config_table.md"))]
+#![doc = ""]
+//! It's important to note that due to a [bug in cargo](https://github.com/rust-lang/cargo/issues/10358),
+//! any modifications to the environment, local or otherwise will only get
+//! picked up on a full clean build of the project.
 //!
-//! Generally drivers take pins and peripherals as [peripheral::PeripheralRef].
-//! This means you can pass the pin/peripheral or a mutable reference to the
-//! pin/peripheral.
+//! ## `Peripheral` Pattern
+//!
+//! Drivers take pins and peripherals as [peripheral::Peripheral] in most
+//! circumstances. This means you can pass the pin/peripheral or a mutable
+//! reference to the pin/peripheral.
 //!
 //! The latter can be used to regain access to the pin when the driver gets
 //! dropped. Then it's possible to reuse the pin/peripheral for a different
 //! purpose.
 //!
-//! ## Don't use [core::mem::forget]
+//! ## Don't use `core::mem::forget`
 //!
-//! In general drivers are _NOT_ safe to use with [core::mem::forget]
-//!
-//! You should never use [core::mem::forget] on any type defined in the HAL.
-//!
-//! Some types heavily rely on their [Drop] implementation to not leave the
+//! You should never use `core::mem::forget` on any type defined in the HAL.
+//! Some types heavily rely on their `Drop` implementation to not leave the
 //! hardware in undefined state and causing UB.
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
@@ -122,8 +130,7 @@
 //! [embedded-hal]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal
 //! [embedded-hal-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-async
 //! [xtask]: https://github.com/matklad/cargo-xtask
-//! [esp-template]: https://github.com/esp-rs/esp-template
-//! [cargo-generate]: https://github.com/cargo-generate/cargo-generate
+//! [esp-generate]: https://github.com/esp-rs/esp-generate
 //! [book]: https://docs.esp-rs.org/book/
 //! [training]: https://docs.esp-rs.org/no_std-training/
 //!
@@ -140,7 +147,6 @@ mod fmt;
 
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
-pub use procmacros as macros;
 #[cfg(xtensa)]
 pub use xtensa_lx;
 #[cfg(xtensa)]
@@ -153,7 +159,7 @@ pub use self::soc::efuse;
 #[cfg(lp_core)]
 pub use self::soc::lp_core;
 pub use self::soc::peripherals;
-#[cfg(psram)]
+#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
 pub use self::soc::ulp_core;
@@ -166,6 +172,9 @@ pub mod analog;
 pub mod assist_debug;
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
+
+pub mod config;
+
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;
 #[cfg(any(gdma, pdma))]
@@ -233,6 +242,11 @@ pub mod usb_serial_jtag;
 
 pub mod debugger;
 
+#[doc(hidden)]
+pub mod sync;
+
+pub mod macros;
+
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {
     #[cfg(riscv)]
@@ -248,31 +262,16 @@ mod soc;
 #[cfg(xtensa)]
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_level: u32, _interrupt: peripherals::Interrupt) {
-    #[cfg(not(feature = "defmt"))]
     panic!("Unhandled level {} interrupt: {:?}", _level, _interrupt);
-
-    #[cfg(feature = "defmt")]
-    panic!(
-        "Unhandled level {} interrupt: {:?}",
-        _level,
-        defmt::Debug2Format(&_interrupt)
-    );
 }
 
 #[cfg(riscv)]
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_interrupt: peripherals::Interrupt) {
-    #[cfg(not(feature = "defmt"))]
     panic!("Unhandled interrupt: {:?}", _interrupt);
-
-    #[cfg(feature = "defmt")]
-    panic!(
-        "Unhandled interrupt: {:?}",
-        defmt::Debug2Format(&_interrupt)
-    );
 }
 
-/// A marker trait for intializing drivers in a specific mode.
+/// A marker trait for initializing drivers in a specific mode.
 pub trait Mode: crate::private::Sealed {}
 
 /// Driver initialized in blocking mode.
@@ -364,20 +363,52 @@ pub enum Cpu {
     AppCpu = 1,
 }
 
-/// Which core the application is currently executing on
-#[inline(always)]
-pub fn get_core() -> Cpu {
-    // This works for both RISCV and Xtensa because both
-    // get_raw_core functions return zero, _or_ something
-    // greater than zero; 1 in the case of RISCV and 0x2000
-    // in the case of Xtensa.
-    match get_raw_core() {
-        0 => Cpu::ProCpu,
-        #[cfg(all(multi_core, riscv))]
-        1 => Cpu::AppCpu,
-        #[cfg(all(multi_core, xtensa))]
-        0x2000 => Cpu::AppCpu,
-        _ => unreachable!(),
+impl Cpu {
+    /// The number of available cores.
+    pub const COUNT: usize = 1 + cfg!(multi_core) as usize;
+
+    /// Returns the core the application is currently executing on
+    #[inline(always)]
+    pub fn current() -> Self {
+        // This works for both RISCV and Xtensa because both
+        // get_raw_core functions return zero, _or_ something
+        // greater than zero; 1 in the case of RISCV and 0x2000
+        // in the case of Xtensa.
+        match raw_core() {
+            0 => Cpu::ProCpu,
+            #[cfg(all(multi_core, riscv))]
+            1 => Cpu::AppCpu,
+            #[cfg(all(multi_core, xtensa))]
+            0x2000 => Cpu::AppCpu,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Returns an iterator over the "other" cores.
+    #[inline(always)]
+    pub(crate) fn other() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                match Self::current() {
+                    Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
+                    Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
+                }
+            } else {
+                [].into_iter()
+            }
+        }
+    }
+
+    /// Returns an iterator over all cores.
+    #[inline(always)]
+    pub(crate) fn all() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                [Cpu::ProCpu, Cpu::AppCpu].into_iter()
+            } else {
+                [Cpu::ProCpu].into_iter()
+            }
+        }
     }
 }
 
@@ -386,7 +417,7 @@ pub fn get_core() -> Cpu {
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(riscv)]
 #[inline(always)]
-fn get_raw_core() -> usize {
+fn raw_core() -> usize {
     #[cfg(multi_core)]
     {
         riscv::register::mhartid::read()
@@ -405,272 +436,8 @@ fn get_raw_core() -> usize {
 /// Safety: This method should never return UNUSED_THREAD_ID_VALUE
 #[cfg(xtensa)]
 #[inline(always)]
-fn get_raw_core() -> usize {
+fn raw_core() -> usize {
     (xtensa_lx::get_processor_id() & 0x2000) as usize
-}
-
-mod critical_section_impl {
-    struct CriticalSection;
-
-    critical_section::set_impl!(CriticalSection);
-
-    #[cfg(xtensa)]
-    mod xtensa {
-        // PS has 15 useful bits. Bits 12..16 and 19..32 are unused, so we can use bit
-        // #31 as our reentry flag.
-        #[cfg(multi_core)]
-        const REENTRY_FLAG: u32 = 1 << 31;
-
-        unsafe impl critical_section::Impl for super::CriticalSection {
-            unsafe fn acquire() -> critical_section::RawRestoreState {
-                let mut tkn: critical_section::RawRestoreState;
-                core::arch::asm!("rsil {0}, 5", out(reg) tkn);
-                #[cfg(multi_core)]
-                {
-                    use super::multicore::{LockKind, MULTICORE_LOCK};
-
-                    match MULTICORE_LOCK.lock() {
-                        LockKind::Lock => {
-                            // We can assume the reserved bit is 0 otherwise
-                            // rsil - wsr pairings would be undefined behavior
-                        }
-                        LockKind::Reentry => tkn |= REENTRY_FLAG,
-                    }
-                }
-                tkn
-            }
-
-            unsafe fn release(token: critical_section::RawRestoreState) {
-                #[cfg(multi_core)]
-                {
-                    use super::multicore::MULTICORE_LOCK;
-
-                    debug_assert!(MULTICORE_LOCK.is_owned_by_current_thread());
-
-                    if token & REENTRY_FLAG != 0 {
-                        return;
-                    }
-
-                    MULTICORE_LOCK.unlock();
-                }
-
-                const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
-                debug_assert!(token & RESERVED_MASK == 0);
-
-                core::arch::asm!(
-                    "wsr.ps {0}",
-                    "rsync", in(reg) token)
-            }
-        }
-    }
-
-    #[cfg(riscv)]
-    mod riscv {
-        // The restore state is a u8 that is casted from a bool, so it has a value of
-        // 0x00 or 0x01 before we add the reentry flag to it.
-        #[cfg(multi_core)]
-        const REENTRY_FLAG: u8 = 1 << 7;
-
-        unsafe impl critical_section::Impl for super::CriticalSection {
-            unsafe fn acquire() -> critical_section::RawRestoreState {
-                let mut mstatus = 0u32;
-                core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-
-                #[cfg_attr(single_core, allow(unused_mut))]
-                let mut tkn = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
-
-                #[cfg(multi_core)]
-                {
-                    use super::multicore::{LockKind, MULTICORE_LOCK};
-
-                    match MULTICORE_LOCK.lock() {
-                        LockKind::Lock => {}
-                        LockKind::Reentry => tkn |= REENTRY_FLAG,
-                    }
-                }
-
-                tkn
-            }
-
-            unsafe fn release(token: critical_section::RawRestoreState) {
-                #[cfg(multi_core)]
-                {
-                    use super::multicore::MULTICORE_LOCK;
-
-                    debug_assert!(MULTICORE_LOCK.is_owned_by_current_thread());
-
-                    if token & REENTRY_FLAG != 0 {
-                        return;
-                    }
-
-                    MULTICORE_LOCK.unlock();
-                }
-
-                if token != 0 {
-                    riscv::interrupt::enable();
-                }
-            }
-        }
-    }
-
-    #[cfg(multi_core)]
-    mod multicore {
-        use portable_atomic::{AtomicUsize, Ordering};
-
-        // We're using a value that we know get_raw_core() will never return. This
-        // avoids an unnecessary increment of the core ID.
-        //
-        // Safety: Ensure that when adding new chips get_raw_core doesn't return this
-        // value. TODO when we have HIL tests ensure this is the case!
-        const UNUSED_THREAD_ID_VALUE: usize = 0x100;
-
-        fn thread_id() -> usize {
-            crate::get_raw_core()
-        }
-
-        pub(super) static MULTICORE_LOCK: ReentrantMutex = ReentrantMutex::new();
-
-        pub(super) enum LockKind {
-            Lock = 0,
-            Reentry,
-        }
-
-        pub(super) struct ReentrantMutex {
-            owner: AtomicUsize,
-        }
-
-        impl ReentrantMutex {
-            const fn new() -> Self {
-                Self {
-                    owner: AtomicUsize::new(UNUSED_THREAD_ID_VALUE),
-                }
-            }
-
-            pub fn is_owned_by_current_thread(&self) -> bool {
-                self.owner.load(Ordering::Relaxed) == thread_id()
-            }
-
-            pub(super) fn lock(&self) -> LockKind {
-                let current_thread_id = thread_id();
-
-                if self.try_lock(current_thread_id) {
-                    return LockKind::Lock;
-                }
-
-                let current_owner = self.owner.load(Ordering::Relaxed);
-                if current_owner == current_thread_id {
-                    return LockKind::Reentry;
-                }
-
-                while !self.try_lock(current_thread_id) {}
-
-                LockKind::Lock
-            }
-
-            fn try_lock(&self, new_owner: usize) -> bool {
-                self.owner
-                    .compare_exchange(
-                        UNUSED_THREAD_ID_VALUE,
-                        new_owner,
-                        Ordering::Acquire,
-                        Ordering::Relaxed,
-                    )
-                    .is_ok()
-            }
-
-            pub(super) fn unlock(&self) {
-                self.owner.store(UNUSED_THREAD_ID_VALUE, Ordering::Release);
-            }
-        }
-    }
-}
-
-// The state of a re-entrant lock
-pub(crate) struct LockState {
-    #[cfg(multi_core)]
-    core: portable_atomic::AtomicUsize,
-}
-
-impl LockState {
-    #[cfg(multi_core)]
-    const UNLOCKED: usize = usize::MAX;
-
-    pub const fn new() -> Self {
-        Self {
-            #[cfg(multi_core)]
-            core: portable_atomic::AtomicUsize::new(Self::UNLOCKED),
-        }
-    }
-}
-
-// This is preferred over critical-section as this allows you to have multiple
-// locks active at the same time rather than using the global mutex that is
-// critical-section.
-#[allow(unused_variables)]
-pub(crate) fn lock<T>(state: &LockState, f: impl FnOnce() -> T) -> T {
-    // In regards to disabling interrupts, we only need to disable
-    // the interrupts that may be calling this function.
-
-    #[cfg(not(multi_core))]
-    {
-        // Disabling interrupts is enough on single core chips to ensure mutual
-        // exclusion.
-
-        #[cfg(riscv)]
-        return riscv::interrupt::free(f);
-        #[cfg(xtensa)]
-        return xtensa_lx::interrupt::free(|_| f());
-    }
-
-    #[cfg(multi_core)]
-    {
-        use portable_atomic::Ordering;
-
-        let current_core = get_core() as usize;
-
-        let mut f = f;
-
-        loop {
-            let func = || {
-                // Use Acquire ordering in success to ensure `f()` "happens after" the lock is
-                // taken. Use Relaxed ordering in failure as there's no
-                // synchronisation happening.
-                if let Err(locked_core) = state.core.compare_exchange(
-                    LockState::UNLOCKED,
-                    current_core,
-                    Ordering::Acquire,
-                    Ordering::Relaxed,
-                ) {
-                    assert_ne!(
-                        locked_core, current_core,
-                        "esp_hal::lock is not re-entrant!"
-                    );
-
-                    Err(f)
-                } else {
-                    let result = f();
-
-                    // Use Release ordering here to ensure `f()` "happens before" this lock is
-                    // released.
-                    state.core.store(LockState::UNLOCKED, Ordering::Release);
-
-                    Ok(result)
-                }
-            };
-
-            #[cfg(riscv)]
-            let result = riscv::interrupt::free(func);
-            #[cfg(xtensa)]
-            let result = xtensa_lx::interrupt::free(|_| func());
-
-            match result {
-                Ok(result) => break result,
-                Err(the_function) => f = the_function,
-            }
-
-            // Consider using core::hint::spin_loop(); Might need SW_INT.
-        }
-    }
 }
 
 /// Default (unhandled) interrupt handler
@@ -720,63 +487,86 @@ unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
 }
 
-#[doc(hidden)]
-/// Helper macro for checking doctest code snippets
-#[macro_export]
-macro_rules! before_snippet {
-    () => {
-        r#"
-# #![no_std]
-# use esp_hal::prelude::*;
-# use procmacros::handler;
-# use esp_hal::interrupt;
-# #[panic_handler]
-# fn panic(_ : &core::panic::PanicInfo) -> ! {
-#     loop {}
-# }
-# fn main() {
-#     let mut peripherals = esp_hal::init(esp_hal::Config::default());
-"#
-    };
-}
-
 use crate::{
     clock::{Clocks, CpuClock},
+    config::{WatchdogConfig, WatchdogStatus},
     peripherals::Peripherals,
 };
 
 /// System configuration.
+///
+/// This `struct` is marked with `#[non_exhaustive]` and can't be instantiated
+/// directly. This is done to prevent breaking changes when new fields are added
+/// to the `struct`. Instead, use the [`Config::default()`] method to create a
+/// new instance.
+///
+/// For usage examples, see the [config module documentation](crate::config).
 #[non_exhaustive]
 #[derive(Default)]
 pub struct Config {
     /// The CPU clock configuration.
     pub cpu_clock: CpuClock,
+    /// Enable watchdog timer(s).
+    pub watchdog: WatchdogConfig,
 }
 
 /// Initialize the system.
 ///
-/// This function sets up the CPU clock and returns the peripherals and clocks.
+/// This function sets up the CPU clock and watchdog, then, returns the
+/// peripherals and clocks.
 pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
-    #[cfg(not(any(esp32, esp32s2)))]
-    rtc.swd.disable();
-    rtc.rwdt.disable();
 
-    unsafe {
-        crate::timer::timg::Wdt::<self::peripherals::TIMG0, Blocking>::set_wdt_enabled(false);
-        #[cfg(timg1)]
-        crate::timer::timg::Wdt::<self::peripherals::TIMG1, Blocking>::set_wdt_enabled(false);
+    #[cfg(not(any(esp32, esp32s2)))]
+    if config.watchdog.swd {
+        rtc.swd.enable();
+    } else {
+        rtc.swd.disable();
+    }
+
+    match config.watchdog.rwdt {
+        WatchdogStatus::Enabled(duration) => {
+            rtc.rwdt.enable();
+            rtc.rwdt
+                .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
+        }
+        WatchdogStatus::Disabled => {
+            rtc.rwdt.disable();
+        }
+    }
+
+    match config.watchdog.timg0 {
+        WatchdogStatus::Enabled(duration) => {
+            let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
+            timg0_wd.enable();
+            timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
+        }
+        WatchdogStatus::Disabled => {
+            crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
+        }
+    }
+
+    #[cfg(timg1)]
+    match config.watchdog.timg1 {
+        WatchdogStatus::Enabled(duration) => {
+            let mut timg1_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
+            timg1_wd.enable();
+            timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
+        }
+        WatchdogStatus::Disabled => {
+            crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();
+        }
     }
 
     Clocks::init(config.cpu_clock);
 
-    #[cfg(xtensa)]
-    crate::interrupt::setup_interrupts();
     #[cfg(esp32)]
     crate::time::time_init();
+
+    crate::gpio::bind_default_interrupt_handler();
 
     peripherals
 }

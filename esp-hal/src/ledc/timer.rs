@@ -117,6 +117,42 @@ pub mod config {
         Duty20Bit,
     }
 
+    impl TryFrom<u32> for Duty {
+        type Error = ();
+
+        fn try_from(value: u32) -> Result<Self, Self::Error> {
+            Ok(match value {
+                1 => Self::Duty1Bit,
+                2 => Self::Duty2Bit,
+                3 => Self::Duty3Bit,
+                4 => Self::Duty4Bit,
+                5 => Self::Duty5Bit,
+                6 => Self::Duty6Bit,
+                7 => Self::Duty7Bit,
+                8 => Self::Duty8Bit,
+                9 => Self::Duty9Bit,
+                10 => Self::Duty10Bit,
+                11 => Self::Duty11Bit,
+                12 => Self::Duty12Bit,
+                13 => Self::Duty13Bit,
+                14 => Self::Duty14Bit,
+                #[cfg(esp32)]
+                15 => Self::Duty15Bit,
+                #[cfg(esp32)]
+                16 => Self::Duty16Bit,
+                #[cfg(esp32)]
+                17 => Self::Duty17Bit,
+                #[cfg(esp32)]
+                18 => Self::Duty18Bit,
+                #[cfg(esp32)]
+                19 => Self::Duty19Bit,
+                #[cfg(esp32)]
+                20 => Self::Duty20Bit,
+                _ => Err(())?,
+            })
+        }
+    }
+
     /// Timer configuration
     #[derive(Copy, Clone)]
     pub struct Config<CS> {
@@ -151,7 +187,7 @@ impl TimerSpeed for HighSpeed {
 /// Interface for Timers
 pub trait TimerIFace<S: TimerSpeed> {
     /// Return the frequency of the timer
-    fn get_freq(&self) -> Option<HertzU32>;
+    fn freq(&self) -> Option<HertzU32>;
 
     /// Configure the timer
     fn configure(&mut self, config: config::Config<S::ClockSourceType>) -> Result<(), Error>;
@@ -160,19 +196,19 @@ pub trait TimerIFace<S: TimerSpeed> {
     fn is_configured(&self) -> bool;
 
     /// Return the duty resolution of the timer
-    fn get_duty(&self) -> Option<config::Duty>;
+    fn duty(&self) -> Option<config::Duty>;
 
     /// Return the timer number
-    fn get_number(&self) -> Number;
+    fn number(&self) -> Number;
 
     /// Return the timer frequency, or 0 if not configured
-    fn get_frequency(&self) -> u32;
+    fn frequency(&self) -> u32;
 }
 
 /// Interface for HW configuration of timer
 pub trait TimerHW<S: TimerSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<HertzU32>;
+    fn freq_hw(&self) -> Option<HertzU32>;
 
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32);
@@ -197,8 +233,8 @@ where
     Timer<'a, S>: TimerHW<S>,
 {
     /// Return the frequency of the timer
-    fn get_freq(&self) -> Option<HertzU32> {
-        self.get_freq_hw()
+    fn freq(&self) -> Option<HertzU32> {
+        self.freq_hw()
     }
 
     /// Configure the timer
@@ -207,7 +243,7 @@ where
         self.clock_source = Some(config.clock_source);
 
         // TODO: we should return some error here if `unwrap()` fails
-        let src_freq: u32 = self.get_freq().unwrap().to_Hz();
+        let src_freq: u32 = self.freq().unwrap().to_Hz();
         let precision = 1 << config.duty as u32;
         let frequency: u32 = config.frequency.raw();
         self.frequency = frequency;
@@ -239,17 +275,17 @@ where
     }
 
     /// Return the duty resolution of the timer
-    fn get_duty(&self) -> Option<config::Duty> {
+    fn duty(&self) -> Option<config::Duty> {
         self.duty
     }
 
     /// Return the timer number
-    fn get_number(&self) -> Number {
+    fn number(&self) -> Number {
         self.number
     }
 
     /// Return the timer frequency
-    fn get_frequency(&self) -> u32 {
+    fn frequency(&self) -> u32 {
         self.frequency
     }
 }
@@ -270,9 +306,9 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
 }
 
 /// Timer HW implementation for LowSpeed timers
-impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
+impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<HertzU32> {
+    fn freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|source| match source {
             LSClockSource::APBClk => {
                 let clocks = Clocks::get();
@@ -335,7 +371,7 @@ impl<'a> TimerHW<LowSpeed> for Timer<'a, LowSpeed> {
 /// Timer HW implementation for HighSpeed timers
 impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
     /// Get the current source timer frequency from the HW
-    fn get_freq_hw(&self) -> Option<HertzU32> {
+    fn freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|source| match source {
             HSClockSource::APBClk => {
                 let clocks = Clocks::get();

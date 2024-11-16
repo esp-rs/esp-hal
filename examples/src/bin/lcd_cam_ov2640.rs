@@ -27,10 +27,11 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
-    dma_buffers,
-    gpio::Io,
-    i2c,
-    i2c::I2C,
+    dma_rx_stream_buffer,
+    i2c::{
+        self,
+        master::{Config, I2c},
+    },
     lcd_cam::{
         cam::{Camera, RxEightBits},
         LcdCam,
@@ -38,58 +39,49 @@ use esp_hal::{
     prelude::*,
     Blocking,
 };
-use esp_println::println;
+use esp_println::{print, println};
 
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     let dma = Dma::new(peripherals.DMA);
     let channel = dma.channel0;
 
-    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32678, 0);
+    let dma_rx_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
 
     let channel = channel.configure(false, DmaPriority::Priority0);
 
-    let cam_siod = io.pins.gpio4;
-    let cam_sioc = io.pins.gpio5;
-    let cam_xclk = io.pins.gpio15;
-    let cam_vsync = io.pins.gpio6;
-    let cam_href = io.pins.gpio7;
-    let cam_pclk = io.pins.gpio13;
+    let cam_siod = peripherals.GPIO4;
+    let cam_sioc = peripherals.GPIO5;
+    let cam_xclk = peripherals.GPIO15;
+    let cam_vsync = peripherals.GPIO6;
+    let cam_href = peripherals.GPIO7;
+    let cam_pclk = peripherals.GPIO13;
     let cam_data_pins = RxEightBits::new(
-        io.pins.gpio11,
-        io.pins.gpio9,
-        io.pins.gpio8,
-        io.pins.gpio10,
-        io.pins.gpio12,
-        io.pins.gpio18,
-        io.pins.gpio17,
-        io.pins.gpio16,
+        peripherals.GPIO11,
+        peripherals.GPIO9,
+        peripherals.GPIO8,
+        peripherals.GPIO10,
+        peripherals.GPIO12,
+        peripherals.GPIO18,
+        peripherals.GPIO17,
+        peripherals.GPIO16,
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let mut camera = Camera::new(
-        lcd_cam.cam,
-        channel.rx,
-        rx_descriptors,
-        cam_data_pins,
-        20u32.MHz(),
-    )
-    .with_master_clock(cam_xclk)
-    .with_pixel_clock(cam_pclk)
-    .with_ctrl_pins(cam_vsync, cam_href);
+    let camera = Camera::new(lcd_cam.cam, channel.rx, cam_data_pins, 20u32.MHz())
+        .with_master_clock(cam_xclk)
+        .with_pixel_clock(cam_pclk)
+        .with_ctrl_pins(cam_vsync, cam_href);
 
     let delay = Delay::new();
 
-    let mut buffer = rx_buffer;
-    buffer.fill(0u8);
-
     delay.delay_millis(500u32);
 
-    let i2c = I2C::new(peripherals.I2C0, cam_siod, cam_sioc, 100u32.kHz());
+    let i2c = I2c::new(peripherals.I2C0, Config::default())
+        .with_sda(cam_siod)
+        .with_scl(cam_sioc);
 
     let mut sccb = Sccb::new(i2c);
 
@@ -100,10 +92,6 @@ fn main() -> ! {
     sccb.write(OV2640_ADDRESS, 0xFF, 0x01).unwrap(); // bank sensor
     let pid = sccb.read(OV2640_ADDRESS, 0x0A).unwrap();
     println!("Found PID of {:#02X}, and was expecting 0x26", pid);
-
-    // Start waiting for camera before initialising it to prevent missing the first few bytes.
-    // This can be improved with a VSYNC interrupt but would complicate this example.
-    let transfer = camera.read_dma(&mut buffer).unwrap();
 
     for (reg, value) in FIRST_BLOCK {
         sccb.write(OV2640_ADDRESS, *reg, *value).unwrap();
@@ -116,20 +104,61 @@ fn main() -> ! {
         }
     }
 
-    transfer.wait().unwrap();
+    // Start receiving data from the camera.
+    let mut transfer = camera.receive(dma_rx_buf).map_err(|e| e.0).unwrap();
 
-    // Note: JPEGs starts with "FF, D8, FF, E0" and end with "FF, D9"
-
-    let index_of_end = buffer.windows(2).position(|c| c[0] == 0xFF && c[1] == 0xD9);
-    let index_of_end = if let Some(idx) = index_of_end {
-        idx + 2
-    } else {
-        println!("Failed to find JPEG terminator");
-        buffer.len()
-    };
+    // Skip the first 2 images. Each image ends with an EOF.
+    // We likely missed the first few bytes of the first image and the second image is likely
+    // garbage from the OV2640 focusing, calibrating, etc.
+    // Feel free to skip more images if the one captured below is still garbage.
+    for _ in 0..2 {
+        let mut total_bytes = 0;
+        loop {
+            let (data, ends_with_eof) = transfer.peek_until_eof();
+            if data.is_empty() {
+                if transfer.is_done() {
+                    panic!("We were too slow to read from the DMA");
+                }
+            } else {
+                let bytes_peeked = data.len();
+                transfer.consume(bytes_peeked);
+                total_bytes += bytes_peeked;
+                if ends_with_eof {
+                    // Found the end of the image/frame.
+                    println!("Skipped a {} byte image", total_bytes);
+                    break;
+                }
+            }
+        }
+    }
 
     println!("Frame data (parse with `xxd -r -p <uart>.txt image.jpg`):");
-    println!("{:02X?}", &buffer[..index_of_end]);
+
+    // Note: JPEGs starts with "FF, D8, FF, E0" and end with "FF, D9".
+    // The OV2640 also sends some trailing zeros after the JPEG. This is expected.
+
+    loop {
+        let (data, ends_with_eof) = transfer.peek_until_eof();
+        if data.is_empty() {
+            if transfer.is_done() {
+                panic!("We were too slow to read from the DMA");
+            }
+        } else {
+            for b in data {
+                print!("{:02X}, ", b);
+            }
+            let bytes_peeked = data.len();
+            transfer.consume(bytes_peeked);
+
+            if ends_with_eof {
+                // Found the end of the image/frame.
+                break;
+            }
+        }
+    }
+
+    // The full frame has been captured, the transfer can be stopped now.
+    let _ = transfer.stop();
 
     loop {}
 }
@@ -137,22 +166,22 @@ fn main() -> ! {
 pub const OV2640_ADDRESS: u8 = 0x30;
 
 pub struct Sccb<'d, T> {
-    i2c: I2C<'d, T, Blocking>,
+    i2c: I2c<'d, Blocking, T>,
 }
 
 impl<'d, T> Sccb<'d, T>
 where
-    T: i2c::Instance,
+    T: i2c::master::Instance,
 {
-    pub fn new(i2c: I2C<'d, T, Blocking>) -> Self {
+    pub fn new(i2c: I2c<'d, Blocking, T>) -> Self {
         Self { i2c }
     }
 
-    pub fn probe(&mut self, address: u8) -> Result<(), i2c::Error> {
+    pub fn probe(&mut self, address: u8) -> Result<(), i2c::master::Error> {
         self.i2c.write(address, &[])
     }
 
-    pub fn read(&mut self, address: u8, reg: u8) -> Result<u8, i2c::Error> {
+    pub fn read(&mut self, address: u8, reg: u8) -> Result<u8, i2c::master::Error> {
         self.i2c.write(address, &[reg])?;
 
         let mut bytes = [0u8; 1];
@@ -160,7 +189,7 @@ where
         Ok(bytes[0])
     }
 
-    pub fn write(&mut self, address: u8, reg: u8, data: u8) -> Result<(), i2c::Error> {
+    pub fn write(&mut self, address: u8, reg: u8, data: u8) -> Result<(), i2c::master::Error> {
         self.i2c.write(address, &[reg, data])
     }
 }

@@ -1,8 +1,8 @@
-# Migration Guide from 0.9.x to vNext
+# Migration Guide from 0.9.x to v0.10.x
 
 ## Initialization
 
-You no longer have to set up clocks and pass them to `esp_wifi::initialize`.
+You no longer have to set up clocks and pass them to `esp_wifi::init` and the `esp_wifi:initialize` function is renamed to `esp_wifi::init`.
 
 ```diff
  use esp_hal::{
@@ -12,10 +12,10 @@ You no longer have to set up clocks and pass them to `esp_wifi::initialize`.
 -    system::SystemControl,
  };
  use esp_wifi::{
-     initialize,
+-     initialize,
      // ...
  };
- 
+
  #[entry]
  fn main() -> ! {
 -    let peripherals = Peripherals::take();
@@ -25,7 +25,8 @@ You no longer have to set up clocks and pass them to `esp_wifi::initialize`.
 
      let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-     let init = initialize(
+-     let init = initialize(
++     let init = esp_wifi::init(
          EspWifiInitFor::Wifi,
          timg0.timer0,
          Rng::new(peripherals.RNG),
@@ -40,7 +41,7 @@ You no longer have to set up clocks and pass them to `esp_wifi::initialize`.
 
 ## Memory allocation
 
-You now need to have a global allocator provided by `esp-alloc` providing allocations from internal memory
+By default the `esp-alloc` feature is enabled which means you need to have a global allocator provided by `esp-alloc` allowing allocations from internal memory
 
 ```diff
  #![no_std]
@@ -65,6 +66,9 @@ The size of the heap depends on what you are going to use esp-wifi for and if yo
 
 E.g. when using `coex` you need around 92k. If not using `coex`, going lower than 72k you will observe some failed allocations but it might still work. Going even lower will make things fail.
 
+If you see linker errors regarding undefined symbols for `esp_wifi_free_internal_heap` and `esp_wifi_allocate_from_internal_ram` you either want to opt-in to use the `esp-alloc` feature
+or provide your own allocator (see below)
+
 ### Using your own allocator
 
 You can also use your own allocator instead of using `esp-alloc`. To do that you need to opt-out of the default feature `esp-alloc` and provide two functions:
@@ -88,3 +92,40 @@ pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
 ```
 
 It's important to allocate from internal memory (i.e. not PSRAM)
+
+## Tunable parameters are now set via esp-config
+
+We've replaced usage of `cfg_toml` with [esp-config](https://docs.rs/esp-config). Please remove any esp-wifi entries from `cfg.toml` and migrate the key value pairs to the `[env]` section of `.cargo/config.toml`.
+
+```diff
+# key in cfg.toml
+- rx_queue_size = 40
+# key in .cargo/config.toml [env] section
++ ESP_WIFI_RX_QUEUE_SIZE=40
+```
+
+## `wifi-logs` feature renamed to `sys-logs`
+
+```diff
+- features = ["wifi-logs"]
++ features = ["sys-logs"]
+```
+
+## Removed `esp_wifi::current_millis`
+
+You can use `esp_hal::time::now()` instead.
+
+```diff
+- let now = esp_wifi::current_millis();
++ let now = time::now().duration_since_epoch().to_millis();
+```
+
+## `esp-wifi` no longer selects the device feature of `esp-hal-embassy`
+
+You'll need to explicitly select your device in your `Cargo.toml`, in case you've been
+previously relying on `esp-wifi` to do this for you.
+
+```diff
+-esp-hal-embassy = "0.3.0"
++esp-hal-embassy = { version = "0.3.0", features = ["esp32s3"] }
+```

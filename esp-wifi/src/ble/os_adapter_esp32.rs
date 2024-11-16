@@ -109,11 +109,12 @@ pub(super) struct osi_funcs_s {
             *mut crate::binary::c_types::c_uint,
         ) -> crate::binary::c_types::c_int,
     >,
+    patch_apply: Option<unsafe extern "C" fn()>,
     magic: u32,
 }
 
 pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
-    version: 0x00010004,
+    version: 0x00010005,
     set_isr: Some(ble_os_adapter_chip_specific::set_isr),
     ints_on: Some(ble_os_adapter_chip_specific::ints_on),
     interrupt_disable: Some(interrupt_disable),
@@ -178,8 +179,23 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     interrupt_l3_restore: Some(interrupt_l3_restore),
     custom_queue_create: Some(custom_queue_create),
     coex_version_get: Some(coex_version_get_wrapper),
+    patch_apply: Some(patch_apply),
     magic: 0xfadebead,
 };
+
+extern "C" fn patch_apply() {
+    trace!("patch apply");
+
+    extern "C" {
+        fn config_ble_funcs_reset();
+        fn config_btdm_funcs_reset();
+    }
+
+    unsafe {
+        config_btdm_funcs_reset();
+        config_ble_funcs_reset();
+    }
+}
 
 extern "C" fn coex_version_get_wrapper(major: *mut u32, minor: *mut u32, patch: *mut u32) -> i32 {
     unsafe {
@@ -287,7 +303,9 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         pcm_polar: 0,
         hli: false,
         dup_list_refresh_period: 0,
-        magic: 0x20221207,
+        ble_scan_backoff: false,
+        pcm_fsyncshp: 0,
+        magic: 0x20240722,
     }
 }
 
@@ -358,7 +376,7 @@ pub(crate) fn disable_sleep_mode() {
 }
 
 pub(crate) unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
-    debug!("coex_bt_wakeup_request");
+    trace!("coex_bt_wakeup_request");
     #[cfg(coex)]
     return async_wakeup_request(BTDM_ASYNC_WAKEUP_REQ_COEX);
 
@@ -375,7 +393,7 @@ pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32 {
-    debug!("coex_bt_request");
+    trace!("coex_bt_request");
     extern "C" {
         #[cfg(coex)]
         fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32;
@@ -390,7 +408,7 @@ pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, durati
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bt_release(event: u32) -> i32 {
-    debug!("coex_bt_release");
+    trace!("coex_bt_release");
     extern "C" {
         #[cfg(coex)]
         fn coex_bt_release(event: u32) -> i32;
@@ -420,7 +438,7 @@ pub(crate) unsafe extern "C" fn coex_register_bt_cb_wrapper(
 }
 
 pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
-    debug!("coex_bb_reset_lock");
+    trace!("coex_bb_reset_lock");
     extern "C" {
         #[cfg(coex)]
         fn coex_bb_reset_lock() -> u32;
@@ -435,7 +453,7 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bb_reset_unlock(event: u32) {
-    debug!("coex_bb_reset_unlock");
+    trace!("coex_bb_reset_unlock");
     extern "C" {
         #[cfg(coex)]
         fn coex_bb_reset_unlock(event: u32);
@@ -462,7 +480,7 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
-    debug!("coex_schm_interval_get");
+    trace!("coex_schm_interval_get");
 
     #[cfg(coex)]
     return crate::binary::include::coex_schm_interval_get();
@@ -472,7 +490,7 @@ pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
-    debug!("coex_schm_curr_period_get");
+    trace!("coex_schm_curr_period_get");
 
     #[cfg(coex)]
     return crate::binary::include::coex_schm_curr_period_get();
@@ -482,7 +500,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
-    debug!("coex_schm_curr_phase_get");
+    trace!("coex_schm_curr_phase_get");
 
     #[cfg(coex)]
     return crate::binary::include::coex_schm_curr_phase_get() as *const ();
@@ -568,7 +586,6 @@ const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
 ///   true if request lock is needed, false otherwise
 ///
 /// *************************************************************************
-
 #[cfg(coex)]
 fn async_wakeup_request(event: i32) -> bool {
     let mut do_wakeup_request = false;
@@ -605,7 +622,6 @@ fn async_wakeup_request(event: i32) -> bool {
 ///   true if request lock is needed, false otherwise
 ///
 /// *************************************************************************
-
 #[cfg(coex)]
 fn async_wakeup_request_end(event: i32) {
     let request_lock = match event {

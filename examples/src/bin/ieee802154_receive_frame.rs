@@ -10,8 +10,8 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = esp_hal::init(esp_hal::Config::default());
-    let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, &mut peripherals.RADIO_CLK);
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, peripherals.RADIO_CLK);
 
     ieee802154.set_config(Config {
         channel: 15,
@@ -28,7 +28,7 @@ fn main() -> ! {
     ieee802154.start_receive();
 
     loop {
-        if let Some(frame) = ieee802154.get_received() {
+        if let Some(frame) = ieee802154.received() {
             println!("Received {:?}\n", &frame);
         }
     }

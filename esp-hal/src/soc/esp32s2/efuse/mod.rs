@@ -24,12 +24,10 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::efuse::Efuse;
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let mut serial_tx = Uart::new(peripherals.UART0, io.pins.gpio4, io.pins.gpio5).unwrap();
+//! # let mut serial_tx = Uart::new(peripherals.UART0, peripherals.GPIO4, peripherals.GPIO5).unwrap();
 //! let mac_address = Efuse::read_base_mac_address();
 //! writeln!(
 //!     serial_tx,
@@ -59,12 +57,12 @@ impl Efuse {
     }
 
     /// Get status of SPI boot encryption.
-    pub fn get_flash_encryption() -> bool {
+    pub fn flash_encryption() -> bool {
         (Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT).count_ones() % 2) != 0
     }
 
     /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
-    pub fn get_rwdt_multiplier() -> u8 {
+    pub fn rwdt_multiplier() -> u8 {
         Self::read_field_le::<u8>(WDT_DELAY_SEL)
     }
 }

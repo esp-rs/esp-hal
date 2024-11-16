@@ -24,7 +24,15 @@ name    = "crc"
 harness = false
 
 [[test]]
+name    = "critical_section"
+harness = false
+
+[[test]]
 name    = "delay"
+harness = false
+
+[[test]]
+name    = "delay_async"
 harness = false
 
 [[test]]
@@ -48,6 +56,10 @@ name    = "gpio"
 harness = false
 
 [[test]]
+name    = "gpio_custom_handler"
+harness = false
+
+[[test]]
 name    = "interrupt"
 harness = false
 
@@ -56,11 +68,11 @@ name    = "i2c"
 harness = false
 
 [[test]]
-name    = "i2s"
+name    = "init"
 harness = false
 
 [[test]]
-name    = "i2s_async"
+name    = "i2s"
 harness = false
 
 [[test]]
@@ -72,35 +84,11 @@ name    = "lcd_cam_i8080_async"
 harness = false
 
 [[test]]
-name    = "qspi_read"
-harness = false
-
-[[test]]
-name    = "qspi_write"
-harness = false
-
-[[test]]
-name    = "qspi_write_read"
+name    = "qspi"
 harness = false
 
 [[test]]
 name    = "spi_full_duplex"
-harness = false
-
-[[test]]
-name    = "spi_full_duplex_dma"
-harness = false
-
-[[test]]
-name    = "spi_full_duplex_dma_async"
-harness = false
-
-[[test]]
-name    = "spi_full_duplex_dma_pcnt"
-harness = false
-
-[[test]]
-name    = "spi_full_duplex_dma_write_read"
 harness = false
 
 [[test]]
@@ -112,7 +100,23 @@ name    = "spi_half_duplex_write"
 harness = false
 
 [[test]]
+name    = "spi_half_duplex_write_psram"
+harness = false
+
+[[test]]
+name    = "spi_slave"
+harness = false
+
+[[test]]
 name    = "systimer"
+harness = false
+
+[[test]]
+name    = "parl_io_tx"
+harness = false
+
+[[test]]
+name    = "parl_io_tx_async"
 harness = false
 
 [[test]]
@@ -149,6 +153,10 @@ harness           = false
 required-features = ["embassy"]
 
 [[test]]
+name    = "uart_regression"
+harness = false
+
+[[test]]
 name    = "uart_tx_rx"
 harness = false
 
@@ -175,23 +183,32 @@ required-features = ["embassy"]
 name    = "twai"
 harness = false
 
+[[test]]
+name              = "esp_wifi_floats"
+harness           = false
+required-features = ["esp-wifi", "esp-alloc"]
+
 [dependencies]
 cfg-if             = "1.0.0"
-critical-section   = "1.1.2"
+critical-section   = "1.1.3"
 defmt              = "0.3.8"
 defmt-rtt          = { version = "0.4.1", optional = true }
 embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.0"
-embassy-time       = { version = "0.3.1" }
+embassy-time       = "0.3.2"
 embedded-hal       = "1.0.0"
 embedded-hal-02    = { version = "0.2.7", package = "embedded-hal", features = ["unproven"] }
 embedded-hal-async = "1.0.0"
 embedded-hal-nb    = { version = "1.0.0", optional = true }
-esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["exception-handler", "panic-handler", "defmt", "semihosting"] }
-esp-hal            = { path = "../esp-hal", features = ["defmt", "digest"], optional = true }
+esp-alloc          = { path = "../esp-alloc", optional = true }
+esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["exception-handler", "defmt", "semihosting"] }
+esp-hal            = { path = "../esp-hal", features = ["digest"], optional = true }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
-portable-atomic    = "1.6.0"
+esp-wifi           = { path = "../esp-wifi", optional = true, features = ["wifi"] }
+portable-atomic    = "1.9.0"
 static_cell        = { version = "2.1.0", features = ["nightly"] }
+semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
+xtensa-lx-rt       = { path = "../xtensa-lx-rt", optional = true }
 
 [dev-dependencies]
 crypto-bigint       = { version = "0.5.5", default-features = false }
@@ -199,7 +216,7 @@ digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 embassy-executor    = { version = "0.6.0", default-features = false }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test       = { version = "0.4.0", default-features = false }
+embedded-test       = { version = "0.5.0", default-features = false }
 fugit               = "0.3.7"
 hex-literal         = "0.4.1"
 nb                  = "1.1.0"
@@ -209,36 +226,59 @@ sha1                = { version = "0.10.6", default-features = false }
 sha2                = { version = "0.10.8", default-features = false }
 
 [build-dependencies]
-esp-build    = { version = "0.1.0", path = "../esp-build" }
-esp-metadata = { version = "0.3.0", path = "../esp-metadata" }
+esp-build    = { path = "../esp-build" }
+esp-metadata = { path = "../esp-metadata" }
 
 [features]
 default = ["embassy"]
 
-defmt = ["dep:defmt-rtt"]
+defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt"]
 
 # Device support (required!):
 esp32 = [
     "embedded-test/xtensa-semihosting",
     "esp-backtrace/esp32",
     "esp-hal/esp32",
-    "esp-hal-embassy/esp32",
+    "esp-hal-embassy?/esp32",
+    "esp-wifi?/esp32",
 ]
-esp32c2 = ["esp-backtrace/esp32c2", "esp-hal/esp32c2", "esp-hal-embassy/esp32c2"]
-esp32c3 = ["esp-backtrace/esp32c3", "esp-hal/esp32c3", "esp-hal-embassy/esp32c3"]
-esp32c6 = ["esp-backtrace/esp32c6", "esp-hal/esp32c6", "esp-hal-embassy/esp32c6"]
-esp32h2 = ["esp-backtrace/esp32h2", "esp-hal/esp32h2", "esp-hal-embassy/esp32h2"]
+esp32c2 = [
+    "esp-backtrace/esp32c2",
+    "esp-hal/esp32c2",
+    "esp-hal-embassy?/esp32c2",
+    "esp-wifi?/esp32c2",
+]
+esp32c3 = [
+    "esp-backtrace/esp32c3",
+    "esp-hal/esp32c3",
+    "esp-hal-embassy?/esp32c3",
+    "esp-wifi?/esp32c3",
+]
+esp32c6 = [
+    "esp-backtrace/esp32c6",
+    "esp-hal/esp32c6",
+    "esp-hal-embassy?/esp32c6",
+    "esp-wifi?/esp32c6",
+]
+esp32h2 = [
+    "esp-backtrace/esp32h2",
+    "esp-hal/esp32h2",
+    "esp-hal-embassy?/esp32h2",
+    "esp-wifi?/esp32h2",
+]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
     "esp-backtrace/esp32s2",
     "esp-hal/esp32s2",
-    "esp-hal-embassy/esp32s2",
+    "esp-hal-embassy?/esp32s2",
+    "esp-wifi?/esp32s2",
 ]
 esp32s3 = [
     "embedded-test/xtensa-semihosting",
     "esp-backtrace/esp32s3",
     "esp-hal/esp32s3",
-    "esp-hal-embassy/esp32s3",
+    "esp-hal-embassy?/esp32s3",
+    "esp-wifi?/esp32s3",
 ]
 # Async & Embassy:
 embassy = [
@@ -252,6 +292,7 @@ generic-queue = [
 integrated-timers = [
     "esp-hal-embassy/integrated-timers",
 ]
+octal-psram = ["esp-hal/octal-psram", "esp-alloc"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.
@@ -269,5 +310,5 @@ debug            = 2
 debug-assertions = false
 incremental      = false
 opt-level        = 3
-lto              = "fat"
+lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = false

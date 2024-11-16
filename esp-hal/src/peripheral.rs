@@ -1,28 +1,4 @@
 //! # Exclusive peripheral access
-//!
-//! ## Overview
-//!
-//! The Peripheral module provides an exclusive access mechanism to peripherals
-//! on ESP chips. It includes the `PeripheralRef` struct, which represents an
-//! exclusive reference to a peripheral. It offers memory efficiency benefits
-//! for zero-sized types.
-//!
-//! ## Configuration
-//!
-//! The `PeripheralRef` struct is used to access and interact with peripherals.
-//! It implements the `Deref` and `DerefMut` traits, allowing you to dereference
-//! it to access the underlying peripheral. It also provides methods for cloning
-//! and re-borrowing the peripheral.
-//!
-//! The module also defines the `Peripheral` trait, which is implemented by
-//! types that can be used as peripherals. The trait allows conversion between
-//! owned and borrowed peripherals and provides an unsafe method for cloning the
-//! peripheral. By implementing this trait, a type can be used with the
-//! `PeripheralRef` struct.
-//!
-//! The module also includes a `peripheral_macros` module, which contains macros
-//! for generating peripheral structs and associated traits based on
-//! configuration options.
 
 use core::{
     marker::PhantomData,
@@ -35,7 +11,7 @@ use core::{
 /// dedicated struct is memory efficiency:
 ///
 /// Peripheral singletons are typically either zero-sized (for concrete
-/// peripherals like `PA9` or `Spi4`) or very small (for example `AnyPin`
+/// peripherals like `SPI2` or `UART0`) or very small (for example `AnyPin`
 /// which is 1 byte). However `&mut T` is always 4 bytes for 32-bit targets,
 /// even if T is zero-sized. PeripheralRef stores a copy of `T` instead, so it's
 /// the same size.
@@ -68,7 +44,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     /// You should strongly prefer using `reborrow()` instead. It returns a
     /// `PeripheralRef` that borrows `self`, which allows the borrow checker
     /// to enforce this at compile time.
-    pub unsafe fn clone_unchecked(&mut self) -> PeripheralRef<'a, T>
+    pub unsafe fn clone_unchecked(&self) -> PeripheralRef<'a, T>
     where
         T: Peripheral<P = T>,
     {
@@ -93,7 +69,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     /// using an `Into` impl to convert from `T` to `U`.
     ///
     /// For example, this can be useful to degrade GPIO pins: converting from
-    /// PeripheralRef<'a, PB11>` to `PeripheralRef<'a, AnyPin>`.
+    /// PeripheralRef<'a, GpioPin<11>>` to `PeripheralRef<'a, AnyPin>`.
     #[inline]
     pub fn map_into<U>(self) -> PeripheralRef<'a, U>
     where
@@ -106,7 +82,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     }
 }
 
-impl<'a, T> Deref for PeripheralRef<'a, T> {
+impl<T> Deref for PeripheralRef<'_, T> {
     type Target = T;
 
     #[inline]
@@ -115,7 +91,7 @@ impl<'a, T> Deref for PeripheralRef<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for PeripheralRef<'a, T> {
+impl<T> DerefMut for PeripheralRef<'_, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
@@ -125,19 +101,19 @@ impl<'a, T> DerefMut for PeripheralRef<'a, T> {
 /// Trait for any type that can be used as a peripheral of type `P`.
 ///
 /// This is used in driver constructors, to allow passing either owned
-/// peripherals (e.g. `TWISPI0`), or borrowed peripherals (e.g. `&mut TWISPI0`).
+/// peripherals (e.g. `UART0`), or borrowed peripherals (e.g. `&mut UART0`).
 ///
 /// For example, if you have a driver with a constructor like this:
 ///
 /// ```rust, ignore
-/// impl<'d, T: Instance> Twim<'d, T> {
-///     pub fn new(
-///         twim: impl Peripheral<P = T> + 'd,
-///         irq: impl Peripheral<P = T::Interrupt> + 'd,
-///         sda: impl Peripheral<P = impl GpioPin> + 'd,
-///         scl: impl Peripheral<P = impl GpioPin> + 'd,
-///         config: Config,
-///     ) -> Self { .. }
+/// impl<'d, T> Uart<'d, T, Blocking> {
+///     pub fn new<TX: PeripheralOutput, RX: PeripheralInput>(
+///         uart: impl Peripheral<P = T> + 'd,
+///         rx: impl Peripheral<P = RX> + 'd,
+///         tx: impl Peripheral<P = TX> + 'd,
+///     ) -> Result<Self, Error> {
+///         Ok(Self { .. })
+///     }
 /// }
 /// ```
 ///
@@ -145,14 +121,14 @@ impl<'a, T> DerefMut for PeripheralRef<'a, T> {
 /// live forever (`'static`):
 ///
 /// ```rust, ignore
-/// let mut twi: Twim<'static, ...> = Twim::new(p.TWISPI0, irq, p.P0_03, p.P0_04, config);
+/// let mut uart: Uart<'static, ...> = Uart::new(p.UART0, p.GPIO0, p.GPIO1);
 /// ```
 ///
 /// Or you may call it with borrowed peripherals, which yields an instance that
 /// can only live for as long as the borrows last:
 ///
 /// ```rust, ignore
-/// let mut twi: Twim<'_, ...> = Twim::new(&mut p.TWISPI0, &mut irq, &mut p.P0_03, &mut p.P0_04, config);
+/// let mut uart: Uart<'_, ...> = Uart::new(&mut p.UART0, &mut p.GPIO0, &mut p.GPIO1);
 /// ```
 ///
 /// # Implementation details, for HAL authors
@@ -179,18 +155,31 @@ pub trait Peripheral: Sized + crate::private::Sealed {
     /// You should strongly prefer using `into_ref()` instead. It returns a
     /// `PeripheralRef`, which allows the borrow checker to enforce this at
     /// compile time.
-    unsafe fn clone_unchecked(&mut self) -> Self::P;
+    unsafe fn clone_unchecked(&self) -> Self::P;
 
     /// Convert a value into a `PeripheralRef`.
     ///
     /// When called on an owned `T`, yields a `PeripheralRef<'static, T>`.
     /// When called on an `&'a mut T`, yields a `PeripheralRef<'a, T>`.
     #[inline]
-    fn into_ref<'a>(mut self) -> PeripheralRef<'a, Self::P>
+    fn into_ref<'a>(self) -> PeripheralRef<'a, Self::P>
     where
         Self: 'a,
     {
         PeripheralRef::new(unsafe { self.clone_unchecked() })
+    }
+
+    /// Map the peripheral using `Into`.
+    ///
+    /// This converts from `Peripheral<P = T>` to `Peripheral<P = U>`,
+    /// using an `Into` impl to convert from `T` to `U`.
+    #[inline]
+    fn map_into<U>(self) -> U
+    where
+        Self::P: Into<U>,
+        U: Peripheral<P = U>,
+    {
+        unsafe { self.clone_unchecked().into() }
     }
 }
 
@@ -200,120 +189,110 @@ where
 {
     type P = P;
 
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         T::clone_unchecked(self)
     }
 }
 
 impl<T> crate::private::Sealed for &mut T where T: crate::private::Sealed {}
+impl<T> crate::private::Sealed for PeripheralRef<'_, T> where T: crate::private::Sealed {}
+
+impl<T: Peripheral> Peripheral for PeripheralRef<'_, T> {
+    type P = T::P;
+
+    #[inline]
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        T::clone_unchecked(self)
+    }
+}
 
 mod peripheral_macros {
-    #[doc(hidden)]
-    #[macro_export]
-    macro_rules! impl_dma_eligible {
-        ($name:ident,$dma:ident) => {
-            impl $crate::dma::DmaEligible for $name {
-                const DMA_PERIPHERAL: $crate::dma::DmaPeripheral = $crate::dma::DmaPeripheral::$dma;
-            }
-        };
-    }
-
+    /// Creates a new `Peripherals` struct and its associated methods.
+    ///
+    /// The macro has a few fields doing different things, in the form of
+    /// `second <= third (fourth)`.
+    /// - The second field is the name of the peripheral, as it appears in the
+    ///   `Peripherals` struct.
+    /// - The third field is the name of the peripheral as it appears in the
+    ///   PAC. This may be `virtual` if the peripheral is not present in the
+    ///   PAC.
+    /// - The fourth field is an optional list of interrupts that can be bound
+    ///   to the peripheral.
     #[doc(hidden)]
     #[macro_export]
     macro_rules! peripherals {
-        ($($(#[$cfg:meta])? $name:ident <= $from_pac:tt $(($($interrupt:ident),*))? ),*$(,)?) => {
+        (
+            peripherals: [
+                $(
+                    $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
+                ), *$(,)?
+            ],
+            pins: [
+                $( ( $pin:literal, $($pin_tokens:tt)* ) )*
+            ]
+        ) => {
 
             /// Contains the generated peripherals which implement [`Peripheral`]
             mod peripherals {
                 pub use super::pac::*;
                 $(
-                    $crate::create_peripheral!($(#[$cfg])? $name <= $from_pac);
-                )*
-
-
-                $crate::impl_dma_eligible!(SPI2,Spi2);
-                #[cfg(any(pdma, esp32s3))]
-                $crate::impl_dma_eligible!(SPI3,Spi3);
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible!(MEM2MEM1,Mem2Mem1);
-                #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-                $crate::impl_dma_eligible!(UHCI0,Uhci0);
-                #[cfg(any(esp32, esp32s2, esp32c3, esp32c6, esp32h2, esp32s3))]
-                $crate::impl_dma_eligible!(I2S0,I2s0);
-                #[cfg(any(esp32, esp32s3))]
-                $crate::impl_dma_eligible!(I2S1,I2s1);
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible!(MEM2MEM4,Mem2Mem4);
-                #[cfg(esp32s3)]
-                $crate::impl_dma_eligible!(LCD_CAM,LcdCam);
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible!(MEM2MEM5,Mem2Mem5);
-                #[cfg(not(esp32c2))]
-                $crate::impl_dma_eligible!(AES,Aes);
-                #[cfg(gdma)]
-                $crate::impl_dma_eligible!(SHA,Sha);
-                #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-                $crate::impl_dma_eligible!(ADC1,Adc);
-                #[cfg(any(esp32c3, esp32s3))]
-                $crate::impl_dma_eligible!(ADC2,Adc);
-                #[cfg(esp32s3)]
-                $crate::impl_dma_eligible!(RMT,Rmt);
-                #[cfg(parl_io)]
-                $crate::impl_dma_eligible!(PARL_IO,ParlIo);
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible!(MEM2MEM10,Mem2Mem10);
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible!(MEM2MEM11,Mem2Mem11);
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible!(MEM2MEM12,Mem2Mem12);
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible!(MEM2MEM13,Mem2Mem13);
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible!(MEM2MEM14,Mem2Mem14);
-                #[cfg(any(esp32c6, esp32h2))]
-                $crate::impl_dma_eligible!(MEM2MEM15,Mem2Mem15);
-            }
-
-            /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
-            #[allow(non_snake_case)]
-            pub struct Peripherals {
-                $(
-                    $(#[$cfg])?
-                    /// Each field represents a hardware peripheral.
-                    pub $name: peripherals::$name,
+                    $crate::create_peripheral!($name <= $from_pac);
                 )*
             }
 
-            impl Peripherals {
-                /// Returns all the peripherals *once*
-                #[inline]
-                pub(crate) fn take() -> Self {
-                    #[no_mangle]
-                    static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
-
-                    critical_section::with(|_| unsafe {
-                        if _ESP_HAL_DEVICE_PERIPHERALS {
-                            panic!("init called more than once!")
-                        }
-                        _ESP_HAL_DEVICE_PERIPHERALS = true;
-                        Self::steal()
-                    })
+            pub(crate) mod gpio {
+                $crate::gpio! {
+                    $( ($pin, $($pin_tokens)* ) )*
                 }
             }
 
-            impl Peripherals {
-                /// Unsafely create an instance of this peripheral out of thin air.
-                ///
-                /// # Safety
-                ///
-                /// You must ensure that you're only using one instance of this type at a time.
-                #[inline]
-                pub unsafe fn steal() -> Self {
-                    Self {
-                        $(
-                            $(#[$cfg])?
-                            $name: peripherals::$name::steal(),
-                        )*
+            paste::paste! {
+                /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
+                #[allow(non_snake_case)]
+                pub struct Peripherals {
+                    $(
+                        #[doc = concat!("The ", stringify!($name), " peripheral.")]
+                        pub $name: peripherals::$name,
+                    )*
+
+                    $(
+                        #[doc = concat!("GPIO", stringify!($pin))]
+                        pub [<GPIO $pin>]: $crate::gpio::GpioPin<$pin>,
+                    )*
+                }
+
+                impl Peripherals {
+                    /// Returns all the peripherals *once*
+                    #[inline]
+                    pub(crate) fn take() -> Self {
+                        #[no_mangle]
+                        static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
+
+                        critical_section::with(|_| unsafe {
+                            if _ESP_HAL_DEVICE_PERIPHERALS {
+                                panic!("init called more than once!")
+                            }
+                            _ESP_HAL_DEVICE_PERIPHERALS = true;
+                            Self::steal()
+                        })
+                    }
+
+                    /// Unsafely create an instance of this peripheral out of thin air.
+                    ///
+                    /// # Safety
+                    ///
+                    /// You must ensure that you're only using one instance of this type at a time.
+                    #[inline]
+                    pub unsafe fn steal() -> Self {
+                        Self {
+                            $(
+                                $name: peripherals::$name::steal(),
+                            )*
+
+                            $(
+                                [<GPIO $pin>]: $crate::gpio::GpioPin::<$pin>::steal(),
+                            )*
+                        }
                     }
                 }
             }
@@ -337,8 +316,7 @@ mod peripheral_macros {
                     }
                 )*
             )*
-
-        }
+        };
     }
 
     #[doc(hidden)]
@@ -354,10 +332,20 @@ mod peripheral_macros {
 
     #[doc(hidden)]
     #[macro_export]
+    macro_rules! into_mapped_ref {
+        ($($name:ident),*) => {
+            $(
+                #[allow(unused_mut)]
+                let mut $name = $name.map_into().into_ref();
+            )*
+        }
+    }
+
+    #[doc(hidden)]
+    #[macro_export]
     /// Macro to create a peripheral structure.
     macro_rules! create_peripheral {
-        ($(#[$cfg:meta])? $name:ident <= virtual) => {
-            $(#[$cfg])?
+        ($name:ident <= virtual) => {
             #[derive(Debug)]
             #[allow(non_camel_case_types)]
             /// Represents a virtual peripheral with no associated hardware.
@@ -366,7 +354,6 @@ mod peripheral_macros {
             /// is defined as virtual.
             pub struct $name { _inner: () }
 
-            $(#[$cfg])?
             impl $name {
                 /// Unsafely create an instance of this peripheral out of thin air.
                 ///
@@ -383,35 +370,18 @@ mod peripheral_macros {
                 type P = $name;
 
                 #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
+                unsafe fn clone_unchecked(&self) -> Self::P {
                     Self::steal()
                 }
             }
 
             impl $crate::private::Sealed for $name {}
         };
-        ($(#[$cfg:meta])? $name:ident <= $base:ident) => {
-            $(#[$cfg])?
-            #[derive(Debug)]
-            #[allow(non_camel_case_types)]
-            /// Represents a concrete hardware peripheral.
-            ///
-            /// This struct is generated by the `create_peripheral!` macro when the peripheral
-            /// is tied to an actual hardware device.
-            pub struct $name { _inner: () }
 
-            $(#[$cfg])?
+        ($([$enum_variant:ident])? $name:ident <= $base:ident) => {
+            $crate::create_peripheral!($([$enum_variant])? $name <= virtual);
+
             impl $name {
-                /// Unsafely create an instance of this peripheral out of thin air.
-                ///
-                /// # Safety
-                ///
-                /// You must ensure that you're only using one instance of this type at a time.
-                #[inline]
-                pub unsafe fn steal() -> Self {
-                    Self { _inner: () }
-                }
-
                 #[doc = r"Pointer to the register block"]
                 pub const PTR: *const <super::pac::$base as core::ops::Deref>::Target = super::pac::$base::PTR;
 
@@ -431,22 +401,10 @@ mod peripheral_macros {
             }
 
             impl core::ops::DerefMut for $name {
-
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     unsafe { &mut *(Self::PTR as *mut _)  }
                 }
             }
-
-            impl $crate::peripheral::Peripheral for $name {
-                type P = $name;
-
-                #[inline]
-                unsafe fn clone_unchecked(&mut self) -> Self::P {
-                    Self::steal()
-                }
-            }
-
-            impl $crate::private::Sealed for $name {}
         };
     }
 }

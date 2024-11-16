@@ -30,7 +30,7 @@ use core::marker::PhantomData;
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::ECC,
+    peripherals::{Interrupt, ECC},
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     InterruptConfigurable,
@@ -113,19 +113,19 @@ impl<'d> Ecc<'d, crate::Blocking> {
     }
 }
 
-impl<'d> crate::private::Sealed for Ecc<'d, crate::Blocking> {}
+impl crate::private::Sealed for Ecc<'_, crate::Blocking> {}
 
-impl<'d> InterruptConfigurable for Ecc<'d, crate::Blocking> {
+impl InterruptConfigurable for Ecc<'_, crate::Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::ECC, handler.handler());
-            crate::interrupt::enable(crate::peripherals::Interrupt::ECC, handler.priority())
-                .unwrap();
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::ECC);
         }
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::ECC, handler.handler()) };
+        unwrap!(crate::interrupt::enable(Interrupt::ECC, handler.priority()));
     }
 }
 
-impl<'d, DM: crate::Mode> Ecc<'d, DM> {
+impl<DM: crate::Mode> Ecc<'_, DM> {
     /// Resets the ECC peripheral.
     pub fn reset(&mut self) {
         self.ecc.mult_conf().reset()

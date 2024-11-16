@@ -26,8 +26,11 @@ use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::RSA,
+    peripherals::{Interrupt, RSA},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    Async,
+    Blocking,
+    Cpu,
     InterruptConfigurable,
 };
 
@@ -47,29 +50,44 @@ pub struct Rsa<'d, DM: crate::Mode> {
     phantom: PhantomData<DM>,
 }
 
-impl<'d> Rsa<'d, crate::Blocking> {
+impl<'d> Rsa<'d, Blocking> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
     pub fn new(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
         Self::new_internal(rsa)
     }
-}
 
-impl<'d> crate::private::Sealed for Rsa<'d, crate::Blocking> {}
-
-impl<'d> InterruptConfigurable for Rsa<'d, crate::Blocking> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.internal_set_interrupt_handler(handler);
+    /// Reconfigures the RSA driver to operate in asynchronous mode.
+    pub fn into_async(mut self) -> Rsa<'d, Async> {
+        self.set_interrupt_handler(asynch::rsa_interrupt_handler);
+        Rsa {
+            rsa: self.rsa,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<'d> Rsa<'d, crate::Async> {
+impl crate::private::Sealed for Rsa<'_, Blocking> {}
+
+impl InterruptConfigurable for Rsa<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::RSA);
+        }
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::RSA, handler.handler()) };
+        unwrap!(crate::interrupt::enable(Interrupt::RSA, handler.priority()));
+    }
+}
+
+impl<'d> Rsa<'d, Async> {
     /// Create a new instance in [crate::Blocking] mode.
-    pub fn new_async(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
-        let mut this = Self::new_internal(rsa);
-        this.internal_set_interrupt_handler(asynch::rsa_interrupt_handler);
-        this
+    pub fn into_blocking(self) -> Rsa<'d, Blocking> {
+        crate::interrupt::disable(Cpu::current(), Interrupt::RSA);
+        Rsa {
+            rsa: self.rsa,
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -129,15 +147,6 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
             );
         }
     }
-
-    fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        unsafe {
-            crate::interrupt::bind_interrupt(crate::peripherals::Interrupt::RSA, handler.handler());
-            crate::interrupt::enable(crate::peripherals::Interrupt::RSA, handler.priority())
-                .unwrap();
-        }
-    }
-
     fn wait_for_idle(&mut self) {
         while !self.is_idle() {}
         self.clear_interrupt();
@@ -398,14 +407,8 @@ pub(crate) mod asynch {
         fn new(instance: &'a Rsa<'d, Async>) -> Self {
             SIGNALED.store(false, Ordering::Relaxed);
 
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                } else if #[cfg(any(esp32s2, esp32s3))] {
-                    instance.rsa.interrupt_ena().write(|w| w.interrupt_ena().set_bit());
-                } else {
-                    instance.rsa.int_ena().write(|w| w.int_ena().set_bit());
-                }
-            }
+            #[cfg(not(esp32))]
+            instance.rsa.int_ena().write(|w| w.int_ena().set_bit());
 
             Self { instance }
         }
@@ -417,14 +420,11 @@ pub(crate) mod asynch {
 
     impl Drop for RsaFuture<'_, '_> {
         fn drop(&mut self) {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                } else if #[cfg(any(esp32s2, esp32s3))] {
-                    self.instance.rsa.interrupt_ena().write(|w| w.interrupt_ena().clear_bit());
-                } else {
-                    self.instance.rsa.int_ena().write(|w| w.int_ena().clear_bit());
-                }
-            }
+            #[cfg(not(esp32))]
+            self.instance
+                .rsa
+                .int_ena()
+                .write(|w| w.int_ena().clear_bit());
         }
     }
 
@@ -444,7 +444,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularExponentiation<'a, 'd, T, Async>
+    impl<T: RsaMode, const N: usize> RsaModularExponentiation<'_, '_, T, Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -463,7 +463,7 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode, const N: usize> RsaModularMultiplication<'a, 'd, T, Async>
+    impl<T: RsaMode, const N: usize> RsaModularMultiplication<'_, '_, T, Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
@@ -492,12 +492,12 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<'a, 'd, T: RsaMode + Multi, const N: usize> RsaMultiplication<'a, 'd, T, Async>
+    impl<T: RsaMode + Multi, const N: usize> RsaMultiplication<'_, '_, T, Async>
     where
         T: RsaMode<InputType = [u32; N]>,
     {
         /// Asynchronously performs an RSA multiplication operation.
-        pub async fn multiplication<'b, const O: usize>(
+        pub async fn multiplication<const O: usize>(
             &mut self,
             operand_b: &T::InputType,
             outbuf: &mut T::OutputType,
@@ -520,10 +520,8 @@ pub(crate) mod asynch {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 rsa.interrupt().write(|w| w.interrupt().set_bit());
-            } else if #[cfg(any(esp32s2, esp32s3))] {
-                rsa.clear_interrupt().write(|w| w.clear_interrupt().set_bit());
             } else  {
-                rsa.int_clr().write(|w| w.clear_interrupt().set_bit());
+                rsa.int_clr().write(|w| w.int_clr().set_bit());
             }
         }
 

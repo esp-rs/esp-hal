@@ -138,7 +138,7 @@ where
 
     /// Pauses execution for *at least* `ns` nanoseconds.
     pub fn delay_nanos(&self, ns: u32) {
-        self.delay((ns as u64 / 1000).micros())
+        self.delay((ns.div_ceil(1000) as u64).micros())
     }
 
     fn delay(&self, us: MicrosDurationU64) {
@@ -201,9 +201,9 @@ where
     }
 }
 
-impl<'d, T> crate::private::Sealed for OneShotTimer<'d, T> where T: Timer {}
+impl<T> crate::private::Sealed for OneShotTimer<'_, T> where T: Timer {}
 
-impl<'d, T> InterruptConfigurable for OneShotTimer<'d, T>
+impl<T> InterruptConfigurable for OneShotTimer<'_, T>
 where
     T: Timer,
 {
@@ -212,7 +212,7 @@ where
     }
 }
 
-impl<'d, T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<'d, T>
+impl<T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<'_, T>
 where
     T: Timer,
     UXX: Into<u32>,
@@ -222,7 +222,7 @@ where
     }
 }
 
-impl<'d, T, UXX> embedded_hal_02::blocking::delay::DelayUs<UXX> for OneShotTimer<'d, T>
+impl<T, UXX> embedded_hal_02::blocking::delay::DelayUs<UXX> for OneShotTimer<'_, T>
 where
     T: Timer,
     UXX: Into<u32>,
@@ -232,7 +232,7 @@ where
     }
 }
 
-impl<'d, T> embedded_hal::delay::DelayNs for OneShotTimer<'d, T>
+impl<T> embedded_hal::delay::DelayNs for OneShotTimer<'_, T>
 where
     T: Timer,
 {
@@ -315,9 +315,9 @@ where
     }
 }
 
-impl<'d, T> crate::private::Sealed for PeriodicTimer<'d, T> where T: Timer {}
+impl<T> crate::private::Sealed for PeriodicTimer<'_, T> where T: Timer {}
 
-impl<'d, T> InterruptConfigurable for PeriodicTimer<'d, T>
+impl<T> InterruptConfigurable for PeriodicTimer<'_, T>
 where
     T: Timer,
 {
@@ -326,7 +326,7 @@ where
     }
 }
 
-impl<'d, T> embedded_hal_02::timer::CountDown for PeriodicTimer<'d, T>
+impl<T> embedded_hal_02::timer::CountDown for PeriodicTimer<'_, T>
 where
     T: Timer,
 {
@@ -344,7 +344,7 @@ where
     }
 }
 
-impl<'d, T> embedded_hal_02::timer::Cancel for PeriodicTimer<'d, T>
+impl<T> embedded_hal_02::timer::Cancel for PeriodicTimer<'_, T>
 where
     T: Timer,
 {
@@ -355,7 +355,7 @@ where
     }
 }
 
-impl<'d, T> embedded_hal_02::timer::Periodic for PeriodicTimer<'d, T> where T: Timer {}
+impl<T> embedded_hal_02::timer::Periodic for PeriodicTimer<'_, T> where T: Timer {}
 
 /// An enum of all timer types
 enum AnyTimerInner {
@@ -461,7 +461,7 @@ impl Peripheral for AnyTimer {
     type P = Self;
 
     #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         core::ptr::read(self as *const _)
     }
 }

@@ -2,16 +2,13 @@ name: Changelog check
 
 on:
   pull_request:
-    # We will not track changes for the following packages.
+    # We will not track changes for the following packages/directories.
     paths-ignore:
-      - "/xtask/"
-      - "/esp-build/"
-      - "/esp-hal-procmacros/"
-      - "/esp-metadata/"
       - "/examples/"
-      - "/hil-tests/"
       - "/extras/"
+      - "/hil-tests/"
       - "/resources/"
+      - "/xtask/"
     # Run on labeled/unlabeled in addition to defaults to detect
     # adding/removing skip-changelog labels.
     types: [opened, reopened, labeled, unlabeled, synchronize]
@@ -33,26 +30,34 @@ jobs:
               - 'esp-alloc/**'
             esp-backtrace:
               - 'esp-backtrace/**'
+            esp-build:
+              - 'esp-build/**'
+            esp-config:
+              - 'esp-config/**'
             esp-hal:
               - 'esp-hal/**'
             esp-hal-embassy:
               - 'esp-hal-embassy/**'
-            esp-hal-smartled:
-              - 'esp-hal-smartled/**'
+            esp-hal-procmacros:
+              - 'esp-hal-procmacros/**'
             esp-ieee802154:
               - 'esp-ieee802154/**'
             esp-lp-hal:
               - 'esp-lp-hal/**'
+            esp-metadata:
+              - 'esp-metadata/**'
             esp-println:
               - 'esp-println/**'
             esp-riscv-rt:
               - 'esp-riscv-rt/**'
-            xtensa-lx-rt:
-              - 'xtensa-lx-rt/**'
             esp-storage:
               - 'esp-storage/**'
             esp-wifi:
               - 'esp-wifi/**'
+            xtensa-lx:
+              - 'xtensa-lx/**'
+            xtensa-lx-rt:
+              - 'xtensa-lx-rt/**'
 
       - name: Check that changelog updated (esp-alloc)
         if: steps.changes.outputs.esp-alloc == 'true'
@@ -70,6 +75,22 @@ jobs:
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-backtrace/CHANGELOG.md file."
 
+      - name: Check that changelog updated (esp-build)
+        if: steps.changes.outputs.esp-build == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-build/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-build/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-config)
+        if: steps.changes.outputs.esp-config == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-config/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-config/CHANGELOG.md file."
+
       - name: Check that changelog updated (esp-hal)
         if: steps.changes.outputs.esp-hal == 'true'
         uses: dangoslen/changelog-enforcer@v3
@@ -86,13 +107,13 @@ jobs:
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-embassy/CHANGELOG.md file."
 
-      - name: Check that changelog updated (esp-hal-smartled)
-        if: steps.changes.outputs.esp-hal-smartled == 'true'
+      - name: Check that changelog updated (esp-hal-procmacros)
+        if: steps.changes.outputs.esp-hal-procmacros == 'true'
         uses: dangoslen/changelog-enforcer@v3
         with:
-          changeLogPath: esp-hal-smartled/CHANGELOG.md
+          changeLogPath: esp-hal-procmacros/CHANGELOG.md
           skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-smartled/CHANGELOG.md file."
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-procmacros/CHANGELOG.md file."
 
       - name: Check that changelog updated (esp-ieee802154)
         if: steps.changes.outputs.esp-ieee802154 == 'true'
@@ -142,4 +163,18 @@ jobs:
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-wifi/CHANGELOG.md file."
 
+      - name: Check that changelog updated (xtensa-lx)
+        if: steps.changes.outputs.xtensa-lx == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: xtensa-lx/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the xtensa-lx/CHANGELOG.md file."
 
+      - name: Check that changelog updated (xtensa-lx-rt)
+        if: steps.changes.outputs.xtensa-lx-rt == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: xtensa-lx-rt/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the xtensa-lx-rt/CHANGELOG.md file."

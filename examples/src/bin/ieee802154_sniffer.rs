@@ -8,22 +8,20 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{gpio::Io, prelude::*, reset::software_reset, uart::Uart};
+use esp_hal::{prelude::*, reset::software_reset, uart::Uart};
 use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
 #[entry]
 fn main() -> ! {
-    let mut peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32c6")] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio16, io.pins.gpio17);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         } else if #[cfg(feature = "esp32h2")] {
-            let (mut tx_pin, mut rx_pin) = (io.pins.gpio24, io.pins.gpio23);
+            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
         }
     }
 
@@ -50,7 +48,7 @@ fn main() -> ! {
         .unwrap();
 
     let radio = peripherals.IEEE802154;
-    let mut ieee802154 = Ieee802154::new(radio, &mut peripherals.RADIO_CLK);
+    let mut ieee802154 = Ieee802154::new(radio, peripherals.RADIO_CLK);
 
     ieee802154.set_config(Config {
         channel,
@@ -64,7 +62,7 @@ fn main() -> ! {
     ieee802154.start_receive();
 
     loop {
-        if let Some(frame) = ieee802154.get_raw_received() {
+        if let Some(frame) = ieee802154.raw_received() {
             println!("@RAW {:02x?}", &frame.data);
         }
 

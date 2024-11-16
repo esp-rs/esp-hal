@@ -29,14 +29,12 @@
 //! # use esp_hal::ledc::timer;
 //! # use esp_hal::ledc::LowSpeed;
 //! # use esp_hal::ledc::channel;
-//! # use esp_hal::gpio::Io;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let led = io.pins.gpio0;
+//! # let led = peripherals.GPIO0;
 //!
 //! let mut ledc = Ledc::new(peripherals.LEDC);
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
-//! let mut lstimer0 = ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
+//! let mut lstimer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
 //! lstimer0
 //!     .configure(timer::config::Config {
 //!         duty: timer::config::Duty::Duty5Bit,
@@ -45,7 +43,7 @@
 //!     })
 //!     .unwrap();
 //!
-//! let mut channel0 = ledc.get_channel(channel::Number::Channel0, led);
+//! let mut channel0 = ledc.channel(channel::Number::Channel0, led);
 //! channel0
 //!     .configure(channel::config::Config {
 //!         timer: &lstimer0,
@@ -65,7 +63,7 @@ use self::{
     timer::{Timer, TimerSpeed},
 };
 use crate::{
-    gpio::OutputPin,
+    gpio::interconnect::PeripheralOutput,
     peripheral::{Peripheral, PeripheralRef},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
@@ -160,16 +158,16 @@ impl<'d> Ledc<'d> {
     }
 
     /// Return a new timer
-    pub fn get_timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<'d, S> {
+    pub fn timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<'d, S> {
         Timer::new(self.ledc, number)
     }
 
     /// Return a new channel
-    pub fn get_channel<S: TimerSpeed, O: OutputPin>(
+    pub fn channel<S: TimerSpeed>(
         &self,
         number: channel::Number,
-        output_pin: impl Peripheral<P = O> + 'd,
-    ) -> Channel<'d, S, O> {
+        output_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
+    ) -> Channel<'d, S> {
         Channel::new(number, output_pin)
     }
 }

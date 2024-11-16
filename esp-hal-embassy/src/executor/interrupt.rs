@@ -4,17 +4,13 @@ use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 use embassy_executor::{raw, SendSpawner};
 use esp_hal::{
-    get_core,
     interrupt::{self, software::SoftwareInterrupt, InterruptHandler},
+    Cpu,
 };
 use portable_atomic::{AtomicUsize, Ordering};
 
-static mut EXECUTORS: [CallbackContext; 4] = [
-    CallbackContext::new(),
-    CallbackContext::new(),
-    CallbackContext::new(),
-    CallbackContext::new(),
-];
+const COUNT: usize = 3 + cfg!(not(multi_core)) as usize;
+static mut EXECUTORS: [CallbackContext; COUNT] = [const { CallbackContext::new() }; COUNT];
 
 /// Interrupt mode executor.
 ///
@@ -46,13 +42,11 @@ impl CallbackContext {
     }
 
     fn set(&self, executor: *mut raw::Executor) {
-        unsafe {
-            self.raw_executor.get().write(executor);
-        }
+        unsafe { self.raw_executor.get().write(executor) };
     }
 }
 
-fn handle_interrupt<const NUM: u8>() {
+extern "C" fn handle_interrupt<const NUM: u8>() {
     let swi = unsafe { SoftwareInterrupt::<NUM>::steal() };
     swi.reset();
 
@@ -60,22 +54,6 @@ fn handle_interrupt<const NUM: u8>() {
         let executor = unwrap!(EXECUTORS[NUM as usize].get().as_mut());
         executor.poll();
     }
-}
-
-extern "C" fn swi_handler0() {
-    handle_interrupt::<0>();
-}
-
-extern "C" fn swi_handler1() {
-    handle_interrupt::<1>();
-}
-
-extern "C" fn swi_handler2() {
-    handle_interrupt::<2>();
-}
-
-extern "C" fn swi_handler3() {
-    handle_interrupt::<3>();
 }
 
 impl<const SWI: u8> InterruptExecutor<SWI> {
@@ -109,7 +87,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
             .core
             .compare_exchange(
                 usize::MAX,
-                get_core() as usize,
+                Cpu::current() as usize,
                 Ordering::Acquire,
                 Ordering::Relaxed,
             )
@@ -121,16 +99,17 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
         unsafe {
             (*self.executor.get())
                 .as_mut_ptr()
-                .write(raw::Executor::new(SWI as *mut ()));
+                .write(raw::Executor::new((SWI as usize) as *mut ()));
 
             EXECUTORS[SWI as usize].set((*self.executor.get()).as_mut_ptr());
         }
 
         let swi_handler = match SWI {
-            0 => swi_handler0,
-            1 => swi_handler1,
-            2 => swi_handler2,
-            3 => swi_handler3,
+            0 => handle_interrupt::<0>,
+            1 => handle_interrupt::<1>,
+            2 => handle_interrupt::<2>,
+            #[cfg(not(multi_core))]
+            3 => handle_interrupt::<3>,
             _ => unreachable!(),
         };
 

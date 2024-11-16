@@ -9,53 +9,98 @@
 //! present on the `ESP32` chip. `PSRAM` provides additional external memory to
 //! supplement the internal memory of the `ESP32`, allowing for increased
 //! storage capacity and improved performance in certain applications.
-//!
-//! The `PSRAM` module is accessed through a virtual address, defined as
-//! `PSRAM_VADDR`. The starting virtual address for the PSRAM module is
-//! 0x3F800000. The `PSRAM` module size depends on the configuration specified
-//! during the compilation process. The available `PSRAM` sizes are `2MB`,
-//! `4MB`, and `8MB`.
-//!
-//! NOTE: If you want to use `PSRAM` on `ESP32` or `ESP32-S3`, it'll work only
-//! in `release` mode.
 
-/// The starting virtual address of the PSRAM (Pseudo-SRAM) region in memory.
-pub const PSRAM_VADDR_START: usize = 0x3F800000;
+pub use crate::soc::psram_common::*;
 
-/// Retrieves the starting virtual address of the PSRAM (Pseudo-SRAM) region in
-/// memory.
-pub fn psram_vaddr_start() -> usize {
-    PSRAM_VADDR_START
+const EXTMEM_ORIGIN: usize = 0x3F800000;
+
+/// Cache Speed
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(missing_docs)]
+pub enum PsramCacheSpeed {
+    #[default]
+    PsramCacheF80mS40m = 0,
+    PsramCacheF40mS40m,
+    PsramCacheF80mS80m,
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "psram-2m")] {
-        const PSRAM_SIZE: u32 = 2;
-    } else if #[cfg(feature = "psram-4m")] {
-        const PSRAM_SIZE: u32 = 4;
-    } else if #[cfg(feature = "psram-8m")] {
-        const PSRAM_SIZE: u32 = 8;
-    } else {
-        const PSRAM_SIZE: u32 = 0;
-    }
+/// PSRAM configuration
+#[derive(Copy, Clone, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct PsramConfig {
+    /// PSRAM size
+    pub size: PsramSize,
+    /// Cache speed
+    pub cache_speed: PsramCacheSpeed,
 }
-
-/// The total size of the PSRAM (Pseudo-SRAM) in bytes.
-pub const PSRAM_BYTES: usize = PSRAM_SIZE as usize * 1024 * 1024;
 
 /// Initializes the PSRAM memory on supported devices.
-#[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
-pub fn init_psram(_peripheral: impl crate::peripheral::Peripheral<P = crate::peripherals::PSRAM>) {
-    utils::psram_init();
-    utils::s_mapping(PSRAM_VADDR_START as u32, PSRAM_BYTES as u32);
+///
+/// Returns the start of the mapped memory and the size
+pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -> (*mut u8, usize) {
+    let mut config = config;
+
+    utils::psram_init(&config);
+
+    if config.size.is_auto() {
+        // Reading the device-id turned out to not work as expected (some bits flipped
+        // for unknown reason)
+        //
+        // As a workaround we just map 4m (maximum we can do) and
+        // probe if we can access top of PSRAM - if not we assume it's 2m
+        //
+        // This currently doesn't work as expected because of https://github.com/esp-rs/esp-hal/issues/2182
+        utils::s_mapping(EXTMEM_ORIGIN as u32, 4 * 1024 * 1024);
+
+        let guessed_size = unsafe {
+            let ptr = (EXTMEM_ORIGIN + 4 * 1024 * 1024 - 36 * 1024) as *mut u8;
+            for i in 0..(36 * 1024) {
+                ptr.add(i).write_volatile(0x7f);
+            }
+
+            let ptr = EXTMEM_ORIGIN as *mut u8;
+            for i in 0..(36 * 1024) {
+                ptr.add(i).write_volatile(0x7f);
+            }
+
+            let mut success = true;
+            let ptr = (EXTMEM_ORIGIN + 4 * 1024 * 1024 - 36 * 1024) as *mut u8;
+            for i in 0..(36 * 1024) {
+                if ptr.add(i).read_volatile() != 0x7f {
+                    success = false;
+                    break;
+                }
+            }
+
+            if success {
+                4 * 1024 * 1024
+            } else {
+                2 * 1024 * 1024
+            }
+        };
+
+        info!("Assuming {} bytes of PSRAM", guessed_size);
+        config.size = PsramSize::Size(guessed_size);
+    } else {
+        utils::s_mapping(EXTMEM_ORIGIN as u32, config.size.get() as u32);
+    }
+
+    crate::soc::MAPPED_PSRAM.with(|mapped_psram| {
+        mapped_psram.memory_range = EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get();
+    });
+
+    (EXTMEM_ORIGIN as *mut u8, config.size.get())
 }
 
-#[cfg(any(feature = "psram-2m", feature = "psram-4m", feature = "psram-8m"))]
 pub(crate) mod utils {
     use core::ptr::addr_of_mut;
 
     use procmacros::ram;
 
+    use super::*;
+
+    #[ram]
     pub(crate) fn s_mapping(v_start: u32, size: u32) {
         // Enable external RAM in MMU
         cache_sram_mmu_set(0, 0, v_start, 0, 32, size / 1024 / 32);
@@ -72,6 +117,7 @@ pub(crate) mod utils {
 
     // we can use the ROM version of this: it works well enough and keeps the size
     // of the binary down.
+    #[ram]
     fn cache_sram_mmu_set(
         cpu_no: u32,
         pid: u32,
@@ -198,15 +244,6 @@ pub(crate) mod utils {
         (((spi_config) >> shift) & mask) as u8
     }
 
-    #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    #[allow(unused)]
-    enum PsramCacheSpeed {
-        PsramCacheF80mS40m = 0,
-        PsramCacheF40mS40m,
-        PsramCacheF80mS80m,
-    }
-
     #[derive(PartialEq, Eq, Debug, Default)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     struct PsramIo {
@@ -228,13 +265,13 @@ pub(crate) mod utils {
     }
 
     #[repr(C)]
-    struct EspRomSpiflashChip {
-        device_id: u32,
-        chip_size: u32, // chip size in bytes
-        block_size: u32,
-        sector_size: u32,
-        page_size: u32,
-        status_mask: u32,
+    pub(super) struct EspRomSpiflashChip {
+        pub device_id: u32,
+        pub chip_size: u32, // chip size in bytes
+        pub block_size: u32,
+        pub sector_size: u32,
+        pub page_size: u32,
+        pub status_mask: u32,
     }
 
     extern "C" {
@@ -253,7 +290,7 @@ pub(crate) mod utils {
 
         static mut g_rom_spiflash_dummy_len_plus: u8;
 
-        static g_rom_flashchip: EspRomSpiflashChip;
+        pub(super) static g_rom_flashchip: EspRomSpiflashChip;
 
         fn cache_sram_mmu_set_rom(
             cpu_no: u32,
@@ -265,10 +302,11 @@ pub(crate) mod utils {
         ) -> i32;
     }
 
-    pub(crate) fn psram_init() {
-        let chip = crate::efuse::Efuse::get_chip_type();
+    #[ram]
+    pub(crate) fn psram_init(config: &PsramConfig) {
+        let chip = crate::efuse::Efuse::chip_type();
 
-        let mode = PsramCacheSpeed::PsramCacheF40mS40m; // How to make this configurable
+        let mode = config.cache_speed;
         let mut psram_io = PsramIo::default();
         let clk_mode;
 
@@ -416,6 +454,7 @@ pub(crate) mod utils {
         }
 
         let extra_dummy = psram_gpio_config(&psram_io, mode);
+        info!("extra dummy = {}", extra_dummy);
 
         // psram_is_32mbit_ver0 would need special handling here
 
@@ -615,6 +654,7 @@ pub(crate) mod utils {
     }
 
     // spi param init for psram
+    #[ram]
     fn psram_spi_init(
         // psram_spi_num_t spi_num = PSRAM_SPI_1,
         mode: PsramCacheSpeed,
@@ -748,7 +788,7 @@ pub(crate) mod utils {
         ps_cmd.rx_data_bit_len = 0;
         ps_cmd.dummy_bit_len = 0;
         let (backup_usr, backup_usr1, backup_usr2) = psram_cmd_config_spi1(&ps_cmd);
-        psram_cmd_recv_start_spi1(core::ptr::null_mut(), PsramCmdMode::PsramCmdSpi);
+        psram_cmd_recv_start_spi1(core::ptr::null_mut(), 0, PsramCmdMode::PsramCmdSpi);
         psram_cmd_end_spi1(backup_usr, backup_usr1, backup_usr2);
     }
 
@@ -870,7 +910,11 @@ pub(crate) mod utils {
 
     // start sending cmd/addr and optionally, receiving data
     #[ram]
-    fn psram_cmd_recv_start_spi1(p_rx_data: *mut u32, cmd_mode: PsramCmdMode) {
+    fn psram_cmd_recv_start_spi1(
+        p_rx_data: *mut u32,
+        rx_data_len_words: usize,
+        cmd_mode: PsramCmdMode,
+    ) {
         unsafe {
             let spi = &*crate::peripherals::SPI1::PTR;
             // get cs1
@@ -942,8 +986,8 @@ pub(crate) mod utils {
 
             if !p_rx_data.is_null() {
                 // Read data out
-                loop {
-                    p_rx_data.write_volatile(spi.w(0).read().bits());
+                for i in 0..rx_data_len_words {
+                    p_rx_data.add(i).write_volatile(spi.w(i).read().bits());
                 }
             }
         }
@@ -1017,7 +1061,7 @@ pub(crate) mod utils {
 
             fn configure_gpio(gpio: u8, field: Field, bits: u8) {
                 unsafe {
-                    let ptr = crate::gpio::get_io_mux_reg(gpio);
+                    let ptr = crate::gpio::io_mux_reg(gpio);
                     ptr.modify(|_, w| apply_to_field!(w, field, bits));
                 }
             }
@@ -1191,6 +1235,7 @@ pub(crate) mod utils {
 
             let flash_id: u32 = g_rom_flashchip.device_id;
             info!("Flash-ID = {}", flash_id);
+            info!("Flash size = {}", g_rom_flashchip.chip_size);
 
             if flash_id == FLASH_ID_GD25LQ32C {
                 // Set drive ability for 1.8v flash in 80Mhz.

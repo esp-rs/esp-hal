@@ -13,17 +13,12 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::Io,
-    peripherals::UART0,
     prelude::*,
-    uart::{
-        config::{AtCmdConfig, Config},
-        Uart,
-    },
+    uart::{AtCmdConfig, Config, Uart, UartInterrupt},
     Blocking,
 };
 
-static SERIAL: Mutex<RefCell<Option<Uart<UART0, Blocking>>>> = Mutex::new(RefCell::new(None));
+static SERIAL: Mutex<RefCell<Option<Uart<Blocking>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -31,22 +26,20 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio1, io.pins.gpio3);
+            let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);
         } else if #[cfg(feature = "esp32c2")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio20, io.pins.gpio19);
+            let (tx_pin, rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);
         } else if #[cfg(feature = "esp32c3")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio21, io.pins.gpio20);
+            let (tx_pin, rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);
         } else if #[cfg(feature = "esp32c6")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio16, io.pins.gpio17);
+            let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         } else if #[cfg(feature = "esp32h2")] {
-            let (tx_pin, rx_pin) = (io.pins.gpio24, io.pins.gpio23);
+            let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
-            let (tx_pin, rx_pin) = (io.pins.gpio43, io.pins.gpio44);
+            let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);
         }
     }
     let config = Config::default().rx_fifo_full_threshold(30);
@@ -56,8 +49,7 @@ fn main() -> ! {
 
     critical_section::with(|cs| {
         uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
-        uart0.listen_at_cmd();
-        uart0.listen_rx_fifo_full();
+        uart0.listen(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
 
         SERIAL.borrow_ref_mut(cs).replace(uart0);
     });
@@ -85,15 +77,15 @@ fn interrupt_handler() {
         }
         writeln!(serial, "Read {} bytes", cnt,).ok();
 
+        let pending_interrupts = serial.interrupts();
         writeln!(
             serial,
             "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
-            serial.at_cmd_interrupt_set(),
-            serial.rx_fifo_full_interrupt_set(),
+            pending_interrupts.contains(UartInterrupt::AtCmd),
+            pending_interrupts.contains(UartInterrupt::RxFifoFull),
         )
         .ok();
 
-        serial.reset_at_cmd_interrupt();
-        serial.reset_rx_fifo_full_interrupt();
+        serial.clear_interrupts(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
     });
 }

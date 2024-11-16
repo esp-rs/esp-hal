@@ -87,7 +87,7 @@ fn interrupt_handler() {
         if da.is_sp_monitor_interrupt_set() {
             println!("SP MONITOR TRIGGERED");
             da.clear_sp_monitor_interrupt();
-            let pc = da.get_sp_monitor_pc();
+            let pc = da.sp_monitor_pc();
             println!("PC = 0x{:x}", pc);
         }
 
@@ -95,7 +95,7 @@ fn interrupt_handler() {
         if da.is_region0_monitor_interrupt_set() {
             println!("REGION0 MONITOR TRIGGERED");
             da.clear_region0_monitor_interrupt();
-            let pc = da.get_region_monitor_pc();
+            let pc = da.region_monitor_pc();
             println!("PC = 0x{:x}", pc);
         }
 
@@ -103,7 +103,7 @@ fn interrupt_handler() {
         if da.is_region1_monitor_interrupt_set() {
             println!("REGION1 MONITOR TRIGGERED");
             da.clear_region1_monitor_interrupt();
-            let pc = da.get_region_monitor_pc();
+            let pc = da.region_monitor_pc();
             println!("PC = 0x{:x}", pc);
         }
 

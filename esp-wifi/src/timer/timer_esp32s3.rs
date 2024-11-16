@@ -1,19 +1,27 @@
 #[cfg(any(feature = "wifi", feature = "ble"))]
 #[allow(unused_imports)]
-use crate::hal::{interrupt, peripherals};
+use crate::hal::{interrupt, peripherals::Interrupt};
 
-pub fn setup_radio_isr() {
+pub(crate) fn setup_radio_isr() {
     // wifi enabled in set_isr
     #[cfg(feature = "ble")]
     {
         unwrap!(interrupt::enable(
-            peripherals::Interrupt::BT_BB,
+            Interrupt::BT_BB,
             interrupt::Priority::Priority1,
         ));
         unwrap!(interrupt::enable(
-            peripherals::Interrupt::RWBLE,
+            Interrupt::RWBLE,
             interrupt::Priority::Priority1,
         ));
+    }
+}
+
+pub(crate) fn shutdown_radio_isr() {
+    #[cfg(feature = "ble")]
+    {
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::BT_BB);
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::RWBLE);
     }
 }
 
@@ -51,7 +59,7 @@ extern "C" fn WIFI_PWR() {
 #[no_mangle]
 extern "C" fn RWBLE() {
     critical_section::with(|_| unsafe {
-        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_5;
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_8;
         trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
         if !fnc.is_null() {
             let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
@@ -64,7 +72,7 @@ extern "C" fn RWBLE() {
 #[no_mangle]
 extern "C" fn BT_BB() {
     critical_section::with(|_| unsafe {
-        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_8;
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_5;
         trace!("interrupt RWBT {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {

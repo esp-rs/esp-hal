@@ -6,11 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    aes::{
-        dma::{CipherMode, WithDmaAes},
-        Aes,
-        Mode,
-    },
+    aes::{dma::CipherMode, Aes, Mode},
     dma::{Dma, DmaPriority},
     dma_buffers,
     peripherals::Peripherals,
@@ -22,8 +18,6 @@ const DMA_BUFFER_SIZE: usize = 16;
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::assert_eq;
-
     use super::*;
 
     #[init]

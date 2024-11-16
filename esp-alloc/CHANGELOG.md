@@ -11,11 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- a global allocator is created in esp-alloc, now you need to add individual memory regions (up to 3) to the allocator (#2099)
-
 ### Fixed
 
 ### Removed
+
+## 0.5.0 - 2024-10-10
+
+### Changed
+
+- a global allocator is created in esp-alloc, now you need to add individual memory regions (up to 3) to the allocator (#2099)
 
 ## 0.4.0 - 2024-06-04
 
@@ -27,4 +31,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.0 - 2022-07-25
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-aloc?since=2024-06-05
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-alloc?since=2024-10-10

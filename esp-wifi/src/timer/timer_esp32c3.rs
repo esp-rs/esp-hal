@@ -5,7 +5,7 @@ use crate::{
     hal::{interrupt, peripherals::Interrupt},
 };
 
-pub fn setup_radio_isr() {
+pub(crate) fn setup_radio_isr() {
     // wifi enabled in set_isr
     #[cfg(feature = "ble")]
     {
@@ -21,6 +21,15 @@ pub fn setup_radio_isr() {
             Interrupt::BT_BB,
             interrupt::Priority::Priority1
         ));
+    }
+}
+
+pub(crate) fn shutdown_radio_isr() {
+    #[cfg(feature = "ble")]
+    {
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::RWBT);
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::RWBLE);
+        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::BT_BB);
     }
 }
 
@@ -79,7 +88,7 @@ extern "C" fn RWBT() {
 #[no_mangle]
 extern "C" fn RWBLE() {
     unsafe {
-        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION8;
 
         trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
 
@@ -96,7 +105,7 @@ extern "C" fn RWBLE() {
 #[no_mangle]
 extern "C" fn BT_BB(_trap_frame: &mut crate::hal::interrupt::TrapFrame) {
     unsafe {
-        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION8;
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
 
         trace!("interrupt BT_BB {:?} {:?}", fnc, arg);
 

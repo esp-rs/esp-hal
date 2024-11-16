@@ -34,12 +34,9 @@ use esp_hal::{
     delay::Delay,
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::{Input, Io, Level, Output, Pull},
+    gpio::{Input, Level, Output, Pull},
     prelude::*,
-    spi::{
-        slave::{prelude::*, Spi},
-        SpiMode,
-    },
+    spi::{slave::Spi, SpiMode},
 };
 use esp_println::println;
 
@@ -47,17 +44,15 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut master_sclk = Output::new(peripherals.GPIO4, Level::Low);
+    let master_miso = Input::new(peripherals.GPIO5, Pull::None);
+    let mut master_mosi = Output::new(peripherals.GPIO8, Level::Low);
+    let mut master_cs = Output::new(peripherals.GPIO9, Level::High);
 
-    let mut master_sclk = Output::new(io.pins.gpio4, Level::Low);
-    let master_miso = Input::new(io.pins.gpio5, Pull::None);
-    let mut master_mosi = Output::new(io.pins.gpio8, Level::Low);
-    let mut master_cs = Output::new(io.pins.gpio9, Level::High);
-
-    let slave_sclk = io.pins.gpio0;
-    let slave_miso = io.pins.gpio1;
-    let slave_mosi = io.pins.gpio2;
-    let slave_cs = io.pins.gpio3;
+    let slave_sclk = peripherals.GPIO0;
+    let slave_miso = peripherals.GPIO1;
+    let slave_mosi = peripherals.GPIO2;
+    let slave_cs = peripherals.GPIO3;
 
     let dma = Dma::new(peripherals.DMA);
     cfg_if::cfg_if! {
@@ -70,19 +65,16 @@ fn main() -> ! {
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
-    let mut spi = Spi::new(
-        peripherals.SPI2,
-        slave_sclk,
-        slave_mosi,
-        slave_miso,
-        slave_cs,
-        SpiMode::Mode0,
-    )
-    .with_dma(
-        dma_channel.configure(false, DmaPriority::Priority0),
-        tx_descriptors,
-        rx_descriptors,
-    );
+    let mut spi = Spi::new(peripherals.SPI2, SpiMode::Mode0)
+        .with_sck(slave_sclk)
+        .with_mosi(slave_mosi)
+        .with_miso(slave_miso)
+        .with_cs(slave_cs)
+        .with_dma(
+            dma_channel.configure(false, DmaPriority::Priority0),
+            rx_descriptors,
+            tx_descriptors,
+        );
 
     let delay = Delay::new();
 
@@ -110,11 +102,9 @@ fn main() -> ! {
 
         println!("Iteration {i}");
 
-        println!("Do `dma_transfer`");
+        println!("Do `transfer`");
 
-        let transfer = spi
-            .dma_transfer(&mut slave_receive, &mut slave_send)
-            .unwrap();
+        let transfer = spi.transfer(&mut slave_receive, &mut slave_send).unwrap();
 
         bitbang_master(
             master_send,
@@ -136,9 +126,9 @@ fn main() -> ! {
 
         delay.delay_millis(250);
 
-        println!("Do `dma_read`");
+        println!("Do `read`");
         slave_receive.fill(0xff);
-        let transfer = spi.dma_read(&mut slave_receive).unwrap();
+        let transfer = spi.read(&mut slave_receive).unwrap();
 
         bitbang_master(
             master_send,
@@ -158,8 +148,8 @@ fn main() -> ! {
 
         delay.delay_millis(250);
 
-        println!("Do `dma_write`");
-        let transfer = spi.dma_write(&mut slave_send).unwrap();
+        println!("Do `write`");
+        let transfer = spi.write(&mut slave_send).unwrap();
 
         master_receive.fill(0);
 

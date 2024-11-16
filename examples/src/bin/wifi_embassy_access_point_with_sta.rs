@@ -10,8 +10,9 @@
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
+//!
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/async esp-wifi/embassy-net esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -33,7 +34,7 @@ use esp_backtrace as _;
 use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
-    initialize,
+    init,
     wifi::{
         AccessPointConfiguration,
         ClientConfiguration,
@@ -45,7 +46,7 @@ use esp_wifi::{
         WifiStaDevice,
         WifiState,
     },
-    EspWifiInitFor,
+    EspWifiController,
 };
 
 const SSID: &str = env!("SSID");
@@ -74,13 +75,15 @@ async fn main(spawner: Spawner) -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = initialize(
-        EspWifiInitFor::Wifi,
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let init = &*mk_static!(
+        EspWifiController<'static>,
+        init(
+            timg0.timer0,
+            Rng::new(peripherals.RNG),
+            peripherals.RADIO_CLK,
+        )
+        .unwrap()
+    );
 
     let wifi = peripherals.WIFI;
     let (wifi_ap_interface, wifi_sta_interface, mut controller) =
@@ -309,18 +312,18 @@ async fn main(spawner: Spawner) -> ! {
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
-    println!("Device capabilities: {:?}", controller.get_capabilities());
+    println!("Device capabilities: {:?}", controller.capabilities());
 
     println!("Starting wifi");
-    controller.start().await.unwrap();
+    controller.start_async().await.unwrap();
     println!("Wifi started!");
 
     loop {
-        match esp_wifi::wifi::get_ap_state() {
+        match esp_wifi::wifi::ap_state() {
             WifiState::ApStarted => {
                 println!("About to connect...");
 
-                match controller.connect().await {
+                match controller.connect_async().await {
                     Ok(_) => {
                         // wait until we're no longer connected
                         controller.wait_for_event(WifiEvent::StaDisconnected).await;

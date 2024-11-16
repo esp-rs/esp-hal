@@ -1,6 +1,10 @@
+use core::ops::Range;
+
 use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
+#[cfg(psram)]
+use crate::sync::Locked;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2/mod.rs")]
@@ -12,6 +16,29 @@ pub use self::implementation::*;
 mod implementation;
 
 mod efuse_field;
+
+#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+mod psram_common;
+
+#[cfg(psram)]
+static MAPPED_PSRAM: Locked<MappedPsram> = Locked::new(MappedPsram { memory_range: 0..0 });
+
+fn psram_range() -> Range<usize> {
+    cfg_if::cfg_if! {
+        if #[cfg(psram)] {
+            MAPPED_PSRAM.with(|mapped_psram| mapped_psram.memory_range.clone())
+        } else {
+            0..0
+        }
+    }
+}
+
+const DRAM: Range<usize> = self::constants::SOC_DRAM_LOW..self::constants::SOC_DRAM_HIGH;
+
+#[cfg(psram)]
+pub struct MappedPsram {
+    memory_range: core::ops::Range<usize>,
+}
 
 // Indicates the state of setting the mac address
 // 0 -- unset
@@ -59,8 +86,8 @@ impl self::efuse::Efuse {
     /// Get base mac address
     ///
     /// By default this reads the base mac address from eFuse, but it can be
-    /// overriden by `set_mac_address`.
-    pub fn get_mac_address() -> [u8; 6] {
+    /// overridden by `set_mac_address`.
+    pub fn mac_address() -> [u8; 6] {
         if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
             unsafe { MAC_OVERRIDE }
         } else {
@@ -70,30 +97,40 @@ impl self::efuse::Efuse {
 }
 
 #[allow(unused)]
-pub(crate) fn is_valid_ram_address(address: u32) -> bool {
-    (self::constants::SOC_DRAM_LOW..=self::constants::SOC_DRAM_HIGH).contains(&address)
+pub(crate) fn is_valid_ram_address(address: usize) -> bool {
+    addr_in_range(address, DRAM)
 }
 
 #[allow(unused)]
 pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
-    let start = slice.as_ptr() as u32;
-    let end = start + slice.len() as u32;
-    self::constants::SOC_DRAM_LOW <= start && end <= self::constants::SOC_DRAM_HIGH
+    slice_in_range(slice, DRAM)
 }
 
 #[allow(unused)]
-pub(crate) fn is_valid_psram_address(address: u32) -> bool {
-    #[cfg(psram)]
-    {
-        let start = crate::psram::psram_vaddr_start() as u32;
-        let end = start + crate::psram::PSRAM_BYTES as u32;
-        (start..=end).contains(&address)
-    }
-    #[cfg(not(psram))]
-    false
+pub(crate) fn is_valid_psram_address(address: usize) -> bool {
+    addr_in_range(address, psram_range())
 }
 
 #[allow(unused)]
-pub(crate) fn is_valid_memory_address(address: u32) -> bool {
+pub(crate) fn is_slice_in_psram<T>(slice: &[T]) -> bool {
+    slice_in_range(slice, psram_range())
+}
+
+#[allow(unused)]
+pub(crate) fn is_valid_memory_address(address: usize) -> bool {
     is_valid_ram_address(address) || is_valid_psram_address(address)
+}
+
+fn slice_in_range<T>(slice: &[T], range: Range<usize>) -> bool {
+    let slice = slice.as_ptr_range();
+    let start = slice.start as usize;
+    let end = slice.end as usize;
+    // `end` is >= `start`, so we don't need to check that `end > range.start`
+    // `end` is also one past the last element, so it can be equal to the range's
+    // end which is also one past the memory region's last valid address.
+    addr_in_range(start, range.clone()) && end <= range.end
+}
+
+fn addr_in_range(addr: usize, range: Range<usize>) -> bool {
+    range.contains(&addr)
 }

@@ -1,14 +1,12 @@
 //! TWAI test
 
-//% CHIPS: esp32c3 esp32c6 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
 
 use embedded_hal_02::can::Frame;
 use esp_hal::{
-    gpio::Io,
-    peripherals::TWAI0,
     prelude::*,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
     Blocking,
@@ -17,35 +15,35 @@ use hil_test as _;
 use nb::block;
 
 struct Context {
-    twai: twai::Twai<'static, TWAI0, Blocking>,
+    twai: twai::Twai<'static, Blocking>,
 }
 
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::assert_eq;
-
     use super::*;
 
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+        let (loopback_pin, _) = hil_test::common_test_pins!(peripherals);
 
-        let (can_tx_pin, can_rx_pin) = hil_test::common_test_pins!(io);
+        let (rx, tx) = loopback_pin.split();
 
         let mut config = twai::TwaiConfiguration::new(
             peripherals.TWAI0,
-            can_rx_pin,
-            can_tx_pin,
+            rx,
+            tx,
             twai::BaudRate::B1000K,
             TwaiMode::SelfTest,
         );
 
-        const FILTER: SingleStandardFilter =
-            SingleStandardFilter::new(b"00000000000", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
-        config.set_filter(FILTER);
+        config.set_filter(SingleStandardFilter::new(
+            b"00000000000",
+            b"x",
+            [b"xxxxxxxx", b"xxxxxxxx"],
+        ));
 
         let twai = config.start();
 
@@ -55,7 +53,7 @@ mod tests {
     #[test]
     #[timeout(3)]
     fn test_send_receive(mut ctx: Context) {
-        let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO.into(), &[1, 2, 3]).unwrap();
+        let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3]).unwrap();
         block!(ctx.twai.transmit(&frame)).unwrap();
 
         let frame = block!(ctx.twai.receive()).unwrap();

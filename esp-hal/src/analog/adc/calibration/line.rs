@@ -59,8 +59,8 @@ where
 
         // Try get the reference point (Dout, Vin) from efuse
         // Dout means mean raw ADC value when specified Vin applied to input.
-        let (code, mv) = ADCI::get_cal_code(atten)
-            .map(|code| (code, ADCI::get_cal_mv(atten)))
+        let (code, mv) = ADCI::cal_code(atten)
+            .map(|code| (code, ADCI::cal_mv(atten)))
             .unwrap_or_else(|| {
                 // As a fallback try to calibrate using reference voltage source.
                 // This method is not too good because actual reference voltage may varies

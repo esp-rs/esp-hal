@@ -10,21 +10,27 @@ use esp_wifi_sys::include::malloc;
 
 use crate::{compat::malloc::free, hal::trapframe::TrapFrame, memory_fence::memory_fence};
 
-static mut CTX_NOW: Mutex<RefCell<*mut Context>> = Mutex::new(RefCell::new(core::ptr::null_mut()));
+#[repr(transparent)]
+struct ContextWrapper(*mut Context);
+
+unsafe impl Send for ContextWrapper {}
+
+static CTX_NOW: Mutex<RefCell<ContextWrapper>> =
+    Mutex::new(RefCell::new(ContextWrapper(core::ptr::null_mut())));
 
 static mut SCHEDULED_TASK_TO_DELETE: *mut Context = core::ptr::null_mut();
 
-pub fn allocate_main_task() -> *mut Context {
+pub(crate) fn allocate_main_task() -> *mut Context {
     critical_section::with(|cs| unsafe {
         let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
-        if !(*ctx_now).is_null() {
+        if !ctx_now.0.is_null() {
             panic!("Tried to allocate main task multiple times");
         }
 
         let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
-        core::ptr::write_bytes(ptr, 0, 1);
+        core::ptr::write(ptr, Context::new());
         (*ptr).next = ptr;
-        *ctx_now = ptr;
+        ctx_now.0 = ptr;
         ptr
     })
 }
@@ -32,14 +38,14 @@ pub fn allocate_main_task() -> *mut Context {
 fn allocate_task() -> *mut Context {
     critical_section::with(|cs| unsafe {
         let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
-        if (*ctx_now).is_null() {
+        if ctx_now.0.is_null() {
             panic!("Called `allocate_task` before allocating main task");
         }
 
         let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
-        core::ptr::write_bytes(ptr, 0, 1);
-        (*ptr).next = (**ctx_now).next;
-        (**ctx_now).next = ptr;
+        core::ptr::write(ptr, Context::new());
+        (*ptr).next = (*ctx_now.0).next;
+        (*ctx_now.0).next = ptr;
         ptr
     })
 }
@@ -47,16 +53,16 @@ fn allocate_task() -> *mut Context {
 fn next_task() {
     critical_section::with(|cs| unsafe {
         let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
-        *ctx_now = (**ctx_now).next;
+        ctx_now.0 = (*ctx_now.0).next;
     });
 }
 
 /// Delete the given task.
 ///
 /// This will also free the memory (stack and context) allocated for it.
-fn delete_task(task: *mut Context) {
+pub(crate) fn delete_task(task: *mut Context) {
     critical_section::with(|cs| unsafe {
-        let mut ptr = *CTX_NOW.borrow_ref_mut(cs);
+        let mut ptr = CTX_NOW.borrow_ref_mut(cs).0;
         let initial = ptr;
         loop {
             if (*ptr).next == task {
@@ -78,12 +84,41 @@ fn delete_task(task: *mut Context) {
     });
 }
 
-pub fn current_task() -> *mut Context {
-    critical_section::with(|cs| unsafe { *CTX_NOW.borrow_ref(cs) })
+pub(crate) fn delete_all_tasks() {
+    critical_section::with(|cs| unsafe {
+        let mut ctx_now_ref = CTX_NOW.borrow_ref_mut(cs);
+        let current_task = ctx_now_ref.0;
+
+        if current_task.is_null() {
+            return;
+        }
+
+        let mut task_to_delete = current_task;
+
+        loop {
+            let next_task = (*task_to_delete).next;
+
+            free((*task_to_delete).allocated_stack as *mut u8);
+            free(task_to_delete as *mut u8);
+
+            if next_task == current_task {
+                break;
+            }
+
+            task_to_delete = next_task;
+        }
+
+        ctx_now_ref.0 = core::ptr::null_mut();
+
+        memory_fence();
+    });
 }
 
-#[cfg(feature = "wifi")]
-pub fn schedule_task_deletion(task: *mut Context) {
+pub(crate) fn current_task() -> *mut Context {
+    critical_section::with(|cs| CTX_NOW.borrow_ref(cs).0)
+}
+
+pub(crate) fn schedule_task_deletion(task: *mut Context) {
     use crate::timer::yield_task;
 
     unsafe {
@@ -97,7 +132,7 @@ pub fn schedule_task_deletion(task: *mut Context) {
     }
 }
 
-pub fn task_switch(trap_frame: &mut TrapFrame) {
+pub(crate) fn task_switch(trap_frame: &mut TrapFrame) {
     save_task_context(current_task(), trap_frame);
 
     unsafe {

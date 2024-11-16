@@ -6,21 +6,28 @@
 //! cargo run --release
 //! ```
 //! Ensure you have set the IP of your local machine in the `HOST_IP` env variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env variable before running this example.
+//!
 
-//% FEATURES: esp-wifi esp-wifi/wifi-default esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
 
+use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    delay::Delay,
+    prelude::*,
+    rng::Rng,
+    time::{self, Duration},
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
 use esp_wifi::{
-    current_millis,
-    initialize,
+    init,
     wifi::{
         utils::create_network_interface,
         AccessPointInfo,
@@ -29,19 +36,17 @@ use esp_wifi::{
         WifiError,
         WifiStaDevice,
     },
-    wifi_interface::WifiStack,
-    EspWifiInitFor,
 };
 use smoltcp::{
-    iface::SocketStorage,
-    wire::{IpAddress, Ipv4Address},
+    iface::{SocketSet, SocketStorage},
+    wire::{DhcpOption, IpAddress, Ipv4Address},
 };
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 const HOST_IP: &str = env!("HOST_IP");
 
-const TEST_DURATION: usize = 15;
+const TEST_DURATION: Duration = Duration::secs(15);
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
 const IO_BUFFER_SIZE: usize = 1024;
@@ -64,19 +69,26 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = initialize(
-        EspWifiInitFor::Wifi,
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let mut rng = Rng::new(peripherals.RNG);
 
-    let wifi = peripherals.WIFI;
+    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+
+    let mut wifi = peripherals.WIFI;
+    let (iface, device, mut controller) =
+        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
-    let (iface, device, mut controller, sockets) =
-        create_network_interface(&init, wifi, WifiStaDevice, &mut socket_set_entries).unwrap();
-    let wifi_stack = WifiStack::new(iface, device, sockets, current_millis);
+    let mut socket_set = SocketSet::new(&mut socket_set_entries[..]);
+    let mut dhcp_socket = smoltcp::socket::dhcpv4::Socket::new();
+    // we can set a hostname here (or add other DHCP options)
+    dhcp_socket.set_outgoing_options(&[DhcpOption {
+        kind: 12,
+        data: b"esp-wifi",
+    }]);
+    socket_set.add(dhcp_socket);
+
+    let now = || time::now().duration_since_epoch().to_millis();
+    let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
@@ -97,19 +109,15 @@ fn main() -> ! {
         }
     }
 
-    println!("{:?}", controller.get_capabilities());
+    println!("{:?}", controller.capabilities());
     println!("wifi_connect {:?}", controller.connect());
 
     // wait to get connected
     println!("Wait to get connected");
     loop {
-        let res = controller.is_connected();
-        match res {
-            Ok(connected) => {
-                if connected {
-                    break;
-                }
-            }
+        match controller.is_connected() {
+            Ok(true) => break,
+            Ok(false) => {}
             Err(err) => {
                 println!("{:?}", err);
                 loop {}
@@ -121,17 +129,17 @@ fn main() -> ! {
     // wait for getting an ip address
     println!("Wait to get an ip address");
     loop {
-        wifi_stack.work();
+        stack.work();
 
-        if wifi_stack.is_iface_up() {
-            println!("got ip {:?}", wifi_stack.get_ip_info());
+        if stack.is_iface_up() {
+            println!("got ip {:?}", stack.get_ip_info());
             break;
         }
     }
 
     let mut rx_buffer = [0u8; RX_BUFFER_SIZE];
     let mut tx_buffer = [0u8; TX_BUFFER_SIZE];
-    let mut socket = wifi_stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+    let mut socket = stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     let delay = Delay::new();
 
@@ -148,9 +156,9 @@ fn main() -> ! {
     }
 }
 
-fn test_download<'a>(
+fn test_download<'a, D: smoltcp::phy::Device>(
     server_address: Ipv4Address,
-    socket: &mut esp_wifi::wifi_interface::Socket<'a, 'a, WifiStaDevice>,
+    socket: &mut blocking_network_stack::Socket<'a, 'a, D>,
 ) {
     println!("Testing download...");
     socket.work();
@@ -162,29 +170,29 @@ fn test_download<'a>(
     let mut buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let wait_end = current_millis() + (TEST_DURATION as u64 * 1000);
+    let deadline = time::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Ok(len) = socket.read(&mut buf) {
-            total += len;
+            total += len as u64;
         } else {
             break;
         }
 
-        if current_millis() > wait_end {
+        if time::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION;
+    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
     println!("download: {} kB/s", kbps);
 
     socket.disconnect();
 }
 
-fn test_upload<'a>(
+fn test_upload<'a, D: smoltcp::phy::Device>(
     server_address: Ipv4Address,
-    socket: &mut esp_wifi::wifi_interface::Socket<'a, 'a, WifiStaDevice>,
+    socket: &mut blocking_network_stack::Socket<'a, 'a, D>,
 ) {
     println!("Testing upload...");
     socket.work();
@@ -196,29 +204,29 @@ fn test_upload<'a>(
     let buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let wait_end = current_millis() + (TEST_DURATION as u64 * 1000);
+    let deadline = time::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Ok(len) = socket.write(&buf) {
-            total += len;
+            total += len as u64;
         } else {
             break;
         }
 
-        if current_millis() > wait_end {
+        if time::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION;
+    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
     println!("upload: {} kB/s", kbps);
 
     socket.disconnect();
 }
 
-fn test_upload_download<'a>(
+fn test_upload_download<'a, D: smoltcp::phy::Device>(
     server_address: Ipv4Address,
-    socket: &mut esp_wifi::wifi_interface::Socket<'a, 'a, WifiStaDevice>,
+    socket: &mut blocking_network_stack::Socket<'a, 'a, D>,
 ) {
     println!("Testing upload+download...");
     socket.work();
@@ -231,7 +239,7 @@ fn test_upload_download<'a>(
     let mut rx_buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let wait_end = current_millis() + (TEST_DURATION as u64 * 1000);
+    let deadline = time::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Err(_) = socket.write(&tx_buf) {
@@ -241,17 +249,17 @@ fn test_upload_download<'a>(
         socket.work();
 
         if let Ok(len) = socket.read(&mut rx_buf) {
-            total += len;
+            total += len as u64;
         } else {
             break;
         }
 
-        if current_millis() > wait_end {
+        if time::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION;
+    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
     println!("upload+download: {} kB/s", kbps);
 
     socket.disconnect();

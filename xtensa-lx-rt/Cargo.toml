@@ -20,10 +20,10 @@ r0                = "1.0.0"
 xtensa-lx         = "0.9.0"
 
 [build-dependencies]
-anyhow          = "1.0.86"
-enum-as-inner   = "0.6.0"
-minijinja       = "2.2.0"
-serde           = { version = "1.0.209", features = ["derive"] }
+anyhow          = "1.0.89"
+enum-as-inner   = "0.6.1"
+minijinja       = "2.3.1"
+serde           = { version = "1.0.210", features = ["derive"] }
 strum           = { version = "0.26.3", features = ["derive"] }
 toml            = "0.8.19"
 

@@ -4,10 +4,10 @@ use crate::MAX_BACKTRACE_ADDRESSES;
 
 // subtract 4 from the return address
 // the return address is the address following the JALR
-// we get better results (especially if the caller was the last function in the
-// calling function) if we report the address of the JALR itself
+// we get better results (especially if the caller was the last instruction in
+// the calling function) if we report the address of the JALR itself
 // even if it was a C.JALR we should get good results using RA - 4
-#[cfg(feature = "panic-handler")]
+#[allow(unused)]
 pub(super) const RA_OFFSET: usize = 4;
 
 /// Registers saved in trap handler

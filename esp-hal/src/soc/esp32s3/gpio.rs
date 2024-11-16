@@ -8,7 +8,7 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `get_io_mux_reg(gpio_num: u8) -> &'static
+//!   - `io_mux_reg(gpio_num: u8) -> &'static
 //!     crate::peripherals::io_mux::GPIO0:`:
 //!       * Returns the IO_MUX register for the specified GPIO pin number.
 //!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
@@ -32,23 +32,12 @@
 //!       * This enumeration defines output signals for the GPIO mux. Each
 //!         output signal is assigned a specific value.
 //!
-//! This module also implements the `InterruptStatusRegisterAccess` trait for
-//! two different banks:
-//!   * `InterruptStatusRegisterAccessBank0`
-//!   * `InterruptStatusRegisterAccessBank1`.
-//!
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 
 use crate::{
-    gpio::{
-        AlternateFunction,
-        GpioPin,
-        InterruptStatusRegisterAccess,
-        InterruptStatusRegisterAccessBank0,
-        InterruptStatusRegisterAccessBank1,
-    },
+    gpio::{AlternateFunction, GpioPin},
     peripherals::GPIO,
 };
 
@@ -57,6 +46,7 @@ pub const NUM_PINS: usize = 49;
 
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
+pub(crate) type InputSignalType = u16;
 pub(crate) type OutputSignalType = u16;
 pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 256;
 pub(crate) const INPUT_SIGNAL_MAX: u16 = 189;
@@ -66,7 +56,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function1;
 
-pub(crate) const fn get_io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
+pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
     unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
 }
 
@@ -76,7 +66,8 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
 pub enum InputSignal {
     SPIQ              = 0,
@@ -214,8 +205,10 @@ pub enum InputSignal {
 
 /// Peripheral output signals for the GPIO mux
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Copy, Clone)]
-#[doc(hidden)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[doc(hidden)] // TODO connection operations are now public on these, we might want to publish
+               // them
 pub enum OutputSignal {
     SPIQ            = 0,
     SPID            = 1,
@@ -356,142 +349,152 @@ pub enum OutputSignal {
     GPIO            = 256,
 }
 
-crate::gpio::gpio! {
-    (0, 0, InputOutputAnalog)
-    (1, 0, InputOutputAnalog)
-    (2, 0, InputOutputAnalog)
-    (3, 0, InputOutputAnalog)
-    (4, 0, InputOutputAnalog)
-    (5, 0, InputOutputAnalog)
-    (6, 0, InputOutputAnalog)
-    (7, 0, InputOutputAnalog)
-    (8, 0, InputOutputAnalog () (3 => SUBSPICS1))
-    (9, 0, InputOutputAnalog (3 => SUBSPIHD 4 => FSPIHD) (3 => SUBSPIHD 4 => FSPIHD))
-    (10, 0, InputOutputAnalog (2 => FSPIIO4 4 => FSPICS0) (2 => FSPIIO4 3 => SUBSPICS0 4 => FSPICS0))
-    (11, 0, InputOutputAnalog (2 => FSPIIO5 3 => SUBSPID 4 => FSPID) (2 => FSPIIO5 3 => SUBSPID 4 => FSPID))
-    (12, 0, InputOutputAnalog (2 => FSPIIO6 4 => FSPICLK) (2 => FSPIIO6 3=> SUBSPICLK 4 => FSPICLK))
-    (13, 0, InputOutputAnalog (2 => FSPIIO7 3 => SUBSPIQ 4 => FSPIQ) (2 => FSPIIO7 3 => SUBSPIQ 4 => FSPIQ))
-    (14, 0, InputOutputAnalog (3 => SUBSPIWP 4 => FSPIWP) (2 => FSPIDQS 3 => SUBSPIWP 4 => FSPIWP))
-    (15, 0, InputOutputAnalog () (2 => U0RTS))
-    (16, 0, InputOutputAnalog (2 => U0CTS) ())
-    (17, 0, InputOutputAnalog () (2 => U1TXD))
-    (18, 0, InputOutputAnalog (2 => U1RXD) ())
-    (19, 0, InputOutputAnalog () (2 => U1RTS))
-    (20, 0, InputOutputAnalog (2 => U1CTS) ())
-    (21, 0, InputOutputAnalog)
-    (26, 0, InputOutput)
-    (27, 0, InputOutput)
-    (28, 0, InputOutput)
-    (29, 0, InputOutput)
-    (30, 0, InputOutput)
-    (31, 0, InputOutput)
-    (32, 1, InputOutput)
-    (33, 1, InputOutput (2 => FSPIHD 3 => SUBSPIHD) (2 => FSPIHD 3 => SUBSPIHD))
-    (34, 1, InputOutput (2 => FSPICS0) (2 => FSPICS0 3 => SUBSPICS0))
-    (35, 1, InputOutput (2 => FSPID 3 => SUBSPID) (2 => FSPID 3 => SUBSPID))
-    (36, 1, InputOutput (2 => FSPICLK) (2 => FSPICLK 3 => SUBSPICLK))
-    (37, 1, InputOutput (2 => FSPIQ 3 => SUBSPIQ 4 => SPIDQS) (2 => FSPIQ 3=> SUBSPIQ 4 => SPIDQS))
-    (38, 1, InputOutput (2 => FSPIWP 3 => SUBSPIWP) (3 => FSPIWP 3 => SUBSPIWP))
-    (39, 1, InputOutput () (4 => SUBSPICS1))
-    (40, 1, InputOutput)
-    (41, 1, InputOutput)
-    (42, 1, InputOutput)
-    (43, 1, InputOutput)
-    (44, 1, InputOutput)
-    (45, 1, InputOutput)
-    (46, 1, InputOutput)
-    (47, 1, InputOutput)
-    (48, 1, InputOutput)
+macro_rules! rtcio_analog {
+    ( @ignore $rue:literal ) => {};
+
+    (
+        $pin_num:expr, $pin_reg:expr, $prefix:pat, $hold:ident
+    ) => {
+        impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
+            fn rtc_number(&self) -> u8 {
+                $pin_num
+            }
+
+            /// Set the RTC properties of the pin. If `mux` is true then then pin is
+            /// routed to RTC, when false it is routed to IO_MUX.
+            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+                enable_iomux_clk_gate();
+
+                // disable input
+                paste::paste!{
+                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                        .$pin_reg.modify(|_,w| unsafe {
+                            w.[<$prefix fun_ie>]().bit(input_enable);
+                            w.[<$prefix mux_sel>]().bit(mux);
+                            w.[<$prefix fun_sel>]().bits(func as u8)
+                        });
+                }
+            }
+
+            fn rtcio_pad_hold(&mut self, enable: bool) {
+                unsafe { $crate::peripherals::LPWR::steal() }
+                    .pad_hold()
+                    .modify(|_, w| w.$hold().bit(enable));
+            }
+        }
+
+        impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
+        {
+            fn rtcio_pullup(&mut self, enable: bool) {
+                paste::paste! {
+                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                        .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
+                }
+            }
+
+            fn rtcio_pulldown(&mut self, enable: bool) {
+                paste::paste! {
+                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                        .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
+                }
+            }
+        }
+
+        impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
+            /// Configures the pin for analog mode.
+            fn set_analog(&self, _: $crate::private::Internal) {
+                use $crate::gpio::RtcPin;
+                enable_iomux_clk_gate();
+
+                let rtcio = unsafe{ $crate::peripherals::RTC_IO::steal() };
+
+                paste::paste! {
+                    // disable input
+                    rtcio.$pin_reg.modify(|_,w| w.[<$prefix fun_ie>]().bit(false));
+
+                    // disable output
+                    rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << self.rtc_number()) });
+
+                    // disable open drain
+                    rtcio.pin(self.rtc_number() as usize).modify(|_,w| w.pad_driver().bit(false));
+
+                    rtcio.$pin_reg.modify(|_,w| {
+                        w.[<$prefix fun_ie>]().clear_bit();
+
+                        // Connect pin to analog / RTC module instead of standard GPIO
+                        w.[<$prefix mux_sel>]().set_bit();
+
+                        // Select function "RTC function 1" (GPIO) for analog use
+                        unsafe { w.[<$prefix fun_sel>]().bits(0b00) };
+
+                        // Disable pull-up and pull-down resistors on the pin
+                        w.[<$prefix rue>]().bit(false);
+                        w.[<$prefix rde>]().bit(false);
+
+                        w
+                    });
+                }
+            }
+        }
+    };
+
+    (
+        $( ( $pin_num:expr, $pin_reg:expr, $prefix:pat, $hold:ident ) )+
+    ) => {
+        $(
+            rtcio_analog!($pin_num, $pin_reg, $prefix, $hold);
+        )+
+    };
 }
 
-crate::gpio::analog! {
-    ( 0,  0,  touch_pad(0),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    ( 1,  1,  touch_pad(1),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    ( 2,  2,  touch_pad(2),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    ( 3,  3,  touch_pad(3),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    ( 4,  4,  touch_pad(4),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    ( 5,  5,  touch_pad(5),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    ( 6,  6,  touch_pad(6),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    ( 7,  7,  touch_pad(7),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    ( 8,  8,  touch_pad(8),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    ( 9,  9,  touch_pad(9),     mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    (10, 10,  touch_pad(10),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    (11, 11,  touch_pad(11),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    (12, 12,  touch_pad(12),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    (13, 13,  touch_pad(13),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    (14, 14,  touch_pad(14),    mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    (15, 15,  xtal_32p_pad(),   x32p_mux_sel, x32p_fun_sel, x32p_fun_ie,    x32p_rue,  x32p_rde)
-    (16, 16,  xtal_32n_pad(),   x32n_mux_sel, x32n_fun_sel, x32n_fun_ie,    x32n_rue,  x32n_rde)
-    (17, 17,  pad_dac1(),       pdac1_mux_sel,pdac1_fun_sel,pdac1_fun_ie,  pdac1_rue, pdac1_rde)
-    (18, 18,  pad_dac2(),       pdac2_mux_sel,pdac2_fun_sel,pdac2_fun_ie,  pdac2_rue, pdac2_rde)
-    (19, 19,  rtc_pad19(),      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    (20, 20,  rtc_pad20(),      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-    (21, 21,  rtc_pad21(),      mux_sel,      fun_sel,      fun_ie,              rue,       rde)
-}
-
-crate::gpio::rtc_pins! {
-    ( 0,  0,  touch_pad(0),   "",     touch_pad0_hold,        rue,       rde)
-    ( 1,  1,  touch_pad(1),   "",     touch_pad1_hold,        rue,       rde)
-    ( 2,  2,  touch_pad(2),   "",     touch_pad2_hold,        rue,       rde)
-    ( 3,  3,  touch_pad(3),   "",     touch_pad3_hold,        rue,       rde)
-    ( 4,  4,  touch_pad(4),   "",     touch_pad4_hold,        rue,       rde)
-    ( 5,  5,  touch_pad(5),   "",     touch_pad5_hold,        rue,       rde)
-    ( 6,  6,  touch_pad(6),   "",     touch_pad6_hold,        rue,       rde)
-    ( 7,  7,  touch_pad(7),   "",     touch_pad7_hold,        rue,       rde)
-    ( 8,  8,  touch_pad(8),   "",     touch_pad8_hold,        rue,       rde)
-    ( 9,  9,  touch_pad(9),   "",     touch_pad9_hold,        rue,       rde)
-    (10, 10,  touch_pad(10),  "",     touch_pad10_hold,       rue,       rde)
-    (11, 11,  touch_pad(11),  "",     touch_pad11_hold,       rue,       rde)
-    (12, 12,  touch_pad(12),  "",     touch_pad12_hold,       rue,       rde)
-    (13, 13,  touch_pad(13),  "",     touch_pad13_hold,       rue,       rde)
-    (14, 14,  touch_pad(14),  "",     touch_pad14_hold,       rue,       rde)
-    (15, 15,  xtal_32p_pad(), x32p_,  x32p_hold,         x32p_rue,  x32p_rde)
-    (16, 16,  xtal_32n_pad(), x32n_,  x32n_hold,         x32n_rue,  x32n_rde)
-    (17, 17,  pad_dac1(),     pdac1_, pdac1_hold,       pdac1_rue, pdac1_rde)
-    (18, 18,  pad_dac2(),     pdac2_, pdac2_hold,       pdac2_rue, pdac2_rde)
-    (19, 19,  rtc_pad19(),    "",     pad19_hold,             rue,       rde)
-    (20, 20,  rtc_pad20(),    "",     pad20_hold,             rue,       rde)
-    (21, 21,  rtc_pad21(),    "",     pad21_hold,             rue,       rde)
+rtcio_analog! {
+    ( 0, touch_pad(0),   "",     touch_pad0_hold )
+    ( 1, touch_pad(1),   "",     touch_pad1_hold )
+    ( 2, touch_pad(2),   "",     touch_pad2_hold )
+    ( 3, touch_pad(3),   "",     touch_pad3_hold )
+    ( 4, touch_pad(4),   "",     touch_pad4_hold )
+    ( 5, touch_pad(5),   "",     touch_pad5_hold )
+    ( 6, touch_pad(6),   "",     touch_pad6_hold )
+    ( 7, touch_pad(7),   "",     touch_pad7_hold )
+    ( 8, touch_pad(8),   "",     touch_pad8_hold )
+    ( 9, touch_pad(9),   "",     touch_pad9_hold )
+    (10, touch_pad(10),  "",     touch_pad10_hold)
+    (11, touch_pad(11),  "",     touch_pad11_hold)
+    (12, touch_pad(12),  "",     touch_pad12_hold)
+    (13, touch_pad(13),  "",     touch_pad13_hold)
+    (14, touch_pad(14),  "",     touch_pad14_hold)
+    (15, xtal_32p_pad(), x32p_,  x32p_hold       )
+    (16, xtal_32n_pad(), x32n_,  x32n_hold       )
+    (17, pad_dac1(),     pdac1_, pdac1_hold      )
+    (18, pad_dac2(),     pdac2_, pdac2_hold      )
+    (19, rtc_pad19(),    "",     pad19_hold      )
+    (20, rtc_pad20(),    "",     pad20_hold      )
+    (21, rtc_pad21(),    "",     pad21_hold      )
 }
 
 // Whilst the S3 is a dual core chip, it shares the enable registers between
 // cores so treat it as a single core device
-impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank0 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int().read().bits()
-    }
-
-    fn interrupt_status_read() -> u32 {
-        Self::pro_cpu_interrupt_status_read()
-    }
-
-    fn nmi_status_read() -> u32 {
-        Self::pro_cpu_nmi_status_read()
-    }
+#[derive(Clone, Copy)]
+pub(crate) enum InterruptStatusRegisterAccess {
+    Bank0,
+    Bank1,
 }
 
-impl InterruptStatusRegisterAccess for InterruptStatusRegisterAccessBank1 {
-    fn pro_cpu_interrupt_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int1().read().bits()
-    }
-
-    fn pro_cpu_nmi_status_read() -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_nmi_int1().read().bits()
-    }
-
-    fn interrupt_status_read() -> u32 {
-        Self::pro_cpu_interrupt_status_read()
-    }
-
-    fn nmi_status_read() -> u32 {
-        Self::pro_cpu_nmi_status_read()
+impl InterruptStatusRegisterAccess {
+    pub(crate) fn interrupt_status_read(self) -> u32 {
+        match self {
+            Self::Bank0 => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
+            Self::Bank1 => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
+        }
     }
 }
 
 // implement marker traits on USB pins
 impl crate::otg_fs::UsbDm for GpioPin<19> {}
 impl crate::otg_fs::UsbDp for GpioPin<20> {}
+
+fn enable_iomux_clk_gate() {
+    unsafe { crate::peripherals::SENS::steal() }
+        .sar_peri_clk_gate_conf()
+        .modify(|_, w| w.iomux_clk_en().set_bit());
+}

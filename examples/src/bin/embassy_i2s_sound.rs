@@ -36,8 +36,7 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::Io,
-    i2s::{asynch::*, DataFormat, I2s, Standard},
+    i2s::master::{DataFormat, I2s, Standard},
     prelude::*,
     timer::timg::TimerGroup,
 };
@@ -59,8 +58,6 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     let dma = Dma::new(peripherals.DMA);
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
     let dma_channel = dma.i2s0channel;
@@ -74,16 +71,17 @@ async fn main(_spawner: Spawner) {
         Standard::Philips,
         DataFormat::Data16Channel16,
         44100u32.Hz(),
-        dma_channel.configure_for_async(false, DmaPriority::Priority0),
+        dma_channel.configure(false, DmaPriority::Priority0),
         rx_descriptors,
         tx_descriptors,
-    );
+    )
+    .into_async();
 
     let i2s_tx = i2s
         .i2s_tx
-        .with_bclk(io.pins.gpio2)
-        .with_ws(io.pins.gpio4)
-        .with_dout(io.pins.gpio5)
+        .with_bclk(peripherals.GPIO2)
+        .with_ws(peripherals.GPIO4)
+        .with_dout(peripherals.GPIO5)
         .build();
 
     let data =

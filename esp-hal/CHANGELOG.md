@@ -7,11 +7,123 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Bump MSRV to 1.77.0 (#1971)
+### Added
+
+- A new config option `PLACE_SWITCH_TABLES_IN_RAM` to improve performance (especially for interrupts) at the cost of slightly more RAM usage (#2331)
+- A new config option `PLACE_ANON_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
+- Add burst transfer support to DMA buffers (#2336)
+- `AnyPin` now implements `From<GpioPin<N>>`. (#2326)
+- Added `AnySpi` and `AnySpiDmaChannel`. (#2334)
+- Added `AnyI2s` and `AnyI2sDmaChannel`. (#2367)
+- Added `AnyTwai`. (#2359)
+- Added `AnyUart`. (#2381)
+- `Pins::steal()` to unsafely obtain GPIO. (#2335)
+- `I2c::with_timeout` (#2361)
+- `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
+- `Cpu::COUNT` and `Cpu::current()` (#2411)
+- `UartInterrupt` and related functions (#2406)
+- I2S Parallel output driver for ESP32. (#2348, #2436, #2472)
+- Add an option to configure `WDT` action (#2330)
+- `DmaDescriptor` is now `Send` (#2456)
+- `into_async` and `into_blocking` functions for most peripherals (#2430, #2461)
+- API mode type parameter (currently always `Blocking`) to `master::Spi` and `slave::Spi` (#2430)
+- `gpio::{GpioPin, AnyPin, Flex, Output, OutputOpenDrain}::split()` to obtain peripheral interconnect signals. (#2418)
+- `gpio::Input::{split(), into_peripheral_output()}` when used with output pins. (#2418)
+- `gpio::Output::peripheral_input()` (#2418)
+- `{Uart, UartRx, UartTx}::apply_config()` (#2449)
+- `{Uart, UartRx, UartTx}` now implement `embassy_embedded_hal::SetConfig` (#2449)
+- GPIO ETM tasks and events now accept `InputSignal` and `OutputSignal` (#2427)
+- `spi::master::Config` and `{Spi, SpiDma, SpiDmaBus}::apply_config` (#2448)
+- `embassy_embedded_hal::SetConfig` is now implemented for `spi::master::{Spi, SpiDma, SpiDmaBus}`, `i2c::master::I2c` (#2448, #2477)
+- `slave::Spi::{with_mosi(), with_miso(), with_sclk(), with_cs()}` functions (#2485)
+- I8080: Added `set_8bits_order()` to set the byte order in 8-bit mode (#2487)
+- `I2c::{apply_config(), with_sda(), with_scl()}` (#2477)
+- ESP32-S2: Added missing GPIO alternate functions (#2512)
+
+### Changed
+
+- Peripheral type erasure for SPI (#2334)
+- Peripheral type erasure for I2S (#2367)
+- Peripheral type erasure for I2C (#2361)
+- Peripheral type erasure for TWAI (#2359)
+- The SPI driver has been rewritten to allow using half-duplex and full-duplex functionality on the same bus. See the migration guide for details. (#2373)
+- Renamed `SpiDma` functions: `dma_transfer` to `transfer`, `dma_write` to `write`, `dma_read` to `read`. (#2373)
+- Peripheral type erasure for UART (#2381)
+- Changed listening for UART events (#2406)
+- Circular DMA transfers now correctly error, `available` returns `Result<usize,DmaError>` now (#2409)
+- Interrupt listen/unlisten/clear functions now accept any type that converts into `EnumSet` (i.e. single interrupt flags). (#2442)
+- SPI interrupt listening is now only available in Blocking mode. The `set_interrupt_handler` is available via `InterruptConfigurable` (#2442)
+- Allow users to create DMA `Preparation`s (#2455)
+- The `rmt::asynch::RxChannelAsync` and `rmt::asynch::TxChannelAsync` traits have been moved to `rmt` (#2430)
+- Calling `AnyPin::output_signals` on an input-only pin (ESP32 GPIO 34-39) will now result in a panic. (#2418)
+- UART configuration types have been moved to `esp_hal::uart` (#2449)
+- `spi::master::Spi::new()` no longer takes `frequency` and `mode` as a parameter. (#2448)
+- Peripheral interconnections via GPIO pins now use the GPIO matrix. (#2419)
+- The I2S driver has been moved to `i2s::master` (#2472)
+- `slave::Spi` constructors no longer take pins (#2485)
+- The `I2c` master driver has been moved from `esp_hal::i2c` to `esp_hal::i2c::master`. (#2476)
+- `I2c` SCL timeout is now defined in bus clock cycles. (#2477)
+- Trying to send a single-shot RMT transmission will result in an error now, `RMT` deals with `u32` now, `PulseCode` is a convenience trait now (#2463)
+- Removed `get_` prefixes from functions (#2528)
+- The `Camera` and `I8080` drivers' constructors now only accepts blocking-mode DMA channels. (#2519)
+
+### Fixed
+
+- Fix conflict between `RtcClock::get_xtal_freq` and `Rtc::disable_rom_message_printing` (#2360)
+- Fixed an issue where interrupts enabled before `esp_hal::init` were disabled. This issue caused the executor created by `#[esp_hal_embassy::main]` to behave incorrectly in multi-core applications. (#2377)
+- Fixed `TWAI::transmit_async`: bus-off state is not reached when CANH and CANL are shorted. (#2421)
+- ESP32: added UART-specific workaround for https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html (#2441)
+- Fixed some SysTimer race conditions and panics (#2451)
+- TWAI: accept all messages by default (#2467)
+- I8080: `set_byte_order()` now works correctly in 16-bit mode (#2487)
+- ESP32-C6/ESP32-H2: Make higher LEDC frequencies work (#2520)
+
+### Removed
+
+- The `i2s::{I2sWrite, I2sWriteDma, I2sRead, I2sReadDma, I2sWriteDmaAsync, I2sReadDmaAsync}` traits have been removed. (#2316)
+- The `ledc::ChannelHW` trait is no longer generic. (#2387)
+- The `I2c::new_with_timeout` constructors have been removed (#2361)
+- `I2c::new()` no longer takes `frequency` and pins as parameters. (#2477)
+- The `spi::master::HalfDuplexReadWrite` trait has been removed. (#2373)
+- The `Spi::with_pins` methods have been removed. (#2373)
+- The `Spi::new_half_duplex` constructor have been removed. (#2373)
+- The `HalfDuplexMode` and `FullDuplexMode` parameters have been removed from `Spi`. (#2373)
+- Removed the output pin type parameter from `ledc::{Channel, ChannelIFace}` (#2388)
+- Removed the output pin type parameter from `mcpwm::operator::{PwmPin, LinkedPins}` (#2388)
+- Removed the output pin type parameter from `parl_io::{ClkOutPin, ClkInPin, RxClkInPin}` (#2388)
+- Removed the valid pin type parameter from `parl_io::{TxPinConfigWithValidPin, RxPinConfigWithValidPin}` (#2388)
+- Removed the pin type parameters from `parl_io::{TxOneBit, TxTwoBits, TxFourBits, TxEightBits, TxSixteenBits}` (#2388)
+- Removed the pin type parameters from `parl_io::{RxOneBit, RxTwoBits, RxFourBits, RxEightBits, RxSixteenBits}` (#2388)
+- Removed the pin type parameters from `lcd_cam::lcd::i8080::{TxEightBits, TxSixteenBits}` (#2388)
+- Removed the pin type parameters from `lcd_cam::cam::{RxEightBits, RxSixteenBits}` (#2388)
+- Most of the async-specific constructors (`new_async`, `new_async_no_transceiver`) have been removed. (#2430)
+- The `configure_for_async` DMA functions have been removed (#2430)
+- The `Uart::{change_baud, change_stop_bits}` functions have been removed (#2449)
+- `gpio::{Input, Output, OutputOpenDrain, Flex, GpioPin}::{peripheral_input, into_peripheral_output}` have been removed. (#2418)
+- The `GpioEtm` prefix has been removed from `gpio::etm` types (#2427)
+- The `TimerEtm` prefix has been removed from `timer::timg::etm` types (#2427)
+- The `SysTimerEtm` prefix has been removed from `timer::systimer::etm` types (#2427)
+- The `GpioEtmEventRising`, `GpioEtmEventFalling`, `GpioEtmEventAny` types have been replaced with `Event` (#2427)
+- The `TaskSet`, `TaskClear`, `TaskToggle` types have been replaced with `Task` (#2427)
+- `{Spi, SpiDma, SpiDmaBus}` configuration methods (#2448)
+- `Io::new_with_priority` and `Io::new_no_bind_interrupt`. (#2486)
+- `parl_io::{no_clk_pin(), NoClkPin}` (#2531)
+- Removed `get_core` function in favour of `Cpu::current` (#2533)
+
+## [0.21.1]
+
+### Fixed
+
+- Restored blocking `embedded_hal` compatibility for async I2C driver (#2343)
+- I2c::transaction is now able to transmit data of arbitrary length (#2481)
+
+## [0.21.0]
+
+- Bump MSRV to 1.79.0 (#1971)
 
 ### Added
 
-- Introduce traits for the DMA buffer objects (#1976)
+- Introduce traits for the DMA buffer objects (#1976, #2213)
 - Implement `embedded-hal` output pin traits for `NoPin` (#2019, #2133)
 - Added `esp_hal::init` to simplify HAL initialisation (#1970, #1999)
 - Added GpioPin::degrade to create ErasePins easily. Same for AnyPin by accident. (#2075)
@@ -24,6 +136,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `Rtc::set_current_time` to allow setting RTC time, and `Rtc::current_time` to getting RTC time while taking into account boot time (#1883)
 - Added RMT fractional divider support. (#2127)
 - Added APIs to allow connecting signals through the GPIO matrix. (#2128)
+- Allow I8080 transfers to be cancelled on the spot (#2191)
+- Implement `TryFrom<u32>` for `ledc::timer::config::Duty` (#1984)
+- Expose `RtcClock::get_xtal_freq` and `RtcClock::get_slow_freq` publically for all chips (#2183)
+- TWAI support for ESP32-H2 (#2199)
+- Make `DmaDescriptor` methods public (#2237)
+- Added a way to configure watchdogs in `esp_hal::init` (#2180)
+- Introduce `DmaRxStreamBuf` (#2242)
+- Implement `embedded_hal_async::delay::DelayNs` for `TIMGx` timers (#2084)
+- Added `Efuse::read_bit` (#2259)
+- Limited SPI slave support for ESP32 (Modes 1 and 3 only) (#2278)
+- Added `Rtc::disable_rom_message_printing` (S3 and H2 only) (#2280)
+- Added `esp_hal::time::{Duration, Instant}` (#2304)
 
 ### Changed
 
@@ -38,11 +162,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The (previously undocumented) `ErasedPin` enum has been replaced with the `ErasedPin` struct. (#2094)
 - Renamed and merged `Rtc::get_time_us` and `Rtc::get_time_ms` into `Rtc::time_since_boot` (#1883)
 - ESP32: Added support for touch sensing on GPIO32 and 33 (#2109)
+- Removed gpio pin generics from I8080 driver type. (#2171)
+- I8080 driver now decides bus width at transfer time rather than construction time. (#2171)
+- Migrate the I8080 driver to a move based API (#2191)
 - Replaced `AnyPin` with `InputSignal` and `OutputSignal` and renamed `ErasedPin` to `AnyPin` (#2128)
-- Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#?)
+- Replaced the `ErasedTimer` enum with the `AnyTimer` struct. (#2144)
+- `Camera` and `AesDma` now support erasing the DMA channel type (#2258)
 - Changed the parameters of `Spi::with_pins` to no longer be optional (#2133)
 - Renamed `DummyPin` to `NoPin` and removed all internal logic from it. (#2133)
 - The `NO_PIN` constant has been removed. (#2133)
+- MSRV bump to 1.79 (#2156)
+- Allow handling interrupts while trying to lock critical section on multi-core chips. (#2197)
+- Migrate `Camera` to a move based API (#2242).
+- Removed the PS-RAM related features, replaced by `quad-psram`/`octal-psram`, `init_psram` takes a configuration parameter, it's now possible to auto-detect PS-RAM size (#2178)
+- `EspTwaiFrame` constructors now accept any type that converts into `esp_hal::twai::Id` (#2207)
+- Change `DmaTxBuf` to support PSRAM on `esp32s3` (#2161)
+- I2c `transaction` is now also available as a inherent function, lift size limit on `write`,`read` and `write_read` (#2262)
+- SPI transactions are now cancelled if the transfer object (or async Future) is dropped. (#2216)
+- The DMA channel types have been removed from peripherals (#2261)
+- `I2C` driver renamed to `I2c` (#2320)
+- The GPIO pins are now accessible via `Peripherals` and are no longer part of the `Io` struct (#2508)
+- `dma::{ChannelRx, ChannelTx}` now have a `Mode` type parameter (#2519)
 
 ### Fixed
 
@@ -50,8 +190,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue with DMA transfers potentially not waking up the correct async task (#2065)
 - Fixed an issue with LCD_CAM i8080 where it would send double the clocks in 16bit mode (#2085)
 - Fix i2c embedded-hal transaction (#2028)
+- Fix some inconsistencies in DMA interrupt bits (#2169)
 - Fix SPI DMA alternating `write` and `read` for ESP32 and ESP32-S2 (#2131)
 - Fix I2C ending up in a state when only re-creating the peripheral makes it useable again (#2141)
+- Fix `SpiBus::transfer` transferring data twice in some cases (#2159)
+- Fixed UART freezing when using `RcFast` clock source on ESP32-C2/C3 (#2170)
+- I2S: on ESP32 and ESP32-S2 data is now output to the right (WS=1) channel first. (#2194)
+- SPI: Fixed an issue where unexpected data was written outside of the read buffer (#2179)
+- SPI: Fixed an issue where `wait` has returned before the DMA has finished writing the memory (#2179)
+- SPI: Fixed an issue where repeated calls to `dma_transfer` may end up looping indefinitely (#2179)
+- SPI: Fixed an issue that prevented correctly reading the first byte in a transaction (#2179)
+- SPI: ESP32: Send address with correct data mode even when no data is sent. (#2231)
+- SPI: ESP32: Allow using QSPI mode on SPI3. (#2245)
+- PARL_IO: Fixed an issue that caused garbage to be output at the start of some requests (#2211)
+- TWAI on ESP32 (#2207)
+- TWAI should no longer panic when receiving a non-compliant frame (#2255)
+- OneShotTimer: fixed `delay_nanos` behaviour (#2256)
+- Fixed unsoundness around `Efuse` (#2259)
+- Empty I2C writes to unknown addresses now correctly fail with `AckCheckFailed`. (#2506)
 
 ### Removed
 
@@ -64,8 +220,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the following functions from `GpioPin`: `is_high`, `is_low`, `set_high`, `set_low`, `set_state`, `is_set_high`, `is_set_low`, `toggle`. (#2094)
 - Removed `Rtc::get_time_raw` (#1883)
 - Removed `_with_default_pins` UART constructors (#2132)
+- Removed transfer methods `send`, `send_dma` and `send_dma_async` from `I8080` (#2191)
 - Removed `uart::{DefaultRxPin, DefaultTxPin}` (#2132)
 - Removed `PcntSource` and `PcntInputConfig`. (#2134)
+- Removed the `place-spi-driver-in-ram` feature, this is now enabled via [esp-config](https://docs.rs/esp-config) (#2156)
+- Removed `esp_hal::spi::slave::prelude` (#2260)
+- Removed `esp_hal::spi::slave::WithDmaSpiN` traits (#2260)
+- The `WithDmaAes` trait has been removed (#2261)
+- The `I2s::new_i2s1` constructor has been removed (#2261)
+- `Peripherals.GPIO` has been removed (#2508)
 
 ## [0.20.1] - 2024-08-30
 
@@ -756,7 +919,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/esp-rs/esp-hal/compare/v0.21.0...v0.21.1
+[0.21.0]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...v0.19.0

@@ -1,5 +1,5 @@
 //! This shows how to use the general purpose timers ETM tasks and events
-//! Notice you need to import the traits esp_hal::timer::etm::{TimerEtmEvents, TimerEtmTasks}
+//! Notice you need to import the traits esp_hal::timer::etm::{Events, Tasks}
 
 //% CHIPS: esp32c6 esp32h2
 
@@ -16,7 +16,7 @@ use esp_hal::{
     peripherals::TIMG0,
     prelude::*,
     timer::timg::{
-        etm::{TimerEtmEvents, TimerEtmTasks},
+        etm::{Events, Tasks},
         Timer,
         Timer0,
         TimerGroup,

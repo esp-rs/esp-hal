@@ -166,7 +166,7 @@ impl<'d> Aes<'d> {
         self.set_block(block);
         self.start();
         while !(self.is_idle()) {}
-        self.get_block(block);
+        self.block(block);
     }
 
     fn set_mode(&mut self, mode: u8) {
@@ -181,7 +181,7 @@ impl<'d> Aes<'d> {
         self.write_block(block);
     }
 
-    fn get_block(&self, block: &mut [u8; 16]) {
+    fn block(&self, block: &mut [u8; 16]) {
         self.read_block(block);
     }
 
@@ -235,20 +235,22 @@ pub mod dma {
         aes::{Key, Mode},
         dma::{
             dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
-            AesPeripheral,
             Channel,
             ChannelRx,
             ChannelTx,
             DescriptorChain,
-            DmaChannel,
+            DmaChannelConvert,
             DmaDescriptor,
+            DmaEligible,
             DmaPeripheral,
             DmaTransferRxTx,
             ReadBuffer,
-            RxPrivate,
-            TxPrivate,
+            Rx,
+            Tx,
             WriteBuffer,
         },
+        peripherals::AES,
+        Blocking,
     };
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
@@ -270,71 +272,42 @@ pub mod dma {
     }
 
     /// A DMA capable AES instance.
-    pub struct AesDma<'d, C>
-    where
-        C: DmaChannel,
-        C::P: AesPeripheral,
-    {
+    pub struct AesDma<'d> {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
-        pub(crate) channel: Channel<'d, C, crate::Blocking>,
+        channel: Channel<'d, Blocking, <AES as DmaEligible>::Dma>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
 
-    /// Functionality for using AES with DMA.
-    pub trait WithDmaAes<'d, C>
-    where
-        C: DmaChannel,
-        C::P: AesPeripheral,
-    {
+    impl<'d> crate::aes::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
-        fn with_dma(
+        pub fn with_dma<CH>(
             self,
-            channel: Channel<'d, C, crate::Blocking>,
+            channel: Channel<'d, Blocking, CH>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> AesDma<'d, C>;
-    }
-
-    impl<'d, C> WithDmaAes<'d, C> for crate::aes::Aes<'d>
-    where
-        C: DmaChannel,
-        C::P: AesPeripheral,
-    {
-        fn with_dma(
-            self,
-            mut channel: Channel<'d, C, crate::Blocking>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> AesDma<'d, C> {
-            channel.tx.init_channel(); // no need to call this for both, TX and RX
-
+        ) -> AesDma<'d>
+        where
+            CH: DmaChannelConvert<<AES as DmaEligible>::Dma>,
+        {
             AesDma {
                 aes: self,
-                channel,
+                channel: channel.degrade(),
                 rx_chain: DescriptorChain::new(rx_descriptors),
                 tx_chain: DescriptorChain::new(tx_descriptors),
             }
         }
     }
 
-    impl<'d, C> core::fmt::Debug for AesDma<'d, C>
-    where
-        C: DmaChannel,
-        C::P: AesPeripheral,
-    {
+    impl core::fmt::Debug for AesDma<'_> {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("AesDma").finish()
         }
     }
 
-    impl<'d, C> DmaSupport for AesDma<'d, C>
-    where
-        C: DmaChannel,
-        C::P: AesPeripheral,
-    {
+    impl DmaSupport for AesDma<'_> {
         fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
             while self.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
             && !self.channel.tx.is_done()
@@ -350,12 +323,8 @@ pub mod dma {
         }
     }
 
-    impl<'d, C> DmaSupportTx for AesDma<'d, C>
-    where
-        C: DmaChannel,
-        C::P: AesPeripheral,
-    {
-        type TX = ChannelTx<'d, C>;
+    impl<'d> DmaSupportTx for AesDma<'d> {
+        type TX = ChannelTx<'d, Blocking, <AES as DmaEligible>::Dma>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -366,12 +335,8 @@ pub mod dma {
         }
     }
 
-    impl<'d, C> DmaSupportRx for AesDma<'d, C>
-    where
-        C: DmaChannel,
-        C::P: AesPeripheral,
-    {
-        type RX = ChannelRx<'d, C>;
+    impl<'d> DmaSupportRx for AesDma<'d> {
+        type RX = ChannelRx<'d, Blocking, <AES as DmaEligible>::Dma>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -382,11 +347,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, C> AesDma<'d, C>
-    where
-        C: DmaChannel,
-        C::P: AesPeripheral,
-    {
+    impl AesDma<'_> {
         /// Writes the encryption key to the AES hardware, checking that its
         /// length matches expected constraints.
         pub fn write_key<K>(&mut self, key: K)

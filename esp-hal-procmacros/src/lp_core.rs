@@ -31,7 +31,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         res
     }
 
-    pub(crate) fn get_simplename(t: &Type) -> String {
+    pub(crate) fn simplename(t: &Type) -> String {
         match t {
             Type::Path(p) => p.path.segments.last().unwrap().ident.to_string(),
             _ => String::new(),
@@ -125,7 +125,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     .into();
             }
             FnArg::Typed(t) => {
-                match get_simplename(&t.ty).as_str() {
+                match simplename(&t.ty).as_str() {
                     "Output" => {
                         let pin = extract_pin(&t.ty);
                         if used_pins.contains(&pin) {

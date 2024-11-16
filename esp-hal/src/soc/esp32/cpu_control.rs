@@ -12,7 +12,6 @@
 //! # use esp_hal::cpu_control::{CpuControl, Stack};
 //! # use core::{cell::RefCell, ptr::addr_of_mut};
 //! # use critical_section::Mutex;
-//! # use esp_hal::prelude::*;
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 //!
 //! # let delay = Delay::new();
@@ -24,8 +23,10 @@
 //!     cpu1_task(&delay, &counter);
 //! };
 //! let _guard = cpu_control
-//!    .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
-//! cpu1_fnctn)     .unwrap();
+//!     .start_app_core(
+//!         unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
+//!         cpu1_fnctn
+//!     ).unwrap();
 //!
 //! loop {
 //!     delay.delay(1.secs());
@@ -36,7 +37,6 @@
 //! // Where `cpu1_task()` may be defined as:
 //! # use esp_hal::delay::Delay;
 //! # use core::cell::RefCell;
-//! # use esp_hal::prelude::*;
 //! fn cpu1_task(
 //!     delay: &Delay,
 //!     counter: &critical_section::Mutex<RefCell<i32>>,
@@ -328,16 +328,17 @@ impl<'d> CpuControl<'d> {
                 let entry = unsafe { ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>()) };
                 entry();
                 loop {
-                    unsafe { internal_park_core(crate::get_core()) };
+                    unsafe { internal_park_core(Cpu::current()) };
                 }
             }
             None => panic!("No start function set"),
         }
     }
 
-    /// Start the APP (second) core
+    /// Start the APP (second) core.
     ///
-    /// The second core will start running the closure `entry`.
+    /// The second core will start running the closure `entry`. Note that if the
+    /// closure exits, the core will be parked.
     ///
     /// Dropping the returned guard will park the core.
     pub fn start_app_core<'a, const SIZE: usize, F>(

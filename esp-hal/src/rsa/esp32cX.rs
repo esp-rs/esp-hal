@@ -10,7 +10,7 @@ use crate::rsa::{
     RsaMultiplication,
 };
 
-impl<'d, DM: crate::Mode> Rsa<'d, DM> {
+impl<DM: crate::Mode> Rsa<'_, DM> {
     /// After the RSA Accelerator is released from reset, the memory blocks
     /// needs to be initialized, only after that peripheral should be used.
     /// This function would return without an error if the memory is initialized
@@ -26,10 +26,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     /// When enabled rsa peripheral would generate an interrupt when a operation
     /// is finished.
     pub fn enable_disable_interrupt(&mut self, enable: bool) {
-        match enable {
-            true => self.rsa.int_ena().write(|w| w.int_ena().set_bit()),
-            false => self.rsa.int_ena().write(|w| w.int_ena().clear_bit()),
-        }
+        self.rsa.int_ena().write(|w| w.int_ena().bit(enable));
     }
 
     fn write_mode(&mut self, mode: u32) {
@@ -55,7 +52,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
                 .rsa
                 .search_enable()
                 .write(|w| w.search_enable().clear_bit()),
-        }
+        };
     }
 
     /// Checks if the search functionality is enabled in the RSA hardware.
@@ -90,7 +87,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
                 .rsa
                 .constant_time()
                 .write(|w| w.constant_time().set_bit()),
-        }
+        };
     }
 
     /// Starts the modular exponentiation operation.
@@ -116,7 +113,7 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
 
     /// Clears the RSA interrupt flag.
     pub(super) fn clear_interrupt(&mut self) {
-        self.rsa.int_clr().write(|w| w.clear_interrupt().set_bit());
+        self.rsa.int_clr().write(|w| w.int_clr().set_bit());
     }
 
     /// Checks if the RSA peripheral is idle.
@@ -232,7 +229,7 @@ pub mod operand_sizes {
     );
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'a, 'd, T, DM>
+impl<'d, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'_, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -252,7 +249,7 @@ where
     }
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'a, 'd, T, DM>
+impl<'d, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'_, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -265,7 +262,7 @@ where
     }
 }
 
-impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'a, 'd, T, DM>
+impl<'d, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'_, 'd, T, DM>
 where
     T: RsaMode<InputType = [u32; N]>,
 {

@@ -51,14 +51,12 @@ const fn compute_mprime(modulus: &U512) -> u32 {
 #[cfg(test)]
 #[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
 mod tests {
-    use defmt::assert_eq;
-
     use super::*;
 
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let mut rsa = Rsa::new_async(peripherals.RSA);
+        let mut rsa = Rsa::new(peripherals.RSA).into_async();
         nb::block!(rsa.ready()).unwrap();
 
         Context { rsa }

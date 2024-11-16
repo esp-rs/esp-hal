@@ -34,8 +34,7 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::{Dma, DmaPriority},
     dma_buffers,
-    gpio::Io,
-    i2s::{DataFormat, I2s, I2sWriteDma, Standard},
+    i2s::master::{DataFormat, I2s, Standard},
     prelude::*,
 };
 
@@ -50,8 +49,6 @@ const SINE: [i16; 64] = [
 #[entry]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let dma = Dma::new(peripherals.DMA);
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -73,9 +70,9 @@ fn main() -> ! {
 
     let mut i2s_tx = i2s
         .i2s_tx
-        .with_bclk(io.pins.gpio2)
-        .with_ws(io.pins.gpio4)
-        .with_dout(io.pins.gpio5)
+        .with_bclk(peripherals.GPIO2)
+        .with_ws(peripherals.GPIO4)
+        .with_dout(peripherals.GPIO5)
         .build();
 
     let data =
@@ -96,7 +93,7 @@ fn main() -> ! {
     let mut transfer = i2s_tx.write_dma_circular(&tx_buffer).unwrap();
 
     loop {
-        let avail = transfer.available();
+        let avail = transfer.available().unwrap();
         if avail > 0 {
             let avail = usize::min(10000, avail);
             for bidx in 0..avail {

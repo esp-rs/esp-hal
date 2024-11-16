@@ -11,7 +11,18 @@ pub struct Context {
     pub allocated_stack: *const u8,
 }
 
-pub fn task_create(
+impl Context {
+    pub(crate) fn new() -> Self {
+        Context {
+            trap_frame: TrapFrame::new(),
+            thread_semaphore: 0,
+            next: core::ptr::null_mut(),
+            allocated_stack: core::ptr::null(),
+        }
+    }
+}
+
+pub(crate) fn task_create(
     task: extern "C" fn(*mut c_types::c_void),
     param: *mut c_types::c_void,
     task_stack_size: usize,
@@ -28,7 +39,7 @@ pub fn task_create(
 
         // stack must be aligned by 16
         let task_stack_ptr = stack as usize + task_stack_size;
-        let stack_ptr = task_stack_ptr - (task_stack_ptr % 0x10);
+        let stack_ptr = task_stack_ptr - (task_stack_ptr % 16);
         (*ctx).trap_frame.A1 = stack_ptr as u32;
 
         (*ctx).trap_frame.PS = 0x00040000 | (1 & 3) << 16; // For windowed ABI set WOE and CALLINC (pretend task was 'call4'd).
@@ -44,13 +55,13 @@ pub fn task_create(
     }
 }
 
-pub fn restore_task_context(ctx: *mut Context, trap_frame: &mut TrapFrame) {
+pub(crate) fn restore_task_context(ctx: *mut Context, trap_frame: &mut TrapFrame) {
     unsafe {
         *trap_frame = (*ctx).trap_frame;
     }
 }
 
-pub fn save_task_context(ctx: *mut Context, trap_frame: &TrapFrame) {
+pub(crate) fn save_task_context(ctx: *mut Context, trap_frame: &TrapFrame) {
     unsafe {
         (*ctx).trap_frame = *trap_frame;
     }

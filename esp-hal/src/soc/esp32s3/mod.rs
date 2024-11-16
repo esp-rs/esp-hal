@@ -17,7 +17,7 @@ pub mod cpu_control;
 pub mod efuse;
 pub mod gpio;
 pub mod peripherals;
-#[cfg(psram)]
+#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 pub mod psram;
 pub mod radio_clocks;
 pub mod trng;
@@ -30,6 +30,13 @@ macro_rules! chip {
     () => {
         "esp32s3"
     };
+}
+
+/// A link to the Technical Reference Manual (TRM) for the chip.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! trm_link {
+    () => { "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf" };
 }
 
 pub use chip;
@@ -46,13 +53,13 @@ pub(crate) mod constants {
     pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
     /// RMT Clock source value.
     pub const RMT_CLOCK_SRC: u8 = 1;
-    /// RMT Clock source frequence.
+    /// RMT Clock source frequency.
     pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(80);
 
     /// The lower bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_LOW: u32 = 0x3FC8_8000;
+    pub const SOC_DRAM_LOW: usize = 0x3FC8_8000;
     /// The upper bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_HIGH: u32 = 0x3FD0_0000;
+    pub const SOC_DRAM_HIGH: usize = 0x3FD0_0000;
 
     /// A reference clock tick of 1 MHz.
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
@@ -131,7 +138,7 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         addr_of_mut!(_rtc_slow_bss_end),
     );
     if matches!(
-        crate::reset::get_reset_reason(),
+        crate::reset::reset_reason(),
         None | Some(SocResetReason::ChipPowerOn)
     ) {
         xtensa_lx_rt::zero_bss(
@@ -151,8 +158,10 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         stack_chk_guard.write_volatile(0xdeadbabe);
     }
 
+    crate::interrupt::setup_interrupts();
+
     // continue with default reset handler
-    xtensa_lx_rt::Reset();
+    xtensa_lx_rt::Reset()
 }
 
 /// The ESP32 has a first stage bootloader that handles loading program data
@@ -169,13 +178,13 @@ pub extern "Rust" fn __init_data() -> bool {
 #[link_section = ".rwtext"]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     extern "C" {
-        fn Cache_WriteBack_Addr(addr: u32, size: u32);
+        fn rom_Cache_WriteBack_Addr(addr: u32, size: u32);
         fn Cache_Suspend_DCache_Autoload() -> u32;
         fn Cache_Resume_DCache_Autoload(value: u32);
     }
     // suspend autoload, avoid load cachelines being written back
     let autoload = Cache_Suspend_DCache_Autoload();
-    Cache_WriteBack_Addr(addr, size);
+    rom_Cache_WriteBack_Addr(addr, size);
     Cache_Resume_DCache_Autoload(autoload);
 }
 

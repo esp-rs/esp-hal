@@ -8,6 +8,7 @@ use std::{
 };
 
 use esp_build::assert_unique_used_features;
+use esp_config::{generate_config, Value};
 use esp_metadata::{Chip, Config};
 
 #[cfg(debug_assertions)]
@@ -57,27 +58,67 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::for_chip(&chip);
 
     // Check PSRAM features are only given if the target supports PSRAM:
-    if !config.contains(&String::from("psram"))
-        && (cfg!(feature = "psram-2m") || cfg!(feature = "psram-4m") || cfg!(feature = "psram-8m"))
-    {
+    if !config.contains(&String::from("psram")) && cfg!(feature = "quad-psram") {
         panic!("The target does not support PSRAM");
+    }
+
+    if !config.contains(&String::from("octal_psram")) && cfg!(feature = "octal-psram") {
+        panic!("The target does not support Octal PSRAM");
     }
 
     // Define all necessary configuration symbols for the configured device:
     config.define_symbols();
-
-    #[allow(unused_mut)]
-    let mut config_symbols = config.all().collect::<Vec<_>>();
-    #[cfg(feature = "flip-link")]
-    config_symbols.push("flip-link");
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
 
+    // emit config
+    let cfg = generate_config(
+        "esp_hal",
+        &[
+            (
+                "place-spi-driver-in-ram",
+                "Places the SPI driver in RAM for better performance",
+                Value::Bool(false),
+                None
+            ),
+            (
+                "spi-address-workaround",
+                "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
+                Value::Bool(true),
+                None
+            ),
+            (
+                "place-switch-tables-in-ram",
+                "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
+                Value::Bool(true),
+                None
+            ),
+            (
+                "place-anon-in-ram",
+                "Places anonymous symbols into RAM - resulting in better performance at the cost of significant more RAM consumption. Best to be combined with `place-switch-tables-in-ram`.",
+                Value::Bool(false),
+                None
+            ),
+        ],
+        true,
+    );
+
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
+
+    #[allow(unused_mut)]
+    let mut config_symbols = config.all().collect::<Vec<_>>();
+    #[cfg(feature = "flip-link")]
+    config_symbols.push("flip-link");
+
+    for (key, value) in &cfg {
+        if let Value::Bool(true) = value {
+            config_symbols.push(key);
+        }
+    }
 
     if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
         // Xtensa devices:
@@ -214,11 +255,7 @@ fn generate_memory_extras() -> Vec<u8> {
 
 #[cfg(feature = "esp32s2")]
 fn generate_memory_extras() -> Vec<u8> {
-    let reserved_cache = if cfg!(any(
-        feature = "psram-2m",
-        feature = "psram-4m",
-        feature = "psram-8m"
-    )) {
+    let reserved_cache = if cfg!(feature = "quad-psram") {
         "0x4000"
     } else {
         "0x2000"

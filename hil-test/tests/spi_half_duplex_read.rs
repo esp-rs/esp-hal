@@ -8,12 +8,10 @@
 use esp_hal::{
     dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Io, Level, Output},
-    peripherals::SPI2,
+    gpio::{Level, Output},
     prelude::*,
     spi::{
-        master::{Address, Command, HalfDuplexReadWrite, Spi, SpiDma},
-        HalfDuplexMode,
+        master::{Address, Command, Config, Spi, SpiDma},
         SpiDataMode,
         SpiMode,
     },
@@ -21,36 +19,22 @@ use esp_hal::{
 };
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(any(
-        feature = "esp32",
-        feature = "esp32s2",
-    ))] {
-        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
-    } else {
-        use esp_hal::dma::DmaChannel0;
-    }
-}
-
 struct Context {
-    spi: SpiDma<'static, SPI2, DmaChannel0, HalfDuplexMode, Blocking>,
+    spi: SpiDma<'static, Blocking>,
     miso_mirror: Output<'static>,
 }
 
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
-    use defmt::assert_eq;
-
     use super::*;
 
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-        let sclk = io.pins.gpio0;
-        let (miso, miso_mirror) = hil_test::common_test_pins!(io);
+        let sclk = peripherals.GPIO0;
+        let (miso, miso_mirror) = hil_test::common_test_pins!(peripherals);
 
         let miso_mirror = Output::new(miso_mirror, Level::High);
 
@@ -64,10 +48,17 @@ mod tests {
             }
         }
 
-        let spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-            .with_sck(sclk)
-            .with_miso(miso)
-            .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+        let spi = Spi::new_with_config(
+            peripherals.SPI2,
+            Config {
+                frequency: 100.kHz(),
+                mode: SpiMode::Mode0,
+                ..Config::default()
+            },
+        )
+        .with_sck(sclk)
+        .with_miso(miso)
+        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
         Context { spi, miso_mirror }
     }
@@ -86,7 +77,7 @@ mod tests {
         let mut spi = ctx.spi;
 
         let transfer = spi
-            .read(
+            .half_duplex_read(
                 SpiDataMode::Single,
                 Command::None,
                 Address::None,
@@ -103,7 +94,7 @@ mod tests {
         ctx.miso_mirror.set_high();
 
         let transfer = spi
-            .read(
+            .half_duplex_read(
                 SpiDataMode::Single,
                 Command::None,
                 Address::None,
@@ -134,7 +125,7 @@ mod tests {
         ctx.miso_mirror.set_low();
 
         let mut buffer = [0xAA; DMA_BUFFER_SIZE];
-        spi.read(
+        spi.half_duplex_read(
             SpiDataMode::Single,
             Command::None,
             Address::None,
@@ -148,7 +139,7 @@ mod tests {
         // SPI should read '1's from the MISO pin
         ctx.miso_mirror.set_high();
 
-        spi.read(
+        spi.half_duplex_read(
             SpiDataMode::Single,
             Command::None,
             Address::None,

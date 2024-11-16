@@ -2,6 +2,16 @@
 //!
 //! The `time` module offers a way to get the system now.
 
+/// Represents a duration of time.
+///
+/// The resolution is 1 microsecond, represented as a 64-bit unsigned integer.
+pub type Duration = fugit::Duration<u64, 1, 1_000_000>;
+
+/// Represents an instant in time.
+///
+/// The resolution is 1 microsecond, represented as a 64-bit unsigned integer.
+pub type Instant = fugit::Instant<u64, 1, 1_000_000>;
+
 /// Provides time since system start in microseconds precision.
 ///
 /// The counter won’t measure time in sleep-mode.
@@ -10,7 +20,7 @@
 #[cfg_attr(esp32, doc = "36_558 years")]
 #[cfg_attr(esp32s2, doc = "7_311 years")]
 #[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
-pub fn now() -> fugit::Instant<u64, 1, 1_000_000> {
+pub fn now() -> Instant {
     #[cfg(esp32)]
     let (ticks, div) = {
         // on ESP32 use LACT
@@ -45,7 +55,7 @@ pub fn now() -> fugit::Instant<u64, 1, 1_000_000> {
         )
     };
 
-    fugit::Instant::<u64, 1, 1_000_000>::from_ticks(ticks / div)
+    Instant::from_ticks(ticks / div)
 }
 
 #[cfg(esp32)]

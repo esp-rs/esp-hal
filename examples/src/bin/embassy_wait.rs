@@ -12,7 +12,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Input, Io, Pull},
+    gpio::{Input, Pull},
     timer::timg::TimerGroup,
 };
 
@@ -24,13 +24,11 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let mut input = Input::new(io.pins.gpio0, Pull::Down);
+            let mut input = Input::new(peripherals.GPIO0, Pull::Down);
         } else {
-            let mut input = Input::new(io.pins.gpio9, Pull::Down);
+            let mut input = Input::new(peripherals.GPIO9, Pull::Down);
         }
     }
 

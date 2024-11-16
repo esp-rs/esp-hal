@@ -1,88 +1,59 @@
 //! Convenience utilities for non-async code
 
-#[cfg(feature = "dhcpv4")]
-use smoltcp::socket::dhcpv4::Socket as Dhcpv4Socket;
 use smoltcp::{
-    iface::{Config, Interface, SocketSet, SocketStorage},
-    time::Instant,
+    iface::{Config, Interface},
     wire::{EthernetAddress, HardwareAddress},
 };
 
 use super::{WifiApDevice, WifiController, WifiDevice, WifiDeviceMode, WifiError, WifiStaDevice};
-use crate::{current_millis, EspWifiInitialization};
+use crate::EspWifiController;
 
-fn setup_iface<'a, MODE: WifiDeviceMode>(
-    device: &mut WifiDevice<'_, MODE>,
-    mode: MODE,
-    storage: &'a mut [SocketStorage<'a>],
-) -> (Interface, SocketSet<'a>) {
+// [esp_hal::time::now()] as a smoltcp [`Instant]`
+#[cfg(feature = "smoltcp")]
+fn timestamp() -> smoltcp::time::Instant {
+    smoltcp::time::Instant::from_micros(
+        esp_hal::time::now().duration_since_epoch().to_micros() as i64
+    )
+}
+
+fn setup_iface<MODE: WifiDeviceMode>(device: &mut WifiDevice<'_, MODE>, mode: MODE) -> Interface {
     let mac = mode.mac_address();
     let hw_address = HardwareAddress::Ethernet(EthernetAddress::from_bytes(&mac));
 
     let config = Config::new(hw_address);
-    let iface = Interface::new(
-        config,
-        device,
-        Instant::from_millis(current_millis() as i64),
-    );
-
-    #[allow(unused_mut)]
-    let mut socket_set = SocketSet::new(storage);
-
-    #[cfg(feature = "dhcpv4")]
-    if mode.mode().is_sta() {
-        // only add DHCP client in STA mode
-        let dhcp_socket = Dhcpv4Socket::new();
-        socket_set.add(dhcp_socket);
-    }
-
-    (iface, socket_set)
+    let iface = Interface::new(config, device, timestamp());
+    iface
 }
 
 /// Convenient way to create an `smoltcp` ethernet interface
-/// You can use the provided macros to create and pass a suitable backing
-/// storage.
-pub fn create_network_interface<'a, 'd, MODE: WifiDeviceMode>(
-    inited: &EspWifiInitialization,
+pub fn create_network_interface<'d, MODE: WifiDeviceMode>(
+    inited: &'d EspWifiController<'d>,
     device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
     mode: MODE,
-    storage: &'a mut [SocketStorage<'a>],
-) -> Result<
-    (
-        Interface,
-        WifiDevice<'d, MODE>,
-        WifiController<'d>,
-        SocketSet<'a>,
-    ),
-    WifiError,
-> {
+) -> Result<(Interface, WifiDevice<'d, MODE>, WifiController<'d>), WifiError> {
     let (mut device, controller) = crate::wifi::new_with_mode(inited, device, mode)?;
 
-    let (iface, socket_set) = setup_iface(&mut device, mode, storage);
+    let iface = setup_iface(&mut device, mode);
 
-    Ok((iface, device, controller, socket_set))
+    Ok((iface, device, controller))
 }
 
-pub struct ApStaInterface<'a, 'd> {
+pub struct ApStaInterface<'d> {
     pub ap_interface: Interface,
     pub sta_interface: Interface,
     pub ap_device: WifiDevice<'d, WifiApDevice>,
     pub sta_device: WifiDevice<'d, WifiStaDevice>,
     pub controller: WifiController<'d>,
-    pub ap_socket_set: SocketSet<'a>,
-    pub sta_socket_set: SocketSet<'a>,
 }
 
-pub fn create_ap_sta_network_interface<'a, 'd>(
-    inited: &EspWifiInitialization,
+pub fn create_ap_sta_network_interface<'d>(
+    inited: &'d EspWifiController<'d>,
     device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-    ap_storage: &'a mut [SocketStorage<'a>],
-    sta_storage: &'a mut [SocketStorage<'a>],
-) -> Result<ApStaInterface<'a, 'd>, WifiError> {
+) -> Result<ApStaInterface<'d>, WifiError> {
     let (mut ap_device, mut sta_device, controller) = crate::wifi::new_ap_sta(inited, device)?;
 
-    let (ap_interface, ap_socket_set) = setup_iface(&mut ap_device, WifiApDevice, ap_storage);
-    let (sta_interface, sta_socket_set) = setup_iface(&mut sta_device, WifiStaDevice, sta_storage);
+    let ap_interface = setup_iface(&mut ap_device, WifiApDevice);
+    let sta_interface = setup_iface(&mut sta_device, WifiStaDevice);
 
     Ok(ApStaInterface {
         ap_interface,
@@ -90,7 +61,5 @@ pub fn create_ap_sta_network_interface<'a, 'd>(
         ap_device,
         sta_device,
         controller,
-        ap_socket_set,
-        sta_socket_set,
     })
 }

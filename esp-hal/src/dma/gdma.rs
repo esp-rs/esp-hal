@@ -12,440 +12,550 @@
 //! GDMA peripheral can be initializes using the `new` function, which requires
 //! a DMA peripheral instance and a clock control reference.
 //!
-//! ## Usage
-//! This module implements DMA channels, such as `channel0`, `channel1` and so
-//! on. Each channel struct implements the `ChannelTypes` trait, which provides
-//! associated types for peripheral configuration.
 //! <em>PS: Note that the number of DMA channels is chip-specific.</em>
 
 use crate::{
     dma::*,
     peripheral::PeripheralRef,
+    peripherals::Interrupt,
     system::{Peripheral, PeripheralClockControl},
+    Blocking,
 };
 
-#[non_exhaustive]
-pub struct Channel<const N: u8> {}
-
-impl<const N: u8> crate::private::Sealed for Channel<N> {}
-
 #[doc(hidden)]
-#[non_exhaustive]
-pub struct ChannelInterruptBinder<const N: u8> {}
+pub trait GdmaChannel {
+    fn number(&self) -> u8;
 
-impl<const N: u8> crate::private::Sealed for ChannelInterruptBinder<N> {}
-
-impl<const N: u8> Channel<N> {
-    #[inline(always)]
-    fn ch() -> &'static crate::peripherals::dma::ch::CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(N as usize)
-    }
-
-    #[cfg(any(esp32c2, esp32c3))]
-    #[inline(always)]
-    fn in_int() -> &'static crate::peripherals::dma::int_ch::INT_CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.int_ch(N as usize)
-    }
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
-    fn in_int() -> &'static crate::peripherals::dma::in_int_ch::IN_INT_CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.in_int_ch(N as usize)
-    }
-    #[cfg(esp32s3)]
-    #[inline(always)]
-    fn in_int() -> &'static crate::peripherals::dma::ch::in_int::IN_INT {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(N as usize).in_int()
+    fn async_handler_out(&self) -> Option<InterruptHandler> {
+        match self.number() {
+            0 => DmaChannel0::handler_out(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::handler_out(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::handler_out(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::handler_out(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::handler_out(),
+            _ => unreachable!(),
+        }
     }
 
-    #[cfg(any(esp32c2, esp32c3))]
-    #[inline(always)]
-    fn out_int() -> &'static crate::peripherals::dma::int_ch::INT_CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.int_ch(N as usize)
+    fn peripheral_interrupt_out(&self) -> Option<Interrupt> {
+        match self.number() {
+            0 => DmaChannel0::isr_out(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::isr_out(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::isr_out(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::isr_out(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::isr_out(),
+            _ => unreachable!(),
+        }
     }
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
-    fn out_int() -> &'static crate::peripherals::dma::out_int_ch::OUT_INT_CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.out_int_ch(N as usize)
+
+    fn async_handler_in(&self) -> Option<InterruptHandler> {
+        match self.number() {
+            0 => DmaChannel0::handler_in(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::handler_in(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::handler_in(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::handler_in(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::handler_in(),
+            _ => unreachable!(),
+        }
     }
-    #[cfg(esp32s3)]
-    #[inline(always)]
-    fn out_int() -> &'static crate::peripherals::dma::ch::out_int::OUT_INT {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(N as usize).out_int()
+
+    fn peripheral_interrupt_in(&self) -> Option<Interrupt> {
+        match self.number() {
+            0 => DmaChannel0::isr_in(),
+            #[cfg(not(esp32c2))]
+            1 => DmaChannel1::isr_in(),
+            #[cfg(not(esp32c2))]
+            2 => DmaChannel2::isr_in(),
+            #[cfg(esp32s3)]
+            3 => DmaChannel3::isr_in(),
+            #[cfg(esp32s3)]
+            4 => DmaChannel4::isr_in(),
+            _ => unreachable!(),
+        }
     }
 }
 
-impl<const N: u8> RegisterAccess for Channel<N> {
-    fn init_channel() {
-        // nothing special to be done here
+/// An arbitrary GDMA channel
+#[non_exhaustive]
+pub struct AnyGdmaChannel(u8);
+
+impl crate::private::Sealed for AnyGdmaChannel {}
+impl DmaChannel for AnyGdmaChannel {
+    type Rx = ChannelRxImpl<Self>;
+    type Tx = ChannelTxImpl<Self>;
+}
+
+#[non_exhaustive]
+#[doc(hidden)]
+pub struct SpecificGdmaChannel<const N: u8> {}
+
+impl GdmaChannel for AnyGdmaChannel {
+    fn number(&self) -> u8 {
+        self.0
+    }
+}
+impl<const N: u8> GdmaChannel for SpecificGdmaChannel<N> {
+    fn number(&self) -> u8 {
+        N
+    }
+}
+
+#[non_exhaustive]
+#[doc(hidden)]
+pub struct ChannelTxImpl<C: GdmaChannel>(C);
+
+use embassy_sync::waitqueue::AtomicWaker;
+
+static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
+static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
+
+cfg_if::cfg_if! {
+    if #[cfg(any(esp32c2, esp32c3))] {
+        use portable_atomic::AtomicBool;
+        static TX_IS_ASYNC: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
+        static RX_IS_ASYNC: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
+    }
+}
+
+impl<C: GdmaChannel> crate::private::Sealed for ChannelTxImpl<C> {}
+
+impl<C: GdmaChannel> ChannelTxImpl<C> {
+    #[inline(always)]
+    fn ch(&self) -> &crate::peripherals::dma::ch::CH {
+        let dma = unsafe { &*crate::peripherals::DMA::PTR };
+        dma.ch(self.0.number() as usize)
     }
 
-    #[cfg(gdma)]
-    fn set_mem2mem_mode(value: bool) {
-        Self::ch()
-            .in_conf0()
-            .modify(|_, w| w.mem_trans_en().bit(value));
+    #[cfg(any(esp32c2, esp32c3))]
+    #[inline(always)]
+    fn int(&self) -> &crate::peripherals::dma::int_ch::INT_CH {
+        let dma = unsafe { &*crate::peripherals::DMA::PTR };
+        dma.int_ch(self.0.number() as usize)
     }
-
+    #[inline(always)]
+    #[cfg(any(esp32c6, esp32h2))]
+    fn int(&self) -> &crate::peripherals::dma::out_int_ch::OUT_INT_CH {
+        let dma = unsafe { &*crate::peripherals::DMA::PTR };
+        dma.out_int_ch(self.0.number() as usize)
+    }
     #[cfg(esp32s3)]
-    fn set_out_ext_mem_block_size(size: DmaExtMemBKSize) {
-        Self::ch()
-            .out_conf1()
-            .modify(|_, w| unsafe { w.out_ext_mem_bk_size().bits(size as u8) });
+    #[inline(always)]
+    fn int(&self) -> &crate::peripherals::dma::ch::out_int::OUT_INT {
+        let dma = unsafe { &*crate::peripherals::DMA::PTR };
+        dma.ch(self.0.number() as usize).out_int()
     }
 
-    fn set_out_burstmode(burst_mode: bool) {
-        Self::ch().out_conf0().modify(|_, w| {
-            w.out_data_burst_en()
-                .bit(burst_mode)
-                .outdscr_burst_en()
-                .bit(burst_mode)
-        });
+    fn degrade(self) -> ChannelTxImpl<AnyGdmaChannel> {
+        ChannelTxImpl(AnyGdmaChannel(self.0.number()))
     }
+}
 
-    fn set_out_priority(priority: DmaPriority) {
-        Self::ch()
-            .out_pri()
-            .write(|w| unsafe { w.tx_pri().bits(priority as u8) });
-    }
-
-    fn clear_out_interrupts() {
-        #[cfg(not(esp32s3))]
-        Self::out_int().clr().write(|w| {
-            w.out_eof().clear_bit_by_one();
-            w.out_dscr_err().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one();
-            w.outfifo_ovf().clear_bit_by_one();
-            w.outfifo_udf().clear_bit_by_one()
-        });
-
-        #[cfg(esp32s3)]
-        Self::out_int().clr().write(|w| {
-            w.out_eof().clear_bit_by_one();
-            w.out_dscr_err().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one();
-            w.outfifo_ovf_l1().clear_bit_by_one();
-            w.outfifo_ovf_l3().clear_bit_by_one();
-            w.outfifo_udf_l1().clear_bit_by_one();
-            w.outfifo_udf_l3().clear_bit_by_one()
-        });
-    }
-
-    fn reset_out() {
-        let conf0 = Self::ch().out_conf0();
+impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
+    fn reset(&self) {
+        let conf0 = self.ch().out_conf0();
         conf0.modify(|_, w| w.out_rst().set_bit());
         conf0.modify(|_, w| w.out_rst().clear_bit());
     }
 
-    fn set_out_descriptors(address: u32) {
-        Self::ch()
-            .out_link()
-            .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
+    fn set_burst_mode(&self, burst_mode: bool) {
+        self.ch().out_conf0().modify(|_, w| {
+            w.out_data_burst_en().bit(burst_mode);
+            w.outdscr_burst_en().bit(burst_mode)
+        });
     }
 
-    fn has_out_descriptor_error() -> bool {
-        Self::out_int().raw().read().out_dscr_err().bit()
+    fn set_priority(&self, priority: DmaPriority) {
+        self.ch()
+            .out_pri()
+            .write(|w| unsafe { w.tx_pri().bits(priority as u8) });
     }
 
-    fn set_out_peripheral(peripheral: u8) {
-        Self::ch()
+    fn set_peripheral(&self, peripheral: u8) {
+        self.ch()
             .out_peri_sel()
             .modify(|_, w| unsafe { w.peri_out_sel().bits(peripheral) });
     }
 
-    fn start_out() {
-        Self::ch()
+    fn set_link_addr(&self, address: u32) {
+        self.ch()
+            .out_link()
+            .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
+    }
+
+    fn start(&self) {
+        self.ch()
             .out_link()
             .modify(|_, w| w.outlink_start().set_bit());
     }
 
-    fn clear_ch_out_done() {
-        Self::out_int()
-            .clr()
-            .write(|w| w.out_done().clear_bit_by_one());
+    fn stop(&self) {
+        self.ch()
+            .out_link()
+            .modify(|_, w| w.outlink_stop().set_bit());
     }
 
-    fn is_ch_out_done_set() -> bool {
-        Self::out_int().raw().read().out_done().bit()
+    fn restart(&self) {
+        self.ch()
+            .out_link()
+            .modify(|_, w| w.outlink_restart().set_bit());
     }
 
-    fn listen_ch_out_done() {
-        Self::out_int().ena().modify(|_, w| w.out_done().set_bit())
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        self.ch()
+            .out_conf1()
+            .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    fn unlisten_ch_out_done() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_done().clear_bit())
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        self.ch()
+            .out_conf1()
+            .modify(|_, w| unsafe { w.out_ext_mem_bk_size().bits(size as u8) });
+    }
+}
+
+impl<C: GdmaChannel> TxRegisterAccess for ChannelTxImpl<C> {
+    fn set_auto_write_back(&self, enable: bool) {
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| w.out_auto_wrback().bit(enable));
     }
 
-    fn is_listening_ch_out_done() -> bool {
-        Self::out_int().ena().read().out_done().bit()
-    }
-
-    fn is_out_done() -> bool {
-        Self::out_int().raw().read().out_total_eof().bit()
-    }
-
-    fn last_out_dscr_address() -> usize {
-        Self::ch()
+    fn last_dscr_address(&self) -> usize {
+        self.ch()
             .out_eof_des_addr()
             .read()
             .out_eof_des_addr()
             .bits() as _
     }
 
-    fn is_out_eof_interrupt_set() -> bool {
-        Self::out_int().raw().read().out_eof().bit()
+    fn async_handler(&self) -> Option<InterruptHandler> {
+        self.0.async_handler_out()
     }
 
-    fn reset_out_eof_interrupt() {
-        Self::out_int()
-            .clr()
-            .write(|w| w.out_eof().clear_bit_by_one());
+    fn peripheral_interrupt(&self) -> Option<Interrupt> {
+        self.0.peripheral_interrupt_out()
+    }
+}
+
+impl<C: GdmaChannel> InterruptAccess<DmaTxInterrupt> for ChannelTxImpl<C> {
+    fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
+        self.int().ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    DmaTxInterrupt::TotalEof => w.out_total_eof().bit(enable),
+                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().bit(enable),
+                    DmaTxInterrupt::Eof => w.out_eof().bit(enable),
+                    DmaTxInterrupt::Done => w.out_done().bit(enable),
+                };
+            }
+            w
+        });
+    }
+
+    fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
+        let mut result = EnumSet::new();
+
+        let int_ena = self.int().ena().read();
+        if int_ena.out_total_eof().bit_is_set() {
+            result |= DmaTxInterrupt::TotalEof;
+        }
+        if int_ena.out_dscr_err().bit_is_set() {
+            result |= DmaTxInterrupt::DescriptorError;
+        }
+        if int_ena.out_eof().bit_is_set() {
+            result |= DmaTxInterrupt::Eof;
+        }
+        if int_ena.out_done().bit_is_set() {
+            result |= DmaTxInterrupt::Done;
+        }
+
+        result
+    }
+
+    fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.int().clr().write(|w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
+                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit_by_one(),
+                    DmaTxInterrupt::Eof => w.out_eof().clear_bit_by_one(),
+                    DmaTxInterrupt::Done => w.out_done().clear_bit_by_one(),
+                };
+            }
+            w
+        });
+    }
+
+    fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
+        let mut result = EnumSet::new();
+
+        let int_raw = self.int().raw().read();
+        if int_raw.out_total_eof().bit_is_set() {
+            result |= DmaTxInterrupt::TotalEof;
+        }
+        if int_raw.out_dscr_err().bit_is_set() {
+            result |= DmaTxInterrupt::DescriptorError;
+        }
+        if int_raw.out_eof().bit_is_set() {
+            result |= DmaTxInterrupt::Eof;
+        }
+        if int_raw.out_done().bit_is_set() {
+            result |= DmaTxInterrupt::Done;
+        }
+
+        result
+    }
+
+    fn waker(&self) -> &'static AtomicWaker {
+        &TX_WAKERS[self.0.number() as usize]
+    }
+
+    fn is_async(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                TX_IS_ASYNC[self.0.number() as usize].load(portable_atomic::Ordering::Acquire)
+            } else {
+                true
+            }
+        }
+    }
+
+    fn set_async(&self, _is_async: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                TX_IS_ASYNC[self.0.number() as usize].store(_is_async, portable_atomic::Ordering::Release);
+            }
+        }
+    }
+}
+
+#[non_exhaustive]
+#[doc(hidden)]
+pub struct ChannelRxImpl<C: GdmaChannel>(C);
+
+impl<C: GdmaChannel> crate::private::Sealed for ChannelRxImpl<C> {}
+
+impl<C: GdmaChannel> ChannelRxImpl<C> {
+    #[inline(always)]
+    fn ch(&self) -> &crate::peripherals::dma::ch::CH {
+        let dma = unsafe { &*crate::peripherals::DMA::PTR };
+        dma.ch(self.0.number() as usize)
+    }
+
+    #[cfg(any(esp32c2, esp32c3))]
+    #[inline(always)]
+    fn int(&self) -> &crate::peripherals::dma::int_ch::INT_CH {
+        let dma = unsafe { &*crate::peripherals::DMA::PTR };
+        dma.int_ch(self.0.number() as usize)
+    }
+
+    #[inline(always)]
+    #[cfg(any(esp32c6, esp32h2))]
+    fn int(&self) -> &crate::peripherals::dma::in_int_ch::IN_INT_CH {
+        let dma = unsafe { &*crate::peripherals::DMA::PTR };
+        dma.in_int_ch(self.0.number() as usize)
     }
 
     #[cfg(esp32s3)]
-    fn set_in_ext_mem_block_size(size: DmaExtMemBKSize) {
-        Self::ch()
-            .in_conf1()
-            .modify(|_, w| unsafe { w.in_ext_mem_bk_size().bits(size as u8) });
+    #[inline(always)]
+    fn int(&self) -> &crate::peripherals::dma::ch::in_int::IN_INT {
+        let dma = unsafe { &*crate::peripherals::DMA::PTR };
+        dma.ch(self.0.number() as usize).in_int()
     }
 
-    fn set_in_burstmode(burst_mode: bool) {
-        Self::ch().in_conf0().modify(|_, w| {
-            w.in_data_burst_en()
-                .bit(burst_mode)
-                .indscr_burst_en()
-                .bit(burst_mode)
-        });
+    fn degrade(self) -> ChannelRxImpl<AnyGdmaChannel> {
+        ChannelRxImpl(AnyGdmaChannel(self.0.number()))
     }
+}
 
-    fn set_in_priority(priority: DmaPriority) {
-        Self::ch()
-            .in_pri()
-            .write(|w| unsafe { w.rx_pri().bits(priority as u8) });
-    }
-
-    fn clear_in_interrupts() {
-        #[cfg(not(esp32s3))]
-        Self::in_int().clr().write(|w| {
-            w.in_suc_eof().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_dscr_err().clear_bit_by_one();
-            w.in_dscr_empty().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.infifo_ovf().clear_bit_by_one();
-            w.infifo_udf().clear_bit_by_one()
-        });
-
-        #[cfg(esp32s3)]
-        Self::in_int().clr().write(|w| {
-            w.in_suc_eof().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_dscr_err().clear_bit_by_one();
-            w.in_dscr_empty().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.infifo_ovf_l1().clear_bit_by_one();
-            w.infifo_ovf_l3().clear_bit_by_one();
-            w.infifo_udf_l1().clear_bit_by_one();
-            w.infifo_udf_l3().clear_bit_by_one()
-        });
-    }
-
-    fn reset_in() {
-        let conf0 = Self::ch().in_conf0();
+impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
+    fn reset(&self) {
+        let conf0 = self.ch().in_conf0();
         conf0.modify(|_, w| w.in_rst().set_bit());
         conf0.modify(|_, w| w.in_rst().clear_bit());
     }
 
-    fn set_in_descriptors(address: u32) {
-        Self::ch()
-            .in_link()
-            .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
+    fn set_burst_mode(&self, burst_mode: bool) {
+        self.ch().in_conf0().modify(|_, w| {
+            w.in_data_burst_en().bit(burst_mode);
+            w.indscr_burst_en().bit(burst_mode)
+        });
     }
 
-    fn has_in_descriptor_error() -> bool {
-        Self::in_int().raw().read().in_dscr_err().bit()
+    fn set_priority(&self, priority: DmaPriority) {
+        self.ch()
+            .in_pri()
+            .write(|w| unsafe { w.rx_pri().bits(priority as u8) });
     }
 
-    fn has_in_descriptor_error_dscr_empty() -> bool {
-        Self::in_int().raw().read().in_dscr_empty().bit()
-    }
-
-    fn has_in_descriptor_error_err_eof() -> bool {
-        Self::in_int().raw().read().in_err_eof().bit()
-    }
-
-    fn set_in_peripheral(peripheral: u8) {
-        Self::ch()
+    fn set_peripheral(&self, peripheral: u8) {
+        self.ch()
             .in_peri_sel()
             .modify(|_, w| unsafe { w.peri_in_sel().bits(peripheral) });
     }
 
-    fn start_in() {
-        Self::ch()
+    fn set_link_addr(&self, address: u32) {
+        self.ch()
+            .in_link()
+            .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
+    }
+
+    fn start(&self) {
+        self.ch()
             .in_link()
             .modify(|_, w| w.inlink_start().set_bit());
     }
 
-    fn is_in_done() -> bool {
-        Self::in_int().raw().read().in_suc_eof().bit()
+    fn stop(&self) {
+        self.ch().in_link().modify(|_, w| w.inlink_stop().set_bit());
     }
 
-    fn is_listening_in_eof() -> bool {
-        Self::in_int().ena().read().in_suc_eof().bit_is_set()
+    fn restart(&self) {
+        self.ch()
+            .in_link()
+            .modify(|_, w| w.inlink_restart().set_bit());
     }
 
-    fn is_listening_out_eof() -> bool {
-        Self::out_int().ena().read().out_total_eof().bit_is_set()
+    fn set_check_owner(&self, check_owner: Option<bool>) {
+        self.ch()
+            .in_conf1()
+            .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    fn listen_in_eof() {
-        Self::in_int().ena().modify(|_, w| w.in_suc_eof().set_bit());
-    }
-
-    fn listen_out_eof() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_total_eof().set_bit());
-    }
-
-    fn unlisten_in_eof() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_suc_eof().clear_bit());
-    }
-
-    fn unlisten_out_eof() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_total_eof().clear_bit());
-    }
-
-    fn listen_ch_in_done() {
-        Self::in_int().ena().modify(|_, w| w.in_done().set_bit())
-    }
-
-    fn clear_ch_in_done() {
-        Self::in_int()
-            .clr()
-            .write(|w| w.in_done().clear_bit_by_one());
-    }
-
-    fn is_ch_in_done_set() -> bool {
-        Self::in_int().raw().read().in_done().bit()
-    }
-
-    fn unlisten_ch_in_done() {
-        Self::in_int().ena().modify(|_, w| w.in_done().clear_bit());
-    }
-
-    fn is_listening_ch_in_done() -> bool {
-        Self::in_int().ena().read().in_done().bit()
-    }
-
-    fn listen_in_descriptor_error() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_dscr_err().set_bit())
-    }
-
-    fn unlisten_in_descriptor_error() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_dscr_err().clear_bit())
-    }
-
-    fn is_listening_in_descriptor_error() -> bool {
-        Self::in_int().ena().read().in_dscr_err().bit()
-    }
-
-    fn listen_in_descriptor_error_dscr_empty() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_dscr_empty().set_bit())
-    }
-
-    fn unlisten_in_descriptor_error_dscr_empty() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_dscr_empty().clear_bit())
-    }
-
-    fn is_listening_in_descriptor_error_dscr_empty() -> bool {
-        Self::in_int().ena().read().in_dscr_empty().bit()
-    }
-
-    fn listen_in_descriptor_error_err_eof() {
-        Self::in_int().ena().modify(|_, w| w.in_err_eof().set_bit())
-    }
-
-    fn unlisten_in_descriptor_error_err_eof() {
-        Self::in_int()
-            .ena()
-            .modify(|_, w| w.in_err_eof().clear_bit())
-    }
-
-    fn is_listening_in_descriptor_error_err_eof() -> bool {
-        Self::in_int().ena().read().in_err_eof().bit()
-    }
-
-    fn listen_out_descriptor_error() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_dscr_err().set_bit())
-    }
-
-    fn unlisten_out_descriptor_error() {
-        Self::out_int()
-            .ena()
-            .modify(|_, w| w.out_dscr_err().clear_bit())
-    }
-
-    fn is_listening_out_descriptor_error() -> bool {
-        Self::out_int().ena().read().out_dscr_err().bit()
+    #[cfg(esp32s3)]
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        self.ch()
+            .in_conf1()
+            .modify(|_, w| unsafe { w.in_ext_mem_bk_size().bits(size as u8) });
     }
 }
 
-#[non_exhaustive]
-#[doc(hidden)]
-pub struct ChannelTxImpl<const N: u8> {}
+impl<C: GdmaChannel> RxRegisterAccess for ChannelRxImpl<C> {
+    fn set_mem2mem_mode(&self, value: bool) {
+        self.ch()
+            .in_conf0()
+            .modify(|_, w| w.mem_trans_en().bit(value));
+    }
 
-use embassy_sync::waitqueue::AtomicWaker;
+    fn async_handler(&self) -> Option<InterruptHandler> {
+        self.0.async_handler_in()
+    }
 
-#[allow(clippy::declare_interior_mutable_const)]
-const INIT: AtomicWaker = AtomicWaker::new();
-
-static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
-
-static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [INIT; CHANNEL_COUNT];
-
-impl<const N: u8> crate::private::Sealed for ChannelTxImpl<N> {}
-
-impl<const N: u8> TxChannel<Channel<N>> for ChannelTxImpl<N> {
-    fn waker() -> &'static AtomicWaker {
-        &TX_WAKERS[N as usize]
+    fn peripheral_interrupt(&self) -> Option<Interrupt> {
+        self.0.peripheral_interrupt_in()
     }
 }
 
-#[non_exhaustive]
-#[doc(hidden)]
-pub struct ChannelRxImpl<const N: u8> {}
+impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
+    fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
+        self.int().ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().bit(enable),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().bit(enable),
+                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().bit(enable),
+                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().bit(enable),
+                    DmaRxInterrupt::Done => w.in_done().bit(enable),
+                };
+            }
+            w
+        });
+    }
 
-impl<const N: u8> crate::private::Sealed for ChannelRxImpl<N> {}
+    fn is_listening(&self) -> EnumSet<DmaRxInterrupt> {
+        let mut result = EnumSet::new();
 
-impl<const N: u8> RxChannel<Channel<N>> for ChannelRxImpl<N> {
-    fn waker() -> &'static AtomicWaker {
-        &RX_WAKERS[N as usize]
+        let int_ena = self.int().ena().read();
+        if int_ena.in_dscr_err().bit_is_set() {
+            result |= DmaRxInterrupt::DescriptorError;
+        }
+        if int_ena.in_dscr_empty().bit_is_set() {
+            result |= DmaRxInterrupt::DescriptorEmpty;
+        }
+        if int_ena.in_suc_eof().bit_is_set() {
+            result |= DmaRxInterrupt::SuccessfulEof;
+        }
+        if int_ena.in_err_eof().bit_is_set() {
+            result |= DmaRxInterrupt::ErrorEof;
+        }
+        if int_ena.in_done().bit_is_set() {
+            result |= DmaRxInterrupt::Done;
+        }
+
+        result
+    }
+
+    fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        self.int().clr().write(|w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
+                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit_by_one(),
+                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit_by_one(),
+                    DmaRxInterrupt::Done => w.in_done().clear_bit_by_one(),
+                };
+            }
+            w
+        });
+    }
+
+    fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
+        let mut result = EnumSet::new();
+
+        let int_raw = self.int().raw().read();
+        if int_raw.in_dscr_err().bit_is_set() {
+            result |= DmaRxInterrupt::DescriptorError;
+        }
+        if int_raw.in_dscr_empty().bit_is_set() {
+            result |= DmaRxInterrupt::DescriptorEmpty;
+        }
+        if int_raw.in_suc_eof().bit_is_set() {
+            result |= DmaRxInterrupt::SuccessfulEof;
+        }
+        if int_raw.in_err_eof().bit_is_set() {
+            result |= DmaRxInterrupt::ErrorEof;
+        }
+        if int_raw.in_done().bit_is_set() {
+            result |= DmaRxInterrupt::Done;
+        }
+
+        result
+    }
+
+    fn waker(&self) -> &'static AtomicWaker {
+        &RX_WAKERS[self.0.number() as usize]
+    }
+
+    fn is_async(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                RX_IS_ASYNC[self.0.number() as usize].load(portable_atomic::Ordering::Acquire)
+            } else {
+                true
+            }
+        }
+    }
+
+    fn set_async(&self, _is_async: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3))] {
+                RX_IS_ASYNC[self.0.number() as usize].store(_is_async, portable_atomic::Ordering::Release);
+            }
+        }
     }
 }
 
@@ -453,144 +563,166 @@ impl<const N: u8> RxChannel<Channel<N>> for ChannelRxImpl<N> {
 #[non_exhaustive]
 pub struct ChannelCreator<const N: u8> {}
 
-#[non_exhaustive]
-#[doc(hidden)]
-pub struct SuitablePeripheral<const N: u8> {}
-impl<const N: u8> PeripheralMarker for SuitablePeripheral<N> {}
-
-// with GDMA every channel can be used for any peripheral
-impl<const N: u8> SpiPeripheral for SuitablePeripheral<N> {}
-impl<const N: u8> Spi2Peripheral for SuitablePeripheral<N> {}
-#[cfg(esp32s3)]
-impl<const N: u8> Spi3Peripheral for SuitablePeripheral<N> {}
-impl<const N: u8> I2sPeripheral for SuitablePeripheral<N> {}
-impl<const N: u8> I2s0Peripheral for SuitablePeripheral<N> {}
-impl<const N: u8> I2s1Peripheral for SuitablePeripheral<N> {}
-#[cfg(parl_io)]
-impl<const N: u8> ParlIoPeripheral for SuitablePeripheral<N> {}
-#[cfg(aes)]
-impl<const N: u8> AesPeripheral for SuitablePeripheral<N> {}
-#[cfg(lcd_cam)]
-impl<const N: u8> LcdCamPeripheral for SuitablePeripheral<N> {}
+impl<CH: DmaChannel, M: Mode> Channel<'_, M, CH> {
+    /// Asserts that the channel is compatible with the given peripheral.
+    pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &PeripheralRef<'_, P>) {
+        // No runtime checks; GDMA channels are compatible with any peripheral
+    }
+}
 
 macro_rules! impl_channel {
-    ($num: literal, $async_handler: path, $($interrupt: ident),* ) => {
+    ($num:literal, $interrupt_in:ident, $async_handler:path $(, $interrupt_out:ident , $async_handler_out:path)? ) => {
         paste::paste! {
-            #[doc(hidden)]
-            pub type [<Channel $num>] = Channel<$num>;
-
-            #[doc(hidden)]
-            pub type [<Channel $num TxImpl>] = ChannelTxImpl<$num>;
-
-            #[doc(hidden)]
-            pub type [<Channel $num RxImpl>] = ChannelRxImpl<$num>;
-
-            #[doc(hidden)]
-            pub type [<ChannelCreator $num>] = ChannelCreator<$num>;
-
-            #[doc(hidden)]
-            pub type [<Channel $num InterruptBinder>] = ChannelInterruptBinder<$num>;
-
-            impl InterruptBinder for ChannelInterruptBinder<$num> {
-                fn set_isr(handler: $crate::interrupt::InterruptHandler) {
-                    let mut dma = unsafe { crate::peripherals::DMA::steal() };
-                    $(
-                        dma.[< bind_ $interrupt:lower _interrupt >](handler.handler());
-                        $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, handler.priority()).unwrap();
-                    )*
-                }
-            }
-
-            impl ChannelTypes for Channel<$num> {
-                type Binder = ChannelInterruptBinder<$num>;
-            }
-
-            /// A description of a GDMA channel
+            /// A description of a specific GDMA channel
             #[non_exhaustive]
             pub struct [<DmaChannel $num>] {}
 
             impl crate::private::Sealed for [<DmaChannel $num>] {}
 
+            impl [<DmaChannel $num>] {
+                fn handler_in() -> Option<InterruptHandler> {
+                    Some($async_handler)
+                }
+
+                fn isr_in() -> Option<Interrupt> {
+                    Some(Interrupt::$interrupt_in)
+                }
+
+                fn handler_out() -> Option<InterruptHandler> {
+                    $crate::if_set! { $(Some($async_handler_out))?, None }
+                }
+
+                fn isr_out() -> Option<Interrupt> {
+                    $crate::if_set! { $(Some(Interrupt::$interrupt_out))?, None }
+                }
+            }
+
             impl DmaChannel for [<DmaChannel $num>] {
-                type Channel = Channel<$num>;
-                type Rx = ChannelRxImpl<$num>;
-                type Tx = ChannelTxImpl<$num>;
-                type P = SuitablePeripheral<$num>;
+                type Rx = ChannelRxImpl<SpecificGdmaChannel<$num>>;
+                type Tx = ChannelTxImpl<SpecificGdmaChannel<$num>>;
+            }
+
+            impl DmaChannelConvert<AnyGdmaChannel> for [<DmaChannel $num>] {
+                fn degrade_rx(rx: Self::Rx) -> ChannelRxImpl<AnyGdmaChannel> {
+                    rx.degrade()
+                }
+                fn degrade_tx(tx: Self::Tx) -> ChannelTxImpl<AnyGdmaChannel> {
+                    tx.degrade()
+                }
+            }
+
+            impl DmaChannelExt for [<DmaChannel $num>] {
+                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
+                    ChannelRxImpl(SpecificGdmaChannel::<$num> {})
+                }
+
+                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
+                    ChannelTxImpl(SpecificGdmaChannel::<$num> {})
+                }
             }
 
             impl ChannelCreator<$num> {
                 /// Configure the channel for use with blocking APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
                 pub fn configure<'a>(
                     self,
                     burst_mode: bool,
                     priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], crate::Blocking> {
-                    let mut tx_impl = ChannelTxImpl {};
-                    tx_impl.init(burst_mode, priority);
+                ) -> Channel<'a, Blocking, [<DmaChannel $num>]> {
+                    let mut this = Channel {
+                        tx: ChannelTx::new(ChannelTxImpl(SpecificGdmaChannel::<$num> {})),
+                        rx: ChannelRx::new(ChannelRxImpl(SpecificGdmaChannel::<$num> {})),
+                    };
 
-                    let mut rx_impl = ChannelRxImpl {};
-                    rx_impl.init(burst_mode, priority);
+                    this.configure(burst_mode, priority);
 
-                    crate::dma::Channel {
-                        tx: ChannelTx::new(tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_impl, burst_mode),
-                        phantom: PhantomData,
-                    }
-                }
-
-                /// Configure the channel for use with async APIs
-                ///
-                /// Descriptors should be sized as `(CHUNK_SIZE + 4091) / 4092`. I.e., to
-                /// transfer buffers of size `1..=4092`, you need 1 descriptor.
-                pub fn configure_for_async<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> crate::dma::Channel<'a, [<DmaChannel $num>], $crate::Async> {
-                    let mut tx_impl = ChannelTxImpl {};
-                    tx_impl.init(burst_mode, priority);
-
-                    let mut rx_impl = ChannelRxImpl {};
-                    rx_impl.init(burst_mode, priority);
-
-                    <Channel<$num> as ChannelTypes>::Binder::set_isr($async_handler);
-
-                    crate::dma::Channel {
-                        tx: ChannelTx::new(tx_impl, burst_mode),
-                        rx: ChannelRx::new(rx_impl, burst_mode),
-                        phantom: PhantomData,
-                    }
+                    this
                 }
             }
         }
     };
 }
 
+use super::asynch::interrupt as asynch_handler;
+
 cfg_if::cfg_if! {
     if #[cfg(esp32c2)] {
         const CHANNEL_COUNT: usize = 1;
-        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
+        impl_channel!(0, DMA_CH0, asynch_handler::interrupt_handler_ch0);
     } else if #[cfg(esp32c3)] {
         const CHANNEL_COUNT: usize = 3;
-        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_CH0);
-        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_CH1);
-        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_CH2);
+        impl_channel!(0, DMA_CH0, asynch_handler::interrupt_handler_ch0);
+        impl_channel!(1, DMA_CH1, asynch_handler::interrupt_handler_ch1);
+        impl_channel!(2, DMA_CH2, asynch_handler::interrupt_handler_ch2);
     } else if #[cfg(any(esp32c6, esp32h2))] {
         const CHANNEL_COUNT: usize = 3;
-        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
-        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
-        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
+        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_in_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_out_ch0);
+        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_in_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_out_ch1);
+        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_in_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_out_ch2);
     } else if #[cfg(esp32s3)] {
         const CHANNEL_COUNT: usize = 5;
-        impl_channel!(0, super::asynch::interrupt::interrupt_handler_ch0, DMA_IN_CH0, DMA_OUT_CH0);
-        impl_channel!(1, super::asynch::interrupt::interrupt_handler_ch1, DMA_IN_CH1, DMA_OUT_CH1);
-        impl_channel!(2, super::asynch::interrupt::interrupt_handler_ch2, DMA_IN_CH2, DMA_OUT_CH2);
-        impl_channel!(3, super::asynch::interrupt::interrupt_handler_ch3, DMA_IN_CH3, DMA_OUT_CH3);
-        impl_channel!(4, super::asynch::interrupt::interrupt_handler_ch4, DMA_IN_CH4, DMA_OUT_CH4);
-  }
+        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_in_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_out_ch0);
+        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_in_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_out_ch1);
+        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_in_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_out_ch2);
+        impl_channel!(3, DMA_IN_CH3, asynch_handler::interrupt_handler_in_ch3, DMA_OUT_CH3, asynch_handler::interrupt_handler_out_ch3);
+        impl_channel!(4, DMA_IN_CH4, asynch_handler::interrupt_handler_in_ch4, DMA_OUT_CH4, asynch_handler::interrupt_handler_out_ch4);
+    }
+}
+
+crate::impl_dma_eligible! {
+    AnyGdmaChannel {
+        #[cfg(spi2)]
+        SPI2 => Spi2,
+
+        #[cfg(spi3)]
+        SPI3 => Spi3,
+
+        #[cfg(uhci0)]
+        UHCI0 => Uhci0,
+
+        #[cfg(i2s0)]
+        I2S0 => I2s0,
+
+        #[cfg(i2s1)]
+        I2S1 => I2s1,
+
+        #[cfg(esp32s3)]
+        LCD_CAM => LcdCam,
+
+        #[cfg(all(gdma, aes))]
+        AES => Aes,
+
+        #[cfg(all(gdma, sha))]
+        SHA => Sha,
+
+        #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
+        ADC1 => Adc,
+
+        #[cfg(any(esp32c3, esp32s3))]
+        ADC2 => Adc,
+
+        #[cfg(esp32s3)]
+        RMT => Rmt,
+
+        #[cfg(parl_io)]
+        PARL_IO => ParlIo,
+
+        #[cfg(any(esp32c2, esp32c6, esp32h2))]
+        MEM2MEM1 => Mem2Mem1,
+    }
+}
+
+#[cfg(any(esp32c6, esp32h2))]
+crate::impl_dma_eligible! {
+    AnyGdmaChannel {
+        MEM2MEM4 => Mem2Mem4,
+        MEM2MEM5 => Mem2Mem5,
+        MEM2MEM10 => Mem2Mem10,
+        MEM2MEM11 => Mem2Mem11,
+        MEM2MEM12 => Mem2Mem12,
+        MEM2MEM13 => Mem2Mem13,
+        MEM2MEM14 => Mem2Mem14,
+        MEM2MEM15 => Mem2Mem15,
+    }
 }
 
 /// GDMA Peripheral
@@ -638,189 +770,6 @@ impl<'d> Dma<'d> {
             channel3: ChannelCreator {},
             #[cfg(esp32s3)]
             channel4: ChannelCreator {},
-        }
-    }
-}
-
-pub use m2m::*;
-mod m2m {
-    #[cfg(esp32s3)]
-    use crate::dma::DmaExtMemBKSize;
-    use crate::dma::{
-        dma_private::{DmaSupport, DmaSupportRx},
-        Channel,
-        ChannelRx,
-        DescriptorChain,
-        DmaChannel,
-        DmaDescriptor,
-        DmaEligible,
-        DmaError,
-        DmaPeripheral,
-        DmaTransferRx,
-        ReadBuffer,
-        RxPrivate,
-        TxPrivate,
-        WriteBuffer,
-    };
-
-    /// DMA Memory to Memory pseudo-Peripheral
-    ///
-    /// This is a pseudo-peripheral that allows for memory to memory transfers.
-    /// It is not a real peripheral, but a way to use the DMA engine for memory
-    /// to memory transfers.
-    pub struct Mem2Mem<'d, C, MODE>
-    where
-        C: DmaChannel,
-        MODE: crate::Mode,
-    {
-        channel: Channel<'d, C, MODE>,
-        rx_chain: DescriptorChain,
-        tx_chain: DescriptorChain,
-        peripheral: DmaPeripheral,
-    }
-
-    impl<'d, C, MODE> Mem2Mem<'d, C, MODE>
-    where
-        C: DmaChannel,
-        MODE: crate::Mode,
-    {
-        /// Create a new Mem2Mem instance.
-        pub fn new(
-            channel: Channel<'d, C, MODE>,
-            peripheral: impl DmaEligible,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> Result<Self, DmaError> {
-            unsafe {
-                Self::new_unsafe(
-                    channel,
-                    peripheral.dma_peripheral(),
-                    rx_descriptors,
-                    tx_descriptors,
-                    crate::dma::CHUNK_SIZE,
-                )
-            }
-        }
-
-        /// Create a new Mem2Mem instance with specific chunk size.
-        pub fn new_with_chunk_size(
-            channel: Channel<'d, C, MODE>,
-            peripheral: impl DmaEligible,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-            chunk_size: usize,
-        ) -> Result<Self, DmaError> {
-            unsafe {
-                Self::new_unsafe(
-                    channel,
-                    peripheral.dma_peripheral(),
-                    rx_descriptors,
-                    tx_descriptors,
-                    chunk_size,
-                )
-            }
-        }
-
-        /// Create a new Mem2Mem instance.
-        ///
-        /// # Safety
-        ///
-        /// You must insure that your not using DMA for the same peripheral and
-        /// that your the only one using the DmaPeripheral.
-        pub unsafe fn new_unsafe(
-            mut channel: Channel<'d, C, MODE>,
-            peripheral: DmaPeripheral,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-            chunk_size: usize,
-        ) -> Result<Self, DmaError> {
-            if !(1..=4092).contains(&chunk_size) {
-                return Err(DmaError::InvalidChunkSize);
-            }
-            if tx_descriptors.is_empty() || rx_descriptors.is_empty() {
-                return Err(DmaError::OutOfDescriptors);
-            }
-            channel.tx.init_channel();
-            channel.rx.init_channel();
-            Ok(Mem2Mem {
-                channel,
-                peripheral,
-                rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
-                tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
-            })
-        }
-
-        /// Start a memory to memory transfer.
-        pub fn start_transfer<'t, TXBUF, RXBUF>(
-            &mut self,
-            rx_buffer: &'t mut RXBUF,
-            tx_buffer: &'t TXBUF,
-        ) -> Result<DmaTransferRx<'_, Self>, DmaError>
-        where
-            TXBUF: ReadBuffer,
-            RXBUF: WriteBuffer,
-        {
-            let (tx_ptr, tx_len) = unsafe { tx_buffer.read_buffer() };
-            let (rx_ptr, rx_len) = unsafe { rx_buffer.write_buffer() };
-            self.tx_chain.fill_for_tx(false, tx_ptr, tx_len)?;
-            self.rx_chain.fill_for_rx(false, rx_ptr, rx_len)?;
-            unsafe {
-                self.channel
-                    .tx
-                    .prepare_transfer_without_start(self.peripheral, &self.tx_chain)?;
-                self.channel
-                    .rx
-                    .prepare_transfer_without_start(self.peripheral, &self.rx_chain)?;
-                self.channel.rx.set_mem2mem_mode(true);
-            }
-            #[cfg(esp32s3)]
-            {
-                let align = match unsafe { crate::soc::cache_get_dcache_line_size() } {
-                    16 => DmaExtMemBKSize::Size16,
-                    32 => DmaExtMemBKSize::Size32,
-                    64 => DmaExtMemBKSize::Size64,
-                    _ => panic!("unsupported cache line size"),
-                };
-                if crate::soc::is_valid_psram_address(tx_ptr as u32) {
-                    self.channel.tx.set_ext_mem_block_size(align);
-                }
-                if crate::soc::is_valid_psram_address(rx_ptr as u32) {
-                    self.channel.rx.set_ext_mem_block_size(align);
-                }
-            }
-            self.channel.tx.start_transfer()?;
-            self.channel.rx.start_transfer()?;
-            Ok(DmaTransferRx::new(self))
-        }
-    }
-
-    impl<'d, C, MODE> DmaSupport for Mem2Mem<'d, C, MODE>
-    where
-        C: DmaChannel,
-        MODE: crate::Mode,
-    {
-        fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-            while !self.channel.rx.is_done() {}
-        }
-
-        fn peripheral_dma_stop(&mut self) {
-            unreachable!("unsupported")
-        }
-    }
-
-    impl<'d, C, MODE> DmaSupportRx for Mem2Mem<'d, C, MODE>
-    where
-        C: DmaChannel,
-        MODE: crate::Mode,
-    {
-        type RX = ChannelRx<'d, C>;
-
-        fn rx(&mut self) -> &mut Self::RX {
-            &mut self.channel.rx
-        }
-
-        fn chain(&mut self) -> &mut DescriptorChain {
-            &mut self.tx_chain
         }
     }
 }

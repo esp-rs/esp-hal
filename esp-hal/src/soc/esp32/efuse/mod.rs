@@ -24,12 +24,10 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::efuse::Efuse;
-//! # use esp_hal::gpio::Io;
 //! # use esp_hal::uart::Uart;
 //! # use core::writeln;
 //! # use core::fmt::Write;
-//! # let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-//! # let mut serial_tx = Uart::new(peripherals.UART0, io.pins.gpio4, io.pins.gpio5).unwrap();
+//! # let mut serial_tx = Uart::new(peripherals.UART0, peripherals.GPIO4, peripherals.GPIO5).unwrap();
 //! let mac_address = Efuse::read_base_mac_address();
 //! writeln!(
 //!     serial_tx,
@@ -84,8 +82,8 @@ impl Efuse {
     /// While ESP32 chips usually come with two mostly equivalent CPUs (protocol
     /// CPU and application CPU), the application CPU is unavailable on
     /// some.
-    pub fn get_core_count() -> u32 {
-        if Self::read_field_le::<bool>(DISABLE_APP_CPU) {
+    pub fn core_count() -> u32 {
+        if Self::read_bit(DISABLE_APP_CPU) {
             1
         } else {
             2
@@ -96,9 +94,9 @@ impl Efuse {
     ///
     /// Note that the actual clock may be lower, depending on the current power
     /// configuration of the chip, clock source, and other settings.
-    pub fn get_max_cpu_frequency() -> HertzU32 {
-        let has_rating = Self::read_field_le::<bool>(CHIP_CPU_FREQ_RATED);
-        let has_low_rating = Self::read_field_le::<bool>(CHIP_CPU_FREQ_LOW);
+    pub fn max_cpu_frequency() -> HertzU32 {
+        let has_rating = Self::read_bit(CHIP_CPU_FREQ_RATED);
+        let has_low_rating = Self::read_bit(CHIP_CPU_FREQ_LOW);
 
         if has_rating && has_low_rating {
             160.MHz()
@@ -109,11 +107,11 @@ impl Efuse {
 
     /// Returns the CHIP_VER_DIS_BT eFuse value.
     pub fn is_bluetooth_enabled() -> bool {
-        !Self::read_field_le::<bool>(DISABLE_BT)
+        !Self::read_bit(DISABLE_BT)
     }
 
     /// Returns the CHIP_VER_PKG eFuse value.
-    pub fn get_chip_type() -> ChipType {
+    pub fn chip_type() -> ChipType {
         let chip_ver = Self::read_field_le::<u8>(CHIP_PACKAGE)
             | Self::read_field_le::<u8>(CHIP_PACKAGE_4BIT) << 4;
 
@@ -129,7 +127,7 @@ impl Efuse {
     }
 
     /// Get status of SPI boot encryption.
-    pub fn get_flash_encryption() -> bool {
+    pub fn flash_encryption() -> bool {
         (Self::read_field_le::<u8>(FLASH_CRYPT_CNT).count_ones() % 2) != 0
     }
 }

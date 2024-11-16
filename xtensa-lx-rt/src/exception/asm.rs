@@ -2,13 +2,22 @@ use core::arch::{asm, global_asm};
 
 use crate::cfg_asm;
 
-// we could cfg symbols away and reduce frame size depending on features enabled
+// We could cfg symbols away and reduce frame size depending on features enabled
 // i.e the frame size is a fixed size based on all the features right now
 // we know at compile time if a target has loops for example, if it doesn't
 // we could cut that memory usage.
 // However in order to conveniently use `addmi` we need 256-byte alignment
 // anyway so wasting a bit more stack space seems to be the better option.
+//
+// The only exception is XT_STK_F64R_LO_CPENABLE which combines two register
+// values depending on `float-save-restore` feature. This is done so that their
+// position stays the same in `Context` without creating a large hole in the
+// struct.
+//
 // Additionally there is a chunk of memory reserved for spilled registers.
+//
+// With the exception of XT_STK_TMP, the fields must be aligned with the
+// `Context` struct in context.rs
 global_asm!(
     "
     .set XT_STK_PC,              0
@@ -44,7 +53,9 @@ global_asm!(
     .set XT_STK_M1,            120
     .set XT_STK_M2,            124
     .set XT_STK_M3,            128
-    .set XT_STK_F64R_LO,       132 // Registers for double support option
+    // if `float-save-restore` is enabled: Registers for double support option.
+    // Otherwise, the saved value of CPENABLE
+    .set XT_STK_F64R_LO_CPENABLE, 132
     .set XT_STK_F64R_HI,       136
     .set XT_STK_F64S,          140
     .set XT_STK_FCR,           144 // Registers for floating point coprocessor
@@ -66,7 +77,6 @@ global_asm!(
     .set XT_STK_F14,           208
     .set XT_STK_F15,           212
     .set XT_STK_TMP,           216
-    .set XT_STK_CPENABLE,      220
 
     .set XT_STK_FRMSZ,         256      // needs to be multiple of 16 and enough additional free space
                                         // for the registers spilled to the stack (max 8 registers / 0x20 bytes)
@@ -128,7 +138,7 @@ unsafe extern "C" fn save_context() {
         "
         /* Disable coprocessor, any use of floats in ISRs will cause an exception unless float-save-restore feature is enabled */
         rsr     a3, CPENABLE
-        s32i    a3, sp, +XT_STK_CPENABLE
+        s32i    a3, sp, +XT_STK_F64R_LO_CPENABLE
         movi    a3,  0
         wsr     a3,  CPENABLE
         rsync
@@ -181,7 +191,7 @@ unsafe extern "C" fn save_context() {
         "
         // Double Precision Accelerator Option
         rur     a3, f64r_lo
-        s32i    a3, sp, +XT_STK_F64R_LO
+        s32i    a3, sp, +XT_STK_F64R_LO_CPENABLE
         rur     a3, f64r_hi
         s32i    a3, sp, +XT_STK_F64R_HI
         rur     a3, f64s
@@ -399,7 +409,7 @@ unsafe extern "C" fn restore_context() {
         #[cfg(all(feature = "float-save-restore", XCHAL_HAVE_DFP_ACCEL))]
         "
         // Double Precision Accelerator Option
-        l32i    a3, sp, +XT_STK_F64R_LO
+        l32i    a3, sp, +XT_STK_F64R_LO_CPENABLE
         wur     a3, f64r_lo
         l32i    a3, sp, +XT_STK_F64R_HI
         wur     a3, f64r_hi
@@ -433,7 +443,7 @@ unsafe extern "C" fn restore_context() {
         #[cfg(all(XCHAL_HAVE_CP, not(feature = "float-save-restore")))]
         "
         /* Restore coprocessor state after ISR */
-        l32i    a3, sp, +XT_STK_CPENABLE
+        l32i    a3, sp, +XT_STK_F64R_LO_CPENABLE
         wsr     a3,  CPENABLE
         rsync
         ",

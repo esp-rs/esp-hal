@@ -24,9 +24,11 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::*,
     dma_buffers,
-    gpio::Io,
     prelude::*,
-    spi::{master::Spi, SpiMode},
+    spi::{
+        master::{Config, Spi},
+        SpiMode,
+    },
     timer::timg::TimerGroup,
 };
 
@@ -38,11 +40,10 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let sclk = io.pins.gpio0;
-    let miso = io.pins.gpio2;
-    let mosi = io.pins.gpio4;
-    let cs = io.pins.gpio5;
+    let sclk = peripherals.GPIO0;
+    let miso = peripherals.GPIO2;
+    let mosi = peripherals.GPIO4;
+    let cs = peripherals.GPIO5;
 
     let dma = Dma::new(peripherals.DMA);
 
@@ -58,10 +59,21 @@ async fn main(_spawner: Spawner) {
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
-        .with_pins(sclk, mosi, miso, cs)
-        .with_dma(dma_channel.configure_for_async(false, DmaPriority::Priority0))
-        .with_buffers(dma_rx_buf, dma_tx_buf);
+    let mut spi = Spi::new_with_config(
+        peripherals.SPI2,
+        Config {
+            frequency: 100.kHz(),
+            mode: SpiMode::Mode0,
+            ..Config::default()
+        },
+    )
+    .with_sck(sclk)
+    .with_mosi(mosi)
+    .with_miso(miso)
+    .with_cs(cs)
+    .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+    .with_buffers(dma_rx_buf, dma_tx_buf)
+    .into_async();
 
     let send_buffer = [0, 1, 2, 3, 4, 5, 6, 7];
     loop {

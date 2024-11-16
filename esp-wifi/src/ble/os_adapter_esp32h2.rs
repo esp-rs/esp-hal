@@ -1,6 +1,5 @@
 use crate::{
     binary::include::esp_bt_controller_config_t,
-    common_adapter::RADIO_CLOCKS,
     hal::system::{RadioClockController, RadioPeripherals},
 };
 
@@ -15,7 +14,7 @@ pub(crate) static mut ISR_INTERRUPT_3: (
 ) = (core::ptr::null_mut(), core::ptr::null_mut());
 
 pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_config_t {
-    config_version: 0x20231124,
+    config_version: 0x20240422,
     ble_ll_resolv_list_size: 4,
     ble_hci_evt_hi_buf_count: 30,
     ble_hci_evt_lo_buf_count: 8,
@@ -47,13 +46,6 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
     controller_run_cpu: 0,
     enable_qa_test: 0,
     enable_bqb_test: 0,
-    enable_uart_hci: 0,
-    ble_hci_uart_port: 0,
-    ble_hci_uart_baud: 0,
-    ble_hci_uart_data_bits: 0,
-    ble_hci_uart_stop_bits: 0,
-    ble_hci_uart_flow_ctrl: 0,
-    ble_hci_uart_uart_parity: 0,
     enable_tx_cca: 0,
     cca_rssi_thresh: (256 - 50) as u8,
     sleep_en: 0,
@@ -73,9 +65,10 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
 };
 
 pub(crate) fn bt_periph_module_enable() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).enable(RadioPeripherals::Bt);
-    }
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.enable(RadioPeripherals::Bt);
 }
 
 pub(crate) fn disable_sleep_mode() {
@@ -89,9 +82,13 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
     arg: *mut crate::binary::c_types::c_void,
     ret_handle: *mut *mut crate::binary::c_types::c_void,
 ) -> i32 {
-    debug!(
+    trace!(
         "esp_intr_alloc {} {} {:?} {:?} {:?}",
-        source, flags, handler, arg, ret_handle
+        source,
+        flags,
+        handler,
+        arg,
+        ret_handle
     );
 
     match source {
@@ -104,16 +101,18 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).ble_rtc_clk_init();
-    }
+    // stealing RADIO_CLK is safe since it is passed (as reference or by value) into
+    // `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.ble_rtc_clk_init();
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
-    unsafe {
-        unwrap!(RADIO_CLOCKS.as_mut()).reset_rpa();
-    }
+    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
+    radio_clocks.reset_rpa();
 }
 
 #[allow(improper_ctypes_definitions)]

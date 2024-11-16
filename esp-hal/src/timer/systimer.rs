@@ -79,15 +79,14 @@ use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
 use super::{Error, Timer as _};
 use crate::{
     interrupt::{self, InterruptHandler},
-    lock,
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
+    sync::{lock, Lock},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Async,
     Blocking,
     Cpu,
     InterruptConfigurable,
-    LockState,
     Mode,
 };
 
@@ -171,13 +170,7 @@ impl<'d> SystemTimer<'d> {
         // an older time stamp
 
         let unit = unsafe { SpecificUnit::<'_, 0>::conjure() };
-
-        unit.update();
-        loop {
-            if let Some(value) = unit.poll_count() {
-                break value;
-            }
-        }
+        unit.read_count()
     }
 }
 
@@ -249,37 +242,29 @@ pub trait Unit {
                     _ => unreachable!(),
                 },
                 UnitConfig::DisabledIfCpuIsStalled(cpu) => match self.channel() {
-                    0 => w
-                        .timer_unit0_work_en()
-                        .set_bit()
-                        .timer_unit0_core0_stall_en()
-                        .bit(cpu == Cpu::ProCpu)
-                        .timer_unit0_core1_stall_en()
-                        .bit(cpu != Cpu::ProCpu),
-                    1 => w
-                        .timer_unit1_work_en()
-                        .set_bit()
-                        .timer_unit1_core0_stall_en()
-                        .bit(cpu == Cpu::ProCpu)
-                        .timer_unit1_core1_stall_en()
-                        .bit(cpu != Cpu::ProCpu),
+                    0 => {
+                        w.timer_unit0_work_en().set_bit();
+                        w.timer_unit0_core0_stall_en().bit(cpu == Cpu::ProCpu);
+                        w.timer_unit0_core1_stall_en().bit(cpu != Cpu::ProCpu)
+                    }
+                    1 => {
+                        w.timer_unit1_work_en().set_bit();
+                        w.timer_unit1_core0_stall_en().bit(cpu == Cpu::ProCpu);
+                        w.timer_unit1_core1_stall_en().bit(cpu != Cpu::ProCpu)
+                    }
                     _ => unreachable!(),
                 },
                 UnitConfig::Enabled => match self.channel() {
-                    0 => w
-                        .timer_unit0_work_en()
-                        .set_bit()
-                        .timer_unit0_core0_stall_en()
-                        .clear_bit()
-                        .timer_unit0_core1_stall_en()
-                        .clear_bit(),
-                    1 => w
-                        .timer_unit1_work_en()
-                        .set_bit()
-                        .timer_unit1_core0_stall_en()
-                        .clear_bit()
-                        .timer_unit1_core1_stall_en()
-                        .clear_bit(),
+                    0 => {
+                        w.timer_unit0_work_en().set_bit();
+                        w.timer_unit0_core0_stall_en().clear_bit();
+                        w.timer_unit0_core1_stall_en().clear_bit()
+                    }
+                    1 => {
+                        w.timer_unit1_work_en().set_bit();
+                        w.timer_unit1_core0_stall_en().clear_bit();
+                        w.timer_unit1_core1_stall_en().clear_bit()
+                    }
                     _ => unreachable!(),
                 },
             });
@@ -318,48 +303,30 @@ pub trait Unit {
         }
     }
 
-    /// Update the value returned by [Self::poll_count] to be the current value
-    /// of the counter.
-    ///
-    /// This can be used to read the current value of the timer.
-    fn update(&self) {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
-        systimer
-            .unit_op(self.channel() as _)
-            .modify(|_, w| w.update().set_bit());
-    }
-
-    /// Return the count value at the time of the last call to [Self::update].
-    ///
-    /// Returns None if the update isn't ready to read if update has never been
-    /// called.
-    fn poll_count(&self) -> Option<u64> {
-        let systimer = unsafe { &*SYSTIMER::ptr() };
-        if systimer
-            .unit_op(self.channel() as _)
-            .read()
-            .value_valid()
-            .bit_is_set()
-        {
-            let unit_value = systimer.unit_value(self.channel() as _);
-
-            let lo = unit_value.lo().read().bits();
-            let hi = unit_value.hi().read().bits();
-
-            Some(((hi as u64) << 32) | lo as u64)
-        } else {
-            None
-        }
-    }
-
-    /// Convenience method to call [Self::update] and [Self::poll_count].
+    /// Reads the current counter value.
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
-        self.update();
+        let channel = self.channel() as usize;
+        let systimer = unsafe { SYSTIMER::steal() };
+
+        systimer.unit_op(channel).write(|w| w.update().set_bit());
+        while !systimer.unit_op(channel).read().value_valid().bit_is_set() {}
+
+        // Read LO, HI, then LO again, check that LO returns the same value.
+        // This accounts for the case when an interrupt may happen between reading
+        // HI and LO values (or the other core updates the counter mid-read), and this
+        // function may get called from the ISR. In this case, the repeated read
+        // will return consistent values.
+        let unit_value = systimer.unit_value(channel);
+        let mut lo_prev = unit_value.lo().read().bits();
         loop {
-            if let Some(count) = self.poll_count() {
-                break count;
+            let lo = lo_prev;
+            let hi = unit_value.hi().read().bits();
+            lo_prev = unit_value.lo().read().bits();
+
+            if lo == lo_prev {
+                return ((hi as u64) << 32) | lo as u64;
             }
         }
     }
@@ -369,13 +336,13 @@ pub trait Unit {
 #[derive(Debug)]
 pub struct SpecificUnit<'d, const CHANNEL: u8>(PhantomData<&'d ()>);
 
-impl<'d, const CHANNEL: u8> SpecificUnit<'d, CHANNEL> {
+impl<const CHANNEL: u8> SpecificUnit<'_, CHANNEL> {
     fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<'d, const CHANNEL: u8> Unit for SpecificUnit<'d, CHANNEL> {
+impl<const CHANNEL: u8> Unit for SpecificUnit<'_, CHANNEL> {
     fn channel(&self) -> u8 {
         CHANNEL
     }
@@ -385,7 +352,7 @@ impl<'d, const CHANNEL: u8> Unit for SpecificUnit<'d, CHANNEL> {
 #[derive(Debug)]
 pub struct AnyUnit<'d>(PhantomData<&'d ()>, u8);
 
-impl<'d> Unit for AnyUnit<'d> {
+impl Unit for AnyUnit<'_> {
     fn channel(&self) -> u8 {
         self.1
     }
@@ -487,7 +454,7 @@ pub trait Comparator {
 
     /// Get the current mode of the comparator, which is either target or
     /// periodic.
-    fn get_mode(&self) -> ComparatorMode {
+    fn mode(&self) -> ComparatorMode {
         let tconf = unsafe {
             let systimer = &*SYSTIMER::ptr();
             systimer.target_conf(self.channel() as usize)
@@ -530,7 +497,7 @@ pub trait Comparator {
     }
 
     /// Get the actual target value of the comparator.
-    fn get_actual_target(&self) -> u64 {
+    fn actual_target(&self) -> u64 {
         let target = unsafe {
             let systimer = &*SYSTIMER::ptr();
             systimer.trgt(self.channel() as usize)
@@ -549,6 +516,10 @@ pub trait Comparator {
             2 => Interrupt::SYSTIMER_TARGET2,
             _ => unreachable!(),
         };
+
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
+        }
 
         #[cfg(not(esp32s2))]
         unsafe {
@@ -599,13 +570,13 @@ pub trait Comparator {
 #[derive(Debug)]
 pub struct SpecificComparator<'d, const CHANNEL: u8>(PhantomData<&'d ()>);
 
-impl<'d, const CHANNEL: u8> SpecificComparator<'d, CHANNEL> {
+impl<const CHANNEL: u8> SpecificComparator<'_, CHANNEL> {
     fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<'d, const CHANNEL: u8> Comparator for SpecificComparator<'d, CHANNEL> {
+impl<const CHANNEL: u8> Comparator for SpecificComparator<'_, CHANNEL> {
     fn channel(&self) -> u8 {
         CHANNEL
     }
@@ -615,7 +586,7 @@ impl<'d, const CHANNEL: u8> Comparator for SpecificComparator<'d, CHANNEL> {
 #[derive(Debug)]
 pub struct AnyComparator<'d>(PhantomData<&'d ()>, u8);
 
-impl<'d> Comparator for AnyComparator<'d> {
+impl Comparator for AnyComparator<'_> {
     fn channel(&self) -> u8 {
         self.1
     }
@@ -738,7 +709,7 @@ where
     _pd: PhantomData<(MODE, DM)>,
 }
 
-impl<'d, T, DM, COMP: Comparator, UNIT: Unit> Debug for Alarm<'d, T, DM, COMP, UNIT>
+impl<T, DM, COMP: Comparator, UNIT: Unit> Debug for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: Mode,
 {
@@ -772,9 +743,7 @@ impl<'d, T, COMP: Comparator, UNIT: Unit> Alarm<'d, T, Async, COMP, UNIT> {
     }
 }
 
-impl<'d, T, COMP: Comparator, UNIT: Unit> InterruptConfigurable
-    for Alarm<'d, T, Blocking, COMP, UNIT>
-{
+impl<T, COMP: Comparator, UNIT: Unit> InterruptConfigurable for Alarm<'_, T, Blocking, COMP, UNIT> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.comparator.set_interrupt_handler(handler)
     }
@@ -852,14 +821,12 @@ where
     }
 }
 
-impl<'d, T, DM, COMP: Comparator, UNIT: Unit> crate::private::Sealed
-    for Alarm<'d, T, DM, COMP, UNIT>
-where
-    DM: Mode,
+impl<T, DM, COMP: Comparator, UNIT: Unit> crate::private::Sealed for Alarm<'_, T, DM, COMP, UNIT> where
+    DM: Mode
 {
 }
 
-impl<'d, T, DM, COMP: Comparator, UNIT: Unit> super::Timer for Alarm<'d, T, DM, COMP, UNIT>
+impl<T, DM, COMP: Comparator, UNIT: Unit> super::Timer for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: Mode,
 {
@@ -896,13 +863,7 @@ where
         // This should be safe to access from multiple contexts; worst case
         // scenario the second accessor ends up reading an older time stamp.
 
-        self.unit.update();
-
-        let ticks = loop {
-            if let Some(value) = self.unit.poll_count() {
-                break value;
-            }
-        };
+        let ticks = self.unit.read_count();
 
         let us = ticks / (SystemTimer::ticks_per_second() / 1_000_000);
 
@@ -910,7 +871,7 @@ where
     }
 
     fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
-        let mode = self.comparator.get_mode();
+        let mode = self.comparator.mode();
 
         let us = value.ticks();
         let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000);
@@ -934,11 +895,6 @@ where
         } else {
             // Target mode
 
-            self.unit.update();
-            while self.unit.poll_count().is_none() {
-                // Wait for value registers to update
-            }
-
             // The counters/comparators are 52-bits wide (except on ESP32-S2,
             // which is 64-bits), so we must ensure that the provided value
             // is not too wide:
@@ -947,7 +903,7 @@ where
                 return Err(Error::InvalidTimeout);
             }
 
-            let v = self.unit.poll_count().unwrap();
+            let v = self.unit.read_count();
             let t = v + ticks;
 
             self.comparator.set_target(t);
@@ -997,20 +953,20 @@ where
     }
 }
 
-impl<'d, T, DM, COMP: Comparator, UNIT: Unit> Peripheral for Alarm<'d, T, DM, COMP, UNIT>
+impl<T, DM, COMP: Comparator, UNIT: Unit> Peripheral for Alarm<'_, T, DM, COMP, UNIT>
 where
     DM: Mode,
 {
     type P = Self;
 
     #[inline]
-    unsafe fn clone_unchecked(&mut self) -> Self::P {
+    unsafe fn clone_unchecked(&self) -> Self::P {
         core::ptr::read(self as *const _)
     }
 }
 
-static CONF_LOCK: LockState = LockState::new();
-static INT_ENA_LOCK: LockState = LockState::new();
+static CONF_LOCK: Lock = Lock::new();
+static INT_ENA_LOCK: Lock = Lock::new();
 
 // Async functionality of the system timer.
 mod asynch {
@@ -1026,17 +982,15 @@ mod asynch {
 
     const NUM_ALARMS: usize = 3;
 
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: AtomicWaker = AtomicWaker::new();
-    static WAKERS: [AtomicWaker; NUM_ALARMS] = [INIT; NUM_ALARMS];
+    static WAKERS: [AtomicWaker; NUM_ALARMS] = [const { AtomicWaker::new() }; NUM_ALARMS];
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub(crate) struct AlarmFuture<'a, COMP: Comparator, UNIT: Unit> {
-        alarm: &'a Alarm<'a, Periodic, crate::Async, COMP, UNIT>,
+        alarm: &'a Alarm<'a, Target, crate::Async, COMP, UNIT>,
     }
 
     impl<'a, COMP: Comparator, UNIT: Unit> AlarmFuture<'a, COMP, UNIT> {
-        pub(crate) fn new(alarm: &'a Alarm<'a, Periodic, crate::Async, COMP, UNIT>) -> Self {
+        pub(crate) fn new(alarm: &'a Alarm<'a, Target, crate::Async, COMP, UNIT>) -> Self {
             alarm.clear_interrupt();
 
             let (interrupt, handler) = match alarm.comparator.channel() {
@@ -1049,6 +1003,8 @@ mod asynch {
                 interrupt::bind_interrupt(interrupt, handler.handler());
                 interrupt::enable(interrupt, handler.priority()).unwrap();
             }
+
+            alarm.set_interrupt_handler(handler);
 
             alarm.enable_interrupt(true);
 
@@ -1064,7 +1020,7 @@ mod asynch {
         }
     }
 
-    impl<'a, COMP: Comparator, UNIT: Unit> core::future::Future for AlarmFuture<'a, COMP, UNIT> {
+    impl<COMP: Comparator, UNIT: Unit> core::future::Future for AlarmFuture<'_, COMP, UNIT> {
         type Output = ();
 
         fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -1078,12 +1034,14 @@ mod asynch {
         }
     }
 
-    impl<'d, COMP: Comparator, UNIT: Unit> embedded_hal_async::delay::DelayNs
-        for Alarm<'d, Periodic, crate::Async, COMP, UNIT>
+    impl<COMP: Comparator, UNIT: Unit> embedded_hal_async::delay::DelayNs
+        for Alarm<'_, Target, crate::Async, COMP, UNIT>
     {
-        async fn delay_ns(&mut self, ns: u32) {
-            let period = MicrosDurationU32::from_ticks(ns / 1000);
-            self.set_period(period);
+        async fn delay_ns(&mut self, nanos: u32) {
+            self.set_target(
+                self.unit.read_count()
+                    + (nanos as u64 * SystemTimer::ticks_per_second()).div_ceil(1_000_000_000),
+            );
 
             AlarmFuture::new(self).await;
         }
@@ -1146,27 +1104,25 @@ pub mod etm {
     //! ## Example
     //! ```rust, no_run
     #![doc = crate::before_snippet!()]
-    //! # use esp_hal::timer::systimer::{etm::SysTimerEtmEvent, SystemTimer};
+    //! # use esp_hal::timer::systimer::{etm::Event, SystemTimer};
     //! # use fugit::ExtU32;
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let syst_alarms = syst.split();
     //! let mut alarm0 = syst_alarms.alarm0.into_periodic();
     //! alarm0.set_period(1u32.secs());
     //!
-    //! let timer_event = SysTimerEtmEvent::new(&mut alarm0);
+    //! let timer_event = Event::new(&mut alarm0);
     //! # }
     //! ```
 
     use super::*;
 
     /// An ETM controlled SYSTIMER event
-    pub struct SysTimerEtmEvent<'a, 'd, M, DM: crate::Mode, COMP, UNIT> {
+    pub struct Event<'a, 'd, M, DM: crate::Mode, COMP, UNIT> {
         alarm: &'a mut Alarm<'d, M, DM, COMP, UNIT>,
     }
 
-    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit>
-        SysTimerEtmEvent<'a, 'd, M, DM, COMP, UNIT>
-    {
+    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> Event<'a, 'd, M, DM, COMP, UNIT> {
         /// Creates an ETM event from the given [Alarm]
         pub fn new(alarm: &'a mut Alarm<'d, M, DM, COMP, UNIT>) -> Self {
             Self { alarm }
@@ -1179,13 +1135,13 @@ pub mod etm {
         }
     }
 
-    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::private::Sealed
-        for SysTimerEtmEvent<'a, 'd, M, DM, COMP, UNIT>
+    impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::private::Sealed
+        for Event<'_, '_, M, DM, COMP, UNIT>
     {
     }
 
-    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::etm::EtmEvent
-        for SysTimerEtmEvent<'a, 'd, M, DM, COMP, UNIT>
+    impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::etm::EtmEvent
+        for Event<'_, '_, M, DM, COMP, UNIT>
     {
         fn id(&self) -> u8 {
             50 + self.alarm.comparator.channel()
