@@ -286,7 +286,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = ctx.spi.with_miso(pin).with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio1(pin).with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0010_0010);
     }
@@ -365,7 +365,7 @@ mod tests {
         let spi = ctx
             .spi
             .with_mosi(mosi)
-            .with_miso(gpio)
+            .with_sio1(gpio)
             .with_dma(ctx.dma_channel);
 
         super::execute_write(unit0, unit1, spi, 0b0000_0010, true);
