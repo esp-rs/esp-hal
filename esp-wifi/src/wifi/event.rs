@@ -53,9 +53,9 @@ pub trait EventExt: sealed::Event + Sized + 'static {
                 .unwrap_or_else(default_handler::<Self>)
         })
     }
-    /// Atomic combination of [`take_handler`] and [`replace_handler`]. Use this
-    /// to add a new handler which runs after the previously registered
-    /// handlers.
+    /// Atomic combination of [`Self::take_handler`] and
+    /// [`Self::replace_handler`]. Use this to add a new handler which runs
+    /// after the previously registered handlers.
     fn update_handler<F: FnMut(&Self) + Sync + Send + 'static>(mut f: F) {
         Self::handler().with(|handler| {
             let mut prev: Box<Handler<Self>> =
