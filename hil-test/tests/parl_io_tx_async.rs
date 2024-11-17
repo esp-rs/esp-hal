@@ -9,7 +9,8 @@
 #[cfg(esp32c6)]
 use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
-    dma::DmaChannel0,
+    dma::{DmaChannel0, DmaTxBuf},
+    dma_tx_buffer,
     gpio::{
         interconnect::{InputSignal, OutputSignal},
         NoPin,
@@ -78,8 +79,7 @@ mod tests {
     #[test]
     async fn test_parl_io_tx_async_16bit_valid_clock_count(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
-        let tx_buffer = [0u16; BUFFER_SIZE];
-        let (_, tx_descriptors) = esp_hal::dma_descriptors!(0, 2 * BUFFER_SIZE);
+        let mut dma_tx_buf: DmaTxBuf = dma_tx_buffer!(2 * BUFFER_SIZE).unwrap();
 
         let pins = TxSixteenBits::new(
             NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin,
@@ -88,7 +88,7 @@ mod tests {
         let mut pins = TxPinConfigIncludingValidPin::new(pins);
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz())
+        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, 10.MHz())
             .unwrap()
             .into_async();
 
@@ -116,7 +116,9 @@ mod tests {
 
         for _ in 0..100 {
             clock_unit.clear();
-            pio.write_dma_async(&tx_buffer).await.unwrap();
+            let mut xfer = pio.write(dma_tx_buf.len(), dma_tx_buf).unwrap();
+            xfer.wait_for_done().await;
+            (_, pio, dma_tx_buf) = xfer.wait();
             info!("clock count: {}", clock_unit.value());
             assert_eq!(clock_unit.value(), BUFFER_SIZE as _);
         }
@@ -125,8 +127,8 @@ mod tests {
     #[test]
     async fn test_parl_io_tx_async_8bit_valid_clock_count(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
-        let tx_buffer = [0u8; BUFFER_SIZE];
-        let (_, tx_descriptors) = esp_hal::dma_descriptors!(0, 2 * BUFFER_SIZE);
+
+        let mut dma_tx_buf: DmaTxBuf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
         let pins = TxEightBits::new(
             NoPin,
@@ -149,7 +151,7 @@ mod tests {
 
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz())
+        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, 10.MHz())
             .unwrap()
             .into_async();
 
@@ -178,7 +180,9 @@ mod tests {
 
         for _ in 0..100 {
             clock_unit.clear();
-            pio.write_dma_async(&tx_buffer).await.unwrap();
+            let mut xfer = pio.write(dma_tx_buf.len(), dma_tx_buf).unwrap();
+            xfer.wait_for_done().await;
+            (_, pio, dma_tx_buf) = xfer.wait();
             info!("clock count: {}", clock_unit.value());
             assert_eq!(clock_unit.value(), BUFFER_SIZE as _);
         }

@@ -162,6 +162,34 @@ config/config.toml
 + ESP_HAL_CONFIG_PSRAM_MODE = "octal"
 ```
 
+## PARL_IO changes
+Parallel IO now uses the newer DMA Move API.
+
+Changes on the TX side
+```diff
+  let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
++ let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+- let transfer = parl_io_tx.write_dma(&tx_buffer).unwrap();
+- transfer.wait().unwrap();
++ let transfer = parl_io_tx.write(dma_tx_buf.len(), dma_tx_buf).unwrap();
++ (result, parl_io_tx, dma_tx_buf) = transfer.wait();
++ result.unwrap();
+```
+
+Changes on the RX side
+```diff
+  let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
++ let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+- let transfer = parl_io_rx.read_dma(&mut rx_buffer).unwrap();
+- transfer.wait().unwrap();
++ let transfer = parl_io_rx.read(Some(dma_rx_buf.len()), dma_rx_buf).unwrap();
++ (_, parl_io_rx, dma_rx_buf) = transfer.wait();
+```
+
+On the RX side, the `EofMode` is now decided at transfer time, rather than config time.
+- `EofMode::ByteLen` -> `Some(<number of bytes to receive>)`
+- `EofMode::EnableSignal` -> `None`
 
 ## UART halves have their configuration split too
 
