@@ -300,6 +300,7 @@ where
 {
 }
 
+impl private::Sealed for AnyTimer {}
 impl IntoAnyTimer for AnyTimer {}
 
 impl<T> EspWifiTimerSource for T
