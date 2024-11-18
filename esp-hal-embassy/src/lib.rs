@@ -151,7 +151,7 @@ impl_array!(4);
 ///
 /// ```rust, no_run
 #[doc = esp_hal::before_snippet!()]
-/// use esp_hal::timg::TimerGroup;
+/// use esp_hal::timer::timg::TimerGroup;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// esp_hal_embassy::init(timg0.timer0);
