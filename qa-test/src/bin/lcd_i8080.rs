@@ -81,10 +81,11 @@ fn main() -> ! {
     )
     .with_ctrl_pins(lcd_rs, lcd_wr);
 
-    // Note: This isn't provided in the HAL since different drivers may require different
-    // considerations, like how to manage the CS pin, the CD pin, cancellation semantics,
-    // 8 vs 16 bit, non-native primitives like Rgb565, Rgb888, etc. This Bus is just provided as
-    // an example of how to implement your own.
+    // Note: This isn't provided in the HAL since different drivers may require
+    // different considerations, like how to manage the CS pin, the CD pin,
+    // cancellation semantics, 8 vs 16 bit, non-native primitives like Rgb565,
+    // Rgb888, etc. This Bus is just provided as an example of how to implement
+    // your own.
     struct Bus<'d> {
         resources: Option<(I8080<'d, Blocking>, DmaTxBuf)>,
     }
@@ -232,16 +233,18 @@ fn main() -> ! {
             chunk.copy_from_slice(&color);
         }
 
-        // Naive implementation of tear prevention. A more robust implementation would use an
-        // interrupt handler to start shipping out the next frame the moment the tear effect pin
-        // goes high. async/await would be too slow and would risk missing the inter-refresh window.
+        // Naive implementation of tear prevention. A more robust implementation would
+        // use an interrupt handler to start shipping out the next frame the
+        // moment the tear effect pin goes high. async/await would be too slow
+        // and would risk missing the inter-refresh window.
         {
             // Wait for display to start refreshing.
             while tear_effect.is_high() {}
             // Wait for display to finish refreshing.
             while tear_effect.is_low() {}
 
-            // Now we have the maximum amount of time between each refresh available, for drawing.
+            // Now we have the maximum amount of time between each refresh
+            // available, for drawing.
         }
 
         let mut bytes_left_to_write = total_bytes;

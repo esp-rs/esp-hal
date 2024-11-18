@@ -49,6 +49,7 @@ pub enum Package {
     EspWifi,
     Examples,
     HilTest,
+    QaTest,
     XtensaLx,
     XtensaLxRt,
 }
