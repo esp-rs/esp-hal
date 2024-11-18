@@ -300,6 +300,7 @@ where
 {
 }
 
+impl private::Sealed for AnyTimer {}
 impl IntoAnyTimer for AnyTimer {}
 
 impl<T> EspWifiTimerSource for T
@@ -356,7 +357,7 @@ impl private::Sealed for Trng<'_> {}
 ///
 /// ```rust, no_run
 #[doc = esp_hal::before_snippet!()]
-/// use esp_hal::{rng::Rng, timg::TimerGroup};
+/// use esp_hal::{rng::Rng, timer::timg::TimerGroup};
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// let init = esp_wifi::init(
@@ -408,7 +409,7 @@ pub fn init<'d, T: EspWifiTimerSource>(
 /// # Safety
 ///
 /// The user must ensure that any use of the radio via the WIFI/BLE/ESP-NOW
-/// drivers are complete, else undefined behavour may occur within those
+/// drivers are complete, else undefined behaviour may occur within those
 /// drivers.
 pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     // Disable coexistence
