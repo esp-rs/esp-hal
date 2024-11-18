@@ -12,8 +12,8 @@ use esp_hal::{
 pub type Timer = OneShotTimer<'static, AnyTimer>;
 
 enum AlarmState {
-    Created(InterruptHandler),
-    Allocated(InterruptHandler),
+    Created(extern "C" fn()),
+    Allocated(extern "C" fn()),
     Initialized(&'static mut Timer),
 }
 
@@ -25,7 +25,7 @@ struct Alarm {
 unsafe impl Send for Alarm {}
 
 impl Alarm {
-    pub const fn new(handler: InterruptHandler) -> Self {
+    pub const fn new(handler: extern "C" fn()) -> Self {
         Self {
             callback: Cell::new((core::ptr::null(), core::ptr::null_mut())),
             state: AlarmState::Created(handler),
@@ -44,8 +44,8 @@ macro_rules! alarms {
     ($($idx:literal),*) => {
         [$(
             Alarm::new({
-                #[handler(priority = Priority::max())]
-                fn handler() {
+                // Not #[handler] so we don't have to store the priority - which is constant.
+                extern "C" fn handler() {
                     DRIVER.on_interrupt($idx);
                 }
                 handler
@@ -87,7 +87,10 @@ impl EmbassyTimer {
 
                     // FIXME: we should track which core allocated an alarm and bind the
                     // interrupt to that core.
-                    timer.set_interrupt_handler(interrupt_handler);
+                    timer.set_interrupt_handler(InterruptHandler::new(
+                        interrupt_handler,
+                        Priority::max(),
+                    ));
                     allocated_alarm.state = AlarmState::Initialized(timer);
                 }
             }
@@ -165,7 +168,10 @@ impl Driver for EmbassyTimer {
                             // If the driver is initialized, bind the interrupt handler to the
                             // timer. This ensures that alarms allocated after init are correctly
                             // bound to the core that created the executor.
-                            timer.set_interrupt_handler(interrupt_handler);
+                            timer.set_interrupt_handler(InterruptHandler::new(
+                                interrupt_handler,
+                                Priority::max(),
+                            ));
                             AlarmState::Initialized(timer)
                         }
 
