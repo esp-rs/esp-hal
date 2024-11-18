@@ -16,24 +16,12 @@
 //!
 //! // Take the interrupt you want to use.
 //! let mut int0 = sw_ints.software_interrupt0;
-//! let mut int1 = sw_ints.software_interrupt1;
-//! let mut int2 = sw_ints.software_interrupt2;
-//! let mut int3 = sw_ints.software_interrupt3;
 //!
 //! // Set up the interrupt handler. Do this in a critical section so the global
 //! // contains the interrupt object before the interrupt is triggered.
 //! critical_section::with(|cs| {
 //!     int0.set_interrupt_handler(swint0_handler);
 //!     SWINT0.borrow_ref_mut(cs).replace(int0);
-//!
-//!     int1.set_interrupt_handler(swint1_handler);
-//!     SWINT1.borrow_ref_mut(cs).replace(int1);
-//!
-//!     int2.set_interrupt_handler(swint2_handler);
-//!     SWINT2.borrow_ref_mut(cs).replace(int2);
-//!
-//!     int3.set_interrupt_handler(swint3_handler);
-//!     SWINT3.borrow_ref_mut(cs).replace(int3);
 //! });
 //! # }
 //!
@@ -46,15 +34,6 @@
 //! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> =
 //!     Mutex::new(RefCell::new(None));
 //!
-//! static SWINT1: Mutex<RefCell<Option<SoftwareInterrupt<1>>>> =
-//!     Mutex::new(RefCell::new(None));
-//!
-//! static SWINT2: Mutex<RefCell<Option<SoftwareInterrupt<2>>>> =
-//!     Mutex::new(RefCell::new(None));
-//!  
-//! static SWINT3: Mutex<RefCell<Option<SoftwareInterrupt<3>>>> =
-//!     Mutex::new(RefCell::new(None));
-//!
 //! #[handler]
 //! fn swint0_handler() {
 //!     // esp_println::println!("SW interrupt0 handled");
@@ -62,36 +41,6 @@
 //!     // Clear the interrupt request.
 //!     critical_section::with(|cs| {
 //!         SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
-//!     });
-//! }
-//!
-//! #[handler]
-//! fn swint1_handler() {
-//!     // esp_println::println!("SW interrupt1 handled");
-//!
-//!     // Clear the interrupt request.
-//!     critical_section::with(|cs| {
-//!         SWINT1.borrow_ref(cs).as_ref().unwrap().reset();
-//!     });
-//! }
-//!
-//! #[handler]
-//! fn swint2_handler() {
-//!     // esp_println::println!("SW interrupt2 handled");
-//!
-//!     // Clear the interrupt request.
-//!     critical_section::with(|cs| {
-//!         SWINT2.borrow_ref(cs).as_ref().unwrap().reset();
-//!     });
-//! }
-//!
-//! #[handler]
-//! fn swint3_handler() {
-//!     // esp_println::println!("SW interrupt3 handled");
-//!
-//!     // Clear the interrupt request.
-//!     critical_section::with(|cs| {
-//!         SWINT3.borrow_ref(cs).as_ref().unwrap().reset();
 //!     });
 //! }
 //! ```

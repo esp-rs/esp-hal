@@ -53,8 +53,10 @@
 //! // esp_println::println!("vec[..100] = {:?}", &large_vec[..100]);
 //!
 //! let string = String::from("A string allocated in PSRAM");
+//!
 //! // esp_println::println!("'{}' allocated at {:p}", &string,
-//! string.as_ptr()); # }
+//! // string.as_ptr());
+//! # }
 //! ```
 
 pub use crate::soc::psram_common::*;
