@@ -173,3 +173,15 @@ mod tests {
         assert_eq!(result, 4.0);
     }
 }
+
+// Here is a random test that doesn't fit anywhere else - and since it's alone,
+// creating a new test suite is not necessary as we don't want to flash/run
+// anything.
+#[allow(unused)] // compile test
+fn esp_wifi_can_be_initialized_with_any_timer(
+    timer: esp_hal::timer::AnyTimer,
+    rng: esp_hal::rng::Rng,
+    radio_clocks: esp_hal::peripherals::RADIO_CLK,
+) {
+    esp_wifi::init(timer, rng, radio_clocks);
+}
