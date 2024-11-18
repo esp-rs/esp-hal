@@ -584,6 +584,12 @@ pub mod asynch {
         waker: Locked<Option<Waker>>,
     }
 
+    impl Default for AtomicWaker {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl AtomicWaker {
         /// Create a new `AtomicWaker`.
         pub const fn new() -> Self {
