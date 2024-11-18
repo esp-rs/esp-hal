@@ -74,35 +74,34 @@ mod tests {
         let (d6_in, d6_out) = peripherals.GPIO17.split();
         let (d7_in, d7_out) = peripherals.GPIO16.split();
 
-        let config = dpi::Config {
-            clock_mode: ClockMode {
-                polarity: Polarity::IdleHigh,
-                phase: Phase::ShiftLow,
-            },
-            format: Format {
-                enable_2byte_mode: false,
-                ..Default::default()
-            },
-            // Send a 50x50 video
-            timing: FrameTiming {
-                horizontal_total_width: 65,
-                hsync_width: 5,
-                horizontal_blank_front_porch: 10,
-                horizontal_active_width: 50,
-
-                vertical_total_height: 65,
-                vsync_width: 5,
-                vertical_blank_front_porch: 10,
-                vertical_active_height: 50,
-
-                hsync_position: 0,
-            },
-            vsync_idle_level: Level::High,
-            hsync_idle_level: Level::High,
-            de_idle_level: Level::Low,
-            disable_black_region: false,
+        let mut config = dpi::Config::default();
+        config.clock_mode = ClockMode {
+            polarity: Polarity::IdleHigh,
+            phase: Phase::ShiftLow,
+        };
+        config.format = Format {
+            enable_2byte_mode: false,
             ..Default::default()
         };
+        // Send a 50x50 video
+        config.timing = FrameTiming {
+            horizontal_total_width: 65,
+            hsync_width: 5,
+            horizontal_blank_front_porch: 10,
+            horizontal_active_width: 50,
+
+            vertical_total_height: 65,
+            vsync_width: 5,
+            vertical_blank_front_porch: 10,
+            vertical_active_height: 50,
+
+            hsync_position: 0,
+        };
+        config.vsync_idle_level = Level::High;
+        config.hsync_idle_level = Level::High;
+        config.de_idle_level = Level::Low;
+        config.disable_black_region = false;
+
         let dpi = Dpi::new(lcd_cam.lcd, channel.tx, 500u32.kHz(), config)
             .with_vsync(vsync_out)
             .with_hsync(hsync_out)

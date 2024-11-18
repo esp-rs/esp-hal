@@ -138,35 +138,33 @@ fn main() -> ! {
 
     let mut dma_buf = dma_loop_buffer!(2 * 16);
 
-    let config = Config {
-        clock_mode: ClockMode {
-            polarity: Polarity::IdleLow,
-            phase: Phase::ShiftLow,
-        },
-        format: Format {
-            enable_2byte_mode: true,
-            ..Default::default()
-        },
-        timing: FrameTiming {
-            horizontal_active_width: 480,
-            horizontal_total_width: 520,
-            horizontal_blank_front_porch: 10,
-
-            vertical_active_height: 480,
-            vertical_total_height: 510,
-            vertical_blank_front_porch: 10,
-
-            hsync_width: 10,
-            vsync_width: 10,
-
-            hsync_position: 0,
-        },
-        vsync_idle_level: Level::High,
-        hsync_idle_level: Level::High,
-        de_idle_level: Level::Low,
-        disable_black_region: false,
+    let mut config = Config::default();
+    config.clock_mode = ClockMode {
+        polarity: Polarity::IdleLow,
+        phase: Phase::ShiftLow,
+    };
+    config.format = Format {
+        enable_2byte_mode: true,
         ..Default::default()
     };
+    config.timing = FrameTiming {
+        horizontal_active_width: 480,
+        horizontal_total_width: 520,
+        horizontal_blank_front_porch: 10,
+
+        vertical_active_height: 480,
+        vertical_total_height: 510,
+        vertical_blank_front_porch: 10,
+
+        hsync_width: 10,
+        vsync_width: 10,
+
+        hsync_position: 0,
+    };
+    config.vsync_idle_level = Level::High;
+    config.hsync_idle_level = Level::High;
+    config.de_idle_level = Level::Low;
+    config.disable_black_region = false;
 
     let mut dpi = Dpi::new(lcd_cam.lcd, channel.tx, 16.MHz(), config)
         .with_vsync(vsync_pin)

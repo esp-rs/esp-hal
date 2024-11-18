@@ -38,35 +38,33 @@
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
-//! let config = dpi::Config {
-//!     clock_mode: ClockMode {
-//!         polarity: Polarity::IdleHigh,
-//!         phase: Phase::ShiftLow,
-//!     },
-//!     format: Format {
-//!         enable_2byte_mode: false,
-//!         ..Default::default()
-//!     },
-//!     // Send a 50x50 video
-//!     timing: FrameTiming {
-//!         horizontal_total_width: 65,
-//!         hsync_width: 5,
-//!         horizontal_blank_front_porch: 10,
-//!         horizontal_active_width: 50,
-//!
-//!         vertical_total_height: 65,
-//!         vsync_width: 5,
-//!         vertical_blank_front_porch: 10,
-//!         vertical_active_height: 50,
-//!
-//!         hsync_position: 0,
-//!     },
-//!     vsync_idle_level: Level::High,
-//!     hsync_idle_level: Level::High,
-//!     de_idle_level: Level::Low,
-//!     disable_black_region: false,
+//! let mut config = dpi::Config::default();
+//! config.clock_mode = ClockMode {
+//!     polarity: Polarity::IdleLow,
+//!     phase: Phase::ShiftLow,
+//! };
+//! config.format = Format {
+//!     enable_2byte_mode: true,
 //!     ..Default::default()
 //! };
+//! config.timing = FrameTiming {
+//!     horizontal_active_width: 480,
+//!     horizontal_total_width: 520,
+//!     horizontal_blank_front_porch: 10,
+//!
+//!     vertical_active_height: 480,
+//!     vertical_total_height: 510,
+//!     vertical_blank_front_porch: 10,
+//!
+//!     hsync_width: 10,
+//!     vsync_width: 10,
+//!
+//!     hsync_position: 0,
+//! };
+//! config.vsync_idle_level = Level::High;
+//! config.hsync_idle_level = Level::High;
+//! config.de_idle_level = Level::Low;
+//! config.disable_black_region = false;
 //!
 //! let mut dpi = Dpi::new(lcd_cam.lcd, channel.tx, 1.MHz(), config)
 //!     .with_vsync(peripherals.GPIO3)
@@ -670,9 +668,10 @@ impl<'d, BUF: DmaTxBuffer> Drop for DpiTransfer<'d, BUF> {
     }
 }
 
+/// Configuration settings for the RGB/DPI interface.
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Configuration settings for the RGB/DPI interface.
 pub struct Config {
     /// Specifies the clock mode, including polarity and phase settings.
     pub clock_mode: ClockMode,
