@@ -135,6 +135,16 @@ pub enum Peripheral {
     Systimer,
 }
 
+impl Peripheral {
+    pub fn try_from(value: u8) -> Option<Peripheral> {
+        if value >= Peripheral::COUNT as u8 {
+            return None;
+        }
+
+        Some(unsafe { core::mem::transmute::<u8, Peripheral>(value) })
+    }
+}
+
 static PERIPHERAL_REF_COUNT: [AtomicUsize; Peripheral::COUNT] =
     [const { AtomicUsize::new(0) }; Peripheral::COUNT];
 
@@ -169,6 +179,29 @@ impl Drop for PeripheralGuard {
     fn drop(&mut self) {
         if !KEEP_ENABLED.contains(&self.peripheral) {
             PeripheralClockControl::enable(self.peripheral, false);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct GenericPeripheralGuard<const P: u8> {}
+
+impl<const P: u8> GenericPeripheralGuard<P> {
+    pub(crate) fn new() -> Self {
+        let peripheral = unwrap!(Peripheral::try_from(P));
+        if !KEEP_ENABLED.contains(&peripheral) && PeripheralClockControl::enable(peripheral, true) {
+            PeripheralClockControl::reset(peripheral);
+        }
+
+        Self {}
+    }
+}
+
+impl<const P: u8> Drop for GenericPeripheralGuard<P> {
+    fn drop(&mut self) {
+        let peripheral = unwrap!(Peripheral::try_from(P));
+        if !KEEP_ENABLED.contains(&peripheral) {
+            PeripheralClockControl::enable(peripheral, false);
         }
     }
 }

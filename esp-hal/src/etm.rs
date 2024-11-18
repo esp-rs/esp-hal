@@ -59,7 +59,7 @@
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
-    system::PeripheralClockControl,
+    system::GenericPeripheralGuard,
 };
 
 /// Unconfigured EtmChannel.
@@ -75,11 +75,8 @@ impl<const C: u8> EtmChannel<C> {
         E: EtmEvent,
         T: EtmTask,
     {
-        if PeripheralClockControl::enable(crate::system::Peripheral::Etm, true) {
-            PeripheralClockControl::reset(crate::system::Peripheral::Etm);
-        }
-
         let etm = unsafe { crate::peripherals::SOC_ETM::steal() };
+        let guard = GenericPeripheralGuard::new();
 
         etm.ch(C as usize)
             .evt_id()
@@ -96,6 +93,7 @@ impl<const C: u8> EtmChannel<C> {
         EtmConfiguredChannel {
             _event: event,
             _task: task,
+            _guard: guard,
         }
     }
 }
@@ -121,6 +119,7 @@ where
 {
     _event: &'a E,
     _task: &'a T,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Etm as u8 }>,
 }
 
 impl<E, T, const C: u8> Drop for EtmConfiguredChannel<'_, E, T, C>
@@ -131,7 +130,6 @@ where
     fn drop(&mut self) {
         debug!("Drop ETM channel {}", C);
         disable_channel(C);
-        PeripheralClockControl::enable(crate::system::Peripheral::Etm, false);
     }
 }
 
@@ -156,7 +154,7 @@ macro_rules! create_etm {
 
                     Self {
                         _peripheral: peripheral,
-                        $([< channel $num >]: EtmChannel {},)+
+                        $([< channel $num >]: EtmChannel { },)+
                     }
                 }
             }

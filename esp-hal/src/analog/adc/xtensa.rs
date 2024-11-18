@@ -6,7 +6,7 @@ use crate::efuse::Efuse;
 use crate::{
     peripheral::PeripheralRef,
     peripherals::{APB_SARADC, SENS},
-    system::{Peripheral, PeripheralClockControl},
+    system::{GenericPeripheralGuard, Peripheral},
 };
 
 mod calibration;
@@ -389,6 +389,7 @@ pub struct Adc<'d, ADC> {
     _adc: PeripheralRef<'d, ADC>,
     active_channel: Option<u8>,
     last_init_code: u16,
+    _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI>
@@ -401,10 +402,7 @@ where
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
     ) -> Self {
-        if PeripheralClockControl::enable(Peripheral::ApbSarAdc, true) {
-            PeripheralClockControl::reset(Peripheral::ApbSarAdc);
-        }
-
+        let guard = GenericPeripheralGuard::new();
         let sensors = unsafe { &*SENS::ptr() };
 
         // Set attenuation for pins
@@ -473,6 +471,7 @@ where
             _adc: adc_instance.into_ref(),
             active_channel: None,
             last_init_code: 0,
+            _guard: guard,
         }
     }
 
@@ -558,12 +557,6 @@ where
 
         ADCI::clear_start_sample();
         ADCI::start_sample();
-    }
-}
-
-impl<ADCI> Drop for Adc<'_, ADCI> {
-    fn drop(&mut self) {
-        PeripheralClockControl::enable(Peripheral::ApbSarAdc, false);
     }
 }
 

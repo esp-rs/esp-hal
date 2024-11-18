@@ -13,7 +13,7 @@ pub use crate::peripherals::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE
 use crate::{
     gpio::{interconnect::PeripheralInput, InputSignal},
     peripheral::Peripheral,
-    system::PeripheralGuard,
+    system::GenericPeripheralGuard,
 };
 
 /// Represents a channel within a pulse counter unit.
@@ -21,13 +21,13 @@ pub struct Channel<'d, const UNIT: usize, const NUM: usize> {
     _phantom: PhantomData<&'d ()>,
     // Individual channels are not Send, since they share registers.
     _not_send: PhantomData<*const ()>,
-    _guard: PeripheralGuard,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Pcnt as u8 }>,
 }
 
 impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// return a new Channel
     pub(super) fn new() -> Self {
-        let guard = PeripheralGuard::new(crate::system::Peripheral::Pcnt);
+        let guard = GenericPeripheralGuard::new();
 
         Self {
             _phantom: PhantomData,

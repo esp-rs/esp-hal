@@ -40,7 +40,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::HMAC,
     reg_access::{AlignmentHelper, SocDependentEndianess},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
 };
 
 /// Provides an interface for interacting with the HMAC hardware peripheral.
@@ -51,6 +51,7 @@ pub struct Hmac<'d> {
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     byte_written: usize,
     next_command: NextCommand,
+    _guard: GenericPeripheralGuard<{ PeripheralEnable::Hmac as u8 }>,
 }
 
 /// HMAC interface error
@@ -107,15 +108,14 @@ impl<'d> Hmac<'d> {
     pub fn new(hmac: impl Peripheral<P = HMAC> + 'd) -> Self {
         crate::into_ref!(hmac);
 
-        if PeripheralClockControl::enable(PeripheralEnable::Hmac, true) {
-            PeripheralClockControl::reset(PeripheralEnable::Hmac);
-        }
+        let guard = GenericPeripheralGuard::new();
 
         Self {
             hmac,
             alignment_helper: AlignmentHelper::default(),
             byte_written: 64,
             next_command: NextCommand::None,
+            _guard: guard,
         }
     }
 
@@ -344,11 +344,5 @@ impl<'d> Hmac<'d> {
             .write(|w| w.set_text_one().set_bit());
 
         while self.is_busy() {}
-    }
-}
-
-impl Drop for Hmac<'_> {
-    fn drop(&mut self) {
-        PeripheralClockControl::enable(PeripheralEnable::Hmac, false);
     }
 }

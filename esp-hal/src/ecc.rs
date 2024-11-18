@@ -32,7 +32,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, ECC},
     reg_access::{AlignmentHelper, SocDependentEndianess},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{self, GenericPeripheralGuard},
     InterruptConfigurable,
 };
 
@@ -41,6 +41,7 @@ pub struct Ecc<'d, DM: crate::Mode> {
     ecc: PeripheralRef<'d, ECC>,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     phantom: PhantomData<DM>,
+    _guard: GenericPeripheralGuard<{ system::Peripheral::Ecc as u8 }>,
 }
 
 /// ECC interface error
@@ -102,14 +103,13 @@ impl<'d> Ecc<'d, crate::Blocking> {
     pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
         crate::into_ref!(ecc);
 
-        if PeripheralClockControl::enable(PeripheralEnable::Ecc, true) {
-            PeripheralClockControl::reset(PeripheralEnable::Ecc);
-        }
+        let guard = GenericPeripheralGuard::new();
 
         Self {
             ecc,
             alignment_helper: AlignmentHelper::default(),
             phantom: PhantomData,
+            _guard: guard,
         }
     }
 }
@@ -963,11 +963,5 @@ impl<DM: crate::Mode> Ecc<'_, DM> {
         for (a, b) in nsrc.chunks_exact(4).zip(ndst.rchunks_exact_mut(4)) {
             b.copy_from_slice(&u32::from_be_bytes(a.try_into().unwrap()).to_ne_bytes());
         }
-    }
-}
-
-impl<DM: crate::Mode> Drop for Ecc<'_, DM> {
-    fn drop(&mut self) {
-        PeripheralClockControl::enable(PeripheralEnable::Ecc, false);
     }
 }

@@ -36,7 +36,7 @@
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::trace::RegisterBlock,
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
 };
 
 /// Errors returned from [Trace::stop_trace]
@@ -62,6 +62,7 @@ where
 {
     peripheral: PeripheralRef<'d, T>,
     buffer: Option<&'d mut [u8]>,
+    _guard: PeripheralGuard,
 }
 
 impl<'d, T> Trace<'d, T>
@@ -71,14 +72,12 @@ where
     /// Construct a new instance
     pub fn new(peripheral: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(peripheral);
-
-        if PeripheralClockControl::enable(peripheral.peripheral(), true) {
-            PeripheralClockControl::reset(peripheral.peripheral());
-        }
+        let guard = PeripheralGuard::new(peripheral.peripheral());
 
         Self {
             peripheral,
             buffer: None,
+            _guard: guard,
         }
     }
 
@@ -204,15 +203,6 @@ where
             valid_start_index: start_index,
             valid_length: len,
         })
-    }
-}
-
-impl<T> Drop for Trace<'_, T>
-where
-    T: Instance,
-{
-    fn drop(&mut self) {
-        PeripheralClockControl::enable(self.peripheral.peripheral(), false);
     }
 }
 

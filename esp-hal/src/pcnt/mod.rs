@@ -25,7 +25,7 @@ use crate::{
     interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{self, Interrupt},
-    system::PeripheralGuard,
+    system::GenericPeripheralGuard,
     InterruptConfigurable,
 };
 
@@ -57,7 +57,7 @@ pub struct Pcnt<'d> {
     /// Unit 7
     pub unit7: Unit<'d, 7>,
 
-    _guard: PeripheralGuard,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Pcnt as u8 }>,
 }
 
 impl<'d> Pcnt<'d> {
@@ -65,7 +65,7 @@ impl<'d> Pcnt<'d> {
     pub fn new(_instance: impl Peripheral<P = peripherals::PCNT> + 'd) -> Self {
         crate::into_ref!(_instance);
 
-        let guard = PeripheralGuard::new(crate::system::Peripheral::Pcnt);
+        let guard = GenericPeripheralGuard::new();
         let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
 
         // disable filter, all events, and channel settings

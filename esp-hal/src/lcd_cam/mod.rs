@@ -18,7 +18,7 @@ use crate::{
     macros::handler,
     peripheral::Peripheral,
     peripherals::{Interrupt, LCD_CAM},
-    system::{self, PeripheralGuard},
+    system::GenericPeripheralGuard,
     Async,
     Blocking,
     Cpu,
@@ -38,8 +38,8 @@ impl<'d> LcdCam<'d, Blocking> {
     pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
         crate::into_ref!(lcd_cam);
 
-        let lcd_guard = PeripheralGuard::new(system::Peripheral::LcdCam);
-        let cam_guard = PeripheralGuard::new(system::Peripheral::LcdCam);
+        let lcd_guard = GenericPeripheralGuard::new();
+        let cam_guard = GenericPeripheralGuard::new();
 
         Self {
             lcd: Lcd {

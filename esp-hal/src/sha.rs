@@ -68,24 +68,22 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::SHA,
     reg_access::{AlignmentHelper, SocDependentEndianess},
-    system::PeripheralClockControl,
+    system::GenericPeripheralGuard,
 };
 
 /// The SHA Accelerator driver instance
 pub struct Sha<'d> {
     sha: PeripheralRef<'d, SHA>,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Sha as u8 }>,
 }
 
 impl<'d> Sha<'d> {
     /// Create a new instance of the SHA Accelerator driver.
     pub fn new(sha: impl Peripheral<P = SHA> + 'd) -> Self {
         crate::into_ref!(sha);
+        let guard = GenericPeripheralGuard::new();
 
-        if PeripheralClockControl::enable(crate::system::Peripheral::Sha, true) {
-            PeripheralClockControl::reset(crate::system::Peripheral::Sha);
-        }
-
-        Self { sha }
+        Self { sha, _guard: guard }
     }
 
     /// Start a new digest.
@@ -102,12 +100,6 @@ impl<'d> Sha<'d> {
 }
 
 impl crate::private::Sealed for Sha<'_> {}
-
-impl Drop for Sha<'_> {
-    fn drop(&mut self) {
-        PeripheralClockControl::enable(crate::system::Peripheral::Sha, false);
-    }
-}
 
 #[cfg(not(esp32))]
 impl crate::InterruptConfigurable for Sha<'_> {

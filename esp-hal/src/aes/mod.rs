@@ -59,6 +59,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,
     reg_access::{AlignmentHelper, NativeEndianess},
+    system::GenericPeripheralGuard,
 };
 
 #[cfg_attr(esp32, path = "esp32.rs")]
@@ -136,6 +137,7 @@ pub enum Mode {
 pub struct Aes<'d> {
     aes: PeripheralRef<'d, AES>,
     alignment_helper: AlignmentHelper<NativeEndianess>,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Aes as u8 }>,
 }
 
 impl<'d> Aes<'d> {
@@ -143,13 +145,12 @@ impl<'d> Aes<'d> {
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
 
-        if crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Aes, true) {
-            crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Aes);
-        }
+        let guard = GenericPeripheralGuard::new();
 
         let mut ret = Self {
             aes,
             alignment_helper: AlignmentHelper::native_endianess(),
+            _guard: guard,
         };
         ret.init();
 
@@ -188,12 +189,6 @@ impl<'d> Aes<'d> {
 
     fn start(&mut self) {
         self.write_start();
-    }
-}
-
-impl Drop for Aes<'_> {
-    fn drop(&mut self) {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Aes, false);
     }
 }
 

@@ -13,7 +13,7 @@ use core::marker::PhantomData;
 
 use critical_section::CriticalSection;
 
-use crate::{pcnt::channel::Channel, system::PeripheralGuard};
+use crate::{pcnt::channel::Channel, system::GenericPeripheralGuard};
 
 /// Invalid filter threshold value
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -83,13 +83,13 @@ pub struct Unit<'d, const NUM: usize> {
     /// The second channel in PCNT unit.
     pub channel1: Channel<'d, NUM, 1>,
 
-    _guard: PeripheralGuard,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Pcnt as u8 }>,
 }
 
 impl<const NUM: usize> Unit<'_, NUM> {
     /// return a new Unit
     pub(super) fn new() -> Self {
-        let guard = PeripheralGuard::new(crate::system::Peripheral::Pcnt);
+        let guard = GenericPeripheralGuard::new();
 
         Self {
             counter: Counter::new(),
