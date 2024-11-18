@@ -34,7 +34,7 @@ impl Alarm {
 }
 
 pub(super) struct EmbassyTimer {
-    alarms: Locked<[Alarm; MAX_SUPPORTED_ALARM_COUNT]>,
+    alarms: [Locked<Alarm>; MAX_SUPPORTED_ALARM_COUNT],
     available_timers: Locked<Option<&'static mut [Timer]>>,
 }
 
@@ -43,20 +43,22 @@ pub(super) struct EmbassyTimer {
 macro_rules! alarms {
     ($($idx:literal),*) => {
         [$(
-            Alarm::new({
-                // Not #[handler] so we don't have to store the priority - which is constant.
-                extern "C" fn handler() {
-                    DRIVER.on_interrupt($idx);
-                }
-                handler
-            }),
+            Locked::new(
+                Alarm::new({
+                    // Not #[handler] so we don't have to store the priority - which is constant.
+                    extern "C" fn handler() {
+                        DRIVER.on_interrupt($idx);
+                    }
+                    handler
+                })
+            ),
         )*]
     };
 }
 
 const MAX_SUPPORTED_ALARM_COUNT: usize = 7;
 embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
-    alarms: Locked::new(alarms!(0, 1, 2, 3, 4, 5, 6)),
+    alarms: alarms!(0, 1, 2, 3, 4, 5, 6),
     available_timers: Locked::new(None),
 });
 
@@ -75,15 +77,14 @@ impl EmbassyTimer {
         });
 
         // Initialize already allocated timers
-        DRIVER.alarms.with(move |alarms| {
-            for allocated_alarm in alarms.iter_mut() {
-                if let AlarmState::Allocated(interrupt_handler) = allocated_alarm.state {
+        for alarm in DRIVER.alarms.iter() {
+            timers = alarm.with(move |alarm| {
+                if let AlarmState::Allocated(interrupt_handler) = alarm.state {
                     // Pluck off a timer
 
-                    let Some((timer, rest)) = timers.split_first_mut() else {
+                    let Some((timer, remaining_timers)) = timers.split_first_mut() else {
                         not_enough_timers();
                     };
-                    timers = rest;
 
                     // FIXME: we should track which core allocated an alarm and bind the
                     // interrupt to that core.
@@ -91,20 +92,23 @@ impl EmbassyTimer {
                         interrupt_handler,
                         Priority::max(),
                     ));
-                    allocated_alarm.state = AlarmState::Initialized(timer);
-                }
-            }
+                    alarm.state = AlarmState::Initialized(timer);
 
-            // Store the available timers
-            DRIVER
-                .available_timers
-                .with(|available_timers| *available_timers = Some(timers));
-        });
+                    remaining_timers
+                } else {
+                    timers
+                }
+            });
+        }
+
+        // Store the available timers
+        DRIVER
+            .available_timers
+            .with(|available_timers| *available_timers = Some(timers));
     }
 
     fn on_interrupt(&self, id: usize) {
-        let (cb, ctx) = self.alarms.with(|alarms| {
-            let alarm = &mut alarms[id];
+        let (cb, ctx) = self.alarms[id].with(|alarm| {
             if let AlarmState::Initialized(timer) = &mut alarm.state {
                 timer.clear_interrupt();
                 alarm.callback.get()
@@ -143,56 +147,63 @@ impl Driver for EmbassyTimer {
     }
 
     unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
-        let timer = self.available_timers.with(|available_timers| {
-            // `allocate_alarm` may be called before `esp_hal_embassy::init()`. If
-            // `timers` is `None`, we return `None` to signal that the alarm cannot be
-            // initialized yet. These alarms will be initialized when `init` is called.
-            if let Some(timers) = available_timers.take() {
-                // If the driver is initialized, we can allocate a timer.
-                // If this fails, we can't do anything about it.
-                let Some((timer, rest)) = timers.split_first_mut() else {
-                    not_enough_timers();
+        for (i, alarm) in self.alarms.iter().enumerate() {
+            let handle = alarm.with(|alarm| {
+                let AlarmState::Created(interrupt_handler) = alarm.state else {
+                    return None;
                 };
-                *available_timers = Some(rest);
-                Some(timer)
-            } else {
-                None
+
+                let timer = self.available_timers.with(|available_timers| {
+                    // `allocate_alarm` may be called before `esp_hal_embassy::init()`. If
+                    // `timers` is `None`, we return `None` to signal that the alarm cannot be
+                    // initialized yet. These alarms will be initialized when `init` is called.
+                    if let Some(timers) = available_timers.take() {
+                        // If the driver is initialized, we can allocate a timer.
+                        // If this fails, we can't do anything about it.
+                        let Some((timer, rest)) = timers.split_first_mut() else {
+                            not_enough_timers();
+                        };
+                        *available_timers = Some(rest);
+                        Some(timer)
+                    } else {
+                        None
+                    }
+                });
+
+                alarm.state = match timer {
+                    Some(timer) => {
+                        // If the driver is initialized, bind the interrupt handler to the
+                        // timer. This ensures that alarms allocated after init are correctly
+                        // bound to the core that created the executor.
+                        timer.set_interrupt_handler(InterruptHandler::new(
+                            interrupt_handler,
+                            Priority::max(),
+                        ));
+                        AlarmState::Initialized(timer)
+                    }
+
+                    None => {
+                        // No timers are available yet, mark the alarm as allocated.
+                        AlarmState::Allocated(interrupt_handler)
+                    }
+                };
+
+                Some(AlarmHandle::new(i as u8))
+            });
+
+            if handle.is_some() {
+                return handle;
             }
-        });
+        }
 
-        self.alarms.with(|alarms| {
-            for (i, alarm) in alarms.iter_mut().enumerate() {
-                if let AlarmState::Created(interrupt_handler) = alarm.state {
-                    alarm.state = match timer {
-                        Some(timer) => {
-                            // If the driver is initialized, bind the interrupt handler to the
-                            // timer. This ensures that alarms allocated after init are correctly
-                            // bound to the core that created the executor.
-                            timer.set_interrupt_handler(InterruptHandler::new(
-                                interrupt_handler,
-                                Priority::max(),
-                            ));
-                            AlarmState::Initialized(timer)
-                        }
-
-                        None => {
-                            // No timers are available yet, mark the alarm as allocated.
-                            AlarmState::Allocated(interrupt_handler)
-                        }
-                    };
-
-                    return Some(AlarmHandle::new(i as u8));
-                }
-            }
-            None
-        })
+        None
     }
 
     fn set_alarm_callback(&self, alarm: AlarmHandle, callback: fn(*mut ()), ctx: *mut ()) {
         let n = alarm.id() as usize;
 
-        self.alarms.with(|alarms| {
-            alarms[n].callback.set((callback as *const (), ctx));
+        self.alarms[n].with(|alarm| {
+            alarm.callback.set((callback as *const (), ctx));
         })
     }
 
@@ -212,8 +223,7 @@ impl Driver for EmbassyTimer {
         // (... the driver should return true and arrange to call the alarm callback as
         // soon as possible, but not synchronously.)
 
-        self.alarms.with(|alarms| {
-            let alarm = &mut alarms[alarm.id() as usize];
+        self.alarms[alarm.id() as usize].with(|alarm| {
             if let AlarmState::Initialized(timer) = &mut alarm.state {
                 Self::arm(timer, timestamp);
             } else {
