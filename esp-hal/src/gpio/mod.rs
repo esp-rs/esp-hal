@@ -44,13 +44,7 @@
 //! an input and output signal. You can then pass these signals to the
 //! peripheral drivers similar to how you would pass a pin.
 //!
-//! ## Examples
-//!
-//! ### Blink an LED
-//!
-//! See the [Blinky][crate#blinky] section of the crate documentation.
-//!
-//! ### Inverting peripheral signals
+//! ### GPIO interconnect example
 //!
 //! See the [Inverting TX and RX Pins] example of the UART documentation.
 //!
