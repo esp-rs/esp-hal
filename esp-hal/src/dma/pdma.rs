@@ -750,15 +750,15 @@ impl InterruptAccess<DmaRxInterrupt> for AnyI2sDmaRxChannel {
 }
 
 macro_rules! ImplPdmaChannel {
-    ($peri:ident, $num:literal, $int:ident) => {
+    ($peri:ident, $register_block:ident, $instance:ident, $int:ident, [$($compatible:ident),*]) => {
         paste::paste! {
-            #[doc = concat!("DMA channel suitable for ", stringify!([< $peri:upper >]), $num)]
+            #[doc = concat!("DMA channel suitable for ", stringify!([< $instance:upper >]))]
             #[non_exhaustive]
-            pub struct [<$peri $num DmaChannel>] {}
+            pub struct [<$instance DmaChannel>] {}
 
-            impl $crate::private::Sealed for [<$peri $num DmaChannel>] {}
+            impl $crate::private::Sealed for [<$instance DmaChannel>] {}
 
-            impl Peripheral for [<$peri $num DmaChannel>] {
+            impl Peripheral for [<$instance DmaChannel>] {
                 type P = Self;
 
                 unsafe fn clone_unchecked(&self) -> Self::P {
@@ -766,7 +766,7 @@ macro_rules! ImplPdmaChannel {
                 }
             }
 
-            impl [<$peri $num DmaChannel>] {
+            impl [<$instance DmaChannel>] {
                 /// Unsafely constructs a new DMA channel.
                 ///
                 /// # Safety
@@ -777,29 +777,29 @@ macro_rules! ImplPdmaChannel {
                 }
             }
 
-            impl DmaChannel for [<$peri $num DmaChannel>] {
-                type Rx = [<Any $peri DmaRxChannel>];
-                type Tx = [<Any $peri DmaTxChannel>];
+            impl DmaChannel for [<$instance DmaChannel>] {
+                type Rx = [<$peri DmaRxChannel>];
+                type Tx = [<$peri DmaTxChannel>];
 
                 unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
-                    ([<Any $peri DmaRxChannel>](Self {}.into()), [<Any $peri DmaTxChannel>](Self {}.into()))
+                    ([<$peri DmaRxChannel>](Self {}.into()), [<$peri DmaTxChannel>](Self {}.into()))
                 }
             }
 
-            impl DmaChannelExt for [<$peri $num DmaChannel>] {
+            impl DmaChannelExt for [<$instance DmaChannel>] {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    [<Any $peri DmaRxChannel>](Self {}.into())
+                    [<$peri DmaRxChannel>](Self {}.into())
                 }
                 fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    [<Any $peri DmaTxChannel>](Self {}.into())
+                    [<$peri DmaTxChannel>](Self {}.into())
                 }
             }
 
-            impl PdmaChannel for [<$peri $num DmaChannel>] {
-                type RegisterBlock = [<$peri RegisterBlock>];
+            impl PdmaChannel for [<$instance DmaChannel>] {
+                type RegisterBlock = $register_block;
 
                 fn register_block(&self) -> &Self::RegisterBlock {
-                    unsafe { &*crate::peripherals::[< $peri:upper $num >]::PTR }
+                    unsafe { &*crate::peripherals::[< $instance:upper >]::PTR }
                 }
                 fn tx_waker(&self) -> &'static AtomicWaker {
                     static WAKER: AtomicWaker = AtomicWaker::new();
@@ -810,7 +810,8 @@ macro_rules! ImplPdmaChannel {
                     &WAKER
                 }
                 fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-                    peripheral == DmaPeripheral::[<$peri $num>]
+                    let compatible_peripherals = [$(DmaPeripheral::$compatible),*];
+                    compatible_peripherals.contains(&peripheral)
                 }
 
                 fn peripheral_interrupt(&self) -> Interrupt {
@@ -830,33 +831,33 @@ macro_rules! ImplPdmaChannel {
                 }
             }
 
-            impl DmaChannelConvert<[<Any $peri DmaChannel>]> for [<$peri $num DmaChannel>] {
-                fn degrade(self) -> [<Any $peri DmaChannel>] {
+            impl DmaChannelConvert<[<$peri DmaChannel>]> for [<$instance DmaChannel>] {
+                fn degrade(self) -> [<$peri DmaChannel>] {
                     self.into()
                 }
             }
 
-            impl DmaChannelConvert<[<Any $peri DmaRxChannel>]> for [<$peri $num DmaChannel>] {
-                fn degrade(self) -> [<Any $peri DmaRxChannel>] {
-                    [<Any $peri DmaRxChannel>](self.into())
+            impl DmaChannelConvert<[<$peri DmaRxChannel>]> for [<$instance DmaChannel>] {
+                fn degrade(self) -> [<$peri DmaRxChannel>] {
+                    [<$peri DmaRxChannel>](self.into())
                 }
             }
 
-            impl DmaChannelConvert<[<Any $peri DmaTxChannel>]> for [<$peri $num DmaChannel>] {
-                fn degrade(self) -> [<Any $peri DmaTxChannel>] {
-                    [<Any $peri DmaTxChannel>](self.into())
+            impl DmaChannelConvert<[<$peri DmaTxChannel>]> for [<$instance DmaChannel>] {
+                fn degrade(self) -> [<$peri DmaTxChannel>] {
+                    [<$peri DmaTxChannel>](self.into())
                 }
             }
         }
     };
 }
 
-ImplPdmaChannel!(Spi, 2, SPI2_DMA);
-ImplPdmaChannel!(Spi, 3, SPI3_DMA);
+ImplPdmaChannel!(AnySpi, SpiRegisterBlock, Spi2, SPI2_DMA, [Spi2]);
+ImplPdmaChannel!(AnySpi, SpiRegisterBlock, Spi3, SPI3_DMA, [Spi3]);
 
-ImplPdmaChannel!(I2s, 0, I2S0);
+ImplPdmaChannel!(AnyI2s, I2sRegisterBlock, I2s0, I2S0, [I2s0]);
 #[cfg(i2s1)]
-ImplPdmaChannel!(I2s, 1, I2S1);
+ImplPdmaChannel!(AnyI2s, I2sRegisterBlock, I2s1, I2S1, [I2s1]);
 
 // Specific peripherals use specific channels. Note that this may be overly
 // restrictive (ESP32 allows configuring 2 SPI DMA channels between 3 different
