@@ -13,7 +13,7 @@
 //!
 //! After initializing the HAL, you can access the individual pins using the
 //! [`crate::Peripherals`] struct. These pins can then be used as general
-//! purpose digital IO using pin drivers, or the can be passed to peripherals
+//! purpose digital IO using pin drivers, or they can be passed to peripherals
 //! (such as SPI, UART, I2C, etc.), or can be [`GpioPin::split`]
 //! into peripheral signals for advanced use.
 //!
