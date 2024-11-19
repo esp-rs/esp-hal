@@ -2317,7 +2317,7 @@ impl PromiscuousPkt<'_> {
             frame_type,
             len,
             data: core::slice::from_raw_parts(
-                (buf as *const u8).add(size_of::<wifi_pkt_rx_ctrl_t>()),
+                (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
                 len,
             ),
         }

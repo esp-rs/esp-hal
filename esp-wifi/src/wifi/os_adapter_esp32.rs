@@ -1,6 +1,4 @@
-use crate::hal::{interrupt, peripherals, sync::Lock};
-
-static WIFI_LOCK: Lock = Lock::new();
+use crate::hal::{interrupt, peripherals};
 
 pub(crate) fn chip_ints_on(mask: u32) {
     unsafe { crate::hal::xtensa_lx::interrupt::enable_mask(mask) };
@@ -8,21 +6,6 @@ pub(crate) fn chip_ints_on(mask: u32) {
 
 pub(crate) fn chip_ints_off(mask: u32) {
     crate::hal::xtensa_lx::interrupt::disable_mask(mask);
-}
-
-pub(crate) unsafe extern "C" fn wifi_int_disable(
-    _wifi_int_mux: *mut crate::binary::c_types::c_void,
-) -> u32 {
-    // TODO: can we use wifi_int_mux?
-    unsafe { WIFI_LOCK.acquire() as u32 }
-}
-
-pub(crate) unsafe extern "C" fn wifi_int_restore(
-    _wifi_int_mux: *mut crate::binary::c_types::c_void,
-    tmp: u32,
-) {
-    let token = tmp as critical_section::RawRestoreState;
-    unsafe { WIFI_LOCK.release(token) }
 }
 
 pub(crate) unsafe extern "C" fn phy_common_clock_disable() {

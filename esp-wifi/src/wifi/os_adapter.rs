@@ -10,7 +10,7 @@ pub(crate) mod os_adapter_chip_specific;
 use core::{cell::RefCell, ptr::addr_of_mut};
 
 use enumset::EnumSet;
-use esp_hal::sync::Locked;
+use esp_hal::sync::{Lock, Locked};
 
 use super::WifiEvent;
 use crate::{
@@ -34,6 +34,8 @@ use crate::{
     memory_fence::memory_fence,
     timer::yield_task,
 };
+
+static WIFI_LOCK: Lock = Lock::new();
 
 static mut QUEUE_HANDLE: *mut ConcurrentQueue = core::ptr::null_mut();
 
@@ -214,10 +216,11 @@ pub unsafe extern "C" fn spin_lock_delete(lock: *mut crate::binary::c_types::c_v
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_int_disable(
-    wifi_int_mux: *mut crate::binary::c_types::c_void,
+    _wifi_int_mux: *mut crate::binary::c_types::c_void,
 ) -> u32 {
     trace!("wifi_int_disable");
-    crate::wifi::os_adapter::os_adapter_chip_specific::wifi_int_disable(wifi_int_mux)
+    // TODO: can we use wifi_int_mux?
+    unsafe { WIFI_LOCK.acquire() as _ }
 }
 
 /// **************************************************************************
@@ -236,11 +239,12 @@ pub unsafe extern "C" fn wifi_int_disable(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_int_restore(
-    wifi_int_mux: *mut crate::binary::c_types::c_void,
+    _wifi_int_mux: *mut crate::binary::c_types::c_void,
     tmp: u32,
 ) {
     trace!("wifi_int_restore");
-    crate::wifi::os_adapter::os_adapter_chip_specific::wifi_int_restore(wifi_int_mux, tmp)
+    let token = tmp as critical_section::RawRestoreState;
+    unsafe { WIFI_LOCK.release(token) }
 }
 
 /// **************************************************************************
