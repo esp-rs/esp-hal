@@ -3032,7 +3032,7 @@ pub(crate) mod asynch {
         }
     }
 
-    fn handle_in_interrupt<CH: DmaChannelExt>() {
+    pub(super) fn handle_in_interrupt<CH: DmaChannelExt>() {
         let rx = CH::rx_interrupts();
 
         if !rx.is_async() {
@@ -3068,7 +3068,7 @@ pub(crate) mod asynch {
         }
     }
 
-    fn handle_out_interrupt<CH: DmaChannelExt>() {
+    pub(super) fn handle_out_interrupt<CH: DmaChannelExt>() {
         let tx = CH::tx_interrupts();
 
         if !tx.is_async() {
@@ -3096,80 +3096,5 @@ pub(crate) mod asynch {
             tx.unlisten(DmaTxInterrupt::Done);
             tx.waker().wake()
         }
-    }
-
-    #[cfg(gdma)]
-    pub(crate) mod interrupt {
-        use super::*;
-        use crate::{interrupt::Priority, macros::handler};
-
-        // Single interrupt handler for IN and OUT
-        #[cfg(any(esp32c2, esp32c3))]
-        macro_rules! interrupt_handler {
-            ($ch:literal) => {
-                paste::paste! {
-                    #[handler(priority = Priority::max())]
-                    pub(crate) fn [<interrupt_handler_ch $ch>]() {
-                        handle_in_interrupt::<[< DmaChannel $ch >]>();
-                        handle_out_interrupt::<[< DmaChannel $ch >]>();
-                    }
-                }
-            };
-        }
-
-        #[cfg(not(any(esp32c2, esp32c3)))]
-        macro_rules! interrupt_handler {
-            ($ch:literal) => {
-                paste::paste! {
-                    #[handler(priority = Priority::max())]
-                    pub(crate) fn [<interrupt_handler_in_ch $ch>]() {
-                        handle_in_interrupt::<[< DmaChannel $ch >]>();
-                    }
-
-                    #[handler(priority = Priority::max())]
-                    pub(crate) fn [<interrupt_handler_out_ch $ch>]() {
-                        handle_out_interrupt::<[< DmaChannel $ch >]>();
-                    }
-                }
-            };
-        }
-
-        interrupt_handler!(0);
-        #[cfg(not(esp32c2))]
-        interrupt_handler!(1);
-        #[cfg(not(esp32c2))]
-        interrupt_handler!(2);
-        #[cfg(esp32s3)]
-        interrupt_handler!(3);
-        #[cfg(esp32s3)]
-        interrupt_handler!(4);
-    }
-
-    #[cfg(pdma)]
-    pub(crate) mod interrupt {
-        use super::*;
-        use crate::{interrupt::Priority, macros::handler};
-
-        // Single interrupt handler for IN and OUT
-        macro_rules! interrupt_handler {
-            ($ch:ident) => {
-                paste::paste! {
-                    #[handler(priority = Priority::max())]
-                    pub(crate) fn [<interrupt_handler_ $ch:lower _dma>]() {
-                        handle_in_interrupt::<[< $ch DmaChannel >]>();
-                        handle_out_interrupt::<[< $ch DmaChannel >]>();
-                    }
-                }
-            };
-        }
-
-        interrupt_handler!(Spi2);
-        #[cfg(spi3)]
-        interrupt_handler!(Spi3);
-
-        #[cfg(i2s0)]
-        interrupt_handler!(I2s0);
-        #[cfg(i2s1)]
-        interrupt_handler!(I2s1);
     }
 }

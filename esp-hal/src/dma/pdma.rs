@@ -16,6 +16,8 @@ use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{
     dma::*,
+    interrupt::Priority,
+    macros::handler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     system::{self, PeripheralClockControl},
@@ -819,7 +821,13 @@ macro_rules! ImplPdmaChannel {
                 }
 
                 fn async_handler(&self) -> InterruptHandler {
-                    super::asynch::interrupt::[< interrupt_handler_ $peri:lower $num _dma >]
+                    #[handler(priority = Priority::max())]
+                    pub(crate) fn interrupt_handler() {
+                        super::asynch::handle_in_interrupt::<[< $instance DmaChannel >]>();
+                        super::asynch::handle_out_interrupt::<[< $instance DmaChannel >]>();
+                    }
+
+                    interrupt_handler
                 }
                 fn rx_async_flag(&self) -> &'static AtomicBool {
                     static FLAG: AtomicBool = AtomicBool::new(false);
