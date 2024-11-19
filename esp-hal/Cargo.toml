@@ -55,13 +55,13 @@ ufmt-write               = "0.1.0"
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.34.0", features = ["critical-section", "rt"], optional = true }
-esp32c2 = { version = "0.23.0", features = ["critical-section", "rt"], optional = true }
-esp32c3 = { version = "0.26.0", features = ["critical-section", "rt"], optional = true }
-esp32c6 = { version = "0.17.0", features = ["critical-section", "rt"], optional = true }
-esp32h2 = { version = "0.13.0", features = ["critical-section", "rt"], optional = true }
-esp32s2 = { version = "0.25.0", features = ["critical-section", "rt"], optional = true }
-esp32s3 = { version = "0.29.0", features = ["critical-section", "rt"], optional = true }
+esp32   = { version = "0.34.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "cfcabec4617b74f182ef812b193941a6a905bc09", optional = true }
+esp32c2 = { version = "0.23.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "cfcabec4617b74f182ef812b193941a6a905bc09", optional = true }
+esp32c3 = { version = "0.26.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "cfcabec4617b74f182ef812b193941a6a905bc09", optional = true }
+esp32c6 = { version = "0.17.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "cfcabec4617b74f182ef812b193941a6a905bc09", optional = true }
+esp32h2 = { version = "0.13.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "cfcabec4617b74f182ef812b193941a6a905bc09", optional = true }
+esp32s2 = { version = "0.25.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "cfcabec4617b74f182ef812b193941a6a905bc09", optional = true }
+esp32s3 = { version = "0.29.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "cfcabec4617b74f182ef812b193941a6a905bc09", optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.12.1" }

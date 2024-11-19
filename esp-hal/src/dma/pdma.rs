@@ -23,9 +23,13 @@ use crate::{
     peripherals::Interrupt,
 };
 
+#[cfg(esp32s2)]
+mod crypto;
 mod i2s;
 mod spi;
 
+#[cfg(esp32s2)]
+pub use crypto::*;
 pub use i2s::*;
 pub use spi::*;
 
@@ -170,6 +174,10 @@ crate::dma::impl_dma_eligible!([Spi3DmaChannel] SPI3 => Spi3);
 crate::dma::impl_dma_eligible!([I2s0DmaChannel] I2S0 => I2s0);
 #[cfg(i2s1)]
 crate::dma::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
+#[cfg(esp32s2)]
+crate::dma::impl_dma_eligible!([CryptoDmaChannel] AES => Aes);
+#[cfg(esp32s2)]
+crate::dma::impl_dma_eligible!([CryptoDmaChannel] SHA => Sha);
 
 pub(super) fn init_dma(_cs: CriticalSection<'_>) {
     #[cfg(esp32)]
