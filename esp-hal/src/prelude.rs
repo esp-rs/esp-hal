@@ -20,13 +20,7 @@ mod imp {
     #[cfg(any(dport, pcr, system))]
     pub use crate::clock::Clock as _esp_hal_clock_Clock;
     #[cfg(gpio)]
-    pub use crate::gpio::{
-        InputPin as _esp_hal_gpio_InputPin,
-        OutputPin as _esp_hal_gpio_OutputPin,
-        Pin as _esp_hal_gpio_Pin,
-    };
-    #[cfg(any(i2c0, i2c1))]
-    pub use crate::i2c::master::Instance as _esp_hal_i2c_master_Instance;
+    pub use crate::gpio::Pin as _esp_hal_gpio_Pin;
     #[cfg(ledc)]
     pub use crate::ledc::{
         channel::{
@@ -45,7 +39,5 @@ mod imp {
     };
     #[cfg(any(systimer, timg0, timg1))]
     pub use crate::timer::Timer as _esp_hal_timer_Timer;
-    #[cfg(any(uart0, uart1, uart2))]
-    pub use crate::uart::Instance as _esp_hal_uart_Instance;
     pub use crate::{clock::CpuClock, entry, macros::*, InterruptConfigurable};
 }
