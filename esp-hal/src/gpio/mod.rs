@@ -1327,10 +1327,6 @@ impl<'d> Input<'d> {
     /// use esp_hal::gpio::{Level, Input, Pull};
     /// use esp_hal::delay::Delay;
     ///
-    /// # macro_rules! println {
-    /// #     ($($tt:tt)*) => { };
-    /// # }
-    ///
     /// fn print_when_pressed(button: &mut Input<'_>, delay: &mut Delay) {
     ///     let mut was_pressed = false;
     ///     loop {
@@ -1380,10 +1376,6 @@ where
     #[doc = crate::before_snippet!()]
     /// use esp_hal::gpio::{GpioPin, Level, Input, Pull};
     /// use esp_hal::delay::Delay;
-    ///
-    /// # macro_rules! println {
-    /// #     ($($tt:tt)*) => { };
-    /// # }
     ///
     /// fn print_when_pressed(
     ///     button: &mut Input<'_, GpioPin<5>>,
