@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+## 0.9.1 - 2024-11-20
+
+## Fixed
+
+- Fix interrupt stack alignment (#2425)
+
 ## 0.9.0 - 2024-07-15
 
 ### Added
