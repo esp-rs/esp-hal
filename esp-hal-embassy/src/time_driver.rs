@@ -164,13 +164,23 @@ impl EmbassyTimer {
         cb(ctx);
     }
 
-    fn arm(timer: &mut Timer, timestamp: u64) {
+    /// Returns `true` if the timer was armed, `false` if the timestamp is in
+    /// the past.
+    fn arm(timer: &mut Timer, timestamp: u64) -> bool {
         let now = now().duration_since_epoch();
         let ts = timestamp.micros();
-        // if the TS is already in the past make the timer fire immediately
-        let timeout = if ts > now { ts - now } else { 0.micros() };
-        unwrap!(timer.schedule(timeout));
-        timer.enable_interrupt(true);
+
+        if ts > now {
+            let timeout = ts - now;
+            unwrap!(timer.schedule(timeout));
+            timer.enable_interrupt(true);
+            true
+        } else {
+            // If the timestamp is past, we return `false` to ask embassy to poll again
+            // immediately.
+            timer.stop();
+            false
+        }
     }
 }
 
@@ -274,13 +284,11 @@ impl Driver for EmbassyTimer {
 
         alarm.inner.with(|alarm| {
             if let AlarmState::Initialized(timer) = &mut alarm.state {
-                Self::arm(timer, timestamp);
+                Self::arm(timer, timestamp)
             } else {
                 panic!("set_alarm called before esp_hal_embassy::init()")
             }
-        });
-
-        true
+        })
     }
 }
 
