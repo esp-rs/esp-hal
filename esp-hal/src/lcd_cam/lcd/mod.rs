@@ -12,6 +12,7 @@
 
 use crate::{peripheral::PeripheralRef, peripherals::LCD_CAM};
 
+pub mod dpi;
 pub mod i8080;
 
 /// Represents an LCD interface.

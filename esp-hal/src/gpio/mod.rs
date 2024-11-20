@@ -11,27 +11,25 @@
 #![doc = ""]
 //! ## Working with pins
 //!
-//! Before use, the GPIO module must be initialized by creating an instance of
-//! the [`Io`] struct. This struct provides access to the pins on the chip.
-//!
-//! The [`Io`] struct can also be used to configure the interrupt handler for
-//! GPIO interrupts. For more information, see the
-//! [`Io::set_interrupt_handler`].
-//!
-//! The pins are accessible via the [`crate::Peripherals`] struct returned by
-//! [`crate::init`]. These pins can then be passed to peripherals (such as
-//! SPI, UART, I2C, etc.), to pin drivers or can be [`GpioPin::split`] into
-//! peripheral signals.
-//!
-//! Each pin is a different type initially. Internally, `esp-hal` will often
-//! erase their types automatically, but they can also be converted into
-//! [`AnyPin`] manually by calling [`Pin::degrade`].
+//! After initializing the HAL, you can access the individual pins using the
+//! [`crate::Peripherals`] struct. These pins can then be used as general
+//! purpose digital IO using pin drivers, or they can be passed to peripherals
+//! (such as SPI, UART, I2C, etc.), or can be [`GpioPin::split`]
+//! into peripheral signals for advanced use.
 //!
 //! Pin drivers can be created using [`Flex::new`], [`Input::new`],
 //! [`Output::new`] and [`OutputOpenDrain::new`]. If you need the pin drivers to
 //! carry the type of the pin, you can use the [`Flex::new_typed`],
 //! [`Input::new_typed`], [`Output::new_typed`], and
 //! [`OutputOpenDrain::new_typed`] functions.
+//!
+//! Each pin is a different type initially. Internally, `esp-hal` will often
+//! erase their types automatically, but they can also be converted into
+//! [`AnyPin`] manually by calling [`Pin::degrade`].
+//!
+//! The [`Io`] struct can also be used to configure the interrupt handler for
+//! GPIO interrupts. For more information, see the
+//! [`Io::set_interrupt_handler`].
 //!
 //! ## GPIO interconnect
 //!
@@ -46,22 +44,7 @@
 //! an input and output signal. You can then pass these signals to the
 //! peripheral drivers similar to how you would pass a pin.
 //!
-//! ## Examples
-//!
-//! ### Set up a GPIO as an Output
-//!
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::{Io, Level, Output};
-//! let mut led = Output::new(peripherals.GPIO5, Level::High);
-//! # }
-//! ```
-//! 
-//! ### Blink an LED
-//!
-//! See the [Blinky][crate#blinky] section of the crate documentation.
-//!
-//! ### Inverting peripheral signals
+//! ### GPIO interconnect example
 //!
 //! See the [Inverting TX and RX Pins] example of the UART documentation.
 //!
@@ -325,11 +308,40 @@ pub trait Pin: Sealed {
         1 << (self.number() % 32)
     }
 
-    /// Type-erase (degrade) this pin into an AnyPin.
+    /// Type-erase (degrade) this pin into an [`AnyPin`].
     ///
     /// This converts pin singletons (`GpioPin<0>`, …), which are all different
     /// types, into the same type. It is useful for creating arrays of pins,
     /// or avoiding generics.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// use esp_hal::gpio::{AnyPin, Pin, Output, Level};
+    /// use esp_hal::delay::Delay;
+    ///
+    /// fn toggle_pins(pins: [AnyPin; 2], delay: &mut Delay) {
+    ///     let [red, blue] = pins;
+    ///     let mut red = Output::new(red, Level::High);
+    ///     let mut blue = Output::new(blue, Level::Low);
+    ///
+    ///     loop {
+    ///         red.toggle();
+    ///         blue.toggle();
+    ///         delay.delay_millis(500);
+    ///     }
+    /// }
+    ///
+    /// let pins: [AnyPin; 2] = [
+    ///    peripherals.GPIO5.degrade(),
+    ///    peripherals.GPIO6.degrade(),
+    /// ];
+    ///
+    /// let mut delay = Delay::new();
+    /// toggle_pins(pins, &mut delay);
+    /// # }
+    /// ```
     fn degrade(self) -> AnyPin
     where
         Self: Sized,
@@ -1109,7 +1121,11 @@ macro_rules! gpio {
     };
 }
 
-/// GPIO output driver.
+/// Push-pull digital output.
+///
+/// This driver configures the GPIO pin to be a push-pull output driver.
+/// Push-pull means that the driver actively sets the output voltage level
+/// for both high and low logical [`Level`]s.
 pub struct Output<'d, P = AnyPin> {
     pin: Flex<'d, P>,
 }
@@ -1124,8 +1140,33 @@ impl<'d, P> Peripheral for Output<'d, P> {
 }
 
 impl<'d> Output<'d> {
-    /// Create GPIO open-drain output driver for a [Pin] with the provided
-    /// initial output-level and [Pull] configuration.
+    /// Creates a new, type-erased GPIO output driver.
+    ///
+    /// The `initial_output` parameter sets the initial output level of the pin.
+    ///
+    /// ## Example
+    ///
+    /// The following example configures `GPIO5` to pulse a LED once. The
+    /// example assumes that the LED is connected such that it is on when
+    /// the pin is low.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// use esp_hal::gpio::{Level, Output};
+    /// use esp_hal::delay::Delay;
+    ///
+    /// fn blink_once(led: &mut Output<'_>, delay: &mut Delay) {
+    ///     led.set_low();
+    ///     delay.delay_millis(500);
+    ///     led.set_high();
+    /// }
+    ///
+    /// let mut led = Output::new(peripherals.GPIO5, Level::High);
+    /// let mut delay = Delay::new();
+    ///
+    /// blink_once(&mut led, &mut delay);
+    /// # }
+    /// ```
     #[inline]
     pub fn new(pin: impl Peripheral<P = impl OutputPin> + 'd, initial_output: Level) -> Self {
         Self::new_typed(pin.map_into(), initial_output)
@@ -1136,7 +1177,36 @@ impl<'d, P> Output<'d, P>
 where
     P: OutputPin,
 {
-    /// Create GPIO output driver for a [GpioPin] with the provided level
+    /// Creates a new, typed GPIO output driver.
+    ///
+    /// The `initial_output` parameter sets the initial output level of the pin.
+    ///
+    /// This constructor is useful when you want to limit which GPIO pin can be
+    /// used for a particular function.
+    ///
+    /// ## Example
+    ///
+    /// The following example configures `GPIO5` to pulse a LED once. The
+    /// example assumes that the LED is connected such that it is on when
+    /// the pin is low.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// use esp_hal::gpio::{GpioPin, Level, Output};
+    /// use esp_hal::delay::Delay;
+    ///
+    /// fn blink_once(led: &mut Output<'_, GpioPin<5>>, delay: &mut Delay) {
+    ///     led.set_low();
+    ///     delay.delay_millis(500);
+    ///     led.set_high();
+    /// }
+    ///
+    /// let mut led = Output::new_typed(peripherals.GPIO5, Level::High);
+    /// let mut delay = Delay::new();
+    ///
+    /// blink_once(&mut led, &mut delay);
+    /// # }
+    /// ```
     #[inline]
     pub fn new_typed(pin: impl Peripheral<P = P> + 'd, initial_output: Level) -> Self {
         let mut pin = Flex::new_typed(pin);
@@ -1223,7 +1293,10 @@ where
     }
 }
 
-/// GPIO input driver.
+/// Digital input.
+///
+/// This driver configures the GPIO pin to be an input. Input drivers read the
+/// voltage of their pins and convert it to a logical [`Level`].
 pub struct Input<'d, P = AnyPin> {
     pin: Flex<'d, P>,
 }
@@ -1238,8 +1311,43 @@ impl<'d, P> Peripheral for Input<'d, P> {
 }
 
 impl<'d> Input<'d> {
-    /// Create GPIO input driver for a [Pin] with the provided [Pull]
-    /// configuration.
+    /// Creates a new, type-erased GPIO input.
+    ///
+    /// The `pull` parameter configures internal pull-up or pull-down
+    /// resistors.
+    ///
+    /// ## Example
+    ///
+    /// The following example configures `GPIO5` to read a button press. The
+    /// example assumes that the button is connected such that the pin is low
+    /// when the button is pressed.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// use esp_hal::gpio::{Level, Input, Pull};
+    /// use esp_hal::delay::Delay;
+    ///
+    /// fn print_when_pressed(button: &mut Input<'_>, delay: &mut Delay) {
+    ///     let mut was_pressed = false;
+    ///     loop {
+    ///         let is_pressed = button.is_low();
+    ///         if is_pressed && !was_pressed {
+    ///             println!("Button pressed!");
+    ///         }
+    ///         was_pressed = is_pressed;
+    ///         delay.delay_millis(100);
+    ///     }
+    /// }
+    ///
+    /// let mut button = Input::new(
+    ///     peripherals.GPIO5,
+    ///     Pull::Up,
+    /// );
+    /// let mut delay = Delay::new();
+    ///
+    /// print_when_pressed(&mut button, &mut delay);
+    /// # }
+    /// ```
     #[inline]
     pub fn new(pin: impl Peripheral<P = impl InputPin> + 'd, pull: Pull) -> Self {
         Self::new_typed(pin.map_into(), pull)
@@ -1250,8 +1358,49 @@ impl<'d, P> Input<'d, P>
 where
     P: InputPin,
 {
-    /// Create GPIO input driver for a [Pin] with the provided [Pull]
-    /// configuration.
+    /// Creates a new, typed GPIO input.
+    ///
+    /// The `pull` parameter configures internal pull-up or pull-down
+    /// resistors.
+    ///
+    /// This constructor is useful when you want to limit which GPIO pin can be
+    /// used for a particular function.
+    ///
+    /// ## Example
+    ///
+    /// The following example configures `GPIO5` to read a button press. The
+    /// example assumes that the button is connected such that the pin is low
+    /// when the button is pressed.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// use esp_hal::gpio::{GpioPin, Level, Input, Pull};
+    /// use esp_hal::delay::Delay;
+    ///
+    /// fn print_when_pressed(
+    ///     button: &mut Input<'_, GpioPin<5>>,
+    ///     delay: &mut Delay,
+    /// ) {
+    ///     let mut was_pressed = false;
+    ///     loop {
+    ///         let is_pressed = button.is_low();
+    ///         if is_pressed && !was_pressed {
+    ///             println!("Button pressed!");
+    ///         }
+    ///         was_pressed = is_pressed;
+    ///         delay.delay_millis(100);
+    ///     }
+    /// }
+    ///
+    /// let mut button = Input::new_typed(
+    ///     peripherals.GPIO5,
+    ///     Pull::Up,
+    /// );
+    /// let mut delay = Delay::new();
+    ///
+    /// print_when_pressed(&mut button, &mut delay);
+    /// # }
+    /// ```
     #[inline]
     pub fn new_typed(pin: impl Peripheral<P = P> + 'd, pull: Pull) -> Self {
         let mut pin = Flex::new_typed(pin);
@@ -1344,7 +1493,13 @@ where
     }
 }
 
-/// GPIO open-drain output driver.
+/// Open drain digital output.
+///
+/// This driver configures the GPIO pin to be an open drain output driver.
+/// Open drain means that the driver actively pulls the output voltage level low
+/// for the low logical [`Level`], but leaves the high level floating, which is
+/// then determined by external hardware, or internal pull-up/pull-down
+/// resistors.
 pub struct OutputOpenDrain<'d, P = AnyPin> {
     pin: Flex<'d, P>,
 }
@@ -1359,8 +1514,39 @@ impl<'d, P> Peripheral for OutputOpenDrain<'d, P> {
 }
 
 impl<'d> OutputOpenDrain<'d> {
-    /// Create GPIO open-drain output driver for a [Pin] with the provided
-    /// initial output-level and [Pull] configuration.
+    /// Creates a new, type-erased GPIO output driver.
+    ///
+    /// The `initial_output` parameter sets the initial output level of the pin.
+    /// The `pull` parameter configures internal pull-up or pull-down
+    /// resistors.
+    ///
+    /// ## Example
+    ///
+    /// The following example configures `GPIO5` to pulse a LED once. The
+    /// example assumes that the LED is connected such that it is on when
+    /// the pin is low.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// use esp_hal::gpio::{Level, OutputOpenDrain, Pull};
+    /// use esp_hal::delay::Delay;
+    ///
+    /// fn blink_once(led: &mut OutputOpenDrain<'_>, delay: &mut Delay) {
+    ///     led.set_low();
+    ///     delay.delay_millis(500);
+    ///     led.set_high();
+    /// }
+    ///
+    /// let mut led = OutputOpenDrain::new(
+    ///     peripherals.GPIO5,
+    ///     Level::High,
+    ///     Pull::Up,
+    /// );
+    /// let mut delay = Delay::new();
+    ///
+    /// blink_once(&mut led, &mut delay);
+    /// # }
+    /// ```
     #[inline]
     pub fn new(
         pin: impl Peripheral<P = impl InputPin + OutputPin> + 'd,
@@ -1375,8 +1561,42 @@ impl<'d, P> OutputOpenDrain<'d, P>
 where
     P: InputPin + OutputPin,
 {
-    /// Create GPIO open-drain output driver for a [Pin] with the provided
-    /// initial output-level and [Pull] configuration.
+    /// Creates a new, typed GPIO output driver.
+    ///
+    /// The `initial_output` parameter sets the initial output level of the pin.
+    /// The `pull` parameter configures internal pull-up or pull-down
+    /// resistors.
+    ///
+    /// ## Example
+    ///
+    /// The following example configures `GPIO5` to pulse a LED once. The
+    /// example assumes that the LED is connected such that it is on when
+    /// the pin is low.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// use esp_hal::gpio::{GpioPin, Level, OutputOpenDrain, Pull};
+    /// use esp_hal::delay::Delay;
+    ///
+    /// fn blink_once(
+    ///     led: &mut OutputOpenDrain<'_, GpioPin<5>>,
+    ///     delay: &mut Delay,
+    /// ) {
+    ///     led.set_low();
+    ///     delay.delay_millis(500);
+    ///     led.set_high();
+    /// }
+    ///
+    /// let mut led = OutputOpenDrain::new_typed(
+    ///     peripherals.GPIO5,
+    ///     Level::High,
+    ///     Pull::Up,
+    /// );
+    /// let mut delay = Delay::new();
+    ///
+    /// blink_once(&mut led, &mut delay);
+    /// # }
+    /// ```
     #[inline]
     pub fn new_typed(pin: impl Peripheral<P = P> + 'd, initial_output: Level, pull: Pull) -> Self {
         let mut pin = Flex::new_typed(pin);
@@ -1493,6 +1713,8 @@ where
 }
 
 /// Flexible pin driver.
+///
+/// This driver allows changing the pin mode between input and output.
 pub struct Flex<'d, P = AnyPin> {
     pin: PeripheralRef<'d, P>,
 }

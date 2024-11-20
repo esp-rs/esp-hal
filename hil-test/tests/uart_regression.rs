@@ -9,6 +9,7 @@
 #[embedded_test::tests]
 mod tests {
     use esp_hal::{
+        gpio::OutputPin,
         prelude::*,
         uart::{UartRx, UartTx},
     };

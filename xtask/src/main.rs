@@ -221,7 +221,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     let package_path = xtask::windows_safe_path(&workspace.join(args.package.to_string()));
 
     let example_path = match args.package {
-        Package::Examples => package_path.join("src").join("bin"),
+        Package::Examples | Package::QaTest => package_path.join("src").join("bin"),
         Package::HilTest => package_path.join("tests"),
         _ => package_path.join("examples"),
     };
@@ -749,7 +749,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 // We will *not* check the following packages with `clippy`; this
                 // may or may not change in the future:
-                Package::Examples | Package::HilTest => {}
+                Package::Examples | Package::HilTest | Package::QaTest => {}
 
                 // By default, no `clippy` arguments are required:
                 _ => lint_package(&path, &[], args.fix)?,
@@ -788,7 +788,7 @@ fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
 
     use Package::*;
     let mut publish_args = match args.package {
-        Examples | HilTest => {
+        Examples | HilTest | QaTest => {
             bail!(
                 "Invalid package '{}' specified, this package should not be published!",
                 args.package
@@ -796,7 +796,7 @@ fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
         }
 
         EspBacktrace | EspHal | EspHalEmbassy | EspIeee802154 | EspLpHal | EspPrintln
-        | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
+        | EspRiscvRt | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
 
         _ => vec![],
     };

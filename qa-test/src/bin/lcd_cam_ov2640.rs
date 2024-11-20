@@ -1,6 +1,8 @@
-//! Drives the camera on a Freenove ESP32-S3 WROOM (also works as is on the ESP32S3-EYE)
+//! Drives the camera on a Freenove ESP32-S3 WROOM (also works as is on the
+//! ESP32S3-EYE)
 //!
-//! This example reads a JPEG from an OV2640 and writes it to the console as hex.
+//! This example reads a JPEG from an OV2640 and writes it to the console as
+//! hex.
 //!
 //! The following wiring is assumed:
 //! - SIOD  => GPIO4
@@ -108,8 +110,8 @@ fn main() -> ! {
     let mut transfer = camera.receive(dma_rx_buf).map_err(|e| e.0).unwrap();
 
     // Skip the first 2 images. Each image ends with an EOF.
-    // We likely missed the first few bytes of the first image and the second image is likely
-    // garbage from the OV2640 focusing, calibrating, etc.
+    // We likely missed the first few bytes of the first image and the second image
+    // is likely garbage from the OV2640 focusing, calibrating, etc.
     // Feel free to skip more images if the one captured below is still garbage.
     for _ in 0..2 {
         let mut total_bytes = 0;

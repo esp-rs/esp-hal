@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## 0.11.0 - 2024-11-20
+
+### Added
+
 - Added `serde` support through the `serde` feature (#2346)
 - Added `PowerSaveMode` and `set_power_saving` methods on `EspNowManager` & `WifiController` (#2446)
 - Added CSI support (#2422)
@@ -34,7 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Features `async`, `embassy-net` have been removed (#2446)
 - Features `phy-enable-usb` & `dump-packets` have been turned into configuration options `phy_enable_usb` & `dump_packets` (#2446)
 - Features `ps-min-modem` & `ps-max-modem` have been removed in favour of a runtime config (#2446)
-
 - The blocking networking stack is removed (#2488)
 
 ## 0.10.1 - 2024-10-10
@@ -190,4 +199,4 @@ Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2
 
 Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2024-10-10
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2024-11-20

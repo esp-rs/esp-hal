@@ -1,4 +1,7 @@
-use core::ptr::null_mut;
+use core::{
+    ops::{Deref, DerefMut},
+    ptr::null_mut,
+};
 
 use super::*;
 use crate::soc::is_slice_in_dram;
@@ -1044,5 +1047,93 @@ unsafe impl DmaRxBuffer for EmptyBuf {
 
     fn length(&self) -> usize {
         0
+    }
+}
+
+/// DMA Loop Buffer
+///
+/// This consists of a single descriptor that points to itself and points to a
+/// single buffer, resulting in the buffer being transmitted over and over
+/// again, indefinitely.
+///
+/// Note: A DMA descriptor is 12 bytes. If your buffer is significantly shorter
+/// than this, the DMA channel will spend more time reading the descriptor than
+/// it does reading the buffer, which may leave it unable to keep up with the
+/// bandwidth requirements of some peripherals at high frequencies.
+pub struct DmaLoopBuf {
+    descriptor: &'static mut DmaDescriptor,
+    buffer: &'static mut [u8],
+}
+
+impl DmaLoopBuf {
+    /// Create a new [DmaLoopBuf].
+    pub fn new(
+        descriptor: &'static mut DmaDescriptor,
+        buffer: &'static mut [u8],
+    ) -> Result<DmaLoopBuf, DmaBufError> {
+        if !is_slice_in_dram(buffer) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+        if !is_slice_in_dram(core::slice::from_ref(descriptor)) {
+            return Err(DmaBufError::UnsupportedMemoryRegion);
+        }
+
+        if buffer.len() > max_chunk_size(None) {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
+
+        descriptor.set_owner(Owner::Dma); // Doesn't matter
+        descriptor.set_suc_eof(false);
+        descriptor.set_length(buffer.len());
+        descriptor.set_size(buffer.len());
+        descriptor.buffer = buffer.as_mut_ptr();
+        descriptor.next = descriptor;
+
+        Ok(Self { descriptor, buffer })
+    }
+
+    /// Consume the buf, returning the descriptor and buffer.
+    pub fn split(self) -> (&'static mut DmaDescriptor, &'static mut [u8]) {
+        (self.descriptor, self.buffer)
+    }
+}
+
+unsafe impl DmaTxBuffer for DmaLoopBuf {
+    type View = Self;
+
+    fn prepare(&mut self) -> Preparation {
+        Preparation {
+            start: self.descriptor,
+            block_size: None,
+            is_burstable: true,
+            // The DMA must not check the owner bit, as it is never set.
+            check_owner: Some(false),
+        }
+    }
+
+    fn into_view(self) -> Self::View {
+        self
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view
+    }
+
+    fn length(&self) -> usize {
+        panic!("DmaLoopBuf does not have a length")
+    }
+}
+
+impl Deref for DmaLoopBuf {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.buffer
+    }
+}
+
+impl DerefMut for DmaLoopBuf {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.buffer
     }
 }

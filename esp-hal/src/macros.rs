@@ -16,6 +16,9 @@ macro_rules! before_snippet {
 # use esp_hal::prelude::*;
 # use procmacros::handler;
 # use esp_hal::interrupt;
+# macro_rules! println {
+#     ($($tt:tt)*) => { };
+# }
 # #[panic_handler]
 # fn panic(_ : &core::panic::PanicInfo) -> ! {
 #     loop {}

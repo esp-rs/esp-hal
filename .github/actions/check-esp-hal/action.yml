@@ -61,3 +61,8 @@ runs:
         CI: 1
       shell: bash
       run: cargo +${{ inputs.toolchain }} xtask build-examples esp-hal ${{ inputs.device }} --debug
+    - name: Build (qa-test)
+      env:
+        CI: 1
+      shell: bash
+      run: cargo +${{ inputs.toolchain }} xtask build-examples qa-test ${{ inputs.device }} --debug

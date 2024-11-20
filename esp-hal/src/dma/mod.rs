@@ -775,6 +775,30 @@ macro_rules! dma_rx_stream_buffer {
     }};
 }
 
+/// Convenience macro to create a [DmaLoopBuf] from a buffer size.
+///
+/// ## Usage
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::dma_loop_buffer;
+///
+/// let buf = dma_loop_buffer!(2000);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! dma_loop_buffer {
+    ($size:expr) => {{
+        const {
+            ::core::assert!($size <= 4095, "size must be <= 4095");
+            ::core::assert!($size > 0, "size must be > 0");
+        }
+
+        let (buffer, descriptors) = $crate::dma_buffers_impl!($size, $size, is_circular = false);
+
+        $crate::dma::DmaLoopBuf::new(&mut descriptors[0], buffer).unwrap()
+    }};
+}
+
 /// DMA Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

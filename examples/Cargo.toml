@@ -19,7 +19,6 @@ embassy-sync        = "0.6.0"
 embassy-time        = "0.3.2"
 embassy-usb         = { version = "0.2.0", default-features = false }
 embedded-can        = "0.4.1"
-embedded-graphics   = "0.8.1"
 embedded-hal-async  = "1.0.0"
 embedded-io         = { version = "0.6.1", default-features = false }
 embedded-io-async   = "0.6.1"
@@ -37,7 +36,6 @@ heapless            = "0.8.0"
 hmac                = { version = "0.12.1", default-features = false }
 ieee80211           = { version = "0.4.0", default-features = false }
 ieee802154          = "0.6.1"
-lis3dh-async        = "0.9.3"
 log                 = "0.4.22"
 nb                  = "1.1.0"
 portable-atomic     = { version = "1.9.0",  default-features = false }
@@ -45,7 +43,6 @@ sha2                = { version = "0.10.8", default-features = false }
 smoltcp             = { version = "0.11.0", default-features = false, features = [ "medium-ethernet", "socket-raw"] }
 smoltcp-nal         = "0.5.1"
 embedded-time       = "=0.12.1"
-ssd1306             = "0.8.4"
 static_cell         = { version = "2.1.0", features = ["nightly"] }
 trouble-host        = { git = "https://github.com/embassy-rs/trouble", package = "trouble-host", rev = "4f1114ce58e96fe54f5ed7e726f66e1ad8d9ce54", features = [ "log", "gatt" ] }
 usb-device          = "0.3.2"

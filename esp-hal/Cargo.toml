@@ -1,6 +1,6 @@
 [package]
 name          = "esp-hal"
-version       = "0.21.1"
+version       = "0.22.0"
 edition       = "2021"
 rust-version  = "1.79.0"
 description   = "Bare-metal HAL for Espressif devices"
@@ -16,13 +16,13 @@ rustdoc-args   = ["--cfg", "docsrs"]
 
 [dependencies]
 bitflags                 = "2.6.0"
-bytemuck                 = "1.18.0"
-bitfield                 = "0.16.1"
+bytemuck                 = "1.19.0"
+bitfield                 = "0.17.0"
 cfg-if                   = "1.0.0"
 chrono                   = { version = "0.4.38", default-features = false }
-critical-section         = "1.1.3"
+critical-section         = "1.2.0"
 defmt                    = { version = "0.3.8", optional = true }
-delegate                 = "0.12.0"
+delegate                 = "0.13.1"
 digest                   = { version = "0.10.7", default-features = false, optional = true }
 document-features        = "0.2.10"
 embassy-embedded-hal     = "0.2.0"
@@ -44,8 +44,8 @@ log                      = { version = "0.4.22", optional = true }
 nb                       = "1.1.0"
 paste                    = "1.0.15"
 portable-atomic          = { version = "1.9.0", default-features = false }
-procmacros               = { version = "0.14.0", features = ["enum-dispatch", "interrupt", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-riscv                    = { version = "0.11.1", optional = true }
+procmacros               = { version = "0.15.0", features = ["enum-dispatch", "interrupt", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+riscv                    = { version = "0.12.1", optional = true }
 strum                    = { version = "0.26.3", default-features = false, features = ["derive"] }
 void                     = { version = "1.0.2", default-features = false }
 usb-device               = { version = "0.3.2", optional = true }
@@ -65,18 +65,18 @@ esp32s2 = { version = "0.25.0", features = ["critical-section", "rt"], optional 
 esp32s3 = { version = "0.29.0", features = ["critical-section", "rt"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
-esp-riscv-rt = { version = "0.9.0", path = "../esp-riscv-rt" }
+esp-riscv-rt = { version = "0.9.1", path = "../esp-riscv-rt" }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx-rt = { version = "0.17.0", path = "../xtensa-lx-rt" }
+xtensa-lx-rt = { version = "0.17.2", path = "../xtensa-lx-rt" }
 
 [build-dependencies]
 basic-toml   = "0.1.9"
 cfg-if       = "1.0.0"
 esp-build    = { version = "0.1.0", path = "../esp-build" }
 esp-metadata = { version = "0.4.0", path = "../esp-metadata" }
-esp-config   = { version = "0.1.0", path = "../esp-config", features = ["build"] }
-serde        = { version = "1.0.210", features = ["derive"] }
+esp-config   = { version = "0.2.0", path = "../esp-config", features = ["build"] }
+serde        = { version = "1.0.215", features = ["derive"] }
 
 [features]
 default = []

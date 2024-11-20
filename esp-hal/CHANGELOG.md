@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.22.0] - 2024-11-20
+
+### Added
+
 - A new config option `PLACE_SWITCH_TABLES_IN_RAM` to improve performance (especially for interrupts) at the cost of slightly more RAM usage (#2331)
 - A new config option `PLACE_ANON_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
 - Add burst transfer support to DMA buffers (#2336)
@@ -20,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 - `I2c::with_timeout` (#2361)
 - `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
+- Add RGB/DPI driver (#2415)
+- Add `DmaLoopBuf` (#2415)
 - `Cpu::COUNT` and `Cpu::current()` (#2411)
 - `UartInterrupt` and related functions (#2406)
 - I2S Parallel output driver for ESP32. (#2348, #2436, #2472)
@@ -919,7 +931,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/esp-rs/esp-hal/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1
