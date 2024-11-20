@@ -796,7 +796,7 @@ fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
         }
 
         EspBacktrace | EspHal | EspHalEmbassy | EspIeee802154 | EspLpHal | EspPrintln
-        | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
+        | EspRiscvRt | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
 
         _ => vec![],
     };
