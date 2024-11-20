@@ -224,6 +224,7 @@ pub mod rtc_cntl;
 pub mod sha;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
+#[doc(hidden)]
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod system;
 pub mod time;
@@ -254,6 +255,9 @@ pub mod trapframe {
     #[cfg(xtensa)]
     pub use xtensa_lx_rt::exception::Context as TrapFrame;
 }
+
+#[cfg(phy)]
+pub mod radio_clock_ctrl;
 
 // The `soc` module contains chip-specific implementation details and should not
 // be directly exposed.

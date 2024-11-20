@@ -11,7 +11,7 @@
 //! `RadioClockControl` struct. This trait provides methods to enable, disable,
 //! reset the MAC, initialize clocks and perform other related operations.
 
-use crate::system::{RadioClockController, RadioPeripherals};
+use crate::radio_clock_ctrl::{RadioClockController, RadioPeripherals};
 
 // Note: this comment has been copied from esp-idf, including the mistake.
 // Mask for clock bits used by both WIFI and Bluetooth, 0, 1, 2, 3, 7,

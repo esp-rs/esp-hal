@@ -11,7 +11,7 @@
 //! `RadioClockControl` struct. This trait provides methods to enable, disable,
 //! reset the MAC, initialize clocks and perform other related operations.
 
-use crate::system::{RadioClockController, RadioPeripherals};
+use crate::radio_clock_ctrl::{RadioClockController, RadioPeripherals};
 
 impl RadioClockController for crate::peripherals::RADIO_CLK {
     fn enable(&mut self, peripheral: RadioPeripherals) {
