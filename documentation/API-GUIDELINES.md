@@ -28,7 +28,9 @@ The following paragraphs contain additional recommendations.
   - `into_async` must configure the driver and/or the associated DMA channels. This most often means enabling an interrupt handler.
   - `into_blocking` must undo the configuration done by `into_async`.
 - The asynchronous driver implemntation must also expose the blocking methods (except for interrupt related functions).
-- Drivers must have a `Drop` implementation resetting the peripheral to idle state.
+- Drivers must have a `Drop` implementation resetting the peripheral to idle state. There are some exceptions to this:
+  - GPIO where common usage is to "set and drop" so they can't be changed 
+  - Where we don't want to disable the peripheral as it's used internally, for example SYSTIMER is used by `time::now()` API. See `KEEP_ENABLED` in src/system.rs
 - Consider using a builder-like pattern for driver construction.
 
 ## Interoperability
@@ -42,7 +44,7 @@ The following paragraphs contain additional recommendations.
 ## API Surface
 
 - API documentation must be provided for every new driver and API.
-- Private details must not leak into the public API, and should be made private where technically possible.
+- Private details should not leak into the public API, and should be made private where technically possible.
   - Implementation details that _need_ to be public should be marked with `#[doc(hidden)]` and a comment as to why it needs to be public.
   - Functions which technically need to be public but shouldn't be callable by the user need to be sealed.
     - see [this example in Rust's core library](https://github.com/rust-lang/rust/blob/044a28a4091f2e1a5883f7fa990223f8b200a2cd/library/core/src/error.rs#L89-L100)
