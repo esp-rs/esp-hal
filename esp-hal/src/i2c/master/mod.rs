@@ -353,8 +353,8 @@ where
     }
 
     fn internal_recover(&self) {
-        PeripheralClockControl::enable(self.driver().info.peripheral, false);
-        PeripheralClockControl::enable(self.driver().info.peripheral, true);
+        PeripheralClockControl::disable(self.driver().info.peripheral);
+        PeripheralClockControl::enable(self.driver().info.peripheral);
         PeripheralClockControl::reset(self.driver().info.peripheral);
 
         // We know the configuration is valid, we can ignore the result.

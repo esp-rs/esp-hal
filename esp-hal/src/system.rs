@@ -167,7 +167,7 @@ pub(crate) struct PeripheralGuard {
 
 impl PeripheralGuard {
     pub(crate) fn new(p: Peripheral) -> Self {
-        if !KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p, true) {
+        if !KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p) {
             PeripheralClockControl::reset(p);
         }
 
@@ -178,7 +178,7 @@ impl PeripheralGuard {
 impl Drop for PeripheralGuard {
     fn drop(&mut self) {
         if !KEEP_ENABLED.contains(&self.peripheral) {
-            PeripheralClockControl::enable(self.peripheral, false);
+            PeripheralClockControl::disable(self.peripheral);
         }
     }
 }
@@ -189,7 +189,7 @@ pub(crate) struct GenericPeripheralGuard<const P: u8> {}
 impl<const P: u8> GenericPeripheralGuard<P> {
     pub(crate) fn new() -> Self {
         let peripheral = unwrap!(Peripheral::try_from(P));
-        if !KEEP_ENABLED.contains(&peripheral) && PeripheralClockControl::enable(peripheral, true) {
+        if !KEEP_ENABLED.contains(&peripheral) && PeripheralClockControl::enable(peripheral) {
             PeripheralClockControl::reset(peripheral);
         }
 
@@ -201,7 +201,7 @@ impl<const P: u8> Drop for GenericPeripheralGuard<P> {
     fn drop(&mut self) {
         let peripheral = unwrap!(Peripheral::try_from(P));
         if !KEEP_ENABLED.contains(&peripheral) {
-            PeripheralClockControl::enable(peripheral, false);
+            PeripheralClockControl::disable(peripheral);
         }
     }
 }
@@ -961,17 +961,26 @@ impl PeripheralClockControl {
 }
 
 impl PeripheralClockControl {
-    /// Enables/disables the given peripheral.
+    /// Enables the given peripheral.
     ///
-    /// This keeps track of enabling/disabling a peripheral - i.e. a peripheral
-    /// is only enabled with the first call attempt to enable it. It only
+    /// This keeps track of enabling a peripheral - i.e. a peripheral
+    /// is only enabled with the first call attempt to enable it.
+    ///
+    /// Returns `true` if it actually enabled the peripheral.
+    pub(crate) fn enable(peripheral: Peripheral) -> bool {
+        Self::enable_forced(peripheral, true, false)
+    }
+
+    /// Disables the given peripheral.
+    ///
+    /// This keeps track of disabling a peripheral - i.e. it only
     /// gets disabled when the number of enable/disable attempts is balanced.
     ///
-    /// Returns `true` if it actually enabled/disabled the peripheral.
+    /// Returns `true` if it actually disabled the peripheral.
     ///
     /// Before disabling a peripheral it will also get reset
-    pub(crate) fn enable(peripheral: Peripheral, enable: bool) -> bool {
-        Self::enable_forced(peripheral, enable, false)
+    pub(crate) fn disable(peripheral: Peripheral) -> bool {
+        Self::enable_forced(peripheral, false, false)
     }
 
     pub(crate) fn enable_forced(peripheral: Peripheral, enable: bool, force: bool) -> bool {

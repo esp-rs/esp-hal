@@ -942,7 +942,7 @@ impl<'d> Dma<'d> {
     pub fn new(
         dma: impl crate::peripheral::Peripheral<P = crate::peripherals::DMA> + 'd,
     ) -> Dma<'d> {
-        if PeripheralClockControl::enable(Peripheral::Dma, true) {
+        if PeripheralClockControl::enable(Peripheral::Dma) {
             PeripheralClockControl::reset(Peripheral::Dma);
         }
 

@@ -148,7 +148,7 @@ impl<'d> SystemTimer<'d> {
     /// Create a new instance.
     pub fn new(_systimer: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
         // Don't reset Systimer as it will break `time::now`, only enable it
-        PeripheralClockControl::enable(PeripheralEnable::Systimer, true);
+        PeripheralClockControl::enable(PeripheralEnable::Systimer);
 
         #[cfg(soc_etm)]
         etm::enable_etm();

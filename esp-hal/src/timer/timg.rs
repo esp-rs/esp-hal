@@ -152,7 +152,7 @@ impl TimerGroupInstance for TIMG0 {
     }
 
     fn enable_peripheral() {
-        PeripheralClockControl::enable(crate::system::Peripheral::Timg0, true);
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg0);
     }
 
     fn reset_peripheral() {
@@ -215,7 +215,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
     }
 
     fn enable_peripheral() {
-        PeripheralClockControl::enable(crate::system::Peripheral::Timg1, true);
+        PeripheralClockControl::enable(crate::system::Peripheral::Timg1);
     }
 
     fn reset_peripheral() {
