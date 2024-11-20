@@ -124,7 +124,9 @@ mod tests {
 
         critical_section::with(|cs| {
             alarm0.set_interrupt_handler(pass_test_if_called);
-            alarm0.set_target(SystemTimer::now() + SystemTimer::ticks_per_second() / 10);
+            alarm0.set_target(
+                SystemTimer::unit_count(Unit::Unit0) + SystemTimer::ticks_per_second() / 10,
+            );
             alarm0.enable_interrupt(true);
 
             ALARM_TARGET.borrow_ref_mut(cs).replace(alarm0);
@@ -144,7 +146,9 @@ mod tests {
 
         critical_section::with(|cs| {
             alarm0.set_interrupt_handler(target_fail_test_if_called_twice);
-            alarm0.set_target(SystemTimer::now() + SystemTimer::ticks_per_second() / 10);
+            alarm0.set_target(
+                SystemTimer::unit_count(Unit::Unit0) + SystemTimer::ticks_per_second() / 10,
+            );
             alarm0.enable_interrupt(true);
 
             let alarm1 = alarm1.into_periodic();

@@ -48,7 +48,7 @@ pub fn now() -> Instant {
     #[cfg(not(esp32))]
     let (ticks, div) = {
         // otherwise use SYSTIMER
-        let ticks = crate::timer::systimer::SystemTimer::now();
+        let ticks = crate::timer::systimer::SystemTimer::unit_count(Unit::Unit0);
         (
             ticks,
             (crate::timer::systimer::SystemTimer::ticks_per_second() / 1_000_000),

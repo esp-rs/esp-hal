@@ -8,6 +8,6 @@ pub fn cycles() -> u64 {
 
     #[cfg(not(feature = "esp32"))]
     {
-        esp_hal::timer::systimer::SystemTimer::now()
+        esp_hal::timer::systimer::SystemTimer::unit_count(Unit::Unit0)
     }
 }

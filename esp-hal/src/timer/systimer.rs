@@ -9,72 +9,17 @@
 //!
 //! ## Configuration
 //!
-//! The timer consists of two counters, `UNIT0` and `UNIT1`. The counter values
-//! can be monitored by 3 comparators, `COMP0`, `COMP1`, and `COMP2`.
+//! The timer consists of two counters, `Unit0` and `Unit1`. The counter values
+//! can be monitored by 3 [`Alarm`]'s
 //!
-//! [Alarm]s can be configured in two modes: [Target] (one-shot) and [Periodic].
-//!
-//! ## Examples
-//!
-//! ### Splitting up the System Timer into three alarms
-//!
-//! Use the [split][SystemTimer::split] method to create three alarms from the
-//!  System Timer, contained in a [SysTimerAlarms] struct.
-//!
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! use esp_hal::timer::systimer::{
-//!     SystemTimer,
-//!     Periodic,
-//! };
-//!
-//! let systimer = SystemTimer::new(
-//!     peripherals.SYSTIMER,
-//! ).split::<Periodic>();
-//!
-//! // Reconfigure a periodic alarm to be a target alarm
-//! let target_alarm = systimer.alarm0.into_target();
-//! # }
-//! ```
-//! 
-//! ### General-purpose Timer
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! use esp_hal::timer::systimer::{
-//!     Alarm,
-//!     FrozenUnit,
-//!     SpecificUnit,
-//!     SystemTimer,
-//! };
-//!
-//! let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
-//!
-//! // Get the current tick count:
-//! let now = SystemTimer::now();
-//!
-//! let frozen_unit = FrozenUnit::new(&mut systimer.unit0);
-//! let alarm0 = Alarm::new(systimer.comparator0, &frozen_unit);
-//!
-//! alarm0.set_target(
-//!     SystemTimer::now() + SystemTimer::ticks_per_second() * 2
-//! );
-//! alarm0.enable_interrupt(true);
-//!
-//! while !alarm0.is_interrupt_set() {
-//!     // Wait for the interrupt to be set
-//! }
-//!
-//! alarm0.clear_interrupt();
-//! # }
-//! ```
+//! It is recommended to pass the [`Alarm`]'s into a high level driver like
+//! [`OneShotTimer`](super::OneShotTimer) and
+//! [`PeriodicTimer`](super::PeriodicTimer). Using the System timer directly is
+//! only possible through the low level [`Timer`](crate::timer::Timer) trait.
 
-use core::{
-    fmt::{Debug, Formatter},
-    marker::PhantomData,
-    ptr::addr_of_mut,
-};
+use core::fmt::Debug;
 
-use fugit::{Instant, MicrosDurationU32, MicrosDurationU64};
+use fugit::{Instant, MicrosDurationU64};
 
 use super::{Error, Timer as _};
 use crate::{
@@ -83,33 +28,35 @@ use crate::{
     peripherals::{Interrupt, SYSTIMER},
     sync::{lock, Lock},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
-    Async,
-    Blocking,
     Cpu,
-    InterruptConfigurable,
-    Mode,
 };
 
-/// System Timer driver.
-pub struct SystemTimer<'d> {
-    /// Unit 0
-    pub unit0: SpecificUnit<'d, 0>,
+/// The configuration of a unit.
+#[derive(Copy, Clone)]
+pub enum UnitConfig {
+    /// Unit is not counting.
+    Disabled,
 
-    #[cfg(not(esp32s2))]
-    /// Unit 1
-    pub unit1: SpecificUnit<'d, 1>,
+    /// Unit is counting unless the Cpu is stalled.
+    DisabledIfCpuIsStalled(Cpu),
 
-    /// Comparator 0.
-    pub comparator0: SpecificComparator<'d, 0>,
-
-    /// Comparator 1.
-    pub comparator1: SpecificComparator<'d, 1>,
-
-    /// Comparator 2.
-    pub comparator2: SpecificComparator<'d, 2>,
+    /// Unit is counting.
+    Enabled,
 }
 
-impl<'d> SystemTimer<'d> {
+/// System Timer driver.
+pub struct SystemTimer {
+    /// Alarm 0.
+    pub alarm0: Alarm,
+
+    /// Alarm 1.
+    pub alarm1: Alarm,
+
+    /// Alarm 2.
+    pub alarm2: Alarm,
+}
+
+impl SystemTimer {
     cfg_if::cfg_if! {
         if #[cfg(esp32s2)] {
             /// Bitmask to be applied to the raw register value.
@@ -146,7 +93,7 @@ impl<'d> SystemTimer<'d> {
     }
 
     /// Create a new instance.
-    pub fn new(_systimer: impl Peripheral<P = SYSTIMER> + 'd) -> Self {
+    pub fn new(_systimer: SYSTIMER) -> Self {
         // Don't reset Systimer as it will break `time::now`, only enable it
         PeripheralClockControl::enable(PeripheralEnable::Systimer);
 
@@ -154,67 +101,49 @@ impl<'d> SystemTimer<'d> {
         etm::enable_etm();
 
         Self {
-            unit0: SpecificUnit::new(),
-            #[cfg(not(esp32s2))]
-            unit1: SpecificUnit::new(),
-            comparator0: SpecificComparator::new(),
-            comparator1: SpecificComparator::new(),
-            comparator2: SpecificComparator::new(),
+            alarm0: Alarm::new(0),
+            alarm1: Alarm::new(1),
+            alarm2: Alarm::new(2),
         }
     }
 
-    /// Get the current count of Unit 0 in the System Timer.
-    pub fn now() -> u64 {
+    /// Get the current count of the given unit in the System Timer.
+    pub fn unit_count(unit: Unit) -> u64 {
         // This should be safe to access from multiple contexts
         // worst case scenario the second accessor ends up reading
         // an older time stamp
 
-        let unit = unsafe { SpecificUnit::<'_, 0>::conjure() };
         unit.read_count()
     }
-}
 
-impl SystemTimer<'static> {
-    /// Split the System Timer into three alarms.
+    #[cfg(not(esp32s2))]
+    /// Configures when this counter can run.
+    /// It can be configured to stall or continue running when CPU stalls
+    /// or enters on-chip-debugging mode.
     ///
-    /// This is a convenience method to create `'static` alarms of the same
-    /// type. You are encouraged to use [Alarm::new] over this very specific
-    /// helper.
-    pub fn split<MODE>(self) -> SysTimerAlarms<MODE, Blocking> {
-        static mut UNIT0: Option<AnyUnit<'static>> = None;
-        let unit0 = unsafe { &mut *addr_of_mut!(UNIT0) };
-
-        let unit0 = unit0.insert(self.unit0.into());
-        let unit = FrozenUnit::new(unit0);
-
-        SysTimerAlarms {
-            alarm0: Alarm::new(self.comparator0.into(), &unit),
-            alarm1: Alarm::new(self.comparator1.into(), &unit),
-            alarm2: Alarm::new(self.comparator2.into(), &unit),
-            #[cfg(not(esp32s2))]
-            unit1: self.unit1,
-        }
+    /// # Safety
+    ///
+    /// - Disabling an `Unit` whilst [`Alarm`]'s are using it will affect the
+    ///   [`Alarm`]'s operation.
+    /// - Disabling Unit0 will affect [`now`](crate::time::now).
+    pub unsafe fn configure_unit(unit: Unit, config: UnitConfig) {
+        unit.configure(config)
     }
 
-    /// Split the System Timer into three alarms.
+    /// Set the value of the counter immediately. If the unit is at work,
+    /// the counter will continue to count up from the new reloaded value.
     ///
-    /// This is a convenience method to create `'static` alarms of the same
-    /// type. You are encouraged to use [Alarm::new_async] over this very
-    /// specific helper.
-    pub fn split_async<MODE>(self) -> SysTimerAlarms<MODE, Async> {
-        static mut UNIT0: Option<AnyUnit<'static>> = None;
-        let unit0 = unsafe { &mut *addr_of_mut!(UNIT0) };
-
-        let unit0 = unit0.insert(self.unit0.into());
-        let unit = FrozenUnit::new(unit0);
-
-        SysTimerAlarms {
-            alarm0: Alarm::new_async(self.comparator0.into(), &unit),
-            alarm1: Alarm::new_async(self.comparator1.into(), &unit),
-            alarm2: Alarm::new_async(self.comparator2.into(), &unit),
-            #[cfg(not(esp32s2))]
-            unit1: self.unit1,
-        }
+    /// This can be used to load back the sleep time recorded by RTC timer
+    /// via software after Light-sleep
+    ///
+    /// # Safety
+    ///
+    /// - Modifying a unit's count whilst [`Alarm`]'s are using it may cause
+    ///   unexpected behaviour
+    /// - Any modification of the unit0 count will affect
+    ///   [`now`](crate::time::now).
+    pub unsafe fn set_unit_count(unit: Unit, value: u64) {
+        unit.set_count(value)
     }
 }
 
@@ -222,14 +151,23 @@ impl SystemTimer<'static> {
 #[cfg_attr(esp32s2, doc = "64-bit")]
 #[cfg_attr(not(esp32s2), doc = "52-bit")]
 /// counter.
-pub trait Unit {
-    /// Returns the unit number.
-    fn channel(&self) -> u8;
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum Unit {
+    #[default]
+    /// Unit 0
+    Unit0 = 0,
+    #[cfg(not(esp32s2))]
+    /// Unit 1
+    Unit1 = 1,
+}
+
+impl Unit {
+    #[inline]
+    fn channel(&self) -> u8 {
+        *self as _
+    }
 
     #[cfg(not(esp32s2))]
-    /// Configures when this counter can run.
-    /// It can be configured to stall or continue running when CPU stalls
-    /// or enters on-chip-debugging mode
     fn configure(&self, config: UnitConfig) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         let conf = systimer.conf();
@@ -271,11 +209,6 @@ pub trait Unit {
         });
     }
 
-    /// Set the value of the counter immediately. If the unit is at work,
-    /// the counter will continue to count up from the new reloaded value.
-    ///
-    /// This can be used to load back the sleep time recorded by RTC timer
-    /// via software after Light-sleep
     fn set_count(&self, value: u64) {
         let systimer = unsafe { &*SYSTIMER::ptr() };
         #[cfg(not(esp32s2))]
@@ -303,7 +236,6 @@ pub trait Unit {
         }
     }
 
-    /// Reads the current counter value.
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
@@ -332,54 +264,26 @@ pub trait Unit {
     }
 }
 
-/// A specific [Unit]. i.e. Either unit 0 or unit 1.
+/// An alarm unit
 #[derive(Debug)]
-pub struct SpecificUnit<'d, const CHANNEL: u8>(PhantomData<&'d ()>);
-
-impl<const CHANNEL: u8> SpecificUnit<'_, CHANNEL> {
-    fn new() -> Self {
-        Self(PhantomData)
-    }
+pub struct Alarm {
+    comp: u8,
+    unit: Unit,
 }
 
-impl<const CHANNEL: u8> Unit for SpecificUnit<'_, CHANNEL> {
-    fn channel(&self) -> u8 {
-        CHANNEL
-    }
-}
-
-/// Any [Unit]. Could be either unit 0 or unit 1.
-#[derive(Debug)]
-pub struct AnyUnit<'d>(PhantomData<&'d ()>, u8);
-
-impl Unit for AnyUnit<'_> {
-    fn channel(&self) -> u8 {
-        self.1
-    }
-}
-
-impl<'d, const CHANNEL: u8> From<SpecificUnit<'d, CHANNEL>> for AnyUnit<'d> {
-    fn from(_value: SpecificUnit<'d, CHANNEL>) -> Self {
-        Self(PhantomData, CHANNEL)
-    }
-}
-
-impl<'d, const CHANNEL: u8> TryFrom<AnyUnit<'d>> for SpecificUnit<'d, CHANNEL> {
-    type Error = u8;
-
-    fn try_from(value: AnyUnit<'d>) -> Result<Self, Self::Error> {
-        if value.1 == CHANNEL {
-            Ok(SpecificUnit::new())
-        } else {
-            Err(value.1)
+impl Alarm {
+    const fn new(comp: u8) -> Self {
+        Alarm {
+            comp,
+            unit: Unit::Unit0,
         }
     }
-}
 
-/// A comparator that can generate alarms/interrupts based on values of a unit.
-pub trait Comparator {
     /// Returns the comparators number.
-    fn channel(&self) -> u8;
+    #[inline]
+    fn channel(&self) -> u8 {
+        self.comp
+    }
 
     /// Enables/disables the comparator. If enabled, this means
     /// it will generate interrupt based on its configuration.
@@ -431,12 +335,12 @@ pub trait Comparator {
 
     /// Sets the unit this comparator uses as a reference count.
     #[cfg(not(esp32s2))]
-    fn set_unit(&self, is_unit0: bool) {
+    pub fn set_unit(&self, unit: Unit) {
         let tconf = unsafe {
             let systimer = &*SYSTIMER::ptr();
             systimer.target_conf(self.channel() as usize)
         };
-        tconf.modify(|_, w| w.timer_unit_sel().bit(is_unit0));
+        tconf.modify(|_, w| w.timer_unit_sel().bit(matches!(unit, Unit::Unit0)));
     }
 
     /// Set the mode of the comparator to be either target or periodic.
@@ -494,18 +398,6 @@ pub trait Comparator {
             let comp_load = systimer.comp_load(self.channel() as usize);
             comp_load.write(|w| w.load().set_bit());
         }
-    }
-
-    /// Get the actual target value of the comparator.
-    fn actual_target(&self) -> u64 {
-        let target = unsafe {
-            let systimer = &*SYSTIMER::ptr();
-            systimer.trgt(self.channel() as usize)
-        };
-        let hi = target.hi().read().hi().bits();
-        let lo = target.lo().read().lo().bits();
-
-        ((hi as u64) << 32) | (lo as u64)
     }
 
     /// Set the interrupt handler for this comparator.
@@ -566,66 +458,9 @@ pub trait Comparator {
     }
 }
 
-/// A specific [Comparator]. i.e. Either comparator 0, comparator 1, etc.
-#[derive(Debug)]
-pub struct SpecificComparator<'d, const CHANNEL: u8>(PhantomData<&'d ()>);
-
-impl<const CHANNEL: u8> SpecificComparator<'_, CHANNEL> {
-    fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<const CHANNEL: u8> Comparator for SpecificComparator<'_, CHANNEL> {
-    fn channel(&self) -> u8 {
-        CHANNEL
-    }
-}
-
-/// Any [Comparator]. Could be either comparator 0, comparator 1, etc.
-#[derive(Debug)]
-pub struct AnyComparator<'d>(PhantomData<&'d ()>, u8);
-
-impl Comparator for AnyComparator<'_> {
-    fn channel(&self) -> u8 {
-        self.1
-    }
-}
-
-impl<'d, const CHANNEL: u8> From<SpecificComparator<'d, CHANNEL>> for AnyComparator<'d> {
-    fn from(_value: SpecificComparator<'d, CHANNEL>) -> Self {
-        Self(PhantomData, CHANNEL)
-    }
-}
-
-impl<'d, const CHANNEL: u8> TryFrom<AnyComparator<'d>> for SpecificComparator<'d, CHANNEL> {
-    type Error = u8;
-
-    fn try_from(value: AnyComparator<'d>) -> Result<Self, Self::Error> {
-        if value.1 == CHANNEL {
-            Ok(SpecificComparator::new())
-        } else {
-            Err(value.1)
-        }
-    }
-}
-
-/// The configuration of a unit.
-#[derive(Copy, Clone)]
-pub enum UnitConfig {
-    /// Unit is not counting.
-    Disabled,
-
-    /// Unit is counting unless the Cpu is stalled.
-    DisabledIfCpuIsStalled(Cpu),
-
-    /// Unit is counting.
-    Enabled,
-}
-
 /// The modes of a comparator.
 #[derive(Copy, Clone)]
-pub enum ComparatorMode {
+enum ComparatorMode {
     /// The comparator will generate interrupts periodically.
     Period,
 
@@ -634,208 +469,13 @@ pub enum ComparatorMode {
     Target,
 }
 
-impl SpecificUnit<'static, 0> {
-    /// Conjure a system timer unit out of thin air.
-    ///
-    /// # Safety
-    ///
-    /// Users must take care to ensure that only one reference to the unit is
-    /// in scope at any given time.
-    pub const unsafe fn conjure() -> Self {
-        Self(PhantomData)
-    }
-}
-
-#[cfg(not(esp32s2))]
-impl SpecificUnit<'static, 1> {
-    /// Conjure a system timer unit out of thin air.
-    ///
-    /// # Safety
-    ///
-    /// Users must take care to ensure that only one reference to the unit is
-    /// in scope at any given time.
-    pub const unsafe fn conjure() -> Self {
-        Self(PhantomData)
-    }
-}
-
-/// A unit whose value cannot be updated.
-pub struct FrozenUnit<'d, U: Unit>(&'d U);
-
-impl<'d, U: Unit> FrozenUnit<'d, U> {
-    /// Creates a frozen unit. You will no longer be allowed
-    /// direct access to this unit until all the alarms created
-    /// from the unit are dropped.
-    pub fn new(unit: &'d mut U) -> Self {
-        Self(unit)
-    }
-
-    fn borrow(&self) -> &'d U {
-        self.0
-    }
-}
-
-/// Alarms created from the System Timer peripheral.
-pub struct SysTimerAlarms<MODE, DM: Mode> {
-    /// Alarm 0
-    pub alarm0: Alarm<'static, MODE, DM>,
-    /// Alarm 1
-    pub alarm1: Alarm<'static, MODE, DM>,
-    /// Alarm 2
-    pub alarm2: Alarm<'static, MODE, DM>,
-
-    /// Unit 1
-    ///
-    /// Leftover unit which wasn't used to create the three alarms.
-    #[cfg(not(esp32s2))]
-    pub unit1: SpecificUnit<'static, 1>,
-}
-
-/// A marker for a [Alarm] in target mode.
-#[derive(Debug)]
-pub struct Target;
-
-/// A marker for a [Alarm] in periodic mode.
-#[derive(Debug)]
-pub struct Periodic;
-
-/// A single alarm.
-pub struct Alarm<'d, MODE, DM, COMP = AnyComparator<'d>, UNIT = AnyUnit<'d>>
-where
-    DM: Mode,
-{
-    comparator: COMP,
-    unit: &'d UNIT,
-    _pd: PhantomData<(MODE, DM)>,
-}
-
-impl<T, DM, COMP: Comparator, UNIT: Unit> Debug for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: Mode,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Alarm")
-            .field("comparator", &self.comparator.channel())
-            .field("unit", &self.unit.channel())
-            .finish()
-    }
-}
-
-impl<'d, T, COMP: Comparator, UNIT: Unit> Alarm<'d, T, Blocking, COMP, UNIT> {
-    /// Creates a new alarm from a comparator and unit, in blocking mode.
-    pub fn new(comparator: COMP, unit: &FrozenUnit<'d, UNIT>) -> Self {
-        Self {
-            comparator,
-            unit: unit.borrow(),
-            _pd: PhantomData,
-        }
-    }
-}
-
-impl<'d, T, COMP: Comparator, UNIT: Unit> Alarm<'d, T, Async, COMP, UNIT> {
-    /// Creates a new alarm from a comparator and unit, in async mode.
-    pub fn new_async(comparator: COMP, unit: &FrozenUnit<'d, UNIT>) -> Self {
-        Self {
-            comparator,
-            unit: unit.0,
-            _pd: PhantomData,
-        }
-    }
-}
-
-impl<T, COMP: Comparator, UNIT: Unit> InterruptConfigurable for Alarm<'_, T, Blocking, COMP, UNIT> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.comparator.set_interrupt_handler(handler)
-    }
-}
-
-impl<'d, DM, COMP: Comparator, UNIT: Unit> Alarm<'d, Target, DM, COMP, UNIT>
-where
-    DM: Mode,
-{
-    /// Set the target value of this [Alarm]
-    pub fn set_target(&self, timestamp: u64) {
-        #[cfg(esp32s2)]
-        unsafe {
-            let systimer = &*SYSTIMER::ptr();
-            // run at XTAL freq, not 80 * XTAL freq
-            systimer.step().write(|w| w.xtal_step().bits(0x1));
-        }
-
-        self.comparator.set_mode(ComparatorMode::Target);
-        self.comparator.set_target(timestamp);
-        self.comparator.set_enable(true);
-    }
-
-    /// Block waiting until the timer reaches the `timestamp`
-    pub fn wait_until(&self, timestamp: u64) {
-        self.clear_interrupt();
-        self.set_target(timestamp);
-
-        let r = unsafe { &*crate::peripherals::SYSTIMER::PTR }.int_raw();
-        loop {
-            if r.read().target(self.comparator.channel()).bit_is_set() {
-                break;
-            }
-        }
-    }
-
-    /// Converts this [Alarm] into [Periodic] mode
-    pub fn into_periodic(self) -> Alarm<'d, Periodic, DM, COMP, UNIT> {
-        Alarm {
-            comparator: self.comparator,
-            unit: self.unit,
-            _pd: PhantomData,
-        }
-    }
-}
-
-impl<'d, DM, COMP: Comparator, UNIT: Unit> Alarm<'d, Periodic, DM, COMP, UNIT>
-where
-    DM: Mode,
-{
-    /// Set the period of this [Alarm]
-    pub fn set_period(&self, period: MicrosDurationU32) {
-        #[cfg(esp32s2)]
-        unsafe {
-            let systimer = &*SYSTIMER::ptr();
-            // run at XTAL freq, not 80 * XTAL freq
-            systimer.step().write(|w| w.xtal_step().bits(0x1));
-        }
-
-        let us = period.ticks();
-        let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000) as u32;
-
-        self.comparator.set_mode(ComparatorMode::Period);
-        self.comparator.set_period(ticks);
-        self.comparator.set_enable(true);
-    }
-
-    /// Converts this [Alarm] into [Target] mode
-    pub fn into_target(self) -> Alarm<'d, Target, DM, COMP, UNIT> {
-        Alarm {
-            comparator: self.comparator,
-            unit: self.unit,
-            _pd: PhantomData,
-        }
-    }
-}
-
-impl<T, DM, COMP: Comparator, UNIT: Unit> crate::private::Sealed for Alarm<'_, T, DM, COMP, UNIT> where
-    DM: Mode
-{
-}
-
-impl<T, DM, COMP: Comparator, UNIT: Unit> super::Timer for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: Mode,
-{
+impl super::Timer for Alarm {
     fn start(&self) {
-        self.comparator.set_enable(true);
+        self.set_enable(true);
     }
 
     fn stop(&self) {
-        self.comparator.set_enable(false);
+        self.set_enable(false);
     }
 
     fn reset(&self) {
@@ -856,7 +496,7 @@ where
     }
 
     fn is_running(&self) -> bool {
-        self.comparator.is_enabled()
+        self.is_enabled()
     }
 
     fn now(&self) -> Instant<u64, 1, 1_000_000> {
@@ -871,7 +511,7 @@ where
     }
 
     fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
-        let mode = self.comparator.mode();
+        let mode = self.mode();
 
         let us = value.ticks();
         let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000);
@@ -886,12 +526,12 @@ where
                 return Err(Error::InvalidTimeout);
             }
 
-            self.comparator.set_period(ticks as u32);
+            self.set_period(ticks as u32);
 
             // Clear and then set SYSTIMER_TARGETx_PERIOD_MODE to configure COMPx into
             // period mode
-            self.comparator.set_mode(ComparatorMode::Target);
-            self.comparator.set_mode(ComparatorMode::Period);
+            self.set_mode(ComparatorMode::Target);
+            self.set_mode(ComparatorMode::Period);
         } else {
             // Target mode
 
@@ -906,7 +546,7 @@ where
             let v = self.unit.read_count();
             let t = v + ticks;
 
-            self.comparator.set_target(t);
+            self.set_target(t);
         }
 
         Ok(())
@@ -919,28 +559,28 @@ where
         } else {
             ComparatorMode::Target
         };
-        self.comparator.set_mode(mode)
+        self.set_mode(mode)
     }
 
     fn enable_interrupt(&self, state: bool) {
         lock(&INT_ENA_LOCK, || {
             unsafe { &*SYSTIMER::PTR }
                 .int_ena()
-                .modify(|_, w| w.target(self.comparator.channel()).bit(state));
+                .modify(|_, w| w.target(self.channel()).bit(state));
         });
     }
 
     fn clear_interrupt(&self) {
         unsafe { &*SYSTIMER::PTR }
             .int_clr()
-            .write(|w| w.target(self.comparator.channel()).clear_bit_by_one());
+            .write(|w| w.target(self.channel()).clear_bit_by_one());
     }
 
     fn is_interrupt_set(&self) -> bool {
         unsafe { &*SYSTIMER::PTR }
             .int_raw()
             .read()
-            .target(self.comparator.channel())
+            .target(self.channel())
             .bit_is_set()
     }
 
@@ -949,21 +589,23 @@ where
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        self.comparator.set_interrupt_handler(handler);
+        self.set_interrupt_handler(handler);
     }
 }
 
-impl<T, DM, COMP: Comparator, UNIT: Unit> Peripheral for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: Mode,
-{
+impl Peripheral for Alarm {
     type P = Self;
 
     #[inline]
     unsafe fn clone_unchecked(&self) -> Self::P {
-        core::ptr::read(self as *const _)
+        Alarm {
+            comp: self.comp,
+            unit: self.unit,
+        }
     }
 }
+
+impl crate::private::Sealed for Alarm {}
 
 static CONF_LOCK: Lock = Lock::new();
 static INT_ENA_LOCK: Lock = Lock::new();
@@ -985,15 +627,15 @@ mod asynch {
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [const { AtomicWaker::new() }; NUM_ALARMS];
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct AlarmFuture<'a, COMP: Comparator, UNIT: Unit> {
-        alarm: &'a Alarm<'a, Target, crate::Async, COMP, UNIT>,
+    pub(crate) struct AlarmFuture<'a> {
+        alarm: &'a Alarm,
     }
 
-    impl<'a, COMP: Comparator, UNIT: Unit> AlarmFuture<'a, COMP, UNIT> {
-        pub(crate) fn new(alarm: &'a Alarm<'a, Target, crate::Async, COMP, UNIT>) -> Self {
+    impl<'a> AlarmFuture<'a> {
+        pub(crate) fn new(alarm: &'a Alarm) -> Self {
             alarm.clear_interrupt();
 
-            let (interrupt, handler) = match alarm.comparator.channel() {
+            let (interrupt, handler) = match alarm.channel() {
                 0 => (Interrupt::SYSTIMER_TARGET0, target0_handler),
                 1 => (Interrupt::SYSTIMER_TARGET1, target1_handler),
                 _ => (Interrupt::SYSTIMER_TARGET2, target2_handler),
@@ -1015,16 +657,16 @@ mod asynch {
             unsafe { &*crate::peripherals::SYSTIMER::PTR }
                 .int_ena()
                 .read()
-                .target(self.alarm.comparator.channel())
+                .target(self.alarm.channel())
                 .bit_is_clear()
         }
     }
 
-    impl<COMP: Comparator, UNIT: Unit> core::future::Future for AlarmFuture<'_, COMP, UNIT> {
+    impl core::future::Future for AlarmFuture<'_> {
         type Output = ();
 
         fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-            WAKERS[self.alarm.comparator.channel() as usize].register(ctx.waker());
+            WAKERS[self.alarm.channel() as usize].register(ctx.waker());
 
             if self.event_bit_is_clear() {
                 Poll::Ready(())
@@ -1034,27 +676,8 @@ mod asynch {
         }
     }
 
-    impl<COMP: Comparator, UNIT: Unit> embedded_hal_async::delay::DelayNs
-        for Alarm<'_, Target, crate::Async, COMP, UNIT>
-    {
-        async fn delay_ns(&mut self, nanos: u32) {
-            self.set_target(
-                self.unit.read_count()
-                    + (nanos as u64 * SystemTimer::ticks_per_second()).div_ceil(1_000_000_000),
-            );
-
-            AlarmFuture::new(self).await;
-        }
-
-        async fn delay_ms(&mut self, ms: u32) {
-            for _ in 0..ms {
-                self.delay_us(1000).await;
-            }
-        }
-    }
-
     #[handler]
-    fn target0_handler() {
+    pub(crate) fn target0_handler() {
         lock(&INT_ENA_LOCK, || {
             unsafe { &*crate::peripherals::SYSTIMER::PTR }
                 .int_ena()
@@ -1065,7 +688,7 @@ mod asynch {
     }
 
     #[handler]
-    fn target1_handler() {
+    pub(crate) fn target1_handler() {
         lock(&INT_ENA_LOCK, || {
             unsafe { &*crate::peripherals::SYSTIMER::PTR }
                 .int_ena()
@@ -1076,7 +699,7 @@ mod asynch {
     }
 
     #[handler]
-    fn target2_handler() {
+    pub(crate) fn target2_handler() {
         lock(&INT_ENA_LOCK, || {
             unsafe { &*crate::peripherals::SYSTIMER::PTR }
                 .int_ena()
@@ -1118,33 +741,28 @@ pub mod etm {
     use super::*;
 
     /// An ETM controlled SYSTIMER event
-    pub struct Event<'a, 'd, M, DM: crate::Mode, COMP, UNIT> {
-        alarm: &'a mut Alarm<'d, M, DM, COMP, UNIT>,
+    pub struct Event<'a> {
+        alarm: &'a mut Alarm,
     }
 
-    impl<'a, 'd, M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> Event<'a, 'd, M, DM, COMP, UNIT> {
+    impl<'a> Event<'a> {
         /// Creates an ETM event from the given [Alarm]
-        pub fn new(alarm: &'a mut Alarm<'d, M, DM, COMP, UNIT>) -> Self {
+        pub fn new(alarm: &'a mut Alarm) -> Self {
             Self { alarm }
         }
 
         /// Execute closure f with mutable access to the wrapped [Alarm].
-        pub fn with<R>(&self, f: impl FnOnce(&&'a mut Alarm<'d, M, DM, COMP, UNIT>) -> R) -> R {
+        pub fn with<R>(&self, f: impl FnOnce(&&'a mut Alarm) -> R) -> R {
             let alarm = &self.alarm;
             f(alarm)
         }
     }
 
-    impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::private::Sealed
-        for Event<'_, '_, M, DM, COMP, UNIT>
-    {
-    }
+    impl crate::private::Sealed for Event<'_> {}
 
-    impl<M, DM: crate::Mode, COMP: Comparator, UNIT: Unit> crate::etm::EtmEvent
-        for Event<'_, '_, M, DM, COMP, UNIT>
-    {
+    impl crate::etm::EtmEvent for Event<'_> {
         fn id(&self) -> u8 {
-            50 + self.alarm.comparator.channel()
+            50 + self.alarm.channel()
         }
     }
 

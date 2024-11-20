@@ -370,12 +370,9 @@ enum AnyTimerInner {
     /// Timer 1 of the TIMG1 peripheral in blocking mode.
     #[cfg(all(timg1, timg_timer1))]
     Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>),
-    /// Systimer Alarm in periodic mode with blocking behavior.
+    /// Systimer Alarm
     #[cfg(systimer)]
-    SystimerAlarmPeriodic(systimer::Alarm<'static, systimer::Periodic, Blocking>),
-    /// Systimer Target in periodic mode with blocking behavior.
-    #[cfg(systimer)]
-    SystimerAlarmTarget(systimer::Alarm<'static, systimer::Target, Blocking>),
+    SystimerAlarm(systimer::Alarm),
 }
 
 /// A type-erased timer
@@ -413,16 +410,9 @@ impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>> for An
 }
 
 #[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Periodic, Blocking>> for AnyTimer {
-    fn from(value: systimer::Alarm<'static, systimer::Periodic, Blocking>) -> Self {
-        Self(AnyTimerInner::SystimerAlarmPeriodic(value))
-    }
-}
-
-#[cfg(systimer)]
-impl From<systimer::Alarm<'static, systimer::Target, Blocking>> for AnyTimer {
-    fn from(value: systimer::Alarm<'static, systimer::Target, Blocking>) -> Self {
-        Self(AnyTimerInner::SystimerAlarmTarget(value))
+impl From<systimer::Alarm> for AnyTimer {
+    fn from(value: systimer::Alarm) -> Self {
+        Self(AnyTimerInner::SystimerAlarm(value))
     }
 }
 
@@ -437,9 +427,7 @@ impl Timer for AnyTimer {
             #[cfg(all(timg1,timg_timer1))]
             AnyTimerInner::Timg1Timer1(inner) => inner,
             #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarmPeriodic(inner) => inner,
-            #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarmTarget(inner) => inner,
+            AnyTimerInner::SystimerAlarm(inner) => inner,
         } {
             fn start(&self);
             fn stop(&self);
