@@ -96,6 +96,7 @@ impl EmbassyTimer {
                         interrupt_handler,
                         Priority::max(),
                     ));
+                    timer.enable_interrupt(true);
                     alarm.state = AlarmState::Initialized(timer);
 
                     remaining_timers
@@ -144,7 +145,6 @@ impl EmbassyTimer {
         if ts > now {
             let timeout = ts - now;
             unwrap!(timer.schedule(timeout));
-            timer.enable_interrupt(true);
             true
         } else {
             // If the timestamp is past, we return `false` to ask embassy to poll again
@@ -193,6 +193,7 @@ impl Driver for EmbassyTimer {
                             interrupt_handler,
                             Priority::max(),
                         ));
+                        timer.enable_interrupt(true);
                         AlarmState::Initialized(timer)
                     }
 
