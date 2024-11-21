@@ -123,6 +123,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
 
         // we do not care about race conditions between the load and store operations,
         // interrupts will only set this value to true.
+        // Acquire makes no sense but at this time it's slightly faster than Relaxed.
         if SIGNAL_WORK_THREAD_MODE[cpu].load(Ordering::Acquire) {
             // if there is work to do, exit critical section and loop back to polling
             unsafe {
@@ -149,7 +150,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         // interrupts will only set this value to true.
         critical_section::with(|_| {
             // if there is work to do, loop back to polling
-            if !SIGNAL_WORK_THREAD_MODE[cpu].load(Ordering::Acquire) {
+            if !SIGNAL_WORK_THREAD_MODE[cpu].load(Ordering::Relaxed) {
                 // if not, wait for interrupt
                 unsafe { core::arch::asm!("wfi") };
             }
