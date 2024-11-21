@@ -61,7 +61,7 @@
 //! config.de_idle_level = Level::Low;
 //! config.disable_black_region = false;
 //!
-//! let mut dpi = Dpi::new(lcd_cam.lcd, channel.tx, 1.MHz(), config)
+//! let mut dpi = Dpi::new(lcd_cam.lcd, channel, 1.MHz(), config)
 //!     .with_vsync(peripherals.GPIO3)
 //!     .with_hsync(peripherals.GPIO46)
 //!     .with_de(peripherals.GPIO17)
@@ -97,6 +97,7 @@
 //! ```
 
 use core::{
+    marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
@@ -120,14 +121,18 @@ use crate::{
 };
 
 /// Represents the RGB LCD interface.
-pub struct Dpi<'d> {
+pub struct Dpi<'d, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, Blocking, TxChannelFor<LCD_CAM>>,
+    _mode: PhantomData<DM>,
 }
 
-impl<'d> Dpi<'d> {
+impl<'d, DM> Dpi<'d, DM>
+where
+    DM: Mode,
+{
     /// Create a new instance of the RGB/DPI driver.
-    pub fn new<DM: Mode, CH>(
+    pub fn new<CH>(
         lcd: Lcd<'d, DM>,
         channel: impl Peripheral<P = CH> + 'd,
         frequency: HertzU32,
@@ -272,6 +277,7 @@ impl<'d> Dpi<'d> {
         Self {
             lcd_cam,
             tx_channel,
+            _mode: PhantomData,
         }
     }
 
@@ -523,7 +529,7 @@ impl<'d> Dpi<'d> {
         mut self,
         next_frame_en: bool,
         mut buf: TX,
-    ) -> Result<DpiTransfer<'d, TX>, (DmaError, Self, TX)> {
+    ) -> Result<DpiTransfer<'d, TX, DM>, (DmaError, Self, TX)> {
         let result = unsafe {
             self.tx_channel
                 .prepare_transfer(DmaPeripheral::LcdCam, &mut buf)
@@ -562,12 +568,12 @@ impl<'d> Dpi<'d> {
 
 /// Represents an ongoing (or potentially finished) transfer using the RGB LCD
 /// interface
-pub struct DpiTransfer<'d, BUF: DmaTxBuffer> {
-    dpi: ManuallyDrop<Dpi<'d>>,
+pub struct DpiTransfer<'d, BUF: DmaTxBuffer, DM: Mode> {
+    dpi: ManuallyDrop<Dpi<'d, DM>>,
     buffer_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, BUF: DmaTxBuffer> DpiTransfer<'d, BUF> {
+impl<'d, BUF: DmaTxBuffer, DM: Mode> DpiTransfer<'d, BUF, DM> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         self.dpi
@@ -579,7 +585,7 @@ impl<'d, BUF: DmaTxBuffer> DpiTransfer<'d, BUF> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(mut self) -> (Dpi<'d>, BUF) {
+    pub fn stop(mut self) -> (Dpi<'d, DM>, BUF) {
         self.stop_peripherals();
         let (dpi, view) = self.release();
         (dpi, BUF::from_view(view))
@@ -589,7 +595,7 @@ impl<'d, BUF: DmaTxBuffer> DpiTransfer<'d, BUF> {
     ///
     /// Note: If you specified `next_frame_en` as true in [Dpi::send], you're
     /// just waiting for a DMA error when you call this.
-    pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, DM>, BUF) {
         while !self.is_done() {
             core::hint::spin_loop();
         }
@@ -612,7 +618,7 @@ impl<'d, BUF: DmaTxBuffer> DpiTransfer<'d, BUF> {
         (result, dpi, BUF::from_view(view))
     }
 
-    fn release(mut self) -> (Dpi<'d>, BUF::View) {
+    fn release(mut self) -> (Dpi<'d, DM>, BUF::View) {
         // SAFETY: Since forget is called on self, we know that self.dpi and
         // self.buffer_view won't be touched again.
         let result = unsafe {
@@ -636,7 +642,7 @@ impl<'d, BUF: DmaTxBuffer> DpiTransfer<'d, BUF> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer> Deref for DpiTransfer<'d, BUF> {
+impl<'d, BUF: DmaTxBuffer, DM: Mode> Deref for DpiTransfer<'d, BUF, DM> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -644,13 +650,13 @@ impl<'d, BUF: DmaTxBuffer> Deref for DpiTransfer<'d, BUF> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer> DerefMut for DpiTransfer<'d, BUF> {
+impl<'d, BUF: DmaTxBuffer, DM: Mode> DerefMut for DpiTransfer<'d, BUF, DM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<'d, BUF: DmaTxBuffer> Drop for DpiTransfer<'d, BUF> {
+impl<'d, BUF: DmaTxBuffer, DM: Mode> Drop for DpiTransfer<'d, BUF, DM> {
     fn drop(&mut self) {
         self.stop_peripherals();
 
