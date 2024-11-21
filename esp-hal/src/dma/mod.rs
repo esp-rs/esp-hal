@@ -1847,7 +1847,7 @@ where
                 #[cfg(esp32s3)]
                 external_memory_block_size: None,
                 direction: TransferDirection::In,
-                burst_transfer: BurstTransfer::Disabled,
+                burst_transfer: BurstConfig::Disabled,
                 check_owner: Some(false),
             },
             peri,
@@ -2142,7 +2142,7 @@ where
                 #[cfg(esp32s3)]
                 external_memory_block_size: None,
                 direction: TransferDirection::Out,
-                burst_transfer: BurstTransfer::Disabled,
+                burst_transfer: BurstConfig::Disabled,
                 check_owner: Some(false),
             },
             peri,
@@ -2227,7 +2227,7 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     /// Enable/Disable INCR burst transfer for channel reading
     /// accessing data in internal RAM.
-    fn set_burst_mode(&self, burst_mode: BurstTransfer);
+    fn set_burst_mode(&self, burst_mode: BurstConfig);
 
     /// Enable/Disable burst transfer for channel reading
     /// descriptors in internal RAM.

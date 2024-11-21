@@ -11,7 +11,7 @@ use crate::soc::is_slice_in_psram;
 /// Burst transfer configuration.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum BurstTransfer {
+pub enum BurstConfig {
     /// Burst mode is disabled.
     Disabled,
 
@@ -19,7 +19,7 @@ pub enum BurstTransfer {
     Enabled,
 }
 
-impl BurstTransfer {
+impl BurstConfig {
     pub(super) fn is_burst_enabled(self) -> bool {
         !matches!(self, Self::Disabled)
     }
@@ -66,7 +66,7 @@ pub struct Preparation {
     /// [`TransferDirection::Out`] burst transfers, but
     /// [`TransferDirection::In`] transfers require all descriptors to have
     /// buffer pointers and sizes that are a multiple of 4 (word aligned).
-    pub burst_transfer: BurstTransfer,
+    pub burst_transfer: BurstConfig,
 
     /// Configures the "check owner" feature of the DMA channel.
     ///
@@ -375,7 +375,7 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
             #[cfg(esp32s3)]
             external_memory_block_size: self.block_size,
             // TODO: support burst transfers.
-            burst_transfer: BurstTransfer::Disabled,
+            burst_transfer: BurstConfig::Disabled,
             check_owner: None,
         }
     }
@@ -531,7 +531,7 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
             // TODO: DmaRxBuf doesn't currently enforce the alignment requirements required for
             // bursting. In the future, it could either enforce the alignment or
             // calculate if the alignment requirements happen to be met.
-            burst_transfer: BurstTransfer::Disabled,
+            burst_transfer: BurstConfig::Disabled,
             check_owner: None,
         }
     }
@@ -663,7 +663,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             external_memory_block_size: None,
 
             // TODO: This is TX, the DMA channel is free to do a burst transfer.
-            burst_transfer: BurstTransfer::Disabled,
+            burst_transfer: BurstConfig::Disabled,
             check_owner: None,
         }
     }
@@ -699,7 +699,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 
             // TODO: DmaRxTxBuf doesn't currently enforce the alignment requirements required for
             // bursting.
-            burst_transfer: BurstTransfer::Disabled,
+            burst_transfer: BurstConfig::Disabled,
             check_owner: None,
         }
     }
@@ -844,7 +844,7 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
 
             // TODO: DmaRxStreamBuf doesn't currently enforce the alignment requirements required
             // for bursting.
-            burst_transfer: BurstTransfer::Disabled,
+            burst_transfer: BurstConfig::Disabled,
 
             // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
             // implementation doesn't rely on the DMA checking for descriptor ownership.
@@ -1057,7 +1057,7 @@ unsafe impl DmaTxBuffer for EmptyBuf {
             direction: TransferDirection::Out,
             #[cfg(esp32s3)]
             external_memory_block_size: None,
-            burst_transfer: BurstTransfer::Disabled,
+            burst_transfer: BurstConfig::Disabled,
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
             // channel does *NOT* check for ownership, otherwise the channel will return an error.
@@ -1088,7 +1088,7 @@ unsafe impl DmaRxBuffer for EmptyBuf {
             direction: TransferDirection::In,
             #[cfg(esp32s3)]
             external_memory_block_size: None,
-            burst_transfer: BurstTransfer::Disabled,
+            burst_transfer: BurstConfig::Disabled,
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
             // channel does *NOT* check for ownership, otherwise the channel will return an error.
@@ -1167,7 +1167,7 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
             // TODO: support external memory access.
             #[cfg(esp32s3)]
             external_memory_block_size: None,
-            burst_transfer: BurstTransfer::Disabled,
+            burst_transfer: BurstConfig::Disabled,
             // The DMA must not check the owner bit, as it is never set.
             check_owner: Some(false),
         }

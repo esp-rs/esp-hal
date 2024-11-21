@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- The `configure` DMA channel functions has been removed (#2403)
+- The `configure` and `configure_for_async` DMA channel functions has been removed (#2403)
 
 ## [0.22.0] - 2024-11-20
 
