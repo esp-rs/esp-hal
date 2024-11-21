@@ -3,7 +3,7 @@ use crate::{
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
-impl<'d> Aes<'d> {
+impl Aes<'_> {
     pub(super) fn init(&mut self) {
         PeripheralClockControl::enable(PeripheralEnable::Aes);
         self.write_dma(false);
@@ -18,10 +18,9 @@ impl<'d> Aes<'d> {
     }
 
     fn write_dma(&mut self, enable_dma: bool) {
-        match enable_dma {
-            true => self.aes.dma_enable().write(|w| w.dma_enable().set_bit()),
-            false => self.aes.dma_enable().write(|w| w.dma_enable().clear_bit()),
-        };
+        self.aes
+            .dma_enable()
+            .write(|w| w.dma_enable().bit(enable_dma));
     }
 
     pub(super) fn write_key(&mut self, key: &[u8]) {

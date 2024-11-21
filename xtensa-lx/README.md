@@ -5,13 +5,7 @@
 ![Crates.io](https://img.shields.io/crates/l/xtensa-lx?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-Low level access to Xtensa LX processors. This crate currently supports the following CPUs:
-
-| Feature   | Supported CPUs   |
-| --------- | ---------------- |
-| `esp32`   | ESP32 (_LX6_)    |
-| `esp32s2` | ESP32-S2 (_LX7_) |
-| `esp32s3` | ESP32-S3 (_LX7_) |
+Low level access to Xtensa LX processors.
 
 ## [Documentation](https://docs.rs/crate/xtensa-lx)
 

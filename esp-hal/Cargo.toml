@@ -45,13 +45,11 @@ nb                       = "1.1.0"
 paste                    = "1.0.15"
 portable-atomic          = { version = "1.9.0", default-features = false }
 procmacros               = { version = "0.15.0", features = ["enum-dispatch", "interrupt", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-riscv                    = { version = "0.12.1", optional = true }
 strum                    = { version = "0.26.3", default-features = false, features = ["derive"] }
 void                     = { version = "1.0.2", default-features = false }
 usb-device               = { version = "0.3.2", optional = true }
 rand_core                = "0.6.4"
 ufmt-write               = "0.1.0"
-xtensa-lx                = { version = "0.9.0", optional = true }
 
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
@@ -65,10 +63,14 @@ esp32s2 = { version = "0.25.0", features = ["critical-section", "rt"], optional 
 esp32s3 = { version = "0.29.0", features = ["critical-section", "rt"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
-esp-riscv-rt = { version = "0.9.1", path = "../esp-riscv-rt" }
+riscv            = { version = "0.12.1" }
+esp-riscv-rt     = { version = "0.9.1", path = "../esp-riscv-rt" }
+critical-section = { version = "1.2.0", features = ["restore-state-u8"] }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx-rt = { version = "0.17.2", path = "../xtensa-lx-rt" }
+xtensa-lx        = { version = "0.9.0", path = "../xtensa-lx" }
+xtensa-lx-rt     = { version = "0.17.2", path = "../xtensa-lx-rt" }
+critical-section = { version = "1.2.0", features = ["restore-state-u32"] }
 
 [build-dependencies]
 basic-toml   = "0.1.9"
@@ -80,9 +82,6 @@ serde        = { version = "1.0.215", features = ["derive"] }
 
 [features]
 default = []
-
-riscv  = ["dep:riscv",     "critical-section/restore-state-u8"]
-xtensa = ["dep:xtensa-lx", "critical-section/restore-state-u32"]
 
 bluetooth = []
 
@@ -105,19 +104,19 @@ log = ["dep:log"]
 
 # Chip Support Feature Flags
 # Target the ESP32.
-esp32   = ["dep:esp32",   "xtensa", "xtensa-lx/spin", "xtensa-lx-rt/esp32"]
+esp32   = ["dep:esp32",   "xtensa-lx-rt/esp32"]
 # Target the ESP32-C2.
-esp32c2 = ["dep:esp32c2", "riscv",  "portable-atomic/unsafe-assume-single-core"]
+esp32c2 = ["dep:esp32c2", "portable-atomic/unsafe-assume-single-core"]
 # Target the ESP32-C3.
-esp32c3 = ["dep:esp32c3", "riscv",  "portable-atomic/unsafe-assume-single-core", "esp-riscv-rt/rtc-ram"]
+esp32c3 = ["dep:esp32c3", "portable-atomic/unsafe-assume-single-core", "esp-riscv-rt/rtc-ram"]
 # Target the ESP32-C6.
-esp32c6 = ["dep:esp32c6", "riscv",  "procmacros/has-lp-core", "esp-riscv-rt/rtc-ram"]
+esp32c6 = ["dep:esp32c6", "procmacros/has-lp-core", "esp-riscv-rt/rtc-ram"]
 # Target the ESP32-H2.
-esp32h2 = ["dep:esp32h2", "riscv", "esp-riscv-rt/rtc-ram"]
+esp32h2 = ["dep:esp32h2", "esp-riscv-rt/rtc-ram"]
 # Target the ESP32-S2.
-esp32s2 = ["dep:esp32s2", "xtensa", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s2", "usb-otg"]
+esp32s2 = ["dep:esp32s2", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s2", "usb-otg"]
 # Target the ESP32-S3.
-esp32s3 = ["dep:esp32s3", "xtensa", "procmacros/has-ulp-core", "xtensa-lx/spin", "xtensa-lx-rt/esp32s3", "usb-otg"]
+esp32s3 = ["dep:esp32s3", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s3", "usb-otg"]
 
 #! ### RISC-V Exclusive Feature Flags
 ## Move the stack to start of RAM to get zero-cost stack overflow protection

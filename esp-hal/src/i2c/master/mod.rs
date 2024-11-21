@@ -601,10 +601,6 @@ impl<'a> I2cFuture<'a> {
 
             w.arbitration_lost().set_bit();
             w.time_out().set_bit();
-
-            #[cfg(esp32)]
-            w.ack_err().set_bit();
-            #[cfg(not(esp32))]
             w.nack().set_bit();
 
             w
@@ -635,13 +631,7 @@ impl<'a> I2cFuture<'a> {
             return Err(Error::TimeOut);
         }
 
-        #[cfg(not(esp32))]
         if r.nack().bit_is_set() {
-            return Err(Error::AckCheckFailed);
-        }
-
-        #[cfg(esp32)]
-        if r.ack_err().bit_is_set() {
             return Err(Error::AckCheckFailed);
         }
 

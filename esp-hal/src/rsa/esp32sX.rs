@@ -44,16 +44,9 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     ///
     /// For more information refer to 20.3.4 of <https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf>.
     pub fn enable_disable_search_acceleration(&mut self, enable: bool) {
-        match enable {
-            true => self
-                .rsa
-                .search_enable()
-                .write(|w| w.search_enable().set_bit()),
-            false => self
-                .rsa
-                .search_enable()
-                .write(|w| w.search_enable().clear_bit()),
-        };
+        self.rsa
+            .search_enable()
+            .write(|w| w.search_enable().bit(enable));
     }
 
     /// Checks if the search functionality is enabled in the RSA hardware.
@@ -79,16 +72,9 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     ///
     /// For more information refer to 20.3.4 of <https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf>.
     pub fn enable_disable_constant_time_acceleration(&mut self, enable: bool) {
-        match enable {
-            true => self
-                .rsa
-                .constant_time()
-                .write(|w| w.constant_time().clear_bit()),
-            false => self
-                .rsa
-                .constant_time()
-                .write(|w| w.constant_time().set_bit()),
-        };
+        self.rsa
+            .constant_time()
+            .write(|w| w.constant_time().bit(!enable));
     }
 
     /// Starts the modular exponentiation operation.
