@@ -91,7 +91,7 @@
 //!         Ok(xfer) => xfer,
 //!         Err(_) => {
 //!             panic!("Failed to send buffer");
-//!             }
+//!         }
 //!     };
 //!     (parallel, tx_buf) = xfer.wait();
 //!     delay.delay_millis(10);
