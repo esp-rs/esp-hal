@@ -40,11 +40,15 @@
 //! # }
 //! ```
 
+use core::marker::PhantomData;
+
 use fugit::{ExtU64, Instant, MicrosDurationU64};
 
 use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
+    Blocking,
+    Mode,
 };
 
 #[cfg(systimer)]
@@ -109,21 +113,39 @@ pub trait Timer: crate::private::Sealed {
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<'d, T> {
+pub struct OneShotTimer<'d, M, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+    _ph: PhantomData<M>,
 }
 
-impl<'d, T> OneShotTimer<'d, T>
+impl<'d> OneShotTimer<'d, Blocking> {
+    /// Construct a new instance of [`OneShotTimer`].
+    pub fn new(
+        inner: impl Peripheral<P = impl Timer + Into<AnyTimer> + 'd> + 'd,
+    ) -> OneShotTimer<'d, Blocking> {
+        Self::new_typed(inner.map_into())
+    }
+}
+
+impl<'d, T> OneShotTimer<'d, Blocking, T>
 where
     T: Timer,
 {
-    /// Construct a new instance of [`OneShotTimer`].
-    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+    /// Construct a typed instance of [`OneShotTimer`].
+    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(inner);
-
-        Self { inner }
+        Self {
+            inner,
+            _ph: PhantomData,
+        }
     }
+}
 
+impl<'d, M, T> OneShotTimer<'d, M, T>
+where
+    M: Mode,
+    T: Timer,
+{
     /// Pauses execution for *at least* `ms` milliseconds.
     pub fn delay_millis(&self, ms: u32) {
         self.delay((ms as u64).millis());
@@ -199,10 +221,16 @@ where
     }
 }
 
-impl<T> crate::private::Sealed for OneShotTimer<'_, T> where T: Timer {}
-
-impl<T> InterruptConfigurable for OneShotTimer<'_, T>
+impl<M, T> crate::private::Sealed for OneShotTimer<'_, M, T>
 where
+    T: Timer,
+    M: Mode,
+{
+}
+
+impl<M, T> InterruptConfigurable for OneShotTimer<'_, M, T>
+where
+    M: Mode,
     T: Timer,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
@@ -212,6 +240,7 @@ where
 
 impl<T> embedded_hal::delay::DelayNs for OneShotTimer<'_, T>
 where
+    M: Mode,
     T: Timer,
 {
     fn delay_ns(&mut self, ns: u32) {
@@ -220,21 +249,39 @@ where
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<'d, T> {
+pub struct PeriodicTimer<'d, M, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
+    _ph: PhantomData<M>,
 }
 
-impl<'d, T> PeriodicTimer<'d, T>
+impl<'d> PeriodicTimer<'d, Blocking> {
+    /// Construct a new instance of [`PeriodicTimer`].
+    pub fn new(
+        inner: impl Peripheral<P = impl Timer + Into<AnyTimer> + 'd> + 'd,
+    ) -> PeriodicTimer<'d, Blocking> {
+        Self::new_typed(inner.map_into())
+    }
+}
+
+impl<'d, T> PeriodicTimer<'d, Blocking, T>
 where
     T: Timer,
 {
-    /// Construct a new instance of [`PeriodicTimer`].
-    pub fn new(inner: impl Peripheral<P = T> + 'd) -> Self {
+    /// Construct a typed instance of [`PeriodicTimer`].
+    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(inner);
-
-        Self { inner }
+        Self {
+            inner,
+            _ph: PhantomData,
+        }
     }
+}
 
+impl<'d, M, T> PeriodicTimer<'d, M, T>
+where
+    M: Mode,
+    T: Timer,
+{
     /// Start a new count down.
     pub fn start(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
         if self.inner.is_running() {
@@ -293,10 +340,11 @@ where
     }
 }
 
-impl<T> crate::private::Sealed for PeriodicTimer<'_, T> where T: Timer {}
+impl<M, T> crate::private::Sealed for PeriodicTimer<'_, M, T> where T: Timer {}
 
-impl<T> InterruptConfigurable for PeriodicTimer<'_, T>
+impl<M, T> InterruptConfigurable for PeriodicTimer<'_, M, T>
 where
+    M: Mode,
     T: Timer,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
@@ -313,23 +361,12 @@ enum AnyTimerInner {
     SystimerAlarm(systimer::Alarm),
 }
 
-/// A type-erased timer
-///
-/// You can create an instance of this by just calling `.into()` on a timer.
-pub struct AnyTimer(AnyTimerInner);
-
-impl crate::private::Sealed for AnyTimer {}
-
-impl From<timg::Timer> for AnyTimer {
-    fn from(value: timg::Timer) -> Self {
-        Self(AnyTimerInner::TimgTimer(value))
-    }
-}
-
-#[cfg(systimer)]
-impl From<systimer::Alarm> for AnyTimer {
-    fn from(value: systimer::Alarm) -> Self {
-        Self(AnyTimerInner::SystimerAlarm(value))
+crate::any_peripheral! {
+    /// Any Timer peripheral.
+    pub peripheral AnyTimer {
+        TimgTimer(timg::Timer),
+        #[cfg(systimer)]
+        SystimerAlarm(systimer::Alarm),
     }
 }
 
@@ -353,14 +390,5 @@ impl Timer for AnyTimer {
             fn is_interrupt_set(&self) -> bool;
             fn set_alarm_active(&self, state: bool);
         }
-    }
-}
-
-impl Peripheral for AnyTimer {
-    type P = Self;
-
-    #[inline]
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        core::ptr::read(self as *const _)
     }
 }

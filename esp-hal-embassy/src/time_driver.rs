@@ -7,6 +7,7 @@ use esp_hal::{
     sync::Locked,
     time::now,
     timer::{AnyTimer, OneShotTimer},
+    Blocking,
 };
 
 pub type Timer = OneShotTimer<'static, AnyTimer>;
