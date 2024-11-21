@@ -942,7 +942,9 @@ impl<'d> Dma<'d> {
     pub fn new(
         dma: impl crate::peripheral::Peripheral<P = crate::peripherals::DMA> + 'd,
     ) -> Dma<'d> {
-        PeripheralClockControl::enable(Peripheral::Dma);
+        if PeripheralClockControl::enable(Peripheral::Dma) {
+            PeripheralClockControl::reset(Peripheral::Dma);
+        }
 
         #[cfg(esp32)]
         {

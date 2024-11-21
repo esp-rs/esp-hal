@@ -100,7 +100,7 @@ use crate::{
     gpio::interconnect::PeripheralOutput,
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
     Async,
     Blocking,
     InterruptConfigurable,
@@ -284,8 +284,11 @@ where
         // could be configured totally independently but for now handle all
         // the targets the same and force same configuration for both, TX and RX
 
-        PeripheralClockControl::reset(i2s.peripheral());
-        PeripheralClockControl::enable(i2s.peripheral());
+        // make sure the peripheral is enabled before configuring it
+        let peripheral = i2s.peripheral();
+        let rx_guard = PeripheralGuard::new(peripheral);
+        let tx_guard = PeripheralGuard::new(peripheral);
+
         i2s.set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));
         i2s.configure(&standard, &data_format);
         i2s.set_master();
@@ -297,11 +300,13 @@ where
                 i2s: unsafe { i2s.clone_unchecked() },
                 rx_channel: channel.rx,
                 descriptors: rx_descriptors,
+                guard: rx_guard,
             },
             i2s_tx: TxCreator {
                 i2s,
                 tx_channel: channel.tx,
                 descriptors: tx_descriptors,
+                guard: tx_guard,
             },
         }
     }
@@ -432,11 +437,13 @@ where
                 i2s: self.i2s_rx.i2s,
                 rx_channel: self.i2s_rx.rx_channel.into_async(),
                 descriptors: self.i2s_rx.descriptors,
+                guard: self.i2s_rx.guard,
             },
             i2s_tx: TxCreator {
                 i2s: self.i2s_tx.i2s,
                 tx_channel: self.i2s_tx.tx_channel.into_async(),
                 descriptors: self.i2s_tx.descriptors,
+                guard: self.i2s_tx.guard,
             },
         }
     }
@@ -465,6 +472,7 @@ where
     i2s: PeripheralRef<'d, T>,
     tx_channel: ChannelTx<'d, DmaMode, T::Dma>,
     tx_chain: DescriptorChain,
+    _guard: PeripheralGuard,
 }
 
 impl<DmaMode, T> core::fmt::Debug for I2sTx<'_, DmaMode, T>
@@ -597,6 +605,7 @@ where
     i2s: PeripheralRef<'d, T>,
     rx_channel: ChannelRx<'d, DmaMode, T::Dma>,
     rx_chain: DescriptorChain,
+    _guard: PeripheralGuard,
 }
 
 impl<DmaMode, T> core::fmt::Debug for I2sRx<'_, DmaMode, T>
@@ -742,6 +751,7 @@ mod private {
         I2sInterrupt,
         I2sRx,
         I2sTx,
+        PeripheralGuard,
         RegisterAccess,
         Standard,
         I2S_LL_MCLK_DIVIDER_MAX,
@@ -774,6 +784,7 @@ mod private {
         pub i2s: PeripheralRef<'d, T>,
         pub tx_channel: ChannelTx<'d, M, T::Dma>,
         pub descriptors: &'static mut [DmaDescriptor],
+        pub(crate) guard: PeripheralGuard,
     }
 
     impl<'d, M, T> TxCreator<'d, M, T>
@@ -782,10 +793,12 @@ mod private {
         T: RegisterAccess,
     {
         pub fn build(self) -> I2sTx<'d, M, T> {
+            let peripheral = self.i2s.peripheral();
             I2sTx {
                 i2s: self.i2s,
                 tx_channel: self.tx_channel,
                 tx_chain: DescriptorChain::new(self.descriptors),
+                _guard: PeripheralGuard::new(peripheral),
             }
         }
 
@@ -831,6 +844,7 @@ mod private {
         pub i2s: PeripheralRef<'d, T>,
         pub rx_channel: ChannelRx<'d, M, T::Dma>,
         pub descriptors: &'static mut [DmaDescriptor],
+        pub(crate) guard: PeripheralGuard,
     }
 
     impl<'d, M, T> RxCreator<'d, M, T>
@@ -839,10 +853,12 @@ mod private {
         T: RegisterAccess,
     {
         pub fn build(self) -> I2sRx<'d, M, T> {
+            let peripheral = self.i2s.peripheral();
             I2sRx {
                 i2s: self.i2s,
                 rx_channel: self.rx_channel,
                 rx_chain: DescriptorChain::new(self.descriptors),
+                _guard: PeripheralGuard::new(peripheral),
             }
         }
 

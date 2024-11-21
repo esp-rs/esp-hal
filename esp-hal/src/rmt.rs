@@ -94,7 +94,7 @@ use crate::{
     peripheral::Peripheral,
     peripherals::Interrupt,
     soc::constants,
-    system::PeripheralClockControl,
+    system::{self, GenericPeripheralGuard},
     Async,
     Blocking,
     InterruptConfigurable,
@@ -227,9 +227,6 @@ where
         if frequency != HertzU32::MHz(80) {
             return Err(Error::UnreachableTargetFrequency);
         }
-
-        PeripheralClockControl::reset(crate::system::Peripheral::Rmt);
-        PeripheralClockControl::enable(crate::system::Peripheral::Rmt);
 
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
@@ -603,7 +600,10 @@ macro_rules! impl_rx_channel_creator {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use crate::peripheral::{Peripheral, PeripheralRef};
+    use crate::{
+        peripheral::{Peripheral, PeripheralRef},
+        system::GenericPeripheralGuard,
+    };
 
     /// RMT Instance
     pub struct Rmt<'d, M>
@@ -635,15 +635,19 @@ mod impl_for_chip {
                 peripheral,
                 channel0: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel1: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel2: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel3: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 phantom: PhantomData,
             }
@@ -656,6 +660,7 @@ mod impl_for_chip {
         M: crate::Mode,
     {
         phantom: PhantomData<M>,
+        _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
     }
 
     impl_tx_channel_creator!(0);
@@ -675,7 +680,10 @@ mod impl_for_chip {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use crate::peripheral::{Peripheral, PeripheralRef};
+    use crate::{
+        peripheral::{Peripheral, PeripheralRef},
+        system::GenericPeripheralGuard,
+    };
 
     /// RMT Instance
     pub struct Rmt<'d, M>
@@ -710,32 +718,39 @@ mod impl_for_chip {
             peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
         ) -> Self {
             crate::into_ref!(peripheral);
-
             Self {
                 peripheral,
                 channel0: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel1: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel2: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel3: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel4: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel5: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel6: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel7: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 phantom: PhantomData,
             }
@@ -748,6 +763,7 @@ mod impl_for_chip {
         M: crate::Mode,
     {
         phantom: PhantomData<M>,
+        _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
     }
 
     impl_tx_channel_creator!(0);
@@ -791,7 +807,10 @@ mod impl_for_chip {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use crate::peripheral::{Peripheral, PeripheralRef};
+    use crate::{
+        peripheral::{Peripheral, PeripheralRef},
+        system::GenericPeripheralGuard,
+    };
 
     /// RMT Instance
     pub struct Rmt<'d, M>
@@ -823,15 +842,19 @@ mod impl_for_chip {
                 peripheral,
                 channel0: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel1: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel2: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel3: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 phantom: PhantomData,
             }
@@ -844,6 +867,7 @@ mod impl_for_chip {
         M: crate::Mode,
     {
         phantom: PhantomData<M>,
+        _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
     }
 
     impl_tx_channel_creator!(0);
@@ -871,7 +895,10 @@ mod impl_for_chip {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use crate::peripheral::{Peripheral, PeripheralRef};
+    use crate::{
+        peripheral::{Peripheral, PeripheralRef},
+        system::GenericPeripheralGuard,
+    };
 
     /// RMT Instance
     pub struct Rmt<'d, M>
@@ -911,27 +938,35 @@ mod impl_for_chip {
                 peripheral,
                 channel0: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel1: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel2: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel3: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel4: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel5: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel6: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 channel7: ChannelCreator {
                     phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
                 },
                 phantom: PhantomData,
             }
@@ -944,6 +979,7 @@ mod impl_for_chip {
         M: crate::Mode,
     {
         phantom: PhantomData<M>,
+        _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
     }
 
     impl_tx_channel_creator!(0);
@@ -968,13 +1004,14 @@ mod impl_for_chip {
 }
 
 /// RMT Channel
-#[non_exhaustive]
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Channel<M, const CHANNEL: u8>
 where
     M: crate::Mode,
 {
     phantom: PhantomData<M>,
+    _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
 }
 
 /// Channel in TX mode
@@ -1594,8 +1631,10 @@ mod chip_specific {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
+                        let guard = GenericPeripheralGuard::new();
                         Self {
                             phantom: core::marker::PhantomData,
+                            _guard: guard,
                         }
                     }
 
@@ -1755,8 +1794,10 @@ mod chip_specific {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
+                        let guard = GenericPeripheralGuard::new();
                         Self {
                             phantom: core::marker::PhantomData,
+                            _guard: guard,
                         }
                     }
 
@@ -1944,8 +1985,10 @@ mod chip_specific {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
+                        let guard = GenericPeripheralGuard::new();
                         Self {
                             phantom: core::marker::PhantomData,
+                            _guard: guard,
                         }
                     }
 
@@ -2095,8 +2138,10 @@ mod chip_specific {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
+                        let guard = GenericPeripheralGuard::new();
                         Self {
                             phantom: core::marker::PhantomData,
+                            _guard: guard,
                         }
                     }
 

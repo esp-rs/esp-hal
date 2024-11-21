@@ -43,7 +43,7 @@ use crate::{
     gpio::InputSignal,
     peripheral::{Peripheral, PeripheralRef},
     peripherals,
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
 };
 
 #[doc(hidden)]
@@ -57,6 +57,7 @@ pub trait UsbDm: crate::private::Sealed {}
 /// USB peripheral.
 pub struct Usb<'d> {
     _usb0: PeripheralRef<'d, peripherals::USB0>,
+    _guard: GenericPeripheralGuard<{ PeripheralEnable::Usb as u8 }>,
 }
 
 impl<'d> Usb<'d> {
@@ -70,11 +71,11 @@ impl<'d> Usb<'d> {
         P: UsbDp + Send + Sync,
         M: UsbDm + Send + Sync,
     {
-        PeripheralClockControl::reset(PeripheralEnable::Usb);
-        PeripheralClockControl::enable(PeripheralEnable::Usb);
+        let guard = GenericPeripheralGuard::new();
 
         Self {
             _usb0: usb0.into_ref(),
+            _guard: guard,
         }
     }
 

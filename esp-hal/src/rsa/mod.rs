@@ -27,7 +27,7 @@ use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, RSA},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
     Async,
     Blocking,
     Cpu,
@@ -48,6 +48,7 @@ pub use rsa_spec_impl::operand_sizes;
 pub struct Rsa<'d, DM: crate::Mode> {
     rsa: PeripheralRef<'d, RSA>,
     phantom: PhantomData<DM>,
+    _guard: GenericPeripheralGuard<{ PeripheralEnable::Rsa as u8 }>,
 }
 
 impl<'d> Rsa<'d, Blocking> {
@@ -64,6 +65,7 @@ impl<'d> Rsa<'d, Blocking> {
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 }
@@ -87,6 +89,7 @@ impl<'d> Rsa<'d, Async> {
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 }
@@ -95,12 +98,12 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     fn new_internal(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
         crate::into_ref!(rsa);
 
-        PeripheralClockControl::reset(PeripheralEnable::Rsa);
-        PeripheralClockControl::enable(PeripheralEnable::Rsa);
+        let guard = GenericPeripheralGuard::new();
 
         Self {
             rsa,
             phantom: PhantomData,
+            _guard: guard,
         }
     }
 

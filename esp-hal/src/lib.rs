@@ -515,6 +515,8 @@ pub struct Config {
 /// This function sets up the CPU clock and watchdog, then, returns the
 /// peripherals and clocks.
 pub fn init(config: Config) -> Peripherals {
+    system::disable_peripherals();
+
     let mut peripherals = Peripherals::take();
 
     // RTC domain must be enabled before we try to disable

@@ -54,7 +54,7 @@ use crate::{
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
     peripherals::{self, Interrupt, PARL_IO},
-    system::PeripheralClockControl,
+    system::{self, GenericPeripheralGuard},
     Async,
     Blocking,
     InterruptConfigurable,
@@ -767,6 +767,7 @@ where
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
             tx_chain: DescriptorChain::new(self.descriptors),
+            _guard: self._guard,
         })
     }
 }
@@ -798,6 +799,7 @@ where
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
             tx_chain: DescriptorChain::new(self.descriptors),
+            _guard: self._guard,
         })
     }
 }
@@ -809,6 +811,7 @@ where
 {
     tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     tx_chain: DescriptorChain,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
 impl<DM> core::fmt::Debug for ParlIoTx<'_, DM>
@@ -836,6 +839,8 @@ where
         P: FullDuplex + RxPins + ConfigurePins,
         CP: RxClkPin,
     {
+        let guard = GenericPeripheralGuard::new();
+
         rx_pins.configure()?;
         clk_pin.configure();
 
@@ -845,6 +850,7 @@ where
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
             rx_chain: DescriptorChain::new(self.descriptors),
+            _guard: guard,
         })
     }
 }
@@ -874,6 +880,7 @@ where
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
             rx_chain: DescriptorChain::new(self.descriptors),
+            _guard: self._guard,
         })
     }
 }
@@ -885,6 +892,7 @@ where
 {
     rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     rx_chain: DescriptorChain,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
 impl<DM> core::fmt::Debug for ParlIoRx<'_, DM>
@@ -1007,6 +1015,8 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
         CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
         Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
+        let tx_guard = GenericPeripheralGuard::new();
+        let rx_guard = GenericPeripheralGuard::new();
         let dma_channel = Channel::<Blocking, CH>::from(dma_channel);
         internal_init(frequency)?;
 
@@ -1014,10 +1024,12 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
             tx: TxCreatorFullDuplex {
                 tx_channel: dma_channel.tx.degrade(),
                 descriptors: tx_descriptors,
+                _guard: tx_guard,
             },
             rx: RxCreatorFullDuplex {
                 rx_channel: dma_channel.rx.degrade(),
                 descriptors: rx_descriptors,
+                _guard: rx_guard,
             },
         })
     }
@@ -1028,10 +1040,12 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
             tx: TxCreatorFullDuplex {
                 tx_channel: self.tx.tx_channel.into_async(),
                 descriptors: self.tx.descriptors,
+                _guard: self.tx._guard,
             },
             rx: RxCreatorFullDuplex {
                 rx_channel: self.rx.rx_channel.into_async(),
                 descriptors: self.rx.descriptors,
+                _guard: self.rx._guard,
             },
         }
     }
@@ -1080,10 +1094,12 @@ impl<'d> ParlIoFullDuplex<'d, Async> {
             tx: TxCreatorFullDuplex {
                 tx_channel: self.tx.tx_channel.into_blocking(),
                 descriptors: self.tx.descriptors,
+                _guard: self.tx._guard,
             },
             rx: RxCreatorFullDuplex {
                 rx_channel: self.rx.rx_channel.into_blocking(),
                 descriptors: self.rx.descriptors,
+                _guard: self.rx._guard,
             },
         }
     }
@@ -1114,12 +1130,14 @@ where
     where
         CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
     {
+        let guard = GenericPeripheralGuard::new();
         internal_init(frequency)?;
 
         Ok(Self {
             tx: TxCreator {
                 tx_channel: dma_channel.tx.degrade(),
                 descriptors,
+                _guard: guard,
             },
         })
     }
@@ -1188,12 +1206,14 @@ where
     where
         CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
     {
+        let guard = GenericPeripheralGuard::new();
         internal_init(frequency)?;
 
         Ok(Self {
             rx: RxCreator {
                 rx_channel: dma_channel.rx.degrade(),
                 descriptors,
+                _guard: guard,
             },
         })
     }
@@ -1241,9 +1261,6 @@ fn internal_init(frequency: HertzU32) -> Result<(), Error> {
     if frequency.raw() > 40_000_000 {
         return Err(Error::UnreachableClockRate);
     }
-
-    PeripheralClockControl::reset(crate::system::Peripheral::ParlIo);
-    PeripheralClockControl::enable(crate::system::Peripheral::ParlIo);
 
     let pcr = unsafe { &*crate::peripherals::PCR::PTR };
 
@@ -1458,6 +1475,7 @@ where
 {
     tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
+    _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
 /// Creates a RX channel
@@ -1467,6 +1485,7 @@ where
 {
     rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
+    _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
 /// Creates a TX channel
@@ -1476,6 +1495,7 @@ where
 {
     tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
+    _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
 /// Creates a RX channel
@@ -1485,6 +1505,7 @@ where
 {
     rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
     descriptors: &'static mut [DmaDescriptor],
+    _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
 #[doc(hidden)]

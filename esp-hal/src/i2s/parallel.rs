@@ -60,7 +60,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
     private::Internal,
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
     Async,
     Mode,
 };
@@ -177,6 +177,7 @@ where
 {
     instance: PeripheralRef<'d, I>,
     tx_channel: ChannelTx<'d, DM, I::Dma>,
+    _guard: PeripheralGuard,
 }
 
 impl<'d, DM> I2sParallel<'d, DM>
@@ -220,8 +221,8 @@ where
         channel.runtime_ensure_compatible(&i2s);
         let channel = channel.degrade();
 
-        PeripheralClockControl::reset(i2s.peripheral());
-        PeripheralClockControl::enable(i2s.peripheral());
+        let guard = PeripheralGuard::new(i2s.peripheral());
+
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
@@ -232,6 +233,7 @@ where
         Self {
             instance: i2s,
             tx_channel: channel.tx,
+            _guard: guard,
         }
     }
 

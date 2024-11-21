@@ -82,6 +82,7 @@ use crate::{
     lcd_cam::{calculate_clkm, BitOrder, ByteOrder},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
+    system::{self, GenericPeripheralGuard},
     Blocking,
 };
 
@@ -121,12 +122,14 @@ pub enum VsyncFilterThreshold {
 pub struct Cam<'d> {
     /// The LCD_CAM peripheral reference for managing the camera functionality.
     pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,
+    pub(super) _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     rx_channel: ChannelRx<'d, Blocking, <LCD_CAM as DmaEligible>::Dma>,
+    _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 
 impl<'d> Camera<'d> {
@@ -187,6 +190,7 @@ impl<'d> Camera<'d> {
         Self {
             lcd_cam,
             rx_channel: channel.degrade(),
+            _guard: cam._guard,
         }
     }
 }

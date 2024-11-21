@@ -10,7 +10,12 @@
 //! ## Implementation State
 //! - RGB is not supported yet
 
-use crate::{peripheral::PeripheralRef, peripherals::LCD_CAM};
+use super::GenericPeripheralGuard;
+use crate::{
+    peripheral::PeripheralRef,
+    peripherals::LCD_CAM,
+    system::{self},
+};
 
 pub mod dpi;
 pub mod i8080;
@@ -22,6 +27,8 @@ pub struct Lcd<'d, DM: crate::Mode> {
 
     /// A marker for the mode of operation (blocking or asynchronous).
     pub(crate) _mode: core::marker::PhantomData<DM>,
+
+    pub(super) _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

@@ -8,7 +8,7 @@ use crate::efuse::Efuse;
 use crate::{
     peripheral::PeripheralRef,
     peripherals::APB_SARADC,
-    system::{Peripheral, PeripheralClockControl},
+    system::{GenericPeripheralGuard, Peripheral},
 };
 
 mod calibration;
@@ -396,6 +396,7 @@ pub struct Adc<'d, ADCI> {
     _adc: PeripheralRef<'d, ADCI>,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
+    _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI>
@@ -408,8 +409,7 @@ where
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
     ) -> Self {
-        PeripheralClockControl::reset(Peripheral::ApbSarAdc);
-        PeripheralClockControl::enable(Peripheral::ApbSarAdc);
+        let guard = GenericPeripheralGuard::new();
 
         unsafe { &*APB_SARADC::PTR }.ctrl().modify(|_, w| unsafe {
             w.start_force().set_bit();
@@ -422,6 +422,7 @@ where
             _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
+            _guard: guard,
         }
     }
 

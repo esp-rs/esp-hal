@@ -32,7 +32,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, ECC},
     reg_access::{AlignmentHelper, SocDependentEndianess},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{self, GenericPeripheralGuard},
     InterruptConfigurable,
 };
 
@@ -41,6 +41,7 @@ pub struct Ecc<'d, DM: crate::Mode> {
     ecc: PeripheralRef<'d, ECC>,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     phantom: PhantomData<DM>,
+    _guard: GenericPeripheralGuard<{ system::Peripheral::Ecc as u8 }>,
 }
 
 /// ECC interface error
@@ -102,13 +103,13 @@ impl<'d> Ecc<'d, crate::Blocking> {
     pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
         crate::into_ref!(ecc);
 
-        PeripheralClockControl::reset(PeripheralEnable::Ecc);
-        PeripheralClockControl::enable(PeripheralEnable::Ecc);
+        let guard = GenericPeripheralGuard::new();
 
         Self {
             ecc,
             alignment_helper: AlignmentHelper::default(),
             phantom: PhantomData,
+            _guard: guard,
         }
     }
 }
