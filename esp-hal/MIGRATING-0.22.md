@@ -16,17 +16,6 @@
 +.with_dma(dma_channel);
 ```
 
-```diff
-+dma_channel.set_priority(DmaPriority::Priority1);
- let mut spi = Spi::new_with_config(
-     peripherals.SPI2,
-     Config::default(),
- )
- // other setup
--.with_dma(dma_channel.configure(false, DmaPriority::Priority1));
-+.with_dma(dma_channel);
-```
-
 ## Timer changes
 
 The low level timers, `SystemTimer` and `TimerGroup` are now "dumb". They contain no logic for operating modes or trait implementations (except the low level `Timer` trait).
