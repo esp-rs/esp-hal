@@ -49,7 +49,7 @@ pub fn now() -> Instant {
     let (ticks, div) = {
         use crate::timer::systimer::{SystemTimer, Unit};
         // otherwise use SYSTIMER
-        let ticks = SystemTimer::unit_count(Unit::Unit0);
+        let ticks = SystemTimer::unit_value(Unit::Unit0);
         (ticks, (SystemTimer::ticks_per_second() / 1_000_000))
     };
 

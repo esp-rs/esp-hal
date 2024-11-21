@@ -108,7 +108,7 @@ impl SystemTimer {
     }
 
     /// Get the current count of the given unit in the System Timer.
-    pub fn unit_count(unit: Unit) -> u64 {
+    pub fn unit_value(unit: Unit) -> u64 {
         // This should be safe to access from multiple contexts
         // worst case scenario the second accessor ends up reading
         // an older time stamp
@@ -142,7 +142,7 @@ impl SystemTimer {
     ///   unexpected behaviour
     /// - Any modification of the unit0 count will affect
     ///   [`now`](crate::time::now).
-    pub unsafe fn set_unit_count(unit: Unit, value: u64) {
+    pub unsafe fn set_unit_value(unit: Unit, value: u64) {
         unit.set_count(value)
     }
 }
