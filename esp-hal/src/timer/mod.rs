@@ -45,7 +45,6 @@ use fugit::{ExtU64, Instant, MicrosDurationU64};
 use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
-    Blocking,
     InterruptConfigurable,
 };
 
@@ -360,16 +359,7 @@ impl<T> embedded_hal_02::timer::Periodic for PeriodicTimer<'_, T> where T: Timer
 /// An enum of all timer types
 enum AnyTimerInner {
     /// Timer 0 of the TIMG0 peripheral in blocking mode.
-    Timg0Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>),
-    /// Timer 1 of the TIMG0 peripheral in blocking mode.
-    #[cfg(timg_timer1)]
-    Timg0Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>),
-    /// Timer 0 of the TIMG1 peripheral in blocking mode.
-    #[cfg(timg1)]
-    Timg1Timer0(timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>),
-    /// Timer 1 of the TIMG1 peripheral in blocking mode.
-    #[cfg(all(timg1, timg_timer1))]
-    Timg1Timer1(timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>),
+    TimgTimer(timg::Timer),
     /// Systimer Alarm
     #[cfg(systimer)]
     SystimerAlarm(systimer::Alarm),
@@ -382,30 +372,9 @@ pub struct AnyTimer(AnyTimerInner);
 
 impl crate::private::Sealed for AnyTimer {}
 
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg0Timer0(value))
-    }
-}
-
-#[cfg(timg_timer1)]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG0>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg0Timer1(value))
-    }
-}
-
-#[cfg(timg1)]
-impl From<timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer0<crate::peripherals::TIMG1>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg1Timer0(value))
-    }
-}
-
-#[cfg(all(timg1, timg_timer1))]
-impl From<timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>> for AnyTimer {
-    fn from(value: timg::Timer<timg::Timer1<crate::peripherals::TIMG1>, Blocking>) -> Self {
-        Self(AnyTimerInner::Timg1Timer1(value))
+impl From<timg::Timer> for AnyTimer {
+    fn from(value: timg::Timer) -> Self {
+        Self(AnyTimerInner::TimgTimer(value))
     }
 }
 
@@ -419,13 +388,7 @@ impl From<systimer::Alarm> for AnyTimer {
 impl Timer for AnyTimer {
     delegate::delegate! {
         to match &self.0 {
-            AnyTimerInner::Timg0Timer0(inner) => inner,
-            #[cfg(timg_timer1)]
-            AnyTimerInner::Timg0Timer1(inner) => inner,
-            #[cfg(timg1)]
-            AnyTimerInner::Timg1Timer0(inner) => inner,
-            #[cfg(all(timg1,timg_timer1))]
-            AnyTimerInner::Timg1Timer1(inner) => inner,
+            AnyTimerInner::TimgTimer(inner) => inner,
             #[cfg(systimer)]
             AnyTimerInner::SystimerAlarm(inner) => inner,
         } {
