@@ -1,4 +1,4 @@
-use core::cell::{Cell, UnsafeCell};
+use core::cell::Cell;
 
 use embassy_time_driver::{AlarmHandle, Driver};
 use esp_hal::{
@@ -15,6 +15,19 @@ enum AlarmState {
     Created(extern "C" fn()),
     Allocated(extern "C" fn()),
     Initialized(&'static mut Timer),
+}
+impl AlarmState {
+    fn initialize(
+        timer: &'static mut OneShotTimer<'_, AnyTimer>,
+        interrupt_handler: extern "C" fn(),
+    ) -> AlarmState {
+        // If the driver is initialized, bind the interrupt handler to the
+        // timer. This ensures that alarms allocated after init are correctly
+        // bound to the core that created the executor.
+        timer.set_interrupt_handler(InterruptHandler::new(interrupt_handler, Priority::max()));
+        timer.enable_interrupt(true);
+        AlarmState::Initialized(timer)
+    }
 }
 
 struct AlarmInner {
@@ -90,14 +103,7 @@ impl EmbassyTimer {
                         not_enough_timers();
                     };
 
-                    // FIXME: we should track which core allocated an alarm and bind the
-                    // interrupt to that core.
-                    timer.set_interrupt_handler(InterruptHandler::new(
-                        interrupt_handler,
-                        Priority::max(),
-                    ));
-                    timer.enable_interrupt(true);
-                    alarm.state = AlarmState::Initialized(timer);
+                    alarm.state = AlarmState::initialize(timer, interrupt_handler);
 
                     remaining_timers
                 } else {
@@ -185,17 +191,7 @@ impl Driver for EmbassyTimer {
                 });
 
                 alarm.state = match timer {
-                    Some(timer) => {
-                        // If the driver is initialized, bind the interrupt handler to the
-                        // timer. This ensures that alarms allocated after init are correctly
-                        // bound to the core that created the executor.
-                        timer.set_interrupt_handler(InterruptHandler::new(
-                            interrupt_handler,
-                            Priority::max(),
-                        ));
-                        timer.enable_interrupt(true);
-                        AlarmState::Initialized(timer)
-                    }
+                    Some(timer) => AlarmState::initialize(timer, interrupt_handler),
 
                     None => {
                         // No timers are available yet, mark the alarm as allocated.
