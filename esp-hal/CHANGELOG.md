@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Removed
+- Remove more examples. Update doctests. (#2547)
 
 - The `configure` and `configure_for_async` DMA channel functions has been removed (#2403)
 - The DMA channel objects no longer have `tx` and `rx` fields. (#2526)
@@ -153,7 +154,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Io::new_with_priority` and `Io::new_no_bind_interrupt`. (#2486)
 - `parl_io::{no_clk_pin(), NoClkPin}` (#2531)
 - Removed `get_core` function in favour of `Cpu::current` (#2533)
-- Remove more examples. Update doctests. (#2547)
 
 ## [0.21.1]
 
