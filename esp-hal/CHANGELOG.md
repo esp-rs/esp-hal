@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SystemTimer::set_unit_count` & `SystemTimer::configure_unit` (#2576)
 - `SystemTimer::set_unit_value` & `SystemTimer::configure_unit` (#2576)
 - `SystemTimer::set_unit_count` & `SystemTimer::configure_unit` (#2576)
+- `SystemTimer::set_unit_value` & `SystemTimer::configure_unit` (#2576)
 
 ### Changed
 
