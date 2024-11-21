@@ -122,7 +122,7 @@ mod test {
         let mut spi = Spi::new_with_config(
             peripherals.SPI2,
             Config {
-                frequency: 100.kHz(),
+                frequency: 10000.kHz(),
                 mode: SpiMode::Mode0,
                 ..Config::default()
             },
@@ -137,7 +137,7 @@ mod test {
         let other_peripheral = Spi::new_with_config(
             peripherals.SPI3,
             Config {
-                frequency: 100.kHz(),
+                frequency: 10000.kHz(),
                 mode: SpiMode::Mode0,
                 ..Config::default()
             },
