@@ -137,7 +137,7 @@ drivers. It is now possible to execute half-duplex and full-duplex operations on
 ```diff
 - let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
 -     .with_pins(sck, mosi, miso, sio2, sio3, cs);
-+ let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
++ let mut spi = Spi::new(peripherals.SPI2) // or new_with_config
 +     .with_sck(sck)
 +     .with_cs(cs)
 +     .with_mosi(mosi)
