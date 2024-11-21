@@ -1618,7 +1618,7 @@ pub trait DmaChannel: Peripheral<P = Self> {
     fn set_priority(&self, priority: DmaPriority);
 
     /// Splits the DMA channel into its RX and TX halves.
-    #[cfg(any(not(esp32c2), not(esp32s3)))]
+    #[cfg(any(esp32c6, esp32h2, esp32s3))] // TODO relax this to allow splitting on all chips
     fn split(self) -> (Self::Rx, Self::Tx) {
         // This function is exposed safely on chips that have separate IN and OUT
         // interrupt handlers.
