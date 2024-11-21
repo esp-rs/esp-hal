@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `SystemTimer` no longer uses peripheral ref (#2576)
 - `SystemTimer::now` has been renamed `SystemTimer::unit_value(Unit)` (#2576)
+- `SystemTimer::now` has been renamed `SystemTimer::unit_count(Unit)` (#2576)
 
 ### Fixed
 
