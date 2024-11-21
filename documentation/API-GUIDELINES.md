@@ -15,20 +15,22 @@ The following paragraphs contain additional recommendations.
 
 ## Construction and Destruction of Drivers
 
-- Drivers should take peripherals via the `PeripheralRef` pattern - they don't consume peripherals directly.
-- If a driver requires pins, those pins should be configured using `fn with_signal_name(self, pin: impl Peripheral<P = InputConnection> + 'd) -> Self)` or `fn with_signal_name(self, pin: impl Peripheral<P = OutputConnection> + 'd) -> Self)`
+- Drivers must take peripherals via the `PeripheralRef` pattern - they don't consume peripherals directly.
+- If a driver requires pins, those pins must be configured using `fn with_signal_name(self, pin: impl Peripheral<P = InputConnection> + 'd) -> Self)` or `fn with_signal_name(self, pin: impl Peripheral<P = OutputConnection> + 'd) -> Self)`
 - If a driver supports multiple peripheral instances (for example, I2C0 is one such instance):
-  - The peripheral instance type should be positioned as the last type parameter of the driver type.
-  - The peripheral instance type should default to a type that supports any of the peripheral instances.
-  - The author is encouraged to use `crate::any_peripheral` to define the "any" peripheral instance type.
-  - The driver should implement a `new` constructor that automatically converts the peripheral instance into the any type, and a `new_typed` that preserves the peripheral type.
+  - The peripheral instance type must be positioned as the last type parameter of the driver type.
+  - The peripheral instance type must default to a type that supports any of the peripheral instances.
+  - The author must to use `crate::any_peripheral` to define the "any" peripheral instance type.
+  - The driver must implement a `new` constructor that automatically converts the peripheral instance into the any type, and a `new_typed` that preserves the peripheral type.
 - If a driver only supports a single peripheral instance, no instance type parameter is necessary.
-- If a driver implements both blocking and async operations, or only implements blocking operations, but may support asynchronous ones in the future, the driver's type signature should include a `crate::Mode` type parameter.
-- By default, constructors should configure the driver for blocking mode. The driver should implement `into_async` (and a matching `into_blocking`) function that reconfigures the driver.
-  - `into_async` should configure the driver and/or the associated DMA channels. This most often means enabling an interrupt handler.
-  - `into_blocking` should undo the configuration done by `into_async`.
-- The asynchronous driver implemntation should also expose the blocking methods (except for interrupt related functions).
-- Consider adding a `Drop` implementation resetting the peripheral to idle state.
+- If a driver implements both blocking and async operations, or only implements blocking operations, but may support asynchronous ones in the future, the driver's type signature must include a `crate::Mode` type parameter.
+- By default, constructors must configure the driver for blocking mode. The driver must implement `into_async` (and a matching `into_blocking`) function that reconfigures the driver.
+  - `into_async` must configure the driver and/or the associated DMA channels. This most often means enabling an interrupt handler.
+  - `into_blocking` must undo the configuration done by `into_async`.
+- The asynchronous driver implemntation must also expose the blocking methods (except for interrupt related functions).
+- Drivers must have a `Drop` implementation resetting the peripheral to idle state. There are some exceptions to this:
+  - GPIO where common usage is to "set and drop" so they can't be changed 
+  - Where we don't want to disable the peripheral as it's used internally, for example SYSTIMER is used by `time::now()` API. See `KEEP_ENABLED` in src/system.rs
 - Consider using a builder-like pattern for driver construction.
 
 ## Interoperability
@@ -41,8 +43,8 @@ The following paragraphs contain additional recommendations.
 
 ## API Surface
 
-- API documentation shouldn't be an afterthought.
-- Private details shouldn't leak into the public API, and should be made private where technically possible.
+- API documentation must be provided for every new driver and API.
+- Private details should not leak into the public API, and should be made private where technically possible.
   - Implementation details that _need_ to be public should be marked with `#[doc(hidden)]` and a comment as to why it needs to be public.
   - Functions which technically need to be public but shouldn't be callable by the user need to be sealed.
     - see [this example in Rust's core library](https://github.com/rust-lang/rust/blob/044a28a4091f2e1a5883f7fa990223f8b200a2cd/library/core/src/error.rs#L89-L100)
@@ -55,7 +57,6 @@ The following paragraphs contain additional recommendations.
     - These often lead to usability problems, and tend to just complicate things needlessly - sometimes it can be a good tradeoff to make a type not ZST
     - Common cases of useless type info is storing pin information - this is usually not required after configuring the pins and will bloat the complexity of the type massively. When following the `PeripheralRef` pattern it's not needed in order to keep users from re-using the pin while in use
 - Avoiding `&mut self` when `&self` is safe to use. `&self` is generally easier to use as an API. Typical applications of this are where the methods just do writes to registers which don't have side effects.
-    - For example starting a timer is fine for `&self`, worst case a timer will be started twice if two parts of the program call it. You can see a real example of this [here](https://github.com/esp-rs/esp-hal/pull/1500#pullrequestreview-2015911974)
 - Maintain order consistency in the API, such as in the case of pairs like RX/TX.
 - If your driver provides a way to listen for interrupts, the interrupts should be listed in a `derive(EnumSetType)` enum as opposed to one function per interrupt flag.
 - If a driver only implements a subset of a peripheral's capabilities, it should be placed in the `peripheral::subcategory` module.
@@ -114,4 +115,8 @@ Modules should have the following documentation format:
     #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/etm.html)")]
     ```
   - In case of referencing a TRM chapter, use the `crate::trm_markdown_link!()` macro. If you are referring to a particular chapter, you may use `crate::trm_markdown_link!("#chapter_anchor")`.
-- Documentation examples should be short and basic. For more complex scenarios, create an example.
+- Documentation examples must be short
+  - But must also provide value beyond what the rustdoc generated docs show
+    - Showing a snippet of a slightly more complex interaction, for example inverting the signals for a driver
+    - Showing construction if it is more complex, or requires some non-obvious precursor steps. Think about this for drivers that take a generic instance to construct, rustdoc doesn't do a good job of showing what concrete things can be passed into a constructor.
+  - For more complex scenarios, create an example.
