@@ -612,6 +612,7 @@ static INT_ENA_LOCK: Lock = Lock::new();
 
 // Async functionality of the system timer.
 mod asynch {
+    #![allow(unused)] // FIXME (mabez)
     use core::{
         pin::Pin,
         task::{Context, Poll},

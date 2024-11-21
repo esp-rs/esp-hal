@@ -83,12 +83,7 @@ where
 }
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> IntoAnyTimer for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for Alarm where Self: Into<AnyTimer> {}
 
 impl<T> TimerCollection for T
 where

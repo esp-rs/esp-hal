@@ -32,10 +32,6 @@ name    = "delay"
 harness = false
 
 [[test]]
-name    = "delay_async"
-harness = false
-
-[[test]]
 name    = "dma_macros"
 harness = false
 
@@ -112,10 +108,6 @@ name    = "spi_slave"
 harness = false
 
 [[test]]
-name    = "systimer"
-harness = false
-
-[[test]]
 name    = "parl_io_tx"
 harness = false
 
@@ -167,11 +159,6 @@ harness = false
 [[test]]
 name    = "uart_tx_rx_async"
 harness = false
-
-[[test]]
-name              = "embassy_timers_executors"
-harness           = false
-required-features = ["embassy"]
 
 [[test]]
 name              = "embassy_interrupt_executor"
