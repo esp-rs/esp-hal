@@ -9,33 +9,6 @@ use esp_hal::{
     timer::{AnyTimer, OneShotTimer},
 };
 
-#[repr(transparent)]
-pub struct SyncUnsafeCell<T> {
-    value: UnsafeCell<T>,
-}
-
-unsafe impl<T: Sync> Sync for SyncUnsafeCell<T> {}
-
-impl<T> SyncUnsafeCell<T> {
-    #[inline]
-    pub const fn new(value: T) -> Self {
-        Self {
-            value: UnsafeCell::new(value),
-        }
-    }
-
-    pub unsafe fn set(&self, value: T) {
-        *self.value.get() = value;
-    }
-
-    pub unsafe fn get(&self) -> T
-    where
-        T: Copy,
-    {
-        *self.value.get()
-    }
-}
-
 pub type Timer = OneShotTimer<'static, AnyTimer>;
 
 enum AlarmState {
@@ -51,7 +24,6 @@ struct AlarmInner {
 
 struct Alarm {
     pub inner: Locked<AlarmInner>,
-    pub last_timestamp: SyncUnsafeCell<u64>,
 }
 
 unsafe impl Send for Alarm {}
@@ -63,7 +35,6 @@ impl Alarm {
                 callback: Cell::new((core::ptr::null(), core::ptr::null_mut())),
                 state: AlarmState::Created(handler),
             }),
-            last_timestamp: SyncUnsafeCell::new(u64::MAX),
         }
     }
 }
@@ -253,25 +224,11 @@ impl Driver for EmbassyTimer {
     fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
         let alarm = &self.alarms[alarm.id() as usize];
 
-        unsafe {
-            // Safety: this is the only point where we access last_timestamp. If the user
-            // uses integrated-timers, `set_alarm` is only called in the executor.
-            // If the user uses `generic-queue`, the implementation uses critical sections
-            // around `set_alarm` calls.
-            if alarm.last_timestamp.get() != timestamp {
-                alarm.last_timestamp.set(timestamp);
-
-                // If `embassy-executor/integrated-timers` is enabled and there are no pending
-                // timers, embassy still calls `set_alarm` with `u64::MAX`. By returning
-                // `true` we signal that no re-polling is necessary.
-                if timestamp == u64::MAX {
-                    return true;
-                }
-            } else {
-                // The timestamp is the same as the last one, we can skip the set_alarm
-                // call.
-                return true;
-            }
+        // If `embassy-executor/integrated-timers` is enabled and there are no pending
+        // timers, embassy still calls `set_alarm` with `u64::MAX`. By returning
+        // `true` we signal that no re-polling is necessary.
+        if timestamp == u64::MAX {
+            return true;
         }
 
         // The hardware fires the alarm even if timestamp is lower than the current
