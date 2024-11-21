@@ -10,15 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - ESP32-S3: Added SDMMC signals (#2556)
-- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
+- Aded `set_priority` to the `DmaChannel` trait on GDMA devices (#2403, #2526)
+- Added `into_async` and `into_blocking` functions for `ParlIoTxOnly`, `ParlIoRxOnly` (#2526)
+- ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526)
 
 ### Changed
+
+- DMA channel objects now implement `Peripheral` (#2526)
+- DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
+- The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
 
 ### Fixed
 
 ### Removed
 
 - The `configure` and `configure_for_async` DMA channel functions has been removed (#2403)
+- The DMA channel objects no longer have `tx` and `rx` fields. (#2526)
 
 ## [0.22.0] - 2024-11-20
 
