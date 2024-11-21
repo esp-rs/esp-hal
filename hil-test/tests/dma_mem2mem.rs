@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{AnyGdmaChannel, Channel, Dma, DmaError, DmaPriority, Mem2Mem},
+    dma::{AnyGdmaChannel, Channel, Dma, DmaError, Mem2Mem},
     dma_buffers,
     dma_buffers_chunk_size,
     dma_descriptors,
@@ -50,9 +50,7 @@ mod tests {
         }
 
         Context {
-            channel: dma_channel
-                .configure(false, DmaPriority::Priority0)
-                .degrade(),
+            channel: dma_channel.degrade(),
             dma_peripheral,
         }
     }

@@ -7,7 +7,7 @@
 use defmt::error;
 use esp_alloc as _;
 use esp_hal::{
-    dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Dma, DmaBufBlkSize, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     dma_descriptors_chunk_size,
     gpio::interconnect::InputSignal,
@@ -73,7 +73,7 @@ mod tests {
         )
         .with_sck(sclk)
         .with_mosi(mosi)
-        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+        .with_dma(dma_channel);
 
         Context {
             spi,

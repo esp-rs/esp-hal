@@ -12,21 +12,22 @@
 
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority},
+    dma::{Channel, Dma},
     dma_buffers,
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     prelude::*,
     Async,
+    Blocking,
 };
 use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel0Creator = esp_hal::dma::I2s0DmaChannelCreator;
+        type DmaChannel0 = esp_hal::dma::I2s0DmaChannel;
     } else {
-        type DmaChannel0Creator = esp_hal::dma::ChannelCreator<0>;
+        type DmaChannel0 = esp_hal::dma::DmaChannel0;
     }
 }
 
@@ -104,7 +105,7 @@ mod tests {
 
     struct Context {
         dout: AnyPin,
-        dma_channel: DmaChannel0Creator,
+        dma_channel: Channel<'static, Blocking, DmaChannel0>,
         i2s: I2S0,
     }
 
@@ -143,7 +144,7 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
         )
@@ -196,7 +197,7 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
         );
@@ -305,7 +306,7 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
         );
@@ -335,7 +336,7 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
         );

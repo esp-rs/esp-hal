@@ -867,6 +867,8 @@ mod dma {
             Rx,
             Tx,
         },
+        Async,
+        Blocking,
         InterruptConfigurable,
     };
 

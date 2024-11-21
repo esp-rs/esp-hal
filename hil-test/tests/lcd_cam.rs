@@ -1,7 +1,6 @@
 //! LCD_CAM Camera and DPI tests
 
 //% CHIPS: esp32s3
-//% FEATURES: defmt
 
 #![no_std]
 #![no_main]
@@ -59,7 +58,7 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 
-        let channel = dma.channel2.configure(false, DmaPriority::Priority0);
+        let channel = dma.channel2;
 
         let (vsync_in, vsync_out) = peripherals.GPIO6.split();
         let (hsync_in, hsync_out) = peripherals.GPIO7.split();

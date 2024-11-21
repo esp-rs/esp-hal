@@ -71,7 +71,7 @@ async fn main(_spawner: Spawner) {
     .with_mosi(mosi)
     .with_miso(miso)
     .with_cs(cs)
-    .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+    .with_dma(dma_channel)
     .with_buffers(dma_rx_buf, dma_tx_buf)
     .into_async();
 

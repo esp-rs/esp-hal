@@ -10,12 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - ESP32-S3: Added SDMMC signals (#2556)
+- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
 
 ### Changed
 
 ### Fixed
 
 ### Removed
+
+- The `configure` and `configure_for_async` DMA channel functions has been removed (#2403)
 
 ## [0.22.0] - 2024-11-20
 

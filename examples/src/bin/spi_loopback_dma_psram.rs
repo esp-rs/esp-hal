@@ -25,7 +25,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Dma, DmaBufBlkSize, DmaRxBuf, DmaTxBuf},
     peripheral::Peripheral,
     prelude::*,
     spi::{
@@ -103,7 +103,7 @@ fn main() -> ! {
     .with_miso(miso)
     .with_mosi(mosi)
     .with_cs(cs)
-    .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+    .with_dma(dma_channel);
 
     delay.delay_millis(100); // delay to let the above messages display
 

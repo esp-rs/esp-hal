@@ -12,7 +12,7 @@ use embedded_hal::spi::SpiBus;
 #[cfg(pcnt)]
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
-    dma::{Dma, DmaDescriptor, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Channel, Dma, DmaDescriptor, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, NoPin},
     peripheral::Peripheral,
@@ -29,15 +29,15 @@ use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannelCreator = esp_hal::dma::Spi2DmaChannelCreator;
+        type DmaChannel = esp_hal::dma::Spi2DmaChannel;
     } else {
-        type DmaChannelCreator = esp_hal::dma::ChannelCreator<0>;
+        type DmaChannel = esp_hal::dma::DmaChannel0;
     }
 }
 
 struct Context {
     spi: Spi<'static, Blocking>,
-    dma_channel: DmaChannelCreator,
+    dma_channel: Channel<'static, Blocking, DmaChannel>,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
     rx_descriptors: &'static mut [DmaDescriptor],
@@ -204,9 +204,7 @@ mod tests {
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
-        let mut spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
+        let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
         unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
@@ -237,9 +235,7 @@ mod tests {
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
-        let mut spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
+        let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
         unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
@@ -274,9 +270,7 @@ mod tests {
             *v = (i % 255) as u8;
         }
 
-        let mut spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
+        let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
         for i in 0..4 {
             dma_tx_buf.as_mut_slice()[0] = i as u8;
@@ -304,9 +298,7 @@ mod tests {
 
         dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
-        let spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
+        let spi = ctx.spi.with_dma(ctx.dma_channel);
         let transfer = spi
             .transfer(dma_rx_buf, dma_tx_buf)
             .map_err(|e| e.0)
@@ -335,7 +327,7 @@ mod tests {
 
         let mut spi = ctx
             .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0))
+            .with_dma(ctx.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
         let tx_buf = [0xde, 0xad, 0xbe, 0xef];
@@ -355,7 +347,7 @@ mod tests {
 
         let mut spi = ctx
             .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0))
+            .with_dma(ctx.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
         let tx_buf = [0xde, 0xad, 0xbe, 0xef];
@@ -377,7 +369,7 @@ mod tests {
 
         let mut spi = ctx
             .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0))
+            .with_dma(ctx.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
         let tx_buf = core::array::from_fn(|i| i as _);
@@ -398,7 +390,7 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let mut spi = ctx
             .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0))
+            .with_dma(ctx.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();
 
@@ -432,9 +424,9 @@ mod tests {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let mut spi = ctx
             .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0))
-            .with_buffers(dma_rx_buf, dma_tx_buf)
-            .into_async();
+            .into_async()
+            .with_dma(ctx.dma_channel)
+            .with_buffers(dma_rx_buf, dma_tx_buf);
 
         ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
         ctx.pcnt_unit
@@ -465,7 +457,7 @@ mod tests {
             .spi
             .with_mosi(NoPin)
             .with_miso(Level::High)
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
+            .with_dma(ctx.dma_channel);
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -507,9 +499,7 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
 
-        let spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
+        let spi = ctx.spi.with_dma(ctx.dma_channel);
 
         let mut transfer = spi
             .transfer(dma_rx_buf, dma_tx_buf)
@@ -535,9 +525,7 @@ mod tests {
         let mut dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
 
-        let mut spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0));
+        let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
         let mut transfer = spi
             .transfer(dma_rx_buf, dma_tx_buf)
@@ -573,10 +561,7 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
 
-        let spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel.configure(false, DmaPriority::Priority0))
-            .into_async();
+        let spi = ctx.spi.with_dma(ctx.dma_channel).into_async();
 
         let mut transfer = spi
             .transfer(dma_rx_buf, dma_tx_buf)

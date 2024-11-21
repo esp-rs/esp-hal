@@ -8,25 +8,65 @@ use crate::soc::is_slice_in_dram;
 #[cfg(esp32s3)]
 use crate::soc::is_slice_in_psram;
 
+/// Burst transfer configuration.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum BurstConfig {
+    /// Burst mode is disabled.
+    Disabled,
+
+    /// Burst mode is enabled.
+    Enabled,
+}
+
+impl BurstConfig {
+    pub(super) fn is_burst_enabled(self) -> bool {
+        !matches!(self, Self::Disabled)
+    }
+}
+
+/// The direction of the DMA transfer.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum TransferDirection {
+    /// DMA transfer from peripheral or external memory to memory.
+    In,
+    /// DMA transfer from memory to peripheral or external memory.
+    Out,
+}
+
 /// Holds all the information needed to configure a DMA channel for a transfer.
 pub struct Preparation {
     /// The descriptor the DMA will start from.
     pub start: *mut DmaDescriptor,
 
-    /// Block size for PSRAM transfers
-    #[cfg_attr(not(esp32s3), allow(dead_code))]
-    pub block_size: Option<DmaBufBlkSize>,
+    /// The direction of the DMA transfer.
+    pub direction: TransferDirection,
 
-    /// Specifies whether descriptor linked list specified in `start` conforms
-    /// to the alignment requirements required to enable burst transfers.
+    /// Block size for PSRAM transfers.
     ///
-    /// Note: This only applies to burst transfer of the buffer data, not the
-    /// descriptors themselves.
+    /// If the buffer is in PSRAM, the implementation must ensure the following:
     ///
-    /// There are no additional alignment requirements for TX burst transfers,
-    /// but RX transfers require all descriptors to have buffer pointers and
-    /// sizes that are a multiple of 4 (word aligned).
-    pub is_burstable: bool,
+    /// - The implementation of the buffer must provide a non-`None` block size.
+    /// - For [`TransferDirection::In`] transfers, the implementation of the
+    ///   buffer must invalidate the cache that contains the buffer before the
+    ///   DMA starts.
+    /// - For [`TransferDirection::Out`] transfers, the implementation of the
+    ///   buffer must write back the cache that contains the buffer before the
+    ///   DMA starts.
+    #[cfg(esp32s3)]
+    pub external_memory_block_size: Option<DmaBufBlkSize>,
+
+    /// Configures the DMA to transfer data in bursts.
+    ///
+    /// The implementation of the buffer must ensure that burst mode is only
+    /// enabled when alignment requirements are met.
+    ///
+    /// There are no additional alignment requirements for
+    /// [`TransferDirection::Out`] burst transfers, but
+    /// [`TransferDirection::In`] transfers require all descriptors to have
+    /// buffer pointers and sizes that are a multiple of 4 (word aligned).
+    pub burst_transfer: BurstConfig,
 
     /// Configures the "check owner" feature of the DMA channel.
     ///
@@ -331,9 +371,11 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
 
         Preparation {
             start: self.descriptors.head(),
-            block_size: self.block_size,
-            // This is TX, the DMA channel is free to do a burst transfer.
-            is_burstable: true,
+            direction: TransferDirection::Out,
+            #[cfg(esp32s3)]
+            external_memory_block_size: self.block_size,
+            // TODO: support burst transfers.
+            burst_transfer: BurstConfig::Disabled,
             check_owner: None,
         }
     }
@@ -480,11 +522,16 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
 
         Preparation {
             start: self.descriptors.head(),
-            block_size: None,
-            // DmaRxBuf doesn't currently enforce the alignment requirements required for bursting.
-            // In the future, it could either enforce the alignment or calculate if the alignment
-            // requirements happen to be met.
-            is_burstable: false,
+            direction: TransferDirection::In,
+
+            // TODO: support external memory access.
+            #[cfg(esp32s3)]
+            external_memory_block_size: None,
+
+            // TODO: DmaRxBuf doesn't currently enforce the alignment requirements required for
+            // bursting. In the future, it could either enforce the alignment or
+            // calculate if the alignment requirements happen to be met.
+            burst_transfer: BurstConfig::Disabled,
             check_owner: None,
         }
     }
@@ -609,10 +656,14 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
 
         Preparation {
             start: self.tx_descriptors.head(),
-            block_size: None, // TODO: support block size!
+            direction: TransferDirection::Out,
 
-            // This is TX, the DMA channel is free to do a burst transfer.
-            is_burstable: true,
+            // TODO: support external memory access.
+            #[cfg(esp32s3)]
+            external_memory_block_size: None,
+
+            // TODO: This is TX, the DMA channel is free to do a burst transfer.
+            burst_transfer: BurstConfig::Disabled,
             check_owner: None,
         }
     }
@@ -640,11 +691,15 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 
         Preparation {
             start: self.rx_descriptors.head(),
-            block_size: None, // TODO: support block size!
+            direction: TransferDirection::In,
 
-            // DmaRxTxBuf doesn't currently enforce the alignment requirements required for
+            // TODO: support external memory access.
+            #[cfg(esp32s3)]
+            external_memory_block_size: None,
+
+            // TODO: DmaRxTxBuf doesn't currently enforce the alignment requirements required for
             // bursting.
-            is_burstable: false,
+            burst_transfer: BurstConfig::Disabled,
             check_owner: None,
         }
     }
@@ -781,11 +836,15 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
         }
         Preparation {
             start: self.descriptors.as_mut_ptr(),
-            block_size: None,
+            direction: TransferDirection::In,
 
-            // DmaRxStreamBuf doesn't currently enforce the alignment requirements required for
-            // bursting.
-            is_burstable: false,
+            // TODO: support external memory access.
+            #[cfg(esp32s3)]
+            external_memory_block_size: None,
+
+            // TODO: DmaRxStreamBuf doesn't currently enforce the alignment requirements required
+            // for bursting.
+            burst_transfer: BurstConfig::Disabled,
 
             // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
             // implementation doesn't rely on the DMA checking for descriptor ownership.
@@ -995,10 +1054,10 @@ unsafe impl DmaTxBuffer for EmptyBuf {
         #[allow(unused_unsafe)] // stable requires unsafe, nightly complains about it
         Preparation {
             start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
-            block_size: None,
-
-            // This is TX, the DMA channel is free to do a burst transfer.
-            is_burstable: true,
+            direction: TransferDirection::Out,
+            #[cfg(esp32s3)]
+            external_memory_block_size: None,
+            burst_transfer: BurstConfig::Disabled,
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
             // channel does *NOT* check for ownership, otherwise the channel will return an error.
@@ -1026,10 +1085,10 @@ unsafe impl DmaRxBuffer for EmptyBuf {
         #[allow(unused_unsafe)] // stable requires unsafe, nightly complains about it
         Preparation {
             start: unsafe { core::ptr::addr_of_mut!(EMPTY).cast() },
-            block_size: None,
-
-            // As much as bursting is meaningless here, the descriptor does meet the requirements.
-            is_burstable: true,
+            direction: TransferDirection::In,
+            #[cfg(esp32s3)]
+            external_memory_block_size: None,
+            burst_transfer: BurstConfig::Disabled,
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
             // channel does *NOT* check for ownership, otherwise the channel will return an error.
@@ -1104,8 +1163,11 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
     fn prepare(&mut self) -> Preparation {
         Preparation {
             start: self.descriptor,
-            block_size: None,
-            is_burstable: true,
+            direction: TransferDirection::Out,
+            // TODO: support external memory access.
+            #[cfg(esp32s3)]
+            external_memory_block_size: None,
+            burst_transfer: BurstConfig::Disabled,
             // The DMA must not check the owner bit, as it is never set.
             check_owner: Some(false),
         }

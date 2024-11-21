@@ -31,11 +31,6 @@
 //!
 //! # let mut dma_buf = dma_loop_buffer!(32);
 //!
-//! # let channel = channel.configure(
-//! #     false,
-//! #     DmaPriority::Priority0,
-//! # );
-//!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
 //! let mut config = dpi::Config::default();

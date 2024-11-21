@@ -169,11 +169,16 @@ impl<C: GdmaChannel> RegisterAccess for ChannelTxImpl<C> {
         conf0.modify(|_, w| w.out_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, burst_mode: bool) {
-        self.ch().out_conf0().modify(|_, w| {
-            w.out_data_burst_en().bit(burst_mode);
-            w.outdscr_burst_en().bit(burst_mode)
-        });
+    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    }
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
     fn set_priority(&self, priority: DmaPriority) {
@@ -388,11 +393,16 @@ impl<C: GdmaChannel> RegisterAccess for ChannelRxImpl<C> {
         conf0.modify(|_, w| w.in_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, burst_mode: bool) {
-        self.ch().in_conf0().modify(|_, w| {
-            w.in_data_burst_en().bit(burst_mode);
-            w.indscr_burst_en().bit(burst_mode)
-        });
+    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+        self.ch()
+            .in_conf0()
+            .modify(|_, w| w.in_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    }
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        self.ch()
+            .in_conf0()
+            .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
     fn set_priority(&self, priority: DmaPriority) {
@@ -559,10 +569,6 @@ impl<C: GdmaChannel> InterruptAccess<DmaRxInterrupt> for ChannelRxImpl<C> {
     }
 }
 
-/// A Channel can be created from this
-#[non_exhaustive]
-pub struct ChannelCreator<const N: u8> {}
-
 impl<CH: DmaChannel, M: Mode> Channel<'_, M, CH> {
     /// Asserts that the channel is compatible with the given peripheral.
     pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &PeripheralRef<'_, P>) {
@@ -621,19 +627,19 @@ macro_rules! impl_channel {
                 }
             }
 
-            impl ChannelCreator<$num> {
-                /// Configure the channel for use with blocking APIs
-                pub fn configure<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> Channel<'a, Blocking, [<DmaChannel $num>]> {
+            impl [<DmaChannel $num>] {
+                /// Unsafely constructs a new DMA channel.
+                ///
+                /// # Safety
+                ///
+                /// The caller must ensure that only a single instance is used.
+                pub unsafe fn steal<'a>() -> Channel<'a, Blocking, Self> {
                     let mut this = Channel {
                         tx: ChannelTx::new(ChannelTxImpl(SpecificGdmaChannel::<$num> {})),
                         rx: ChannelRx::new(ChannelRxImpl(SpecificGdmaChannel::<$num> {})),
                     };
 
-                    this.configure(burst_mode, priority);
+                    this.set_priority(DmaPriority::Priority0);
 
                     this
                 }
@@ -731,19 +737,19 @@ crate::impl_dma_eligible! {
 pub struct Dma<'d> {
     _inner: PeripheralRef<'d, crate::peripherals::DMA>,
     /// Channel 0
-    pub channel0: ChannelCreator<0>,
+    pub channel0: Channel<'d, Blocking, DmaChannel0>,
     /// Channel 1
     #[cfg(not(esp32c2))]
-    pub channel1: ChannelCreator<1>,
+    pub channel1: Channel<'d, Blocking, DmaChannel1>,
     /// Channel 2
     #[cfg(not(esp32c2))]
-    pub channel2: ChannelCreator<2>,
+    pub channel2: Channel<'d, Blocking, DmaChannel2>,
     /// Channel 3
     #[cfg(esp32s3)]
-    pub channel3: ChannelCreator<3>,
+    pub channel3: Channel<'d, Blocking, DmaChannel3>,
     /// Channel 4
     #[cfg(esp32s3)]
-    pub channel4: ChannelCreator<4>,
+    pub channel4: Channel<'d, Blocking, DmaChannel4>,
 }
 
 impl<'d> Dma<'d> {
@@ -761,17 +767,19 @@ impl<'d> Dma<'d> {
             .modify(|_, w| w.ahbm_rst_inter().clear_bit());
         dma.misc_conf().modify(|_, w| w.clk_en().set_bit());
 
-        Dma {
-            _inner: dma,
-            channel0: ChannelCreator {},
-            #[cfg(not(esp32c2))]
-            channel1: ChannelCreator {},
-            #[cfg(not(esp32c2))]
-            channel2: ChannelCreator {},
-            #[cfg(esp32s3)]
-            channel3: ChannelCreator {},
-            #[cfg(esp32s3)]
-            channel4: ChannelCreator {},
+        unsafe {
+            Dma {
+                _inner: dma,
+                channel0: DmaChannel0::steal(),
+                #[cfg(not(esp32c2))]
+                channel1: DmaChannel1::steal(),
+                #[cfg(not(esp32c2))]
+                channel2: DmaChannel2::steal(),
+                #[cfg(esp32s3)]
+                channel3: DmaChannel3::steal(),
+                #[cfg(esp32s3)]
+                channel4: DmaChannel4::steal(),
+            }
         }
     }
 }

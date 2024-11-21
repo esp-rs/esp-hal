@@ -30,7 +30,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Dma, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     prelude::*,
     spi::{
@@ -91,7 +91,7 @@ fn main() -> ! {
     .with_sio2(sio2)
     .with_sio3(sio3)
     .with_cs(cs)
-    .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+    .with_dma(dma_channel);
 
     let delay = Delay::new();
 

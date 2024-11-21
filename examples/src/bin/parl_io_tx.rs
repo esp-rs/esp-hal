@@ -16,7 +16,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority},
+    dma::Dma,
     dma_buffers,
     parl_io::{
         BitPackOrder,
@@ -48,13 +48,8 @@ fn main() -> ! {
 
     let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, peripherals.GPIO5);
 
-    let parl_io = ParlIoTxOnly::new(
-        peripherals.PARL_IO,
-        dma_channel.configure(false, DmaPriority::Priority0),
-        tx_descriptors,
-        1.MHz(),
-    )
-    .unwrap();
+    let parl_io =
+        ParlIoTxOnly::new(peripherals.PARL_IO, dma_channel, tx_descriptors, 1.MHz()).unwrap();
 
     let mut clock_pin = ClkOutPin::new(peripherals.GPIO6);
 

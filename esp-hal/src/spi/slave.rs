@@ -15,7 +15,6 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::dma::DmaPriority;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::SpiMode;
 //! # use esp_hal::spi::slave::Spi;
@@ -39,10 +38,7 @@
 //! .with_miso(miso)
 //! .with_cs(cs)
 //! .with_dma(
-//!     dma_channel.configure(
-//!         false,
-//!         DmaPriority::Priority0,
-//!     ),
+//!     dma_channel,
 //!     rx_descriptors,
 //!     tx_descriptors,
 //! );

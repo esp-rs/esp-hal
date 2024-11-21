@@ -19,7 +19,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::{master::{Config, Spi}, SpiMode};
-//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::dma::Dma;
 //! let dma = Dma::new(peripherals.DMA);
 #![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
 #![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
@@ -40,10 +40,7 @@
 //! .with_mosi(mosi)
 //! .with_miso(miso)
 //! .with_cs(cs)
-//! .with_dma(dma_channel.configure(
-//!     false,
-//!     DmaPriority::Priority0,
-//! ));
+//! .with_dma(dma_channel);
 //! # }
 //! ```
 //! 
@@ -1688,7 +1685,6 @@ pub struct ChannelRx<'a, M, CH>
 where
     CH: DmaChannel,
 {
-    pub(crate) burst_mode: bool,
     pub(crate) rx_impl: CH::Rx,
     pub(crate) _phantom: PhantomData<(&'a (), CH, M)>,
 }
@@ -1711,7 +1707,6 @@ where
         rx_impl.set_async(false);
 
         Self {
-            burst_mode: false,
             rx_impl,
             _phantom: PhantomData,
         }
@@ -1724,7 +1719,6 @@ where
         }
         self.rx_impl.set_async(true);
         ChannelRx {
-            burst_mode: self.burst_mode,
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
         }
@@ -1758,7 +1752,6 @@ where
         }
         self.rx_impl.set_async(false);
         ChannelRx {
-            burst_mode: self.burst_mode,
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
         }
@@ -1777,16 +1770,36 @@ where
         CH: DmaChannelConvert<DEG>,
     {
         ChannelRx {
-            burst_mode: self.burst_mode,
             rx_impl: CH::degrade_rx(self.rx_impl),
             _phantom: PhantomData,
         }
     }
 
     /// Configure the channel.
-    pub fn configure(&mut self, burst_mode: bool, priority: DmaPriority) {
-        self.burst_mode = burst_mode;
-        self.rx_impl.configure(burst_mode, priority);
+    #[cfg(gdma)]
+    pub fn set_priority(&mut self, priority: DmaPriority) {
+        self.rx_impl.set_priority(priority);
+    }
+
+    fn do_prepare(
+        &mut self,
+        preparation: Preparation,
+        peri: DmaPeripheral,
+    ) -> Result<(), DmaError> {
+        debug_assert_eq!(preparation.direction, TransferDirection::In);
+
+        self.rx_impl.set_burst_mode(preparation.burst_transfer);
+        self.rx_impl.set_descr_burst_mode(true);
+        self.rx_impl.set_check_owner(preparation.check_owner);
+
+        compiler_fence(core::sync::atomic::Ordering::SeqCst);
+
+        self.rx_impl.clear_all();
+        self.rx_impl.reset();
+        self.rx_impl.set_link_addr(preparation.start as u32);
+        self.rx_impl.set_peripheral(peri as u8);
+
+        Ok(())
     }
 }
 
@@ -1802,24 +1815,18 @@ where
     M: Mode,
     CH: DmaChannel,
 {
+    // TODO: used by I2S, which should be rewritten to use the Preparation-based
+    // API.
     unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        if self.burst_mode
-            && chain
-                .descriptors
-                .iter()
-                .any(|d| d.len() % 4 != 0 || d.buffer as u32 % 4 != 0)
-        {
-            return Err(DmaError::InvalidAlignment);
-        }
-
-        // for esp32s3 we check each descriptor buffer that points to psram for
-        // alignment and invalidate the cache for that buffer
+        // For ESP32-S3 we check each descriptor buffer that points to PSRAM for
+        // alignment and invalidate the cache for that buffer.
         // NOTE: for RX the `buffer` and `size` need to be aligned but the `len` does
         // not. TRM section 3.4.9
+        // Note that DmaBuffer implementations are required to do this for us.
         #[cfg(esp32s3)]
         for des in chain.descriptors.iter() {
             // we are forcing the DMA alignment to the cache line size
@@ -1834,14 +1841,17 @@ where
             }
         }
 
-        compiler_fence(core::sync::atomic::Ordering::SeqCst);
-
-        self.rx_impl.clear_all();
-        self.rx_impl.reset();
-        self.rx_impl.set_link_addr(chain.first() as u32);
-        self.rx_impl.set_peripheral(peri as u8);
-
-        Ok(())
+        self.do_prepare(
+            Preparation {
+                start: chain.first().cast_mut(),
+                #[cfg(esp32s3)]
+                external_memory_block_size: None,
+                direction: TransferDirection::In,
+                burst_transfer: BurstConfig::Disabled,
+                check_owner: Some(false),
+            },
+            peri,
+        )
     }
 
     unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
@@ -1851,19 +1861,7 @@ where
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
 
-        self.rx_impl
-            .set_burst_mode(self.burst_mode && preparation.is_burstable);
-
-        self.rx_impl.set_check_owner(preparation.check_owner);
-
-        compiler_fence(core::sync::atomic::Ordering::SeqCst);
-
-        self.rx_impl.clear_all();
-        self.rx_impl.reset();
-        self.rx_impl.set_link_addr(preparation.start as u32);
-        self.rx_impl.set_peripheral(peri as u8);
-
-        Ok(())
+        self.do_prepare(preparation, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -1982,8 +1980,6 @@ pub struct ChannelTx<'a, M, CH>
 where
     CH: DmaChannel,
 {
-    #[allow(unused)]
-    pub(crate) burst_mode: bool,
     pub(crate) tx_impl: CH::Tx,
     pub(crate) _phantom: PhantomData<(&'a (), CH, M)>,
 }
@@ -2001,7 +1997,6 @@ where
         tx_impl.set_async(false);
 
         Self {
-            burst_mode: false,
             tx_impl,
             _phantom: PhantomData,
         }
@@ -2014,7 +2009,6 @@ where
         }
         self.tx_impl.set_async(true);
         ChannelTx {
-            burst_mode: self.burst_mode,
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
         }
@@ -2048,7 +2042,6 @@ where
         }
         self.tx_impl.set_async(false);
         ChannelTx {
-            burst_mode: self.burst_mode,
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
         }
@@ -2067,16 +2060,41 @@ where
         CH: DmaChannelConvert<DEG>,
     {
         ChannelTx {
-            burst_mode: self.burst_mode,
             tx_impl: CH::degrade_tx(self.tx_impl),
             _phantom: PhantomData,
         }
     }
 
-    /// Configure the channel.
-    pub fn configure(&mut self, burst_mode: bool, priority: DmaPriority) {
-        self.burst_mode = burst_mode;
-        self.tx_impl.configure(burst_mode, priority);
+    /// Configure the channel priority.
+    #[cfg(gdma)]
+    pub fn set_priority(&mut self, priority: DmaPriority) {
+        self.tx_impl.set_priority(priority);
+    }
+
+    fn do_prepare(
+        &mut self,
+        preparation: Preparation,
+        peri: DmaPeripheral,
+    ) -> Result<(), DmaError> {
+        debug_assert_eq!(preparation.direction, TransferDirection::Out);
+
+        #[cfg(esp32s3)]
+        if let Some(block_size) = preparation.external_memory_block_size {
+            self.set_ext_mem_block_size(block_size.into());
+        }
+
+        self.tx_impl.set_burst_mode(preparation.burst_transfer);
+        self.tx_impl.set_descr_burst_mode(true);
+        self.tx_impl.set_check_owner(preparation.check_owner);
+
+        compiler_fence(core::sync::atomic::Ordering::SeqCst);
+
+        self.tx_impl.clear_all();
+        self.tx_impl.reset();
+        self.tx_impl.set_link_addr(preparation.start as u32);
+        self.tx_impl.set_peripheral(peri as u8);
+
+        Ok(())
     }
 }
 
@@ -2092,14 +2110,18 @@ where
     M: Mode,
     CH: DmaChannel,
 {
+    // TODO: used by I2S, which should be rewritten to use the Preparation-based
+    // API.
     unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        // TODO: based on the ESP32-S3 TRM the alignment check is not needed for TX!
-        // for esp32s3 we check each descriptor buffer that points to psram for
-        // alignment and writeback the cache for that buffer
+        // Based on the ESP32-S3 TRM the alignment check is not needed for TX
+
+        // For esp32s3 we check each descriptor buffer that points to PSRAM for
+        // alignment and writeback the cache for that buffer.
+        // Note that DmaBuffer implementations are required to do this for us.
         #[cfg(esp32s3)]
         for des in chain.descriptors.iter() {
             // we are forcing the DMA alignment to the cache line size
@@ -2114,12 +2136,17 @@ where
             }
         }
 
-        compiler_fence(core::sync::atomic::Ordering::SeqCst);
-
-        self.tx_impl.clear_all();
-        self.tx_impl.reset();
-        self.tx_impl.set_link_addr(chain.first() as u32);
-        self.tx_impl.set_peripheral(peri as u8);
+        self.do_prepare(
+            Preparation {
+                start: chain.first().cast_mut(),
+                #[cfg(esp32s3)]
+                external_memory_block_size: None,
+                direction: TransferDirection::Out,
+                burst_transfer: BurstConfig::Disabled,
+                check_owner: Some(false),
+            },
+            peri,
+        )?;
 
         // enable descriptor write back in circular mode
         self.tx_impl
@@ -2134,32 +2161,8 @@ where
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
-        cfg_if::cfg_if!(
-            if #[cfg(esp32s3)] {
-                if let Some(block_size) = preparation.block_size {
-                    self.set_ext_mem_block_size(block_size.into());
-                }
-            } else {
-                // we ensure that block_size is some only for PSRAM addresses
-                if preparation.block_size.is_some() {
-                    return Err(DmaError::UnsupportedMemoryRegion);
-                }
-            }
-        );
 
-        self.tx_impl
-            .set_burst_mode(self.burst_mode && preparation.is_burstable);
-
-        self.tx_impl.set_check_owner(preparation.check_owner);
-
-        compiler_fence(core::sync::atomic::Ordering::SeqCst);
-
-        self.tx_impl.clear_all();
-        self.tx_impl.reset();
-        self.tx_impl.set_link_addr(preparation.start as u32);
-        self.tx_impl.set_peripheral(peri as u8);
-
-        Ok(())
+        self.do_prepare(preparation, peri)
     }
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
@@ -2223,11 +2226,16 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn reset(&self);
 
     /// Enable/Disable INCR burst transfer for channel reading
-    /// descriptor and accessing data in internal RAM.
-    fn set_burst_mode(&self, burst_mode: bool);
+    /// accessing data in internal RAM.
+    fn set_burst_mode(&self, burst_mode: BurstConfig);
+
+    /// Enable/Disable burst transfer for channel reading
+    /// descriptors in internal RAM.
+    fn set_descr_burst_mode(&self, burst_mode: bool);
 
     /// The priority of the channel. The larger the value, the higher the
     /// priority.
+    #[cfg(gdma)]
     fn set_priority(&self, priority: DmaPriority);
 
     /// Select a peripheral for the channel.
@@ -2254,12 +2262,6 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     #[cfg(pdma)]
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
-
-    /// Configure the channel.
-    fn configure(&self, burst_mode: bool, priority: DmaPriority) {
-        self.set_burst_mode(burst_mode);
-        self.set_priority(priority);
-    }
 }
 
 #[doc(hidden)]
@@ -2375,10 +2377,11 @@ where
         }
     }
 
-    /// Configure the channel.
-    pub fn configure(&mut self, burst_mode: bool, priority: DmaPriority) {
-        self.rx.configure(burst_mode, priority);
-        self.tx.configure(burst_mode, priority);
+    /// Configure the channel priorities.
+    #[cfg(gdma)]
+    pub fn set_priority(&mut self, priority: DmaPriority) {
+        self.tx.set_priority(priority);
+        self.rx.set_priority(priority);
     }
 
     /// Converts a blocking channel to an async channel.

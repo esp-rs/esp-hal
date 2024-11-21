@@ -57,13 +57,17 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         spi.dma_conf().modify(|_, w| w.out_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, burst_mode: bool) {
+    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+        let spi = self.0.register_block();
+        spi.dma_conf()
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    }
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
         let spi = self.0.register_block();
         spi.dma_conf()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
-
-    fn set_priority(&self, _priority: DmaPriority) {}
 
     fn set_peripheral(&self, _peripheral: u8) {
         // no-op
@@ -218,13 +222,13 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
         spi.dma_conf().modify(|_, w| w.in_rst().clear_bit());
     }
 
-    fn set_burst_mode(&self, burst_mode: bool) {
+    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
         let spi = self.0.register_block();
         spi.dma_conf()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
-
-    fn set_priority(&self, _priority: DmaPriority) {}
 
     fn set_peripheral(&self, _peripheral: u8) {
         // no-op
@@ -442,25 +446,17 @@ macro_rules! ImplSpiChannel {
 
             impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
 
-            #[doc = concat!("Creates a channel for SPI", $num)]
-            #[non_exhaustive]
-            pub struct [<Spi $num DmaChannelCreator>] {}
-
-            impl [<Spi $num DmaChannelCreator>] {
-                /// Configure the channel for use with blocking APIs
-                pub fn configure<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> Channel<'a, Blocking, [<Spi $num DmaChannel>]> {
-                    let mut this = Channel {
+            impl [<Spi $num DmaChannel>] {
+                /// Unsafely constructs a new DMA channel.
+                ///
+                /// # Safety
+                ///
+                /// The caller must ensure that only a single instance is used.
+                pub unsafe fn steal<'a>() -> Channel<'a, Blocking, Self> {
+                    Channel {
                         tx: ChannelTx::new(SpiDmaTxChannelImpl([<Spi $num DmaChannel>] {})),
                         rx: ChannelRx::new(SpiDmaRxChannelImpl([<Spi $num DmaChannel>] {})),
-                    };
-
-                    this.configure(burst_mode, priority);
-
-                    this
+                    }
                 }
             }
         }
@@ -478,19 +474,24 @@ pub struct I2sDmaTxChannelImpl<C>(C);
 impl<C> crate::private::Sealed for I2sDmaTxChannelImpl<C> {}
 
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaTxChannelImpl<C> {
-    fn set_burst_mode(&self, burst_mode: bool) {
-        let reg_block = self.0.register_block();
-        reg_block
-            .lc_conf()
-            .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
-    }
-
-    fn set_priority(&self, _priority: DmaPriority) {}
-
     fn reset(&self) {
         let reg_block = self.0.register_block();
         reg_block.lc_conf().modify(|_, w| w.out_rst().set_bit());
         reg_block.lc_conf().modify(|_, w| w.out_rst().clear_bit());
+    }
+
+    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    }
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
     fn set_link_addr(&self, address: u32) {
@@ -652,19 +653,19 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaTxInte
 }
 
 impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaRxChannelImpl<C> {
-    fn set_burst_mode(&self, burst_mode: bool) {
-        let reg_block = self.0.register_block();
-        reg_block
-            .lc_conf()
-            .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
-    }
-
-    fn set_priority(&self, _priority: DmaPriority) {}
-
     fn reset(&self) {
         let reg_block = self.0.register_block();
         reg_block.lc_conf().modify(|_, w| w.in_rst().set_bit());
         reg_block.lc_conf().modify(|_, w| w.in_rst().clear_bit());
+    }
+
+    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        let reg_block = self.0.register_block();
+        reg_block
+            .lc_conf()
+            .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
     fn set_link_addr(&self, address: u32) {
@@ -881,24 +882,17 @@ macro_rules! ImplI2sChannel {
                 }
             }
 
-            #[doc = concat!("Creates a channel for I2S", $num)]
-            pub struct [<I2s $num DmaChannelCreator>] {}
-
-            impl [<I2s $num DmaChannelCreator>] {
-                /// Configure the channel for use with blocking APIs
-                pub fn configure<'a>(
-                    self,
-                    burst_mode: bool,
-                    priority: DmaPriority,
-                ) -> Channel<'a, Blocking, [<I2s $num DmaChannel>]> {
-                    let mut this = Channel {
+            impl [<I2s $num DmaChannel>] {
+                /// Unsafely constructs a new DMA channel.
+                ///
+                /// # Safety
+                ///
+                /// The caller must ensure that only a single instance is used.
+                pub unsafe fn steal<'a>() -> Channel<'a, Blocking, Self> {
+                    Channel {
                         tx: ChannelTx::new(I2sDmaTxChannelImpl([<I2s $num DmaChannel>] {})),
                         rx: ChannelRx::new(I2sDmaRxChannelImpl([<I2s $num DmaChannel>] {})),
-                    };
-
-                    this.configure(burst_mode, priority);
-
-                    this
+                    }
                 }
             }
         }
@@ -927,14 +921,14 @@ crate::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
 pub struct Dma<'d> {
     _inner: PeripheralRef<'d, crate::peripherals::DMA>,
     /// DMA channel for SPI2
-    pub spi2channel: Spi2DmaChannelCreator,
+    pub spi2channel: Channel<'d, Blocking, Spi2DmaChannel>,
     /// DMA channel for SPI3
-    pub spi3channel: Spi3DmaChannelCreator,
+    pub spi3channel: Channel<'d, Blocking, Spi3DmaChannel>,
     /// DMA channel for I2S0
-    pub i2s0channel: I2s0DmaChannelCreator,
+    pub i2s0channel: Channel<'d, Blocking, I2s0DmaChannel>,
     /// DMA channel for I2S1
     #[cfg(i2s1)]
-    pub i2s1channel: I2s1DmaChannelCreator,
+    pub i2s1channel: Channel<'d, Blocking, I2s1DmaChannel>,
 }
 
 impl<'d> Dma<'d> {
@@ -959,13 +953,15 @@ impl<'d> Dma<'d> {
             });
         }
 
-        Dma {
-            _inner: dma.into_ref(),
-            spi2channel: Spi2DmaChannelCreator {},
-            spi3channel: Spi3DmaChannelCreator {},
-            i2s0channel: I2s0DmaChannelCreator {},
-            #[cfg(i2s1)]
-            i2s1channel: I2s1DmaChannelCreator {},
+        unsafe {
+            Dma {
+                _inner: dma.into_ref(),
+                spi2channel: Spi2DmaChannel::steal(),
+                spi3channel: Spi3DmaChannel::steal(),
+                i2s0channel: I2s0DmaChannel::steal(),
+                #[cfg(i2s1)]
+                i2s1channel: I2s1DmaChannel::steal(),
+            }
         }
     }
 }

@@ -19,17 +19,12 @@
 //! # use esp_hal::lcd_cam::{cam::{Camera, RxEightBits}, LcdCam};
 //! # use fugit::RateExtU32;
 //! # use esp_hal::dma_rx_stream_buffer;
-//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::dma::Dma;
 //!
 //! # let dma = Dma::new(peripherals.DMA);
 //! # let channel = dma.channel0;
 //!
 //! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
-//!
-//! # let channel = channel.configure(
-//! #     false,
-//! #     DmaPriority::Priority0,
-//! # );
 //!
 //! let mclk_pin = peripherals.GPIO15;
 //! let vsync_pin = peripherals.GPIO6;
