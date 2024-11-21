@@ -341,6 +341,36 @@ impl super::Timer for Timer {
     fn set_alarm_active(&self, state: bool) {
         self.set_alarm_active(state)
     }
+
+    async fn wait(&self) {
+        asynch::TimerFuture::new(self).await
+    }
+
+    fn async_interrupt_handler(&self) -> InterruptHandler {
+        match (self.timer_group(), self.timer_number()) {
+            (0, 0) => asynch::timg0_timer0_handler,
+            #[cfg(timg_timer1)]
+            (0, 1) => asynch::timg0_timer1_handler,
+            #[cfg(timg1)]
+            (1, 0) => asynch::timg1_timer0_handler,
+            #[cfg(all(timg_timer1, timg1))]
+            (1, 1) => asynch::timg1_timer1_handler,
+            _ => unreachable!(),
+        }
+    }
+
+    fn peripheral_interrupt(&self) -> Interrupt {
+        match (self.timer_group(), self.timer_number()) {
+            (0, 0) => Interrupt::TG0_T0_LEVEL,
+            #[cfg(timg_timer1)]
+            (0, 1) => Interrupt::TG0_T1_LEVEL,
+            #[cfg(timg1)]
+            (1, 0) => Interrupt::TG1_T0_LEVEL,
+            #[cfg(all(timg_timer1, timg1))]
+            (1, 1) => Interrupt::TG1_T1_LEVEL,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl Peripheral for Timer {

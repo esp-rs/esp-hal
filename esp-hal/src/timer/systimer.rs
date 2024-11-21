@@ -590,6 +590,28 @@ impl super::Timer for Alarm {
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
     }
+
+    async fn wait(&self) {
+        asynch::AlarmFuture::new(self).await
+    }
+
+    fn async_interrupt_handler(&self) -> InterruptHandler {
+        match self.channel() {
+            0 => asynch::target0_handler,
+            1 => asynch::target1_handler,
+            2 => asynch::target2_handler,
+            _ => unreachable!(),
+        }
+    }
+
+    fn peripheral_interrupt(&self) -> Interrupt {
+        match self.channel() {
+            0 => Interrupt::SYSTIMER_TARGET0,
+            1 => Interrupt::SYSTIMER_TARGET1,
+            2 => Interrupt::SYSTIMER_TARGET2,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl Peripheral for Alarm {
@@ -633,21 +655,6 @@ mod asynch {
 
     impl<'a> AlarmFuture<'a> {
         pub(crate) fn new(alarm: &'a Alarm) -> Self {
-            alarm.clear_interrupt();
-
-            let (interrupt, handler) = match alarm.channel() {
-                0 => (Interrupt::SYSTIMER_TARGET0, target0_handler),
-                1 => (Interrupt::SYSTIMER_TARGET1, target1_handler),
-                _ => (Interrupt::SYSTIMER_TARGET2, target2_handler),
-            };
-
-            unsafe {
-                interrupt::bind_interrupt(interrupt, handler.handler());
-                interrupt::enable(interrupt, handler.priority()).unwrap();
-            }
-
-            alarm.set_interrupt_handler(handler);
-
             alarm.enable_interrupt(true);
 
             Self { alarm }

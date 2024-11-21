@@ -47,7 +47,10 @@ use fugit::{ExtU64, Instant, MicrosDurationU64};
 use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::Interrupt,
+    Async,
     Blocking,
+    Cpu,
     Mode,
 };
 
@@ -107,6 +110,18 @@ pub trait Timer: crate::private::Sealed {
     /// Has the timer triggered?
     fn is_interrupt_set(&self) -> bool;
 
+    /// Asynchronously wait for the timer interrupt to fire.
+    ///
+    /// Requires the correct `InterruptHandler` to be installed to function
+    /// correctly.
+    async fn wait(&self);
+
+    /// Returns the HAL provided async interrupt handler
+    fn async_interrupt_handler(&self) -> InterruptHandler;
+
+    /// Returns the interrupt source for the underlying timer
+    fn peripheral_interrupt(&self) -> Interrupt;
+
     // NOTE: This is an unfortunate implementation detail of `TIMGx`
     #[doc(hidden)]
     fn set_alarm_active(&self, state: bool);
@@ -139,6 +154,57 @@ where
             _ph: PhantomData,
         }
     }
+
+    /// Converts the driver to [`Async`] mode.
+    pub fn into_async(self) -> OneShotTimer<'d, Async, T> {
+        self.inner
+            .set_interrupt_handler(self.inner.async_interrupt_handler());
+        OneShotTimer {
+            inner: self.inner,
+            _ph: PhantomData,
+        }
+    }
+}
+
+impl<'d, T> OneShotTimer<'d, Async, T>
+where
+    T: Timer,
+{
+    /// Converts the driver to [`Blocking`] mode.
+    pub fn into_blocking(self) -> Self {
+        crate::interrupt::disable(Cpu::current(), self.inner.peripheral_interrupt());
+        Self {
+            inner: self.inner,
+            _ph: PhantomData,
+        }
+    }
+}
+
+impl<T> OneShotTimer<'_, Async, T>
+where
+    T: Timer,
+{
+    /// Delay for *at least* `ns` nanoseconds.
+    pub async fn delay_nanos_async(&mut self, ns: u32) {
+        self.delay_async(MicrosDurationU64::from_ticks(ns.div_ceil(1000) as u64))
+            .await
+    }
+
+    /// Delay for *at least* `ms` milliseconds.
+    pub async fn delay_millis_async(&mut self, ms: u32) {
+        self.delay_async((ms as u64).millis()).await;
+    }
+
+    /// Delay for *at least* `us` microseconds.
+    pub async fn delay_micros_async(&mut self, us: u32) {
+        self.delay_async((us as u64).micros()).await;
+    }
+
+    async fn delay_async(&mut self, us: MicrosDurationU64) {
+        unwrap!(self.schedule(us));
+        self.inner.wait().await;
+        self.stop();
+    }
 }
 
 impl<'d, M, T> OneShotTimer<'d, M, T>
@@ -146,17 +212,17 @@ where
     M: Mode,
     T: Timer,
 {
-    /// Pauses execution for *at least* `ms` milliseconds.
+    /// Delay for *at least* `ms` milliseconds.
     pub fn delay_millis(&self, ms: u32) {
         self.delay((ms as u64).millis());
     }
 
-    /// Pauses execution for *at least* `us` microseconds.
+    /// Delay for *at least* `us` microseconds.
     pub fn delay_micros(&self, us: u32) {
         self.delay((us as u64).micros());
     }
 
-    /// Pauses execution for *at least* `ns` nanoseconds.
+    /// Delay for *at least* `ns` nanoseconds.
     pub fn delay_nanos(&self, ns: u32) {
         self.delay((ns.div_ceil(1000) as u64).micros())
     }
@@ -245,6 +311,15 @@ where
 {
     fn delay_ns(&mut self, ns: u32) {
         self.delay_nanos(ns);
+    }
+}
+
+impl<T> embedded_hal_async::delay::DelayNs for OneShotTimer<'_, Async, T>
+where
+    T: Timer,
+{
+    async fn delay_ns(&mut self, ns: u32) {
+        self.delay_nanos_async(ns).await
     }
 }
 
@@ -389,6 +464,9 @@ impl Timer for AnyTimer {
             fn set_interrupt_handler(&self, handler: InterruptHandler);
             fn is_interrupt_set(&self) -> bool;
             fn set_alarm_active(&self, state: bool);
+            async fn wait(&self);
+            fn async_interrupt_handler(&self) -> InterruptHandler;
+            fn peripheral_interrupt(&self) -> Interrupt;
         }
     }
 }
