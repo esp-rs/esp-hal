@@ -95,12 +95,12 @@ impl Metadata {
     }
 }
 
-#[derive(Debug, Clone, Copy, Display, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Display, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 pub enum Version {
-    Major,
-    Minor,
     Patch,
+    Minor,
+    Major,
 }
 
 /// Build the documentation for the specified package and device.

@@ -8,6 +8,7 @@ use std::{
 use anyhow::{bail, ensure, Context as _, Result};
 use clap::{Args, Parser};
 use esp_metadata::{Arch, Chip, Config};
+use markdown::mdast::Node;
 use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
@@ -23,6 +24,9 @@ use xtask::{
 
 #[derive(Debug, Parser)]
 enum Cli {
+    /// Analyze each package's `CHANGELOG.md` to try and determine how much to
+    /// increment the version by.
+    AnalyzeChangelog(AnalyzeChangelogArgs),
     /// Build documentation for the specified chip.
     BuildDocumentationIndex(BuildDocumentationArgs),
     /// Build documentation for the specified chip.
@@ -53,6 +57,13 @@ enum Cli {
     RunTests(TestArgs),
     /// Run all ELFs in a folder.
     RunElfs(RunElfArgs),
+}
+
+#[derive(Debug, Args)]
+struct AnalyzeChangelogArgs {
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
 }
 
 #[derive(Debug, Args)]
@@ -182,6 +193,7 @@ fn main() -> Result<()> {
     let workspace = std::env::current_dir()?;
 
     match Cli::parse() {
+        Cli::AnalyzeChangelog(args) => analyze_changelogs(&workspace, args),
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildDocumentationIndex(args) => build_documentation_index(&workspace, args),
         Cli::BuildExamples(args) => examples(&workspace, args, CargoAction::Build),
@@ -201,6 +213,68 @@ fn main() -> Result<()> {
 
 // ----------------------------------------------------------------------------
 // Subcommands
+
+fn analyze_changelogs(workspace: &Path, args: AnalyzeChangelogArgs) -> Result<()> {
+    for package in args.packages {
+        let changelog_path = workspace.join(package.to_string()).join("CHANGELOG.md");
+        if !changelog_path.exists() {
+            continue;
+        }
+
+        let changelog = fs::read_to_string(changelog_path)?;
+        let changelog = parse_changelog::parse(&changelog)?;
+
+        let release = &changelog[0];
+        let release = markdown::to_mdast(&release.notes, &markdown::ParseOptions::default())
+            .expect("Unable to parse markdown");
+
+        let mut version_change: Option<Version> = None;
+        if let Some(children) = release.children() {
+            let mut i = 0;
+            loop {
+                if i >= children.len().saturating_sub(1) {
+                    break;
+                }
+
+                let Node::Heading(heading) = &children[i] else {
+                    bail!("Expected `Node::Heading(..), found something else");
+                };
+                let Node::Text(text) = &heading.children[0] else {
+                    bail!("Expected `Node::Text(..)`, found something else");
+                };
+
+                i += 1;
+
+                if let Node::List(list) = &children[i] {
+                    if !list.children.is_empty() {
+                        match text.value.to_lowercase().as_str() {
+                            // TODO: Once we move to `1.x.x` update to handle major versions
+                            "added" | "changed" | "removed" => {
+                                version_change = Some(Version::Minor);
+                            }
+                            "fixed" => {
+                                if version_change != Some(Version::Major)
+                                    && version_change != Some(Version::Minor)
+                                {
+                                    version_change = Some(Version::Patch);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    i += 1;
+                }
+            }
+        }
+
+        if let Some(version) = version_change {
+            println!("{package}: {version}");
+        }
+    }
+
+    Ok(())
+}
 
 fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:
