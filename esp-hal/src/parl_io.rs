@@ -16,7 +16,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::dma::Dma;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::gpio::NoPin;
 //! # use esp_hal::parl_io::{BitPackOrder, ParlIoRxOnly, RxFourBits};
@@ -39,7 +39,7 @@
 //! //  configuration
 //!  let parl_io = ParlIoRxOnly::new(
 //!     peripherals.PARL_IO,
-//!     dma_channel.configure(false, DmaPriority::Priority0),
+//!     dma_channel,
 //!     rx_descriptors,
 //!     1.MHz(),
 //! )
@@ -75,7 +75,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::dma::{Dma, DmaPriority};
+//! # use esp_hal::dma::Dma;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::parl_io::{BitPackOrder, ParlIoTxOnly, TxFourBits, SampleEdge, ClkOutPin, TxPinConfigWithValidPin};
 //!
@@ -98,7 +98,7 @@
 //! //  configuration
 //!  let parl_io = ParlIoTxOnly::new(
 //!     peripherals.PARL_IO,
-//!     dma_channel.configure(false, DmaPriority::Priority0),
+//!     dma_channel,
 //!     tx_descriptors,
 //!     1.MHz(),
 //! )
