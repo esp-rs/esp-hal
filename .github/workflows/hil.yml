@@ -188,6 +188,8 @@ jobs:
       - name: Run Tests
         id: run-tests
         run: |
+          [ -f ~/setup.sh ] && source ~/setup.sh
+
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
           ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
