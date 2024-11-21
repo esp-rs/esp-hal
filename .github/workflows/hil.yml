@@ -156,32 +156,25 @@ jobs:
           - soc: esp32c2
             runner: esp32c2-jtag
             host: aarch64
-            hubs: "1 3"
           - soc: esp32c3
             runner: esp32c3-usb
             host: armv7
-            hubs: "1-1"
           - soc: esp32c6
             runner: esp32c6-usb
             host: armv7
-            hubs: "1-1"
           - soc: esp32h2
             runner: esp32h2-usb
             host: armv7
-            hubs: "1-1"
           # Xtensa devices:
           - soc: esp32
             runner: esp32-jtag
             host: aarch64
-            hubs: "1 3"
           - soc: esp32s2
             runner: esp32s2-jtag
             host: armv7
-            hubs: "1-1"
           - soc: esp32s3
             runner: esp32s3-usb
             host: armv7
-            hubs: "1-1"
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -191,29 +184,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: xtask-${{ matrix.target.host }}
-
-      - name: Cycle USB ports
-        run: |
-          export PATH=$PATH:/home/espressif/.cargo/bin
-          for i in {1..10}; do
-            # Disable all used hubs
-            for hub in ${{ matrix.target.hubs }}; do
-              sudo uhubctl -a off -l $hub
-            done
-
-            sleep 5
-
-            # Enable all used hubs
-            for hub in ${{ matrix.target.hubs }}; do
-              sudo uhubctl -a on -l $hub
-            done
-
-            sleep 0.5
-
-            if probe-rs list | grep -q "\[0\]:"; then
-              break
-            fi
-          done
 
       - name: Run Tests
         id: run-tests
