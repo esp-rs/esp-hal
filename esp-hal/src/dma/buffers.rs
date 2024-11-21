@@ -1163,8 +1163,11 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
     fn prepare(&mut self) -> Preparation {
         Preparation {
             start: self.descriptor,
-            block_size: None,
-            is_burstable: true,
+            direction: TransferDirection::Out,
+            // TODO: support external memory access.
+            #[cfg(esp32s3)]
+            external_memory_block_size: None,
+            burst_transfer: BurstTransfer::Disabled,
             // The DMA must not check the owner bit, as it is never set.
             check_owner: Some(false),
         }
