@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA channel objects now implement `Peripheral` (#2526)
 - DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
 - The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
+- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
+- `SystemTimer::set_unit_count` & `SystemTimer::configure_unit` (#2576)
+
+### Changed
+
+- `SystemTimer` no longer uses peripheral ref (#2576)
+- `SystemTimer::now` has been renamed `SystemTimer::unit_count(Unit)` (#2576)
 
 ### Fixed
 
@@ -26,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `configure` and `configure_for_async` DMA channel functions has been removed (#2403)
 - The DMA channel objects no longer have `tx` and `rx` fields. (#2526)
+- `SysTimerAlarms` has been removed, alarms are now part of the `SystemTimer` struct (#2576)
+- `FrozenUnit`, `AnyUnit`, `SpecificUnit`, `SpecificComparator`, `AnyComparator` have been removed from `systimer` (#2576)
 
 ## [0.22.0] - 2024-11-20
 
