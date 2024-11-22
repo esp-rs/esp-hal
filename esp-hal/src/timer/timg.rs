@@ -369,6 +369,12 @@ impl super::Timer for Timer {
     }
 }
 
+impl InterruptConfigurable for Timer {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler)
+    }
+}
+
 impl Peripheral for Timer {
     type P = Self;
 
@@ -380,14 +386,9 @@ impl Peripheral for Timer {
 
 /// A timer within a Timer Group.
 pub struct Timer {
-    /// Pointer to the register block for this TimerGroup instance.
-    pub register_block: *const RegisterBlock,
-
-    /// The timer number inside the TimerGroup
-    pub timer: u8,
-
-    /// The TimerGroup number
-    pub tg: u8,
+    register_block: *const RegisterBlock,
+    timer: u8,
+    tg: u8,
 }
 
 impl Sealed for Timer {}
@@ -395,6 +396,25 @@ unsafe impl Send for Timer {}
 
 /// Timer peripheral instance
 impl Timer {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        let interrupt = match (self.timer_group(), self.timer_number()) {
+            (0, 0) => Interrupt::TG0_T0_LEVEL,
+            #[cfg(timg_timer1)]
+            (0, 1) => Interrupt::TG0_T1_LEVEL,
+            #[cfg(timg1)]
+            (1, 0) => Interrupt::TG1_T0_LEVEL,
+            #[cfg(all(timg_timer1, timg1))]
+            (1, 1) => Interrupt::TG1_T1_LEVEL,
+            _ => unreachable!(),
+        };
+
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
+        }
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
+    }
+
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
     }
