@@ -164,15 +164,11 @@ impl<'d> Aes<'d> {
     {
         // Convert from into Key enum
         self.write_key(key.into().as_slice());
-        self.set_mode(mode as u8);
+        self.write_mode(mode);
         self.set_block(block);
         self.start();
         while !(self.is_idle()) {}
         self.block(block);
-    }
-
-    fn set_mode(&mut self, mode: u8) {
-        self.write_mode(mode as u32);
     }
 
     fn is_idle(&mut self) -> bool {
@@ -444,7 +440,7 @@ pub mod dma {
             }
             self.enable_dma(true);
             self.enable_interrupt();
-            self.set_mode(mode);
+            self.aes.write_mode(mode);
             self.set_cipher_mode(cipher_mode);
             self.write_key(key.into());
 
@@ -503,13 +499,6 @@ pub mod dma {
                     .inc_sel()
                     .modify(|_, w| w.inc_sel().clear_bit());
             }
-        }
-
-        fn set_mode(&self, mode: Mode) {
-            self.aes
-                .aes
-                .mode()
-                .modify(|_, w| unsafe { w.mode().bits(mode as u8) });
         }
 
         fn start_transform(&self) {

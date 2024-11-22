@@ -1,4 +1,4 @@
-use crate::aes::{Aes, Aes128, Aes192, Aes256, AesFlavour, Endianness, ALIGN_SIZE};
+use crate::aes::{Aes, Aes128, Aes192, Aes256, AesFlavour, Endianness, Mode, ALIGN_SIZE};
 
 impl Aes<'_> {
     pub(super) fn init(&mut self) {
@@ -27,8 +27,8 @@ impl Aes<'_> {
             .volatile_write_regset(self.aes.text(0).as_ptr(), block, text_len);
     }
 
-    pub(super) fn write_mode(&mut self, mode: u32) {
-        self.aes.mode().write(|w| unsafe { w.bits(mode) });
+    pub(super) fn write_mode(&self, mode: Mode) {
+        self.aes.mode().write(|w| unsafe { w.bits(mode as _) });
     }
 
     /// Configures how the state matrix would be laid out
