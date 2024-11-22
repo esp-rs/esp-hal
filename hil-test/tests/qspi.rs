@@ -8,7 +8,7 @@
 #[cfg(pcnt)]
 use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
-    dma::{Channel, Dma, DmaRxBuf, DmaTxBuf},
+    dma::{Dma, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Input, Level, Output, Pull},
     prelude::*,
@@ -43,7 +43,7 @@ struct Context {
     spi: Spi<'static, Blocking>,
     #[cfg(pcnt)]
     pcnt: esp_hal::peripherals::PCNT,
-    dma_channel: Channel<'static, Blocking, DmaChannel0>,
+    dma_channel: DmaChannel0,
     gpios: [AnyPin; 3],
 }
 

@@ -54,13 +54,9 @@ async fn main(_spawner: Spawner) {
 
     let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, peripherals.GPIO5);
 
-    let parl_io = ParlIoTxOnly::new(
-        peripherals.PARL_IO,
-        dma.channel0.into_async(),
-        tx_descriptors,
-        1.MHz(),
-    )
-    .unwrap();
+    let parl_io = ParlIoTxOnly::new(peripherals.PARL_IO, dma.channel0, tx_descriptors, 1.MHz())
+        .unwrap()
+        .into_async();
 
     let mut clock_pin = ClkOutPin::new(peripherals.GPIO8);
 

@@ -63,6 +63,18 @@ impl<'a, T> PeripheralRef<'a, T> {
         PeripheralRef::new(unsafe { self.inner.clone_unchecked() })
     }
 
+    /// Transform the inner peripheral.
+    ///
+    /// This converts from `PeripheralRef<'a, T>` to `PeripheralRef<'a, U>`,
+    /// using a user-provided impl to convert from `T` to `U`.
+    #[inline]
+    pub fn map<U>(self, transform: impl FnOnce(T) -> U) -> PeripheralRef<'a, U> {
+        PeripheralRef {
+            inner: transform(self.inner),
+            _lifetime: PhantomData,
+        }
+    }
+
     /// Map the inner peripheral using `Into`.
     ///
     /// This converts from `PeripheralRef<'a, T>` to `PeripheralRef<'a, U>`,
@@ -75,10 +87,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     where
         T: Into<U>,
     {
-        PeripheralRef {
-            inner: self.inner.into(),
-            _lifetime: PhantomData,
-        }
+        self.map(Into::into)
     }
 }
 
@@ -179,7 +188,19 @@ pub trait Peripheral: Sized + crate::private::Sealed {
         Self::P: Into<U>,
         U: Peripheral<P = U>,
     {
-        unsafe { self.clone_unchecked().into() }
+        self.map(Into::into)
+    }
+
+    /// Map the peripheral using `Into`.
+    ///
+    /// This converts from `Peripheral<P = T>` to `Peripheral<P = U>`,
+    /// using an `Into` impl to convert from `T` to `U`.
+    #[inline]
+    fn map<U>(self, transform: impl FnOnce(Self::P) -> U) -> U
+    where
+        U: Peripheral<P = U>,
+    {
+        transform(unsafe { self.clone_unchecked() })
     }
 }
 

@@ -36,15 +36,17 @@ use crate::{
         ChannelTx,
         DescriptorChain,
         DmaChannelConvert,
+        DmaChannelFor,
         DmaDescriptor,
-        DmaEligible,
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
         DmaTransferTx,
         ReadBuffer,
         Rx,
+        RxChannelFor,
         Tx,
+        TxChannelFor,
         WriteBuffer,
     },
     gpio::{
@@ -53,7 +55,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
-    peripherals::{self, Interrupt, PARL_IO},
+    peripherals::{Interrupt, PARL_IO},
     system::{self, GenericPeripheralGuard},
     Async,
     Blocking,
@@ -809,7 +811,7 @@ pub struct ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
+    tx_channel: ChannelTx<'d, DM, TxChannelFor<PARL_IO>>,
     tx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
@@ -890,7 +892,7 @@ pub struct ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
+    rx_channel: ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
     rx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
@@ -1003,31 +1005,29 @@ where
 
 impl<'d> ParlIoFullDuplex<'d, Blocking> {
     /// Create a new instance of [ParlIoFullDuplex]
-    pub fn new<CH, DM>(
-        _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        dma_channel: Channel<'d, DM, CH>,
+    pub fn new<CH>(
+        _parl_io: impl Peripheral<P = PARL_IO> + 'd,
+        dma_channel: impl Peripheral<P = CH> + 'd,
         tx_descriptors: &'static mut [DmaDescriptor],
         rx_descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        DM: Mode,
-        CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
-        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
+        CH: DmaChannelConvert<DmaChannelFor<PARL_IO>>,
     {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
-        let dma_channel = Channel::<Blocking, CH>::from(dma_channel);
+        let dma_channel = Channel::new(dma_channel.map(|ch| ch.degrade()));
         internal_init(frequency)?;
 
         Ok(Self {
             tx: TxCreatorFullDuplex {
-                tx_channel: dma_channel.tx.degrade(),
+                tx_channel: dma_channel.tx,
                 descriptors: tx_descriptors,
                 _guard: tx_guard,
             },
             rx: RxCreatorFullDuplex {
-                rx_channel: dma_channel.rx.degrade(),
+                rx_channel: dma_channel.rx,
                 descriptors: rx_descriptors,
                 _guard: rx_guard,
             },
@@ -1036,6 +1036,17 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
 
     /// Convert to an async version.
     pub fn into_async(self) -> ParlIoFullDuplex<'d, Async> {
+        for core in crate::Cpu::other() {
+            #[cfg(esp32c6)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO);
+            }
+            #[cfg(esp32h2)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
+                crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
+            }
+        }
         ParlIoFullDuplex {
             tx: TxCreatorFullDuplex {
                 tx_channel: self.tx.tx_channel.into_async(),
@@ -1115,35 +1126,52 @@ where
     pub tx: TxCreator<'d, DM>,
 }
 
-impl<'d, DM> ParlIoTxOnly<'d, DM>
-where
-    DM: Mode,
-{
-    /// Create a new [ParlIoTxOnly]
-    // TODO: only take a TX DMA channel?
+impl<'d> ParlIoTxOnly<'d, Blocking> {
+    /// Creates a new [ParlIoTxOnly]
     pub fn new<CH>(
-        _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        dma_channel: Channel<'d, DM, CH>,
+        _parl_io: impl Peripheral<P = PARL_IO> + 'd,
+        dma_channel: impl Peripheral<P = CH> + 'd,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
+        CH: DmaChannelConvert<TxChannelFor<PARL_IO>>,
     {
         let guard = GenericPeripheralGuard::new();
+        let tx_channel = ChannelTx::new(dma_channel.map(|ch| ch.degrade()));
         internal_init(frequency)?;
 
         Ok(Self {
             tx: TxCreator {
-                tx_channel: dma_channel.tx.degrade(),
+                tx_channel,
                 descriptors,
                 _guard: guard,
             },
         })
     }
-}
 
-impl ParlIoTxOnly<'_, Blocking> {
+    /// Converts to Async mode.
+    pub fn into_async(self) -> ParlIoTxOnly<'d, Async> {
+        for core in crate::Cpu::other() {
+            #[cfg(esp32c6)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO);
+            }
+            #[cfg(esp32h2)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
+                crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
+            }
+        }
+        ParlIoTxOnly {
+            tx: TxCreator {
+                tx_channel: self.tx.tx_channel.into_async(),
+                descriptors: self.tx.descriptors,
+                _guard: self.tx._guard,
+            },
+        }
+    }
+
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1170,6 +1198,19 @@ impl ParlIoTxOnly<'_, Blocking> {
     /// Resets asserted interrupts
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
         internal_clear_interrupts(interrupts.into());
+    }
+}
+
+impl<'d> ParlIoTxOnly<'d, Async> {
+    /// Convert to a blocking version.
+    pub fn into_blocking(self) -> ParlIoTxOnly<'d, Blocking> {
+        ParlIoTxOnly {
+            tx: TxCreator {
+                tx_channel: self.tx.tx_channel.into_blocking(),
+                descriptors: self.tx.descriptors,
+                _guard: self.tx._guard,
+            },
+        }
     }
 }
 
@@ -1191,35 +1232,53 @@ where
     pub rx: RxCreator<'d, DM>,
 }
 
-impl<'d, DM> ParlIoRxOnly<'d, DM>
-where
-    DM: Mode,
-{
+impl<'d> ParlIoRxOnly<'d, Blocking> {
     /// Create a new [ParlIoRxOnly] instance
-    // TODO: only take a RX DMA channel?
     pub fn new<CH>(
-        _parl_io: impl Peripheral<P = peripherals::PARL_IO> + 'd,
-        dma_channel: Channel<'d, DM, CH>,
+        _parl_io: impl Peripheral<P = PARL_IO> + 'd,
+        dma_channel: impl Peripheral<P = CH> + 'd,
         descriptors: &'static mut [DmaDescriptor],
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<<PARL_IO as DmaEligible>::Dma>,
+        CH: DmaChannelConvert<RxChannelFor<PARL_IO>>,
     {
         let guard = GenericPeripheralGuard::new();
+        let rx_channel = ChannelRx::new(dma_channel.map(|ch| ch.degrade()));
         internal_init(frequency)?;
 
         Ok(Self {
             rx: RxCreator {
-                rx_channel: dma_channel.rx.degrade(),
+                rx_channel,
                 descriptors,
                 _guard: guard,
             },
         })
     }
-}
 
-impl ParlIoRxOnly<'_, Blocking> {
+    /// Converts to Async mode.
+    pub fn into_async(self) -> ParlIoRxOnly<'d, Async> {
+        for core in crate::Cpu::other() {
+            #[cfg(esp32c6)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO);
+            }
+            #[cfg(esp32h2)]
+            {
+                crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
+                crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
+            }
+        }
+
+        ParlIoRxOnly {
+            rx: RxCreator {
+                rx_channel: self.rx.rx_channel.into_async(),
+                descriptors: self.rx.descriptors,
+                _guard: self.rx._guard,
+            },
+        }
+    }
+
     /// Sets the interrupt handler, enables it with
     /// [crate::interrupt::Priority::min()]
     ///
@@ -1246,6 +1305,19 @@ impl ParlIoRxOnly<'_, Blocking> {
     /// Resets asserted interrupts
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
         internal_clear_interrupts(interrupts.into());
+    }
+}
+
+impl<'d> ParlIoRxOnly<'d, Async> {
+    /// Convert to a blocking version.
+    pub fn into_blocking(self) -> ParlIoRxOnly<'d, Blocking> {
+        ParlIoRxOnly {
+            rx: RxCreator {
+                rx_channel: self.rx.rx_channel.into_blocking(),
+                descriptors: self.rx.descriptors,
+                _guard: self.rx._guard,
+            },
+        }
     }
 }
 
@@ -1361,7 +1433,7 @@ impl<'d, DM> DmaSupportTx for ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    type TX = ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>;
+    type TX = ChannelTx<'d, DM, TxChannelFor<PARL_IO>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -1403,7 +1475,7 @@ where
     }
 
     fn start_receive_bytes_dma(
-        rx_channel: &mut ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
+        rx_channel: &mut ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
         rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
@@ -1457,7 +1529,7 @@ impl<'d, DM> DmaSupportRx for ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    type RX = ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>;
+    type RX = ChannelRx<'d, DM, RxChannelFor<PARL_IO>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -1473,7 +1545,7 @@ pub struct TxCreator<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
+    tx_channel: ChannelTx<'d, DM, TxChannelFor<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1483,7 +1555,7 @@ pub struct RxCreator<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
+    rx_channel: ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1493,7 +1565,7 @@ pub struct TxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
+    tx_channel: ChannelTx<'d, DM, TxChannelFor<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1503,7 +1575,7 @@ pub struct RxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, <PARL_IO as DmaEligible>::Dma>,
+    rx_channel: ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1529,6 +1601,25 @@ pub mod asynch {
     impl TxDoneFuture {
         pub fn new() -> Self {
             Instance::listen_tx_done();
+            let mut parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
+
+            #[cfg(esp32c6)]
+            {
+                parl_io.bind_parl_io_interrupt(interrupt_handler.handler());
+                unwrap!(crate::interrupt::enable(
+                    Interrupt::PARL_IO,
+                    interrupt_handler.priority()
+                ));
+            }
+            #[cfg(esp32h2)]
+            {
+                parl_io.bind_parl_io_tx_interrupt(interrupt_handler.handler());
+                unwrap!(crate::interrupt::enable(
+                    Interrupt::PARL_IO_TX,
+                    interrupt_handler.priority()
+                ));
+            }
+
             Self {}
         }
     }
@@ -1540,20 +1631,6 @@ pub mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            let mut parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
-
-            #[cfg(esp32c6)]
-            {
-                parl_io.bind_parl_io_interrupt(interrupt_handler.handler());
-                crate::interrupt::enable(Interrupt::PARL_IO, interrupt_handler.priority()).unwrap();
-            }
-            #[cfg(esp32h2)]
-            {
-                parl_io.bind_parl_io_tx_interrupt(interrupt_handler.handler());
-                crate::interrupt::enable(Interrupt::PARL_IO_TX, interrupt_handler.priority())
-                    .unwrap();
-            }
-
             TX_WAKER.register(cx.waker());
             if Instance::is_listening_tx_done() {
                 Poll::Pending

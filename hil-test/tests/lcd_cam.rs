@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{Dma, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::Level,
     lcd_cam::{
@@ -58,7 +58,9 @@ mod tests {
         let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 
-        let channel = dma.channel2;
+        // TODO: use split channels once supported
+        let tx_channel = dma.channel2;
+        let rx_channel = dma.channel3;
 
         let (vsync_in, vsync_out) = peripherals.GPIO6.split();
         let (hsync_in, hsync_out) = peripherals.GPIO7.split();
@@ -101,7 +103,7 @@ mod tests {
         config.de_idle_level = Level::Low;
         config.disable_black_region = false;
 
-        let dpi = Dpi::new(lcd_cam.lcd, channel.tx, 500u32.kHz(), config)
+        let dpi = Dpi::new(lcd_cam.lcd, tx_channel, 500u32.kHz(), config)
             .with_vsync(vsync_out)
             .with_hsync(hsync_out)
             .with_de(de_out)
@@ -117,7 +119,7 @@ mod tests {
 
         let camera = Camera::new(
             lcd_cam.cam,
-            channel.rx,
+            rx_channel,
             RxEightBits::new(d0_in, d1_in, d2_in, d3_in, d4_in, d5_in, d6_in, d7_in),
             1u32.MHz(),
         )

@@ -54,7 +54,7 @@ mod tests {
 
         let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
-            ctx.dma.channel0.tx,
+            ctx.dma.channel0,
             pins,
             20.MHz(),
             Config::default(),

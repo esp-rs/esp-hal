@@ -7,7 +7,7 @@
 #[cfg(esp32c6)]
 use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
-    dma::{Channel, Dma, DmaChannel0},
+    dma::{Dma, DmaChannel0},
     gpio::{
         interconnect::{InputSignal, OutputSignal},
         NoPin,
@@ -27,13 +27,12 @@ use esp_hal::{
     },
     peripherals::PARL_IO,
     prelude::*,
-    Blocking,
 };
 use hil_test as _;
 
 struct Context {
     parl_io: PARL_IO,
-    dma_channel: Channel<'static, Blocking, DmaChannel0>,
+    dma_channel: DmaChannel0,
     clock: OutputSignal,
     valid: OutputSignal,
     clock_loopback: InputSignal,

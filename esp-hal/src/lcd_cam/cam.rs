@@ -44,7 +44,7 @@
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //! let mut camera = Camera::new(
 //!     lcd_cam.cam,
-//!     channel.rx,
+//!     channel,
 //!     data_pins,
 //!     20u32.MHz(),
 //! )
@@ -67,7 +67,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelRx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaRxBuffer, Rx},
+    dma::{ChannelRx, DmaChannelConvert, DmaError, DmaPeripheral, DmaRxBuffer, Rx, RxChannelFor},
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -123,7 +123,7 @@ pub struct Cam<'d> {
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    rx_channel: ChannelRx<'d, Blocking, <LCD_CAM as DmaEligible>::Dma>,
+    rx_channel: ChannelRx<'d, Blocking, RxChannelFor<LCD_CAM>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 
@@ -131,14 +131,15 @@ impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
     pub fn new<P, CH>(
         cam: Cam<'d>,
-        channel: ChannelRx<'d, Blocking, CH>,
+        channel: impl Peripheral<P = CH> + 'd,
         _pins: P,
         frequency: HertzU32,
     ) -> Self
     where
-        CH: DmaChannelConvert<<LCD_CAM as DmaEligible>::Dma>,
+        CH: DmaChannelConvert<RxChannelFor<LCD_CAM>>,
         P: RxPins,
     {
+        let rx_channel = ChannelRx::new(channel.map(|ch| ch.degrade()));
         let lcd_cam = cam.lcd_cam;
 
         let clocks = Clocks::get();
@@ -184,7 +185,7 @@ impl<'d> Camera<'d> {
 
         Self {
             lcd_cam,
-            rx_channel: channel.degrade(),
+            rx_channel,
             _guard: cam._guard,
         }
     }

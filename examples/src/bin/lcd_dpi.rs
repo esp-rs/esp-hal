@@ -71,7 +71,7 @@ fn main() -> ! {
     .with_scl(peripherals.GPIO48);
 
     let dma = Dma::new(peripherals.DMA);
-    let channel = dma.channel2;
+    let tx_channel = dma.channel2;
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 
     let mut expander = Tca9554::new(i2c);
@@ -166,7 +166,7 @@ fn main() -> ! {
     config.de_idle_level = Level::Low;
     config.disable_black_region = false;
 
-    let mut dpi = Dpi::new(lcd_cam.lcd, channel.tx, 16.MHz(), config)
+    let mut dpi = Dpi::new(lcd_cam.lcd, tx_channel, 16.MHz(), config)
         .with_vsync(vsync_pin)
         .with_hsync(peripherals.GPIO46)
         .with_de(peripherals.GPIO17)

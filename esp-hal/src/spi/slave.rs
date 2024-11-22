@@ -177,39 +177,44 @@ pub mod dma {
             ChannelRx,
             ChannelTx,
             DescriptorChain,
+            DmaChannelFor,
             DmaDescriptor,
             DmaTransferRx,
             DmaTransferRxTx,
             DmaTransferTx,
             ReadBuffer,
             Rx,
+            RxChannelFor,
             Tx,
+            TxChannelFor,
             WriteBuffer,
         },
         Mode,
     };
 
-    impl<'d, M, T> Spi<'d, M, T>
+    impl<'d, T> Spi<'d, Blocking, T>
     where
         T: InstanceDma,
-        M: Mode,
     {
-        /// Configures the SPI3 peripheral with the provided DMA channel and
+        /// Configures the SPI peripheral with the provided DMA channel and
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-        pub fn with_dma<CH, DM>(
+        pub fn with_dma<CH>(
             self,
-            channel: Channel<'d, DM, CH>,
+            channel: impl Peripheral<P = CH> + 'd,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, M, T>
+        ) -> SpiDma<'d, Blocking, T>
         where
-            CH: DmaChannelConvert<T::Dma>,
-            DM: Mode,
-            Channel<'d, M, CH>: From<Channel<'d, DM, CH>>,
+            CH: DmaChannelConvert<DmaChannelFor<T>>,
         {
             self.spi.info().set_data_mode(self.data_mode, true);
-            SpiDma::new(self.spi, channel.into(), rx_descriptors, tx_descriptors)
+            SpiDma::new(
+                self.spi,
+                channel.map(|ch| ch.degrade()).into_ref(),
+                rx_descriptors,
+                tx_descriptors,
+            )
         }
     }
 
@@ -220,7 +225,7 @@ pub mod dma {
         M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, M, T::Dma>,
+        pub(crate) channel: Channel<'d, M, DmaChannelFor<T>>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
         _guard: PeripheralGuard,
@@ -260,7 +265,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, DmaMode, T::Dma>;
+        type TX = ChannelTx<'d, DmaMode, TxChannelFor<T>>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -276,7 +281,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, DmaMode, T::Dma>;
+        type RX = ChannelRx<'d, DmaMode, RxChannelFor<T>>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -287,32 +292,35 @@ pub mod dma {
         }
     }
 
-    impl<'d, DmaMode, T> SpiDma<'d, DmaMode, T>
+    impl<'d, T> SpiDma<'d, Blocking, T>
     where
         T: InstanceDma,
-        DmaMode: Mode,
     {
-        fn new<CH>(
+        fn new(
             spi: PeripheralRef<'d, T>,
-            channel: Channel<'d, DmaMode, CH>,
+            channel: PeripheralRef<'d, DmaChannelFor<T>>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> Self
-        where
-            CH: DmaChannelConvert<T::Dma>,
-        {
+        ) -> Self {
+            let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
             let guard = PeripheralGuard::new(spi.info().peripheral);
 
             Self {
                 spi,
-                channel: channel.degrade(),
+                channel,
                 rx_chain: DescriptorChain::new(rx_descriptors),
                 tx_chain: DescriptorChain::new(tx_descriptors),
                 _guard: guard,
             }
         }
+    }
 
+    impl<'d, M, T> SpiDma<'d, M, T>
+    where
+        M: Mode,
+        T: InstanceDma,
+    {
         fn driver(&self) -> DmaDriver {
             DmaDriver {
                 info: self.spi.info(),

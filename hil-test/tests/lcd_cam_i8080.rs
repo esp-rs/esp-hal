@@ -78,7 +78,7 @@ mod tests {
 
         let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
-            ctx.dma.channel0.tx,
+            ctx.dma.channel0,
             pins,
             20.MHz(),
             Config::default(),
@@ -141,7 +141,7 @@ mod tests {
 
         let mut i8080 = I8080::new(
             ctx.lcd_cam.lcd,
-            ctx.dma.channel0.tx,
+            ctx.dma.channel0,
             pins,
             20.MHz(),
             Config::default(),
@@ -258,15 +258,9 @@ mod tests {
             unit3_signal,
         );
 
-        let mut i8080 = I8080::new(
-            ctx.lcd_cam.lcd,
-            channel.tx,
-            pins,
-            20.MHz(),
-            Config::default(),
-        )
-        .with_cs(cs_signal)
-        .with_ctrl_pins(NoPin, NoPin);
+        let mut i8080 = I8080::new(ctx.lcd_cam.lcd, channel, pins, 20.MHz(), Config::default())
+            .with_cs(cs_signal)
+            .with_ctrl_pins(NoPin, NoPin);
 
         // This is to make the test values look more intuitive.
         i8080.set_bit_order(BitOrder::Inverted);

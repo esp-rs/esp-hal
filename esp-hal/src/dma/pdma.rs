@@ -16,10 +16,9 @@ use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{
     dma::*,
-    peripheral::PeripheralRef,
+    peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
-    system::{Peripheral, PeripheralClockControl},
-    Blocking,
+    system::{self, PeripheralClockControl},
 };
 
 type SpiRegisterBlock = crate::peripherals::spi2::RegisterBlock;
@@ -40,17 +39,33 @@ pub trait PdmaChannel: crate::private::Sealed {
     fn tx_async_flag(&self) -> &'static AtomicBool;
 }
 
-#[doc(hidden)]
-pub struct SpiDmaRxChannelImpl<C>(C);
+/// The RX half of an arbitrary SPI DMA channel.
+pub struct AnySpiDmaRxChannel(AnySpiDmaChannel);
 
-impl<C> crate::private::Sealed for SpiDmaRxChannelImpl<C> {}
+impl crate::private::Sealed for AnySpiDmaRxChannel {}
+impl DmaRxChannel for AnySpiDmaRxChannel {}
+impl Peripheral for AnySpiDmaRxChannel {
+    type P = Self;
 
-#[doc(hidden)]
-pub struct SpiDmaTxChannelImpl<C>(C);
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self(self.0.clone_unchecked())
+    }
+}
 
-impl<C> crate::private::Sealed for SpiDmaTxChannelImpl<C> {}
+/// The TX half of an arbitrary SPI DMA channel.
+pub struct AnySpiDmaTxChannel(AnySpiDmaChannel);
 
-impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDmaTxChannelImpl<C> {
+impl crate::private::Sealed for AnySpiDmaTxChannel {}
+impl DmaTxChannel for AnySpiDmaTxChannel {}
+impl Peripheral for AnySpiDmaTxChannel {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self(self.0.clone_unchecked())
+    }
+}
+
+impl RegisterAccess for AnySpiDmaTxChannel {
     fn reset(&self) {
         let spi = self.0.register_block();
         spi.dma_conf().modify(|_, w| w.out_rst().set_bit());
@@ -107,7 +122,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> TxRegisterAccess for SpiDmaTxChannelImpl<C> {
+impl TxRegisterAccess for AnySpiDmaTxChannel {
     fn set_auto_write_back(&self, enable: bool) {
         // there is no `auto_wrback` for SPI
         assert!(!enable);
@@ -127,9 +142,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> TxRegisterAccess for SpiD
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaTxInterrupt>
-    for SpiDmaTxChannelImpl<C>
-{
+impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block.dma_int_ena().modify(|_, w| {
@@ -215,7 +228,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaTxInte
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDmaRxChannelImpl<C> {
+impl RegisterAccess for AnySpiDmaRxChannel {
     fn reset(&self) {
         let spi = self.0.register_block();
         spi.dma_conf().modify(|_, w| w.in_rst().set_bit());
@@ -267,7 +280,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RegisterAccess for SpiDma
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RxRegisterAccess for SpiDmaRxChannelImpl<C> {
+impl RxRegisterAccess for AnySpiDmaRxChannel {
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         Some(self.0.peripheral_interrupt())
     }
@@ -277,9 +290,7 @@ impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> RxRegisterAccess for SpiD
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = SpiRegisterBlock>> InterruptAccess<DmaRxInterrupt>
-    for SpiDmaRxChannelImpl<C>
-{
+impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block.dma_int_ena().modify(|_, w| {
@@ -385,17 +396,42 @@ macro_rules! ImplSpiChannel {
             #[non_exhaustive]
             pub struct [<Spi $num DmaChannel>] {}
 
+            impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
+
+            impl Peripheral for [<Spi $num DmaChannel>] {
+                type P = Self;
+
+                unsafe fn clone_unchecked(&self) -> Self::P {
+                    Self::steal()
+                }
+            }
+
+            impl [<Spi $num DmaChannel>] {
+                /// Unsafely constructs a new DMA channel.
+                ///
+                /// # Safety
+                ///
+                /// The caller must ensure that only a single instance is used.
+                pub unsafe fn steal() -> Self {
+                    Self {}
+                }
+            }
+
             impl DmaChannel for [<Spi $num DmaChannel>] {
-                type Rx = SpiDmaRxChannelImpl<Self>;
-                type Tx = SpiDmaTxChannelImpl<Self>;
+                type Rx = AnySpiDmaRxChannel;
+                type Tx = AnySpiDmaTxChannel;
+
+                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
+                    (AnySpiDmaRxChannel(Self {}.into()), AnySpiDmaTxChannel(Self {}.into()))
+                }
             }
 
             impl DmaChannelExt for [<Spi $num DmaChannel>] {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    SpiDmaRxChannelImpl(Self {})
+                    AnySpiDmaRxChannel(Self {}.into())
                 }
                 fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    SpiDmaTxChannelImpl(Self {})
+                    AnySpiDmaTxChannel(Self {}.into())
                 }
             }
 
@@ -403,7 +439,7 @@ macro_rules! ImplSpiChannel {
                 type RegisterBlock = SpiRegisterBlock;
 
                 fn register_block(&self) -> &SpiRegisterBlock {
-                    unsafe { &*crate::peripherals::[<SPI $num>]::PTR }
+                    unsafe { &*$crate::peripherals::[<SPI $num>]::PTR }
                 }
                 fn tx_waker(&self) -> &'static AtomicWaker {
                     static WAKER: AtomicWaker = AtomicWaker::new();
@@ -436,44 +472,53 @@ macro_rules! ImplSpiChannel {
             }
 
             impl DmaChannelConvert<AnySpiDmaChannel> for [<Spi $num DmaChannel>] {
-                fn degrade_rx(rx: SpiDmaRxChannelImpl<Self>) -> SpiDmaRxChannelImpl<AnySpiDmaChannelInner> {
-                    SpiDmaRxChannelImpl(rx.0.into())
-                }
-                fn degrade_tx(tx: SpiDmaTxChannelImpl<Self>) -> SpiDmaTxChannelImpl<AnySpiDmaChannelInner> {
-                    SpiDmaTxChannelImpl(tx.0.into())
+                fn degrade(self) -> AnySpiDmaChannel {
+                    self.into()
                 }
             }
 
-            impl $crate::private::Sealed for [<Spi $num DmaChannel>] {}
+            impl DmaChannelConvert<AnySpiDmaRxChannel> for [<Spi $num DmaChannel>] {
+                fn degrade(self) -> AnySpiDmaRxChannel {
+                    AnySpiDmaRxChannel(Self {}.into())
+                }
+            }
 
-            impl [<Spi $num DmaChannel>] {
-                /// Unsafely constructs a new DMA channel.
-                ///
-                /// # Safety
-                ///
-                /// The caller must ensure that only a single instance is used.
-                pub unsafe fn steal<'a>() -> Channel<'a, Blocking, Self> {
-                    Channel {
-                        tx: ChannelTx::new(SpiDmaTxChannelImpl([<Spi $num DmaChannel>] {})),
-                        rx: ChannelRx::new(SpiDmaRxChannelImpl([<Spi $num DmaChannel>] {})),
-                    }
+            impl DmaChannelConvert<AnySpiDmaTxChannel> for [<Spi $num DmaChannel>] {
+                fn degrade(self) -> AnySpiDmaTxChannel {
+                    AnySpiDmaTxChannel(Self {}.into())
                 }
             }
         }
     };
 }
 
-#[doc(hidden)]
-pub struct I2sDmaRxChannelImpl<C>(C);
+/// The RX half of an arbitrary I2S DMA channel.
+pub struct AnyI2sDmaRxChannel(AnyI2sDmaChannel);
 
-impl<C> crate::private::Sealed for I2sDmaRxChannelImpl<C> {}
+impl crate::private::Sealed for AnyI2sDmaRxChannel {}
+impl DmaRxChannel for AnyI2sDmaRxChannel {}
+impl Peripheral for AnyI2sDmaRxChannel {
+    type P = Self;
 
-#[doc(hidden)]
-pub struct I2sDmaTxChannelImpl<C>(C);
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self(self.0.clone_unchecked())
+    }
+}
 
-impl<C> crate::private::Sealed for I2sDmaTxChannelImpl<C> {}
+/// The TX half of an arbitrary I2S DMA channel.
+pub struct AnyI2sDmaTxChannel(AnyI2sDmaChannel);
 
-impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaTxChannelImpl<C> {
+impl crate::private::Sealed for AnyI2sDmaTxChannel {}
+impl DmaTxChannel for AnyI2sDmaTxChannel {}
+impl Peripheral for AnyI2sDmaTxChannel {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self(self.0.clone_unchecked())
+    }
+}
+
+impl RegisterAccess for AnyI2sDmaTxChannel {
     fn reset(&self) {
         let reg_block = self.0.register_block();
         reg_block.lc_conf().modify(|_, w| w.out_rst().set_bit());
@@ -538,7 +583,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> TxRegisterAccess for I2sDmaTxChannelImpl<C> {
+impl TxRegisterAccess for AnyI2sDmaTxChannel {
     fn set_auto_write_back(&self, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block
@@ -564,9 +609,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> TxRegisterAccess for I2sD
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaTxInterrupt>
-    for I2sDmaTxChannelImpl<C>
-{
+impl InterruptAccess<DmaTxInterrupt> for AnyI2sDmaTxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block.int_ena().modify(|_, w| {
@@ -652,7 +695,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaTxInte
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDmaRxChannelImpl<C> {
+impl RegisterAccess for AnyI2sDmaRxChannel {
     fn reset(&self) {
         let reg_block = self.0.register_block();
         reg_block.lc_conf().modify(|_, w| w.in_rst().set_bit());
@@ -710,7 +753,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RegisterAccess for I2sDma
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RxRegisterAccess for I2sDmaRxChannelImpl<C> {
+impl RxRegisterAccess for AnyI2sDmaRxChannel {
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         Some(self.0.peripheral_interrupt())
     }
@@ -720,9 +763,7 @@ impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> RxRegisterAccess for I2sD
     }
 }
 
-impl<C: PdmaChannel<RegisterBlock = I2sRegisterBlock>> InterruptAccess<DmaRxInterrupt>
-    for I2sDmaRxChannelImpl<C>
-{
+impl InterruptAccess<DmaRxInterrupt> for AnyI2sDmaRxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block.int_ena().modify(|_, w| {
@@ -824,17 +865,40 @@ macro_rules! ImplI2sChannel {
 
             impl $crate::private::Sealed for [<I2s $num DmaChannel>] {}
 
+            impl Peripheral for [<I2s $num DmaChannel>] {
+                type P = Self;
+
+                unsafe fn clone_unchecked(&self) -> Self::P {
+                    Self::steal()
+                }
+            }
+
+            impl [<I2s $num DmaChannel>] {
+                /// Unsafely constructs a new DMA channel.
+                ///
+                /// # Safety
+                ///
+                /// The caller must ensure that only a single instance is used.
+                pub unsafe fn steal() -> Self {
+                    Self {}
+                }
+            }
+
             impl DmaChannel for [<I2s $num DmaChannel>] {
-                type Rx = I2sDmaRxChannelImpl<Self>;
-                type Tx = I2sDmaTxChannelImpl<Self>;
+                type Rx = AnyI2sDmaRxChannel;
+                type Tx = AnyI2sDmaTxChannel;
+
+                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
+                    (AnyI2sDmaRxChannel(Self {}.into()), AnyI2sDmaTxChannel(Self {}.into()))
+                }
             }
 
             impl DmaChannelExt for [<I2s $num DmaChannel>] {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    I2sDmaRxChannelImpl(Self {})
+                    AnyI2sDmaRxChannel(Self {}.into())
                 }
                 fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    I2sDmaTxChannelImpl(Self {})
+                    AnyI2sDmaTxChannel(Self {}.into())
                 }
             }
 
@@ -874,25 +938,20 @@ macro_rules! ImplI2sChannel {
             }
 
             impl DmaChannelConvert<AnyI2sDmaChannel> for [<I2s $num DmaChannel>] {
-                fn degrade_rx(rx: I2sDmaRxChannelImpl<Self>) -> I2sDmaRxChannelImpl<AnyI2sDmaChannelInner> {
-                    I2sDmaRxChannelImpl(rx.0.into())
-                }
-                fn degrade_tx(tx: I2sDmaTxChannelImpl<Self>) -> I2sDmaTxChannelImpl<AnyI2sDmaChannelInner> {
-                    I2sDmaTxChannelImpl(tx.0.into())
+                fn degrade(self) -> AnyI2sDmaChannel {
+                    self.into()
                 }
             }
 
-            impl [<I2s $num DmaChannel>] {
-                /// Unsafely constructs a new DMA channel.
-                ///
-                /// # Safety
-                ///
-                /// The caller must ensure that only a single instance is used.
-                pub unsafe fn steal<'a>() -> Channel<'a, Blocking, Self> {
-                    Channel {
-                        tx: ChannelTx::new(I2sDmaTxChannelImpl([<I2s $num DmaChannel>] {})),
-                        rx: ChannelRx::new(I2sDmaRxChannelImpl([<I2s $num DmaChannel>] {})),
-                    }
+            impl DmaChannelConvert<AnyI2sDmaRxChannel> for [<I2s $num DmaChannel>] {
+                fn degrade(self) -> AnyI2sDmaRxChannel {
+                    AnyI2sDmaRxChannel(Self {}.into())
+                }
+            }
+
+            impl DmaChannelConvert<AnyI2sDmaTxChannel> for [<I2s $num DmaChannel>] {
+                fn degrade(self) -> AnyI2sDmaTxChannel {
+                    AnyI2sDmaTxChannel(Self {}.into())
                 }
             }
         }
@@ -921,23 +980,21 @@ crate::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
 pub struct Dma<'d> {
     _inner: PeripheralRef<'d, crate::peripherals::DMA>,
     /// DMA channel for SPI2
-    pub spi2channel: Channel<'d, Blocking, Spi2DmaChannel>,
+    pub spi2channel: Spi2DmaChannel,
     /// DMA channel for SPI3
-    pub spi3channel: Channel<'d, Blocking, Spi3DmaChannel>,
+    pub spi3channel: Spi3DmaChannel,
     /// DMA channel for I2S0
-    pub i2s0channel: Channel<'d, Blocking, I2s0DmaChannel>,
+    pub i2s0channel: I2s0DmaChannel,
     /// DMA channel for I2S1
     #[cfg(i2s1)]
-    pub i2s1channel: Channel<'d, Blocking, I2s1DmaChannel>,
+    pub i2s1channel: I2s1DmaChannel,
 }
 
 impl<'d> Dma<'d> {
     /// Create a DMA instance.
-    pub fn new(
-        dma: impl crate::peripheral::Peripheral<P = crate::peripherals::DMA> + 'd,
-    ) -> Dma<'d> {
-        if PeripheralClockControl::enable(Peripheral::Dma) {
-            PeripheralClockControl::reset(Peripheral::Dma);
+    pub fn new(dma: impl Peripheral<P = crate::peripherals::DMA> + 'd) -> Dma<'d> {
+        if PeripheralClockControl::enable(system::Peripheral::Dma) {
+            PeripheralClockControl::reset(system::Peripheral::Dma);
         }
 
         #[cfg(esp32)]
@@ -983,31 +1040,31 @@ where
     }
 }
 
-/// A marker for SPI-compatible type-erased DMA channels.
-pub struct AnySpiDmaChannel;
-
-impl crate::private::Sealed for AnySpiDmaChannel {}
-
-impl DmaChannel for AnySpiDmaChannel {
-    type Rx = SpiDmaRxChannelImpl<AnySpiDmaChannelInner>;
-    type Tx = SpiDmaTxChannelImpl<AnySpiDmaChannelInner>;
-}
-
-crate::any_enum! {
-    #[doc(hidden)]
-    pub enum AnySpiDmaChannelInner {
+crate::any_peripheral! {
+    /// An SPI-compatible type-erased DMA channel.
+    pub peripheral AnySpiDmaChannel {
         Spi2(Spi2DmaChannel),
         Spi3(Spi3DmaChannel),
     }
 }
 
-impl crate::private::Sealed for AnySpiDmaChannelInner {}
+impl DmaChannel for AnySpiDmaChannel {
+    type Rx = AnySpiDmaRxChannel;
+    type Tx = AnySpiDmaTxChannel;
 
-impl PdmaChannel for AnySpiDmaChannelInner {
+    unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
+        (
+            AnySpiDmaRxChannel(unsafe { self.clone_unchecked() }),
+            AnySpiDmaTxChannel(unsafe { self.clone_unchecked() }),
+        )
+    }
+}
+
+impl PdmaChannel for AnySpiDmaChannel {
     type RegisterBlock = SpiRegisterBlock;
 
     delegate::delegate! {
-        to match self {
+        to match &self.0 {
             AnySpiDmaChannelInner::Spi2(channel) => channel,
             AnySpiDmaChannelInner::Spi3(channel) => channel,
         } {
@@ -1023,32 +1080,32 @@ impl PdmaChannel for AnySpiDmaChannelInner {
     }
 }
 
-/// A marker for I2S-compatible type-erased DMA channels.
-pub struct AnyI2sDmaChannel;
-
-impl crate::private::Sealed for AnyI2sDmaChannel {}
-
-impl DmaChannel for AnyI2sDmaChannel {
-    type Rx = I2sDmaRxChannelImpl<AnyI2sDmaChannelInner>;
-    type Tx = I2sDmaTxChannelImpl<AnyI2sDmaChannelInner>;
-}
-
-crate::any_enum! {
-    #[doc(hidden)]
-    pub enum AnyI2sDmaChannelInner {
+crate::any_peripheral! {
+    /// An I2S-compatible type-erased DMA channel.
+    pub peripheral AnyI2sDmaChannel {
         I2s0(I2s0DmaChannel),
         #[cfg(i2s1)]
         I2s1(I2s1DmaChannel),
     }
 }
 
-impl crate::private::Sealed for AnyI2sDmaChannelInner {}
+impl DmaChannel for AnyI2sDmaChannel {
+    type Rx = AnyI2sDmaRxChannel;
+    type Tx = AnyI2sDmaTxChannel;
 
-impl PdmaChannel for AnyI2sDmaChannelInner {
+    unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
+        (
+            AnyI2sDmaRxChannel(unsafe { self.clone_unchecked() }),
+            AnyI2sDmaTxChannel(unsafe { self.clone_unchecked() }),
+        )
+    }
+}
+
+impl PdmaChannel for AnyI2sDmaChannel {
     type RegisterBlock = I2sRegisterBlock;
 
     delegate::delegate! {
-        to match self {
+        to match &self.0 {
             AnyI2sDmaChannelInner::I2s0(channel) => channel,
             #[cfg(i2s1)]
             AnyI2sDmaChannelInner::I2s1(channel) => channel,

@@ -122,7 +122,7 @@ mod test {
         let mut spi = Spi::new_with_config(
             peripherals.SPI2,
             Config {
-                frequency: 100.kHz(),
+                frequency: 10000.kHz(),
                 mode: SpiMode::Mode0,
                 ..Config::default()
             },
@@ -137,7 +137,7 @@ mod test {
         let other_peripheral = Spi::new_with_config(
             peripherals.SPI3,
             Config {
-                frequency: 100.kHz(),
+                frequency: 10000.kHz(),
                 mode: SpiMode::Mode0,
                 ..Config::default()
             },
@@ -205,7 +205,7 @@ mod test {
     #[timeout(3)]
     async fn dma_does_not_lock_up_on_core_1() {
         use embassy_time::Timer;
-        use esp_hal::{dma::Channel, peripherals::SPI2, Blocking};
+        use esp_hal::peripherals::SPI2;
         use portable_atomic::{AtomicU32, Ordering};
 
         cfg_if::cfg_if! {
@@ -221,7 +221,7 @@ mod test {
 
         pub struct SpiPeripherals {
             pub spi: SPI2,
-            pub dma_channel: Channel<'static, Blocking, DmaChannel>,
+            pub dma_channel: DmaChannel,
         }
 
         #[embassy_executor::task]

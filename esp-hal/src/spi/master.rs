@@ -78,7 +78,7 @@ use procmacros::ram;
 use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
 use crate::{
     clock::Clocks,
-    dma::{Channel, DmaChannelConvert, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
+    dma::{DmaChannelConvert, DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{interconnect::PeripheralOutput, InputSignal, NoPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -465,26 +465,6 @@ pub struct Spi<'d, M, T = AnySpi> {
     guard: PeripheralGuard,
 }
 
-impl<'d, M, T> Spi<'d, M, T>
-where
-    M: Mode,
-    T: Instance,
-{
-    /// Configures the SPI instance to use DMA with the specified channel.
-    ///
-    /// This method prepares the SPI instance for DMA transfers using SPI
-    /// and returns an instance of `SpiDma` that supports DMA
-    /// operations.
-    pub fn with_dma<CH, DM>(self, channel: Channel<'d, DM, CH>) -> SpiDma<'d, M, T>
-    where
-        CH: DmaChannelConvert<T::Dma>,
-        DM: Mode,
-        Channel<'d, M, CH>: From<Channel<'d, DM, CH>>,
-    {
-        SpiDma::new(self.spi, channel.into())
-    }
-}
-
 impl<M, T> Spi<'_, M, T>
 where
     T: Instance,
@@ -546,6 +526,23 @@ impl<'d> Spi<'d, Blocking> {
             _mode: PhantomData,
             guard: self.guard,
         }
+    }
+}
+
+impl<'d, T> Spi<'d, Blocking, T>
+where
+    T: Instance,
+{
+    /// Configures the SPI instance to use DMA with the specified channel.
+    ///
+    /// This method prepares the SPI instance for DMA transfers using SPI
+    /// and returns an instance of `SpiDma` that supports DMA
+    /// operations.
+    pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking, T>
+    where
+        CH: DmaChannelConvert<DmaChannelFor<T>>,
+    {
+        SpiDma::new(self.spi, channel.map(|ch| ch.degrade()).into_ref())
     }
 }
 
@@ -859,6 +856,7 @@ mod dma {
         dma::{
             asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
+            DmaChannelFor,
             DmaRxBuf,
             DmaRxBuffer,
             DmaTxBuf,
@@ -885,7 +883,7 @@ mod dma {
         M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, M, T::Dma>,
+        pub(crate) channel: Channel<'d, M, DmaChannelFor<T>>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
@@ -993,15 +991,15 @@ mod dma {
         }
     }
 
-    impl<'d, M, T> SpiDma<'d, M, T>
+    impl<'d, T> SpiDma<'d, Blocking, T>
     where
         T: Instance,
-        M: Mode,
     {
-        pub(super) fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, M, CH>) -> Self
-        where
-            CH: DmaChannelConvert<T::Dma>,
-        {
+        pub(super) fn new(
+            spi: PeripheralRef<'d, T>,
+            channel: PeripheralRef<'d, DmaChannelFor<T>>,
+        ) -> Self {
+            let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
             #[cfg(all(esp32, spi_address_workaround))]
             let address_buffer = {
@@ -1027,7 +1025,7 @@ mod dma {
 
             Self {
                 spi,
-                channel: channel.degrade(),
+                channel,
                 #[cfg(all(esp32, spi_address_workaround))]
                 address_buffer,
                 tx_transfer_in_progress: false,
@@ -1035,7 +1033,13 @@ mod dma {
                 guard,
             }
         }
+    }
 
+    impl<'d, M, T> SpiDma<'d, M, T>
+    where
+        M: Mode,
+        T: Instance,
+    {
         fn driver(&self) -> &'static Info {
             self.spi.info()
         }

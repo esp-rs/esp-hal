@@ -71,7 +71,7 @@ fn main() -> ! {
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
     let i8080 = I8080::new(
         lcd_cam.lcd,
-        dma.channel0.tx,
+        dma.channel0,
         tx_pins,
         20.MHz(),
         Config::default(),

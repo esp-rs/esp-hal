@@ -38,7 +38,7 @@
 //!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
-//!     channel.tx,
+//!     channel,
 //!     tx_pins,
 //!     20.MHz(),
 //!     Config::default(),
@@ -62,7 +62,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelTx, DmaChannelConvert, DmaEligible, DmaError, DmaPeripheral, DmaTxBuffer, Tx},
+    dma::{ChannelTx, DmaChannelConvert, DmaError, DmaPeripheral, DmaTxBuffer, Tx, TxChannelFor},
     gpio::{
         interconnect::{OutputConnection, PeripheralOutput},
         OutputSignal,
@@ -85,7 +85,7 @@ use crate::{
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, Blocking, <LCD_CAM as DmaEligible>::Dma>,
+    tx_channel: ChannelTx<'d, Blocking, TxChannelFor<LCD_CAM>>,
     _mode: PhantomData<DM>,
 }
 
@@ -96,15 +96,16 @@ where
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P, CH>(
         lcd: Lcd<'d, DM>,
-        channel: ChannelTx<'d, Blocking, CH>,
+        channel: impl Peripheral<P = CH> + 'd,
         mut pins: P,
         frequency: HertzU32,
         config: Config,
     ) -> Self
     where
-        CH: DmaChannelConvert<<LCD_CAM as DmaEligible>::Dma>,
+        CH: DmaChannelConvert<TxChannelFor<LCD_CAM>>,
         P: TxPins,
     {
+        let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));
         let lcd_cam = lcd.lcd_cam;
 
         let clocks = Clocks::get();
@@ -207,7 +208,7 @@ where
 
         Self {
             lcd_cam,
-            tx_channel: channel.degrade(),
+            tx_channel,
             _mode: PhantomData,
         }
     }

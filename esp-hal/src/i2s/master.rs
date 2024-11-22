@@ -82,6 +82,7 @@ use crate::{
         ChannelTx,
         DescriptorChain,
         DmaChannelConvert,
+        DmaChannelFor,
         DmaDescriptor,
         DmaEligible,
         DmaError,
@@ -91,7 +92,9 @@ use crate::{
         DmaTransferTxCircular,
         ReadBuffer,
         Rx,
+        RxChannelFor,
         Tx,
+        TxChannelFor,
         WriteBuffer,
     },
     gpio::interconnect::PeripheralOutput,
@@ -258,24 +261,21 @@ where
     pub i2s_tx: TxCreator<'d, M, T>,
 }
 
-impl<'d, DmaMode, T> I2s<'d, DmaMode, T>
+impl<'d, T> I2s<'d, Blocking, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
 {
     #[allow(clippy::too_many_arguments)]
-    fn new_internal<CH>(
+    fn new_internal(
         i2s: PeripheralRef<'d, T>,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, DmaMode, CH>,
+        channel: PeripheralRef<'d, DmaChannelFor<T>>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self
-    where
-        CH: DmaChannelConvert<T::Dma>,
-    {
+    ) -> Self {
+        let channel = Channel::new(channel);
         channel.runtime_ensure_compatible(&i2s);
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -291,7 +291,6 @@ where
         i2s.set_master();
         i2s.update();
 
-        let channel = channel.degrade();
         Self {
             i2s_rx: RxCreator {
                 i2s: unsafe { i2s.clone_unchecked() },
@@ -368,19 +367,17 @@ impl<'d> I2s<'d, Blocking> {
     /// Construct a new I2S peripheral driver instance for the first I2S
     /// peripheral
     #[allow(clippy::too_many_arguments)]
-    pub fn new<CH, DM>(
+    pub fn new<CH>(
         i2s: impl Peripheral<P = impl RegisterAccess> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, DM, CH>,
+        channel: impl Peripheral<P = CH> + 'd,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
-        CH: DmaChannelConvert<<AnyI2s as DmaEligible>::Dma>,
-        DM: Mode,
-        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
+        CH: DmaChannelConvert<DmaChannelFor<AnyI2s>>,
     {
         Self::new_typed(
             i2s.map_into(),
@@ -401,19 +398,17 @@ where
     /// Construct a new I2S peripheral driver instance for the first I2S
     /// peripheral
     #[allow(clippy::too_many_arguments)]
-    pub fn new_typed<CH, DM>(
+    pub fn new_typed<CH>(
         i2s: impl Peripheral<P = T> + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: impl Into<fugit::HertzU32>,
-        channel: Channel<'d, DM, CH>,
+        channel: impl Peripheral<P = CH> + 'd,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
-        CH: DmaChannelConvert<T::Dma>,
-        DM: Mode,
-        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
+        CH: DmaChannelConvert<DmaChannelFor<T>>,
     {
         crate::into_ref!(i2s);
         Self::new_internal(
@@ -421,7 +416,7 @@ where
             standard,
             data_format,
             sample_rate,
-            channel.into(),
+            channel.map(|ch| ch.degrade()).into_ref(),
             rx_descriptors,
             tx_descriptors,
         )
@@ -465,9 +460,10 @@ where
 pub struct I2sTx<'d, DmaMode, T = AnyI2s>
 where
     T: RegisterAccess,
+    DmaMode: Mode,
 {
     i2s: PeripheralRef<'d, T>,
-    tx_channel: ChannelTx<'d, DmaMode, T::Dma>,
+    tx_channel: ChannelTx<'d, DmaMode, TxChannelFor<T>>,
     tx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
@@ -501,7 +497,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type TX = ChannelTx<'d, DmaMode, T::Dma>;
+    type TX = ChannelTx<'d, DmaMode, TxChannelFor<T>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -600,7 +596,7 @@ where
     DmaMode: Mode,
 {
     i2s: PeripheralRef<'d, T>,
-    rx_channel: ChannelRx<'d, DmaMode, T::Dma>,
+    rx_channel: ChannelRx<'d, DmaMode, RxChannelFor<T>>,
     rx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
@@ -634,7 +630,7 @@ where
     T: RegisterAccess,
     DmaMode: Mode,
 {
-    type RX = ChannelRx<'d, DmaMode, T::Dma>;
+    type RX = ChannelRx<'d, DmaMode, RxChannelFor<T>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -743,16 +739,7 @@ mod private {
     use enumset::EnumSet;
     use fugit::HertzU32;
 
-    use super::{
-        DataFormat,
-        I2sInterrupt,
-        I2sRx,
-        I2sTx,
-        PeripheralGuard,
-        RegisterAccess,
-        Standard,
-        I2S_LL_MCLK_DIVIDER_MAX,
-    };
+    use super::*;
     #[cfg(not(i2s1))]
     use crate::peripherals::i2s0::RegisterBlock;
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
@@ -779,7 +766,7 @@ mod private {
         M: Mode,
     {
         pub i2s: PeripheralRef<'d, T>,
-        pub tx_channel: ChannelTx<'d, M, T::Dma>,
+        pub tx_channel: ChannelTx<'d, M, TxChannelFor<T>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
@@ -839,7 +826,7 @@ mod private {
         M: Mode,
     {
         pub i2s: PeripheralRef<'d, T>,
-        pub rx_channel: ChannelRx<'d, M, T::Dma>,
+        pub rx_channel: ChannelRx<'d, M, RxChannelFor<T>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
