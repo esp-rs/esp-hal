@@ -583,14 +583,6 @@ impl super::Timer for Alarm {
             .bit_is_set()
     }
 
-    fn set_alarm_active(&self, _active: bool) {
-        // Nothing to do
-    }
-
-    fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        self.set_interrupt_handler(handler);
-    }
-
     async fn wait(&self) {
         asynch::AlarmFuture::new(self).await
     }

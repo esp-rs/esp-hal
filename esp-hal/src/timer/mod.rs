@@ -121,10 +121,6 @@ pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
 
     /// Returns the interrupt source for the underlying timer
     fn peripheral_interrupt(&self) -> Interrupt;
-
-    // NOTE: This is an unfortunate implementation detail of `TIMGx`
-    #[doc(hidden)]
-    fn set_alarm_active(&self, state: bool);
 }
 
 /// A one-shot timer.
@@ -281,7 +277,6 @@ where
     /// Clear the interrupt flag
     pub fn clear_interrupt(&mut self) {
         self.inner.clear_interrupt();
-        self.inner.set_alarm_active(false);
     }
 }
 
@@ -373,7 +368,6 @@ where
     pub fn wait(&mut self) -> nb::Result<(), void::Void> {
         if self.inner.is_interrupt_set() {
             self.inner.clear_interrupt();
-            self.inner.set_alarm_active(true);
 
             Ok(())
         } else {
@@ -407,7 +401,6 @@ where
     /// Clear the interrupt flag
     pub fn clear_interrupt(&mut self) {
         self.inner.clear_interrupt();
-        self.inner.set_alarm_active(true);
     }
 }
 
@@ -459,7 +452,6 @@ impl Timer for AnyTimer {
             fn clear_interrupt(&self);
             fn set_interrupt_handler(&self, handler: InterruptHandler);
             fn is_interrupt_set(&self) -> bool;
-            fn set_alarm_active(&self, state: bool);
             async fn wait(&self);
             fn async_interrupt_handler(&self) -> InterruptHandler;
             fn peripheral_interrupt(&self) -> Interrupt;

@@ -338,10 +338,6 @@ impl super::Timer for Timer {
         self.is_interrupt_set()
     }
 
-    fn set_alarm_active(&self, state: bool) {
-        self.set_alarm_active(state)
-    }
-
     async fn wait(&self) {
         asynch::TimerFuture::new(self).await
     }
@@ -472,6 +468,8 @@ impl Timer {
         self.register_block()
             .int_clr()
             .write(|w| w.t(self.timer).clear_bit_by_one());
+        let periodic = self.t().config().read().autoreload().bit_is_set();
+        self.set_alarm_active(periodic);
     }
 
     fn now(&self) -> Instant<u64, 1, 1_000_000> {
