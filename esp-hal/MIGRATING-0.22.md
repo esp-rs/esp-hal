@@ -31,11 +31,22 @@
 
 ### Usability changes affecting applications
 
-It is now simpler to work with DMA channels in generic contexts. esp-hal now provides convenience
-traits and type aliasses to specify peripheral compatibility. The `ChannelCreator` types have been
-removed and individual channels are no longer wrapped in `Channel`, further simplifying use.
+Individual channels are no longer wrapped in `Channel`, but they implement the `DmaChannel` trait.
+This means that if you want to split them into an `rx` and a `tx` half (which is only supported on
+the H2, C6 and S3 currently), you can't move out of the channel but instead you need to call
+the `split` method.
+
+```diff
+-let tx = channel.tx;
++use esp_hal::dma::DmaChannel;
++let (rx, tx) = channel.split();
+```
 
 The `Channel` types remain available for use in peripheral drivers.
+
+It is now simpler to work with DMA channels in generic contexts. esp-hal now provides convenience
+traits and type aliasses to specify peripheral compatibility. The `ChannelCreator` types have been
+removed, further simplifying use.
 
 For example, previously you may have needed to write something like this to accept a DMA channel
 in a generic function:
