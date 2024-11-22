@@ -1,6 +1,8 @@
 # Migration Guide from 0.22.x to v1.0.0-beta.0
 
-## DMA configuration changes
+## DMA changes
+
+### Configuration changes
 
 - `configure_for_async` and `configure` have been removed
 - PDMA devices (ESP32, ESP32-S2) provide no configurability
@@ -25,6 +27,76 @@
  // other setup
 -.with_dma(dma_channel.configure(false, DmaPriority::Priority1));
 +.with_dma(dma_channel);
+```
+
+### Usability changes affecting applications
+
+Individual channels are no longer wrapped in `Channel`, but they implement the `DmaChannel` trait.
+This means that if you want to split them into an `rx` and a `tx` half (which is only supported on
+the H2, C6 and S3 currently), you can't move out of the channel but instead you need to call
+the `split` method.
+
+```diff
+-let tx = channel.tx;
++use esp_hal::dma::DmaChannel;
++let (rx, tx) = channel.split();
+```
+
+The `Channel` types remain available for use in peripheral drivers.
+
+It is now simpler to work with DMA channels in generic contexts. esp-hal now provides convenience
+traits and type aliasses to specify peripheral compatibility. The `ChannelCreator` types have been
+removed, further simplifying use.
+
+For example, previously you may have needed to write something like this to accept a DMA channel
+in a generic function:
+
+```rust
+fn new_foo<'d, T>(
+    dma_channel: ChannelCreator<2>, // It wasn't possible to accept a generic ChannelCreator.
+    peripheral: impl Peripheral<P = T> + 'd,
+)
+where
+    T: SomePeripheralInstance,
+    ChannelCreator<2>: DmaChannelConvert<<T as DmaEligible>::Dma>,
+{
+    let dma_channel = dma_channel.configure_for_async(false, DmaPriority::Priority0);
+
+    let driver = PeripheralDriver::new(peripheral, config).with_dma(dma_channel);
+
+    // ...
+}
+```
+
+From now on a similar, but more flexible implementation may look like:
+
+```rust
+fn new_foo<'d, T, CH>(
+    dma_channel: impl Peripheral<P = CH> + 'd,
+    peripheral: impl Peripheral<P = T> + 'd,
+)
+where
+    T: SomePeripheralInstance,
+    CH: DmaChannelFor<T>,
+{
+    // Optionally: dma_channel.set_priority(DmaPriority::Priority2);
+
+    let driver = PeripheralDriver::new(peripheral, config).with_dma(dma_channel);
+
+    // ...
+}
+```
+
+### Usability changes affecting third party peripheral drivers
+
+If you are writing a driver and need to store a channel in a structure, you can use one of the
+`ChannelFor` type aliasses.
+
+```diff
+ struct Aes<'d> {
+-    channel: ChannelTx<'d, Blocking, <AES as DmaEligible>::Dma>,
++    channel: ChannelTx<'d, Blocking, PeripheralTxChannel<AES>>,
+ }
 ```
 
 ## Timer changes

@@ -944,38 +944,6 @@ pub trait DmaEligible {
     fn dma_peripheral(&self) -> DmaPeripheral;
 }
 
-/// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
-pub type DmaChannelFor<T> = <T as DmaEligible>::Dma;
-/// Helper type to get the DMA Rx channel for a peripheral.
-pub type RxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Rx;
-/// Helper type to get the DMA Tx channel for a peripheral.
-pub type TxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Tx;
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! impl_dma_eligible {
-    ([$dma_ch:ident] $name:ident => $dma:ident) => {
-        impl $crate::dma::DmaEligible for $crate::peripherals::$name {
-            type Dma = $dma_ch;
-
-            fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
-                $crate::dma::DmaPeripheral::$dma
-            }
-        }
-    };
-
-    (
-        $dma_ch:ident {
-            $($(#[$cfg:meta])? $name:ident => $dma:ident,)*
-        }
-    ) => {
-        $(
-            $(#[$cfg])?
-            $crate::impl_dma_eligible!([$dma_ch] $name => $dma);
-        )*
-    };
-}
-
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct DescriptorChain {
@@ -1594,6 +1562,38 @@ impl RxCircularState {
 }
 
 #[doc(hidden)]
+#[macro_export]
+macro_rules! impl_dma_eligible {
+    ([$dma_ch:ident] $name:ident => $dma:ident) => {
+        impl $crate::dma::DmaEligible for $crate::peripherals::$name {
+            type Dma = $dma_ch;
+
+            fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
+                $crate::dma::DmaPeripheral::$dma
+            }
+        }
+    };
+
+    (
+        $dma_ch:ident {
+            $($(#[$cfg:meta])? $name:ident => $dma:ident,)*
+        }
+    ) => {
+        $(
+            $(#[$cfg])?
+            $crate::impl_dma_eligible!([$dma_ch] $name => $dma);
+        )*
+    };
+}
+
+/// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
+pub type PeripheralDmaChannel<T> = <T as DmaEligible>::Dma;
+/// Helper type to get the DMA Rx channel for a peripheral.
+pub type PeripheralRxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Rx;
+/// Helper type to get the DMA Tx channel for a peripheral.
+pub type PeripheralTxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Tx;
+
+#[doc(hidden)]
 pub trait DmaRxChannel:
     RxRegisterAccess + InterruptAccess<DmaRxInterrupt> + Peripheral<P = Self>
 {
@@ -1647,7 +1647,7 @@ pub trait DmaChannelExt: DmaChannel {
     note = "Not all channels are useable with all peripherals"
 )]
 #[doc(hidden)]
-pub trait DmaChannelConvert<DEG>: DmaChannel {
+pub trait DmaChannelConvert<DEG> {
     fn degrade(self) -> DEG;
 }
 
@@ -1655,6 +1655,94 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
     fn degrade(self) -> DEG {
         self
     }
+}
+
+/// Trait implemented for DMA channels that are compatible with a particular
+/// peripheral.
+///
+/// You can use this in places where a peripheral driver would expect a
+/// `DmaChannel` implementation.
+#[cfg_attr(pdma, doc = "")]
+#[cfg_attr(
+    pdma,
+    doc = "Note that using mismatching channels (e.g. trying to use `spi2channel` with SPI3) may compile, but will panic in runtime."
+)]
+#[cfg_attr(pdma, doc = "")]
+/// ## Example
+///
+/// The following example demonstrates how this trait can be used to only accept
+/// types compatible with a specific peripheral.
+///
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::spi::master::{Spi, SpiDma, Config, Instance as SpiInstance};
+/// use esp_hal::dma::DmaChannelFor;
+/// use esp_hal::peripheral::Peripheral;
+/// use esp_hal::Blocking;
+/// use esp_hal::dma::Dma;
+///
+/// fn configures_spi_dma<'d, S, CH>(
+///     spi: Spi<'d, Blocking, S>,
+///     channel: impl Peripheral<P = CH> + 'd,
+/// ) -> SpiDma<'d, Blocking, S>
+/// where
+///     S: SpiInstance,
+///     CH: DmaChannelFor<S> + 'd,
+///  {
+///     spi.with_dma(channel)
+/// }
+///
+/// let dma = Dma::new(peripherals.DMA);
+#[cfg_attr(pdma, doc = "let dma_channel = dma.spi2channel;")]
+#[cfg_attr(gdma, doc = "let dma_channel = dma.channel0;")]
+#[doc = ""]
+/// let spi = Spi::new_with_config(
+///     peripherals.SPI2,
+///     Config::default(),
+/// );
+///
+/// let spi_dma = configures_spi_dma(spi, dma_channel);
+/// # }
+/// ```
+pub trait DmaChannelFor<P: DmaEligible>:
+    DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>
+{
+}
+impl<P, CH> DmaChannelFor<P> for CH
+where
+    P: DmaEligible,
+    CH: DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>,
+{
+}
+
+/// Trait implemented for the RX half of split DMA channels that are compatible
+/// with a particular peripheral. Accepts complete DMA channels or split halves.
+///
+/// This trait is similar in use to [`DmaChannelFor`].
+///
+/// You can use this in places where a peripheral driver would expect a
+/// `DmaRxChannel` implementation.
+pub trait RxChannelFor<P: DmaEligible>: DmaChannelConvert<PeripheralRxChannel<P>> {}
+impl<P, RX> RxChannelFor<P> for RX
+where
+    P: DmaEligible,
+    RX: DmaChannelConvert<PeripheralRxChannel<P>>,
+{
+}
+
+/// Trait implemented for the TX half of split DMA channels that are compatible
+/// with a particular peripheral. Accepts complete DMA channels or split halves.
+///
+/// This trait is similar in use to [`DmaChannelFor`].
+///
+/// You can use this in places where a peripheral driver would expect a
+/// `DmaTxChannel` implementation.
+pub trait TxChannelFor<PER: DmaEligible>: DmaChannelConvert<PeripheralTxChannel<PER>> {}
+impl<P, TX> TxChannelFor<P> for TX
+where
+    P: DmaEligible,
+    TX: DmaChannelConvert<PeripheralTxChannel<P>>,
+{
 }
 
 /// The functions here are not meant to be used outside the HAL

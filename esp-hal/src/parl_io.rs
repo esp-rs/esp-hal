@@ -35,13 +35,14 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DescriptorChain,
-        DmaChannelConvert,
         DmaChannelFor,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
         DmaTransferTx,
+        PeripheralRxChannel,
+        PeripheralTxChannel,
         ReadBuffer,
         Rx,
         RxChannelFor,
@@ -811,7 +812,7 @@ pub struct ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, TxChannelFor<PARL_IO>>,
+    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>,
     tx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
@@ -892,7 +893,7 @@ pub struct ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
+    rx_channel: ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
     rx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
@@ -1013,7 +1014,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<DmaChannelFor<PARL_IO>>,
+        CH: DmaChannelFor<PARL_IO>,
     {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
@@ -1135,7 +1136,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<TxChannelFor<PARL_IO>>,
+        CH: TxChannelFor<PARL_IO>,
     {
         let guard = GenericPeripheralGuard::new();
         let tx_channel = ChannelTx::new(dma_channel.map(|ch| ch.degrade()));
@@ -1241,7 +1242,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<RxChannelFor<PARL_IO>>,
+        CH: RxChannelFor<PARL_IO>,
     {
         let guard = GenericPeripheralGuard::new();
         let rx_channel = ChannelRx::new(dma_channel.map(|ch| ch.degrade()));
@@ -1433,7 +1434,7 @@ impl<'d, DM> DmaSupportTx for ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    type TX = ChannelTx<'d, DM, TxChannelFor<PARL_IO>>;
+    type TX = ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -1475,7 +1476,7 @@ where
     }
 
     fn start_receive_bytes_dma(
-        rx_channel: &mut ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
+        rx_channel: &mut ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
         rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
@@ -1529,7 +1530,7 @@ impl<'d, DM> DmaSupportRx for ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    type RX = ChannelRx<'d, DM, RxChannelFor<PARL_IO>>;
+    type RX = ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -1545,7 +1546,7 @@ pub struct TxCreator<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, TxChannelFor<PARL_IO>>,
+    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1555,7 +1556,7 @@ pub struct RxCreator<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
+    rx_channel: ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1565,7 +1566,7 @@ pub struct TxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, TxChannelFor<PARL_IO>>,
+    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1575,7 +1576,7 @@ pub struct RxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
+    rx_channel: ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }

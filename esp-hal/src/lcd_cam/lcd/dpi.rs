@@ -106,7 +106,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelTx, DmaChannelConvert, DmaError, DmaPeripheral, DmaTxBuffer, Tx, TxChannelFor},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, Tx, TxChannelFor},
     gpio::{interconnect::PeripheralOutput, Level, OutputSignal},
     lcd_cam::{
         calculate_clkm,
@@ -123,7 +123,7 @@ use crate::{
 /// Represents the RGB LCD interface.
 pub struct Dpi<'d, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, Blocking, TxChannelFor<LCD_CAM>>,
+    tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
     _mode: PhantomData<DM>,
 }
 
@@ -139,7 +139,7 @@ where
         config: Config,
     ) -> Self
     where
-        CH: DmaChannelConvert<TxChannelFor<LCD_CAM>>,
+        CH: TxChannelFor<LCD_CAM>,
     {
         let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));
         let lcd_cam = lcd.lcd_cam;

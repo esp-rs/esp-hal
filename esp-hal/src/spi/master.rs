@@ -78,7 +78,7 @@ use procmacros::ram;
 use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
 use crate::{
     clock::Clocks,
-    dma::{DmaChannelConvert, DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
+    dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{interconnect::PeripheralOutput, InputSignal, NoPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -540,7 +540,7 @@ where
     /// operations.
     pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking, T>
     where
-        CH: DmaChannelConvert<DmaChannelFor<T>>,
+        CH: DmaChannelFor<T>,
     {
         SpiDma::new(self.spi, channel.map(|ch| ch.degrade()).into_ref())
     }
@@ -856,12 +856,12 @@ mod dma {
         dma::{
             asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
-            DmaChannelFor,
             DmaRxBuf,
             DmaRxBuffer,
             DmaTxBuf,
             DmaTxBuffer,
             EmptyBuf,
+            PeripheralDmaChannel,
             Rx,
             Tx,
         },
@@ -883,7 +883,7 @@ mod dma {
         M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, M, DmaChannelFor<T>>,
+        pub(crate) channel: Channel<'d, M, PeripheralDmaChannel<T>>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
@@ -997,7 +997,7 @@ mod dma {
     {
         pub(super) fn new(
             spi: PeripheralRef<'d, T>,
-            channel: PeripheralRef<'d, DmaChannelFor<T>>,
+            channel: PeripheralRef<'d, PeripheralDmaChannel<T>>,
         ) -> Self {
             let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
