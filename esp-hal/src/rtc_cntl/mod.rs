@@ -73,13 +73,13 @@
 //! #[handler]
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
-//!         // esp_println::println!("RWDT Interrupt");
+//!         println!("RWDT Interrupt");
 //!
 //!         let mut rwdt = RWDT.borrow_ref_mut(cs);
 //!         let rwdt = rwdt.as_mut().unwrap();
 //!         rwdt.clear_interrupt();
 //!
-//!         // esp_println::println!("Restarting in 5 seconds...");
+//!         println!("Restarting in 5 seconds...");
 //!
 //!         rwdt.set_timeout(RwdtStage::Stage0, 5000u64.millis());
 //!         rwdt.unlisten();

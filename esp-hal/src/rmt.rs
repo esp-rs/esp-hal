@@ -188,7 +188,7 @@
 //!                 let count = WIDTH / (total / entry.length1() as usize);
 //!                 let c = if entry.level1() { '-' } else { '_' };
 //!                 for _ in 0..count + 1 {
-//!                     // print!("{}", c);
+//!                     print!("{}", c);
 //!                 }
 //!
 //!                 if entry.length2() == 0 {
@@ -198,11 +198,11 @@
 //!                 let count = WIDTH / (total / entry.length2() as usize);
 //!                 let c = if entry.level2() { '-' } else { '_' };
 //!                 for _ in 0..count + 1 {
-//!                     // print!("{}", c);
+//!                     print!("{}", c);
 //!                 }
 //!             }
 //!
-//!             // esp_println::println!();
+//!             println!();
 //!         }
 //!         Err((_err, channel_res)) => {
 //!             channel = channel_res;

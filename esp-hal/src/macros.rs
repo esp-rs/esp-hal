@@ -19,6 +19,9 @@ macro_rules! before_snippet {
 # macro_rules! println {
 #     ($($tt:tt)*) => { };
 # }
+# macro_rules! print {
+#     ($($tt:tt)*) => { };
+# }
 # #[panic_handler]
 # fn panic(_ : &core::panic::PanicInfo) -> ! {
 #     loop {}

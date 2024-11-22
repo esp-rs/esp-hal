@@ -36,7 +36,7 @@
 //!
 //! #[handler]
 //! fn swint0_handler() {
-//!     // esp_println::println!("SW interrupt0 handled");
+//!     println!("SW interrupt0 handled");
 //!
 //!     // Clear the interrupt request.
 //!     critical_section::with(|cs| {

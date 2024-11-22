@@ -64,7 +64,6 @@
 //!     // Read data via DMA and print received values
 //!     let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
 //!     transfer.wait().unwrap();
-//!     // esp_println::println!("Received: {:02x?} ...", &buffer[..30]);
 //!
 //!     delay.delay_millis(500);
 //! }
@@ -125,7 +124,6 @@
 //! loop {
 //!     let transfer = parl_io_tx.write_dma(&buffer).unwrap();
 //!     transfer.wait().unwrap();
-//!     //println!("Transferred {} bytes", buffer.len());
 //!     delay.delay_millis(500);
 //! }
 //! # }
