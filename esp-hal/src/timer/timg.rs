@@ -777,7 +777,6 @@ where
 
 // Async functionality of the timer groups.
 mod asynch {
-    #![allow(unused)] // FIXME(mabez)
     use core::{
         pin::Pin,
         task::{Context, Poll},
