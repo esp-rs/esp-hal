@@ -133,7 +133,7 @@ impl EmbassyTimer {
 
         let cb: fn(*mut ()) = unsafe {
             // Safety:
-            // - we can ignore the possiblity of `f` being unset (null) because of the
+            // - we can ignore the possibility of `f` being unset (null) because of the
             //   safety contract of `allocate_alarm`.
             // - other than that we only store valid function pointers into alarm.callback
             core::mem::transmute(cb)
