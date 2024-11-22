@@ -24,14 +24,10 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::efuse::Efuse;
-//! # use esp_hal::uart::Uart;
-//! # use core::writeln;
-//! # use core::fmt::Write;
 //!
-//! let mut serial_tx = Uart::new(peripherals.UART0, peripherals.GPIO4,
-//! peripherals.GPIO5).unwrap(); let mac_address =
-//! Efuse::read_base_mac_address(); writeln!(
-//!     serial_tx,
+//! let mac_address = Efuse::read_base_mac_address();
+//!
+//! println!(
 //!     "MAC: {:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}",
 //!     mac_address[0],
 //!     mac_address[1],
@@ -41,8 +37,8 @@
 //!     mac_address[5]
 //! );
 //!
-//! writeln!(serial_tx, "MAC address {:02x?}", Efuse::mac_address());
-//! writeln!(serial_tx, "Flash Encryption {:?}", Efuse::flash_encryption());
+//! println!("MAC address {:02x?}", Efuse::mac_address());
+//! println!("Flash Encryption {:?}", Efuse::flash_encryption());
 //! # }
 //! ```
 

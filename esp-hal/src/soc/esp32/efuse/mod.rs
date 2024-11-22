@@ -24,18 +24,10 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::efuse::Efuse;
-//! # use esp_hal::uart::Uart;
-//! # use core::writeln;
-//! # use core::fmt::Write;
-//!
-//! let mut serial_tx =
-//!     Uart::new(peripherals.UART0, peripherals.GPIO4,
-//!         peripherals.GPIO5).unwrap();
 //!
 //! let mac_address = Efuse::read_base_mac_address();
 //!
-//! writeln!(
-//!     serial_tx,
+//! println!(
 //!     "MAC: {:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}",
 //!     mac_address[0],
 //!     mac_address[1],
@@ -45,12 +37,12 @@
 //!     mac_address[5]
 //! );
 //!
-//! writeln!(serial_tx, "MAC address {:02x?}", Efuse::mac_address());
-//! writeln!(serial_tx, "Flash Encryption {:?}", Efuse::flash_encryption());
-//! writeln!(serial_tx, "Core Count {}", Efuse::core_count());
-//! writeln!(serial_tx, "Bluetooth enabled {}", Efuse::is_bluetooth_enabled());
-//! writeln!(serial_tx, "Chip type {:?}", Efuse::chip_type());
-//! writeln!(serial_tx, "Max CPU clock {:?}", Efuse::max_cpu_frequency());
+//! println!("MAC address {:02x?}", Efuse::mac_address());
+//! println!("Flash Encryption {:?}", Efuse::flash_encryption());
+//! println!("Core Count {}", Efuse::core_count());
+//! println!("Bluetooth enabled {}", Efuse::is_bluetooth_enabled());
+//! println!("Chip type {:?}", Efuse::chip_type());
+//! println!("Max CPU clock {:?}", Efuse::max_cpu_frequency());
 //! # }
 //! ```
 
