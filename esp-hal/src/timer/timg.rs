@@ -94,7 +94,7 @@ pub struct TimerGroup<T>
 where
     T: TimerGroupInstance,
 {
-    _timer_group: T,
+    _timer_group: PhantomData<T>,
     /// Timer 0
     pub timer0: Timer,
     /// Timer 1
@@ -245,7 +245,7 @@ where
         T::configure_src_clk();
 
         Self {
-            _timer_group,
+            _timer_group: PhantomData,
             timer0: Timer {
                 timer: 0,
                 tg: T::id(),
