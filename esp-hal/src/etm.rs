@@ -66,13 +66,14 @@
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
-//! # use esp_hal::timer::systimer::{etm::Event, Periodic, SystemTimer};
+//! # use esp_hal::timer::systimer::{etm::Event, SystemTimer};
+//! # use esp_hal::timer::PeriodicTimer;
 //! # use fugit::ExtU32;
 //!
 //! let syst = SystemTimer::new(peripherals.SYSTIMER);
-//! let syst_alarms = syst.split::<Periodic>();
-//! let mut alarm0 = syst_alarms.alarm0;
-//! alarm0.set_period(1u32.secs());
+//! let mut alarm0 = syst.alarm0;
+//! let mut timer = PeriodicTimer::new(&mut alarm0);
+//! timer.start(1u64.secs());
 //!
 //! let mut led = peripherals.GPIO1;
 //!
