@@ -14,15 +14,12 @@ use core::{
 
 use embassy_executor::{raw::TaskStorage, Spawner};
 use esp_backtrace as _;
-use esp_println::println;
 use esp_hal::{
     prelude::*,
     time::Duration,
-    timer::{
-        systimer::SystemTimer,
-        OneShotTimer,
-    },
+    timer::{systimer::SystemTimer, OneShotTimer},
 };
+use esp_println::println;
 
 static mut COUNTER: u32 = 0;
 
