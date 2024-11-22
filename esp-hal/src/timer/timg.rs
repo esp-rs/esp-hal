@@ -63,53 +63,6 @@
 //! }
 //! # }
 //! ```
-//! 
-//! ### Usage of Timer with interrupts
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::interrupt::{self, Priority};
-//! # use esp_hal::peripherals::{Interrupt, TIMG0};
-//! # use esp_hal::prelude::*;
-//! # use esp_hal::timer::timg::{Timer, Timer0, TimerGroup};
-//!
-//! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! let timer0 = timg0.timer0;
-//! timer0.set_interrupt_handler(tg0_t0_level);
-//!
-//! interrupt::enable(Interrupt::TG0_T0_LEVEL, Priority::Priority1).unwrap();
-//! timer0.load_value(500u64.millis()).unwrap();
-//! timer0.start();
-//! timer0.listen();
-//!
-//! critical_section::with(|cs| {
-//!     TIMER0.borrow_ref_mut(cs).replace(timer0);
-//! });
-//!
-//! loop {}
-//! # }
-//!
-//! # use core::cell::RefCell;
-//! # use critical_section::Mutex;
-//! # use esp_hal::peripherals::{Interrupt, TIMG0};
-//! # use esp_hal::timer::timg::{Timer, Timer0};
-//!
-//! static TIMER0:
-//!     Mutex<RefCell<Option<Timer<Timer0<TIMG0>, esp_hal::Blocking>>>> =
-//!         Mutex::new(RefCell::new(None));
-//!
-//! #[handler]
-//! fn tg0_t0_level() {
-//!     critical_section::with(|cs| {
-//!         let mut timer0 = TIMER0.borrow_ref_mut(cs);
-//!         let timer0 = timer0.as_mut().unwrap();
-//!
-//!         timer0.clear_interrupt();
-//!         timer0.load_value(500u64.millis()).unwrap();
-//!         timer0.start();
-//!     });
-//! }
-//! ```
-
 use core::marker::PhantomData;
 
 use fugit::{HertzU32, Instant, MicrosDurationU64};
