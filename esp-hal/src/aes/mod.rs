@@ -257,6 +257,7 @@ pub mod dma {
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
     /// Specifies the block cipher modes available for AES operations.
+    #[derive(Clone, Copy, PartialEq, Eq)]
     pub enum CipherMode {
         /// Electronic Codebook Mode
         Ecb = 0,
@@ -487,9 +488,9 @@ pub mod dma {
             self.aes
                 .aes
                 .block_mode()
-                .modify(|_, w| unsafe { w.bits(mode as u32) });
+                .modify(|_, w| unsafe { w.block_mode().bits(mode as u8) });
 
-            if self.aes.aes.block_mode().read().block_mode().bits() == CipherMode::Ctr as u8 {
+            if mode == CipherMode::Ctr {
                 self.aes
                     .aes
                     .inc_sel()
