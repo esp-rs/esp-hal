@@ -29,7 +29,7 @@ impl Aes<'_> {
         self.aes.mode().write(|w| unsafe { w.bits(mode) });
     }
 
-    pub(super) fn write_start(&mut self) {
+    pub(super) fn write_start(&self) {
         self.aes.trigger().write(|w| w.trigger().set_bit());
     }
 

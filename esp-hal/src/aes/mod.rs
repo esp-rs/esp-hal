@@ -513,7 +513,7 @@ pub mod dma {
         }
 
         fn start_transform(&self) {
-            self.aes.aes.trigger().write(|w| w.trigger().set_bit());
+            self.aes.write_start();
         }
 
         fn finish_transform(&self) {

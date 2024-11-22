@@ -51,7 +51,7 @@ impl Aes<'_> {
         self.aes.endian().write(|w| unsafe { w.bits(to_write) });
     }
 
-    pub(super) fn write_start(&mut self) {
+    pub(super) fn write_start(&self) {
         self.aes.start().write(|w| w.start().set_bit());
     }
 
