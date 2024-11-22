@@ -1114,12 +1114,11 @@ mod dma {
         unsafe fn start_transfer_dma<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             &mut self,
             full_duplex: bool,
+            bytes_to_read: usize,
+            bytes_to_write: usize,
             rx_buffer: &mut RX,
             tx_buffer: &mut TX,
         ) -> Result<(), Error> {
-            let bytes_to_read = rx_buffer.length();
-            let bytes_to_write = tx_buffer.length();
-
             if bytes_to_read > MAX_DMA_SIZE || bytes_to_write > MAX_DMA_SIZE {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
@@ -1129,6 +1128,8 @@ mod dma {
             unsafe {
                 self.dma_driver().start_transfer_dma(
                     full_duplex,
+                    bytes_to_read,
+                    bytes_to_write,
                     rx_buffer,
                     tx_buffer,
                     &mut self.channel.rx,
@@ -1167,6 +1168,8 @@ mod dma {
             unsafe {
                 self.dma_driver().start_transfer_dma(
                     false,
+                    0,
+                    bytes_to_write,
                     &mut EmptyBuf,
                     &mut self.address_buffer,
                     &mut self.channel.rx,
@@ -1326,8 +1329,12 @@ mod dma {
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
         #[cfg_attr(place_spi_driver_in_ram, ram)]
-        unsafe fn start_dma_write(&mut self, buffer: &mut impl DmaTxBuffer) -> Result<(), Error> {
-            self.start_dma_transfer(&mut EmptyBuf, buffer)
+        unsafe fn start_dma_write(
+            &mut self,
+            bytes_to_write: usize,
+            buffer: &mut impl DmaTxBuffer,
+        ) -> Result<(), Error> {
+            self.start_dma_transfer(0, bytes_to_write, &mut EmptyBuf, buffer)
         }
 
         /// Perform a DMA write.
@@ -1339,11 +1346,12 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         pub fn write<TX: DmaTxBuffer>(
             mut self,
+            bytes_to_write: usize,
             mut buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, M, TX, T>, (Error, Self, TX)> {
             self.wait_for_idle();
 
-            match unsafe { self.start_dma_write(&mut buffer) } {
+            match unsafe { self.start_dma_write(bytes_to_write, &mut buffer) } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
             }
@@ -1354,8 +1362,12 @@ mod dma {
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
         #[cfg_attr(place_spi_driver_in_ram, ram)]
-        unsafe fn start_dma_read(&mut self, buffer: &mut impl DmaRxBuffer) -> Result<(), Error> {
-            self.start_dma_transfer(buffer, &mut EmptyBuf)
+        unsafe fn start_dma_read(
+            &mut self,
+            bytes_to_read: usize,
+            buffer: &mut impl DmaRxBuffer,
+        ) -> Result<(), Error> {
+            self.start_dma_transfer(bytes_to_read, 0, buffer, &mut EmptyBuf)
         }
 
         /// Perform a DMA read.
@@ -1367,10 +1379,11 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         pub fn read<RX: DmaRxBuffer>(
             mut self,
+            bytes_to_read: usize,
             mut buffer: RX,
         ) -> Result<SpiDmaTransfer<'d, M, RX, T>, (Error, Self, RX)> {
             self.wait_for_idle();
-            match unsafe { self.start_dma_read(&mut buffer) } {
+            match unsafe { self.start_dma_read(bytes_to_read, &mut buffer) } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
             }
@@ -1383,10 +1396,12 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         unsafe fn start_dma_transfer(
             &mut self,
+            bytes_to_read: usize,
+            bytes_to_write: usize,
             rx_buffer: &mut impl DmaRxBuffer,
             tx_buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
-            self.start_transfer_dma(true, rx_buffer, tx_buffer)
+            self.start_transfer_dma(true, bytes_to_read, bytes_to_write, rx_buffer, tx_buffer)
         }
 
         /// Perform a DMA transfer
@@ -1398,11 +1413,20 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         pub fn transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             mut self,
+            bytes_to_read: usize,
             mut rx_buffer: RX,
+            bytes_to_write: usize,
             mut tx_buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, M, (RX, TX), T>, (Error, Self, RX, TX)> {
             self.wait_for_idle();
-            match unsafe { self.start_dma_transfer(&mut rx_buffer, &mut tx_buffer) } {
+            match unsafe {
+                self.start_dma_transfer(
+                    bytes_to_read,
+                    bytes_to_write,
+                    &mut rx_buffer,
+                    &mut tx_buffer,
+                )
+            } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, (rx_buffer, tx_buffer))),
                 Err(e) => Err((e, self, rx_buffer, tx_buffer)),
             }
@@ -1419,10 +1443,9 @@ mod dma {
             cmd: Command,
             address: Address,
             dummy: u8,
+            bytes_to_read: usize,
             buffer: &mut impl DmaRxBuffer,
         ) -> Result<(), Error> {
-            let bytes_to_read = buffer.length();
-
             self.driver().setup_half_duplex(
                 false,
                 cmd,
@@ -1433,7 +1456,7 @@ mod dma {
                 data_mode,
             );
 
-            self.start_transfer_dma(false, buffer, &mut EmptyBuf)
+            self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
         }
 
         /// Perform a half-duplex read operation using DMA.
@@ -1445,12 +1468,20 @@ mod dma {
             cmd: Command,
             address: Address,
             dummy: u8,
+            bytes_to_read: usize,
             mut buffer: RX,
         ) -> Result<SpiDmaTransfer<'d, M, RX, T>, (Error, Self, RX)> {
             self.wait_for_idle();
 
             match unsafe {
-                self.start_half_duplex_read(data_mode, cmd, address, dummy, &mut buffer)
+                self.start_half_duplex_read(
+                    data_mode,
+                    cmd,
+                    address,
+                    dummy,
+                    bytes_to_read,
+                    &mut buffer,
+                )
             } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
@@ -1468,10 +1499,9 @@ mod dma {
             cmd: Command,
             address: Address,
             dummy: u8,
+            bytes_to_write: usize,
             buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
-            let bytes_to_write = buffer.length();
-
             #[cfg(all(esp32, spi_address_workaround))]
             {
                 // On the ESP32, if we don't have data, the address is always sent
@@ -1491,7 +1521,7 @@ mod dma {
                 data_mode,
             );
 
-            self.start_transfer_dma(false, &mut EmptyBuf, buffer)
+            self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
         }
 
         /// Perform a half-duplex write operation using DMA.
@@ -1503,12 +1533,20 @@ mod dma {
             cmd: Command,
             address: Address,
             dummy: u8,
+            bytes_to_write: usize,
             mut buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, M, TX, T>, (Error, Self, TX)> {
             self.wait_for_idle();
 
             match unsafe {
-                self.start_half_duplex_write(data_mode, cmd, address, dummy, &mut buffer)
+                self.start_half_duplex_write(
+                    data_mode,
+                    cmd,
+                    address,
+                    dummy,
+                    bytes_to_write,
+                    &mut buffer,
+                )
             } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
@@ -1641,8 +1679,12 @@ mod dma {
                 self.rx_buf.set_length(chunk.len());
 
                 unsafe {
-                    self.spi_dma
-                        .start_dma_transfer(&mut self.rx_buf, &mut EmptyBuf)?;
+                    self.spi_dma.start_dma_transfer(
+                        chunk.len(),
+                        0,
+                        &mut self.rx_buf,
+                        &mut EmptyBuf,
+                    )?;
                 }
 
                 self.wait_for_idle();
@@ -1661,8 +1703,12 @@ mod dma {
                 self.tx_buf.fill(chunk);
 
                 unsafe {
-                    self.spi_dma
-                        .start_dma_transfer(&mut EmptyBuf, &mut self.tx_buf)?;
+                    self.spi_dma.start_dma_transfer(
+                        chunk.len(),
+                        0,
+                        &mut EmptyBuf,
+                        &mut self.tx_buf,
+                    )?;
                 }
 
                 self.wait_for_idle();
@@ -1688,8 +1734,12 @@ mod dma {
                 self.rx_buf.set_length(read_chunk.len());
 
                 unsafe {
-                    self.spi_dma
-                        .start_dma_transfer(&mut self.rx_buf, &mut self.tx_buf)?;
+                    self.spi_dma.start_dma_transfer(
+                        read_chunk.len(),
+                        write_chunk.len(),
+                        &mut self.rx_buf,
+                        &mut self.tx_buf,
+                    )?;
                 }
                 self.wait_for_idle();
 
@@ -1716,8 +1766,12 @@ mod dma {
                 self.rx_buf.set_length(chunk.len());
 
                 unsafe {
-                    self.spi_dma
-                        .start_dma_transfer(&mut self.rx_buf, &mut self.tx_buf)?;
+                    self.spi_dma.start_dma_transfer(
+                        chunk.len(),
+                        chunk.len(),
+                        &mut self.rx_buf,
+                        &mut self.tx_buf,
+                    )?;
                 }
                 self.wait_for_idle();
 
@@ -1749,6 +1803,7 @@ mod dma {
                     cmd,
                     address,
                     dummy,
+                    buffer.len(),
                     &mut self.rx_buf,
                 )?;
             }
@@ -1782,6 +1837,7 @@ mod dma {
                     cmd,
                     address,
                     dummy,
+                    buffer.len(),
                     &mut self.tx_buf,
                 )?;
             }
@@ -1891,7 +1947,9 @@ mod dma {
 
                     let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
 
-                    unsafe { spi.start_dma_transfer(&mut self.rx_buf, &mut EmptyBuf)? };
+                    unsafe {
+                        spi.start_dma_transfer(chunk.len(), 0, &mut self.rx_buf, &mut EmptyBuf)?
+                    };
 
                     spi.wait_for_idle_async().await;
 
@@ -1914,7 +1972,9 @@ mod dma {
                 for chunk in words.chunks(chunk_size) {
                     self.tx_buf.fill(chunk);
 
-                    unsafe { spi.start_dma_transfer(&mut EmptyBuf, &mut self.tx_buf)? };
+                    unsafe {
+                        spi.start_dma_transfer(0, chunk.len(), &mut EmptyBuf, &mut self.tx_buf)?
+                    };
 
                     spi.wait_for_idle_async().await;
                 }
@@ -1947,7 +2007,12 @@ mod dma {
                     self.rx_buf.set_length(read_chunk.len());
 
                     unsafe {
-                        spi.start_dma_transfer(&mut self.rx_buf, &mut self.tx_buf)?;
+                        spi.start_dma_transfer(
+                            read_chunk.len(),
+                            write_chunk.len(),
+                            &mut self.rx_buf,
+                            &mut self.tx_buf,
+                        )?;
                     }
                     spi.wait_for_idle_async().await;
 
@@ -1977,7 +2042,12 @@ mod dma {
                     self.rx_buf.set_length(chunk.len());
 
                     unsafe {
-                        spi.start_dma_transfer(&mut self.rx_buf, &mut self.tx_buf)?;
+                        spi.start_dma_transfer(
+                            chunk.len(),
+                            chunk.len(),
+                            &mut self.rx_buf,
+                            &mut self.tx_buf,
+                        )?;
                     }
                     spi.wait_for_idle_async().await;
 
@@ -2222,10 +2292,13 @@ impl DmaDriver {
         self.info.update();
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
         &self,
         _full_duplex: bool,
+        rx_len: usize,
+        tx_len: usize,
         rx_buffer: &mut impl DmaRxBuffer,
         tx_buffer: &mut impl DmaTxBuffer,
         rx: &mut RX,
@@ -2240,8 +2313,6 @@ impl DmaDriver {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        let rx_len = rx_buffer.length();
-        let tx_len = tx_buffer.length();
         self.info.configure_datalen(rx_len, tx_len);
 
         // enable the MISO and MOSI if needed

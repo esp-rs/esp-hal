@@ -82,7 +82,7 @@ fn main() -> ! {
         i = i.wrapping_add(1);
 
         let transfer = spi
-            .transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         // here we could do something else while DMA transfer is in progress

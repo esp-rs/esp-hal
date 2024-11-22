@@ -103,6 +103,7 @@ fn main() -> ! {
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
             0,
+            0,
             dma_tx_buf,
         )
         .map_err(|e| e.0)
@@ -117,6 +118,7 @@ fn main() -> ! {
             Command::Command8(0x20, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
             0,
+            dma_tx_buf.len(),
             dma_tx_buf,
         )
         .map_err(|e| e.0)
@@ -131,6 +133,7 @@ fn main() -> ! {
             Command::Command8(0x06, SpiDataMode::Single),
             Address::None,
             0,
+            dma_tx_buf.len(),
             dma_tx_buf,
         )
         .map_err(|e| e.0)
@@ -148,6 +151,7 @@ fn main() -> ! {
             Command::Command8(0x32, SpiDataMode::Single),
             Address::Address24(0x000000, SpiDataMode::Single),
             0,
+            dma_tx_buf.len(),
             dma_tx_buf,
         )
         .map_err(|e| e.0)
@@ -163,6 +167,7 @@ fn main() -> ! {
                 Command::Command8(0xeb, SpiDataMode::Single),
                 Address::Address32(0x000000 << 8, SpiDataMode::Quad),
                 4,
+                dma_rx_buf.len(),
                 dma_rx_buf,
             )
             .map_err(|e| e.0)

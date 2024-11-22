@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `SystemTimer` no longer uses peripheral ref (#2576)
 - `SystemTimer::now` has been renamed `SystemTimer::unit_value(Unit)` (#2576)
+- `SpiDma` transfers now explicitly take a length along with the DMA buffer object (#2587)
 
 ### Fixed
 
@@ -36,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The DMA channel objects no longer have `tx` and `rx` fields. (#2526)
 - `SysTimerAlarms` has been removed, alarms are now part of the `SystemTimer` struct (#2576)
 - `FrozenUnit`, `AnyUnit`, `SpecificUnit`, `SpecificComparator`, `AnyComparator` have been removed from `systimer` (#2576)
+- Remove Dma[Rx|Tx]Buffer::length (#2587)
 
 ## [0.22.0] - 2024-11-20
 

@@ -109,6 +109,7 @@ mod tests {
                 Command::None,
                 Address::None,
                 0,
+                dma_tx_buf.len(),
                 dma_tx_buf,
             )
             .map_err(|e| e.0)
@@ -123,6 +124,7 @@ mod tests {
                 Command::None,
                 Address::None,
                 0,
+                dma_tx_buf.len(),
                 dma_tx_buf,
             )
             .map_err(|e| e.0)

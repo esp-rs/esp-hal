@@ -120,13 +120,6 @@ pub unsafe trait DmaTxBuffer {
 
     /// This is called after the DMA is done using the buffer.
     fn from_view(view: Self::View) -> Self;
-
-    /// Returns the maximum number of bytes that would be transmitted by this
-    /// buffer.
-    ///
-    /// This is a convenience hint for SPI. Most peripherals don't care how long
-    /// the transfer is.
-    fn length(&self) -> usize;
 }
 
 /// [DmaRxBuffer] is a DMA descriptor + memory combo that can be used for
@@ -156,12 +149,6 @@ pub unsafe trait DmaRxBuffer {
 
     /// This is called after the DMA is done using the buffer.
     fn from_view(view: Self::View) -> Self;
-
-    /// Returns the maximum number of bytes that can be received by this buffer.
-    ///
-    /// This is a convenience hint for SPI. Most peripherals don't care how long
-    /// the transfer is.
-    fn length(&self) -> usize;
 }
 
 /// An in-progress view into [DmaRxBuf]/[DmaTxBuf].
@@ -387,10 +374,6 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
     fn from_view(view: Self::View) -> Self {
         view.0
     }
-
-    fn length(&self) -> usize {
-        self.len()
-    }
 }
 
 /// DMA receive buffer
@@ -543,10 +526,6 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
     fn from_view(view: Self::View) -> Self {
         view.0
     }
-
-    fn length(&self) -> usize {
-        self.len()
-    }
 }
 
 /// DMA transmit and receive buffer.
@@ -675,10 +654,6 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
     fn from_view(view: Self::View) -> Self {
         view.0
     }
-
-    fn length(&self) -> usize {
-        self.len()
-    }
 }
 
 unsafe impl DmaRxBuffer for DmaRxTxBuf {
@@ -710,10 +685,6 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 
     fn from_view(view: Self::View) -> Self {
         view.0
-    }
-
-    fn length(&self) -> usize {
-        self.len()
     }
 }
 
@@ -864,10 +835,6 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
 
     fn from_view(view: Self::View) -> Self {
         view.buf
-    }
-
-    fn length(&self) -> usize {
-        panic!("DmaCircularBuf doesn't have a length")
     }
 }
 
@@ -1072,10 +1039,6 @@ unsafe impl DmaTxBuffer for EmptyBuf {
     fn from_view(view: Self::View) -> Self {
         view
     }
-
-    fn length(&self) -> usize {
-        0
-    }
 }
 
 unsafe impl DmaRxBuffer for EmptyBuf {
@@ -1102,10 +1065,6 @@ unsafe impl DmaRxBuffer for EmptyBuf {
 
     fn from_view(view: Self::View) -> Self {
         view
-    }
-
-    fn length(&self) -> usize {
-        0
     }
 }
 
@@ -1179,10 +1138,6 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
 
     fn from_view(view: Self::View) -> Self {
         view
-    }
-
-    fn length(&self) -> usize {
-        panic!("DmaLoopBuf does not have a length")
     }
 }
 
