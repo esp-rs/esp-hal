@@ -10,9 +10,9 @@
 //! ## Configuration
 //!
 //! The timer consists of two counters, `Unit0` and `Unit1`. The counter values
-//! can be monitored by 3 [`Alarm`]'s
+//! can be monitored by 3 [`Alarm`]s
 //!
-//! It is recommended to pass the [`Alarm`]'s into a high level driver like
+//! It is recommended to pass the [`Alarm`]s into a high level driver like
 //! [`OneShotTimer`](super::OneShotTimer) and
 //! [`PeriodicTimer`](super::PeriodicTimer). Using the System timer directly is
 //! only possible through the low level [`Timer`](crate::timer::Timer) trait.
@@ -123,8 +123,8 @@ impl SystemTimer {
     ///
     /// # Safety
     ///
-    /// - Disabling an `Unit` whilst [`Alarm`]'s are using it will affect the
-    ///   [`Alarm`]'s operation.
+    /// - Disabling a `Unit` whilst [`Alarm`]s are using it will affect the
+    ///   [`Alarm`]s operation.
     /// - Disabling Unit0 will affect [`now`](crate::time::now).
     pub unsafe fn configure_unit(unit: Unit, config: UnitConfig) {
         unit.configure(config)
@@ -138,7 +138,7 @@ impl SystemTimer {
     ///
     /// # Safety
     ///
-    /// - Modifying a unit's count whilst [`Alarm`]'s are using it may cause
+    /// - Modifying a unit's count whilst [`Alarm`]s are using it may cause
     ///   unexpected behaviour
     /// - Any modification of the unit0 count will affect
     ///   [`now`](crate::time::now).
@@ -151,9 +151,8 @@ impl SystemTimer {
 #[cfg_attr(esp32s2, doc = "64-bit")]
 #[cfg_attr(not(esp32s2), doc = "52-bit")]
 /// counter.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Unit {
-    #[default]
     /// Unit 0
     Unit0 = 0,
     #[cfg(not(esp32s2))]
@@ -279,7 +278,7 @@ impl Alarm {
         }
     }
 
-    /// Returns the comparators number.
+    /// Returns the comparator's number.
     #[inline]
     fn channel(&self) -> u8 {
         self.comp
@@ -340,7 +339,7 @@ impl Alarm {
             let systimer = &*SYSTIMER::ptr();
             systimer.target_conf(self.channel() as usize)
         };
-        tconf.modify(|_, w| w.timer_unit_sel().bit(matches!(unit, Unit::Unit0)));
+        tconf.modify(|_, w| w.timer_unit_sel().bit(matches!(unit, Unit::Unit1)));
     }
 
     /// Set the mode of the comparator to be either target or periodic.
