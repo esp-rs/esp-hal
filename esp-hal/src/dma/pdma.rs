@@ -333,7 +333,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel {
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
         let spi = self.0.register_block();
-        spi.dma_int_clr().modify(|_, w| {
+        spi.dma_int_clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
