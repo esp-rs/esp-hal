@@ -360,7 +360,7 @@ pub struct Timer {
     pub register_block: *const RegisterBlock,
 
     /// The timer number inside the TimerGroup
-    pub timer: u8, // TODO should this be something else?
+    pub timer: u8,
 
     /// The TimerGroup number
     pub tg: u8,
@@ -432,7 +432,7 @@ impl Timer {
         let high = (ticks >> 32) as u32;
         let low = (ticks & 0xFFFF_FFFF) as u32;
 
-        let t = self.register_block().t(self.timer_number().into());
+        let t = self.t();
 
         t.alarmlo().write(|w| unsafe { w.alarm_lo().bits(low) });
         t.alarmhi().write(|w| unsafe { w.alarm_hi().bits(high) });
@@ -447,7 +447,7 @@ impl Timer {
     }
 
     fn now(&self) -> Instant<u64, 1, 1_000_000> {
-        let t = self.register_block().t(self.timer_number().into());
+        let t = self.t();
 
         t.update().write(|w| w.update().set_bit());
         while t.update().read().update().bit_is_set() {
