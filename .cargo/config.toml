@@ -1,3 +1,4 @@
 [alias]
 xtask = "run --package xtask --"
 xfmt = "xtask fmt-packages"
+qa = "xtask run-example qa-test"
