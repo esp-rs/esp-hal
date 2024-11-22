@@ -420,9 +420,6 @@ pub mod dma {
             // AES has to be restarted after each calculation
             self.reset_aes();
 
-            self.channel.tx.is_done();
-            self.channel.rx.is_done();
-
             unsafe {
                 self.tx_chain
                     .fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
@@ -444,8 +441,7 @@ pub mod dma {
             self.set_cipher_mode(cipher_mode);
             self.write_key(key.into());
 
-            // TODO: verify 16?
-            self.set_num_block(16);
+            self.set_num_block((write_buffer_len as u32).div_ceil(16));
 
             self.start_transform();
 
