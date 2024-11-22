@@ -575,42 +575,43 @@ pub fn init(config: Config) -> Peripherals {
 
 /// Asynchronous utilities.
 pub mod asynch {
-    use core::task::Waker;
+    use core::{cell::Cell, task::Waker};
 
-    use crate::sync::Locked;
+    use embassy_sync::blocking_mutex::Mutex;
 
-    /// Utility struct to register and wake a waker.
+    use crate::sync::RawMutex;
+
+    /// TODO: this just exists to test RawMutex, otherwise it should be replaced
+    /// by embassy_sync::waitqueue::atomic_waker::GenericAtomicWaker.
     pub struct AtomicWaker {
-        waker: Locked<Option<Waker>>,
-    }
-
-    impl Default for AtomicWaker {
-        fn default() -> Self {
-            Self::new()
-        }
+        waker: Mutex<RawMutex, Cell<Option<Waker>>>,
     }
 
     impl AtomicWaker {
         /// Create a new `AtomicWaker`.
+        #[allow(clippy::new_without_default)]
         pub const fn new() -> Self {
             Self {
-                waker: Locked::new(None),
+                waker: Mutex::const_new(RawMutex::new(), Cell::new(None)),
             }
         }
 
         /// Register a waker. Overwrites the previous waker, if any.
         pub fn register(&self, w: &Waker) {
-            self.waker.with(|waker| match waker {
-                Some(w2) if w2.will_wake(w) => {}
-                _ => *waker = Some(w.clone()),
+            self.waker.lock(|cell| {
+                cell.set(match cell.replace(None) {
+                    Some(w2) if (w2.will_wake(w)) => Some(w2),
+                    _ => Some(w.clone()),
+                })
             })
         }
 
         /// Wake the registered waker, if any.
         pub fn wake(&self) {
-            self.waker.with(|waker| {
-                if let Some(w) = waker {
+            self.waker.lock(|cell| {
+                if let Some(w) = cell.replace(None) {
                     w.wake_by_ref();
+                    cell.set(Some(w));
                 }
             })
         }
