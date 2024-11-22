@@ -42,12 +42,12 @@ in a generic function:
 
 ```rust
 fn new_foo<'d, T>(
-    dma_channel: dma::ChannelCreator<2>, // It wasn't possible to accept a generic ChannelCreator.
+    dma_channel: ChannelCreator<2>, // It wasn't possible to accept a generic ChannelCreator.
     peripheral: impl Peripheral<P = T> + 'd,
 )
 where
     T: SomePeripheralInstance,
-    dma::ChannelCreator<2>: esp_hal::dma::DmaChannelConvert<<T as esp_hal::dma::DmaEligible>::Dma>,
+    ChannelCreator<2>: DmaChannelConvert<<T as DmaEligible>::Dma>,
 {
     let dma_channel = dma_channel.configure_for_async(false, DmaPriority::Priority0);
 
