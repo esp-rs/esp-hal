@@ -944,38 +944,6 @@ pub trait DmaEligible {
     fn dma_peripheral(&self) -> DmaPeripheral;
 }
 
-/// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
-pub type DmaChannelFor<T> = <T as DmaEligible>::Dma;
-/// Helper type to get the DMA Rx channel for a peripheral.
-pub type RxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Rx;
-/// Helper type to get the DMA Tx channel for a peripheral.
-pub type TxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Tx;
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! impl_dma_eligible {
-    ([$dma_ch:ident] $name:ident => $dma:ident) => {
-        impl $crate::dma::DmaEligible for $crate::peripherals::$name {
-            type Dma = $dma_ch;
-
-            fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
-                $crate::dma::DmaPeripheral::$dma
-            }
-        }
-    };
-
-    (
-        $dma_ch:ident {
-            $($(#[$cfg:meta])? $name:ident => $dma:ident,)*
-        }
-    ) => {
-        $(
-            $(#[$cfg])?
-            $crate::impl_dma_eligible!([$dma_ch] $name => $dma);
-        )*
-    };
-}
-
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct DescriptorChain {
@@ -1592,6 +1560,38 @@ impl RxCircularState {
         Ok(len - remaining_buffer.len())
     }
 }
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! impl_dma_eligible {
+    ([$dma_ch:ident] $name:ident => $dma:ident) => {
+        impl $crate::dma::DmaEligible for $crate::peripherals::$name {
+            type Dma = $dma_ch;
+
+            fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
+                $crate::dma::DmaPeripheral::$dma
+            }
+        }
+    };
+
+    (
+        $dma_ch:ident {
+            $($(#[$cfg:meta])? $name:ident => $dma:ident,)*
+        }
+    ) => {
+        $(
+            $(#[$cfg])?
+            $crate::impl_dma_eligible!([$dma_ch] $name => $dma);
+        )*
+    };
+}
+
+/// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
+pub type DmaChannelFor<T> = <T as DmaEligible>::Dma;
+/// Helper type to get the DMA Rx channel for a peripheral.
+pub type RxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Rx;
+/// Helper type to get the DMA Tx channel for a peripheral.
+pub type TxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Tx;
 
 #[doc(hidden)]
 pub trait DmaRxChannel:
