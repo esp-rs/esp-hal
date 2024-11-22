@@ -46,13 +46,13 @@ use crate::{
         asynch::DmaTxFuture,
         Channel,
         ChannelTx,
-        CompatibleWith,
+        DmaChannelFor,
         DmaEligible,
         DmaError,
         DmaPeripheral,
         DmaTxBuffer,
+        PeripheralTxChannel,
         Tx,
-        TxChannelFor,
     },
     gpio::{
         interconnect::{OutputConnection, PeripheralOutput},
@@ -178,7 +178,7 @@ where
     I: Instance,
 {
     instance: PeripheralRef<'d, I>,
-    tx_channel: ChannelTx<'d, DM, TxChannelFor<I>>,
+    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<I>>,
     _guard: PeripheralGuard,
 }
 
@@ -192,7 +192,7 @@ impl<'d> I2sParallel<'d, Blocking> {
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
-        CH: CompatibleWith<AnyI2s>,
+        CH: DmaChannelFor<AnyI2s>,
     {
         Self::new_typed(i2s.map_into(), channel, frequency, pins, clock_pin)
     }
@@ -211,7 +211,7 @@ where
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
-        CH: CompatibleWith<I>,
+        CH: DmaChannelFor<I>,
     {
         crate::into_ref!(i2s);
         crate::into_mapped_ref!(clock_pin);

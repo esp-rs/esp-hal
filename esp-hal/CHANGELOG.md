@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `set_priority` to the `DmaChannel` trait on GDMA devices (#2403, #2526)
 - Added `into_async` and `into_blocking` functions for `ParlIoTxOnly`, `ParlIoRxOnly` (#2526)
 - ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526, #2532)
-- DMA: `CompatibleWith` traits and `ChannelFor` type aliasses to improve usability. (#2532)
+- DMA: `PeripheralDmaChannel` type aliasses and `DmaChannelFor` traits to improve usability. (#2532)
 
 ### Changed
 

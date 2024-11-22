@@ -1587,11 +1587,11 @@ macro_rules! impl_dma_eligible {
 }
 
 /// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
-pub type DmaChannelFor<T> = <T as DmaEligible>::Dma;
+pub type PeripheralDmaChannel<T> = <T as DmaEligible>::Dma;
 /// Helper type to get the DMA Rx channel for a peripheral.
-pub type RxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Rx;
+pub type PeripheralRxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Rx;
 /// Helper type to get the DMA Tx channel for a peripheral.
-pub type TxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Tx;
+pub type PeripheralTxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Tx;
 
 #[doc(hidden)]
 pub trait DmaRxChannel:
@@ -1676,7 +1676,7 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// ```rust,no_run
 #[doc = crate::before_snippet!()]
 /// use esp_hal::spi::master::{Spi, SpiDma, Config, Instance as SpiInstance};
-/// use esp_hal::dma::CompatibleWith;
+/// use esp_hal::dma::DmaChannelFor;
 /// use esp_hal::peripheral::Peripheral;
 /// use esp_hal::Blocking;
 /// use esp_hal::dma::Dma;
@@ -1687,7 +1687,7 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// ) -> SpiDma<'d, Blocking, S>
 /// where
 ///     S: SpiInstance,
-///     CH: CompatibleWith<S> + 'd,
+///     CH: DmaChannelFor<S> + 'd,
 ///  {
 ///     spi.with_dma(channel)
 /// }
@@ -1704,41 +1704,44 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// let spi_dma = configures_spi_dma(spi, dma_channel);
 /// # }
 /// ```
-pub trait CompatibleWith<P: DmaEligible>: DmaChannel + DmaChannelConvert<DmaChannelFor<P>> {}
-impl<P, CH> CompatibleWith<P> for CH
+pub trait DmaChannelFor<P: DmaEligible>:
+    DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>
+{
+}
+impl<P, CH> DmaChannelFor<P> for CH
 where
     P: DmaEligible,
-    CH: DmaChannel + DmaChannelConvert<DmaChannelFor<P>>,
+    CH: DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>,
 {
 }
 
 /// Trait implemented for the RX half of split DMA channels that are compatible
 /// with a particular peripheral. Accepts complete DMA channels or split halves.
 ///
-/// This trait is similar in use to [`CompatibleWith`].
+/// This trait is similar in use to [`DmaChannelFor`].
 ///
 /// You can use this in places where a peripheral driver would expect a
 /// `DmaRxChannel` implementation.
-pub trait RxCompatibleWith<P: DmaEligible>: DmaChannelConvert<RxChannelFor<P>> {}
-impl<P, RX> RxCompatibleWith<P> for RX
+pub trait RxChannelFor<P: DmaEligible>: DmaChannelConvert<PeripheralRxChannel<P>> {}
+impl<P, RX> RxChannelFor<P> for RX
 where
     P: DmaEligible,
-    RX: DmaChannelConvert<RxChannelFor<P>>,
+    RX: DmaChannelConvert<PeripheralRxChannel<P>>,
 {
 }
 
 /// Trait implemented for the TX half of split DMA channels that are compatible
 /// with a particular peripheral. Accepts complete DMA channels or split halves.
 ///
-/// This trait is similar in use to [`CompatibleWith`].
+/// This trait is similar in use to [`DmaChannelFor`].
 ///
 /// You can use this in places where a peripheral driver would expect a
 /// `DmaTxChannel` implementation.
-pub trait TxCompatibleWith<PER: DmaEligible>: DmaChannelConvert<TxChannelFor<PER>> {}
-impl<P, TX> TxCompatibleWith<P> for TX
+pub trait TxChannelFor<PER: DmaEligible>: DmaChannelConvert<PeripheralTxChannel<PER>> {}
+impl<P, TX> TxChannelFor<P> for TX
 where
     P: DmaEligible,
-    TX: DmaChannelConvert<TxChannelFor<P>>,
+    TX: DmaChannelConvert<PeripheralTxChannel<P>>,
 {
 }
 

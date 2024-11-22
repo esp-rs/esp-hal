@@ -176,18 +176,18 @@ pub mod dma {
             Channel,
             ChannelRx,
             ChannelTx,
-            CompatibleWith,
             DescriptorChain,
             DmaChannelFor,
             DmaDescriptor,
             DmaTransferRx,
             DmaTransferRxTx,
             DmaTransferTx,
+            PeripheralDmaChannel,
+            PeripheralRxChannel,
+            PeripheralTxChannel,
             ReadBuffer,
             Rx,
-            RxChannelFor,
             Tx,
-            TxChannelFor,
             WriteBuffer,
         },
         Mode,
@@ -207,7 +207,7 @@ pub mod dma {
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> SpiDma<'d, Blocking, T>
         where
-            CH: CompatibleWith<T>,
+            CH: DmaChannelFor<T>,
         {
             self.spi.info().set_data_mode(self.data_mode, true);
             SpiDma::new(
@@ -226,7 +226,7 @@ pub mod dma {
         M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, M, DmaChannelFor<T>>,
+        pub(crate) channel: Channel<'d, M, PeripheralDmaChannel<T>>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
         _guard: PeripheralGuard,
@@ -266,7 +266,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type TX = ChannelTx<'d, DmaMode, TxChannelFor<T>>;
+        type TX = ChannelTx<'d, DmaMode, PeripheralTxChannel<T>>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -282,7 +282,7 @@ pub mod dma {
         T: InstanceDma,
         DmaMode: Mode,
     {
-        type RX = ChannelRx<'d, DmaMode, RxChannelFor<T>>;
+        type RX = ChannelRx<'d, DmaMode, PeripheralRxChannel<T>>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -299,7 +299,7 @@ pub mod dma {
     {
         fn new(
             spi: PeripheralRef<'d, T>,
-            channel: PeripheralRef<'d, DmaChannelFor<T>>,
+            channel: PeripheralRef<'d, PeripheralDmaChannel<T>>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Self {

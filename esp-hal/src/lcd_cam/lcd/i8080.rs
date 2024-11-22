@@ -62,7 +62,7 @@ use fugit::HertzU32;
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, Tx, TxChannelFor, TxCompatibleWith},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, Tx, TxChannelFor},
     gpio::{
         interconnect::{OutputConnection, PeripheralOutput},
         OutputSignal,
@@ -85,7 +85,7 @@ use crate::{
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, Blocking, TxChannelFor<LCD_CAM>>,
+    tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
     _mode: PhantomData<DM>,
 }
 
@@ -102,7 +102,7 @@ where
         config: Config,
     ) -> Self
     where
-        CH: TxCompatibleWith<LCD_CAM>,
+        CH: TxChannelFor<LCD_CAM>,
         P: TxPins,
     {
         let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));

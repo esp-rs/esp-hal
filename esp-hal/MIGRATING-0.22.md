@@ -66,7 +66,7 @@ fn new_foo<'d, T, CH>(
 )
 where
     T: SomePeripheralInstance,
-    CH: CompatibleWith<T>,
+    CH: DmaChannelFor<T>,
 {
     // Optionally: dma_channel.set_priority(DmaPriority::Priority2);
 
@@ -84,7 +84,7 @@ If you are writing a driver and need to store a channel in a structure, you can 
 ```diff
  struct Aes<'d> {
 -    channel: ChannelTx<'d, Blocking, <AES as DmaEligible>::Dma>,
-+    channel: ChannelTx<'d, Blocking, TxChannelFor<AES>>,
++    channel: ChannelTx<'d, Blocking, PeripheralTxChannel<AES>>,
  }
 ```
 
