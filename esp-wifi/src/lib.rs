@@ -293,12 +293,7 @@ where
 }
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> IntoAnyTimer for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for Alarm where Self: Into<AnyTimer> {}
 
 impl private::Sealed for AnyTimer {}
 impl IntoAnyTimer for AnyTimer {}
@@ -326,12 +321,7 @@ where
 {
 }
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> private::Sealed for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl private::Sealed for Alarm where Self: Into<AnyTimer> {}
 
 /// A marker trait for suitable Rng sources for esp-wifi
 pub trait EspWifiRngSource: rand_core::RngCore + private::Sealed {}
