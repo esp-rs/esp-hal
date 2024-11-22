@@ -109,8 +109,8 @@
 //! ```
 //! 
 //! ### Operation with interrupts that by UART/Serial
-//! Notice, that in practice a proper serial terminal to connect to the board (espmonitor and
-//! espflash won't work)
+//! Notice, that in practice a proper serial terminal should be used
+//! to connect to the board (espmonitor and espflash won't work)
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;

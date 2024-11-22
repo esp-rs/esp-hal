@@ -15,9 +15,11 @@
 //!
 //! ## Examples
 //!
-//! ### Octal/Quad PSRAM (depends on which feature of `octal-psram` or `quad-psram` is enabled)
+//! ### Octal/Quad PSRAM
 //! This example shows how to use PSRAM as heap-memory via esp-alloc.
 //! You need an ESP32-S3 with at least 2 MB of PSRAM memory.
+//! Either `Octal` or `Quad` PSRAM will be used, depending on whether
+//! `octal-psram` or `quad-psram` feature is enabled.
 //! Notice that PSRAM example **must** be built in release mode!
 //!
 //! ```rust, no_run
@@ -40,7 +42,9 @@
 //!
 //! // Initialize PSRAM and add it to the heap
 //! let (start, size) = psram::init_psram(peripherals.PSRAM,
-//! psram::PsramConfig::default()); init_psram_heap(start, size);
+//!     psram::PsramConfig::default());
+//!
+//! init_psram_heap(start, size);
 //!
 //! let mut large_vec: Vec<u32> = Vec::with_capacity(500 * 1024 / 4);
 //!
@@ -48,14 +52,7 @@
 //!     large_vec.push((i & 0xff) as u32);
 //! }
 //!
-//! // esp_println::println!("vec size = {} bytes", large_vec.len() * 4);
-//! // esp_println::println!("vec address = {:p}", large_vec.as_ptr());
-//! // esp_println::println!("vec[..100] = {:?}", &large_vec[..100]);
-//!
 //! let string = String::from("A string allocated in PSRAM");
-//!
-//! // esp_println::println!("'{}' allocated at {:p}", &string,
-//! // string.as_ptr());
 //! # }
 //! ```
 

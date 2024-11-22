@@ -62,16 +62,12 @@ pub enum WakeupLevel {
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
-/// // esp_println::println!("Up and running!");
 /// let reason =
 /// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
 ///
-/// // esp_println::println! ("reset reason: {:?}", reason);
 /// let wake_reason = wakeup_cause();
-/// // esp_println::println!("wake reason: {:?}", wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(5));
-/// // esp_println::println!("Sleeping...");
 /// delay.delay_millis(100);
 /// rtc.sleep_deep(&[&timer]);
 ///
@@ -118,19 +114,15 @@ pub enum Error {
 ///
 /// let pin_0 = Input::new(peripherals.GPIO4, Pull::None);
 ///
-/// // esp_println::println!("up and running!");
 /// let reason =
 ///     reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
 ///
-/// // esp_println::println! ("reset reason: {:?}", reason);
 /// let wake_reason = wakeup_cause();
-/// // esp_println::println!("wake reason: {:?}", wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
 /// let ext0 = Ext0WakeupSource::new(pin_0, WakeupLevel::High);
 ///
-/// // esp_println::println!("sleeping!");
 /// delay.delay_millis(100);
 /// rtc.sleep_deep(&[&timer, &ext0]);
 ///
@@ -175,13 +167,10 @@ impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
 /// let pin_4 = Input::new(peripherals.GPIO4, Pull::None);
 /// let mut pin_2 = peripherals.GPIO2;
 ///
-/// // esp_println::println!("up and running!");
 /// let reason =
 /// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
 ///
-/// // esp_println::println! ("reset reason: {:?}", reason);
 /// let wake_reason = wakeup_cause();
-/// // esp_println::println!("wake reason: {:?}", wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
@@ -191,7 +180,6 @@ impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
 ///
 /// let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
 ///
-/// // esp_println::println!("sleeping!");
 /// delay.delay_millis(100);
 /// rtc.sleep_deep(&[&timer, &ext1]);
 ///
@@ -234,13 +222,10 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// let pin2 = Input::new(peripherals.GPIO2, Pull::None);
 /// let mut pin3 = peripherals.GPIO3;
 ///
-/// // esp_println::println!("up and running!");
 /// let reason =
 /// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
 ///
-/// // esp_println::println! ("reset reason: {:?}", reason);
 /// let wake_reason = wakeup_cause();
-/// // esp_println::println!("wake reason: {:?}", wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
@@ -251,7 +236,6 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 ///
 /// let ext1 = Ext1WakeupSource::new(wakeup_pins);
 ///
-/// // esp_println::println!("sleeping!");
 /// delay.delay_millis(100);
 /// rtc.sleep_deep(&[&timer, &ext1]);
 ///
@@ -291,14 +275,10 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 ///
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
-/// // esp_println::println!("Up and running!");
 /// let reason =
 /// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
 ///
-/// // esp_println::println!("reset reason: {:?}", reason);
-///
 /// let wake_reason = wakeup_cause();
-/// // esp_println::println!("wake reason: {:?}", wake_reason);
 ///
 /// let delay = Delay::new();
 /// let timer = TimerWakeupSource::new(Duration::from_secs(10));
@@ -325,7 +305,6 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// ];
 ///
 /// let rtcio = RtcioWakeupSource::new(wakeup_pins);
-/// // esp_println::println!("sleeping!");
 /// delay.delay_millis(100);
 /// rtc.sleep_deep(&[&timer, &rtcio]);
 ///

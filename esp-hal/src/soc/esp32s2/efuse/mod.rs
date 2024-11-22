@@ -41,8 +41,7 @@
 //!     mac_address[5]
 //! );
 //!
-//! // Or just
-//! // writeln!(serial_tx, "MAC address {:02x?}", Efuse::mac_address());
+//! writeln!(serial_tx, "MAC address {:02x?}", Efuse::mac_address());
 //! writeln!(serial_tx, "Flash Encryption {:?}", Efuse::flash_encryption());
 //! # }
 //! ```
