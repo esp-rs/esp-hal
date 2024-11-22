@@ -54,10 +54,6 @@
 //!     })
 //!     .unwrap();
 //!
-//! channel0.start_duty_fade(0, 100, 2000).expect_err(
-//!     "Fading from 0% to 100% over 2 seconds, should fail",
-//! );
-//!
 //! loop {
 //!     // Set up a breathing LED: fade from off to on over a second, then
 //!     // from on back off over the next second.  Then loop.
