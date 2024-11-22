@@ -74,7 +74,7 @@ pub enum Error {
 }
 
 /// Functionality provided by any timer peripheral.
-pub trait Timer: crate::private::Sealed {
+pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
     /// Start the timer.
     fn start(&self);
 
@@ -135,9 +135,7 @@ pub struct OneShotTimer<'d, M, T = AnyTimer> {
 
 impl<'d> OneShotTimer<'d, Blocking> {
     /// Construct a new instance of [`OneShotTimer`].
-    pub fn new(
-        inner: impl Peripheral<P = impl Timer + Into<AnyTimer> + 'd> + 'd,
-    ) -> OneShotTimer<'d, Blocking> {
+    pub fn new(inner: impl Peripheral<P = impl Timer> + 'd) -> OneShotTimer<'d, Blocking> {
         Self::new_typed(inner.map_into())
     }
 }
@@ -331,9 +329,7 @@ pub struct PeriodicTimer<'d, M, T = AnyTimer> {
 
 impl<'d> PeriodicTimer<'d, Blocking> {
     /// Construct a new instance of [`PeriodicTimer`].
-    pub fn new(
-        inner: impl Peripheral<P = impl Timer + Into<AnyTimer> + 'd> + 'd,
-    ) -> PeriodicTimer<'d, Blocking> {
+    pub fn new(inner: impl Peripheral<P = impl Timer> + 'd) -> PeriodicTimer<'d, Blocking> {
         Self::new_typed(inner.map_into())
     }
 }
