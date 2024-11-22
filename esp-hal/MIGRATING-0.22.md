@@ -116,3 +116,12 @@ let systimer = SystemTimer::new(peripherals.SYSTIMER);
 + let mut timer = PeriodicTimer::new(alarm0);
 + timer.start(1u64.secs());
 ```
+
+### TIMG
+
+Timer group timers have been type erased.
+
+```diff
+- timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>
++ timg::Timer
+```

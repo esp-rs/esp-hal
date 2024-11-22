@@ -285,12 +285,7 @@ pub trait EspWifiTimerSource: private::Sealed {
 /// conflicting implementations.
 trait IntoAnyTimer: Into<AnyTimer> {}
 
-impl<T, DM> IntoAnyTimer for TimgTimer<T, DM>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for TimgTimer where Self: Into<AnyTimer> {}
 
 #[cfg(not(feature = "esp32"))]
 impl IntoAnyTimer for Alarm where Self: Into<AnyTimer> {}
@@ -314,12 +309,7 @@ impl EspWifiTimerSource for TimeBase {
 }
 
 impl private::Sealed for TimeBase {}
-impl<T, DM> private::Sealed for TimgTimer<T, DM>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl private::Sealed for TimgTimer where Self: Into<AnyTimer> {}
 #[cfg(not(feature = "esp32"))]
 impl private::Sealed for Alarm where Self: Into<AnyTimer> {}
 

@@ -21,13 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
 - The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
 - `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
-- `SystemTimer::set_unit_count` & `SystemTimer::configure_unit` (#2576)
 - `SystemTimer::set_unit_value` & `SystemTimer::configure_unit` (#2576)
-
-### Changed
-
 - `SystemTimer` no longer uses peripheral ref (#2576)
+- `TIMGX` no longer uses peripheral ref (#2581)
 - `SystemTimer::now` has been renamed `SystemTimer::unit_value(Unit)` (#2576)
+- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
+- `SystemTimer`s `Alarm`s are now type erased (#2576)
+- `TimerGroup` `Timer`s are now type erased (#2581)
 
 ### Fixed
 
