@@ -3001,8 +3001,6 @@ impl PartialEq for Info {
 unsafe impl Sync for Info {}
 
 macro_rules! spi_instance {
-    (@ignore $sio2:ident) => {};
-
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident $(, $sio2:ident, $sio3:ident)?) => {
         paste::paste! {
             impl Instance for crate::peripherals::[<SPI $num>] {
@@ -3030,7 +3028,7 @@ macro_rules! spi_instance {
 
             $(
                 // If the extra pins are set, implement QspiInstance
-                spi_instance!(@ignore $sio2);
+                $crate::ignore!($sio2);
                 impl QspiInstance for crate::peripherals::[<SPI $num>] {}
             )?
         }

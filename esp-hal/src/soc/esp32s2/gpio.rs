@@ -318,8 +318,6 @@ pub enum OutputSignal {
 }
 
 macro_rules! rtcio_analog {
-    ( @ignore $rue:literal ) => {};
-
     (
         $pin_num:expr, $pin_reg:expr, $prefix:pat, $hold:ident
     ) => {

@@ -531,8 +531,6 @@ pub enum OutputSignal {
 }
 
 macro_rules! rtcio_analog {
-    ( @ignore $rue:literal ) => {};
-
     (
         $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
     ) => {
@@ -564,7 +562,7 @@ macro_rules! rtcio_analog {
 
         $(
             // FIXME: replace with $(ignore($rue)) once stable
-            rtcio_analog!(@ignore $rue);
+            $crate::ignore!($rue);
             impl $crate::gpio::RtcPinWithResistors for $crate::gpio::GpioPin<$pin_num> {
                 fn rtcio_pullup(&mut self, enable: bool) {
                     paste::paste! {
@@ -610,7 +608,7 @@ macro_rules! rtcio_analog {
                         // Disable pull-up and pull-down resistors on the pin, if it has them
                         $(
                             // FIXME: replace with $(ignore($rue)) once stable
-                            rtcio_analog!( @ignore $rue );
+                            $crate::ignore!($rue);
                             w.[<$prefix rue>]().bit(false);
                             w.[<$prefix rde>]().bit(false);
                         )?

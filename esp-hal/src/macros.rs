@@ -134,3 +134,13 @@ macro_rules! if_set {
         $set
     };
 }
+
+/// Macro to ignore tokens.
+///
+/// This is useful when we need existence of a metavariable (to expand a
+/// repetition), but we don't need to use it.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! ignore {
+    ($($item:tt)*) => {};
+}

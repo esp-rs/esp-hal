@@ -16,6 +16,8 @@
 
 use crate::{
     dma::*,
+    interrupt::Priority,
+    macros::handler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     system::{self, PeripheralClockControl},
@@ -564,7 +566,7 @@ impl<CH: DmaChannel, M: Mode> Channel<'_, M, CH> {
 }
 
 macro_rules! impl_channel {
-    ($num:literal, $interrupt_in:ident, $async_handler:path $(, $interrupt_out:ident , $async_handler_out:path)? ) => {
+    ($num:literal, $interrupt_in:ident $(, $interrupt_out:ident)? ) => {
         paste::paste! {
             /// A description of a specific GDMA channel
             #[non_exhaustive]
@@ -593,7 +595,25 @@ macro_rules! impl_channel {
 
             impl [<DmaChannel $num>] {
                 fn handler_in() -> Option<InterruptHandler> {
-                    Some($async_handler)
+                    $crate::if_set! {
+                        $({
+                            // $interrupt_out is present, meaning we have split handlers
+                            #[handler(priority = Priority::max())]
+                            fn interrupt_handler_in() {
+                                $crate::ignore!($interrupt_out);
+                                super::asynch::handle_in_interrupt::<[< DmaChannel $num >]>();
+                            }
+                            Some(interrupt_handler_in)
+                        })?,
+                        {
+                            #[handler(priority = Priority::max())]
+                            fn interrupt_handler() {
+                                super::asynch::handle_in_interrupt::<[< DmaChannel $num >]>();
+                                super::asynch::handle_out_interrupt::<[< DmaChannel $num >]>();
+                            }
+                            Some(interrupt_handler)
+                        }
+                    }
                 }
 
                 fn isr_in() -> Option<Interrupt> {
@@ -601,7 +621,17 @@ macro_rules! impl_channel {
                 }
 
                 fn handler_out() -> Option<InterruptHandler> {
-                    $crate::if_set! { $(Some($async_handler_out))?, None }
+                    $crate::if_set! {
+                        $({
+                            #[handler(priority = Priority::max())]
+                            fn interrupt_handler_out() {
+                                $crate::ignore!($interrupt_out);
+                                super::asynch::handle_out_interrupt::<[< DmaChannel $num >]>();
+                            }
+                            Some(interrupt_handler_out)
+                        })?,
+                        None
+                    }
                 }
 
                 fn isr_out() -> Option<Interrupt> {
@@ -653,29 +683,27 @@ macro_rules! impl_channel {
     };
 }
 
-use super::asynch::interrupt as asynch_handler;
-
 cfg_if::cfg_if! {
     if #[cfg(esp32c2)] {
         const CHANNEL_COUNT: usize = 1;
-        impl_channel!(0, DMA_CH0, asynch_handler::interrupt_handler_ch0);
+        impl_channel!(0, DMA_CH0);
     } else if #[cfg(esp32c3)] {
         const CHANNEL_COUNT: usize = 3;
-        impl_channel!(0, DMA_CH0, asynch_handler::interrupt_handler_ch0);
-        impl_channel!(1, DMA_CH1, asynch_handler::interrupt_handler_ch1);
-        impl_channel!(2, DMA_CH2, asynch_handler::interrupt_handler_ch2);
+        impl_channel!(0, DMA_CH0);
+        impl_channel!(1, DMA_CH1);
+        impl_channel!(2, DMA_CH2);
     } else if #[cfg(any(esp32c6, esp32h2))] {
         const CHANNEL_COUNT: usize = 3;
-        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_in_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_out_ch0);
-        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_in_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_out_ch1);
-        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_in_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_out_ch2);
+        impl_channel!(0, DMA_IN_CH0, DMA_OUT_CH0);
+        impl_channel!(1, DMA_IN_CH1, DMA_OUT_CH1);
+        impl_channel!(2, DMA_IN_CH2, DMA_OUT_CH2);
     } else if #[cfg(esp32s3)] {
         const CHANNEL_COUNT: usize = 5;
-        impl_channel!(0, DMA_IN_CH0, asynch_handler::interrupt_handler_in_ch0, DMA_OUT_CH0, asynch_handler::interrupt_handler_out_ch0);
-        impl_channel!(1, DMA_IN_CH1, asynch_handler::interrupt_handler_in_ch1, DMA_OUT_CH1, asynch_handler::interrupt_handler_out_ch1);
-        impl_channel!(2, DMA_IN_CH2, asynch_handler::interrupt_handler_in_ch2, DMA_OUT_CH2, asynch_handler::interrupt_handler_out_ch2);
-        impl_channel!(3, DMA_IN_CH3, asynch_handler::interrupt_handler_in_ch3, DMA_OUT_CH3, asynch_handler::interrupt_handler_out_ch3);
-        impl_channel!(4, DMA_IN_CH4, asynch_handler::interrupt_handler_in_ch4, DMA_OUT_CH4, asynch_handler::interrupt_handler_out_ch4);
+        impl_channel!(0, DMA_IN_CH0, DMA_OUT_CH0);
+        impl_channel!(1, DMA_IN_CH1, DMA_OUT_CH1);
+        impl_channel!(2, DMA_IN_CH2, DMA_OUT_CH2);
+        impl_channel!(3, DMA_IN_CH3, DMA_OUT_CH3);
+        impl_channel!(4, DMA_IN_CH4, DMA_OUT_CH4);
     }
 }
 
