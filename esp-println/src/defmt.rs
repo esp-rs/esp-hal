@@ -4,7 +4,7 @@
 #[cfg(feature = "critical-section")]
 use critical_section::RestoreState;
 
-use super::PrinterImpl;
+use super::{LockToken, PrinterImpl};
 
 /// Global logger lock.
 #[cfg(feature = "critical-section")]
@@ -74,7 +74,12 @@ unsafe impl defmt::Logger for Logger {
     }
 
     unsafe fn flush() {
-        PrinterImpl::flush();
+        let token = unsafe {
+            // Safety: the implementation ensures this is only called in a critical
+            // section.
+            LockToken::conjure()
+        };
+        PrinterImpl::flush(token);
     }
 
     unsafe fn write(bytes: &[u8]) {
@@ -85,5 +90,10 @@ unsafe impl defmt::Logger for Logger {
 }
 
 fn do_write(bytes: &[u8]) {
-    PrinterImpl::write_bytes_assume_cs(bytes)
+    let token = unsafe {
+        // Safety: the above implementation ensures this is only called in a critical
+        // section.
+        LockToken::conjure()
+    };
+    PrinterImpl::write_bytes_in_cs(bytes, token)
 }
