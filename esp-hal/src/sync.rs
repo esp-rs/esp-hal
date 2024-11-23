@@ -222,38 +222,10 @@ impl Lock {
     }
 }
 
-// This is preferred over critical-section as this allows you to have multiple
+// Prefer this over a critical-section as this allows you to have multiple
 // locks active at the same time rather than using the global mutex that is
 // critical-section.
 pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
-    // In regards to disabling interrupts, we only need to disable
-    // the interrupts that may be calling this function.
-
-    struct LockGuard<'a> {
-        lock: &'a Lock,
-        token: critical_section::RawRestoreState,
-    }
-
-    impl<'a> LockGuard<'a> {
-        fn new(lock: &'a Lock) -> Self {
-            let token = unsafe {
-                // SAFETY: the same lock will be released when dropping the guard.
-                // This ensures that the lock is released on the same thread, in the reverse
-                // order it was acquired.
-                lock.acquire()
-            };
-            assert!(token & REENTRY_FLAG == 0, "lock is not reentrant");
-
-            Self { lock, token }
-        }
-    }
-
-    impl Drop for LockGuard<'_> {
-        fn drop(&mut self) {
-            unsafe { self.lock.release(self.token) };
-        }
-    }
-
     let _token = LockGuard::new(lock);
     f()
 }
@@ -277,6 +249,8 @@ impl<T> Locked<T> {
     }
 
     /// Provide exclusive access to the protected data to the given closure.
+    ///
+    /// Calling this reentrantly will panic.
     pub fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
         lock(&self.lock_state, || f(unsafe { &mut *self.data.get() }))
     }
@@ -297,5 +271,62 @@ unsafe impl critical_section::Impl for CriticalSection {
 
     unsafe fn release(token: critical_section::RawRestoreState) {
         CRITICAL_SECTION.release(token);
+    }
+}
+
+/// A mutual exclusion primitive.
+///
+/// This is an implementation of `embassy_sync::blocking_mutex::raw::RawMutex`.
+/// It needs a bit of memory, but it does not take a global critical section,
+/// making it preferrable for use in multi-core systems.
+///
+/// On single core systems, this is equivalent to `CriticalSectionRawMutex`.
+pub struct RawMutex(Lock);
+
+impl RawMutex {
+    /// Create a new mutex.
+    #[allow(clippy::new_without_default)]
+    pub const fn new() -> Self {
+        Self(Lock::new())
+    }
+}
+
+unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawMutex {
+    #[allow(clippy::declare_interior_mutable_const)]
+    const INIT: Self = Self(Lock::new());
+
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        let _token = LockGuard::new_reentrant(&self.0);
+        f()
+    }
+}
+
+struct LockGuard<'a> {
+    lock: &'a Lock,
+    token: critical_section::RawRestoreState,
+}
+
+impl<'a> LockGuard<'a> {
+    fn new(lock: &'a Lock) -> Self {
+        let this = Self::new_reentrant(lock);
+        assert!(this.token & REENTRY_FLAG == 0, "lock is not reentrant");
+        this
+    }
+
+    fn new_reentrant(lock: &'a Lock) -> Self {
+        let token = unsafe {
+            // SAFETY: the same lock will be released when dropping the guard.
+            // This ensures that the lock is released on the same thread, in the reverse
+            // order it was acquired.
+            lock.acquire()
+        };
+
+        Self { lock, token }
+    }
+}
+
+impl Drop for LockGuard<'_> {
+    fn drop(&mut self) {
+        unsafe { self.lock.release(self.token) };
     }
 }

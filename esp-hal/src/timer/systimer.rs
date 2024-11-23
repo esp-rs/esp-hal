@@ -617,10 +617,10 @@ mod asynch {
         task::{Context, Poll},
     };
 
-    use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::handler;
 
     use super::*;
+    use crate::asynch::AtomicWaker;
 
     const NUM_ALARMS: usize = 3;
 

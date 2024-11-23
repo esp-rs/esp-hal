@@ -11,10 +11,10 @@
 //! [SPI]: ../spi/index.html
 //! [I2S]: ../i2s/index.html
 
-use embassy_sync::waitqueue::AtomicWaker;
 use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{
+    asynch::AtomicWaker,
     dma::*,
     interrupt::Priority,
     macros::handler,

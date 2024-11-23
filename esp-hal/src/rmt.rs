@@ -84,11 +84,11 @@ use core::{
     task::{Context, Poll},
 };
 
-use embassy_sync::waitqueue::AtomicWaker;
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 
 use crate::{
+    asynch::AtomicWaker,
     gpio::interconnect::{PeripheralInput, PeripheralOutput},
     macros::handler,
     peripheral::Peripheral,

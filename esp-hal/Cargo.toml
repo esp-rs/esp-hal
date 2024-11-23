@@ -27,7 +27,7 @@ digest                   = { version = "0.10.7", default-features = false, optio
 document-features        = "0.2.10"
 embassy-embedded-hal     = "0.2.0"
 embassy-futures          = "0.1.1"
-embassy-sync             = "0.6.0"
+embassy-sync             = "0.6.1"
 embassy-usb-driver       = { version = "0.1.0", optional = true }
 embassy-usb-synopsys-otg = { version = "0.1.0", optional = true }
 embedded-can             = "0.4.1"

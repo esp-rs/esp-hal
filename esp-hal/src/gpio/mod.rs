@@ -2193,9 +2193,8 @@ fn handle_pin_interrupts(handle: impl Fn(u8)) {
 mod asynch {
     use core::task::{Context, Poll};
 
-    use embassy_sync::waitqueue::AtomicWaker;
-
     use super::*;
+    use crate::asynch::AtomicWaker;
 
     #[ram]
     pub(super) static PIN_WAKERS: [AtomicWaker; NUM_PINS] =

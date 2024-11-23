@@ -379,11 +379,11 @@ where
 pub(crate) mod asynch {
     use core::task::Poll;
 
-    use embassy_sync::waitqueue::AtomicWaker;
     use portable_atomic::{AtomicBool, Ordering};
     use procmacros::handler;
 
     use crate::{
+        asynch::AtomicWaker,
         rsa::{
             Multi,
             Rsa,

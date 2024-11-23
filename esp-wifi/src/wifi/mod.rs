@@ -3122,7 +3122,7 @@ macro_rules! esp_wifi_result {
 
 pub(crate) mod embassy {
     use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
-    use embassy_sync::waitqueue::AtomicWaker;
+    use esp_hal::asynch::AtomicWaker;
 
     use super::*;
 
@@ -3209,7 +3209,7 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
 mod asynch {
     use core::task::Poll;
 
-    use embassy_sync::waitqueue::AtomicWaker;
+    use esp_hal::asynch::AtomicWaker;
 
     use super::*;
 

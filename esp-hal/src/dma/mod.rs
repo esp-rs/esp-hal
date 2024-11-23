@@ -1799,7 +1799,7 @@ pub trait Rx: crate::private::Sealed {
 
     fn clear_interrupts(&self);
 
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker;
 }
 
 // DMA receive channel
@@ -2032,7 +2032,7 @@ where
         self.rx_impl.clear_all();
     }
 
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker {
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker {
         self.rx_impl.waker()
     }
 }
@@ -2081,7 +2081,7 @@ pub trait Tx: crate::private::Sealed {
 
     fn clear_interrupts(&self);
 
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker;
 
     fn last_out_dscr_address(&self) -> usize;
 }
@@ -2306,7 +2306,7 @@ where
         self.tx_impl.pending_interrupts()
     }
 
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker {
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker {
         self.tx_impl.waker()
     }
 
@@ -2401,7 +2401,7 @@ pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
     fn is_listening(&self) -> EnumSet<T>;
     fn clear(&self, interrupts: impl Into<EnumSet<T>>);
     fn pending_interrupts(&self) -> EnumSet<T>;
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker;
 
     fn is_async(&self) -> bool;
     fn set_async(&self, is_async: bool);

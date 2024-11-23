@@ -527,10 +527,8 @@ mod asynch {
         task::{Context, Poll},
     };
 
-    use embassy_sync::waitqueue::AtomicWaker;
-
     use super::*;
-    use crate::{macros::ram, prelude::handler, Async};
+    use crate::{asynch::AtomicWaker, macros::ram, prelude::handler, Async};
 
     const NUM_TOUCH_PINS: usize = 10;
 

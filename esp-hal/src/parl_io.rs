@@ -1585,11 +1585,11 @@ where
 pub mod asynch {
     use core::task::Poll;
 
-    use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::handler;
 
     use super::{private::Instance, Error, ParlIoRx, ParlIoTx, MAX_DMA_SIZE};
     use crate::{
+        asynch::AtomicWaker,
         dma::{asynch::DmaRxFuture, ReadBuffer, WriteBuffer},
         peripherals::Interrupt,
     };

@@ -145,6 +145,8 @@
 // MUST be the first module
 mod fmt;
 
+pub mod asynch;
+
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
 #[cfg(xtensa)]
