@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526)
 - Added PSRAM configuration to `esp_hal::Config` if `quad-psram` or `octal-psram` is enabled (#2546)
 - Added `esp_hal::psram::psram_raw_parts` (#2546)
+- The timer drivers `OneShotTimer` & `PeriodicTimer` have `into_async` and `new_typed` methods (#2586)
+- `timer::Timer` trait has three new methods, `wait`, `async_interrupt_handler` and `peripheral_interrupt` (#2586)
 
 ### Changed
 
@@ -37,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PSRAM is now initialized automatically if `quad-psram` or `octal-psram` is enabled (#2546)
 - DMA channels are now available via the `Peripherals` struct, and have been renamed accordingly. (#2545)
 - Moved interrupt related items from lib.rs, moved to the `interrupt` module (#2613)
+- The timer drivers `OneShotTimer` & `PeriodicTimer` now have a `Mode` parameter and type erase the underlying driver by default (#2586)
+- `timer::Timer` has new trait requirements of `Into<AnyTimer>`, `'static` and `InterruptConfigurable` (#2586)
+- `systimer::etm::Event` no longer borrows the alarm indefinitely (#2586)
+- `DEFAULT_INTERRUPT_HANDLER` and `InterruptConfigurable` have moved from the the crate root to `interrupt` (#2586)
 
 ### Fixed
 
