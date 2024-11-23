@@ -14,6 +14,8 @@
 //!
 //! <em>PS: Note that the number of DMA channels is chip-specific.</em>
 
+use critical_section::CriticalSection;
+
 use crate::{
     dma::*,
     interrupt::Priority,
@@ -775,7 +777,7 @@ crate::impl_dma_eligible! {
     }
 }
 
-pub(super) fn init_dma() {
+pub(super) fn init_dma(_cs: CriticalSection<'_>) {
     let dma = unsafe { crate::soc::peripherals::DMA::steal() };
     dma.misc_conf().modify(|_, w| w.ahbm_rst_inter().set_bit());
     dma.misc_conf()

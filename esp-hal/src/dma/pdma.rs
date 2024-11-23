@@ -11,6 +11,7 @@
 //! [SPI]: ../spi/index.html
 //! [I2S]: ../i2s/index.html
 
+use critical_section::CriticalSection;
 use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{
@@ -875,7 +876,7 @@ crate::impl_dma_eligible!([I2s0DmaChannel] I2S0 => I2s0);
 #[cfg(i2s1)]
 crate::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
 
-pub(super) fn init_dma() {
+pub(super) fn init_dma(_cs: CriticalSection<'_>) {
     #[cfg(esp32)]
     {
         // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
