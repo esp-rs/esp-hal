@@ -10,15 +10,8 @@ categories   = ["embedded", "hardware-support", "no-std"]
 keywords     = ["lx", "peripheral", "register", "xtensa"]
 links        = "xtensa-lx"
 
-[package.metadata.docs.rs]
-features = ["spin"]
-
 [dependencies]
-bare-metal        = "1.0.0"
+critical-section = "1.0.0"
 document-features = "0.2.10"
-mutex-trait       = "0.2.0"
-spin              = { version = "0.9.8", optional = true }
 
 [features]
-## Use the [spin] package for synchronization
-spin = ["dep:spin"]

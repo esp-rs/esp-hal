@@ -11,9 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `interrupt:free` incorrectly providing `CriticalSection` (#2537)
+
 ### Changed
 
+- The `singleton` macro has been updated to match the cortex-m counterpart (#2537)
+
 ### Removed
+
+- The `spin` feature and `mutex` module has been removed. (#2537)
+- The `InterruptNumber` trait has been removed. (#2537)
 
 ## [0.9.0] - 2024-02-21
 

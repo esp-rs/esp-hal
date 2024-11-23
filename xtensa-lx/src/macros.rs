@@ -26,12 +26,17 @@
 /// ```
 #[macro_export]
 macro_rules! singleton {
-    (: $ty:ty = $expr:expr) => {
-        $crate::interrupt::free(|_| {
-            static mut VAR: Option<$ty> = None;
+    ($(#[$meta:meta])* $name:ident: $ty:ty = $expr:expr) => {
+        $crate::_export::critical_section::with(|_| {
+            // this is a tuple of a MaybeUninit and a bool because using an Option here is
+            // problematic:  Due to niche-optimization, an Option could end up producing a non-zero
+            // initializer value which would move the entire static from `.bss` into `.data`...
+            $(#[$meta])*
+            static mut $name: (::core::mem::MaybeUninit<$ty>, bool) =
+                (::core::mem::MaybeUninit::uninit(), false);
 
             #[allow(unsafe_code)]
-            let used = unsafe { VAR.is_some() };
+            let used = unsafe { $name.1 };
             if used {
                 None
             } else {
@@ -39,14 +44,13 @@ macro_rules! singleton {
 
                 #[allow(unsafe_code)]
                 unsafe {
-                    VAR = Some(expr)
-                }
-
-                #[allow(unsafe_code)]
-                unsafe {
-                    VAR.as_mut()
+                    $name.1 = true;
+                    Some($name.0.write(expr))
                 }
             }
         })
+    };
+    ($(#[$meta:meta])* : $ty:ty = $expr:expr) => {
+        $crate::singleton!($(#[$meta])* VAR: $ty = $expr)
     };
 }
