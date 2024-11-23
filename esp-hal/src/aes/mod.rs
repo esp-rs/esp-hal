@@ -164,15 +164,11 @@ impl<'d> Aes<'d> {
     {
         // Convert from into Key enum
         self.write_key(key.into().as_slice());
-        self.set_mode(mode as u8);
+        self.write_mode(mode);
         self.set_block(block);
         self.start();
         while !(self.is_idle()) {}
         self.block(block);
-    }
-
-    fn set_mode(&mut self, mode: u8) {
-        self.write_mode(mode as u32);
     }
 
     fn is_idle(&mut self) -> bool {
@@ -261,6 +257,7 @@ pub mod dma {
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
     /// Specifies the block cipher modes available for AES operations.
+    #[derive(Clone, Copy, PartialEq, Eq)]
     pub enum CipherMode {
         /// Electronic Codebook Mode
         Ecb = 0,
@@ -424,9 +421,6 @@ pub mod dma {
             // AES has to be restarted after each calculation
             self.reset_aes();
 
-            self.channel.tx.is_done();
-            self.channel.rx.is_done();
-
             unsafe {
                 self.tx_chain
                     .fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
@@ -444,12 +438,11 @@ pub mod dma {
             }
             self.enable_dma(true);
             self.enable_interrupt();
-            self.set_mode(mode);
+            self.aes.write_mode(mode);
             self.set_cipher_mode(cipher_mode);
             self.write_key(key.into());
 
-            // TODO: verify 16?
-            self.set_num_block(16);
+            self.set_num_block((write_buffer_len as u32).div_ceil(16));
 
             self.start_transform();
 
@@ -495,9 +488,9 @@ pub mod dma {
             self.aes
                 .aes
                 .block_mode()
-                .modify(|_, w| unsafe { w.bits(mode as u32) });
+                .modify(|_, w| unsafe { w.block_mode().bits(mode as u8) });
 
-            if self.aes.aes.block_mode().read().block_mode().bits() == CipherMode::Ctr as u8 {
+            if mode == CipherMode::Ctr {
                 self.aes
                     .aes
                     .inc_sel()
@@ -505,15 +498,8 @@ pub mod dma {
             }
         }
 
-        fn set_mode(&self, mode: Mode) {
-            self.aes
-                .aes
-                .mode()
-                .modify(|_, w| unsafe { w.mode().bits(mode as u8) });
-        }
-
         fn start_transform(&self) {
-            self.aes.aes.trigger().write(|w| w.trigger().set_bit());
+            self.aes.write_start();
         }
 
         fn finish_transform(&self) {
