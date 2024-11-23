@@ -70,7 +70,7 @@ pub struct PsramConfig {
 ///
 /// Returns the start of the mapped memory and the size
 #[procmacros::ram]
-pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -> (*mut u8, usize) {
+pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
     utils::psram_init(&mut config);
 
@@ -179,11 +179,9 @@ pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -
         start
     };
 
-    crate::soc::MAPPED_PSRAM.with(|mapped_psram| {
-        mapped_psram.memory_range = start as usize..start as usize + config.size.get();
-    });
-
-    (start as *mut u8, config.size.get())
+    unsafe {
+        crate::soc::MAPPED_PSRAM.memory_range = start as usize..start as usize + config.size.get();
+    }
 }
 
 #[cfg(feature = "quad-psram")]

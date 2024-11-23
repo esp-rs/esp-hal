@@ -38,7 +38,7 @@ pub struct PsramConfig {
 /// Initializes the PSRAM memory on supported devices.
 ///
 /// Returns the start of the mapped memory and the size
-pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -> (*mut u8, usize) {
+pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
 
     utils::psram_init(&config);
@@ -86,11 +86,9 @@ pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -
         utils::s_mapping(EXTMEM_ORIGIN as u32, config.size.get() as u32);
     }
 
-    crate::soc::MAPPED_PSRAM.with(|mapped_psram| {
-        mapped_psram.memory_range = EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get();
-    });
-
-    (EXTMEM_ORIGIN as *mut u8, config.size.get())
+    unsafe {
+        crate::soc::MAPPED_PSRAM.memory_range = EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get();
+    }
 }
 
 pub(crate) mod utils {
