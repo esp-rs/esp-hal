@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Breaking
-
-- Remove `embedded-hal 0.2.x` impls and deps from esp-hal (#2593)
-
 ### Added
 
 - ESP32-S3: Added SDMMC signals (#2556)
@@ -45,13 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Remove more examples. Update doctests. (#2547)
-
 - The `configure` and `configure_for_async` DMA channel functions has been removed (#2403)
 - The DMA channel objects no longer have `tx` and `rx` fields. (#2526)
 - `SysTimerAlarms` has been removed, alarms are now part of the `SystemTimer` struct (#2576)
 - `FrozenUnit`, `AnyUnit`, `SpecificUnit`, `SpecificComparator`, `AnyComparator` have been removed from `systimer` (#2576)
 - `esp_hal::psram::psram_range` (#2546)
 - The `Dma` structure has been removed. (#2545)
+- Remove `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
 
 ## [0.22.0] - 2024-11-20
 
