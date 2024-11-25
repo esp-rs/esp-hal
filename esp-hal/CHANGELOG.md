@@ -39,7 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Xtensa devices now correctly enable the `esp-hal-procmacros/rtc-slow` feature (#2594)
+
 ### Removed
+
 - Remove more examples. Update doctests. (#2547)
 - The `configure` and `configure_for_async` DMA channel functions has been removed (#2403)
 - The DMA channel objects no longer have `tx` and `rx` fields. (#2526)
