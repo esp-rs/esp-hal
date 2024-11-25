@@ -1203,26 +1203,6 @@ where
         sync_regs(register_block);
     }
 
-    /// Listen for the given interrupts
-    pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
-        self.tx.uart.info().enable_listen(interrupts.into(), true)
-    }
-
-    /// Unlisten the given interrupts
-    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
-        self.tx.uart.info().enable_listen(interrupts.into(), false)
-    }
-
-    /// Gets asserted interrupts
-    pub fn interrupts(&mut self) -> EnumSet<UartInterrupt> {
-        self.tx.uart.info().interrupts()
-    }
-
-    /// Resets asserted interrupts
-    pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
-        self.tx.uart.info().clear_interrupts(interrupts)
-    }
-
     /// Write a byte out over the UART
     pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
         self.tx.write_byte(word)
@@ -1326,6 +1306,31 @@ where
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         // `self.tx.uart` and `self.rx.uart` are the same
         self.tx.uart.info().set_interrupt_handler(handler);
+    }
+}
+
+impl<T> Uart<'_, Blocking, T>
+where
+    T: Instance,
+{
+    /// Listen for the given interrupts
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
+        self.tx.uart.info().enable_listen(interrupts.into(), true)
+    }
+
+    /// Unlisten the given interrupts
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
+        self.tx.uart.info().enable_listen(interrupts.into(), false)
+    }
+
+    /// Gets asserted interrupts
+    pub fn interrupts(&mut self) -> EnumSet<UartInterrupt> {
+        self.tx.uart.info().interrupts()
+    }
+
+    /// Resets asserted interrupts
+    pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
+        self.tx.uart.info().clear_interrupts(interrupts)
     }
 }
 

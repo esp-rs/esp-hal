@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `timer::Timer` has new trait requirements of `Into<AnyTimer>`, `'static` and `InterruptConfigurable` (#2586)
 - `systimer::etm::Event` no longer borrows the alarm indefinitely (#2586)
 - A number of public enums and structs in the I2C, SPI, and UART drivers have been marked with `#[non_exhaustive]` (#2614)
+- Interrupt handling related functions are only provided for Blocking UART. (#2610)
 
 ### Fixed
 
