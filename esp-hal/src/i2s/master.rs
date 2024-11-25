@@ -31,10 +31,11 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::i2s::master::{I2s, Standard, DataFormat};
 //! # use esp_hal::dma_buffers;
-//! # use esp_hal::dma::Dma;
-//! let dma = Dma::new(peripherals.DMA);
-#![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.i2s0channel;")]
-#![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
+#![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = peripherals.DMA_I2S0;")]
+#![cfg_attr(
+    not(any(esp32, esp32s2)),
+    doc = "let dma_channel = peripherals.DMA_CH0;"
+)]
 //! let (mut rx_buffer, rx_descriptors, _, tx_descriptors) =
 //! dma_buffers!(0, 4 * 4092);
 //!

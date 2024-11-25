@@ -7,12 +7,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    delay::Delay,
-    dma::{Dma, Mem2Mem},
-    dma_buffers,
-    prelude::*,
-};
+use esp_hal::{delay::Delay, dma::Mem2Mem, dma_buffers, prelude::*};
 use log::{error, info};
 
 const DATA_SIZE: usize = 1024 * 10;
@@ -27,14 +22,21 @@ fn main() -> ! {
 
     let (mut rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 
-    let dma = Dma::new(peripherals.DMA);
-    #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))]
-    let dma_peripheral = peripherals.SPI2;
-    #[cfg(not(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3")))]
-    let dma_peripheral = peripherals.MEM2MEM1;
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
+            let dma_peripheral = peripherals.SPI2;
+        } else {
+            let dma_peripheral = peripherals.MEM2MEM1;
+        }
+    }
 
-    let mut mem2mem =
-        Mem2Mem::new(dma.channel0, dma_peripheral, rx_descriptors, tx_descriptors).unwrap();
+    let mut mem2mem = Mem2Mem::new(
+        peripherals.DMA_CH0,
+        dma_peripheral,
+        rx_descriptors,
+        tx_descriptors,
+    )
+    .unwrap();
 
     for i in 0..core::mem::size_of_val(tx_buffer) {
         tx_buffer[i] = (i % 256) as u8;

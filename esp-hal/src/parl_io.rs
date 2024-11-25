@@ -16,15 +16,13 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::dma::Dma;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::gpio::NoPin;
 //! # use esp_hal::parl_io::{BitPackOrder, ParlIoRxOnly, RxFourBits};
 //!
 //! // Initialize DMA buffer and descriptors for data reception
 //! let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
-//! let dma = Dma::new(peripherals.DMA);
-//! let dma_channel = dma.channel0;
+//! let dma_channel = peripherals.DMA_CH0;
 //!
 //! // Configure the 4-bit input pins and clock pin
 //! let mut rx_pins = RxFourBits::new(
@@ -74,14 +72,12 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::dma::Dma;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::parl_io::{BitPackOrder, ParlIoTxOnly, TxFourBits, SampleEdge, ClkOutPin, TxPinConfigWithValidPin};
 //!
 //! // Initialize DMA buffer and descriptors for data reception
 //! let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
-//! let dma = Dma::new(peripherals.DMA);
-//! let dma_channel = dma.channel0;
+//! let dma_channel = peripherals.DMA_CH0;
 //!
 //! // Configure the 4-bit input pins and clock pin
 //! let tx_pins = TxFourBits::new(

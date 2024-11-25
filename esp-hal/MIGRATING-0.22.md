@@ -2,6 +2,20 @@
 
 ## DMA changes
 
+### Accessing channel objects
+
+DMA channels are now available through the `Peripherals` struct, which is returned
+by `esp_hal::init()`. The channels themselves have been renamed to match other peripheral singletons.
+
+- ESP32-C2, C3, C6, H2 and S3: `channelX -> DMA_CHX`
+- ESP32 and S2: `spiXchannel -> DMA_SPIX`, `i2sXchannel -> DMA_I2SX`
+
+```diff
+-let dma = Dma::new(peripherals.DMA);
+-let channel = dma.channel2;
++let channel = peripherals.DMA_CH2;
+```
+
 ### Configuration changes
 
 - `configure_for_async` and `configure` have been removed

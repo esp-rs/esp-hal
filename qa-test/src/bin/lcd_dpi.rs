@@ -34,7 +34,6 @@ use core::iter::{empty, once};
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::Dma,
     dma_loop_buffer,
     gpio::{Level, Output},
     i2c,
@@ -70,8 +69,7 @@ fn main() -> ! {
     .with_sda(peripherals.GPIO47)
     .with_scl(peripherals.GPIO48);
 
-    let dma = Dma::new(peripherals.DMA);
-    let tx_channel = dma.channel2;
+    let tx_channel = peripherals.DMA_CH2;
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 
     let mut expander = Tca9554::new(i2c);

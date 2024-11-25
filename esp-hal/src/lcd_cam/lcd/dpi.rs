@@ -24,11 +24,8 @@
 //! #     }
 //! # };
 //! # use esp_hal::dma_loop_buffer;
-//! # use esp_hal::dma::{Dma, DmaPriority};
 //!
-//! # let dma = Dma::new(peripherals.DMA);
-//! # let channel = dma.channel0;
-//!
+//! # let channel = peripherals.DMA_CH0;
 //! # let mut dma_buf = dma_loop_buffer!(32);
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);

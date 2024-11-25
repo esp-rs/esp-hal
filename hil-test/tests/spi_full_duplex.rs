@@ -12,7 +12,7 @@ use embedded_hal::spi::SpiBus;
 #[cfg(pcnt)]
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
-    dma::{Dma, DmaDescriptor, DmaRxBuf, DmaTxBuf},
+    dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, NoPin},
     peripheral::Peripheral,
@@ -61,13 +61,11 @@ mod tests {
         let sclk = peripherals.GPIO0;
         let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
-        let dma = Dma::new(peripherals.DMA);
-
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let dma_channel = dma.spi2channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 

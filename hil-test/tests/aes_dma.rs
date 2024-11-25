@@ -7,7 +7,6 @@
 
 use esp_hal::{
     aes::{dma::CipherMode, Aes, Mode},
-    dma::Dma,
     dma_buffers,
     peripherals::Peripherals,
 };
@@ -27,8 +26,7 @@ mod tests {
 
     #[test]
     fn test_aes_128_dma_encryption(peripherals: Peripherals) {
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        let dma_channel = peripherals.DMA_CH0;
 
         let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
@@ -66,8 +64,7 @@ mod tests {
 
     #[test]
     fn test_aes_128_dma_decryption(peripherals: Peripherals) {
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        let dma_channel = peripherals.DMA_CH0;
 
         let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
@@ -104,8 +101,7 @@ mod tests {
 
     #[test]
     fn test_aes_256_dma_encryption(peripherals: Peripherals) {
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        let dma_channel = peripherals.DMA_CH0;
 
         let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
@@ -143,8 +139,7 @@ mod tests {
 
     #[test]
     fn test_aes_256_dma_decryption(peripherals: Peripherals) {
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        let dma_channel = peripherals.DMA_CH0;
 
         let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 

@@ -32,7 +32,6 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::Dma,
     dma_buffers,
     gpio::{Input, Level, Output, Pull},
     prelude::*,
@@ -54,12 +53,11 @@ fn main() -> ! {
     let slave_mosi = peripherals.GPIO2;
     let slave_cs = peripherals.GPIO3;
 
-    let dma = Dma::new(peripherals.DMA);
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32s2")] {
-            let dma_channel = dma.spi2channel;
+            let dma_channel = peripherals.DMA_SPI2;
         } else {
-            let dma_channel = dma.channel0;
+            let dma_channel = peripherals.DMA_CH0;
         }
     }
 

@@ -17,10 +17,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_tx_buffer;
-//! # use esp_hal::dma::{Dma, DmaTxBuf};
-//!
-//! # let dma = Dma::new(peripherals.DMA);
-//! # let channel = dma.channel0;
+//! # use esp_hal::dma::DmaTxBuf;
 //!
 //! # let mut dma_buf = dma_tx_buffer!(32678).unwrap();
 //!
@@ -38,7 +35,7 @@
 //!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
-//!     channel,
+//!     peripherals.DMA_CH0,
 //!     tx_pins,
 //!     20.MHz(),
 //!     Config::default(),

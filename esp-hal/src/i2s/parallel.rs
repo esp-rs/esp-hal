@@ -39,7 +39,7 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::dma::{Dma, DmaTxBuf};
+//! # use esp_hal::dma::DmaTxBuf;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::i2s::parallel::{I2sParallel, TxEightBits};
@@ -48,8 +48,7 @@
 //! const BUFFER_SIZE: usize = 256;
 //!
 //! let delay = Delay::new();
-//! let dma = Dma::new(peripherals.DMA);
-//! let dma_channel = dma.i2s1channel;
+//! let dma_channel = peripherals.DMA_I2S1;
 //! let i2s = peripherals.I2S1;
 //! let clock = peripherals.GPIO25;
 //!
