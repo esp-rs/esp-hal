@@ -539,58 +539,6 @@ where
     }
 }
 
-impl<M> embedded_hal_02::serial::Read<u8> for UsbSerialJtag<'_, M>
-where
-    M: Mode,
-{
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        embedded_hal_02::serial::Read::read(&mut self.rx)
-    }
-}
-
-impl<M> embedded_hal_02::serial::Read<u8> for UsbSerialJtagRx<'_, M>
-where
-    M: Mode,
-{
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-}
-
-impl<M> embedded_hal_02::serial::Write<u8> for UsbSerialJtag<'_, M>
-where
-    M: Mode,
-{
-    type Error = Error;
-
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        embedded_hal_02::serial::Write::write(&mut self.tx, word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        embedded_hal_02::serial::Write::flush(&mut self.tx)
-    }
-}
-
-impl<M> embedded_hal_02::serial::Write<u8> for UsbSerialJtagTx<'_, M>
-where
-    M: Mode,
-{
-    type Error = Error;
-
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte_nb(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx_nb()
-    }
-}
-
 impl<M> embedded_hal_nb::serial::ErrorType for UsbSerialJtag<'_, M>
 where
     M: Mode,

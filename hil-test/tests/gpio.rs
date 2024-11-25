@@ -146,7 +146,7 @@ mod tests {
 
         fn set<T>(pin: &mut T, state: bool)
         where
-            T: embedded_hal_02::digital::v2::OutputPin,
+            T: embedded_hal::digital::OutputPin,
         {
             if state {
                 pin.set_high().ok();
@@ -157,7 +157,7 @@ mod tests {
 
         fn toggle<T>(pin: &mut T)
         where
-            T: embedded_hal_02::digital::v2::ToggleableOutputPin,
+            T: embedded_hal::digital::StatefulOutputPin,
         {
             pin.toggle().ok();
         }

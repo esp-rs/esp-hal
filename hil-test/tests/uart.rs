@@ -5,7 +5,7 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::serial::{Read, Write};
+use embedded_hal_nb::serial::{Read, Write};
 use esp_hal::{
     prelude::*,
     uart::{self, ClockSource, Uart},

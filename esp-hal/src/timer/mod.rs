@@ -211,26 +211,6 @@ where
     }
 }
 
-impl<T, UXX> embedded_hal_02::blocking::delay::DelayMs<UXX> for OneShotTimer<'_, T>
-where
-    T: Timer,
-    UXX: Into<u32>,
-{
-    fn delay_ms(&mut self, ms: UXX) {
-        self.delay_millis(ms.into());
-    }
-}
-
-impl<T, UXX> embedded_hal_02::blocking::delay::DelayUs<UXX> for OneShotTimer<'_, T>
-where
-    T: Timer,
-    UXX: Into<u32>,
-{
-    fn delay_us(&mut self, us: UXX) {
-        self.delay_micros(us.into());
-    }
-}
-
 impl<T> embedded_hal::delay::DelayNs for OneShotTimer<'_, T>
 where
     T: Timer,
@@ -324,37 +304,6 @@ where
         PeriodicTimer::set_interrupt_handler(self, handler);
     }
 }
-
-impl<T> embedded_hal_02::timer::CountDown for PeriodicTimer<'_, T>
-where
-    T: Timer,
-{
-    type Time = MicrosDurationU64;
-
-    fn start<Time>(&mut self, timeout: Time)
-    where
-        Time: Into<Self::Time>,
-    {
-        self.start(timeout.into()).unwrap();
-    }
-
-    fn wait(&mut self) -> nb::Result<(), void::Void> {
-        self.wait()
-    }
-}
-
-impl<T> embedded_hal_02::timer::Cancel for PeriodicTimer<'_, T>
-where
-    T: Timer,
-{
-    type Error = Error;
-
-    fn cancel(&mut self) -> Result<(), Self::Error> {
-        self.cancel()
-    }
-}
-
-impl<T> embedded_hal_02::timer::Periodic for PeriodicTimer<'_, T> where T: Timer {}
 
 /// An enum of all timer types
 enum AnyTimerInner {
