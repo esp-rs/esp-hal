@@ -24,7 +24,7 @@
 //! We reserve a number of CPU interrupts, which cannot be used; see
 //! [`RESERVED_INTERRUPTS`].
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### Using the peripheral driver to register an interrupt handler
 //!
@@ -60,7 +60,7 @@
 //!
 //! #[handler(priority = Priority::Priority1)]
 //! fn swint0_handler() {
-//!     // esp_println::println!("SW interrupt0");
+//!     println!("SW interrupt0");
 //!     critical_section::with(|cs| {
 //!         SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
 //!     });

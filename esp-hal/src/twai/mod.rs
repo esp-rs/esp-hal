@@ -36,38 +36,38 @@
 //! # use nb::block;
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_rx_pin = peripherals.GPIO3;
-//! let can_tx_pin = peripherals.GPIO2;
+//! let twai_rx_pin = peripherals.GPIO3;
+//! let twai_tx_pin = peripherals.GPIO2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
 //!
 //! // Begin configuring the TWAI peripheral. The peripheral is in a reset like
 //! // state that prevents transmission but allows configuration.
-//! let mut can_config = twai::TwaiConfiguration::new(
+//! let mut twai_config = twai::TwaiConfiguration::new(
 //!     peripherals.TWAI0,
-//!     can_rx_pin,
-//!     can_tx_pin,
+//!     twai_rx_pin,
+//!     twai_tx_pin,
 //!     TWAI_BAUDRATE,
 //!     TwaiMode::Normal
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
 //! // undesired messages
-//! can_config.set_filter(const { SingleStandardFilter::new(b"xxxxxxxxxx0",
+//! twai_config.set_filter(const { SingleStandardFilter::new(b"xxxxxxxxxx0",
 //! b"x", [b"xxxxxxxx", b"xxxxxxxx"]) });
 //!
 //! // Start the peripheral. This locks the configuration settings of the
 //! // peripheral and puts it into operation mode, allowing packets to be sent
 //! // and received.
-//! let mut can = can_config.start();
+//! let mut twai = twai_config.start();
 //!
 //! loop {
 //!     // Wait for a frame to be received.
-//!     let frame = block!(can.receive()).unwrap();
+//!     let frame = block!(twai.receive()).unwrap();
 //!
 //!     // Transmit the frame back.
-//!     let _result = block!(can.transmit(&frame)).unwrap();
+//!     let _result = block!(twai.transmit(&frame)).unwrap();
 //! }
 //! # }
 //! ```

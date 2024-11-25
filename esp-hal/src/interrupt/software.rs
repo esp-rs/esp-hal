@@ -20,7 +20,7 @@
 //! // Set up the interrupt handler. Do this in a critical section so the global
 //! // contains the interrupt object before the interrupt is triggered.
 //! critical_section::with(|cs| {
-//!     int0.set_interrupt_handler(interrupt_handler);
+//!     int0.set_interrupt_handler(swint0_handler);
 //!     SWINT0.borrow_ref_mut(cs).replace(int0);
 //! });
 //! # }
@@ -35,8 +35,8 @@
 //!     Mutex::new(RefCell::new(None));
 //!
 //! #[handler]
-//! fn interrupt_handler() {
-//!     // esp_println::println!("SW interrupt0 handled");
+//! fn swint0_handler() {
+//!     println!("SW interrupt0 handled");
 //!
 //!     // Clear the interrupt request.
 //!     critical_section::with(|cs| {

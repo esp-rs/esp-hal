@@ -1,8 +1,8 @@
-//! Demonstrates deep sleep with timer, using low and high level pins as wakeup sources.
+//! Demonstrates deep sleep with timer, using low and high level pins as wakeup
+//! sources.
 //!
 //! The following wiring is assumed:
-//! - ext1 wakeup pin => GPIO2 (low level)
-//!                   => GPIO3 (high level)
+//! - ext1 wakeup pin => GPIO2 (low level) / GPIO3 (high level)
 
 //% CHIPS: esp32c6
 

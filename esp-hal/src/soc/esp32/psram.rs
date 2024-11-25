@@ -9,6 +9,47 @@
 //! present on the `ESP32` chip. `PSRAM` provides additional external memory to
 //! supplement the internal memory of the `ESP32`, allowing for increased
 //! storage capacity and improved performance in certain applications.
+//!
+//! ## Examples
+//!
+//! ### Quad PSRAM
+//! This example shows how to use PSRAM as heap-memory via esp-alloc.
+//! You need an ESP32 with at least 2 MB of PSRAM memory.
+//! Notice that PSRAM example **must** be built in release mode!
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # extern crate alloc;
+//! # use alloc::{string::String, vec::Vec};
+//! # use esp_alloc as _;
+//! # use esp_hal::{psram, prelude::*};
+//!
+//! // Initialize PSRAM and add it as a heap memory region
+//! fn init_psram_heap(start: *mut u8, size: usize) {
+//!     unsafe {
+//!         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+//!             start,
+//!             size,
+//!             esp_alloc::MemoryCapability::External.into(),
+//!         ));
+//!     }
+//! }
+//!
+//! // Initialize PSRAM and add it to the heap
+//! let (start, size) = psram::init_psram(peripherals.PSRAM,
+//!     psram::PsramConfig::default());
+//!
+//! init_psram_heap(start, size);
+//!
+//! let mut large_vec: Vec<u32> = Vec::with_capacity(500 * 1024 / 4);
+//!
+//! for i in 0..(500 * 1024 / 4) {
+//!     large_vec.push((i & 0xff) as u32);
+//! }
+//!
+//! let string = String::from("A string allocated in PSRAM");
+//! # }
+//! ```
 
 pub use crate::soc::psram_common::*;
 

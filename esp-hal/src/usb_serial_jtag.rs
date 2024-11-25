@@ -70,6 +70,57 @@
 //! # }
 //! ```
 //! 
+//! ### How to output text using USB Serial/JTAG.
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::{delay::Delay, prelude::*, usb_serial_jtag::UsbSerialJtag, Blocking};
+//!
+//! let delay = Delay::new();
+//!
+//! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
+//! usb_serial.set_interrupt_handler(usb_device);
+//! usb_serial.listen_rx_packet_recv_interrupt();
+//!
+//! critical_section::with(|cs|
+//! USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));
+//!
+//! loop {
+//!     critical_section::with(|cs| {
+//!         writeln!(
+//!             USB_SERIAL.borrow_ref_mut(cs).as_mut().unwrap(),
+//!             "Hello world!"
+//!         )
+//!         .ok();
+//!     });
+//!
+//!     delay.delay(1.secs());
+//! }
+//! # }
+//!
+//! # use critical_section::Mutex;
+//! # use core::{cell::RefCell, fmt::Write};
+//! # use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//! static USB_SERIAL:
+//!     Mutex<RefCell<Option<UsbSerialJtag<'static, esp_hal::Blocking>>>> =
+//!         Mutex::new(RefCell::new(None));
+//!
+//! #[handler]
+//! fn usb_device() {
+//!     critical_section::with(|cs| {
+//!         let mut usb_serial = USB_SERIAL.borrow_ref_mut(cs);
+//!         let usb_serial = usb_serial.as_mut().unwrap();
+//!
+//!         writeln!(usb_serial, "USB serial interrupt").unwrap();
+//!
+//!         while let nb::Result::Ok(c) = usb_serial.read_byte() {
+//!             writeln!(usb_serial, "Read byte: {:02x}", c).unwrap();
+//!         }
+//!
+//!         usb_serial.reset_rx_packet_recv_interrupt();
+//!     });
+//! }
+//! ```
+//! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/

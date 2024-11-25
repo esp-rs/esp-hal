@@ -63,7 +63,6 @@
 //! }
 //! # }
 //! ```
-
 use core::marker::PhantomData;
 
 use fugit::{HertzU32, Instant, MicrosDurationU64};

@@ -31,13 +31,9 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::md5;
-//! # use esp_hal::uart::Uart;
-//! # use core::writeln;
-//! # use core::fmt::Write;
-//! # let mut uart0 = Uart::new(peripherals.UART0, peripherals.GPIO1, peripherals.GPIO2).unwrap();
 //! # let data = "Dummy";
 //! let d: md5::Digest = md5::compute(&data);
-//! writeln!(uart0, "{}", d);
+//! println!("{}", d);
 //! # }
 //! ```
 //! 
@@ -45,10 +41,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rom::md5;
-//! # use esp_hal::uart::Uart;
-//! # use core::writeln;
-//! # use core::fmt::Write;
-//! # let mut uart0 = Uart::new(peripherals.UART0, peripherals.GPIO1, peripherals.GPIO2).unwrap();
 //! # let data0 = "Dummy";
 //! # let data1 = "Dummy";
 //! #
@@ -56,7 +48,7 @@
 //! ctx.consume(&data0);
 //! ctx.consume(&data1);
 //! let d: md5::Digest = ctx.compute();
-//! writeln!(uart0, "{}", d);
+//! println!("{}", d);
 //! # }
 //! ```
 //! 

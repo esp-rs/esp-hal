@@ -20,7 +20,7 @@
 //!
 //! The ADC driver implements the `embedded-hal@0.2.x` ADC traits.
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### Read an analog signal from a pin
 //!

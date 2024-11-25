@@ -45,7 +45,7 @@
 //! channels are indicated by n which is used as a placeholder for the channel
 //! number, and by m for RX channels.
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### Initialization
 //!
@@ -73,6 +73,144 @@
 //!         },
 //!     )
 //!     .unwrap();
+//! # }
+//! ```
+//! 
+//! ### TX operation
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator};
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::prelude::*;
+//!
+//! // Configure frequency based on chip type
+#![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
+#![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
+//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+//!
+//! let tx_config = TxChannelConfig {
+//!     clk_divider: 255,
+//!     ..TxChannelConfig::default()
+//! };
+//!
+//! let mut channel = rmt
+//!     .channel0
+//!     .configure(peripherals.GPIO4, tx_config)
+//!     .unwrap();
+//!
+//! let delay = Delay::new();
+//!
+//! let mut data = [PulseCode::new(true, 200, false, 50); 20];
+//! data[data.len() - 2] = PulseCode::new(true, 3000, false, 500);
+//! data[data.len() - 1] = PulseCode::empty();
+//!
+//! loop {
+//!     let transaction = channel.transmit(&data).unwrap();
+//!     channel = transaction.wait().unwrap();
+//!     delay.delay_millis(500);
+//! }
+//! # }
+//! ```
+//! 
+//! ### RX operation
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator};
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::prelude::*;
+//! # use esp_hal::gpio::{Level, Output};
+//!
+//! const WIDTH: usize = 80;
+//!
+//! let mut out = Output::new(peripherals.GPIO5, Level::Low);
+//!
+//! // Configure frequency based on chip type
+#![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
+#![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
+//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+//!
+//! let rx_config = RxChannelConfig {
+//!     clk_divider: 1,
+//!     idle_threshold: 10000,
+//!     ..RxChannelConfig::default()
+//! };
+#![cfg_attr(
+    any(esp32, esp32s2),
+    doc = "let mut channel = rmt.channel0.configure(peripherals.GPIO4, rx_config).unwrap();"
+)]
+#![cfg_attr(
+    esp32s3,
+    doc = "let mut channel = rmt.channel7.configure(peripherals.GPIO4, rx_config).unwrap();"
+)]
+#![cfg_attr(
+    not(any(esp32, esp32s2, esp32s3)),
+    doc = "let mut channel = rmt.channel2.configure(peripherals.GPIO4, rx_config).unwrap();"
+)]
+//! let delay = Delay::new();
+//! let mut data: [u32; 48] = [PulseCode::empty(); 48];
+//!
+//! loop {
+//!     for x in data.iter_mut() {
+//!         x.reset()
+//!     }
+//!
+//!     let transaction = channel.receive(&mut data).unwrap();
+//!
+//!     // Simulate input
+//!     for i in 0u32..5u32 {
+//!         out.set_high();
+//!         delay.delay_micros(i * 10 + 20);
+//!         out.set_low();
+//!         delay.delay_micros(i * 20 + 20);
+//!     }
+//!
+//!     match transaction.wait() {
+//!         Ok(channel_res) => {
+//!             channel = channel_res;
+//!             let mut total = 0usize;
+//!             for entry in &data[..data.len()] {
+//!                 if entry.length1() == 0 {
+//!                     break;
+//!                 }
+//!                 total += entry.length1() as usize;
+//!
+//!                 if entry.length2() == 0 {
+//!                     break;
+//!                 }
+//!                 total += entry.length2() as usize;
+//!             }
+//!
+//!             for entry in &data[..data.len()] {
+//!                 if entry.length1() == 0 {
+//!                     break;
+//!                 }
+//!
+//!                 let count = WIDTH / (total / entry.length1() as usize);
+//!                 let c = if entry.level1() { '-' } else { '_' };
+//!                 for _ in 0..count + 1 {
+//!                     print!("{}", c);
+//!                 }
+//!
+//!                 if entry.length2() == 0 {
+//!                     break;
+//!                 }
+//!
+//!                 let count = WIDTH / (total / entry.length2() as usize);
+//!                 let c = if entry.level2() { '-' } else { '_' };
+//!                 for _ in 0..count + 1 {
+//!                     print!("{}", c);
+//!                 }
+//!             }
+//!
+//!             println!();
+//!         }
+//!         Err((_err, channel_res)) => {
+//!             channel = channel_res;
+//!         }
+//!     }
+//!
+//!     delay.delay_millis(1500);
+//! }
 //! # }
 //! ```
 //! 
