@@ -50,12 +50,13 @@ mod tests {
 
         let (mosi_loopback, mosi) = mosi.split();
 
-        let spi = Spi::new_with_config(
+        let spi = Spi::new(
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
                 .with_mode(SpiMode::Mode0),
         )
+        .unwrap()
         .with_sck(sclk)
         .with_mosi(mosi)
         .with_dma(dma_channel);

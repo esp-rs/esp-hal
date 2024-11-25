@@ -43,7 +43,7 @@
 //! let mosi = peripherals.GPIO1;
 //! let cs = peripherals.GPIO5;
 //!
-//! let mut spi = Spi::new_with_config(
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     Config::default().with_frequency(100.kHz()).with_mode(SpiMode::Mode0)
 //! )

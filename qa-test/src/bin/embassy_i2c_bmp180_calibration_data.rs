@@ -37,6 +37,7 @@ async fn main(_spawner: Spawner) {
         config.frequency = 400.kHz();
         config
     })
+    .unwrap()
     .with_sda(peripherals.GPIO4)
     .with_scl(peripherals.GPIO5)
     .into_async();

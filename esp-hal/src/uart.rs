@@ -22,10 +22,11 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::Uart;
+//! # use esp_hal::uart::{Config, Uart};
 //!
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
+//!     Config::default(),
 //!     peripherals.GPIO1,
 //!     peripherals.GPIO2,
 //! ).unwrap();
@@ -53,7 +54,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{Config, Uart};
-//! # let mut uart1 = Uart::new_with_config(
+//! # let mut uart1 = Uart::new(
 //! #     peripherals.UART1,
 //! #     Config::default(),
 //! #     peripherals.GPIO1,
@@ -68,7 +69,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{Config, Uart};
-//! # let mut uart1 = Uart::new_with_config(
+//! # let mut uart1 = Uart::new(
 //! #     peripherals.UART1,
 //! #     Config::default(),
 //! #     peripherals.GPIO1,
@@ -86,12 +87,13 @@
 //! ### Inverting RX and TX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::Uart;
+//! # use esp_hal::uart::{Config, Uart};
 //!
 //! let (rx, _) = peripherals.GPIO2.split();
 //! let (_, tx) = peripherals.GPIO1.split();
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
+//!     Config::default(),
 //!     rx.inverted(),
 //!     tx.inverted(),
 //! ).unwrap();
@@ -101,10 +103,18 @@
 //! ### Constructing RX and TX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{UartTx, UartRx};
+//! # use esp_hal::uart::{Config, UartTx, UartRx};
 //!
-//! let tx = UartTx::new(peripherals.UART0, peripherals.GPIO1).unwrap();
-//! let rx = UartRx::new(peripherals.UART1, peripherals.GPIO2).unwrap();
+//! let tx = UartTx::new(
+//!     peripherals.UART0,
+//!     Config::default(),
+//!     peripherals.GPIO1,
+//! ).unwrap();
+//! let rx = UartRx::new(
+//!     peripherals.UART1,
+//!     Config::default(),
+//!     peripherals.GPIO2,
+//! ).unwrap();
 //! # }
 //! ```
 //! 
@@ -145,7 +155,7 @@
 )]
 //! let config = Config::default().rx_fifo_full_threshold(30);
 //!
-//! let mut uart0 = Uart::new_with_config(
+//! let mut uart0 = Uart::new(
 //!     peripherals.UART0,
 //!     config,
 //!     tx_pin,
@@ -1977,9 +1987,14 @@ pub mod lp_uart {
     }
 
     impl LpUart {
-        /// Initialize the UART driver using the default configuration
+        /// Initialize the UART driver using the provided configuration
         // TODO: CTS and RTS pins
-        pub fn new(uart: LP_UART, _tx: LowPowerOutput<'_, 5>, _rx: LowPowerInput<'_, 4>) -> Self {
+        pub fn new(
+            uart: LP_UART,
+            config: Config,
+            _tx: LowPowerOutput<'_, 5>,
+            _rx: LowPowerInput<'_, 4>,
+        ) -> Self {
             let lp_io = unsafe { crate::peripherals::LP_IO::steal() };
             let lp_aon = unsafe { crate::peripherals::LP_AON::steal() };
 
@@ -1994,11 +2009,6 @@ pub mod lp_uart {
             lp_io.gpio(4).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
             lp_io.gpio(5).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
 
-            Self::new_with_config(uart, Config::default())
-        }
-
-        /// Initialize the UART driver using the provided configuration
-        pub fn new_with_config(uart: LP_UART, config: Config) -> Self {
             let mut me = Self { uart };
 
             // Set UART mode - do nothing for LP

@@ -118,12 +118,13 @@ mod test {
 
         let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
-        let mut spi = Spi::new_with_config(
+        let mut spi = Spi::new(
             peripherals.SPI2,
             Config::default()
                 .with_frequency(10000.kHz())
                 .with_mode(SpiMode::Mode0),
         )
+        .unwrap()
         .with_miso(unsafe { mosi.clone_unchecked() })
         .with_mosi(mosi)
         .with_dma(dma_channel1)
@@ -131,12 +132,13 @@ mod test {
         .into_async();
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        let other_peripheral = Spi::new_with_config(
+        let other_peripheral = Spi::new(
             peripherals.SPI3,
             Config::default()
                 .with_frequency(10000.kHz())
                 .with_mode(SpiMode::Mode0),
         )
+        .unwrap()
         .with_dma(dma_channel2)
         .into_async();
 
@@ -225,12 +227,13 @@ mod test {
             let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
             let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-            let mut spi = Spi::new_with_config(
+            let mut spi = Spi::new(
                 peripherals.spi,
                 Config::default()
                     .with_frequency(100.kHz())
                     .with_mode(SpiMode::Mode0),
             )
+            .unwrap()
             .with_dma(peripherals.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();

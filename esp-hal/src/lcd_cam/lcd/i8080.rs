@@ -34,13 +34,12 @@
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
 //! let mut config = Config::default();
-//! config.frequency = 1.MHz();
+//! config.frequency = 20.MHz();
 //!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
 //!     peripherals.DMA_CH0,
 //!     tx_pins,
-//!     20.MHz(),
 //!     config,
 //! )
 //! .unwrap()

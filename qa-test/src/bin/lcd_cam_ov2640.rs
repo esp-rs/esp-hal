@@ -34,7 +34,7 @@ use esp_hal::{
         master::{Config, I2c},
     },
     lcd_cam::{
-        cam::{Camera, RxEightBits},
+        cam::{self, Camera, RxEightBits},
         LcdCam,
     },
     prelude::*,
@@ -65,8 +65,12 @@ fn main() -> ! {
         peripherals.GPIO16,
     );
 
+    let mut cam_config = cam::Config::default();
+    cam_config.frequency = 20u32.MHz();
+
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, cam_data_pins, 20u32.MHz())
+    let camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, cam_data_pins, cam_config)
+        .unwrap()
         .with_master_clock(cam_xclk)
         .with_pixel_clock(cam_pclk)
         .with_ctrl_pins(cam_vsync, cam_href);
@@ -76,6 +80,7 @@ fn main() -> ! {
     delay.delay_millis(500u32);
 
     let i2c = I2c::new(peripherals.I2C0, Config::default())
+        .unwrap()
         .with_sda(cam_siod)
         .with_scl(cam_sioc);
 

@@ -88,12 +88,13 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     // Need to set miso first so that mosi can overwrite the
     // output connection (because we are using the same pin to loop back)
-    let mut spi = Spi::new_with_config(
+    let mut spi = Spi::new(
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
             .with_mode(SpiMode::Mode0),
     )
+    .unwrap()
     .with_sck(sclk)
     .with_miso(miso)
     .with_mosi(mosi)

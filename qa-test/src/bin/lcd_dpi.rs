@@ -62,6 +62,7 @@ fn main() -> ! {
         peripherals.I2C0,
         i2c::master::Config::default().with_frequency(400.kHz()),
     )
+    .unwrap()
     .with_sda(peripherals.GPIO47)
     .with_scl(peripherals.GPIO48);
 
@@ -137,6 +138,7 @@ fn main() -> ! {
         polarity: Polarity::IdleLow,
         phase: Phase::ShiftLow,
     };
+    config.frequency = 16.MHz();
     config.format = Format {
         enable_2byte_mode: true,
         ..Default::default()
@@ -160,7 +162,8 @@ fn main() -> ! {
     config.de_idle_level = Level::Low;
     config.disable_black_region = false;
 
-    let mut dpi = Dpi::new(lcd_cam.lcd, tx_channel, 16.MHz(), config)
+    let mut dpi = Dpi::new(lcd_cam.lcd, tx_channel, config)
+        .unwrap()
         .with_vsync(vsync_pin)
         .with_hsync(peripherals.GPIO46)
         .with_de(peripherals.GPIO17)

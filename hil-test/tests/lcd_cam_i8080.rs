@@ -75,7 +75,12 @@ mod tests {
     fn test_i8080_8bit(ctx: Context<'static>) {
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
-        let i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, 20.MHz(), Config::default());
+        let i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
+            let mut config = Config::default();
+            config.frequency = 20.MHz();
+            config
+        })
+        .unwrap();
 
         let xfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
         xfer.wait().0.unwrap();
@@ -132,9 +137,14 @@ mod tests {
             NoPin,
         );
 
-        let mut i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, 20.MHz(), Config::default())
-            .with_cs(cs_signal)
-            .with_ctrl_pins(NoPin, NoPin);
+        let mut i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
+            let mut config = Config::default();
+            config.frequency = 20.MHz();
+            config
+        })
+        .unwrap()
+        .with_cs(cs_signal)
+        .with_ctrl_pins(NoPin, NoPin);
 
         // This is to make the test values look more intuitive.
         i8080.set_bit_order(BitOrder::Inverted);
@@ -244,9 +254,14 @@ mod tests {
             unit3_signal,
         );
 
-        let mut i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, 20.MHz(), Config::default())
-            .with_cs(cs_signal)
-            .with_ctrl_pins(NoPin, NoPin);
+        let mut i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
+            let mut config = Config::default();
+            config.frequency = 20.MHz();
+            config
+        })
+        .unwrap()
+        .with_cs(cs_signal)
+        .with_ctrl_pins(NoPin, NoPin);
 
         // This is to make the test values look more intuitive.
         i8080.set_bit_order(BitOrder::Inverted);

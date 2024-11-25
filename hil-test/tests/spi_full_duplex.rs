@@ -75,6 +75,7 @@ mod tests {
         // output connection (because we are using the same pin to loop back)
         let spi =
             Spi::new_with_config(peripherals.SPI2, Config::default().with_frequency(10.MHz()))
+                .unwrap()
                 .with_sck(sclk)
                 .with_miso(unsafe { mosi.clone_unchecked() })
                 .with_mosi(mosi);

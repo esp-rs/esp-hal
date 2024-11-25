@@ -16,7 +16,7 @@
 //! master mode.
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::lcd_cam::{cam::{Camera, RxEightBits}, LcdCam};
+//! # use esp_hal::lcd_cam::{cam::{Camera, Config, RxEightBits}, LcdCam};
 //! # use fugit::RateExtU32;
 //! # use esp_hal::dma_rx_stream_buffer;
 //!
@@ -47,8 +47,8 @@
 //!     data_pins,
 //!     config,
 //! )
-//! // Remove this for slave mode.
-//! .with_master_clock(mclk_pin)
+//! .unwrap()
+//! .with_master_clock(mclk_pin) // Remove this for slave mode
 //! .with_pixel_clock(pclk_pin)
 //! .with_ctrl_pins(vsync_pin, href_pin);
 //!
