@@ -1095,29 +1095,6 @@ impl Rwdt {
     }
 }
 
-impl embedded_hal_02::watchdog::WatchdogDisable for Rwdt {
-    fn disable(&mut self) {
-        self.disable();
-    }
-}
-
-impl embedded_hal_02::watchdog::WatchdogEnable for Rwdt {
-    type Time = MicrosDurationU64;
-
-    fn start<T>(&mut self, period: T)
-    where
-        T: Into<Self::Time>,
-    {
-        self.set_timeout(RwdtStage::Stage0, period.into());
-    }
-}
-
-impl embedded_hal_02::watchdog::Watchdog for Rwdt {
-    fn feed(&mut self) {
-        self.feed();
-    }
-}
-
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 /// Super Watchdog
 pub struct Swd;
@@ -1169,13 +1146,6 @@ impl Swd {
 impl Default for Swd {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-impl embedded_hal_02::watchdog::WatchdogDisable for Swd {
-    fn disable(&mut self) {
-        self.disable();
     }
 }
 

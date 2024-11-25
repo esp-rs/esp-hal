@@ -206,26 +206,6 @@ impl_display! {
     Other => "A different error occurred. The original error may contain more information",
 }
 
-impl From<ErrorKind> for embedded_hal_02::can::ErrorKind {
-    fn from(value: ErrorKind) -> Self {
-        match value {
-            ErrorKind::Overrun => embedded_hal_02::can::ErrorKind::Overrun,
-            ErrorKind::Bit => embedded_hal_02::can::ErrorKind::Bit,
-            ErrorKind::Stuff => embedded_hal_02::can::ErrorKind::Stuff,
-            ErrorKind::Crc => embedded_hal_02::can::ErrorKind::Crc,
-            ErrorKind::Form => embedded_hal_02::can::ErrorKind::Form,
-            ErrorKind::Acknowledge => embedded_hal_02::can::ErrorKind::Acknowledge,
-            ErrorKind::Other => embedded_hal_02::can::ErrorKind::Other,
-        }
-    }
-}
-
-impl embedded_hal_02::can::Error for ErrorKind {
-    fn kind(&self) -> embedded_hal_02::can::ErrorKind {
-        (*self).into()
-    }
-}
-
 impl From<ErrorKind> for embedded_can::ErrorKind {
     fn from(value: ErrorKind) -> Self {
         match value {
@@ -301,18 +281,6 @@ impl StandardId {
     }
 }
 
-impl From<StandardId> for embedded_hal_02::can::StandardId {
-    fn from(value: StandardId) -> Self {
-        embedded_hal_02::can::StandardId::new(value.as_raw()).unwrap()
-    }
-}
-
-impl From<embedded_hal_02::can::StandardId> for StandardId {
-    fn from(value: embedded_hal_02::can::StandardId) -> Self {
-        StandardId::new(value.as_raw()).unwrap()
-    }
-}
-
 impl From<StandardId> for embedded_can::StandardId {
     fn from(value: StandardId) -> Self {
         embedded_can::StandardId::new(value.as_raw()).unwrap()
@@ -373,18 +341,6 @@ impl ExtendedId {
     }
 }
 
-impl From<ExtendedId> for embedded_hal_02::can::ExtendedId {
-    fn from(value: ExtendedId) -> Self {
-        embedded_hal_02::can::ExtendedId::new(value.0).unwrap()
-    }
-}
-
-impl From<embedded_hal_02::can::ExtendedId> for ExtendedId {
-    fn from(value: embedded_hal_02::can::ExtendedId) -> Self {
-        ExtendedId::new(value.as_raw()).unwrap()
-    }
-}
-
 impl From<ExtendedId> for embedded_can::ExtendedId {
     fn from(value: ExtendedId) -> Self {
         embedded_can::ExtendedId::new(value.0).unwrap()
@@ -421,24 +377,6 @@ impl From<ExtendedId> for Id {
     }
 }
 
-impl From<Id> for embedded_hal_02::can::Id {
-    fn from(value: Id) -> Self {
-        match value {
-            Id::Standard(id) => embedded_hal_02::can::Id::Standard(id.into()),
-            Id::Extended(id) => embedded_hal_02::can::Id::Extended(id.into()),
-        }
-    }
-}
-
-impl From<embedded_hal_02::can::Id> for Id {
-    fn from(value: embedded_hal_02::can::Id) -> Self {
-        match value {
-            embedded_hal_02::can::Id::Standard(id) => Id::Standard(id.into()),
-            embedded_hal_02::can::Id::Extended(id) => Id::Extended(id.into()),
-        }
-    }
-}
-
 impl From<Id> for embedded_can::Id {
     fn from(value: Id) -> Self {
         match value {
@@ -457,7 +395,7 @@ impl From<embedded_can::Id> for Id {
     }
 }
 
-/// Structure backing the embedded_hal_02::can::Frame/embedded_can::Frame trait.
+/// Structure backing the `embedded_can::Frame` trait.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct EspTwaiFrame {
@@ -545,41 +483,6 @@ impl EspTwaiFrame {
             dlc,
             is_remote: false,
             self_reception: false,
-        }
-    }
-}
-
-impl embedded_hal_02::can::Frame for EspTwaiFrame {
-    fn new(id: impl Into<embedded_hal_02::can::Id>, data: &[u8]) -> Option<Self> {
-        Self::new(id.into(), data)
-    }
-
-    fn new_remote(id: impl Into<embedded_hal_02::can::Id>, dlc: usize) -> Option<Self> {
-        Self::new_remote(id.into(), dlc)
-    }
-
-    fn is_extended(&self) -> bool {
-        matches!(self.id, Id::Extended(_))
-    }
-
-    fn is_remote_frame(&self) -> bool {
-        self.is_remote
-    }
-
-    fn id(&self) -> embedded_hal_02::can::Id {
-        self.id.into()
-    }
-
-    fn dlc(&self) -> usize {
-        self.dlc
-    }
-
-    fn data(&self) -> &[u8] {
-        // Remote frames do not contain data, yet have a value for the dlc so return
-        // an empty slice for remote frames.
-        match self.is_remote {
-            true => &[],
-            false => &self.data[0..self.dlc],
         }
     }
 }
@@ -1374,16 +1277,6 @@ pub enum EspTwaiError {
     EmbeddedHAL(ErrorKind),
 }
 
-impl embedded_hal_02::can::Error for EspTwaiError {
-    fn kind(&self) -> embedded_hal_02::can::ErrorKind {
-        if let Self::EmbeddedHAL(kind) = self {
-            (*kind).into()
-        } else {
-            embedded_hal_02::can::ErrorKind::Other
-        }
-    }
-}
-
 impl embedded_can::Error for EspTwaiError {
     fn kind(&self) -> embedded_can::ErrorKind {
         if let Self::EmbeddedHAL(kind) = self {
@@ -1423,30 +1316,6 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     for (i, src) in src.iter().enumerate() {
         // Perform a volatile write to avoid compiler optimizations.
         dest.add(i).write_volatile(*src as u32);
-    }
-}
-
-impl<DM, T> embedded_hal_02::can::Can for Twai<'_, DM, T>
-where
-    T: Instance,
-    DM: crate::Mode,
-{
-    type Frame = EspTwaiFrame;
-    type Error = EspTwaiError;
-
-    /// Transmit a frame.
-    fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
-        self.tx.transmit(frame)?;
-
-        // Success in readying packet for transmit. No packets can be replaced in the
-        // transmit buffer so return None in accordance with the
-        // embedded-can/embedded-hal trait.
-        nb::Result::Ok(None)
-    }
-
-    /// Return a received frame if there are any available.
-    fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
-        self.rx.receive()
     }
 }
 

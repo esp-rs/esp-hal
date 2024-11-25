@@ -31,7 +31,6 @@ embassy-sync             = "0.6.1"
 embassy-usb-driver       = { version = "0.1.0", optional = true }
 embassy-usb-synopsys-otg = { version = "0.1.0", optional = true }
 embedded-can             = "0.4.1"
-embedded-hal-02          = { version = "0.2.7", features = ["unproven"], package = "embedded-hal" }
 embedded-hal             = "1.0.0"
 embedded-hal-async       = "1.0.0"
 embedded-hal-nb          = "1.0.0"

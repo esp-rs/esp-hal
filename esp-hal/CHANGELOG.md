@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FrozenUnit`, `AnyUnit`, `SpecificUnit`, `SpecificComparator`, `AnyComparator` have been removed from `systimer` (#2576)
 - `esp_hal::psram::psram_range` (#2546)
 - The `Dma` structure has been removed. (#2545)
+- Remove `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
 
 ## [0.22.0] - 2024-11-20
 

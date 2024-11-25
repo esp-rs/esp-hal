@@ -343,19 +343,6 @@ impl<'d, ADC1> Adc<'d, ADC1> {
     }
 }
 
-impl<'d, ADCI, PIN> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI>>
-    for Adc<'d, ADCI>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8> + super::AdcChannel,
-    ADCI: RegisterAccess,
-{
-    type Error = ();
-
-    fn read(&mut self, pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, Self::Error> {
-        self.read_oneshot(pin)
-    }
-}
-
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [

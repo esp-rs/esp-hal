@@ -9,8 +9,7 @@
 //!
 //! The I2C driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
-//! from the community. This includes the [`embedded-hal`] for both 0.2.x and
-//! 1.0.x versions.
+//! from the community, including the [`embedded-hal`].
 //!
 //! ## Examples
 //!
@@ -35,7 +34,7 @@
 //! }
 //! # }
 //! ```
-//! [`embedded-hal`]: https://crates.io/crates/embedded-hal
+//! [`embedded-hal`]: https://docs.rs/embedded-hal/latest/embedded_hal/index.html
 
 use core::marker::PhantomData;
 #[cfg(not(esp32))]
@@ -282,44 +281,6 @@ impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
         self.apply_config(config)
-    }
-}
-
-impl<T> embedded_hal_02::blocking::i2c::Read for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.read(address, buffer)
-    }
-}
-
-impl<T> embedded_hal_02::blocking::i2c::Write for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.write(addr, bytes)
-    }
-}
-
-impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn write_read(
-        &mut self,
-        address: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
-    ) -> Result<(), Self::Error> {
-        self.write_read(address, bytes, buffer)
     }
 }
 

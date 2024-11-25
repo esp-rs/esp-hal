@@ -14,8 +14,6 @@
 //! If all you want to do is to communicate to a single device, and you initiate
 //! transactions yourself, there are a number of ways to achieve this:
 //!
-//! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
-//!   read/write single bytes at a time,
 //! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated
 //!   functions to initiate transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
@@ -30,8 +28,8 @@
 //!
 //! ## Usage
 //!
-//! The module implements several third-party traits from embedded-hal@0.2.x,
-//! embedded-hal@1.x.x and embassy-embedded-hal
+//! The module implements several third-party traits from embedded-hal@1.x.x
+//! and embassy-embedded-hal.
 //!
 //! ## Examples
 //!
@@ -802,44 +800,6 @@ where
             self.driver().start_operation();
         }
 
-        self.driver().flush()
-    }
-}
-
-impl<M, T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, M, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-
-    fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-}
-
-impl<M, T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, M, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-        self.transfer(words)
-    }
-}
-
-impl<M, T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, M, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.write_bytes(words)?;
         self.driver().flush()
     }
 }
@@ -1805,30 +1765,6 @@ mod dma {
         }
     }
 
-    impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for SpiDmaBus<'_, Blocking, T>
-    where
-        T: Instance,
-    {
-        type Error = Error;
-
-        fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-            self.transfer_in_place(words)?;
-            Ok(words)
-        }
-    }
-
-    impl<T> embedded_hal_02::blocking::spi::Write<u8> for SpiDmaBus<'_, Blocking, T>
-    where
-        T: Instance,
-    {
-        type Error = Error;
-
-        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.write(words)?;
-            Ok(())
-        }
-    }
-
     /// Async functionality
     mod asynch {
         use core::{
@@ -2773,7 +2709,7 @@ impl Info {
 
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
-            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0-alpha.8/embedded_hal/spi/blocking/index.html#flushing)
+            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0/embedded_hal/spi/index.html#flushing)
             if i < num_chunks {
                 self.flush()?;
             }

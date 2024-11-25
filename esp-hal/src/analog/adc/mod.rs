@@ -16,10 +16,6 @@
 //! basic calibration, curve fitting or linear interpolation. The calibration
 //! schemes can be used to improve the accuracy of the ADC readings.
 //!
-//! ## Usage
-//!
-//! The ADC driver implements the `embedded-hal@0.2.x` ADC traits.
-//!
 //! ## Examples
 //!
 //! ### Read an analog signal from a pin
@@ -106,17 +102,6 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
     #[cfg_attr(esp32, allow(unused))]
     pub cal_scheme: CS,
     _phantom: PhantomData<ADCI>,
-}
-
-impl<PIN, ADCI, CS> embedded_hal_02::adc::Channel<ADCI> for AdcPin<PIN, ADCI, CS>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8>,
-{
-    type ID = u8;
-
-    fn channel() -> Self::ID {
-        PIN::channel()
-    }
 }
 
 /// Configuration for the ADC.
@@ -255,12 +240,6 @@ macro_rules! impl_adc_interface {
         $(
             impl $crate::analog::adc::AdcChannel for crate::gpio::GpioPin<$pin> {
                 const CHANNEL: u8 = $channel;
-            }
-
-            impl embedded_hal_02::adc::Channel<crate::peripherals::$adc> for crate::gpio::GpioPin<$pin> {
-                type ID = u8;
-
-                fn channel() -> u8 { $channel }
             }
         )+
     }

@@ -31,6 +31,9 @@
 //! GPIO interrupts. For more information, see the
 //! [`Io::set_interrupt_handler`].
 //!
+//! This driver also implements pin-related traits from [embedded-hal] and
+//! [Wait](embedded_hal_async::digital::Wait) trait from [embedded-hal-async].
+//!
 //! ## GPIO interconnect
 //!
 //! Sometimes you may want to connect peripherals together without using
@@ -49,6 +52,7 @@
 //! See the [Inverting TX and RX Pins] example of the UART documentation.
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+//! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/index.html
 //! [Inverting TX and RX Pins]: crate::uart#inverting-rx-and-tx-pins
 
 use portable_atomic::{AtomicPtr, Ordering};
@@ -2293,175 +2297,6 @@ mod asynch {
             } else {
                 Poll::Pending
             }
-        }
-    }
-}
-
-mod embedded_hal_02_impls {
-    use embedded_hal_02::digital::v2 as digital;
-
-    use super::*;
-
-    impl<P> digital::InputPin for Input<'_, P>
-    where
-        P: InputPin,
-    {
-        type Error = core::convert::Infallible;
-
-        fn is_high(&self) -> Result<bool, Self::Error> {
-            Ok(self.pin.is_high())
-        }
-        fn is_low(&self) -> Result<bool, Self::Error> {
-            Ok(self.pin.is_low())
-        }
-    }
-
-    impl<P> digital::OutputPin for Output<'_, P>
-    where
-        P: OutputPin,
-    {
-        type Error = core::convert::Infallible;
-
-        fn set_high(&mut self) -> Result<(), Self::Error> {
-            self.pin.set_high();
-            Ok(())
-        }
-        fn set_low(&mut self) -> Result<(), Self::Error> {
-            self.pin.set_low();
-            Ok(())
-        }
-    }
-
-    impl<P> digital::StatefulOutputPin for Output<'_, P>
-    where
-        P: OutputPin,
-    {
-        fn is_set_high(&self) -> Result<bool, Self::Error> {
-            Ok(self.is_set_high())
-        }
-        fn is_set_low(&self) -> Result<bool, Self::Error> {
-            Ok(self.is_set_low())
-        }
-    }
-
-    impl<P> digital::ToggleableOutputPin for Output<'_, P>
-    where
-        P: OutputPin,
-    {
-        type Error = core::convert::Infallible;
-
-        fn toggle(&mut self) -> Result<(), Self::Error> {
-            self.toggle();
-            Ok(())
-        }
-    }
-
-    impl<P> digital::InputPin for OutputOpenDrain<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
-        type Error = core::convert::Infallible;
-
-        fn is_high(&self) -> Result<bool, Self::Error> {
-            Ok(self.pin.is_high())
-        }
-        fn is_low(&self) -> Result<bool, Self::Error> {
-            Ok(self.pin.is_low())
-        }
-    }
-
-    impl<P> digital::OutputPin for OutputOpenDrain<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
-        type Error = core::convert::Infallible;
-
-        fn set_high(&mut self) -> Result<(), Self::Error> {
-            self.set_high();
-            Ok(())
-        }
-
-        fn set_low(&mut self) -> Result<(), Self::Error> {
-            self.set_low();
-            Ok(())
-        }
-    }
-
-    impl<P> digital::StatefulOutputPin for OutputOpenDrain<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
-        fn is_set_high(&self) -> Result<bool, Self::Error> {
-            Ok(self.is_set_high())
-        }
-        fn is_set_low(&self) -> Result<bool, Self::Error> {
-            Ok(self.is_set_low())
-        }
-    }
-
-    impl<P> digital::ToggleableOutputPin for OutputOpenDrain<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
-        type Error = core::convert::Infallible;
-
-        fn toggle(&mut self) -> Result<(), Self::Error> {
-            self.toggle();
-            Ok(())
-        }
-    }
-
-    impl<P> digital::InputPin for Flex<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
-        type Error = core::convert::Infallible;
-
-        fn is_high(&self) -> Result<bool, Self::Error> {
-            Ok(self.is_high())
-        }
-        fn is_low(&self) -> Result<bool, Self::Error> {
-            Ok(self.is_low())
-        }
-    }
-
-    impl<P> digital::OutputPin for Flex<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
-        type Error = core::convert::Infallible;
-
-        fn set_high(&mut self) -> Result<(), Self::Error> {
-            self.pin.set_output_high(true, private::Internal);
-            Ok(())
-        }
-        fn set_low(&mut self) -> Result<(), Self::Error> {
-            self.pin.set_output_high(false, private::Internal);
-            Ok(())
-        }
-    }
-
-    impl<P> digital::StatefulOutputPin for Flex<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
-        fn is_set_high(&self) -> Result<bool, Self::Error> {
-            Ok(self.is_set_high())
-        }
-        fn is_set_low(&self) -> Result<bool, Self::Error> {
-            Ok(self.is_set_low())
-        }
-    }
-
-    impl<P> digital::ToggleableOutputPin for Flex<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
-        type Error = core::convert::Infallible;
-
-        fn toggle(&mut self) -> Result<(), Self::Error> {
-            self.toggle();
-            Ok(())
         }
     }
 }
