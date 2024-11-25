@@ -120,3 +120,5 @@ Modules should have the following documentation format:
     - Showing a snippet of a slightly more complex interaction, for example inverting the signals for a driver
     - Showing construction if it is more complex, or requires some non-obvious precursor steps. Think about this for drivers that take a generic instance to construct, rustdoc doesn't do a good job of showing what concrete things can be passed into a constructor.
   - For more complex scenarios, create an example.
+- Use rustdoc syntax for linking to other documentation items instead of markdown links where possible
+  - https://doc.rust-lang.org/rustdoc/write-documentation/linking-to-items-by-name.html
