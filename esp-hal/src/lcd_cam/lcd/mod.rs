@@ -11,11 +11,7 @@
 //! - RGB is not supported yet
 
 use super::GenericPeripheralGuard;
-use crate::{
-    peripheral::PeripheralRef,
-    peripherals::LCD_CAM,
-    system::{self},
-};
+use crate::{peripheral::PeripheralRef, peripherals::LCD_CAM, system};
 
 pub mod dpi;
 pub mod i8080;

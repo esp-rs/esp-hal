@@ -37,12 +37,15 @@
 //!     peripherals.GPIO16,
 //! );
 //!
+//! let mut config = Config::default();
+//! config.frequency = 20.MHz();
+//!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //! let mut camera = Camera::new(
 //!     lcd_cam.cam,
 //!     peripherals.DMA_CH0,
 //!     data_pins,
-//!     20u32.MHz(),
+//!     config,
 //! )
 //! // Remove this for slave mode.
 //! .with_master_clock(mclk_pin)
@@ -59,7 +62,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use fugit::HertzU32;
+use fugit::{HertzU32, RateExtU32};
 
 use crate::{
     clock::Clocks,
@@ -70,7 +73,7 @@ use crate::{
         OutputSignal,
         Pull,
     },
-    lcd_cam::{calculate_clkm, BitOrder, ByteOrder},
+    lcd_cam::{calculate_clkm, BitOrder, ByteOrder, ClockError},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
@@ -109,6 +112,14 @@ pub enum VsyncFilterThreshold {
     Eight,
 }
 
+/// Vsync Filter Threshold
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ConfigError {
+    /// The frequency is out of range.
+    Clock(ClockError),
+}
+
 /// Represents the camera interface.
 pub struct Cam<'d> {
     /// The LCD_CAM peripheral reference for managing the camera functionality.
@@ -129,109 +140,86 @@ impl<'d> Camera<'d> {
         cam: Cam<'d>,
         channel: impl Peripheral<P = CH> + 'd,
         _pins: P,
-        frequency: HertzU32,
-    ) -> Self
+        config: Config,
+    ) -> Result<Self, ConfigError>
     where
         CH: RxChannelFor<LCD_CAM>,
         P: RxPins,
     {
         let rx_channel = ChannelRx::new(channel.map(|ch| ch.degrade()));
-        let lcd_cam = cam.lcd_cam;
 
+        let mut this = Self {
+            lcd_cam: cam.lcd_cam,
+            rx_channel,
+            _guard: cam._guard,
+        };
+
+        this.lcd_cam
+            .cam_ctrl1()
+            .modify(|_, w| w.cam_2byte_en().bit(P::BUS_WIDTH == 2));
+
+        this.apply_config(&config)?;
+
+        Ok(this)
+    }
+
+    /// Applies the configuration to the camera interface.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         let (i, divider) = calculate_clkm(
-            frequency.to_Hz() as _,
+            config.frequency.to_Hz() as _,
             &[
                 clocks.xtal_clock.to_Hz() as _,
                 clocks.cpu_clock.to_Hz() as _,
                 clocks.crypto_pwm_clock.to_Hz() as _,
             ],
-        );
+        )
+        .map_err(ConfigError::Clock)?;
 
-        lcd_cam.cam_ctrl().write(|w| {
+        self.lcd_cam.cam_ctrl().write(|w| {
             // Force enable the clock for all configuration registers.
             unsafe {
                 w.cam_clk_sel().bits((i + 1) as _);
                 w.cam_clkm_div_num().bits(divider.div_num as _);
                 w.cam_clkm_div_b().bits(divider.div_b as _);
                 w.cam_clkm_div_a().bits(divider.div_a as _);
-                w.cam_vsync_filter_thres().bits(0);
+                if let Some(threshold) = config.vsync_filter_threshold {
+                    w.cam_vsync_filter_thres().bits(threshold as _);
+                }
+                w.cam_byte_order()
+                    .bit(config.byte_order != ByteOrder::default());
+                w.cam_bit_order()
+                    .bit(config.bit_order != BitOrder::default());
                 w.cam_vs_eof_en().set_bit();
                 w.cam_line_int_en().clear_bit();
                 w.cam_stop_en().clear_bit()
             }
         });
-        lcd_cam.cam_ctrl1().write(|w| unsafe {
+        self.lcd_cam.cam_ctrl1().modify(|_, w| unsafe {
             w.cam_vh_de_mode_en().set_bit();
             w.cam_rec_data_bytelen().bits(0);
             w.cam_line_int_num().bits(0);
-            w.cam_vsync_filter_en().clear_bit();
-            w.cam_2byte_en().bit(P::BUS_WIDTH == 2);
+            w.cam_vsync_filter_en()
+                .bit(config.vsync_filter_threshold.is_some());
             w.cam_clk_inv().clear_bit();
             w.cam_de_inv().clear_bit();
             w.cam_hsync_inv().clear_bit();
             w.cam_vsync_inv().clear_bit()
         });
 
-        lcd_cam
+        self.lcd_cam
             .cam_rgb_yuv()
             .write(|w| w.cam_conv_bypass().clear_bit());
 
-        lcd_cam.cam_ctrl().modify(|_, w| w.cam_update().set_bit());
+        self.lcd_cam
+            .cam_ctrl()
+            .modify(|_, w| w.cam_update().set_bit());
 
-        Self {
-            lcd_cam,
-            rx_channel,
-            _guard: cam._guard,
-        }
+        Ok(())
     }
 }
 
 impl<'d> Camera<'d> {
-    /// Configures the byte order for the camera data.
-    pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
-        self.lcd_cam
-            .cam_ctrl()
-            .modify(|_, w| w.cam_byte_order().bit(byte_order != ByteOrder::default()));
-        self
-    }
-
-    /// Configures the bit order for the camera data.
-    pub fn set_bit_order(&mut self, bit_order: BitOrder) -> &mut Self {
-        self.lcd_cam
-            .cam_ctrl()
-            .modify(|_, w| w.cam_bit_order().bit(bit_order != BitOrder::default()));
-        self
-    }
-
-    /// Configures the VSYNC filter threshold.
-    pub fn set_vsync_filter(&mut self, threshold: Option<VsyncFilterThreshold>) -> &mut Self {
-        if let Some(threshold) = threshold {
-            let value = match threshold {
-                VsyncFilterThreshold::One => 0,
-                VsyncFilterThreshold::Two => 1,
-                VsyncFilterThreshold::Three => 2,
-                VsyncFilterThreshold::Four => 3,
-                VsyncFilterThreshold::Five => 4,
-                VsyncFilterThreshold::Six => 5,
-                VsyncFilterThreshold::Seven => 6,
-                VsyncFilterThreshold::Eight => 7,
-            };
-
-            self.lcd_cam
-                .cam_ctrl()
-                .modify(|_, w| unsafe { w.cam_vsync_filter_thres().bits(value) });
-            self.lcd_cam
-                .cam_ctrl1()
-                .modify(|_, w| w.cam_vsync_filter_en().set_bit());
-        } else {
-            self.lcd_cam
-                .cam_ctrl1()
-                .modify(|_, w| w.cam_vsync_filter_en().clear_bit());
-        }
-        self
-    }
-
     /// Configures the master clock (MCLK) pin for the camera interface.
     pub fn with_master_clock<MCLK: PeripheralOutput>(
         self,
@@ -604,4 +592,32 @@ impl RxPins for RxSixteenBits {
 #[doc(hidden)]
 pub trait RxPins {
     const BUS_WIDTH: usize;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Configuration settings for the Camera interface.
+pub struct Config {
+    /// The pixel clock frequency for the camera interface.
+    pub frequency: HertzU32,
+
+    /// The byte order for the camera data.
+    pub byte_order: ByteOrder,
+
+    /// The bit order for the camera data.
+    pub bit_order: BitOrder,
+
+    /// The Vsync filter threshold.
+    pub vsync_filter_threshold: Option<VsyncFilterThreshold>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            frequency: 20.MHz(),
+            byte_order: Default::default(),
+            bit_order: Default::default(),
+            vsync_filter_threshold: None,
+        }
+    }
 }
