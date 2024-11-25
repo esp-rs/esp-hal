@@ -17,7 +17,7 @@ esp-hal            = { path = "../esp-hal" }
 esp-hal-embassy    = { path = "../esp-hal-embassy" }
 esp-println        = { path = "../esp-println", features = ["log"] }
 lis3dh-async       = "0.9.3"
-ssd1306            = "0.8.4"
+ssd1306            = "0.9.0"
 
 [features]
 esp32   = ["esp-backtrace/esp32",   "esp-hal/esp32",   "esp-hal-embassy/esp32",   "esp-println/esp32"]
