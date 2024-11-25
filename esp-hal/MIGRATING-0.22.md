@@ -181,3 +181,6 @@ Analogs of all traits from the above mentioned version are available in `embedde
 - use embedded_hal_02::serial::{Read, Write};
 + use embedded_hal_nb::serial::{Read, Write};
 ```
+
+You might also want to check the full official `embedded-hal` migration guide:
+https://github.com/rust-embedded/embedded-hal/blob/master/docs/migrating-from-0.2-to-1.0.md
