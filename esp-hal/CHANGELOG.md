@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- Remove `embedded-hal 0.2.x` impls and deps from esp-hal (#2593)
+
 ### Added
 
 - ESP32-S3: Added SDMMC signals (#2556)
