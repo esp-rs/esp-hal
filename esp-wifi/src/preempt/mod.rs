@@ -2,10 +2,10 @@
 #[cfg_attr(target_arch = "xtensa", path = "preempt_xtensa.rs")]
 pub mod arch_specific;
 
-use core::{cell::RefCell, mem::size_of};
+use core::mem::size_of;
 
 use arch_specific::*;
-use critical_section::Mutex;
+use esp_hal::sync::Locked;
 use esp_wifi_sys::include::malloc;
 
 use crate::{compat::malloc::free, hal::trapframe::TrapFrame, memory_fence::memory_fence};
@@ -15,14 +15,12 @@ struct ContextWrapper(*mut Context);
 
 unsafe impl Send for ContextWrapper {}
 
-static CTX_NOW: Mutex<RefCell<ContextWrapper>> =
-    Mutex::new(RefCell::new(ContextWrapper(core::ptr::null_mut())));
+static CTX_NOW: Locked<ContextWrapper> = Locked::new(ContextWrapper(core::ptr::null_mut()));
 
 static mut SCHEDULED_TASK_TO_DELETE: *mut Context = core::ptr::null_mut();
 
 pub(crate) fn allocate_main_task() -> *mut Context {
-    critical_section::with(|cs| unsafe {
-        let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
+    CTX_NOW.with(|ctx_now| unsafe {
         if !ctx_now.0.is_null() {
             panic!("Tried to allocate main task multiple times");
         }
@@ -36,8 +34,7 @@ pub(crate) fn allocate_main_task() -> *mut Context {
 }
 
 fn allocate_task() -> *mut Context {
-    critical_section::with(|cs| unsafe {
-        let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
+    CTX_NOW.with(|ctx_now| unsafe {
         if ctx_now.0.is_null() {
             panic!("Called `allocate_task` before allocating main task");
         }
@@ -51,8 +48,7 @@ fn allocate_task() -> *mut Context {
 }
 
 fn next_task() {
-    critical_section::with(|cs| unsafe {
-        let mut ctx_now = CTX_NOW.borrow_ref_mut(cs);
+    CTX_NOW.with(|ctx_now| unsafe {
         ctx_now.0 = (*ctx_now.0).next;
     });
 }
@@ -61,8 +57,8 @@ fn next_task() {
 ///
 /// This will also free the memory (stack and context) allocated for it.
 pub(crate) fn delete_task(task: *mut Context) {
-    critical_section::with(|cs| unsafe {
-        let mut ptr = CTX_NOW.borrow_ref_mut(cs).0;
+    CTX_NOW.with(|ctx_now| unsafe {
+        let mut ptr = ctx_now.0;
         let initial = ptr;
         loop {
             if (*ptr).next == task {
@@ -85,9 +81,8 @@ pub(crate) fn delete_task(task: *mut Context) {
 }
 
 pub(crate) fn delete_all_tasks() {
-    critical_section::with(|cs| unsafe {
-        let mut ctx_now_ref = CTX_NOW.borrow_ref_mut(cs);
-        let current_task = ctx_now_ref.0;
+    CTX_NOW.with(|ctx_now| unsafe {
+        let current_task = ctx_now.0;
 
         if current_task.is_null() {
             return;
@@ -108,14 +103,14 @@ pub(crate) fn delete_all_tasks() {
             task_to_delete = next_task;
         }
 
-        ctx_now_ref.0 = core::ptr::null_mut();
+        ctx_now.0 = core::ptr::null_mut();
 
         memory_fence();
     });
 }
 
 pub(crate) fn current_task() -> *mut Context {
-    critical_section::with(|cs| CTX_NOW.borrow_ref(cs).0)
+    CTX_NOW.with(|ctx_now| ctx_now.0)
 }
 
 pub(crate) fn schedule_task_deletion(task: *mut Context) {

@@ -22,16 +22,15 @@
 //! ```toml
 //! [dependencies.esp-wifi]
 //! # A supported chip needs to be specified, as well as specific use-case features
-//! features = ["esp32s3", "wifi", "esp-now"]
+#![doc = concat!(r#"features = [""#, esp_hal::chip!(), r#"", "wifi", "esp-now"]"#)]
 //! ```
-//!
+//! 
 //! ### Optimization Level
 //!
 //! It is necessary to build with optimization level 2 or 3 since otherwise, it
 //! might not even be able to connect or advertise.
 //!
 //! To make it work also for your debug builds add this to your `Cargo.toml`
-//!
 //! ```toml
 //! [profile.dev.package.esp-wifi]
 //! opt-level = 3
@@ -419,7 +418,7 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     shutdown_timer_isr();
     crate::preempt::delete_all_tasks();
 
-    critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take());
+    crate::timer::TIMER.with(|timer| timer.take());
 
     crate::flags::ESP_WIFI_INITIALIZED.store(false, Ordering::Release);
 
