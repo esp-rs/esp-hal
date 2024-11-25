@@ -127,8 +127,8 @@
 //!
 //! [documentation]: https://docs.esp-rs.org/esp-hal
 //! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
-//! [embedded-hal]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal
-//! [embedded-hal-async]: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-hal-async
+//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
+//! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
 //! [xtask]: https://github.com/matklad/cargo-xtask
 //! [esp-generate]: https://github.com/esp-rs/esp-generate
 //! [book]: https://docs.esp-rs.org/book/

@@ -34,7 +34,7 @@
 //! }
 //! # }
 //! ```
-//! [`embedded-hal`]: https://crates.io/crates/embedded-hal
+//! [`embedded-hal`]: https://docs.rs/embedded-hal/latest/embedded_hal/index.html
 
 use core::marker::PhantomData;
 #[cfg(not(esp32))]

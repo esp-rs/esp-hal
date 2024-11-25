@@ -13,7 +13,7 @@
 //!
 //! ## Usage
 //!
-//! This module implements the blocking [DelayNs] trait [embedded-hal].
+//! This module implements the blocking [DelayNs] trait from [embedded-hal].
 //!
 //! ## Examples
 //! ### Delay for 1 second
