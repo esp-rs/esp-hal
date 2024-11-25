@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Functions marked with `#[handler]` can now be referenced in `const` context. (#2559)
+
 ### Removed
 
 - Removed the `enum-dispatch`, `interrupt`, and `ram` features (#2594)

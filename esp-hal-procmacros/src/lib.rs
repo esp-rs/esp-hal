@@ -321,7 +321,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         #f
 
         #[allow(non_upper_case_globals)]
-        #vis static #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
+        #vis const #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
     )
     .into()
 }

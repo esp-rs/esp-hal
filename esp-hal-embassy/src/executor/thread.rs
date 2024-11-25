@@ -30,7 +30,7 @@ pub(crate) fn pend_thread_mode(_core: usize) {
     #[cfg(low_power_wait)]
     {
         // Signal that there is work to be done.
-        SIGNAL_WORK_THREAD_MODE[_core].store(true, Ordering::SeqCst);
+        SIGNAL_WORK_THREAD_MODE[_core].store(true, Ordering::Relaxed);
 
         // If we are pending a task on the current core, we're done. Otherwise, we
         // need to make sure the other core wakes up.
@@ -123,7 +123,8 @@ This will use software-interrupt 3 which isn't available for anything else to wa
 
         // we do not care about race conditions between the load and store operations,
         // interrupts will only set this value to true.
-        if SIGNAL_WORK_THREAD_MODE[cpu].load(Ordering::SeqCst) {
+        // Acquire makes no sense but at this time it's slightly faster than Relaxed.
+        if SIGNAL_WORK_THREAD_MODE[cpu].load(Ordering::Acquire) {
             // if there is work to do, exit critical section and loop back to polling
             unsafe {
                 core::arch::asm!(
@@ -140,7 +141,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
             unsafe { core::arch::asm!("waiti 0") };
         }
         // If this races and some waker sets the signal, we'll reset it, but still poll.
-        SIGNAL_WORK_THREAD_MODE[cpu].store(false, Ordering::SeqCst);
+        SIGNAL_WORK_THREAD_MODE[cpu].store(false, Ordering::Relaxed);
     }
 
     #[cfg(all(riscv, low_power_wait))]
@@ -149,14 +150,14 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         // interrupts will only set this value to true.
         critical_section::with(|_| {
             // if there is work to do, loop back to polling
-            if !SIGNAL_WORK_THREAD_MODE[cpu].load(Ordering::SeqCst) {
+            if !SIGNAL_WORK_THREAD_MODE[cpu].load(Ordering::Relaxed) {
                 // if not, wait for interrupt
                 unsafe { core::arch::asm!("wfi") };
             }
         });
         // if an interrupt occurred while waiting, it will be serviced here
         // If this races and some waker sets the signal, we'll reset it, but still poll.
-        SIGNAL_WORK_THREAD_MODE[cpu].store(false, Ordering::SeqCst);
+        SIGNAL_WORK_THREAD_MODE[cpu].store(false, Ordering::Relaxed);
     }
 }
 
