@@ -7,12 +7,10 @@
 //!
 //! Make sure the LP RAM is cleared before loading the code.
 
-//% FEATURES: embedded-hal-02
-
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::{blocking::delay::DelayMs, digital::v2::OutputPin};
+use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*};
 use panic_halt as _;
 

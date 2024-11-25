@@ -8,12 +8,11 @@
 //! - SCL => GPIO7
 
 //% CHIPS: esp32c6
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::blocking::i2c::WriteRead;
+use embedded_hal::i2c::I2c;
 use esp_lp_hal::{i2c::LpI2c, prelude::*};
 use panic_halt as _;
 
