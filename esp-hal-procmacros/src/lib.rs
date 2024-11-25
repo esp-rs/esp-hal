@@ -47,12 +47,17 @@
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-#[allow(unused)]
-use proc_macro::TokenStream;
+use darling::{ast::NestedMeta, Error, FromMeta};
+use proc_macro::{Span, TokenStream};
+use proc_macro2::Ident;
+use proc_macro_crate::{crate_name, FoundCrate};
+use proc_macro_error2::abort;
+use syn::{parse, parse::Error as ParseError, spanned::Spanned, Item, ItemFn, ReturnType, Type};
+
+use self::interrupt::{check_attr_whitelist, WhiteListCaller};
 
 #[cfg(feature = "embassy")]
 mod embassy;
-#[cfg(feature = "interrupt")]
 mod interrupt;
 #[cfg(any(
     feature = "is-lp-core",
@@ -62,7 +67,6 @@ mod interrupt;
 ))]
 mod lp_core;
 
-#[cfg(feature = "ram")]
 #[derive(Debug, Default, darling::FromMeta)]
 #[darling(default)]
 struct RamArgs {
@@ -80,7 +84,7 @@ struct RamArgs {
 /// # Options
 ///
 /// - `rtc_fast`: Use RTC fast RAM.
-/// - `rtc_slow`: Use RTC slow RAM. **Note**: not available on all targets
+/// - `rtc_slow`: Use RTC slow RAM. **Note**: not available on all targets.
 /// - `persistent`: Persist the contents of the `static` across resets. See [the
 ///   section below](#persistent) for details.
 /// - `zeroed`: Initialize the memory of the `static` to zero. The initializer
@@ -126,15 +130,9 @@ struct RamArgs {
 ///
 /// [`bytemuck::AnyBitPattern`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.AnyBitPattern.html
 /// [`bytemuck::Zeroable`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.Zeroable.html
-#[cfg(feature = "ram")]
 #[proc_macro_attribute]
 #[proc_macro_error2::proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
-    use darling::{ast::NestedMeta, Error, FromMeta};
-    use proc_macro::Span;
-    use proc_macro_error2::abort;
-    use syn::{parse, Item};
-
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
         Ok(v) => v,
         Err(e) => {
@@ -156,7 +154,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let item: Item = parse(input).expect("failed to parse input");
 
-    #[cfg(not(feature = "rtc_slow"))]
+    #[cfg(not(feature = "rtc-slow"))]
     if rtc_slow {
         abort!(
             Span::call_site(),
@@ -206,7 +204,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let trait_check = trait_check.map(|name| {
         use proc_macro_crate::{crate_name, FoundCrate};
 
-        let hal = proc_macro2::Ident::new(
+        let hal = Ident::new(
             if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
                 name
             } else {
@@ -240,18 +238,9 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// esp_hal::interrupt::Priority::Priority2)]`.
 ///
 /// If no priority is given, `Priority::min()` is assumed
-#[cfg(feature = "interrupt")]
 #[proc_macro_error2::proc_macro_error]
 #[proc_macro_attribute]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
-    use darling::{ast::NestedMeta, FromMeta};
-    use proc_macro::Span;
-    use proc_macro2::Ident;
-    use proc_macro_crate::{crate_name, FoundCrate};
-    use syn::{parse::Error as ParseError, spanned::Spanned, ItemFn, ReturnType, Type};
-
-    use self::interrupt::{check_attr_whitelist, WhiteListCaller};
-
     #[derive(Debug, FromMeta)]
     struct MacroArgs {
         priority: Option<syn::Expr>,

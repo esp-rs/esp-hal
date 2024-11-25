@@ -17,24 +17,18 @@ proc-macro = true
 darling           = "0.20.10"
 document-features = "0.2.10"
 litrs             = "0.4.1"
-object            = { version = "0.36.5", optional = true, default-features = false, features = ["read_core", "elf"] }
+object            = { version = "0.36.5", default-features = false, features = ["read_core", "elf"], optional = true }
 proc-macro-crate  = "3.2.0"
 proc-macro-error2 = "2.0.1"
-proc-macro2       = "1.0.89"
+proc-macro2       = "1.0.92"
 quote             = "1.0.37"
-syn               = { version = "2.0.87", features = ["extra-traits", "full"] }
+syn               = { version = "2.0.89", features = ["extra-traits", "full"] }
 
 [features]
 ## Provide a `#[main]` procmacro to mark the entry point for Embassy applications.
 embassy = []
-## Provide enum dispatch helpers.
-enum-dispatch = []
-## Provide an `#[interrupt]` procmacro for defining interrupt service routines.
-interrupt = []
-## Provide a `#[ram]` procmacro to place functions in RAM instead of flash.
-ram = []
 ## Indicates the target device has RTC slow memory available.
-rtc_slow = []
+rtc-slow = []
 
 #! ### Low-power Core Feature Flags
 ## Indicate that the SoC contains an LP core.
