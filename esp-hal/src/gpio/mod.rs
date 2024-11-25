@@ -32,7 +32,7 @@
 //! [`Io::set_interrupt_handler`].
 //!
 //! This driver also implements pin-related traits from [embedded-hal] and
-//! [Wait] trait from [embedded-hal-async].
+//! [Wait](embedded_hal_async::digital::Wait) trait from [embedded-hal-async].
 //!
 //! ## GPIO interconnect
 //!
@@ -52,7 +52,6 @@
 //! See the [Inverting TX and RX Pins] example of the UART documentation.
 //!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
-//! [Wait]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/digital/trait.Wait.html
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/index.html
 //! [Inverting TX and RX Pins]: crate::uart#inverting-rx-and-tx-pins
 
