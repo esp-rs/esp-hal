@@ -42,7 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The timer drivers `OneShotTimer` & `PeriodicTimer` now have a `Mode` parameter and type erase the underlying driver by default (#2586)
 - `timer::Timer` has new trait requirements of `Into<AnyTimer>`, `'static` and `InterruptConfigurable` (#2586)
 - `systimer::etm::Event` no longer borrows the alarm indefinitely (#2586)
-- `DEFAULT_INTERRUPT_HANDLER` and `InterruptConfigurable` have moved from the the crate root to `interrupt` (#2586)
 
 ### Fixed
 

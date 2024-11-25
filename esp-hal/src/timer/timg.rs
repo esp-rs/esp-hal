@@ -315,25 +315,6 @@ impl super::Timer for Timer {
         self.clear_interrupt()
     }
 
-    fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        let interrupt = match (self.timer_group(), self.timer_number()) {
-            (0, 0) => Interrupt::TG0_T0_LEVEL,
-            #[cfg(timg_timer1)]
-            (0, 1) => Interrupt::TG0_T1_LEVEL,
-            #[cfg(timg1)]
-            (1, 0) => Interrupt::TG1_T0_LEVEL,
-            #[cfg(all(timg_timer1, timg1))]
-            (1, 1) => Interrupt::TG1_T1_LEVEL,
-            _ => unreachable!(),
-        };
-
-        for core in crate::Cpu::other() {
-            crate::interrupt::disable(core, interrupt);
-        }
-        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(interrupt::enable(interrupt, handler.priority()));
-    }
-
     fn is_interrupt_set(&self) -> bool {
         self.is_interrupt_set()
     }

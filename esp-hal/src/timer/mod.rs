@@ -74,7 +74,7 @@ pub enum Error {
 }
 
 /// Functionality provided by any timer peripheral.
-pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
+pub trait Timer: Into<AnyTimer> + InterruptConfigurable + 'static + crate::private::Sealed {
     /// Start the timer.
     fn start(&self);
 
@@ -101,11 +101,6 @@ pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
 
     /// Clear the timer's interrupt.
     fn clear_interrupt(&self);
-
-    /// Set the interrupt handler
-    ///
-    /// Note that this will replace any previously set interrupt handler
-    fn set_interrupt_handler(&self, handler: InterruptHandler);
 
     /// Has the timer triggered?
     fn is_interrupt_set(&self) -> bool;
@@ -150,9 +145,9 @@ where
     }
 
     /// Converts the driver to [`Async`] mode.
-    pub fn into_async(self) -> OneShotTimer<'d, Async, T> {
-        self.inner
-            .set_interrupt_handler(self.inner.async_interrupt_handler());
+    pub fn into_async(mut self) -> OneShotTimer<'d, Async, T> {
+        let handler = self.inner.async_interrupt_handler();
+        self.inner.set_interrupt_handler(handler);
         OneShotTimer {
             inner: self.inner,
             _ph: PhantomData,
@@ -297,9 +292,8 @@ where
     }
 }
 
-impl<T> embedded_hal::delay::DelayNs for OneShotTimer<'_, T>
+impl<T> embedded_hal::delay::DelayNs for OneShotTimer<'_, Blocking, T>
 where
-    M: Mode,
     T: Timer,
 {
     fn delay_ns(&mut self, ns: u32) {
@@ -416,15 +410,6 @@ where
     }
 }
 
-/// An enum of all timer types
-enum AnyTimerInner {
-    /// Timer 0 of the TIMG0 peripheral in blocking mode.
-    TimgTimer(timg::Timer),
-    /// Systimer Alarm
-    #[cfg(systimer)]
-    SystimerAlarm(systimer::Alarm),
-}
-
 crate::any_peripheral! {
     /// Any Timer peripheral.
     pub peripheral AnyTimer {
@@ -450,11 +435,22 @@ impl Timer for AnyTimer {
             fn enable_auto_reload(&self, auto_reload: bool);
             fn enable_interrupt(&self, state: bool);
             fn clear_interrupt(&self);
-            fn set_interrupt_handler(&self, handler: InterruptHandler);
             fn is_interrupt_set(&self) -> bool;
             async fn wait(&self);
             fn async_interrupt_handler(&self) -> InterruptHandler;
             fn peripheral_interrupt(&self) -> Interrupt;
+        }
+    }
+}
+
+impl InterruptConfigurable for AnyTimer {
+    delegate::delegate! {
+        to match &mut self.0 {
+            AnyTimerInner::TimgTimer(inner) => inner,
+            #[cfg(systimer)]
+            AnyTimerInner::SystimerAlarm(inner) => inner,
+        } {
+            fn set_interrupt_handler(&mut self, handler: InterruptHandler);
         }
     }
 }

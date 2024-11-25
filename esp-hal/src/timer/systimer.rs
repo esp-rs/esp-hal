@@ -29,6 +29,7 @@ use crate::{
     sync::{lock, Lock},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Cpu,
+    InterruptConfigurable,
 };
 
 /// The configuration of a unit.

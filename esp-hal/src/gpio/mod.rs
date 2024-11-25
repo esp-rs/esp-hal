@@ -29,7 +29,7 @@
 //!
 //! The [`Io`] struct can also be used to configure the interrupt handler for
 //! GPIO interrupts. For more information, see the
-//! [`InterruptConfigurable::set_interrupt_handler`](interrupt::InterruptConfigurable::set_interrupt_handler).
+//! [`InterruptConfigurable::set_interrupt_handler`](crate::InterruptConfigurable::set_interrupt_handler).
 //!
 //! This driver also implements pin-related traits from [embedded-hal] and
 //! [Wait](embedded_hal_async::digital::Wait) trait from [embedded-hal-async].
