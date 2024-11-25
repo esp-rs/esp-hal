@@ -5,7 +5,7 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::can::Frame;
+use embedded_can::Frame;
 use esp_hal::{
     prelude::*,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},

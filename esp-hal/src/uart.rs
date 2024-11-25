@@ -1434,62 +1434,6 @@ where
     }
 }
 
-impl<T, M> embedded_hal_02::serial::Write<u8> for Uart<'_, M, T>
-where
-    T: Instance,
-    M: Mode,
-{
-    type Error = Error;
-
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.tx.write(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.tx.flush()
-    }
-}
-
-impl<T, M> embedded_hal_02::serial::Write<u8> for UartTx<'_, M, T>
-where
-    T: Instance,
-    M: Mode,
-{
-    type Error = Error;
-
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx()
-    }
-}
-
-impl<T, M> embedded_hal_02::serial::Read<u8> for Uart<'_, M, T>
-where
-    T: Instance,
-    M: Mode,
-{
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.rx.read()
-    }
-}
-
-impl<T, M> embedded_hal_02::serial::Read<u8> for UartRx<'_, M, T>
-where
-    T: Instance,
-    M: Mode,
-{
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-}
-
 impl<T, M> embedded_hal_nb::serial::ErrorType for Uart<'_, M, T> {
     type Error = Error;
 }

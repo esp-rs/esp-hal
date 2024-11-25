@@ -13,8 +13,7 @@
 //!
 //! ## Usage
 //!
-//! This module implements the blocking [DelayMs] and [DelayUs] traits from
-//! [embedded-hal], both 0.2.x and 1.x.x.
+//! This module implements the blocking [DelayNs] trait [embedded-hal].
 //!
 //! ## Examples
 //! ### Delay for 1 second
@@ -28,8 +27,7 @@
 //! # }
 //! ```
 //! 
-//! [DelayMs]: embedded_hal_02::blocking::delay::DelayMs
-//! [DelayUs]: embedded_hal_02::blocking::delay::DelayUs
+//! [DelayNs]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/trait.DelayNs.html
 //! [embedded-hal]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/index.html
 //! [now]: crate::time::now
 
@@ -42,24 +40,6 @@ pub use fugit::MicrosDurationU64;
 #[derive(Clone, Copy, Default)]
 #[non_exhaustive]
 pub struct Delay;
-
-impl<T> embedded_hal_02::blocking::delay::DelayMs<T> for Delay
-where
-    T: Into<u32>,
-{
-    fn delay_ms(&mut self, ms: T) {
-        self.delay_millis(ms.into());
-    }
-}
-
-impl<T> embedded_hal_02::blocking::delay::DelayUs<T> for Delay
-where
-    T: Into<u32>,
-{
-    fn delay_us(&mut self, us: T) {
-        self.delay_micros(us.into());
-    }
-}
 
 impl embedded_hal::delay::DelayNs for Delay {
     fn delay_ns(&mut self, ns: u32) {

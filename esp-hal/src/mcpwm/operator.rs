@@ -421,39 +421,6 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
     }
 }
 
-impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal_02::PwmPin
-    for PwmPin<'_, PWM, OP, IS_A>
-{
-    type Duty = u16;
-
-    /// This only set the timestamp to 0, if you want to disable the PwmPin,
-    /// it must be done on the timer itself.
-    fn disable(&mut self) {
-        self.set_timestamp(0);
-    }
-
-    /// This only set the timestamp to the maximum, if you want to disable the
-    /// PwmPin, it must be done on the timer itself.
-    fn enable(&mut self) {
-        self.set_timestamp(u16::MAX);
-    }
-
-    /// Get the duty of the pin
-    fn get_duty(&self) -> Self::Duty {
-        self.timestamp()
-    }
-
-    /// Get the max duty of the pin
-    fn get_max_duty(&self) -> Self::Duty {
-        self.period()
-    }
-
-    /// Set the duty of the pin
-    fn set_duty(&mut self, duty: Self::Duty) {
-        self.set_timestamp(duty);
-    }
-}
-
 /// Implement no error type for the PwmPin because the method are infallible
 impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::ErrorType
     for PwmPin<'_, PWM, OP, IS_A>

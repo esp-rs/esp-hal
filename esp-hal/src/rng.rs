@@ -32,10 +32,7 @@
 //! method, which returns a 32-bit unsigned integer.
 //!
 //! ## Usage
-//! This driver implements the [Read](embedded_hal_02::blocking::rng::Read)
-//! trait from the `embedded_hal` crate, allowing you to generate random bytes
-//! by calling the `read` method. The driver also implements the traits from the
-//! [`rand_core`] crate.
+//! The driver implements the traits from the [`rand_core`] crate.
 //!
 //! [`rand_core`]: https://crates.io/crates/rand_core
 //!
@@ -139,15 +136,6 @@ impl Rng {
     }
 }
 
-impl embedded_hal_02::blocking::rng::Read for Rng {
-    type Error = core::convert::Infallible;
-
-    fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.read(buffer);
-        Ok(())
-    }
-}
-
 impl rand_core::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
         self.random()
@@ -226,15 +214,6 @@ impl<'d> Trng<'d> {
 impl Drop for Trng<'_> {
     fn drop(&mut self) {
         crate::soc::trng::revert_trng();
-    }
-}
-
-impl embedded_hal_02::blocking::rng::Read for Trng<'_> {
-    type Error = core::convert::Infallible;
-    /// Fills the provided buffer with random bytes.
-    fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.rng.read(buffer);
-        Ok(())
     }
 }
 
