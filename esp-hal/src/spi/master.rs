@@ -47,6 +47,7 @@
 //!     peripherals.SPI2,
 //!     Config::default().with_frequency(100.kHz()).with_mode(SpiMode::Mode0)
 //! )
+//! .unwrap()
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
 //! .with_miso(miso)
@@ -503,16 +504,11 @@ where
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new(spi: impl Peripheral<P = impl Instance> + 'd) -> Spi<'d, Blocking> {
-        Self::new_with_config(spi, Config::default())
-    }
-
-    /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_with_config(
+    pub fn new(
         spi: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
-    ) -> Spi<'d, Blocking> {
-        Self::new_typed_with_config(spi.map_into(), config)
+    ) -> Result<Self, ConfigError> {
+        Self::new_typed(spi.map_into(), config)
     }
 
     /// Converts the SPI instance into async mode.
@@ -558,15 +554,10 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_typed(spi: impl Peripheral<P = T> + 'd) -> Spi<'d, M, T> {
-        Self::new_typed_with_config(spi, Config::default())
-    }
-
-    /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_typed_with_config(
+    pub fn new_typed(
         spi: impl Peripheral<P = T> + 'd,
         config: Config,
-    ) -> Spi<'d, M, T> {
+    ) -> Result<Self, ConfigError> {
         crate::into_ref!(spi);
 
         let guard = PeripheralGuard::new(spi.info().peripheral);
@@ -578,7 +569,7 @@ where
         };
 
         this.driver().init();
-        unwrap!(this.apply_config(&config)); // FIXME: update based on the resolution of https://github.com/esp-rs/esp-hal/issues/2416
+        this.apply_config(&config)?;
 
         let this = this
             .with_mosi(NoPin)
@@ -594,7 +585,7 @@ where
             unwrap!(this.driver().sio3_output).connect_to(NoPin);
         }
 
-        this
+        Ok(this)
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
