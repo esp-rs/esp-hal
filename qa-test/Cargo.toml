@@ -35,3 +35,8 @@ debug         = 2
 debug-assertions = true
 lto           = "fat"
 codegen-units = 1
+
+[patch.crates-io]
+embassy-executor    = { path = "C:/_Hobby/CardIo/embassy/embassy-executor" }
+embassy-time        = { path = "C:/_Hobby/CardIo/embassy/embassy-time" }
+embassy-time-driver = { path = "C:/_Hobby/CardIo/embassy/embassy-time-driver" }

@@ -54,6 +54,13 @@ impl Future for Task1 {
 
 static TASK1: TaskStorage<Task1> = TaskStorage::new();
 
+#[embassy_executor::task]
+async fn task2() {
+    loop {
+        embassy_time::Timer::after(embassy_time::Duration::from_millis(1)).await;
+    }
+}
+
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -63,6 +70,7 @@ async fn main(spawner: Spawner) {
     println!("Embassy initialized!");
 
     spawner.spawn(TASK1.spawn(|| Task1 {})).unwrap();
+    spawner.spawn(task2()).unwrap();
 
     println!("Starting test");
 

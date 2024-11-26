@@ -90,6 +90,9 @@ This will use software-interrupt 3 which isn't available for anything else to wa
             Priority::min(),
         ));
 
+        unsafe {
+            self.inner.initialize();
+        }
         init(self.inner.spawner());
 
         #[cfg(low_power_wait)]
