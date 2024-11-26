@@ -22,10 +22,10 @@ by `esp_hal::init()`. The channels themselves have been renamed to match other p
 +let channel = peripherals.DMA_CH2;
 ```
 
-### Configuration changes
+### Channel configuration changes
 
 - `configure_for_async` and `configure` have been removed
-- PDMA devices (ESP32, ESP32-S2) provide no configurability
+- PDMA devices (ESP32, ESP32-S2) provide no channel configurability
 - GDMA devices provide `set_priority` to change DMA in/out channel priority
 
 ```diff
@@ -48,6 +48,12 @@ by `esp_hal::init()`. The channels themselves have been renamed to match other p
 -.with_dma(dma_channel.configure(false, DmaPriority::Priority1));
 +.with_dma(dma_channel);
 ```
+
+### Burst mode configuration
+
+Burst mode is now a property of buffers, instead of DMA channels. Configuration can be done by
+calling `set_burst_config` on buffers that support it. The configuration options and the
+corresponding `BurstConfig` type are device specfic.
 
 ### Usability changes affecting applications
 

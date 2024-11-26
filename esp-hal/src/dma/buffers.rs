@@ -10,7 +10,7 @@ use crate::soc::{is_valid_psram_address, is_valid_ram_address};
 
 cfg_if::cfg_if! {
     if #[cfg(psram_dma)] {
-        /// PSRAM access burst size.
+        /// Burst size used when transferring to and from external memory.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum ExternalBurstSize {
@@ -459,7 +459,7 @@ impl DmaTxBuf {
     /// Note that the hardware is allowed to ignore this setting. If you attempt
     /// to use burst transfers with improperly aligned buffers, starting the
     /// transfer will result in [`DmaError::InvalidAlignment`].
-    pub fn set_burst_transfer(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
+    pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
         let len = self.len();
         self.configure(burst, len)
     }
@@ -618,7 +618,7 @@ impl DmaRxBuf {
     /// Note that the hardware is allowed to ignore this setting. If you attempt
     /// to use burst transfers with improperly aligned buffers, starting the
     /// transfer will result in [`DmaError::InvalidAlignment`].
-    pub fn set_burst_transfer(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
+    pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
         let len = self.len();
         self.configure(burst, len)
     }
@@ -816,7 +816,7 @@ impl DmaRxTxBuf {
     /// Note that the hardware is allowed to ignore this setting. If you attempt
     /// to use burst transfers with improperly aligned buffers, starting the
     /// transfer will result in [`DmaError::InvalidAlignment`].
-    pub fn set_burst_transfer(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
+    pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
         let len = self.len();
         self.configure(burst, len)
     }
