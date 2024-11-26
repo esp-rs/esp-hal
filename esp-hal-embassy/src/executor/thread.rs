@@ -100,6 +100,9 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
+        unsafe {
+            self.inner.initialize();
+        }
         init(self.inner.spawner());
 
         #[cfg(low_power_wait)]
