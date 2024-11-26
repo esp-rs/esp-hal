@@ -1,6 +1,6 @@
-use core::arch::{asm, global_asm};
+use core::arch::{global_asm, naked_asm};
 
-use crate::cfg_asm;
+use crate::cfg_naked_asm;
 
 // We could cfg symbols away and reduce frame size depending on features enabled
 // i.e the frame size is a fixed size based on all the features right now
@@ -113,7 +113,7 @@ global_asm!(
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn save_context() {
-    cfg_asm!(
+    cfg_naked_asm!(
     {
         "
         s32i    a2,  sp, +XT_STK_A2
@@ -265,7 +265,6 @@ unsafe extern "C" fn save_context() {
         ret
         ",
     },
-    options(noreturn)
     );
 }
 
@@ -356,7 +355,7 @@ global_asm!(
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn restore_context() {
-    cfg_asm!(
+    cfg_naked_asm!(
     {
         "
         l32i    a3,  sp, +XT_STK_SAR
@@ -465,7 +464,8 @@ unsafe extern "C" fn restore_context() {
         l32i    a15, sp, +XT_STK_A15
         ret
         ",
-    }, options(noreturn));
+    },
+    );
 }
 
 global_asm!(
@@ -504,7 +504,7 @@ global_asm!(
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn __default_naked_exception() {
-    asm!(
+    naked_asm!(
         "
         SAVE_CONTEXT 1
 
@@ -534,7 +534,6 @@ unsafe extern "C" fn __default_naked_exception() {
 
         rfe                               // PS.EXCM is cleared
         ",
-        options(noreturn)
     )
 }
 
@@ -548,7 +547,7 @@ unsafe extern "C" fn __default_naked_exception() {
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn __default_naked_double_exception() {
-    asm!(
+    naked_asm!(
         "
         mov     a0, a1                     // save a1/sp
         addmi   sp, sp, -XT_STK_FRMSZ      // only allow multiple of 256
@@ -593,7 +592,6 @@ unsafe extern "C" fn __default_naked_double_exception() {
 
         rfde
         ",
-        options(noreturn)
     )
 }
 
@@ -626,7 +624,7 @@ global_asm!(
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn __default_naked_level_2_interrupt() {
-    asm!("HANDLE_INTERRUPT_LEVEL 2", options(noreturn));
+    naked_asm!("HANDLE_INTERRUPT_LEVEL 2");
 }
 
 /// Handle Level 3 Interrupt by storing full context and then calling regular
@@ -638,7 +636,7 @@ unsafe extern "C" fn __default_naked_level_2_interrupt() {
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn __default_naked_level_3_interrupt() {
-    asm!("HANDLE_INTERRUPT_LEVEL 3", options(noreturn));
+    naked_asm!("HANDLE_INTERRUPT_LEVEL 3");
 }
 
 /// Handle Level 4 Interrupt by storing full context and then calling regular
@@ -650,7 +648,7 @@ unsafe extern "C" fn __default_naked_level_3_interrupt() {
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn __default_naked_level_4_interrupt() {
-    asm!("HANDLE_INTERRUPT_LEVEL 4", options(noreturn));
+    naked_asm!("HANDLE_INTERRUPT_LEVEL 4");
 }
 
 /// Handle Level 5 Interrupt by storing full context and then calling regular
@@ -662,7 +660,7 @@ unsafe extern "C" fn __default_naked_level_4_interrupt() {
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn __default_naked_level_5_interrupt() {
-    asm!("HANDLE_INTERRUPT_LEVEL 5", options(noreturn));
+    naked_asm!("HANDLE_INTERRUPT_LEVEL 5");
 }
 
 /// Handle Level 6 (=Debug) Interrupt by storing full context and then calling
@@ -674,7 +672,7 @@ unsafe extern "C" fn __default_naked_level_5_interrupt() {
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn __default_naked_level_6_interrupt() {
-    asm!("HANDLE_INTERRUPT_LEVEL 6", options(noreturn));
+    naked_asm!("HANDLE_INTERRUPT_LEVEL 6");
 }
 
 /// Handle Level 7 (=NMI) Interrupt by storing full context and then calling
@@ -686,5 +684,5 @@ unsafe extern "C" fn __default_naked_level_6_interrupt() {
 #[no_mangle]
 #[link_section = ".rwtext"]
 unsafe extern "C" fn __default_naked_level_7_interrupt() {
-    asm!("HANDLE_INTERRUPT_LEVEL 7", options(noreturn));
+    naked_asm!("HANDLE_INTERRUPT_LEVEL 7");
 }

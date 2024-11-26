@@ -1,4 +1,4 @@
-use core::arch::asm;
+use core::arch::naked_asm;
 
 use super::ExceptionCause;
 
@@ -176,7 +176,7 @@ extern "C" fn __default_double_exception(cause: ExceptionCause, save_frame: &Con
 #[no_mangle]
 #[link_section = ".KernelExceptionVector.text"]
 unsafe extern "C" fn _KernelExceptionVector() {
-    asm!(
+    naked_asm!(
         "
         wsr a0, EXCSAVE1 // preserve a0
         rsr a0, EXCCAUSE // get exception cause
@@ -184,8 +184,7 @@ unsafe extern "C" fn _KernelExceptionVector() {
         beqi a0, 5, .AllocAException
 
         call0 __naked_kernel_exception
-        ",
-        options(noreturn)
+        "
     );
 }
 
@@ -193,7 +192,7 @@ unsafe extern "C" fn _KernelExceptionVector() {
 #[no_mangle]
 #[link_section = ".UserExceptionVector.text"]
 unsafe extern "C" fn _UserExceptionVector() {
-    asm!(
+    naked_asm!(
         "
         wsr a0, EXCSAVE1 // preserve a0
         rsr a0, EXCCAUSE // get exception cause
@@ -204,8 +203,7 @@ unsafe extern "C" fn _UserExceptionVector() {
 
         .AllocAException:
         call0  _AllocAException
-        ",
-        options(noreturn)
+        "
     );
 }
 
@@ -213,14 +211,13 @@ unsafe extern "C" fn _UserExceptionVector() {
 #[no_mangle]
 #[link_section = ".DoubleExceptionVector.text"]
 unsafe extern "C" fn _DoubleExceptionVector() {
-    asm!(
+    naked_asm!(
         "
     wsr a0, EXCSAVE1                   // preserve a0 (EXCSAVE1 can be reused as long as there
                                        // is no double exception in the first exception until
                                        // EXCSAVE1 is stored to the stack.)
     call0 __naked_double_exception     // used as long jump
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -228,12 +225,11 @@ unsafe extern "C" fn _DoubleExceptionVector() {
 #[no_mangle]
 #[link_section = ".Level2InterruptVector.text"]
 unsafe extern "C" fn _Level2InterruptVector() {
-    asm!(
+    naked_asm!(
         "
     wsr a0, EXCSAVE2 // preserve a0
     call0 __naked_level_2_interrupt     // used as long jump
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -241,12 +237,11 @@ unsafe extern "C" fn _Level2InterruptVector() {
 #[no_mangle]
 #[link_section = ".Level3InterruptVector.text"]
 unsafe extern "C" fn _Level3InterruptVector() {
-    asm!(
+    naked_asm!(
         "
     wsr a0, EXCSAVE3 // preserve a0
     call0 __naked_level_3_interrupt     // used as long jump
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -254,12 +249,11 @@ unsafe extern "C" fn _Level3InterruptVector() {
 #[no_mangle]
 #[link_section = ".Level4InterruptVector.text"]
 unsafe extern "C" fn _Level4InterruptVector() {
-    asm!(
+    naked_asm!(
         "
     wsr a0, EXCSAVE4 // preserve a0
     call0 __naked_level_4_interrupt     // used as long jump
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -267,12 +261,11 @@ unsafe extern "C" fn _Level4InterruptVector() {
 #[no_mangle]
 #[link_section = ".Level5InterruptVector.text"]
 unsafe extern "C" fn _Level5InterruptVector() {
-    asm!(
+    naked_asm!(
         "
     wsr a0, EXCSAVE5 // preserve a0
     call0 __naked_level_5_interrupt     // used as long jump
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -280,12 +273,11 @@ unsafe extern "C" fn _Level5InterruptVector() {
 #[no_mangle]
 #[link_section = ".DebugExceptionVector.text"]
 unsafe extern "C" fn _Level6InterruptVector() {
-    asm!(
+    naked_asm!(
         "
     wsr a0, EXCSAVE6 // preserve a0
     call0 __naked_level_6_interrupt     // used as long jump
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -293,12 +285,11 @@ unsafe extern "C" fn _Level6InterruptVector() {
 #[no_mangle]
 #[link_section = ".NMIExceptionVector.text"]
 unsafe extern "C" fn _Level7InterruptVector() {
-    asm!(
+    naked_asm!(
         "
     wsr a0, EXCSAVE7 // preserve a0
     call0 __naked_level_7_interrupt     // used as long jump
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -306,15 +297,14 @@ unsafe extern "C" fn _Level7InterruptVector() {
 #[no_mangle]
 #[link_section = ".WindowOverflow4.text"]
 unsafe extern "C" fn _WindowOverflow4() {
-    asm!(
+    naked_asm!(
         "
         s32e    a0, a5, -16
         s32e    a1, a5, -12
         s32e    a2, a5,  -8
         s32e    a3, a5,  -4
         rfwo
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -322,7 +312,7 @@ unsafe extern "C" fn _WindowOverflow4() {
 #[no_mangle]
 #[link_section = ".WindowUnderflow4.text"]
 unsafe extern "C" fn _WindowUnderflow4() {
-    asm!(
+    naked_asm!(
         "
         l32e    a0, a5, -16
         l32e    a1, a5, -12
@@ -351,8 +341,7 @@ unsafe extern "C" fn _WindowUnderflow4() {
         bbci    a8, 30, _WindowUnderflow8
         rotw    -1
         j               _WindowUnderflow12
-        ",
-        options(noreturn)
+        "
     );
 }
 
@@ -360,7 +349,7 @@ unsafe extern "C" fn _WindowUnderflow4() {
 #[no_mangle]
 #[link_section = ".WindowOverflow8.text"]
 unsafe extern "C" fn _WindowOverflow8() {
-    asm!(
+    naked_asm!(
         "
         s32e    a0, a9, -16
         l32e    a0, a1, -12
@@ -373,8 +362,7 @@ unsafe extern "C" fn _WindowOverflow8() {
         s32e    a6, a0, -24
         s32e    a7, a0, -20
         rfwo
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -382,7 +370,7 @@ unsafe extern "C" fn _WindowOverflow8() {
 #[no_mangle]
 #[link_section = ".WindowUnderflow8.text"]
 unsafe extern "C" fn _WindowUnderflow8() {
-    asm!(
+    naked_asm!(
         "
         l32e    a0, a9, -16
         l32e    a1, a9, -12
@@ -395,8 +383,7 @@ unsafe extern "C" fn _WindowUnderflow8() {
         l32e    a6, a7, -24
         l32e    a7, a7, -20
         rfwu
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -404,7 +391,7 @@ unsafe extern "C" fn _WindowUnderflow8() {
 #[no_mangle]
 #[link_section = ".WindowOverflow12.text"]
 unsafe extern "C" fn _WindowOverflow12() {
-    asm!(
+    naked_asm!(
         "
         s32e    a0,  a13, -16
         l32e    a0,  a1,  -12
@@ -421,8 +408,7 @@ unsafe extern "C" fn _WindowOverflow12() {
         s32e    a10, a0,  -24
         s32e    a11, a0,  -20
         rfwo
-    ",
-        options(noreturn)
+    "
     );
 }
 
@@ -430,7 +416,7 @@ unsafe extern "C" fn _WindowOverflow12() {
 #[no_mangle]
 #[link_section = ".WindowUnderflow12.text"]
 unsafe extern "C" fn _WindowUnderflow12() {
-    asm!(
+    naked_asm!(
         "
         l32e    a0,  a13, -16
         l32e    a1,  a13, -12
@@ -447,7 +433,6 @@ unsafe extern "C" fn _WindowUnderflow12() {
         l32e    a10, a11, -24
         l32e    a11, a11, -20
         rfwu
-    ",
-        options(noreturn)
+    "
     );
 }
