@@ -104,7 +104,7 @@ macro_rules! impl_wifi_event {
 }
 
 impl_wifi_event!(WifiReady);
-impl_wifi_event!(ScanDone);
+impl_wifi_event!(ScanDone, wifi_event_sta_scan_done_t);
 impl_wifi_event!(StaStart);
 impl_wifi_event!(StaStop);
 impl_wifi_event!(StaConnected, wifi_event_sta_connected_t);
@@ -131,13 +131,25 @@ impl_wifi_event!(ApWpsRgFailed, wifi_event_ap_wps_rg_fail_reason_t);
 impl_wifi_event!(ApWpsRgTimeout);
 impl_wifi_event!(ApWpsRgPin, wifi_event_ap_wps_rg_pin_t);
 impl_wifi_event!(ApWpsRgPbcOverlap);
-impl_wifi_event!(ItwtSetup);
-impl_wifi_event!(ItwtTeardown);
-impl_wifi_event!(ItwtProbe);
-impl_wifi_event!(ItwtSuspend);
-impl_wifi_event!(TwtWakeup);
-impl_wifi_event!(BtwtSetup);
-impl_wifi_event!(BtwtTeardown);
+cfg_if::cfg_if! {
+    if #[cfg(wifi6)] {
+        impl_wifi_event!(ItwtSetup, wifi_event_sta_itwt_setup_t);
+        impl_wifi_event!(ItwtTeardown, wifi_event_sta_itwt_teardown_t);
+        impl_wifi_event!(ItwtProbe, wifi_event_sta_itwt_probe_t);
+        impl_wifi_event!(ItwtSuspend, wifi_event_sta_itwt_suspend_t);
+        impl_wifi_event!(TwtWakeup);
+        impl_wifi_event!(BtwtSetup, wifi_event_sta_btwt_setup_t);
+        impl_wifi_event!(BtwtTeardown, wifi_event_sta_btwt_teardown_t);
+    } else {
+        impl_wifi_event!(ItwtSetup);
+        impl_wifi_event!(ItwtTeardown);
+        impl_wifi_event!(ItwtProbe);
+        impl_wifi_event!(ItwtSuspend);
+        impl_wifi_event!(TwtWakeup);
+        impl_wifi_event!(BtwtSetup);
+        impl_wifi_event!(BtwtTeardown);
+    }
+}
 impl_wifi_event!(NanStarted);
 impl_wifi_event!(NanStopped);
 impl_wifi_event!(NanSvcMatch, wifi_event_nan_svc_match_t);
