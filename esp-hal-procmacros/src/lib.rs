@@ -432,6 +432,8 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(BuilderLite)]
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::DeriveInput);
+
+    let span = input.span();
     let ident = input.ident;
 
     let mut fns = Vec::new();
@@ -468,7 +470,12 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
             });
         }
     } else {
-        panic!("#[derive(Builder)] is only defined for structs, not for enums or unions!");
+        return ParseError::new(
+            span,
+            "#[derive(Builder)] is only defined for structs, not for enums or unions!",
+        )
+        .to_compile_error()
+        .into();
     }
 
     let implementation = quote! {
