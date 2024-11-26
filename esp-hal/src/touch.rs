@@ -29,13 +29,13 @@ use core::marker::PhantomData;
 
 use crate::{
     gpio::TouchPin,
+    interrupt::InterruptConfigurable,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, SENS, TOUCH},
     private::{Internal, Sealed},
     rtc_cntl::Rtc,
     Async,
     Blocking,
-    InterruptConfigurable,
     Mode,
 };
 

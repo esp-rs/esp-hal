@@ -131,14 +131,13 @@ use crate::{
         OutputSignal,
         Pull,
     },
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
     system::PeripheralGuard,
     twai::filter::SingleStandardFilter,
     Async,
     Blocking,
-    InterruptConfigurable,
 };
 
 pub mod filter;

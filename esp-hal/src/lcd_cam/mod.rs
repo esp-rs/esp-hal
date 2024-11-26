@@ -12,7 +12,7 @@ use core::marker::PhantomData;
 
 use crate::{
     asynch::AtomicWaker,
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     lcd_cam::{cam::Cam, lcd::Lcd},
     macros::handler,
     peripheral::Peripheral,
@@ -21,7 +21,6 @@ use crate::{
     Async,
     Blocking,
     Cpu,
-    InterruptConfigurable,
 };
 
 /// Represents a combined LCD and Camera interface.

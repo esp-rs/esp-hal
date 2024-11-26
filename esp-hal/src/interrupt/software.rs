@@ -45,7 +45,7 @@
 //! }
 //! ```
 
-use crate::{interrupt::InterruptHandler, InterruptConfigurable};
+use crate::interrupt::{InterruptConfigurable, InterruptHandler};
 
 /// A software interrupt can be triggered by software.
 #[non_exhaustive]

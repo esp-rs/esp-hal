@@ -62,7 +62,13 @@ use procmacros::ram;
 use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
-    interrupt::{self, InterruptHandler, Priority},
+    interrupt::{
+        self,
+        InterruptConfigurable,
+        InterruptHandler,
+        Priority,
+        DEFAULT_INTERRUPT_HANDLER,
+    },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{
         gpio::{handle_gpio_input, handle_gpio_output, AnyPinInner},
@@ -71,8 +77,6 @@ use crate::{
         IO_MUX,
     },
     private::{self, Sealed},
-    InterruptConfigurable,
-    DEFAULT_INTERRUPT_HANDLER,
 };
 
 pub mod interconnect;

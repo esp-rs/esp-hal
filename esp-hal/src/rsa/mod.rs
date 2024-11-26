@@ -24,14 +24,13 @@
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, RSA},
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
     Async,
     Blocking,
     Cpu,
-    InterruptConfigurable,
 };
 
 #[cfg_attr(esp32s2, path = "esp32sX.rs")]

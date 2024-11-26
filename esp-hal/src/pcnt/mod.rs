@@ -95,11 +95,10 @@
 
 use self::unit::Unit;
 use crate::{
-    interrupt::{self, InterruptHandler},
+    interrupt::{self, InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{self, Interrupt},
     system::GenericPeripheralGuard,
-    InterruptConfigurable,
 };
 
 pub mod channel;

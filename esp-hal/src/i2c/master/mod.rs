@@ -51,7 +51,7 @@ use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{
         i2c0::{RegisterBlock, COMD},
@@ -62,7 +62,6 @@ use crate::{
     Async,
     Blocking,
     Cpu,
-    InterruptConfigurable,
     Mode,
 };
 

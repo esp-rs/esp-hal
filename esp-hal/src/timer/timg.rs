@@ -72,13 +72,12 @@ use super::Error;
 use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
-    interrupt::{self, InterruptHandler},
+    interrupt::{self, InterruptConfigurable, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
     sync::{lock, Lock},
     system::PeripheralClockControl,
-    InterruptConfigurable,
 };
 
 const NUM_TIMG: usize = 1 + cfg!(timg1) as usize;

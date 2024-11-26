@@ -825,9 +825,9 @@ mod dma {
             Rx,
             Tx,
         },
+        interrupt::InterruptConfigurable,
         Async,
         Blocking,
-        InterruptConfigurable,
     };
 
     /// A DMA capable SPI instance.
