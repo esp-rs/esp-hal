@@ -180,11 +180,14 @@ pub(crate) unsafe fn handle_raw<Event: EventExt>(
     event_data: *mut crate::binary::c_types::c_void,
     event_data_size: usize,
 ) -> bool {
-    debug_assert_eq!(
-        event_data_size,
-        core::mem::size_of::<Event>(),
-        "wrong size event data"
-    );
+    if event_data_size != core::mem::size_of::<Event>() {
+        warn!(
+            "event data size doesn't match {} != {}",
+            event_data_size,
+            core::mem::size_of::<Event>()
+        );
+    }
+
     handle::<Event>(unsafe { &Event::from_raw_event_data(event_data) })
 }
 
