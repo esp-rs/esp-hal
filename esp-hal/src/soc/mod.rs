@@ -30,7 +30,7 @@ static mut MAPPED_PSRAM: MappedPsram = MappedPsram { memory_range: 0..0 };
 pub(crate) fn psram_range() -> Range<usize> {
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "quad-psram", feature = "octal-psram"))] {
-            unsafe { MAPPED_PSRAM.memory_range.clone() }
+            unsafe { (*&raw mut MAPPED_PSRAM.memory_range).clone() }
         } else {
             0..0
         }

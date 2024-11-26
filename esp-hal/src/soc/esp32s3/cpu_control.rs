@@ -259,6 +259,7 @@ impl<'d> CpuControl<'d> {
     where
         F: FnOnce(),
     {
+        #[allow(static_mut_refs)] // FIXME
         match START_CORE1_FUNCTION.take() {
             Some(entry) => {
                 let entry = unsafe { ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>()) };
