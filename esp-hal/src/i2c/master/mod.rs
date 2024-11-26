@@ -86,6 +86,7 @@ const MAX_ITERATIONS: u32 = 1_000_000;
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Error {
     /// The transmission exceeded the FIFO size.
     ExceedingFifo,
@@ -106,14 +107,15 @@ pub enum Error {
 /// I2C-specific configuration errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum ConfigError {}
 
-#[derive(PartialEq)]
 // This enum is used to keep track of the last/next operation that was/will be
 // performed in an embedded-hal(-async) I2c::transaction. It is used to
 // determine whether a START condition should be issued at the start of the
 // current operation and whether a read needs an ack or a nack for the final
 // byte.
+#[derive(PartialEq)]
 enum OpKind {
     Write,
     Read,
@@ -217,6 +219,7 @@ enum Ack {
     Ack  = 0,
     Nack = 1,
 }
+
 impl From<u32> for Ack {
     fn from(ack: u32) -> Self {
         match ack {
@@ -226,6 +229,7 @@ impl From<u32> for Ack {
         }
     }
 }
+
 impl From<Ack> for u32 {
     fn from(ack: Ack) -> u32 {
         ack as u32
@@ -233,8 +237,9 @@ impl From<Ack> for u32 {
 }
 
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
     pub frequency: HertzU32,
