@@ -90,11 +90,11 @@ mod tests {
         let mut byte_to_write = 0xA5;
         for (baudrate, clock_source) in configs {
             ctx.uart
-                .apply_config(&uart::Config {
-                    baudrate,
-                    clock_source,
-                    ..Default::default()
-                })
+                .apply_config(
+                    &Config::default()
+                        .with_baudrate(baudrate)
+                        .with_clock_source(clock_source),
+                )
                 .unwrap();
             ctx.uart.write(byte_to_write).ok();
             let read = block!(ctx.uart.read());
