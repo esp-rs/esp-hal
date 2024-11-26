@@ -31,6 +31,7 @@ use crate::{
     gpio::TouchPin,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, SENS, TOUCH},
+    prelude::*,
     private::{Internal, Sealed},
     rtc_cntl::Rtc,
     Async,

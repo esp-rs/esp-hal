@@ -221,7 +221,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
             } else if #[cfg(any(esp32c6, esp32h2))] {
                 unsafe { &*crate::peripherals::PCR::PTR }
                     .timergroup1_wdt_clk_conf()
-                    .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(1) });
+                    .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             }
         }
     }
@@ -446,7 +446,15 @@ impl Timer {
     }
 
     fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
-        let ticks = timeout_to_ticks(value, Clocks::get().apb_clock, self.divider());
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+                let clk_src = Clocks::get().pll_48m_clock;
+            } else {
+                let clk_src = Clocks::get().apb_clock;
+            }
+        }
+        let ticks = timeout_to_ticks(value, clk_src, self.divider());
 
         // The counter is 54-bits wide, so we must ensure that the provided
         // value is not too wide:
@@ -485,7 +493,15 @@ impl Timer {
         let value_hi = t.hi().read().bits() as u64;
 
         let ticks = (value_hi << 32) | value_lo;
-        let micros = ticks_to_timeout(ticks, Clocks::get().apb_clock, self.divider());
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+                let clk_src = Clocks::get().pll_48m_clock;
+            } else {
+                let clk_src = Clocks::get().apb_clock;
+            }
+        }
+        let micros = ticks_to_timeout(ticks, clk_src, self.divider());
 
         Instant::<u64, 1, 1_000_000>::from_ticks(micros)
     }

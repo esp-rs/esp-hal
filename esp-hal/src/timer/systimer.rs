@@ -23,13 +23,12 @@ use fugit::{Instant, MicrosDurationU64};
 
 use super::{Error, Timer as _};
 use crate::{
-    interrupt::{self, InterruptHandler},
+    interrupt::{self, InterruptConfigurable, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     sync::{lock, Lock},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Cpu,
-    InterruptConfigurable,
 };
 
 /// The configuration of a unit.

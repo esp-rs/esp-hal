@@ -19,7 +19,7 @@
 //! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
 //! #
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! let one_shot = OneShotTimer::new(timg0.timer0);
+//! let mut one_shot = OneShotTimer::new(timg0.timer0);
 //!
 //! one_shot.delay_millis(500);
 //! # }
@@ -193,6 +193,7 @@ where
         unwrap!(self.schedule(us));
         self.inner.wait().await;
         self.stop();
+        self.clear_interrupt();
     }
 }
 
@@ -202,38 +203,29 @@ where
     T: Timer,
 {
     /// Delay for *at least* `ms` milliseconds.
-    pub fn delay_millis(&self, ms: u32) {
+    pub fn delay_millis(&mut self, ms: u32) {
         self.delay((ms as u64).millis());
     }
 
     /// Delay for *at least* `us` microseconds.
-    pub fn delay_micros(&self, us: u32) {
+    pub fn delay_micros(&mut self, us: u32) {
         self.delay((us as u64).micros());
     }
 
     /// Delay for *at least* `ns` nanoseconds.
-    pub fn delay_nanos(&self, ns: u32) {
+    pub fn delay_nanos(&mut self, ns: u32) {
         self.delay((ns.div_ceil(1000) as u64).micros())
     }
 
-    fn delay(&self, us: MicrosDurationU64) {
-        if self.inner.is_running() {
-            self.inner.stop();
-        }
-
-        self.inner.clear_interrupt();
-        self.inner.reset();
-
-        self.inner.enable_auto_reload(false);
-        self.inner.load_value(us).unwrap();
-        self.inner.start();
+    fn delay(&mut self, us: MicrosDurationU64) {
+        self.schedule(us).unwrap();
 
         while !self.inner.is_interrupt_set() {
             // Wait
         }
 
-        self.inner.stop();
-        self.inner.clear_interrupt();
+        self.stop();
+        self.clear_interrupt();
     }
 
     /// Start counting until the given timeout and raise an interrupt

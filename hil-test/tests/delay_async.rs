@@ -22,7 +22,7 @@ struct Context {
 }
 
 async fn test_async_delay_ns(mut timer: impl DelayNs, duration: u32) {
-    for _ in 1..5 {
+    for i in 1..5 {
         let t1 = esp_hal::time::now();
         timer.delay_ns(duration).await;
         let t2 = esp_hal::time::now();
@@ -30,8 +30,10 @@ async fn test_async_delay_ns(mut timer: impl DelayNs, duration: u32) {
         assert!(t2 > t1);
         assert!(
             (t2 - t1).to_nanos() >= duration as u64,
-            "diff: {:?}",
-            (t2 - t1).to_nanos()
+            "diff[{}]: {:?} >= {}",
+            i,
+            (t2 - t1).to_nanos(),
+            duration
         );
     }
 }

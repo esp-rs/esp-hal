@@ -151,7 +151,6 @@ Timer group timers have been type erased.
 + timg::Timer
 ```
 
-The usage of `esp_alloc::psram_allocator!` remains unchanged.
 ### ETM usage has changed
 
 Timer dependant ETM events should be created _prior_ to initializing the timer with the chosen driver.
