@@ -35,20 +35,6 @@ pub enum Error {
     InvalidResponse,
 }
 
-#[cfg(feature = "embedded-hal")]
-impl embedded_hal::i2c::Error for Error {
-    fn kind(&self) -> embedded_hal::i2c::ErrorKind {
-        use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
-
-        match self {
-            Self::ExceedingFifo => ErrorKind::Overrun,
-            Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
-            Self::AckCheckFailed => ErrorKind::NoAcknowledge(NoAcknowledgeSource::Unknown),
-            _ => ErrorKind::Other,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OperationType {
     Write = 0,
@@ -68,55 +54,6 @@ enum Opcode {
     Read   = 3,
     Stop   = 2,
     End    = 4,
-}
-
-/// LP_I2C operation.
-///
-/// Several operations can be combined as part of a transaction.
-pub enum Operation<'a> {
-    /// Write data from the provided buffer.
-    Write(&'a [u8]),
-
-    /// Read data into the provided buffer.
-    Read(&'a mut [u8]),
-}
-
-impl<'a, 'b> From<&'a mut embedded_hal::i2c::Operation<'b>> for Operation<'a> {
-    fn from(value: &'a mut embedded_hal::i2c::Operation<'b>) -> Self {
-        match value {
-            embedded_hal::i2c::Operation::Write(buffer) => Operation::Write(buffer),
-            embedded_hal::i2c::Operation::Read(buffer) => Operation::Read(buffer),
-        }
-    }
-}
-
-impl<'a, 'b> From<&'a mut Operation<'b>> for Operation<'a> {
-    fn from(value: &'a mut Operation<'b>) -> Self {
-        match value {
-            Operation::Write(buffer) => Operation::Write(buffer),
-            Operation::Read(buffer) => Operation::Read(buffer),
-        }
-    }
-}
-
-impl Operation<'_> {
-    fn is_write(&self) -> bool {
-        matches!(self, Operation::Write(_))
-    }
-
-    fn kind(&self) -> OperationType {
-        match self {
-            Operation::Write(_) => OperationType::Write,
-            Operation::Read(_) => OperationType::Read,
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        match self {
-            Operation::Write(buffer) => buffer.is_empty(),
-            Operation::Read(buffer) => buffer.is_empty(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -250,7 +187,8 @@ pub struct LpI2c {
 }
 
 impl LpI2c {
-    fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+    /// Writes bytes to slave with address `addr`
+    pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
         let mut cmd_iterator = CommandRegister::COMD0;
 
         // If SCL is busy, reset the Master FSM
@@ -335,7 +273,8 @@ impl LpI2c {
         Ok(())
     }
 
-    fn master_read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    /// Reads enough bytes from slave with `addr` to fill `buffer`
+    pub fn read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
         // Check size constraints
         if buffer.len() > 254 {
             return Err(Error::ExceedingFifo);
@@ -433,17 +372,14 @@ impl LpI2c {
         Ok(())
     }
 
-    fn master_write_read(
-        &mut self,
-        addr: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
-    ) -> Result<(), Error> {
+    /// Writes bytes to slave with address `addr` and then reads enough bytes
+    /// to fill `buffer` *in a single transaction*
+    pub fn write_read(&mut self, addr: u8, bytes: &[u8], buffer: &mut [u8]) -> Result<(), Error> {
         // It would be possible to combine the write and read in one transaction, but
         // filling the tx fifo with the current code is somewhat slow even in release
         // mode which can cause issues.
-        self.master_write(addr, bytes)?;
-        self.master_read(addr, buffer)?;
+        self.write(addr, bytes)?;
+        self.read(addr, buffer)?;
 
         Ok(())
     }
@@ -529,74 +465,5 @@ impl LpI2c {
         command_register.advance();
 
         Ok(())
-    }
-
-    fn transaction_impl<'a>(
-        &mut self,
-        address: u8,
-        operations: impl Iterator<Item = Operation<'a>>,
-    ) -> Result<(), Error> {
-        let mut last_op: Option<OperationType> = None;
-        // filter out 0 length read operations
-        let mut op_iter = operations
-            .filter(|op| op.is_write() || !op.is_empty())
-            .peekable();
-
-        while let Some(op) = op_iter.next() {
-            let next_op = op_iter.peek().map(|v| v.kind());
-            let kind = op.kind();
-            match op {
-                Operation::Write(buffer) => {
-                    // execute a write operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    self.master_write(address, buffer)?;
-                }
-                Operation::Read(buffer) => {
-                    // execute a read operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    // - will_continue is true if there is another read operation next
-                    self.master_read(address, buffer)?;
-                }
-            }
-
-            last_op = Some(kind);
-        }
-
-        Ok(())
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl embedded_hal::i2c::ErrorType for LpI2c {
-    type Error = Error;
-}
-
-#[cfg(feature = "embedded-hal")]
-impl embedded_hal::i2c::I2c for LpI2c {
-    fn transaction(
-        &mut self,
-        address: u8,
-        operations: &mut [embedded_hal::i2c::Operation<'_>],
-    ) -> Result<(), Self::Error> {
-        self.transaction_impl(address, operations.iter_mut().map(Operation::from))
-    }
-
-    fn read(&mut self, address: u8, read: &mut [u8]) -> Result<(), Self::Error> {
-        self.master_read(address, read)
-    }
-
-    fn write(&mut self, addr: u8, write: &[u8]) -> Result<(), Self::Error> {
-        self.master_write(addr, write)
-    }
-
-    fn write_read(
-        &mut self,
-        address: u8,
-        write: &[u8],
-        read: &mut [u8],
-    ) -> Result<(), Self::Error> {
-        self.master_write_read(address, write, read)
     }
 }

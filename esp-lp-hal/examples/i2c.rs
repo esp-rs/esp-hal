@@ -12,7 +12,6 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal::i2c::I2c;
 use esp_lp_hal::{i2c::LpI2c, prelude::*};
 use panic_halt as _;
 
