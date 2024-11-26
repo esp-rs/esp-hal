@@ -91,7 +91,7 @@ mod tests {
         for (baudrate, clock_source) in configs {
             ctx.uart
                 .apply_config(
-                    &Config::default()
+                    &uart::Config::default()
                         .with_baudrate(baudrate)
                         .with_clock_source(clock_source),
                 )
