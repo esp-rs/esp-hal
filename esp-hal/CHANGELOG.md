@@ -36,11 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TimerGroup` `Timer`s are now type erased (#2581)
 - PSRAM is now initialized automatically if `quad-psram` or `octal-psram` is enabled (#2546)
 - DMA channels are now available via the `Peripherals` struct, and have been renamed accordingly. (#2545)
+- Moved interrupt related items from lib.rs, moved to the `interrupt` module (#2613)
 
 ### Fixed
 
 - Xtensa devices now correctly enable the `esp-hal-procmacros/rtc-slow` feature (#2594)
-- Removed interrupt related items from lib.rs, moved to the `interrupt` module (#2613)
 
 ### Removed
 

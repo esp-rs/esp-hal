@@ -100,7 +100,7 @@ pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
 );
 
 /// Trait implemented by drivers which allow the user to set an
-/// [interrupt::InterruptHandler]
+/// [InterruptHandler]
 pub trait InterruptConfigurable: crate::private::Sealed {
     /// Set the interrupt handler
     ///
