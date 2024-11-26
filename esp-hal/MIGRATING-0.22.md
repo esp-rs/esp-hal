@@ -184,3 +184,12 @@ Analogs of all traits from the above mentioned version are available in `embedde
 
 You might also want to check the full official `embedded-hal` migration guide:
 https://github.com/rust-embedded/embedded-hal/blob/master/docs/migrating-from-0.2-to-1.0.md
+
+## Interrupt related reshuffle
+
+```diff
+- use esp_hal::InterruptConfigurable;
+- use esp_hal::DEFAULT_INTERRUPT_HANDLER;
++ use esp_hal::interrupt::InterruptConfigurable;
++ use esp_hal::interrupt::DEFAULT_INTERRUPT_HANDLER;
+```
