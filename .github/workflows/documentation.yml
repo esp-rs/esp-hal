@@ -36,6 +36,7 @@ jobs:
         with:
           default: true
           ldproxy: false
+          version: 1.83.0.0
 
       - name: Checkout repository
         uses: actions/checkout@v4
