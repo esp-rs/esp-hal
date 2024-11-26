@@ -158,6 +158,40 @@ impl Display for RegionStats {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for RegionStats {
+    fn format(&self, fmt: defmt::Formatter) {
+        let used_blocks = BAR_WIDTH * self.used / self.size;
+        let free_blocks = BAR_WIDTH - used_blocks;
+
+        if self.capabilities.contains(MemoryCapability::Internal) {
+            defmt::write!(fmt, "Internal");
+        } else if self.capabilities.contains(MemoryCapability::External) {
+            defmt::write!(fmt, "External");
+        } else {
+            defmt::write!(fmt, "Unknown");
+        }
+
+        defmt::write!(fmt, " | ");
+
+        for _ in 0..used_blocks {
+            defmt::write!(fmt, "█");
+        }
+        for _ in 0..free_blocks {
+            defmt::write!(fmt, "░");
+        }
+
+        defmt::write!(
+            fmt,
+            " | Used: {} / Total: {} (Free: {})",
+            self.used,
+            self.size,
+            self.free
+        );
+    }
+}
+
+
 /// A memory region to be used as heap memory
 pub struct HeapRegion {
     heap: Heap,
@@ -250,6 +284,33 @@ impl Display for HeapStats {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for HeapStats {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "HEAP INFO\n");
+        defmt::write!(fmt, "Size: {}\n", self.size);
+        defmt::write!(fmt, "Current usage: {}\n", self.current_usage);
+        #[cfg(feature = "internal-heap-stats")]
+        {
+            defmt::write!(fmt, "Max usage: {}\n", self.max_usage);
+            defmt::write!(fmt, "Total freed: {}\n", self.total_freed);
+            defmt::write!(fmt, "Total allocated: {}\n", self.total_allocated);
+        }
+        defmt::write!(fmt, "Memory Layout:\n");
+        for region in self.region_stats.iter() {
+            if let Some(region) = region.as_ref() {
+                defmt::write!(fmt, "{}\n", region);
+            } else {
+                defmt::write!(fmt, "Unused   | ");
+                for _ in 0..BAR_WIDTH {
+                    defmt::write!(fmt, "░");
+                }
+                defmt::write!(fmt, " |\n");
+            }
+        }
     }
 }
 
