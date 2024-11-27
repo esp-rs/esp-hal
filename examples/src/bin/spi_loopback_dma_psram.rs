@@ -90,11 +90,9 @@ fn main() -> ! {
     // output connection (because we are using the same pin to loop back)
     let mut spi = Spi::new_with_config(
         peripherals.SPI2,
-        Config {
-            frequency: 100.kHz(),
-            mode: SpiMode::Mode0,
-            ..Config::default()
-        },
+        Config::default()
+            .with_frequency(100.kHz())
+            .with_mode(SpiMode::Mode0),
     )
     .with_sck(sclk)
     .with_miso(miso)

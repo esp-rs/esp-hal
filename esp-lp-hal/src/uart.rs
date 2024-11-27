@@ -231,28 +231,6 @@ impl core::fmt::Write for LpUart {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
-impl embedded_hal_02::serial::Read<u8> for LpUart {
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl embedded_hal_02::serial::Write<u8> for LpUart {
-    type Error = Error;
-
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx()
-    }
-}
-
 #[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::ErrorType for LpUart {
     type Error = Error;

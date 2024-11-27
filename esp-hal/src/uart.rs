@@ -244,6 +244,7 @@ const UART_FIFO_SIZE: u16 = 128;
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Error {
     /// An invalid configuration argument was provided.
     ///
@@ -289,21 +290,23 @@ impl embedded_io::Error for Error {
 
 // (outside of `config` module in order not to "use" it an extra time)
 /// UART clock source
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockSource {
     /// APB_CLK clock source (default for UART on all the chips except of
     /// esp32c6 and esp32h2)
+    #[cfg_attr(not(any(esp32c6, esp32h2, lp_uart)), default)]
     Apb,
-    #[cfg(not(any(esp32, esp32s2)))]
     /// RC_FAST_CLK clock source (17.5 MHz)
-    RcFast,
     #[cfg(not(any(esp32, esp32s2)))]
+    RcFast,
     /// XTAL_CLK clock source (default for UART on esp32c6 and esp32h2 and
     /// LP_UART)
+    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg_attr(any(esp32c6, esp32h2, lp_uart), default)]
     Xtal,
-    #[cfg(any(esp32, esp32s2))]
     /// REF_TICK clock source (derived from XTAL or RC_FAST, 1MHz)
+    #[cfg(any(esp32, esp32s2))]
     RefTick,
 }
 
@@ -317,7 +320,7 @@ const UART_TOUT_THRESH_DEFAULT: u8 = 10;
 /// This enum represents the various configurations for the number of data
 /// bits used in UART communication. The number of data bits defines the
 /// length of each transmitted or received data frame.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DataBits {
     /// 5 data bits per frame.
@@ -327,6 +330,7 @@ pub enum DataBits {
     /// 7 data bits per frame.
     DataBits7 = 2,
     /// 8 data bits per frame (most common).
+    #[default]
     DataBits8 = 3,
 }
 
@@ -336,10 +340,11 @@ pub enum DataBits {
 /// ensure that the data has not been corrupted during transmission. The
 /// parity bit is added to the data bits to make the number of 1-bits
 /// either even or odd.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Parity {
     /// No parity bit is used (most common).
+    #[default]
     ParityNone,
     /// Even parity: the parity bit is set to make the total number of
     /// 1-bits even.
@@ -354,10 +359,11 @@ pub enum Parity {
 /// The stop bit(s) signal the end of a data packet in UART communication.
 /// This enum defines the possible configurations for the number of stop
 /// bits.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum StopBits {
     /// 1 stop bit.
+    #[default]
     STOP1   = 1,
     /// 1.5 stop bits.
     STOP1P5 = 2,
@@ -366,8 +372,9 @@ pub enum StopBits {
 }
 
 /// UART Configuration
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct Config {
     /// The baud rate (speed) of the UART communication in bits per second
     /// (bps).
@@ -467,18 +474,10 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             baudrate: 115_200,
-            data_bits: DataBits::DataBits8,
-            parity: Parity::ParityNone,
-            stop_bits: StopBits::STOP1,
-            clock_source: {
-                cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c6, esp32h2, lp_uart))] {
-                        ClockSource::Xtal
-                    } else {
-                        ClockSource::Apb
-                    }
-                }
-            },
+            data_bits: Default::default(),
+            parity: Default::default(),
+            stop_bits: Default::default(),
+            clock_source: Default::default(),
             rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
             rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
         }
@@ -1158,6 +1157,7 @@ where
 /// List of exposed UART events.
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum UartInterrupt {
     /// Indicates that the received has detected the configured
     /// [`Uart::set_at_cmd`] character.
@@ -1589,12 +1589,13 @@ where
     }
 }
 
-#[derive(EnumSetType, Debug)]
+#[derive(Debug, EnumSetType)]
 pub(crate) enum TxEvent {
     TxDone,
     TxFiFoEmpty,
 }
-#[derive(EnumSetType, Debug)]
+
+#[derive(Debug, EnumSetType)]
 pub(crate) enum RxEvent {
     FifoFull,
     CmdCharDetected,
@@ -1705,6 +1706,7 @@ struct UartTxFuture {
     state: &'static State,
     registered: bool,
 }
+
 impl UartTxFuture {
     fn new(uart: impl Peripheral<P = impl Instance>, events: impl Into<EnumSet<TxEvent>>) -> Self {
         crate::into_ref!(uart);

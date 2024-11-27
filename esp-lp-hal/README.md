@@ -12,7 +12,7 @@ Implements a number of blocking and, where applicable, async traits from the var
 
 For help getting started with this HAL, please refer to [The Rust on ESP Book] and the [documentation].
 
-[embedded-hal]: https://github.com/rust-embedded/embedded-hal
+[embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 [the rust on esp book]: https://docs.esp-rs.org/book/
 
 ## [Documentation]

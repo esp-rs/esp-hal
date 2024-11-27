@@ -36,8 +36,7 @@ use esp_hal::{
     delay::Delay,
     dma_loop_buffer,
     gpio::{Level, Output},
-    i2c,
-    i2c::master::I2c,
+    i2c::{self, master::I2c},
     lcd_cam::{
         lcd::{
             dpi::{Config, Dpi, Format, FrameTiming},
@@ -61,10 +60,7 @@ fn main() -> ! {
 
     let i2c = I2c::new(
         peripherals.I2C0,
-        i2c::master::Config {
-            frequency: 400.kHz(),
-            ..Default::default()
-        },
+        i2c::master::Config::default().with_frequency(400.kHz()),
     )
     .with_sda(peripherals.GPIO47)
     .with_scl(peripherals.GPIO48);
