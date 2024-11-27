@@ -257,9 +257,14 @@ mod peripheral_macros {
                 ),* $(,)?
             ]
         ) => {
+            use portable_atomic::Ordering;
+
 
             /// Contains the generated peripherals which implement [`Peripheral`]
             mod peripherals {
+                use portable_atomic::AtomicBool;
+                pub(crate) static INITIALIZED: AtomicBool = AtomicBool::new(false);
+
                 pub use super::pac::*;
                 $(
                     $crate::create_peripheral!($name <= $from_pac);
@@ -295,17 +300,13 @@ mod peripheral_macros {
                 impl Peripherals {
                     /// Returns all the peripherals *once*
                     #[inline]
-                    pub(crate) fn take() -> Self {
-                        #[no_mangle]
-                        static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
-
-                        critical_section::with(|_| unsafe {
-                            if _ESP_HAL_DEVICE_PERIPHERALS {
-                                panic!("init called more than once!")
-                            }
-                            _ESP_HAL_DEVICE_PERIPHERALS = true;
-                            Self::steal()
-                        })
+                    pub(crate) fn try_take() -> Option<Self> {
+                        if let Ok(_) = peripherals::INITIALIZED.compare_exchange(false, true,
+                            Ordering::Acquire, Ordering::Relaxed) {
+                            Some(unsafe { Self::steal() })
+                        } else {
+                            None
+                        }
                     }
 
                     /// Unsafely create an instance of this peripheral out of thin air.

@@ -107,4 +107,19 @@ mod tests {
         let delay = Delay::new();
         delay.delay(2000.millis());
     }
+
+    #[test]
+    #[timeout(3)]
+    fn test_init_then_try_init() {
+        esp_hal::init(Config::default());
+
+        esp_hal::try_init(Config::default());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_try_init_then_init() {
+        esp_hal::try_init(Config::default());
+        esp_hal::init(Config::default());
+    }
 }

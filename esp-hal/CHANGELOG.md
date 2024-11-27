@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `esp_hal::psram::psram_raw_parts` (#2546)
 - The timer drivers `OneShotTimer` & `PeriodicTimer` have `into_async` and `new_typed` methods (#2586)
 - `timer::Timer` trait has three new methods, `wait`, `async_interrupt_handler` and `peripheral_interrupt` (#2586)
+- Configuration structs in the I2C, SPI, and UART drivers now implement the Builder Lite pattern (#2614)
+- Improve safety for verifying `init` is only called once, 
+  add `try_init` function for safely initializing peripheral when they may already have been (#2618)
 
 ### Changed
 
@@ -42,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The timer drivers `OneShotTimer` & `PeriodicTimer` now have a `Mode` parameter and type erase the underlying driver by default (#2586)
 - `timer::Timer` has new trait requirements of `Into<AnyTimer>`, `'static` and `InterruptConfigurable` (#2586)
 - `systimer::etm::Event` no longer borrows the alarm indefinitely (#2586)
+- A number of public enums and structs in the I2C, SPI, and UART drivers have been marked with `#[non_exhaustive]` (#2614)
 
 ### Fixed
 
