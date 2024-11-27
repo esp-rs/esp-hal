@@ -100,6 +100,19 @@ const NON_REGION: Option<HeapRegion> = None;
 
 const BAR_WIDTH: usize = 35;
 
+fn write_bar(f: &mut core::fmt::Formatter<'_>, usage_percent: usize) -> core::fmt::Result {
+    let used_blocks = BAR_WIDTH * usage_percent / 100;
+    (0..used_blocks).try_for_each(|_| write!(f, "█"))?;
+    (0..BAR_WIDTH - used_blocks).try_for_each(|_| write!(f, "░"))
+}
+
+#[cfg(feature = "defmt")]
+fn write_bar_defmt(fmt: defmt::Formatter, usage_percent: usize) {
+    let used_blocks = BAR_WIDTH * usage_percent / 100;
+    (0..used_blocks).for_each(|_| defmt::write!(fmt, "█"));
+    (0..BAR_WIDTH - used_blocks).for_each(|_| defmt::write!(fmt, "░"));
+}
+
 #[derive(EnumSetType, Debug)]
 /// Describes the properties of a memory region
 pub enum MemoryCapability {
@@ -128,8 +141,7 @@ pub struct RegionStats {
 
 impl Display for RegionStats {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let used_blocks = BAR_WIDTH * self.used / self.size;
-        let free_blocks = BAR_WIDTH - used_blocks;
+        let usage_percent = self.used * 100 / self.size;
 
         // Display Memory type
         if self.capabilities.contains(MemoryCapability::Internal) {
@@ -142,18 +154,12 @@ impl Display for RegionStats {
 
         write!(f, " | ")?;
 
-        // Display usage of the memory region using a bar graph.
-        for _ in 0..used_blocks {
-            write!(f, "█")?;
-        }
-        for _ in 0..free_blocks {
-            write!(f, "░")?;
-        }
+        write_bar(f, usage_percent)?;
 
         write!(
             f,
-            " | Used: {} / Total: {} (Free: {})",
-            self.used, self.size, self.free
+            " | Used: {}% (Used {} of {}, free: {})",
+            usage_percent, self.used, self.size, self.free
         )
     }
 }
@@ -161,8 +167,7 @@ impl Display for RegionStats {
 #[cfg(feature = "defmt")]
 impl defmt::Format for RegionStats {
     fn format(&self, fmt: defmt::Formatter) {
-        let used_blocks = BAR_WIDTH * self.used / self.size;
-        let free_blocks = BAR_WIDTH - used_blocks;
+        let usage_percent = self.used * 100 / self.size;
 
         if self.capabilities.contains(MemoryCapability::Internal) {
             defmt::write!(fmt, "Internal");
@@ -174,16 +179,12 @@ impl defmt::Format for RegionStats {
 
         defmt::write!(fmt, " | ");
 
-        for _ in 0..used_blocks {
-            defmt::write!(fmt, "█");
-        }
-        for _ in 0..free_blocks {
-            defmt::write!(fmt, "░");
-        }
+        write_bar_defmt(fmt, usage_percent);
 
         defmt::write!(
             fmt,
-            " | Used: {} / Total: {} (Free: {})",
+            " | Used: {}% (Used {} of {}, free: {})",
+            usage_percent,
             self.used,
             self.size,
             self.free
@@ -276,9 +277,7 @@ impl Display for HeapStats {
             } else {
                 // Display unused memory regions
                 write!(f, "Unused   | ")?;
-                for _ in 0..BAR_WIDTH {
-                    write!(f, "░")?;
-                }
+                write_bar(f, 0)?;
                 writeln!(f, " |")?;
             }
         }
@@ -304,9 +303,7 @@ impl defmt::Format for HeapStats {
                 defmt::write!(fmt, "{}\n", region);
             } else {
                 defmt::write!(fmt, "Unused   | ");
-                for _ in 0..BAR_WIDTH {
-                    defmt::write!(fmt, "░");
-                }
+                write_bar_defmt(fmt, 0);
                 defmt::write!(fmt, " |\n");
             }
         }
