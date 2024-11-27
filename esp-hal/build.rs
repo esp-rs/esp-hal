@@ -14,7 +14,7 @@ use esp_metadata::{Chip, Config};
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-check-cfg=cfg(is_debug_build)");
     if let Ok(level) = std::env::var("OPT_LEVEL") {
-        if level != "2" && level != "3" {
+        if level == "0" || level == "1" {
             println!("cargo:rustc-cfg=is_debug_build");
         }
     }
