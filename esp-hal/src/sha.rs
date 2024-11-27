@@ -102,7 +102,7 @@ impl<'d> Sha<'d> {
 impl crate::private::Sealed for Sha<'_> {}
 
 #[cfg(not(esp32))]
-impl crate::InterruptConfigurable for Sha<'_> {
+impl crate::interrupt::InterruptConfigurable for Sha<'_> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::SHA);

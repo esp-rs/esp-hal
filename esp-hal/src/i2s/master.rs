@@ -99,12 +99,11 @@ use crate::{
         WriteBuffer,
     },
     gpio::interconnect::PeripheralOutput,
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralGuard,
     Async,
     Blocking,
-    InterruptConfigurable,
     Mode,
 };
 

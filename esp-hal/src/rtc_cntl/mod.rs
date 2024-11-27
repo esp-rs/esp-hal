@@ -49,7 +49,6 @@
 //! # use esp_hal::rtc_cntl::Rtc;
 //! # use esp_hal::rtc_cntl::Rwdt;
 //! # use esp_hal::rtc_cntl::RwdtStage;
-//! # use crate::esp_hal::InterruptConfigurable;
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 //!
 //! let mut delay = Delay::new();
@@ -126,12 +125,11 @@ use crate::peripherals::{LP_AON, LP_TIMER, LP_WDT};
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
-    interrupt::{self, InterruptHandler},
+    interrupt::{self, InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     reset::{SleepSource, WakeupReason},
     Cpu,
-    InterruptConfigurable,
 };
 // only include sleep where it's been implemented
 #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]

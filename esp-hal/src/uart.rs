@@ -229,14 +229,13 @@ use crate::{
         OutputSignal,
         Pull,
     },
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{uart0::RegisterBlock, Interrupt},
     private::Internal,
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
-    InterruptConfigurable,
     Mode,
 };
 

@@ -228,6 +228,7 @@ use fugit::HertzU32;
 use crate::{
     asynch::AtomicWaker,
     gpio::interconnect::{PeripheralInput, PeripheralOutput},
+    interrupt::InterruptConfigurable,
     macros::handler,
     peripheral::Peripheral,
     peripherals::Interrupt,
@@ -235,7 +236,6 @@ use crate::{
     system::{self, GenericPeripheralGuard},
     Async,
     Blocking,
-    InterruptConfigurable,
 };
 
 /// Errors

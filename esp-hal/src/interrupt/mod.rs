@@ -81,6 +81,38 @@ mod xtensa;
 
 pub mod software;
 
+#[cfg(xtensa)]
+#[no_mangle]
+extern "C" fn EspDefaultHandler(_level: u32, _interrupt: crate::peripherals::Interrupt) {
+    panic!("Unhandled level {} interrupt: {:?}", _level, _interrupt);
+}
+
+#[cfg(riscv)]
+#[no_mangle]
+extern "C" fn EspDefaultHandler(_interrupt: crate::peripherals::Interrupt) {
+    panic!("Unhandled interrupt: {:?}", _interrupt);
+}
+
+/// Default (unhandled) interrupt handler
+pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
+    unsafe { core::mem::transmute::<*const (), extern "C" fn()>(EspDefaultHandler as *const ()) },
+    Priority::min(),
+);
+
+/// Trait implemented by drivers which allow the user to set an
+/// [InterruptHandler]
+pub trait InterruptConfigurable: crate::private::Sealed {
+    /// Set the interrupt handler
+    ///
+    /// Note that this will replace any previously registered interrupt handler.
+    /// Some peripherals offer a shared interrupt handler for multiple purposes.
+    /// It's the users duty to honor this.
+    ///
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [DEFAULT_INTERRUPT_HANDLER]
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler);
+}
+
 /// An interrupt handler
 #[cfg_attr(
     multi_core,

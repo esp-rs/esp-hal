@@ -14,9 +14,9 @@
 use embassy_time::{Duration, Timer};
 use esp_hal::{
     gpio::{AnyPin, Input, Io, Level, Output, Pull},
+    interrupt::InterruptConfigurable,
     macros::handler,
     timer::timg::TimerGroup,
-    InterruptConfigurable,
 };
 use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};

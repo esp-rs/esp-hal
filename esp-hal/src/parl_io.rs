@@ -156,13 +156,12 @@ use crate::{
         interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
         NoPin,
     },
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{self, Peripheral},
     peripherals::{Interrupt, PARL_IO},
     system::{self, GenericPeripheralGuard},
     Async,
     Blocking,
-    InterruptConfigurable,
     Mode,
 };
 

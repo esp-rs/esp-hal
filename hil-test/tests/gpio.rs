@@ -12,9 +12,9 @@ use critical_section::Mutex;
 use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, Input, Io, Level, Output, Pin, Pull},
+    interrupt::InterruptConfigurable,
     macros::handler,
     timer::timg::TimerGroup,
-    InterruptConfigurable,
 };
 use hil_test as _;
 

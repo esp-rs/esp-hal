@@ -43,9 +43,8 @@
 use fugit::{ExtU64, Instant, MicrosDurationU64};
 
 use crate::{
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
-    InterruptConfigurable,
 };
 
 #[cfg(systimer)]
