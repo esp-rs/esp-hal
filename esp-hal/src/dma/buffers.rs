@@ -13,7 +13,7 @@ cfg_if::cfg_if! {
         /// Burst size used when transferring to and from external memory.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum ExternalBurstSize {
+        pub enum ExternalBurstConfig {
             /// 16 bytes
             Size16 = 16,
 
@@ -24,12 +24,12 @@ cfg_if::cfg_if! {
             Size64 = 64,
         }
 
-        impl ExternalBurstSize {
+        impl ExternalBurstConfig {
             /// The default external memory burst length.
             pub const DEFAULT: Self = Self::Size16;
         }
 
-        impl Default for ExternalBurstSize {
+        impl Default for ExternalBurstConfig {
             fn default() -> Self {
                 Self::DEFAULT
             }
@@ -38,7 +38,7 @@ cfg_if::cfg_if! {
         /// Internal memory access burst mode.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum InternalBurstTransfer {
+        pub enum InternalBurstConfig {
             /// Burst mode is disabled.
             Disabled,
 
@@ -46,12 +46,12 @@ cfg_if::cfg_if! {
             Enabled,
         }
 
-        impl InternalBurstTransfer {
+        impl InternalBurstConfig {
             /// The default internal burst mode configuration.
             pub const DEFAULT: Self = Self::Disabled;
         }
 
-        impl Default for InternalBurstTransfer {
+        impl Default for InternalBurstConfig {
             fn default() -> Self {
                 Self::DEFAULT
             }
@@ -64,19 +64,19 @@ cfg_if::cfg_if! {
             /// Configures the burst size for PSRAM transfers.
             ///
             /// Burst mode is always enabled for PSRAM transfers.
-            pub external: ExternalBurstSize,
+            pub external: ExternalBurstConfig,
 
             /// Enables or disables the burst mode for internal memory transfers.
             ///
             /// The burst size is not configurable.
-            pub internal: InternalBurstTransfer,
+            pub internal: InternalBurstConfig,
         }
 
         impl BurstConfig {
             /// The default burst mode configuration.
             pub const DEFAULT: Self = Self {
-                external: ExternalBurstSize::DEFAULT,
-                internal: InternalBurstTransfer::DEFAULT,
+                external: ExternalBurstConfig::DEFAULT,
+                internal: InternalBurstConfig::DEFAULT,
             };
         }
 
@@ -108,19 +108,19 @@ cfg_if::cfg_if! {
             }
         }
 
-        type InternalBurstTransfer = BurstConfig;
+        type InternalBurstConfig = BurstConfig;
     }
 }
 
 #[cfg(psram_dma)]
-impl ExternalBurstSize {
+impl ExternalBurstConfig {
     const fn min_psram_alignment(self, direction: TransferDirection) -> usize {
-        // S2: Specifically, size and buffer address pointer in receive descriptors
+        // S2 TRM: Specifically, size and buffer address pointer in receive descriptors
         // should be 16-byte, 32-byte or 64-byte aligned. For data frame whose
         // length is not a multiple of 16 bytes, 32 bytes, or 64 bytes, EDMA adds
         // padding bytes to the end.
 
-        // S3: Size and Address for IN transfers must be block aligned. For receive
+        // S3 TRM: Size and Address for IN transfers must be block aligned. For receive
         // descriptors, if the data length received are not aligned with block size,
         // GDMA will pad the data received with 0 until they are aligned to
         // initiate burst transfer. You can read the length field in receive descriptors
@@ -128,17 +128,17 @@ impl ExternalBurstSize {
         if matches!(direction, TransferDirection::In) {
             self as usize
         } else {
-            // S2: Size, length and buffer address pointer in transmit descriptors are not
-            // necessarily aligned with block size.
+            // S2 TRM: Size, length and buffer address pointer in transmit descriptors are
+            // not necessarily aligned with block size.
 
-            // S3: Size, length, and buffer address pointer in transmit descriptors do not
-            // need to be aligned.
+            // S3 TRM: Size, length, and buffer address pointer in transmit descriptors do
+            // not need to be aligned.
             1
         }
     }
 }
 
-impl InternalBurstTransfer {
+impl InternalBurstConfig {
     pub(super) fn is_burst_enabled(self) -> bool {
         !matches!(self, Self::Disabled)
     }
@@ -455,10 +455,6 @@ impl DmaTxBuf {
     }
 
     /// Configures the DMA to use burst transfers to access this buffer.
-    ///
-    /// Note that the hardware is allowed to ignore this setting. If you attempt
-    /// to use burst transfers with improperly aligned buffers, starting the
-    /// transfer will result in [`DmaError::InvalidAlignment`].
     pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
         let len = self.len();
         self.configure(burst, len)
@@ -534,7 +530,6 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
 
         cfg_if::cfg_if! {
             if #[cfg(psram_dma)] {
-                // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram {
                     unsafe {
@@ -614,10 +609,6 @@ impl DmaRxBuf {
     }
 
     /// Configures the DMA to use burst transfers to access this buffer.
-    ///
-    /// Note that the hardware is allowed to ignore this setting. If you attempt
-    /// to use burst transfers with improperly aligned buffers, starting the
-    /// transfer will result in [`DmaError::InvalidAlignment`].
     pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
         let len = self.len();
         self.configure(burst, len)
@@ -812,10 +803,6 @@ impl DmaRxTxBuf {
     }
 
     /// Configures the DMA to use burst transfers to access this buffer.
-    ///
-    /// Note that the hardware is allowed to ignore this setting. If you attempt
-    /// to use burst transfers with improperly aligned buffers, starting the
-    /// transfer will result in [`DmaError::InvalidAlignment`].
     pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
         let len = self.len();
         self.configure(burst, len)

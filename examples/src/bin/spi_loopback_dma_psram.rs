@@ -25,7 +25,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{BurstConfig, DmaRxBuf, DmaTxBuf, ExternalBurstSize},
+    dma::{BurstConfig, DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
     peripheral::Peripheral,
     prelude::*,
     spi::{
@@ -51,7 +51,7 @@ macro_rules! dma_alloc_buffer {
 }
 
 const DMA_BUFFER_SIZE: usize = 8192;
-const DMA_ALIGNMENT: ExternalBurstSize = ExternalBurstSize::Size64;
+const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
 const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
 #[entry]

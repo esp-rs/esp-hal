@@ -363,26 +363,6 @@ impl DmaDescriptor {
             true => Owner::Dma,
         }
     }
-
-    fn iter(&self) -> impl Iterator<Item = &DmaDescriptor> {
-        core::iter::successors(Some(self), |d| {
-            if d.next.is_null() {
-                None
-            } else {
-                Some(unsafe { &*d.next })
-            }
-        })
-    }
-
-    fn iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor> {
-        core::iter::successors(Some(self), |d| {
-            if d.next.is_null() {
-                None
-            } else {
-                Some(unsafe { &mut *d.next })
-            }
-        })
-    }
 }
 
 // The pointers in the descriptor can be Sent.
@@ -1131,15 +1111,28 @@ impl<'a> DescriptorSet<'a> {
 
     /// Returns an iterator over the linked descriptors.
     fn linked_iter(&self) -> impl Iterator<Item = &DmaDescriptor> {
-        self.descriptors.first().into_iter().flat_map(|d| d.iter())
+        let mut was_last = false;
+        self.descriptors.iter().take_while(move |d| {
+            if was_last {
+                false
+            } else {
+                was_last = d.next.is_null();
+                true
+            }
+        })
     }
 
     /// Returns an iterator over the linked descriptors.
     fn linked_iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor> {
-        self.descriptors
-            .first_mut()
-            .into_iter()
-            .flat_map(|d| d.iter_mut())
+        let mut was_last = false;
+        self.descriptors.iter_mut().take_while(move |d| {
+            if was_last {
+                false
+            } else {
+                was_last = d.next.is_null();
+                true
+            }
+        })
     }
 
     /// Associate each descriptor with a chunk of the buffer.
@@ -1283,12 +1276,12 @@ pub enum DmaExtMemBKSize {
 }
 
 #[cfg(psram_dma)]
-impl From<ExternalBurstSize> for DmaExtMemBKSize {
-    fn from(size: ExternalBurstSize) -> Self {
+impl From<ExternalBurstConfig> for DmaExtMemBKSize {
+    fn from(size: ExternalBurstConfig) -> Self {
         match size {
-            ExternalBurstSize::Size16 => DmaExtMemBKSize::Size16,
-            ExternalBurstSize::Size32 => DmaExtMemBKSize::Size32,
-            ExternalBurstSize::Size64 => DmaExtMemBKSize::Size64,
+            ExternalBurstConfig::Size16 => DmaExtMemBKSize::Size16,
+            ExternalBurstConfig::Size32 => DmaExtMemBKSize::Size32,
+            ExternalBurstConfig::Size64 => DmaExtMemBKSize::Size64,
         }
     }
 }
@@ -1759,9 +1752,6 @@ pub trait Rx: crate::private::Sealed {
 
     fn stop_transfer(&mut self);
 
-    #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
-
     #[cfg(gdma)]
     fn set_mem2mem_mode(&mut self, value: bool);
 
@@ -1923,7 +1913,8 @@ where
         }
 
         #[cfg(psram_dma)]
-        self.set_ext_mem_block_size(preparation.burst_transfer.external.into());
+        self.rx_impl
+            .set_ext_mem_block_size(preparation.burst_transfer.external.into());
         self.rx_impl.set_burst_mode(preparation.burst_transfer);
         self.rx_impl.set_descr_burst_mode(true);
         self.rx_impl.set_check_owner(preparation.check_owner);
@@ -2021,11 +2012,6 @@ where
         self.rx_impl.stop()
     }
 
-    #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.rx_impl.set_ext_mem_block_size(size);
-    }
-
     #[cfg(gdma)]
     fn set_mem2mem_mode(&mut self, value: bool) {
         self.rx_impl.set_mem2mem_mode(value);
@@ -2093,9 +2079,6 @@ pub trait Tx: crate::private::Sealed {
     fn start_transfer(&mut self) -> Result<(), DmaError>;
 
     fn stop_transfer(&mut self);
-
-    #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
     fn is_done(&self) -> bool {
         self.pending_out_interrupts()
@@ -2218,7 +2201,8 @@ where
         }
 
         #[cfg(psram_dma)]
-        self.set_ext_mem_block_size(preparation.burst_transfer.external.into());
+        self.tx_impl
+            .set_ext_mem_block_size(preparation.burst_transfer.external.into());
         self.tx_impl.set_burst_mode(preparation.burst_transfer);
         self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);
@@ -2321,11 +2305,6 @@ where
 
     fn stop_transfer(&mut self) {
         self.tx_impl.stop()
-    }
-
-    #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.tx_impl.set_ext_mem_block_size(size);
     }
 
     fn listen_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {

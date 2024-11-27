@@ -1,5 +1,3 @@
-#[cfg(esp32s3)]
-use crate::dma::DmaExtMemBKSize;
 use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx},
@@ -151,21 +149,6 @@ where
                 .rx
                 .prepare_transfer_without_start(self.peripheral, &self.rx_chain)?;
             self.channel.rx.set_mem2mem_mode(true);
-        }
-        #[cfg(esp32s3)]
-        {
-            let align = match unsafe { crate::soc::cache_get_dcache_line_size() } {
-                16 => DmaExtMemBKSize::Size16,
-                32 => DmaExtMemBKSize::Size32,
-                64 => DmaExtMemBKSize::Size64,
-                _ => panic!("unsupported cache line size"),
-            };
-            if crate::soc::is_valid_psram_address(tx_ptr as usize) {
-                self.channel.tx.set_ext_mem_block_size(align);
-            }
-            if crate::soc::is_valid_psram_address(rx_ptr as usize) {
-                self.channel.rx.set_ext_mem_block_size(align);
-            }
         }
         self.channel.tx.start_transfer()?;
         self.channel.rx.start_transfer()?;

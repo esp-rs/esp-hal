@@ -7,7 +7,7 @@
 use defmt::error;
 use esp_alloc as _;
 use esp_hal::{
-    dma::{BurstConfig, DmaRxBuf, DmaTxBuf, ExternalBurstSize, InternalBurstTransfer},
+    dma::{BurstConfig, DmaRxBuf, DmaTxBuf, ExternalBurstConfig, InternalBurstConfig},
     dma_buffers,
     dma_descriptors_chunk_size,
     gpio::interconnect::InputSignal,
@@ -83,7 +83,7 @@ mod tests {
     #[test]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
-        const DMA_ALIGNMENT: ExternalBurstSize = ExternalBurstSize::Size32;
+        const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size32;
         const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
         let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
@@ -92,8 +92,8 @@ mod tests {
             descriptors,
             buffer,
             BurstConfig {
-                internal: InternalBurstTransfer::default(),
-                external: ExternalBurstSize::Size32,
+                internal: InternalBurstConfig::default(),
+                external: ExternalBurstConfig::Size32,
             },
         )
         .unwrap();
@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
-        const DMA_ALIGNMENT: ExternalBurstSize = ExternalBurstSize::Size32; // matches dcache line size
+        const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size32; // matches dcache line size
         const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize; // 64 byte aligned
 
         let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
@@ -150,8 +150,8 @@ mod tests {
             descriptors,
             buffer,
             BurstConfig {
-                internal: InternalBurstTransfer::default(),
-                external: ExternalBurstSize::Size32,
+                internal: InternalBurstConfig::default(),
+                external: ExternalBurstConfig::Size32,
             },
         )
         .unwrap();
