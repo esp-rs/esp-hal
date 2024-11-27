@@ -32,6 +32,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
   - The driver must implement a `new` constructor that automatically converts the peripheral instance into the any type, and a `new_typed` that preserves the peripheral type.
 - If a driver is configurable, configuration options should be implemented as a `Config` struct in the same module where the driver is located.
   - The driver's constructor should take the config struct by value, and it should return `Result<Self, ConfigError>`.
+  - The `ConfigError` enum should be separate from other `Error` enums used by the driver.
   - The driver should implement `fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError>`.
   - In case the driver's configuration is infallible (all possible combinations of options are supported by the hardware), the `ConfigError` should be implemented as an empty `enum`.
 - If a driver only supports a single peripheral instance, no instance type parameter is necessary.
