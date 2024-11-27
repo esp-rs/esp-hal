@@ -298,7 +298,7 @@ overflow-checks  = true
 [profile.release]
 codegen-units    = 1
 debug            = 2
-debug-assertions = false
+debug-assertions = true
 incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
