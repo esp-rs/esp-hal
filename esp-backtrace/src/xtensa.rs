@@ -1,5 +1,6 @@
 use core::{arch::asm, fmt::Display};
 
+use super::*;
 use crate::MAX_BACKTRACE_ADDRESSES;
 
 // subtract 3 from the return address
@@ -421,4 +422,42 @@ pub(crate) fn backtrace_internal(
     }
 
     result
+}
+
+#[cfg(feature = "exception-handler")]
+#[no_mangle]
+#[link_section = ".rwtext"]
+unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
+    pre_backtrace();
+
+    #[cfg(feature = "colors")]
+    set_color_code(RED);
+
+    // Unfortunately, a different formatter string is used
+    #[cfg(not(feature = "defmt"))]
+    esp_println::println!("\n\nException occurred '{}'", cause);
+
+    #[cfg(feature = "defmt")]
+    defmt::error!("\n\nException occurred '{}'", cause);
+
+    println!("{:?}", context);
+
+    let backtrace = crate::arch::backtrace_internal(context.A1, 0);
+    for e in backtrace {
+        if let Some(addr) = e {
+            println!("0x{:x}", addr);
+        }
+    }
+    println!("");
+    println!("");
+    println!("");
+
+    #[cfg(feature = "colors")]
+    set_color_code(RESET);
+
+    #[cfg(feature = "semihosting")]
+    semihosting::process::abort();
+
+    #[cfg(not(feature = "semihosting"))]
+    halt();
 }
