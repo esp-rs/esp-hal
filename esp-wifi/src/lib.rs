@@ -99,6 +99,7 @@ use hal::{
     rng::{Rng, Trng},
     system::RadioClockController,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
+    Blocking,
 };
 use portable_atomic::Ordering;
 
@@ -216,7 +217,7 @@ const _: () = {
     core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
 };
 
-type TimeBase = PeriodicTimer<'static, AnyTimer>;
+type TimeBase = PeriodicTimer<'static, Blocking, AnyTimer>;
 
 pub(crate) mod flags {
     use portable_atomic::{AtomicBool, AtomicUsize};

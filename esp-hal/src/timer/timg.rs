@@ -221,7 +221,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
             } else if #[cfg(any(esp32c6, esp32h2))] {
                 unsafe { &*crate::peripherals::PCR::PTR }
                     .timergroup1_wdt_clk_conf()
-                    .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(1) });
+                    .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             }
         }
     }
@@ -315,7 +315,69 @@ impl super::Timer for Timer {
         self.clear_interrupt()
     }
 
-    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+    fn is_interrupt_set(&self) -> bool {
+        self.is_interrupt_set()
+    }
+
+    async fn wait(&self) {
+        asynch::TimerFuture::new(self).await
+    }
+
+    fn async_interrupt_handler(&self) -> InterruptHandler {
+        match (self.timer_group(), self.timer_number()) {
+            (0, 0) => asynch::timg0_timer0_handler,
+            #[cfg(timg_timer1)]
+            (0, 1) => asynch::timg0_timer1_handler,
+            #[cfg(timg1)]
+            (1, 0) => asynch::timg1_timer0_handler,
+            #[cfg(all(timg_timer1, timg1))]
+            (1, 1) => asynch::timg1_timer1_handler,
+            _ => unreachable!(),
+        }
+    }
+
+    fn peripheral_interrupt(&self) -> Interrupt {
+        match (self.timer_group(), self.timer_number()) {
+            (0, 0) => Interrupt::TG0_T0_LEVEL,
+            #[cfg(timg_timer1)]
+            (0, 1) => Interrupt::TG0_T1_LEVEL,
+            #[cfg(timg1)]
+            (1, 0) => Interrupt::TG1_T0_LEVEL,
+            #[cfg(all(timg_timer1, timg1))]
+            (1, 1) => Interrupt::TG1_T1_LEVEL,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl InterruptConfigurable for Timer {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler)
+    }
+}
+
+impl Peripheral for Timer {
+    type P = Self;
+
+    #[inline]
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        core::ptr::read(self as *const _)
+    }
+}
+
+/// A timer within a Timer Group.
+pub struct Timer {
+    register_block: *const RegisterBlock,
+    timer: u8,
+    tg: u8,
+}
+
+impl Sealed for Timer {}
+unsafe impl Send for Timer {}
+
+/// Timer peripheral instance
+impl Timer {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         let interrupt = match (self.timer_group(), self.timer_number()) {
             (0, 0) => Interrupt::TG0_T0_LEVEL,
             #[cfg(timg_timer1)]
@@ -334,41 +396,6 @@ impl super::Timer for Timer {
         unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 
-    fn is_interrupt_set(&self) -> bool {
-        self.is_interrupt_set()
-    }
-
-    fn set_alarm_active(&self, state: bool) {
-        self.set_alarm_active(state)
-    }
-}
-
-impl Peripheral for Timer {
-    type P = Self;
-
-    #[inline]
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        core::ptr::read(self as *const _)
-    }
-}
-
-/// A timer within a Timer Group.
-pub struct Timer {
-    /// Pointer to the register block for this TimerGroup instance.
-    pub register_block: *const RegisterBlock,
-
-    /// The timer number inside the TimerGroup
-    pub timer: u8,
-
-    /// The TimerGroup number
-    pub tg: u8,
-}
-
-impl Sealed for Timer {}
-unsafe impl Send for Timer {}
-
-/// Timer peripheral instance
-impl Timer {
     fn register_block(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
     }
@@ -419,7 +446,15 @@ impl Timer {
     }
 
     fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
-        let ticks = timeout_to_ticks(value, Clocks::get().apb_clock, self.divider());
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+                let clk_src = Clocks::get().pll_48m_clock;
+            } else {
+                let clk_src = Clocks::get().apb_clock;
+            }
+        }
+        let ticks = timeout_to_ticks(value, clk_src, self.divider());
 
         // The counter is 54-bits wide, so we must ensure that the provided
         // value is not too wide:
@@ -442,6 +477,8 @@ impl Timer {
         self.register_block()
             .int_clr()
             .write(|w| w.t(self.timer).clear_bit_by_one());
+        let periodic = self.t().config().read().autoreload().bit_is_set();
+        self.set_alarm_active(periodic);
     }
 
     fn now(&self) -> Instant<u64, 1, 1_000_000> {
@@ -456,7 +493,15 @@ impl Timer {
         let value_hi = t.hi().read().bits() as u64;
 
         let ticks = (value_hi << 32) | value_lo;
-        let micros = ticks_to_timeout(ticks, Clocks::get().apb_clock, self.divider());
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+                let clk_src = Clocks::get().pll_48m_clock;
+            } else {
+                let clk_src = Clocks::get().apb_clock;
+            }
+        }
+        let micros = ticks_to_timeout(ticks, clk_src, self.divider());
 
         Instant::<u64, 1, 1_000_000>::from_ticks(micros)
     }
@@ -747,7 +792,6 @@ where
 
 // Async functionality of the timer groups.
 mod asynch {
-    #![allow(unused)] // FIXME(mabez)
     use core::{
         pin::Pin,
         task::{Context, Poll},

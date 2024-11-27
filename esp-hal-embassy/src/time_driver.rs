@@ -7,9 +7,10 @@ use esp_hal::{
     sync::Locked,
     time::now,
     timer::{AnyTimer, OneShotTimer},
+    Blocking,
 };
 
-pub type Timer = OneShotTimer<'static, AnyTimer>;
+pub type Timer = OneShotTimer<'static, Blocking, AnyTimer>;
 
 enum AlarmState {
     Created(extern "C" fn()),
@@ -17,10 +18,7 @@ enum AlarmState {
     Initialized(&'static mut Timer),
 }
 impl AlarmState {
-    fn initialize(
-        timer: &'static mut OneShotTimer<'_, AnyTimer>,
-        interrupt_handler: extern "C" fn(),
-    ) -> AlarmState {
+    fn initialize(timer: &'static mut Timer, interrupt_handler: extern "C" fn()) -> AlarmState {
         // If the driver is initialized, bind the interrupt handler to the
         // timer. This ensures that alarms allocated after init are correctly
         // bound to the core that created the executor.

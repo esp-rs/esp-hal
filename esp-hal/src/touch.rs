@@ -29,9 +29,9 @@ use core::marker::PhantomData;
 
 use crate::{
     gpio::TouchPin,
-    interrupt::InterruptConfigurable,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, SENS, TOUCH},
+    prelude::*,
     private::{Internal, Sealed},
     rtc_cntl::Rtc,
     Async,

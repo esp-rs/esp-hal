@@ -117,6 +117,17 @@ If you are writing a driver and need to store a channel in a structure, you can 
 
 The low level timers, `SystemTimer` and `TimerGroup` are now "dumb". They contain no logic for operating modes or trait implementations (except the low level `Timer` trait).
 
+### Timer drivers - `OneShotTimer` & `PeriodicTimer`
+
+Both drivers now have a `Mode` parameter. Both also type erase the underlying driver by default, call `new_typed` to retain the type.
+
+```diff
+- OneShotTimer<'static, systimer::Alarm>;
++ OneShotTimer<'static, Blocking>;
+- PeriodicTimer<'static, systimer::Alarm>;
++ PeriodicTimer<'static, Blocking>;
+```
+
 ### SystemTimer
 
 ```diff
@@ -138,6 +149,23 @@ Timer group timers have been type erased.
 ```diff
 - timg::Timer<timg::Timer0<crate::peripherals::TIMG0>, Blocking>
 + timg::Timer
+```
+
+### ETM usage has changed
+
+Timer dependant ETM events should be created _prior_ to initializing the timer with the chosen driver.
+
+```diff
+let task = ...; // ETM task
+let syst = SystemTimer::new(peripherals.SYSTIMER);
+let alarm0 = syst.alarm0;
+- alarm0.load_value(1u64.millis()).unwrap();
+- alarm0.start();
+- let event = Event::new(&mut alarm0);
++ let event = Event::new(&alarm0);
++ let timer = OneShotTimer::new(alarm0);
++ timer.schedule(1u64.millis()).unwrap();
+let _configured_channel = channel0.setup(&event, &task);
 ```
 
 ## PSRAM is now initialized automatically
