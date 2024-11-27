@@ -55,19 +55,19 @@
 //! You can also gets stats about the heap usage at anytime with:
 //! ```rust
 //! let stats: HeapStats = esp_alloc::HEAP.stats();
-//! // HeapStats implements the Display trait, so you can pretty print the heap stats.
+//! // HeapStats implements the Display and defmt::Format traits, so you can pretty print the heap stats.
 //! println!("{}", stats);
 //! ```
 //!
 //! ```txt
 //! HEAP INFO
-//! Size: 2097152
-//! Current usage: 512028
-//! Max usage: 512028
+//! Size: 131068
+//! Current usage: 46148
+//! Max usage: 46148
 //! Total freed: 0
-//! Total allocated: 512028
+//! Total allocated: 46148
 //! Memory Layout:
-//! External | ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░ | Used: 512028 / Total: 2097152 (Free: 1585124)
+//! Internal | ████████████░░░░░░░░░░░░░░░░░░░░░░░ | Used: 35% (Used 46148 of 131068, free: 84920)
 //! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
 //! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
 //! ```
