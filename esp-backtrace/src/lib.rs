@@ -11,6 +11,30 @@ use esp_println as _;
 
 const MAX_BACKTRACE_ADDRESSES: usize = 10;
 
+#[cfg(feature = "esp32")]
+const RAM: (u32, u32) = (0x3FFA_E000, 0x4000_0000);
+
+#[cfg(feature = "esp32c2")]
+const RAM: (u32, u32) = (0x3FCA_0000, 0x3FCE_0000);
+
+#[cfg(feature = "esp32c3")]
+const RAM: (u32, u32) = (0x3FC8_0000, 0x3FCE_0000);
+
+#[cfg(feature = "esp32c6")]
+const RAM: (u32, u32) = (0x4080_0000, 0x4088_0000);
+
+#[cfg(feature = "esp32h2")]
+const RAM: (u32, u32) = (0x4080_0000, 0x4085_0000);
+
+#[cfg(feature = "esp32p4")]
+const RAM: (u32, u32) = (0x4FF0_0000, 0x4FFC_0000);
+
+#[cfg(feature = "esp32s2")]
+const RAM: (u32, u32) = (0x3FFB_0000, 0x4000_0000);
+
+#[cfg(feature = "esp32s3")]
+const RAM: (u32, u32) = (0x3FC8_8000, 0x3FD0_0000);
+
 #[cfg(feature = "colors")]
 const RESET: &str = "\u{001B}[0m";
 #[cfg(feature = "colors")]
@@ -89,121 +113,6 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     halt();
 }
 
-#[cfg(all(feature = "exception-handler", target_arch = "xtensa"))]
-#[no_mangle]
-#[link_section = ".rwtext"]
-unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
-    pre_backtrace();
-
-    #[cfg(feature = "colors")]
-    set_color_code(RED);
-
-    // Unfortunately, a different formatter string is used
-    #[cfg(not(feature = "defmt"))]
-    esp_println::println!("\n\nException occurred '{}'", cause);
-
-    #[cfg(feature = "defmt")]
-    defmt::error!("\n\nException occurred '{}'", cause);
-
-    println!("{:?}", context);
-
-    let backtrace = crate::arch::backtrace_internal(context.A1, 0);
-    for e in backtrace {
-        if let Some(addr) = e {
-            println!("0x{:x}", addr);
-        }
-    }
-    println!("");
-    println!("");
-    println!("");
-
-    #[cfg(feature = "colors")]
-    set_color_code(RESET);
-
-    #[cfg(feature = "semihosting")]
-    semihosting::process::abort();
-
-    #[cfg(not(feature = "semihosting"))]
-    halt();
-}
-
-#[cfg(all(feature = "exception-handler", target_arch = "riscv32"))]
-#[export_name = "ExceptionHandler"]
-fn exception_handler(context: &arch::TrapFrame) -> ! {
-    pre_backtrace();
-
-    let mepc = context.pc;
-    let code = context.mcause & 0xff;
-    let mtval = context.mtval;
-
-    #[cfg(feature = "colors")]
-    set_color_code(RED);
-
-    if code == 14 {
-        println!("");
-        println!(
-            "Stack overflow detected at 0x{:x} called by 0x{:x}",
-            mepc, context.ra
-        );
-        println!("");
-    } else {
-        let code = match code {
-            0 => "Instruction address misaligned",
-            1 => "Instruction access fault",
-            2 => "Illegal instruction",
-            3 => "Breakpoint",
-            4 => "Load address misaligned",
-            5 => "Load access fault",
-            6 => "Store/AMO address misaligned",
-            7 => "Store/AMO access fault",
-            8 => "Environment call from U-mode",
-            9 => "Environment call from S-mode",
-            10 => "Reserved",
-            11 => "Environment call from M-mode",
-            12 => "Instruction page fault",
-            13 => "Load page fault",
-            14 => "Reserved",
-            15 => "Store/AMO page fault",
-            _ => "UNKNOWN",
-        };
-
-        println!(
-            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}",
-            code, mepc, mtval
-        );
-        #[cfg(not(feature = "defmt"))]
-        println!("{:x?}", context);
-
-        #[cfg(feature = "defmt")]
-        println!("{:?}", context);
-
-        let backtrace = crate::arch::backtrace_internal(context.s0 as u32, 0);
-        if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
-            println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
-        }
-        for addr in backtrace.into_iter().flatten() {
-            #[cfg(all(feature = "colors", feature = "println"))]
-            println!("{}0x{:x}", RED, addr - crate::arch::RA_OFFSET);
-
-            #[cfg(not(all(feature = "colors", feature = "println")))]
-            println!("0x{:x}", addr - crate::arch::RA_OFFSET);
-        }
-    }
-
-    println!("");
-    println!("");
-    println!("");
-
-    #[cfg(feature = "colors")]
-    set_color_code(RESET);
-
-    #[cfg(feature = "semihosting")]
-    semihosting::process::abort();
-
-    #[cfg(not(feature = "semihosting"))]
-    halt();
-}
-
 // Ensure that the address is in DRAM and that it is 16-byte aligned.
 //
 // Based loosely on the `esp_stack_ptr_in_dram` function from
@@ -216,47 +125,7 @@ fn is_valid_ram_address(address: u32) -> bool {
         return false;
     }
 
-    #[cfg(feature = "esp32")]
-    if !(0x3FFA_E000..=0x4000_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32c2")]
-    if !(0x3FCA_0000..=0x3FCE_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32c3")]
-    if !(0x3FC8_0000..=0x3FCE_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32c6")]
-    if !(0x4080_0000..=0x4088_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32h2")]
-    if !(0x4080_0000..=0x4085_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32p4")]
-    if !(0x4FF0_0000..=0x4FFC_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32s2")]
-    if !(0x3FFB_0000..=0x4000_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32s3")]
-    if !(0x3FC8_8000..=0x3FD0_0000).contains(&address) {
-        return false;
-    }
-
-    true
+    (RAM.0..=RAM.1).contains(&address)
 }
 
 #[cfg(all(
