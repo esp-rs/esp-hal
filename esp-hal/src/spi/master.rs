@@ -45,11 +45,7 @@
 //!
 //! let mut spi = Spi::new_with_config(
 //!     peripherals.SPI2,
-//!     Config {
-//!         frequency: 100.kHz(),
-//!         mode: SpiMode::Mode0,
-//!         ..Config::default()
-//!     },
+//!     Config::default().with_frequency(100.kHz()).with_mode(SpiMode::Mode0)
 //! )
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
@@ -93,6 +89,7 @@ use crate::{
 #[cfg(gdma)]
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum SpiInterrupt {
     /// Indicates that the SPI transaction has completed successfully.
     ///
@@ -423,8 +420,9 @@ impl Address {
 }
 
 /// SPI peripheral configuration
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct Config {
     /// SPI clock frequency
     pub frequency: HertzU32,

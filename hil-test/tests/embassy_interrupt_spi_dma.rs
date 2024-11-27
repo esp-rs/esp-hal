@@ -120,11 +120,9 @@ mod test {
 
         let mut spi = Spi::new_with_config(
             peripherals.SPI2,
-            Config {
-                frequency: 10000.kHz(),
-                mode: SpiMode::Mode0,
-                ..Config::default()
-            },
+            Config::default()
+                .with_frequency(10000.kHz())
+                .with_mode(SpiMode::Mode0),
         )
         .with_miso(unsafe { mosi.clone_unchecked() })
         .with_mosi(mosi)
@@ -135,11 +133,9 @@ mod test {
         #[cfg(any(esp32, esp32s2, esp32s3))]
         let other_peripheral = Spi::new_with_config(
             peripherals.SPI3,
-            Config {
-                frequency: 10000.kHz(),
-                mode: SpiMode::Mode0,
-                ..Config::default()
-            },
+            Config::default()
+                .with_frequency(10000.kHz())
+                .with_mode(SpiMode::Mode0),
         )
         .with_dma(dma_channel2)
         .into_async();
@@ -231,11 +227,9 @@ mod test {
 
             let mut spi = Spi::new_with_config(
                 peripherals.spi,
-                Config {
-                    frequency: 100.kHz(),
-                    mode: SpiMode::Mode0,
-                    ..Config::default()
-                },
+                Config::default()
+                    .with_frequency(100.kHz())
+                    .with_mode(SpiMode::Mode0),
             )
             .with_dma(peripherals.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf)

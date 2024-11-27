@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the `BuilderLite` derive macro which implements the Builder Lite pattern for a struct (#2614)
+
 ### Fixed
 
 ### Changed
