@@ -65,7 +65,7 @@ embassy-generic-timers = ["embassy-time/generic-queue-8"]
 [profile.release]
 codegen-units    = 1
 debug            = 2
-debug-assertions = false
+debug-assertions = true
 incremental      = false
 opt-level        = 3
 lto = 'fat'
