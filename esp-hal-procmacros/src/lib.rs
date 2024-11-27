@@ -468,6 +468,17 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
                     self
                 }
             });
+
+            if maybe_path_type.is_some() {
+                let function_ident = format_ident!("with_{}_none", field_ident);
+                fns.push(quote! {
+                    #[doc = concat!(" Set the value of `", stringify!(#field_ident), "` to `None`.")]
+                    pub fn #function_ident(mut self) -> Self {
+                        self.#field_ident = None;
+                        self
+                    }
+                });
+            }
         }
     } else {
         return ParseError::new(
