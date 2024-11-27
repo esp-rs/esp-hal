@@ -191,7 +191,6 @@ impl defmt::Format for RegionStats {
     }
 }
 
-
 /// A memory region to be used as heap memory
 pub struct HeapRegion {
     heap: Heap,
