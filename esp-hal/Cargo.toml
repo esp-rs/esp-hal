@@ -37,6 +37,7 @@ embedded-hal-nb          = "1.0.0"
 embedded-io              = "0.6.1"
 embedded-io-async        = "0.6.1"
 enumset                  = "1.1.5"
+esp-build                = { version = "0.1.0", path = "../esp-build" }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                    = "0.3.7"
 log                      = { version = "0.4.22", optional = true }

@@ -261,6 +261,15 @@ pub mod trapframe {
 // be directly exposed.
 mod soc;
 
+#[cfg(is_debug_build)]
+esp_build::warning! {"
+WARNING: use --release
+  We *strongly* recommend using release profile when building esp-hal.
+  The dev profile can potentially be one or more orders of magnitude
+  slower than release, and may cause issues with timing-senstive
+  peripherals and/or devices.
+"}
+
 /// A marker trait for initializing drivers in a specific mode.
 pub trait Mode: crate::private::Sealed {}
 
