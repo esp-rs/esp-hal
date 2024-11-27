@@ -494,15 +494,7 @@ pub struct Config {
     pub psram: psram::PsramConfig,
 }
 
-/// Initialize the system.
-///
-/// This function sets up the CPU clock and watchdog, then, returns the
-/// peripherals and clocks.
-pub fn init(config: Config) -> Peripherals {
-    system::disable_peripherals();
-
-    let mut peripherals = Peripherals::take();
-
+fn init_internal<'a>(peripherals: &'a mut Peripherals, config: Config) {
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
 
@@ -556,6 +548,34 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
     crate::psram::init_psram(config.psram);
+}
 
-    peripherals
+/// Initialize the system.
+///
+/// This function sets up the CPU clock and watchdog, then, returns the
+/// peripherals and clocks.
+pub fn init(config: Config) -> Peripherals {
+    system::disable_peripherals();
+
+    if let Some(mut peripherals) = Peripherals::try_take() {
+        init_internal(&mut peripherals, config);
+        peripherals
+    } else {
+        panic!("init called more than once!");
+    }
+}
+
+/// Initializes the system only if necessary, then returns the peripherals.
+///
+/// If [`init`] has already been executed, simply steals and returns the
+/// peripherals. (This check uses [`AtomicBool`](core::sync::atomic::AtomicBool)
+/// to be as thread-safe as possible)
+///
+/// Otherwise, the initialization process is executed (and then the peripherals
+/// are stolen and handed off to you).
+pub unsafe fn try_init(config: Config) -> Peripherals {
+    if let Some(mut peripherals) = Peripherals::try_take() {
+        init_internal(&mut peripherals, config);
+    }
+    Peripherals::steal()
 }
