@@ -74,30 +74,6 @@ fn cycles() -> u64 {
     cycles as u64
 }
 
-#[cfg(feature = "embedded-hal-02")]
-impl embedded_hal_02::blocking::delay::DelayUs<u64> for Delay {
-    #[inline(always)]
-    fn delay_us(&mut self, us: u64) {
-        self.delay_micros(us as u32);
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl embedded_hal_02::blocking::delay::DelayUs<u32> for Delay {
-    #[inline(always)]
-    fn delay_us(&mut self, us: u32) {
-        self.delay_micros(us);
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl embedded_hal_02::blocking::delay::DelayMs<u32> for Delay {
-    #[inline(always)]
-    fn delay_ms(&mut self, ms: u32) {
-        self.delay_millis(ms);
-    }
-}
-
 #[cfg(feature = "embedded-hal")]
 impl embedded_hal::delay::DelayNs for Delay {
     #[inline(always)]

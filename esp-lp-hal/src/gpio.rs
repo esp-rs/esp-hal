@@ -86,48 +86,6 @@ pub unsafe fn conjure_input<const PIN: u8>() -> Option<Input<PIN>> {
     }
 }
 
-#[cfg(feature = "embedded-hal-02")]
-impl<const PIN: u8> embedded_hal_02::digital::v2::InputPin for Input<PIN> {
-    type Error = core::convert::Infallible;
-
-    fn is_high(&self) -> Result<bool, Self::Error> {
-        Ok(self.input_state())
-    }
-
-    fn is_low(&self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<const PIN: u8> embedded_hal_02::digital::v2::OutputPin for Output<PIN> {
-    type Error = core::convert::Infallible;
-
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        self.set_output(false);
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        self.set_output(true);
-        Ok(())
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<const PIN: u8> embedded_hal_02::digital::v2::StatefulOutputPin for Output<PIN> {
-    fn is_set_high(&self) -> Result<bool, Self::Error> {
-        Ok(self.output_state())
-    }
-
-    fn is_set_low(&self) -> Result<bool, Self::Error> {
-        Ok(!self.is_set_high()?)
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl<const PIN: u8> embedded_hal_02::digital::v2::toggleable::Default for Output<PIN> {}
-
 #[cfg(feature = "embedded-hal")]
 impl<const PIN: u8> embedded_hal::digital::ErrorType for Input<PIN> {
     type Error = core::convert::Infallible;
