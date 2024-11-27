@@ -103,14 +103,14 @@ const BAR_WIDTH: usize = 35;
 fn write_bar(f: &mut core::fmt::Formatter<'_>, usage_percent: usize) -> core::fmt::Result {
     let used_blocks = BAR_WIDTH * usage_percent / 100;
     (0..used_blocks).try_for_each(|_| write!(f, "█"))?;
-    (0..BAR_WIDTH - used_blocks).try_for_each(|_| write!(f, "░"))
+    (used_blocks..BAR_WIDTH).try_for_each(|_| write!(f, "░"))
 }
 
 #[cfg(feature = "defmt")]
 fn write_bar_defmt(fmt: defmt::Formatter, usage_percent: usize) {
     let used_blocks = BAR_WIDTH * usage_percent / 100;
     (0..used_blocks).for_each(|_| defmt::write!(fmt, "█"));
-    (0..BAR_WIDTH - used_blocks).for_each(|_| defmt::write!(fmt, "░"));
+    (used_blocks..BAR_WIDTH).for_each(|_| defmt::write!(fmt, "░"));
 }
 
 #[derive(EnumSetType, Debug)]
