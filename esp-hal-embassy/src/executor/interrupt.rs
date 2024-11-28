@@ -117,6 +117,9 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
             .set_interrupt_handler(InterruptHandler::new(swi_handler, priority));
 
         let executor = unsafe { (*self.executor.get()).assume_init_ref() };
+        unsafe {
+            executor.initialize();
+        }
         executor.spawner().make_send()
     }
 

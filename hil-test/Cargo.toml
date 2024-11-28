@@ -316,3 +316,8 @@ incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = false
+
+[patch.crates-io]
+embassy-executor    = { git = "https://github.com/bugadani/embassy.git", branch = "timers" }
+embassy-time        = { git = "https://github.com/bugadani/embassy.git", branch = "timers" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy.git", branch = "timers" }

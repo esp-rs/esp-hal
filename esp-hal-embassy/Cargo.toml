@@ -50,3 +50,8 @@ integrated-timers = ["embassy-executor?/integrated-timers"]
 
 [lints.rust]
 unexpected_cfgs = "allow"
+
+[patch.crates-io]
+embassy-executor    = { git = "https://github.com/bugadani/embassy.git", branch = "timers" }
+embassy-time        = { git = "https://github.com/bugadani/embassy.git", branch = "timers" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy.git", branch = "timers" }
