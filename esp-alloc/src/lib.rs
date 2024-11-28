@@ -52,7 +52,7 @@
 //! let large_buffer: Vec<u8, _> = Vec::with_capacity_in(1048576, &PSRAM_ALLOCATOR);
 //! ```
 //!
-//! You can also gets stats about the heap usage at anytime with:
+//! You can also get stats about the heap usage at anytime with:
 //! ```rust
 //! let stats: HeapStats = esp_alloc::HEAP.stats();
 //! // HeapStats implements the Display and defmt::Format traits, so you can pretty print the heap stats.
