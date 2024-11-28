@@ -561,8 +561,9 @@ unsafe impl GlobalAlloc for EspHeap {
             {
                 let mut internal_heap_stats = self.internal_heap_stats.borrow_ref_mut(cs);
                 drop(regions);
-                // We need to call `used()` because [linked_list_allocator::Heap] does internal size
-                // alignment so we cannot use the size provided by the layout.
+                // We need to call `used()` because [linked_list_allocator::Heap] does internal
+                // size alignment so we cannot use the size provided by the
+                // layout.
                 internal_heap_stats.total_freed += before - self.used();
             }
         })
