@@ -188,7 +188,7 @@ is enabled. To retrieve the address and size of the initialized external memory,
 The usage of `esp_alloc::psram_allocator!` remains unchanged.
 
 
-### embedded-hal 0.2.* is not supported anymore.
+## embedded-hal 0.2.* is not supported anymore.
 
 As per https://github.com/rust-embedded/embedded-hal/pull/640, our driver no longer implements traits from `embedded-hal 0.2.x`.
 Analogs of all traits from the above mentioned version are available in `embedded-hal 1.x.x`
@@ -220,4 +220,50 @@ https://github.com/rust-embedded/embedded-hal/blob/master/docs/migrating-from-0.
 - use esp_hal::DEFAULT_INTERRUPT_HANDLER;
 + use esp_hal::interrupt::InterruptConfigurable;
 + use esp_hal::interrupt::DEFAULT_INTERRUPT_HANDLER;
+```
+
+## Driver constructors now take a configuration and are fallible
+
+The old `new_with_config` constructor have been removed, and `new` constructors now always take
+a configuration structure. They have also been updated to return a `ConfigError` if the configuration
+is not compatible with the hardware.
+
+```diff
+-let mut spi = Spi::new_with_config(
++let mut spi = Spi::new(
+     peripherals.SPI2,
+     Config {
+         frequency: 100.kHz(),
+         mode: SpiMode::Mode0,
+         ..Config::default()
+     },
+-);
++)
++.unwrap();
+```
+
+```diff
+ let mut spi = Spi::new(
+     peripherals.SPI2,
++    Config::default(),
+-);
++)
++.unwrap();
+```
+
+### LCD_CAM configuration changes
+
+- `cam` now has a `Config` strurct that contains frequency, bit/byte order, VSync filter options.
+- DPI, I8080: `frequency` has been moved into `Config`.
+
+```diff
++let mut cam_config = cam::Config::default();
++cam_config.frequency = 1u32.MHz();
+ cam::Camera::new(
+     lcd_cam.cam,
+     dma_rx_channel,
+     pins,
+-    1u32.MHz(),
++    cam_config,
+ )
 ```

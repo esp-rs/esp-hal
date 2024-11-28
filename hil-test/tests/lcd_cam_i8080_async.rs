@@ -51,7 +51,12 @@ mod tests {
     async fn test_i8080_8bit(ctx: Context<'static>) {
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
-        let i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, 20.MHz(), Config::default());
+        let i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
+            let mut config = Config::default();
+            config.frequency = 20.MHz();
+            config
+        })
+        .unwrap();
 
         let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
 

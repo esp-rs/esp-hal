@@ -7,7 +7,7 @@
 
 use esp_hal::{
     prelude::*,
-    uart::{UartRx, UartTx},
+    uart::{self, UartRx, UartTx},
     Blocking,
 };
 use hil_test as _;
@@ -29,8 +29,8 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx = UartTx::new(peripherals.UART0, tx).unwrap();
-        let rx = UartRx::new(peripherals.UART1, rx).unwrap();
+        let tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx).unwrap();
+        let rx = UartRx::new(peripherals.UART1, uart::Config::default(), rx).unwrap();
 
         Context { rx, tx }
     }
