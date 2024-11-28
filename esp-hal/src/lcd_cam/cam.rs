@@ -432,7 +432,7 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
     }
 }
 
-impl<'d, BUF: DmaRxBuffer> Deref for CameraTransfer<'d, BUF> {
+impl<BUF: DmaRxBuffer> Deref for CameraTransfer<'_, BUF> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -440,13 +440,13 @@ impl<'d, BUF: DmaRxBuffer> Deref for CameraTransfer<'d, BUF> {
     }
 }
 
-impl<'d, BUF: DmaRxBuffer> DerefMut for CameraTransfer<'d, BUF> {
+impl<BUF: DmaRxBuffer> DerefMut for CameraTransfer<'_, BUF> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<'d, BUF: DmaRxBuffer> Drop for CameraTransfer<'d, BUF> {
+impl<BUF: DmaRxBuffer> Drop for CameraTransfer<'_, BUF> {
     fn drop(&mut self) {
         self.stop_peripherals();
 

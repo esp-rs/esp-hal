@@ -391,7 +391,7 @@ impl DebugAssist<'_> {
 }
 
 #[cfg(all(assist_debug_region_monitor, multi_core))]
-impl<'d> DebugAssist<'d> {
+impl DebugAssist<'_> {
     /// Enable region monitoring of read/write performed by the secondary CPU in
     /// a certain memory region0. Whenever the bus reads or writes in the
     /// specified memory region, an interrupt will be triggered.
