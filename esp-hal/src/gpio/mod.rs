@@ -55,7 +55,7 @@
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/index.html
 //! [Inverting TX and RX Pins]: crate::uart#inverting-rx-and-tx-pins
 
-use portable_atomic::{AtomicPtr, Ordering};
+use portable_atomic::{AtomicPtr, AtomicU32, Ordering};
 use procmacros::ram;
 
 #[cfg(any(lp_io, rtc_cntl))]
@@ -307,7 +307,7 @@ pub trait RtcPinWithResistors: RtcPin {
 }
 
 /// Common trait implemented by pins
-pub trait Pin: Sealed {
+pub trait Pin: Sealed + Unpin {
     /// GPIO number
     fn number(&self) -> u8;
 
@@ -565,6 +565,23 @@ impl From<usize> for GpioRegisterAccess {
 }
 
 impl GpioRegisterAccess {
+    pub const BANK_COUNT: usize = 1 + cfg!(any(esp32, esp32s2, esp32s3)) as usize;
+
+    fn async_operations(self) -> &'static AtomicU32 {
+        static FLAGS: [AtomicU32; GpioRegisterAccess::BANK_COUNT] =
+            [const { AtomicU32::new(0) }; GpioRegisterAccess::BANK_COUNT];
+
+        &FLAGS[self as usize]
+    }
+
+    fn offset(self) -> u8 {
+        match self {
+            Self::Bank0 => 0,
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            Self::Bank1 => 32,
+        }
+    }
+
     fn write_out_en(self, word: u32, enable: bool) {
         if enable {
             self.write_out_en_set(word);
@@ -862,15 +879,6 @@ impl crate::private::Sealed for Io {}
 impl InterruptConfigurable for Io {
     /// Install the given interrupt handler replacing any previously set
     /// handler.
-    ///
-    /// ⚠️ Be careful when using this together with the async API:
-    ///
-    /// - The async driver will disable any interrupts whose status is not
-    ///   cleared by the user handler.
-    /// - Clearing the interrupt status in the user handler will prevent the
-    ///   async driver from detecting the interrupt, silently disabling the
-    ///   corresponding pin's async API.
-    /// - You will not be notified if you make a mistake.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::GPIO);
@@ -883,22 +891,58 @@ impl InterruptConfigurable for Io {
 
 #[ram]
 extern "C" fn user_gpio_interrupt_handler() {
-    USER_INTERRUPT_HANDLER.call();
-
-    default_gpio_interrupt_handler();
+    handle_pin_interrupts(|| USER_INTERRUPT_HANDLER.call());
 }
 
 #[ram]
 extern "C" fn default_gpio_interrupt_handler() {
-    handle_pin_interrupts(on_pin_irq);
+    handle_pin_interrupts(|| ());
 }
 
 #[ram]
-fn on_pin_irq(pin_nr: u8) {
-    // FIXME: async handlers signal completion by disabling the interrupt, but this
-    // conflicts with user handlers.
-    set_int_enable(pin_nr, 0, 0, false);
-    asynch::PIN_WAKERS[pin_nr as usize].wake(); // wake task
+fn handle_pin_interrupts(user_handler: fn()) {
+    let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
+
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
+
+    user_handler();
+
+    // Clear interrupt bits early so that we catch repeat interrupts with larger
+    // probability.
+    Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
+
+    // Get the async pins and also unmark them in the same go.
+    let bank0_async = GpioRegisterAccess::Bank0
+        .async_operations()
+        .fetch_and(!intrs_bank0, Ordering::Release);
+
+    // Wake up the tasks
+    let mut intr_bits = intrs_bank0 & bank0_async;
+    while intr_bits != 0 {
+        let pin_nr = intr_bits.trailing_zeros();
+        intr_bits -= 1 << pin_nr;
+        asynch::PIN_WAKERS[pin_nr as usize].wake();
+        set_int_enable(pin_nr as u8, 0, 0, false);
+    }
+
+    // Now repeat for Bank1 if it exists.
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    {
+        let bank1_async = GpioRegisterAccess::Bank1
+            .async_operations()
+            .fetch_and(!intrs_bank1, Ordering::Release);
+
+        let mut intr_bits = intrs_bank1 & bank1_async;
+        while intr_bits != 0 {
+            let pin_nr = intr_bits.trailing_zeros();
+            intr_bits -= 1 << pin_nr;
+            asynch::PIN_WAKERS[pin_nr as usize + 32].wake();
+            set_int_enable(pin_nr as u8 + 32, 0, 0, false);
+        }
+    }
 }
 
 #[doc(hidden)]
@@ -1445,7 +1489,13 @@ where
         self.pin.level()
     }
 
-    /// Listen for interrupts
+    /// Listen for interrupts.
+    ///
+    /// Note that [`Event::LowLevel`] and [`Event::HighLevel`] are fired
+    /// continuously when the pin is low or high, respectively. You must use
+    /// a custom interrupt handler to stop listening for these events,
+    /// otherwise your program will be stuck in a loop as long as the pin is
+    /// reading the corresponding level.
     #[inline]
     pub fn listen(&mut self, event: Event) {
         self.pin.listen(event);
@@ -1660,7 +1710,13 @@ where
         self.pin.level()
     }
 
-    /// Listen for interrupts
+    /// Listen for interrupts.
+    ///
+    /// Note that [`Event::LowLevel`] and [`Event::HighLevel`] are fired
+    /// continuously when the pin is low or high, respectively. You must use
+    /// a custom interrupt handler to stop listening for these events,
+    /// otherwise your program will be stuck in a loop as long as the pin is
+    /// reading the corresponding level.
     #[inline]
     pub fn listen(&mut self, event: Event) {
         self.pin.listen(event);
@@ -1821,15 +1877,28 @@ where
         )
     }
 
-    /// Listen for interrupts
+    /// Listen for interrupts.
+    ///
+    /// Note that [`Event::LowLevel`] and [`Event::HighLevel`] are fired
+    /// continuously when the pin is low or high, respectively. You must use
+    /// a custom interrupt handler to stop listening for these events,
+    /// otherwise your program will be stuck in a loop as long as the pin is
+    /// reading the corresponding level.
     #[inline]
     pub fn listen(&mut self, event: Event) {
         self.listen_with_options(event, true, false, false)
     }
 
-    /// Stop listening for interrupts
+    /// Stop listening for interrupts.
+    #[inline]
     pub fn unlisten(&mut self) {
         set_int_enable(self.pin.number(), 0, 0, false);
+    }
+
+    /// Check if the pin is listening for interrupts.
+    #[inline]
+    pub fn is_listening(&self) -> bool {
+        is_int_enabled(self.pin.number())
     }
 
     /// Clear the interrupt status bit for this Pin
@@ -2151,15 +2220,6 @@ pub(crate) mod internal {
     }
 }
 
-fn is_listening(pin_num: u8) -> bool {
-    let bits = unsafe { GPIO::steal() }
-        .pin(pin_num as usize)
-        .read()
-        .int_ena()
-        .bits();
-    bits != 0
-}
-
 fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sleep: bool) {
     unsafe { GPIO::steal() }
         .pin(gpio_num as usize)
@@ -2170,33 +2230,13 @@ fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sl
         });
 }
 
-#[ram]
-fn handle_pin_interrupts(handle: impl Fn(u8)) {
-    let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
-
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
-
-    let mut intr_bits = intrs_bank0;
-    while intr_bits != 0 {
-        let pin_nr = intr_bits.trailing_zeros();
-        handle(pin_nr as u8);
-        intr_bits -= 1 << pin_nr;
-    }
-
-    // clear interrupt bits
-    Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
-
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    {
-        let mut intr_bits = intrs_bank1;
-        while intr_bits != 0 {
-            let pin_nr = intr_bits.trailing_zeros();
-            handle(pin_nr as u8 + 32);
-            intr_bits -= 1 << pin_nr;
-        }
-        Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
-    }
+fn is_int_enabled(gpio_num: u8) -> bool {
+    unsafe { GPIO::steal() }
+        .pin(gpio_num as usize)
+        .read()
+        .int_ena()
+        .bits()
+        != 0
 }
 
 mod asynch {
@@ -2213,34 +2253,50 @@ mod asynch {
     where
         P: InputPin,
     {
-        async fn wait_for(&mut self, event: Event) {
-            self.listen(event);
-            PinFuture::new(self.pin.number()).await
+        /// Wait until the pin experiences a particular [`Event`].
+        ///
+        /// The GPIO driver will disable listening for the event once it occurs,
+        /// or if the `Future` is dropped.
+        ///
+        /// Note that calling this function will overwrite previous
+        /// [`listen`][Self::listen] operations for this pin.
+        #[inline]
+        pub async fn wait_for(&mut self, event: Event) {
+            PinFuture::new(self, event).await
         }
 
-        /// Wait until the pin is high. If it is already high, return
-        /// immediately.
+        /// Wait until the pin is high.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_high(&mut self) {
             self.wait_for(Event::HighLevel).await
         }
 
-        /// Wait until the pin is low. If it is already low, return immediately.
+        /// Wait until the pin is low.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_low(&mut self) {
             self.wait_for(Event::LowLevel).await
         }
 
         /// Wait for the pin to undergo a transition from low to high.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_rising_edge(&mut self) {
             self.wait_for(Event::RisingEdge).await
         }
 
         /// Wait for the pin to undergo a transition from high to low.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_falling_edge(&mut self) {
             self.wait_for(Event::FallingEdge).await
         }
 
         /// Wait for the pin to undergo any transition, i.e low to high OR high
         /// to low.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_any_edge(&mut self) {
             self.wait_for(Event::AnyEdge).await
         }
@@ -2250,57 +2306,114 @@ mod asynch {
     where
         P: InputPin,
     {
-        /// Wait until the pin is high. If it is already high, return
-        /// immediately.
+        /// Wait until the pin experiences a particular [`Event`].
+        ///
+        /// The GPIO driver will disable listening for the event once it occurs,
+        /// or if the `Future` is dropped.
+        ///
+        /// Note that calling this function will overwrite previous
+        /// [`listen`][Self::listen] operations for this pin.
+        #[inline]
+        pub async fn wait_for(&mut self, event: Event) {
+            self.pin.wait_for(event).await
+        }
+
+        /// Wait until the pin is high.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_high(&mut self) {
             self.pin.wait_for_high().await
         }
 
-        /// Wait until the pin is low. If it is already low, return immediately.
+        /// Wait until the pin is low.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_low(&mut self) {
             self.pin.wait_for_low().await
         }
 
         /// Wait for the pin to undergo a transition from low to high.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_rising_edge(&mut self) {
             self.pin.wait_for_rising_edge().await
         }
 
         /// Wait for the pin to undergo a transition from high to low.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_falling_edge(&mut self) {
             self.pin.wait_for_falling_edge().await
         }
 
         /// Wait for the pin to undergo any transition, i.e low to high OR high
         /// to low.
+        ///
+        /// See [Self::wait_for] for more information.
         pub async fn wait_for_any_edge(&mut self) {
             self.pin.wait_for_any_edge().await
         }
     }
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    struct PinFuture {
-        pin_num: u8,
+    struct PinFuture<'d, P: InputPin> {
+        pin: Flex<'d, P>,
+        resolved: bool,
     }
 
-    impl PinFuture {
-        fn new(pin_num: u8) -> Self {
-            Self { pin_num }
+    impl<'d, P: InputPin> PinFuture<'d, P> {
+        fn new(pin: &'d mut Flex<'_, P>, event: Event) -> Self {
+            let mut this = Self {
+                pin: unsafe { pin.clone_unchecked() },
+                resolved: false,
+            };
+
+            // Mark pin as async
+            this.pin
+                .gpio_bank(private::Internal)
+                .async_operations()
+                .fetch_or(this.pin_mask(), Ordering::Relaxed);
+
+            this.pin.listen(event);
+
+            this
+        }
+
+        fn pin_mask(&self) -> u32 {
+            let bank = self.pin.gpio_bank(private::Internal);
+            1 << (self.pin.number() - bank.offset())
+        }
+
+        fn is_done(&self) -> bool {
+            !self.pin.is_listening()
         }
     }
 
-    impl core::future::Future for PinFuture {
+    impl<P: InputPin> core::future::Future for PinFuture<'_, P> {
         type Output = ();
 
-        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            PIN_WAKERS[self.pin_num as usize].register(cx.waker());
+        fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            PIN_WAKERS[self.pin.number() as usize].register(cx.waker());
 
-            // if pin is no longer listening its been triggered
-            // therefore the future has resolved
-            if !is_listening(self.pin_num) {
+            if self.is_done() {
+                self.resolved = true;
                 Poll::Ready(())
             } else {
                 Poll::Pending
+            }
+        }
+    }
+
+    impl<P: InputPin> Drop for PinFuture<'_, P> {
+        fn drop(&mut self) {
+            if !self.resolved {
+                self.pin.unlisten();
+
+                // Unmark pin as async
+                self.pin
+                    .gpio_bank(private::Internal)
+                    .async_operations()
+                    .fetch_and(!self.pin_mask(), Ordering::Relaxed);
             }
         }
     }
