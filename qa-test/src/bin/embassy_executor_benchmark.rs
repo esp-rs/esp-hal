@@ -23,9 +23,11 @@ use esp_hal::{
 use esp_println::println;
 
 static mut COUNTER: u32 = 0;
+static mut T2_COUNTER: u32 = 0;
+static mut T3_COUNTER: u32 = 0;
 
 const CLOCK: CpuClock = CpuClock::max();
-const TEST_MILLIS: u64 = 50;
+const TEST_MILLIS: u64 = 500;
 
 #[handler]
 fn timer_handler() {
@@ -33,6 +35,8 @@ fn timer_handler() {
     let cpu_clock = CLOCK.hz() as u64;
     let timer_ticks_per_second = SystemTimer::ticks_per_second();
     let cpu_cycles_per_timer_ticks = cpu_clock / timer_ticks_per_second;
+    println!("task2 count={}", unsafe { T2_COUNTER });
+    println!("task3 count={}", unsafe { T3_COUNTER });
     println!(
         "Test OK, count={}, cycles={}/100",
         c,
@@ -57,7 +61,16 @@ static TASK1: TaskStorage<Task1> = TaskStorage::new();
 #[embassy_executor::task]
 async fn task2() {
     loop {
-        embassy_time::Timer::after(embassy_time::Duration::from_millis(1)).await;
+        unsafe { T2_COUNTER += 1 };
+        embassy_time::Timer::after(embassy_time::Duration::from_millis(10)).await;
+    }
+}
+
+#[embassy_executor::task]
+async fn task3() {
+    loop {
+        unsafe { T3_COUNTER += 1 };
+        embassy_time::Timer::after(embassy_time::Duration::from_millis(100)).await;
     }
 }
 
@@ -71,6 +84,7 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(TASK1.spawn(|| Task1 {})).unwrap();
     spawner.spawn(task2()).unwrap();
+    spawner.spawn(task3()).unwrap();
 
     println!("Starting test");
 
