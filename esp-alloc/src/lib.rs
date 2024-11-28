@@ -55,7 +55,7 @@
 //! You can also get stats about the heap usage at anytime with:
 //! ```rust
 //! let stats: HeapStats = esp_alloc::HEAP.stats();
-//! // HeapStats implements the Display and defmt::Format traits, so you can pretty print the heap stats.
+//! // HeapStats implements the Display and defmt::Format traits, so you can pretty-print the heap stats.
 //! println!("{}", stats);
 //! ```
 //!
