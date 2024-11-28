@@ -76,7 +76,7 @@ async fn task3() {
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
-    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let config = esp_hal::Config::default().with_cpu_clock(CLOCK);
     let peripherals = esp_hal::init(config);
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     esp_hal_embassy::init(systimer.alarm0);
