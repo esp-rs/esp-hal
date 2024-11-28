@@ -200,12 +200,13 @@ mod tests {
             }
         }
 
-        let spi = Spi::new_with_config(
+        let spi = Spi::new(
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
                 .with_mode(SpiMode::Mode0),
-        );
+        )
+        .unwrap();
 
         Context {
             spi,

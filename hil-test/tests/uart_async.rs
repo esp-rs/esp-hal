@@ -6,7 +6,10 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::{uart::Uart, Async};
+use esp_hal::{
+    uart::{self, Uart},
+    Async,
+};
 use hil_test as _;
 
 struct Context {
@@ -24,7 +27,9 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let uart = Uart::new(peripherals.UART0, rx, tx).unwrap().into_async();
+        let uart = Uart::new(peripherals.UART0, uart::Config::default(), rx, tx)
+            .unwrap()
+            .into_async();
 
         Context { uart }
     }

@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_hal::{
-    uart::{UartRx, UartTx},
+    uart::{self, UartRx, UartTx},
     Async,
 };
 use hil_test as _;
@@ -28,8 +28,12 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx = UartTx::new(peripherals.UART0, tx).unwrap().into_async();
-        let rx = UartRx::new(peripherals.UART1, rx).unwrap().into_async();
+        let tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx)
+            .unwrap()
+            .into_async();
+        let rx = UartRx::new(peripherals.UART1, uart::Config::default(), rx)
+            .unwrap()
+            .into_async();
 
         Context { rx, tx }
     }

@@ -25,6 +25,7 @@
 //!     peripherals.I2C0,
 //!     Config::default(),
 //! )
+//! .unwrap()
 //! .with_sda(peripherals.GPIO1)
 //! .with_scl(peripherals.GPIO2);
 //!
@@ -421,7 +422,10 @@ impl<'d> I2c<'d, Blocking> {
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new(i2c: impl Peripheral<P = impl Instance> + 'd, config: Config) -> Self {
+    pub fn new(
+        i2c: impl Peripheral<P = impl Instance> + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
         Self::new_typed(i2c.map_into(), config)
     }
 }
@@ -433,7 +437,10 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_typed(i2c: impl Peripheral<P = T> + 'd, config: Config) -> Self {
+    pub fn new_typed(
+        i2c: impl Peripheral<P = T> + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
         crate::into_ref!(i2c);
 
         let guard = PeripheralGuard::new(i2c.info().peripheral);
@@ -445,8 +452,9 @@ where
             guard,
         };
 
-        unwrap!(i2c.driver().setup(&i2c.config));
-        i2c
+        i2c.driver().setup(&i2c.config)?;
+
+        Ok(i2c)
     }
 
     // TODO: missing interrupt APIs

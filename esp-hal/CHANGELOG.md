@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The timer drivers `OneShotTimer` & `PeriodicTimer` have `into_async` and `new_typed` methods (#2586)
 - `timer::Timer` trait has three new methods, `wait`, `async_interrupt_handler` and `peripheral_interrupt` (#2586)
 - Configuration structs in the I2C, SPI, and UART drivers now implement the Builder Lite pattern (#2614)
+- Added `I8080::apply_config`, `DPI::apply_config` and `Camera::apply_config` (#2610)
 
 ### Changed
 
@@ -44,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `timer::Timer` has new trait requirements of `Into<AnyTimer>`, `'static` and `InterruptConfigurable` (#2586)
 - `systimer::etm::Event` no longer borrows the alarm indefinitely (#2586)
 - A number of public enums and structs in the I2C, SPI, and UART drivers have been marked with `#[non_exhaustive]` (#2614)
+- Interrupt handling related functions are only provided for Blocking UART. (#2610)
+- Changed how `Spi`, (split or unsplit) `Uart`, `LpUart`, `I8080`, `Camera`, `DPI` and `I2C` drivers are constructed (#2610)
+- I8080, camera, DPI: The various standalone configuration options have been merged into `Config` (#2610)
 
 ### Fixed
 
@@ -58,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FrozenUnit`, `AnyUnit`, `SpecificUnit`, `SpecificComparator`, `AnyComparator` have been removed from `systimer` (#2576)
 - `esp_hal::psram::psram_range` (#2546)
 - The `Dma` structure has been removed. (#2545)
-- Remove `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
+- Removed `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
+- Removed `Camera::set_` functions (#2610)
 
 ## [0.22.0] - 2024-11-20
 

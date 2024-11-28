@@ -33,13 +33,16 @@
 //! );
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
+//! let mut config = Config::default();
+//! config.frequency = 20.MHz();
+//!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
 //!     peripherals.DMA_CH0,
 //!     tx_pins,
-//!     20.MHz(),
-//!     Config::default(),
+//!     config,
 //! )
+//! .unwrap()
 //! .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
 //!
 //! dma_buf.fill(&[0x55]);
@@ -55,7 +58,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use fugit::HertzU32;
+use fugit::{HertzU32, RateExtU32};
 
 use crate::{
     clock::Clocks,
@@ -69,6 +72,7 @@ use crate::{
         lcd::{ClockMode, DelayMode, Phase, Polarity},
         BitOrder,
         ByteOrder,
+        ClockError,
         Instance,
         Lcd,
         LCD_DONE_WAKER,
@@ -78,6 +82,14 @@ use crate::{
     Blocking,
     Mode,
 };
+
+/// A configuration error.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ConfigError {
+    /// Clock configuration error.
+    Clock(ClockError),
+}
 
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, DM: Mode> {
@@ -95,30 +107,43 @@ where
         lcd: Lcd<'d, DM>,
         channel: impl Peripheral<P = CH> + 'd,
         mut pins: P,
-        frequency: HertzU32,
         config: Config,
-    ) -> Self
+    ) -> Result<Self, ConfigError>
     where
         CH: TxChannelFor<LCD_CAM>,
         P: TxPins,
     {
         let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));
-        let lcd_cam = lcd.lcd_cam;
 
+        let mut this = Self {
+            lcd_cam: lcd.lcd_cam,
+            tx_channel,
+            _mode: PhantomData,
+        };
+
+        this.apply_config(&config)?;
+        pins.configure();
+
+        Ok(this)
+    }
+
+    /// Applies configuration.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
         let (i, divider) = calculate_clkm(
-            (frequency.to_Hz() * 2) as _,
+            (config.frequency.to_Hz() * 2) as _,
             &[
                 clocks.xtal_clock.to_Hz() as _,
                 clocks.cpu_clock.to_Hz() as _,
                 clocks.crypto_pwm_clock.to_Hz() as _,
             ],
-        );
+        )
+        .map_err(ConfigError::Clock)?;
 
-        lcd_cam.lcd_clock().write(|w| unsafe {
+        self.lcd_cam.lcd_clock().write(|w| unsafe {
             // Force enable the clock for all configuration registers.
             w.clk_en().set_bit();
             w.lcd_clk_sel().bits((i + 1) as _);
@@ -133,20 +158,20 @@ where
                 .bit(config.clock_mode.phase == Phase::ShiftHigh)
         });
 
-        lcd_cam
+        self.lcd_cam
             .lcd_ctrl()
             .write(|w| w.lcd_rgb_mode_en().clear_bit());
-        lcd_cam
+        self.lcd_cam
             .lcd_rgb_yuv()
             .write(|w| w.lcd_conv_bypass().clear_bit());
 
-        lcd_cam.lcd_user().modify(|_, w| {
+        self.lcd_cam.lcd_user().modify(|_, w| {
             w.lcd_8bits_order().bit(false);
             w.lcd_bit_order().bit(false);
             w.lcd_byte_order().bit(false);
             w.lcd_2byte_en().bit(false)
         });
-        lcd_cam.lcd_misc().write(|w| unsafe {
+        self.lcd_cam.lcd_misc().write(|w| unsafe {
             // Set the threshold for Async Tx FIFO full event. (5 bits)
             w.lcd_afifo_threshold_num().bits(0);
             // Configure the setup cycles in LCD non-RGB mode. Setup cycles
@@ -177,10 +202,10 @@ where
             // The default value of LCD_CD
             w.lcd_cd_idle_edge().bit(config.cd_idle_edge)
         });
-        lcd_cam
+        self.lcd_cam
             .lcd_dly_mode()
             .write(|w| unsafe { w.lcd_cd_mode().bits(config.cd_mode as u8) });
-        lcd_cam.lcd_data_dout_mode().write(|w| unsafe {
+        self.lcd_cam.lcd_data_dout_mode().write(|w| unsafe {
             w.dout0_mode().bits(config.output_bit_mode as u8);
             w.dout1_mode().bits(config.output_bit_mode as u8);
             w.dout2_mode().bits(config.output_bit_mode as u8);
@@ -199,15 +224,11 @@ where
             w.dout15_mode().bits(config.output_bit_mode as u8)
         });
 
-        lcd_cam.lcd_user().modify(|_, w| w.lcd_update().set_bit());
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_update().set_bit());
 
-        pins.configure();
-
-        Self {
-            lcd_cam,
-            tx_channel,
-            _mode: PhantomData,
-        }
+        Ok(())
     }
 
     /// Configures the byte order for data transmission in 16-bit mode.
@@ -523,6 +544,9 @@ pub struct Config {
     /// Specifies the clock mode, including polarity and phase settings.
     pub clock_mode: ClockMode,
 
+    /// The frequency of the pixel clock.
+    pub frequency: HertzU32,
+
     /// Setup cycles expected, must be at least 1. (6 bits)
     pub setup_cycles: usize,
 
@@ -548,6 +572,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             clock_mode: Default::default(),
+            frequency: 20.MHz(),
             setup_cycles: 1,
             hold_cycles: 1,
             cd_idle_edge: false,

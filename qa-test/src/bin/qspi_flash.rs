@@ -75,12 +75,13 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let mut spi = Spi::new_with_config(
+    let mut spi = Spi::new(
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
             .with_mode(SpiMode::Mode0),
     )
+    .unwrap()
     .with_sck(sclk)
     .with_mosi(mosi)
     .with_miso(miso)

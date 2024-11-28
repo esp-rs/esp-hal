@@ -26,10 +26,11 @@
 //! let mosi = peripherals.GPIO4;
 //! let cs = peripherals.GPIO5;
 //!
-//! let mut spi = Spi::new_with_config(
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     Config::default().with_frequency(100.kHz()).with_mode(SpiMode::Mode0)
 //! )
+//! .unwrap()
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
 //! .with_miso(miso)
@@ -1688,10 +1689,11 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 #[cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
 #[cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
 #[doc = ""]
-/// let spi = Spi::new_with_config(
+/// let spi = Spi::new(
 ///     peripherals.SPI2,
 ///     Config::default(),
-/// );
+/// )
+/// .unwrap();
 ///
 /// let spi_dma = configures_spi_dma(spi, dma_channel);
 /// # }

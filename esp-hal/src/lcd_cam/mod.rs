@@ -173,10 +173,18 @@ pub(crate) struct ClockDivider {
     pub div_a: usize,
 }
 
+/// Clock configuration errors.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ClockError {
+    /// Desired frequency was too low for the dividers to divide to
+    FrequencyTooLow,
+}
+
 pub(crate) fn calculate_clkm(
     desired_frequency: usize,
     source_frequencies: &[usize],
-) -> (usize, ClockDivider) {
+) -> Result<(usize, ClockDivider), ClockError> {
     let mut result_freq = 0;
     let mut result = None;
 
@@ -191,7 +199,7 @@ pub(crate) fn calculate_clkm(
         }
     }
 
-    result.expect("Desired frequency was too low for the dividers to divide to")
+    result.ok_or(ClockError::FrequencyTooLow)
 }
 
 fn calculate_output_frequency(source_frequency: usize, divider: &ClockDivider) -> usize {
@@ -257,15 +265,15 @@ fn calculate_closest_divider(
         }
     } else {
         let target = div_fraction;
-        let closest = farey_sequence(63)
-            .find(|curr| {
-                // https://en.wikipedia.org/wiki/Fraction#Adding_unlike_quantities
+        let closest = farey_sequence(63).find(|curr| {
+            // https://en.wikipedia.org/wiki/Fraction#Adding_unlike_quantities
 
-                let new_curr_num = curr.numerator * target.denominator;
-                let new_target_num = target.numerator * curr.denominator;
-                new_curr_num >= new_target_num
-            })
-            .expect("The fraction must be between 0 and 1");
+            let new_curr_num = curr.numerator * target.denominator;
+            let new_target_num = target.numerator * curr.denominator;
+            new_curr_num >= new_target_num
+        });
+
+        let closest = unwrap!(closest, "The fraction must be between 0 and 1");
 
         ClockDivider {
             div_num,
