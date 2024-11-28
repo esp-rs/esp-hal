@@ -549,6 +549,21 @@ where
         self
     }
 
+    /// Configure DTR pin
+    pub fn with_dtr(self, dtr: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        crate::into_mapped_ref!(dtr);
+        dtr.set_to_push_pull_output(Internal);
+        self.uart.info().dtr_signal.connect_to(dtr);
+
+        self
+    }
+
+    /// Enable RS485 mode
+    pub fn with_rs485(self) -> Self {
+        self.uart.info().register_block().rs485_conf().write(|w| w.rs485_en().set_bit());
+        self
+    }
+
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the RX half.
@@ -1074,6 +1089,18 @@ where
     /// Configure RTS pin
     pub fn with_rts(mut self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         self.tx = self.tx.with_rts(rts);
+        self
+    }
+
+    /// Configure DTR pin
+    pub fn with_dtr(mut self, dtr: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        self.tx = self.tx.with_dtr(dtr);
+        self
+    }
+
+    /// Enable RS485 mode
+    pub fn with_rs485(mut self) -> Self {
+        self.tx = self.tx.with_rs485();
         self
     }
 
@@ -2187,6 +2214,9 @@ pub struct Info {
 
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
+
+    /// DTR (Data Terminal Ready) pin
+    pub dtr_signal: OutputSignal,
 }
 
 /// Peripheral state for a UART instance.
@@ -2575,7 +2605,7 @@ impl PartialEq for Info {
 unsafe impl Sync for Info {}
 
 macro_rules! impl_instance {
-    ($inst:ident, $peri:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
+    ($inst:ident, $peri:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident, $dtr:ident) => {
         impl Instance for crate::peripherals::$inst {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[crate::macros::handler]
@@ -2599,6 +2629,7 @@ macro_rules! impl_instance {
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
                     rts_signal: OutputSignal::$rts,
+                    dtr_signal: OutputSignal::$dtr,
                 };
                 (&PERIPHERAL, &STATE)
             }
@@ -2606,10 +2637,10 @@ macro_rules! impl_instance {
     };
 }
 
-impl_instance!(UART0, Uart0, U0TXD, U0RXD, U0CTS, U0RTS);
-impl_instance!(UART1, Uart1, U1TXD, U1RXD, U1CTS, U1RTS);
+impl_instance!(UART0, Uart0, U0TXD, U0RXD, U0CTS, U0RTS, U0DTR);
+impl_instance!(UART1, Uart1, U1TXD, U1RXD, U1CTS, U1RTS, U1DTR);
 #[cfg(uart2)]
-impl_instance!(UART2, Uart2, U2TXD, U2RXD, U2CTS, U2RTS);
+impl_instance!(UART2, Uart2, U2TXD, U2RXD, U2CTS, U2RTS, U2DTR);
 
 crate::any_peripheral! {
     /// Any UART peripheral.
