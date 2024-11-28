@@ -401,7 +401,7 @@ where
     }
 }
 
-impl<'d, I, BUF, DM> Deref for I2sParallelTransfer<'d, BUF, DM, I>
+impl<I, BUF, DM> Deref for I2sParallelTransfer<'_, BUF, DM, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
@@ -414,7 +414,7 @@ where
     }
 }
 
-impl<'d, I, BUF, DM> DerefMut for I2sParallelTransfer<'d, BUF, DM, I>
+impl<I, BUF, DM> DerefMut for I2sParallelTransfer<'_, BUF, DM, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
@@ -425,7 +425,7 @@ where
     }
 }
 
-impl<'d, I, BUF, DM> Drop for I2sParallelTransfer<'d, BUF, DM, I>
+impl<I, BUF, DM> Drop for I2sParallelTransfer<'_, BUF, DM, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,

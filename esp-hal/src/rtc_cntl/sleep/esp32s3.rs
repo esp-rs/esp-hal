@@ -234,7 +234,7 @@ impl Drop for Ext1WakeupSource<'_, '_> {
     }
 }
 
-impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
+impl RtcioWakeupSource<'_, '_> {
     fn apply_pin(&self, pin: &mut dyn RtcPin, level: WakeupLevel) {
         let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
 
