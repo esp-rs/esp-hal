@@ -219,7 +219,7 @@ pub(crate) fn backtrace_internal(
     result
 }
 
-#[cfg(feature = "exception-handler")]
+#[cfg(all(feature = "exception-handler", not(feature = "coredump")))]
 #[export_name = "ExceptionHandler"]
 fn exception_handler(context: TrapFrame) -> ! {
     pre_backtrace();
@@ -288,6 +288,69 @@ fn exception_handler(context: TrapFrame) -> ! {
 
     #[cfg(feature = "colors")]
     set_color_code(RESET);
+
+    #[cfg(feature = "semihosting")]
+    semihosting::process::abort();
+
+    #[cfg(not(feature = "semihosting"))]
+    halt();
+}
+
+#[cfg(all(feature = "exception-handler", feature = "coredump"))]
+#[export_name = "ExceptionHandler"]
+fn exception_handler(context: &arch::TrapFrame) -> ! {
+    use core::ptr::addr_of;
+
+    let regs = coredump::Registers {
+        pc: context.pc as u32,
+        x1: context.ra as u32,
+        x2: context.sp as u32,
+        x3: context.gp as u32,
+        x4: context.tp as u32,
+        x5: context.t0 as u32,
+        x6: context.t1 as u32,
+        x7: context.t2 as u32,
+        x8: context.s0 as u32,
+        x9: context.s1 as u32,
+        x10: context.a0 as u32,
+        x11: context.a1 as u32,
+        x12: context.a2 as u32,
+        x13: context.a3 as u32,
+        x14: context.a4 as u32,
+        x15: context.a5 as u32,
+        x16: context.a6 as u32,
+        x17: context.a7 as u32,
+        x18: context.s2 as u32,
+        x19: context.s3 as u32,
+        x20: context.s4 as u32,
+        x21: context.s5 as u32,
+        x22: context.s6 as u32,
+        x23: context.s7 as u32,
+        x24: context.s8 as u32,
+        x25: context.s9 as u32,
+        x26: context.s10 as u32,
+        x27: context.s11 as u32,
+        x28: context.t3 as u32,
+        x29: context.t4 as u32,
+        x30: context.t5 as u32,
+        x31: context.t6 as u32,
+    };
+
+    let mut writer = crate::coredump::DumpWriter {};
+
+    let start = regs.x2 - 256;
+    let end = addr_of!(_stack_start) as u32;
+    let len = (end - start) as usize;
+
+    let slice = unsafe { core::slice::from_raw_parts(start as *const u8, len) };
+    let mem = coredump::Memory {
+        start: start as u32,
+        slice,
+    };
+
+    println!("@COREDUMP");
+    coredump::dump(&mut writer, &regs, mem);
+    println!("@ENDCOREDUMP");
 
     #[cfg(feature = "semihosting")]
     semihosting::process::abort();
