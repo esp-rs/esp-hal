@@ -1491,11 +1491,72 @@ where
 
     /// Listen for interrupts.
     ///
+    /// The interrupts will be handled by the handler set using
+    /// [`Io::set_interrupt_handler`]. All GPIO pins share the same
+    /// interrupt handler.
+    ///
     /// Note that [`Event::LowLevel`] and [`Event::HighLevel`] are fired
     /// continuously when the pin is low or high, respectively. You must use
     /// a custom interrupt handler to stop listening for these events,
     /// otherwise your program will be stuck in a loop as long as the pin is
     /// reading the corresponding level.
+    ///
+    /// ## Example: print something when a button is pressed.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// use esp_hal::gpio::{Event, Input, Pull, Io};
+    ///
+    /// let mut io = Io::new(peripherals.IO_MUX);
+    /// io.set_interrupt_handler(handler);
+    ///
+    /// // Set up the input and store it in the static variable.
+    /// // This example uses a push button that is high when not
+    /// // pressed and low when pressed.
+    /// let mut button = Input::new(peripherals.GPIO5, Pull::Up);
+    ///
+    /// critical_section::with(|cs| {
+    ///     // Here we are listening for a low level to demonstrate
+    ///     // that you need to stop listening for level interrupts,
+    ///     // but usually you'd probably use `FallingEdge`.
+    ///     button.listen(Event::LowLevel);
+    ///     BUTTON.borrow_ref_mut(cs).replace(button);
+    /// });
+    /// # }
+    ///
+    /// // Outside of your `main` function:
+    ///
+    /// # use esp_hal::gpio::Input;
+    /// use core::cell::RefCell;
+    /// use critical_section::Mutex;
+    ///
+    /// // You will need to store the `Input` object in a static variable so
+    /// // that the interrupt handler can access it.
+    /// static BUTTON: Mutex<RefCell<Option<Input>>> =
+    ///     Mutex::new(RefCell::new(None));
+    ///
+    /// #[handler]
+    /// fn handler() {
+    ///     critical_section::with(|cs| {
+    ///         let mut button = BUTTON.borrow_ref_mut(cs);
+    ///         let Some(button) = button.as_mut() else {
+    ///             // Some other interrupt has occurred
+    ///             // before the button was set up.
+    ///             return;
+    ///         };
+    ///
+    ///         if button.is_interrupt_set() {
+    ///             print!("Button pressed");
+    ///
+    ///             // If you want to stop listening for interrupts, you need to
+    ///             // call `unlisten` here. If you comment this line, the
+    ///             // interruptwill fire continuously while the button
+    ///             // is pressed.
+    ///             button.unlisten();
+    ///         }
+    ///     });
+    /// }
+    /// ```
     #[inline]
     pub fn listen(&mut self, event: Event) {
         self.pin.listen(event);
@@ -1712,14 +1773,16 @@ where
 
     /// Listen for interrupts.
     ///
-    /// Note that [`Event::LowLevel`] and [`Event::HighLevel`] are fired
-    /// continuously when the pin is low or high, respectively. You must use
-    /// a custom interrupt handler to stop listening for these events,
-    /// otherwise your program will be stuck in a loop as long as the pin is
-    /// reading the corresponding level.
+    /// See [`Input::listen`] for more information and an example.
     #[inline]
     pub fn listen(&mut self, event: Event) {
         self.pin.listen(event);
+    }
+
+    /// Stop listening for interrupts.
+    #[inline]
+    pub fn unlisten(&mut self) {
+        self.pin.unlisten();
     }
 
     /// Clear the interrupt status bit for this Pin
@@ -1879,11 +1942,7 @@ where
 
     /// Listen for interrupts.
     ///
-    /// Note that [`Event::LowLevel`] and [`Event::HighLevel`] are fired
-    /// continuously when the pin is low or high, respectively. You must use
-    /// a custom interrupt handler to stop listening for these events,
-    /// otherwise your program will be stuck in a loop as long as the pin is
-    /// reading the corresponding level.
+    /// See [`Input::listen`] for more information and an example.
     #[inline]
     pub fn listen(&mut self, event: Event) {
         self.listen_with_options(event, true, false, false)
