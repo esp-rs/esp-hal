@@ -137,7 +137,11 @@ pub fn build_documentation(workspace: &Path, package: Package, chip: Chip) -> Re
     log::debug!("{args:#?}");
 
     // Execute `cargo doc` from the package root:
-    cargo::run(&args, &package_path)?;
+    cargo::run_with_env(
+        &args,
+        &package_path,
+        [("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs")],
+    )?;
 
     let docs_path = windows_safe_path(
         &workspace

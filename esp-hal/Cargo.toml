@@ -40,6 +40,7 @@ enumset                  = "1.1.5"
 esp-build                = { version = "0.1.0", path = "../esp-build" }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                    = "0.3.7"
+instability              = "0.3"
 log                      = { version = "0.4.22", optional = true }
 nb                       = "1.1.0"
 paste                    = "1.0.15"
@@ -151,6 +152,9 @@ octal-psram = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["defmt", "bluetooth"]
+
+# Enables APIs that are not stable and thus come with no stability guarantees.
+unstable = []
 
 [lints.clippy]
 mixed_attributes_style = "allow"
