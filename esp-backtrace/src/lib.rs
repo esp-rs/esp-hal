@@ -65,11 +65,19 @@ fn set_color_code(code: &str) {
     }
 }
 
+#[cfg(feature = "coredump")]
+pub(crate) mod coredump;
+
 #[cfg_attr(target_arch = "riscv32", path = "riscv.rs")]
 #[cfg_attr(target_arch = "xtensa", path = "xtensa.rs")]
 pub mod arch;
 
-#[cfg(feature = "panic-handler")]
+extern "C" {
+    static _stack_start: u32;
+    static _stack_end: u32;
+}
+
+#[cfg(all(feature = "panic-handler", not(feature = "coredump")))]
 #[panic_handler]
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     pre_backtrace();
@@ -110,6 +118,29 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     semihosting::process::abort();
 
     #[cfg(not(feature = "semihosting"))]
+    halt();
+}
+
+#[cfg(all(feature = "panic-handler", feature = "coredump"))]
+#[panic_handler]
+fn panic_handler(info: &core::panic::PanicInfo) -> ! {
+    println!("");
+    println!("====================== PANIC ======================");
+
+    #[cfg(not(feature = "defmt"))]
+    println!("{}", info);
+
+    #[cfg(feature = "defmt")]
+    println!("{}", defmt::Display2Format(info));
+
+    unsafe {
+        #[cfg(target_arch = "riscv32")]
+        core::arch::asm!("ecall");
+
+        #[cfg(target_arch = "xtensa")]
+        core::arch::asm!("syscall");
+    }
+
     halt();
 }
 
