@@ -57,6 +57,7 @@
 
 use portable_atomic::{AtomicPtr, AtomicU32, Ordering};
 use procmacros::ram;
+use strum::EnumCount;
 
 #[cfg(any(lp_io, rtc_cntl))]
 use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
@@ -546,7 +547,7 @@ pub trait TouchPin: Pin {
 }
 
 #[doc(hidden)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, EnumCount)]
 pub enum GpioRegisterAccess {
     Bank0,
     #[cfg(gpio_bank_1)]
@@ -565,11 +566,9 @@ impl From<usize> for GpioRegisterAccess {
 }
 
 impl GpioRegisterAccess {
-    pub const BANK_COUNT: usize = 1 + cfg!(gpio_bank_1) as usize;
-
     fn async_operations(self) -> &'static AtomicU32 {
-        static FLAGS: [AtomicU32; GpioRegisterAccess::BANK_COUNT] =
-            [const { AtomicU32::new(0) }; GpioRegisterAccess::BANK_COUNT];
+        static FLAGS: [AtomicU32; GpioRegisterAccess::COUNT] =
+            [const { AtomicU32::new(0) }; GpioRegisterAccess::COUNT];
 
         &FLAGS[self as usize]
     }
