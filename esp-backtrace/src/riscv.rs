@@ -263,22 +263,23 @@ fn exception_handler(context: TrapFrame) -> ! {
             "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}",
             code, mepc, mtval
         );
+
         #[cfg(not(feature = "defmt"))]
         println!("{:x?}", context);
 
         #[cfg(feature = "defmt")]
         println!("{:?}", context);
 
-        let backtrace = crate::arch::backtrace_internal(context.s0 as u32, 0);
+        let backtrace = backtrace_internal(context.s0 as u32, 0);
         if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
             println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
         }
         for addr in backtrace.into_iter().flatten() {
             #[cfg(all(feature = "colors", feature = "println"))]
-            println!("{}0x{:x}", RED, addr - crate::arch::RA_OFFSET);
+            println!("{}0x{:x}", RED, addr - RA_OFFSET);
 
             #[cfg(not(all(feature = "colors", feature = "println")))]
-            println!("0x{:x}", addr - crate::arch::RA_OFFSET);
+            println!("0x{:x}", addr - RA_OFFSET);
         }
     }
 
@@ -298,8 +299,51 @@ fn exception_handler(context: TrapFrame) -> ! {
 
 #[cfg(all(feature = "exception-handler", feature = "coredump"))]
 #[export_name = "ExceptionHandler"]
-fn exception_handler(context: &arch::TrapFrame) -> ! {
+fn exception_handler(context: &TrapFrame) -> ! {
     use core::ptr::addr_of;
+
+    let mepc = context.pc;
+    let code = context.mcause & 0xff;
+    let mtval = context.mtval;
+
+    #[cfg(feature = "colors")]
+    set_color_code(RED);
+
+    if code == 14 {
+        println!("");
+        println!(
+            "Stack overflow detected at 0x{:x} called by 0x{:x}",
+            mepc, context.ra
+        );
+        println!("");
+    } else if code != 11 {
+        let code = match code {
+            0 => "Instruction address misaligned",
+            1 => "Instruction access fault",
+            2 => "Illegal instruction",
+            3 => "Breakpoint",
+            4 => "Load address misaligned",
+            5 => "Load access fault",
+            6 => "Store/AMO address misaligned",
+            7 => "Store/AMO access fault",
+            8 => "Environment call from U-mode",
+            9 => "Environment call from S-mode",
+            10 => "Reserved",
+            11 => "Environment call from M-mode",
+            12 => "Instruction page fault",
+            13 => "Load page fault",
+            14 => "Reserved",
+            15 => "Store/AMO page fault",
+            _ => "UNKNOWN",
+        };
+
+        println!(
+            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}",
+            code, mepc, mtval
+        );
+    }
+    #[cfg(feature = "colors")]
+    set_color_code(RESET);
 
     let regs = coredump::Registers {
         pc: context.pc as u32,

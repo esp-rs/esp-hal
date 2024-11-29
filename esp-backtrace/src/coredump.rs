@@ -1,5 +1,3 @@
-use esp_println::print;
-
 const HEADER_SIZE: u32 = 0x34;
 const PROGRAM_HEADER_SIZE: u32 = 0x20;
 const REG_INFO_HEADER_SIZE: usize = 20;
