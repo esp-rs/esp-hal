@@ -427,7 +427,7 @@ pub(crate) fn backtrace_internal(
 #[cfg(all(feature = "exception-handler", not(feature = "coredump")))]
 #[no_mangle]
 #[link_section = ".rwtext"]
-unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
+unsafe fn __user_exception(cause: ExceptionCause, context: Context) {
     pre_backtrace();
 
     #[cfg(feature = "colors")]
@@ -442,7 +442,7 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
 
     println!("{:?}", context);
 
-    let backtrace = crate::arch::backtrace_internal(context.A1, 0);
+    let backtrace = backtrace_internal(context.A1, 0);
     for e in backtrace {
         if let Some(addr) = e {
             println!("0x{:x}", addr);
@@ -465,8 +465,21 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
 #[cfg(all(feature = "exception-handler", feature = "coredump"))]
 #[no_mangle]
 #[link_section = ".rwtext"]
-unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
-    println!("{:?}", context);
+unsafe fn __user_exception(cause: ExceptionCause, context: Context) {
+    #[cfg(feature = "colors")]
+    set_color_code(RED);
+
+    if cause != ExceptionCause::Syscall {
+        // Unfortunately, a different formatter string is used
+        #[cfg(not(feature = "defmt"))]
+        esp_println::println!("\n\nException occurred '{}'", cause);
+
+        #[cfg(feature = "defmt")]
+        defmt::error!("\n\nException occurred '{}'", cause);
+    }
+
+    #[cfg(feature = "colors")]
+    set_color_code(RESET);
 
     fn sanitize(addr: u32) -> u32 {
         if (addr & 0x8000_0000) != 0 {
@@ -516,7 +529,7 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
 
     println!("@COREDUMP");
     coredump::dump(&mut writer, &regs, mem);
-    println!();
+    println!("@ENDCOREDUMP");
 
     #[cfg(feature = "semihosting")]
     semihosting::process::abort();

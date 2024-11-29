@@ -124,6 +124,9 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 #[cfg(all(feature = "panic-handler", feature = "coredump"))]
 #[panic_handler]
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
+    #[cfg(feature = "colors")]
+    set_color_code(RED);
+
     println!("");
     println!("====================== PANIC ======================");
 
@@ -132,6 +135,9 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 
     #[cfg(feature = "defmt")]
     println!("{}", defmt::Display2Format(info));
+
+    #[cfg(feature = "colors")]
+    set_color_code(RESET);
 
     unsafe {
         #[cfg(target_arch = "riscv32")]
