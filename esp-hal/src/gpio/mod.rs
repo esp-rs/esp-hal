@@ -914,33 +914,25 @@ fn handle_pin_interrupts(user_handler: fn()) {
     #[cfg(any(esp32, esp32s2, esp32s3))]
     Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
 
-    // Get the async pins and also unmark them in the same go.
-    let bank0_async = GpioRegisterAccess::Bank0
-        .async_operations()
-        .fetch_and(!intrs_bank0, Ordering::Release);
+    let banks = [
+        (GpioRegisterAccess::Bank0, intrs_bank0),
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        (GpioRegisterAccess::Bank1, intrs_bank1),
+    ];
 
-    // Wake up the tasks
-    let mut intr_bits = intrs_bank0 & bank0_async;
-    while intr_bits != 0 {
-        let pin_nr = intr_bits.trailing_zeros();
-        intr_bits -= 1 << pin_nr;
-        asynch::PIN_WAKERS[pin_nr as usize].wake();
-        set_int_enable(pin_nr as u8, 0, 0, false);
-    }
+    for (bank, intrs) in banks {
+        // Get the mask of active async pins and also unmark them in the same go.
+        let async_pins = bank.async_operations().fetch_and(!intrs, Ordering::Release);
 
-    // Now repeat for Bank1 if it exists.
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    {
-        let bank1_async = GpioRegisterAccess::Bank1
-            .async_operations()
-            .fetch_and(!intrs_bank1, Ordering::Release);
-
-        let mut intr_bits = intrs_bank1 & bank1_async;
+        // Wake up the tasks
+        let mut intr_bits = intrs & async_pins;
         while intr_bits != 0 {
-            let pin_nr = intr_bits.trailing_zeros();
-            intr_bits -= 1 << pin_nr;
-            asynch::PIN_WAKERS[pin_nr as usize + 32].wake();
-            set_int_enable(pin_nr as u8 + 32, 0, 0, false);
+            let pin_pos = intr_bits.trailing_zeros();
+            intr_bits -= 1 << pin_pos;
+
+            let pin_nr = pin_pos as u8 + bank.offset();
+            asynch::PIN_WAKERS[pin_nr as usize].wake();
+            set_int_enable(pin_nr, 0, 0, false);
         }
     }
 }
