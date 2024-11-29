@@ -925,7 +925,7 @@ fn handle_pin_interrupts(user_handler: fn()) {
 
             let pin_nr = pin_pos as u8 + bank.offset();
             asynch::PIN_WAKERS[pin_nr as usize].wake();
-            set_int_enable(pin_nr, 0, 0, false);
+            set_int_enable(pin_nr, Some(0), 0, false);
         }
 
         bank.write_interrupt_status_clear(intrs);
@@ -1921,7 +1921,7 @@ where
 
         set_int_enable(
             self.pin.number(),
-            gpio_intr_enable(int_enable, nmi_enable),
+            Some(gpio_intr_enable(int_enable, nmi_enable)),
             event as u8,
             wake_up_from_light_sleep,
         )
@@ -1938,7 +1938,7 @@ where
     /// Stop listening for interrupts.
     #[inline]
     pub fn unlisten(&mut self) {
-        set_int_enable(self.pin.number(), 0, 0, false);
+        set_int_enable(self.pin.number(), Some(0), 0, false);
     }
 
     /// Check if the pin is listening for interrupts.
@@ -2266,11 +2266,20 @@ pub(crate) mod internal {
     }
 }
 
-fn set_int_enable(gpio_num: u8, int_ena: u8, int_type: u8, wake_up_from_light_sleep: bool) {
+/// Set GPIO event listening.
+///
+/// - `gpio_num`: the pin to configure
+/// - `int_ena`: maskable and non-maskable CPU interrupt bits. None to leave
+///   unchanged.
+/// - `int_type`: interrupt type, see [Event] (or 0 to disable)
+/// - `wake_up_from_light_sleep`: whether to wake up from light sleep
+fn set_int_enable(gpio_num: u8, int_ena: Option<u8>, int_type: u8, wake_up_from_light_sleep: bool) {
     unsafe { GPIO::steal() }
         .pin(gpio_num as usize)
         .modify(|_, w| unsafe {
-            w.int_ena().bits(int_ena);
+            if let Some(int_ena) = int_ena {
+                w.int_ena().bits(int_ena);
+            }
             w.int_type().bits(int_type);
             w.wakeup_enable().bit(wake_up_from_light_sleep)
         });
@@ -2317,7 +2326,12 @@ mod asynch {
 
             // Make sure this pin is not being processed by an interrupt handler.
             if future.pin.is_listening() {
-                future.pin.unlisten();
+                set_int_enable(
+                    future.pin.number(),
+                    None, // Do not disable handling pending interrupts.
+                    0,    // Disable generating new events
+                    false,
+                );
                 poll_fn(|cx| {
                     if future.pin.is_interrupt_set() {
                         cx.waker().wake_by_ref();
@@ -2478,7 +2492,14 @@ mod asynch {
             if self.pin.is_listening() {
                 // Make sure the future isn't dropped while the interrupt is being handled.
                 // This prevents tricky drop-and-relisten scenarios.
-                self.pin.unlisten();
+
+                set_int_enable(
+                    self.pin.number(),
+                    None, // Do not disable handling pending interrupts.
+                    0,    // Disable generating new events
+                    false,
+                );
+
                 while self.pin.is_interrupt_set() {}
 
                 // Unmark pin as async
