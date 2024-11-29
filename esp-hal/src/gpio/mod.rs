@@ -907,12 +907,6 @@ fn handle_pin_interrupts(user_handler: fn()) {
 
     user_handler();
 
-    // Clear interrupt bits early so that we catch repeat interrupts with larger
-    // probability.
-    Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
-    #[cfg(gpio_bank_1)]
-    Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
-
     let banks = [
         (GpioRegisterAccess::Bank0, intrs_bank0),
         #[cfg(gpio_bank_1)]
@@ -921,7 +915,7 @@ fn handle_pin_interrupts(user_handler: fn()) {
 
     for (bank, intrs) in banks {
         // Get the mask of active async pins and also unmark them in the same go.
-        let async_pins = bank.async_operations().fetch_and(!intrs, Ordering::Release);
+        let async_pins = bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
 
         // Wake up the tasks
         let mut intr_bits = intrs & async_pins;
@@ -934,6 +928,10 @@ fn handle_pin_interrupts(user_handler: fn()) {
             set_int_enable(pin_nr, 0, 0, false);
         }
     }
+
+    Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
+    #[cfg(gpio_bank_1)]
+    Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
 }
 
 #[doc(hidden)]
@@ -2290,7 +2288,10 @@ fn is_int_enabled(gpio_num: u8) -> bool {
 }
 
 mod asynch {
-    use core::task::{Context, Poll};
+    use core::{
+        future::poll_fn,
+        task::{Context, Poll},
+    };
 
     use super::*;
     use crate::asynch::AtomicWaker;
@@ -2312,7 +2313,37 @@ mod asynch {
         /// [`listen`][Self::listen] operations for this pin.
         #[inline]
         pub async fn wait_for(&mut self, event: Event) {
-            PinFuture::new(self, event).await
+            let mut future = PinFuture {
+                pin: unsafe { self.clone_unchecked() },
+            };
+
+            // Make sure this pin is not being processed by an interrupt handler.
+            if future.pin.is_listening() {
+                future.pin.unlisten();
+                poll_fn(|cx| {
+                    if future.pin.is_interrupt_set() {
+                        cx.waker().wake_by_ref();
+                        Poll::Pending
+                    } else {
+                        Poll::Ready(())
+                    }
+                })
+                .await;
+            }
+
+            // At this point the pin is no longer listening, we can safely
+            // do our setup.
+
+            // Mark pin as async.
+            future
+                .pin
+                .gpio_bank(private::Internal)
+                .async_operations()
+                .fetch_or(future.pin_mask(), Ordering::Relaxed);
+
+            future.pin.listen(event);
+
+            future.await
         }
 
         /// Wait until the pin is high.
@@ -2408,45 +2439,33 @@ mod asynch {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     struct PinFuture<'d, P: InputPin> {
         pin: Flex<'d, P>,
-        resolved: bool,
     }
 
     impl<'d, P: InputPin> PinFuture<'d, P> {
-        fn new(pin: &'d mut Flex<'_, P>, event: Event) -> Self {
-            let mut this = Self {
-                pin: unsafe { pin.clone_unchecked() },
-                resolved: false,
-            };
-
-            // Mark pin as async
-            this.pin
-                .gpio_bank(private::Internal)
-                .async_operations()
-                .fetch_or(this.pin_mask(), Ordering::Relaxed);
-
-            this.pin.listen(event);
-
-            this
-        }
-
         fn pin_mask(&self) -> u32 {
             let bank = self.pin.gpio_bank(private::Internal);
             1 << (self.pin.number() - bank.offset())
         }
 
         fn is_done(&self) -> bool {
-            !self.pin.is_listening()
+            // Only the interrupt handler should clear the async bit, and only if the
+            // specific pin is handling an interrupt.
+            self.pin
+                .gpio_bank(private::Internal)
+                .async_operations()
+                .load(Ordering::Acquire)
+                & self.pin_mask()
+                == 0
         }
     }
 
     impl<P: InputPin> core::future::Future for PinFuture<'_, P> {
         type Output = ();
 
-        fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             PIN_WAKERS[self.pin.number() as usize].register(cx.waker());
 
             if self.is_done() {
-                self.resolved = true;
                 Poll::Ready(())
             } else {
                 Poll::Pending
@@ -2456,8 +2475,13 @@ mod asynch {
 
     impl<P: InputPin> Drop for PinFuture<'_, P> {
         fn drop(&mut self) {
-            if !self.resolved {
+            // If the pin isn't listening, the future has either been dropped before setup,
+            // or the interrupt has already been handled.
+            if self.pin.is_listening() {
+                // Make sure the future isn't dropped while the interrupt is being handled.
+                // This prevents tricky drop-and-relisten scenarios.
                 self.pin.unlisten();
+                while self.pin.is_interrupt_set() {}
 
                 // Unmark pin as async
                 self.pin
