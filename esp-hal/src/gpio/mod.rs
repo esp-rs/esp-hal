@@ -1537,7 +1537,7 @@ where
     ///
     ///             // If you want to stop listening for interrupts, you need to
     ///             // call `unlisten` here. If you comment this line, the
-    ///             // interruptwill fire continuously while the button
+    ///             // interrupt will fire continuously while the button
     ///             // is pressed.
     ///             button.unlisten();
     ///         }
