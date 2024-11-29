@@ -58,6 +58,7 @@ symbols = [
     "ulp_riscv_core",
     "timg_timer1",
     "large_intr_status",
+    "gpio_bank_1",
 
     # ROM capabilities
     "rom_crc_le",
