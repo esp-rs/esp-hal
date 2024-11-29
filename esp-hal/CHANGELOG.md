@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `I8080::apply_config`, `DPI::apply_config` and `Camera::apply_config` (#2610)
 - Introduced the `unstable` feature which will be used to restrict stable APIs to a subset of esp-hal. (#2628)
 - HAL configuration structs now implement the Builder Lite pattern (#2645)
+- Added `OutputOpenDrain::unlisten` (#2625)
+- Added `{Input, Flex}::wait_for` (#2625)
 
 ### Changed
 
@@ -50,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interrupt handling related functions are only provided for Blocking UART. (#2610)
 - Changed how `Spi`, (split or unsplit) `Uart`, `LpUart`, `I8080`, `Camera`, `DPI` and `I2C` drivers are constructed (#2610)
 - I8080, camera, DPI: The various standalone configuration options have been merged into `Config` (#2610)
+- Dropped GPIO futures stop listening for interrupts (#2625)
 
 ### Fixed
 
