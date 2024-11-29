@@ -927,11 +927,9 @@ fn handle_pin_interrupts(user_handler: fn()) {
             asynch::PIN_WAKERS[pin_nr as usize].wake();
             set_int_enable(pin_nr, 0, 0, false);
         }
-    }
 
-    Bank0GpioRegisterAccess::write_interrupt_status_clear(intrs_bank0);
-    #[cfg(gpio_bank_1)]
-    Bank1GpioRegisterAccess::write_interrupt_status_clear(intrs_bank1);
+        bank.write_interrupt_status_clear(intrs);
+    }
 }
 
 #[doc(hidden)]
