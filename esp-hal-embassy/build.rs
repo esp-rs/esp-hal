@@ -1,7 +1,7 @@
 use std::{error::Error, str::FromStr};
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, Value};
+use esp_config::{generate_config, Validator, Value};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -46,6 +46,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             "Enables the lower-power wait if no tasks are ready to run on the thread-mode executor. This allows the MCU to use less power if the workload allows. Recommended for battery-powered systems. May impact analog performance.",
             Value::Bool(true),
             None
+        ),
+        (
+            "generic-queue-size",
+            "The size of the generic queue. Only used if `generic-queue` is enabled.",
+            Value::Integer(64),
+            Some(Validator::PositiveInteger),
         )],
         true,
     );
