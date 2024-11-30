@@ -2,12 +2,14 @@
 
 use core::marker::PhantomData;
 
-use embassy_executor::{raw, Spawner};
+use embassy_executor::Spawner;
 use esp_hal::Cpu;
 #[cfg(multi_core)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, macros::handler};
 #[cfg(low_power_wait)]
 use portable_atomic::{AtomicBool, Ordering};
+
+use super::InnerExecutor;
 
 pub(crate) const THREAD_MODE_CONTEXT: usize = 16;
 
@@ -55,7 +57,7 @@ pub(crate) fn pend_thread_mode(_core: usize) {
 create one instance per core. The executors don't steal tasks from each other."
 )]
 pub struct Executor {
-    inner: raw::Executor,
+    inner: InnerExecutor,
     not_send: PhantomData<*mut ()>,
 }
 
@@ -74,7 +76,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         }
 
         Self {
-            inner: raw::Executor::new((THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut ()),
+            inner: InnerExecutor::new((THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut ()),
             not_send: PhantomData,
         }
     }
@@ -100,16 +102,15 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
-        unsafe {
-            self.inner.initialize();
-        }
-        init(self.inner.spawner());
+        self.inner.init();
+
+        init(self.inner.inner.spawner());
 
         #[cfg(low_power_wait)]
         let cpu = Cpu::current() as usize;
 
         loop {
-            unsafe { self.inner.poll() };
+            unsafe { self.inner.inner.poll() };
 
             #[cfg(low_power_wait)]
             Self::wait_impl(cpu);

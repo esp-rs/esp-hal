@@ -28,7 +28,7 @@ esp32h2 = ["esp-backtrace/esp32h2", "esp-hal/esp32h2", "esp-hal-embassy/esp32h2"
 esp32s2 = ["esp-backtrace/esp32s2", "esp-hal/esp32s2", "esp-hal-embassy/esp32s2", "esp-println/esp32s2"]
 esp32s3 = ["esp-backtrace/esp32s3", "esp-hal/esp32s3", "esp-hal-embassy/esp32s3", "esp-println/esp32s3"]
 
-embassy-generic-timers = ["embassy-time/generic-queue-8"]
+embassy-generic-timers = ["esp-hal-embassy/generic-queue"]
 
 [profile.release]
 debug         = 2
@@ -40,3 +40,4 @@ codegen-units = 1
 embassy-executor    = { path = "C:/_Hobby/CardIo/embassy/embassy-executor" }
 embassy-time        = { path = "C:/_Hobby/CardIo/embassy/embassy-time" }
 embassy-time-driver = { path = "C:/_Hobby/CardIo/embassy/embassy-time-driver" }
+embassy-time-queue-driver = { path = "C:/_Hobby/CardIo/embassy/embassy-time-queue-driver" }
