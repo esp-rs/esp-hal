@@ -34,14 +34,17 @@ impl TimerQueue {
     }
 
     pub fn dispatch(&self) {
+        let now = esp_hal::time::now().ticks();
+        let next_expiration = self.inner.with(|q| adapter::dequeue(q, now));
+        self.arm_alarm(next_expiration);
+    }
+
+    fn arm_alarm(&self, mut next_expiration: u64) {
         let alarm = self.alarm();
 
-        loop {
-            let now = adapter::now();
-            let next_expiration = self.inner.with(|q| adapter::dequeue(q, now));
-            if alarm.update(next_expiration) {
-                break;
-            }
+        while !alarm.update(next_expiration) {
+            // next_expiration is in the past, dequeue and find a new expiration
+            next_expiration = self.inner.with(|q| adapter::dequeue(q, next_expiration));
         }
     }
 }
@@ -69,20 +72,15 @@ mod adapter {
     use embassy_executor::raw;
 
     pub(super) type RawQueue = raw::timer_queue::TimerQueue;
-    pub(super) type Instant = u64;
 
-    pub(super) fn now() -> Instant {
-        esp_hal::time::now().ticks()
-    }
-
-    pub(super) fn dequeue(q: &mut RawQueue, now: Instant) -> u64 {
+    pub(super) fn dequeue(q: &mut RawQueue, now: u64) -> u64 {
         unsafe { q.next_expiration(now, embassy_executor::raw::wake_task) }
     }
 
     impl super::TimerQueue {
         pub fn schedule_wake(&self, task: raw::TaskRef, at: u64) {
             if unsafe { self.inner.with(|q| q.schedule_wake(task, at)) } {
-                self.dispatch();
+                self.arm_alarm(at);
             }
         }
     }
@@ -92,17 +90,14 @@ mod adapter {
 mod adapter {
     use core::task::Waker;
 
+    use embassy_time::Instant;
+
     pub(super) type RawQueue = embassy_time::queue_generic::Queue<
         { esp_config::esp_config_int!(usize, "ESP_HAL_EMBASSY_GENERIC_QUEUE_SIZE") },
     >;
-    pub(super) type Instant = embassy_time::Instant;
 
-    pub(super) fn now() -> Instant {
-        Instant::now()
-    }
-
-    pub(super) fn dequeue(q: &mut RawQueue, now: Instant) -> u64 {
-        q.next_expiration(now).as_ticks()
+    pub(super) fn dequeue(q: &mut RawQueue, now: u64) -> u64 {
+        q.next_expiration(Instant::from_ticks(now)).as_ticks()
     }
 
     impl super::TimerQueue {
@@ -111,7 +106,7 @@ mod adapter {
                 .inner
                 .with(|q| q.schedule_wake(Instant::from_ticks(at), waker))
             {
-                self.dispatch();
+                self.arm_alarm(at);
             }
         }
     }
