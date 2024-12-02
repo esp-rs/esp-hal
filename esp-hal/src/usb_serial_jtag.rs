@@ -32,8 +32,8 @@
 //! The USB Serial/JTAG driver implements a number of third-party traits, with
 //! the intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes, but is not limited to, the [embedded-hal]
-//! and [embedded-io] blocking traits, and the [embedded-hal-async] and
-//! [embedded-io-async] asynchronous traits.
+//! and [embedded-io] (`unstable`) blocking traits, and the [embedded-hal-async]
+//! and [embedded-io-async] (`unstable`) asynchronous traits.
 //!
 //! In addition to the interfaces provided by these traits, native APIs are also
 //! available. See the examples below for more information on how to interact
@@ -126,7 +126,9 @@
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
 //! [embedded-io-async]: https://docs.rs/embedded-io-async/latest/embedded_io_async/
 
-use core::{convert::Infallible, marker::PhantomData, task::Poll};
+#[cfg(feature = "unstable")]
+use core::task::Poll;
+use core::{convert::Infallible, marker::PhantomData};
 
 use procmacros::handler;
 
@@ -604,6 +606,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<M> embedded_io::ErrorType for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -611,6 +614,7 @@ where
     type Error = Error;
 }
 
+#[cfg(feature = "unstable")]
 impl<M> embedded_io::ErrorType for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -618,6 +622,7 @@ where
     type Error = Error;
 }
 
+#[cfg(feature = "unstable")]
 impl<M> embedded_io::ErrorType for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -625,6 +630,7 @@ where
     type Error = Error;
 }
 
+#[cfg(feature = "unstable")]
 impl<M> embedded_io::Read for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -634,6 +640,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<M> embedded_io::Read for UsbSerialJtagRx<'_, M>
 where
     M: Mode,
@@ -648,6 +655,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<M> embedded_io::Write for UsbSerialJtag<'_, M>
 where
     M: Mode,
@@ -661,6 +669,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<M> embedded_io::Write for UsbSerialJtagTx<'_, M>
 where
     M: Mode,
@@ -680,11 +689,13 @@ where
 static WAKER_TX: AtomicWaker = AtomicWaker::new();
 static WAKER_RX: AtomicWaker = AtomicWaker::new();
 
+#[cfg(feature = "unstable")]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagWriteFuture<'d> {
     _peripheral: PeripheralRef<'d, USB_DEVICE>,
 }
 
+#[cfg(feature = "unstable")]
 impl<'d> UsbSerialJtagWriteFuture<'d> {
     fn new(_peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         crate::into_ref!(_peripheral);
@@ -706,6 +717,7 @@ impl<'d> UsbSerialJtagWriteFuture<'d> {
     }
 }
 
+#[cfg(feature = "unstable")]
 impl core::future::Future for UsbSerialJtagWriteFuture<'_> {
     type Output = ();
 
@@ -723,10 +735,12 @@ impl core::future::Future for UsbSerialJtagWriteFuture<'_> {
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
+#[cfg(feature = "unstable")]
 struct UsbSerialJtagReadFuture<'d> {
     _peripheral: PeripheralRef<'d, USB_DEVICE>,
 }
 
+#[cfg(feature = "unstable")]
 impl<'d> UsbSerialJtagReadFuture<'d> {
     fn new(_peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         crate::into_ref!(_peripheral);
@@ -748,6 +762,7 @@ impl<'d> UsbSerialJtagReadFuture<'d> {
     }
 }
 
+#[cfg(feature = "unstable")]
 impl core::future::Future for UsbSerialJtagReadFuture<'_> {
     type Output = ();
 
@@ -783,6 +798,7 @@ impl<'d> UsbSerialJtag<'d, Async> {
 }
 
 impl UsbSerialJtagTx<'_, Async> {
+    #[cfg(feature = "unstable")]
     async fn write_bytes_async(&mut self, words: &[u8]) -> Result<(), Error> {
         let reg_block = USB_DEVICE::register_block();
 
@@ -800,6 +816,7 @@ impl UsbSerialJtagTx<'_, Async> {
         Ok(())
     }
 
+    #[cfg(feature = "unstable")]
     async fn flush_tx_async(&mut self) -> Result<(), Error> {
         if USB_DEVICE::register_block()
             .jfifo_st()
@@ -815,6 +832,7 @@ impl UsbSerialJtagTx<'_, Async> {
 }
 
 impl UsbSerialJtagRx<'_, Async> {
+    #[cfg(feature = "unstable")]
     async fn read_bytes_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if buf.is_empty() {
             return Ok(0);
@@ -830,6 +848,7 @@ impl UsbSerialJtagRx<'_, Async> {
     }
 }
 
+#[cfg(feature = "unstable")]
 impl embedded_io_async::Write for UsbSerialJtag<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         embedded_io_async::Write::write(&mut self.tx, buf).await
@@ -840,6 +859,7 @@ impl embedded_io_async::Write for UsbSerialJtag<'_, Async> {
     }
 }
 
+#[cfg(feature = "unstable")]
 impl embedded_io_async::Write for UsbSerialJtagTx<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_bytes_async(buf).await?;
@@ -852,12 +872,14 @@ impl embedded_io_async::Write for UsbSerialJtagTx<'_, Async> {
     }
 }
 
+#[cfg(feature = "unstable")]
 impl embedded_io_async::Read for UsbSerialJtag<'_, Async> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         embedded_io_async::Read::read(&mut self.rx, buf).await
     }
 }
 
+#[cfg(feature = "unstable")]
 impl embedded_io_async::Read for UsbSerialJtagRx<'_, Async> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.read_bytes_async(buf).await

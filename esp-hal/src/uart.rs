@@ -42,8 +42,8 @@
 //! The UART driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
 //! from the community. This includes, but is not limited to, the [embedded-hal]
-//! and [embedded-io] blocking traits, and the [embedded-hal-async] and
-//! [embedded-io-async] asynchronous traits.
+//! and [embedded-io] (`unstable`) blocking traits, and the [embedded-hal-async] and
+//! [embedded-io-async] (`unstable`) asynchronous traits.
 //!
 //! In addition to the interfaces provided by these traits, native APIs are also
 //! available. See the examples below for more information on how to interact
@@ -226,6 +226,7 @@
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
+#[cfg(feature = "unstable")]
 use embassy_embedded_hal::SetConfig;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
@@ -292,6 +293,7 @@ impl embedded_hal_nb::serial::Error for Error {
     }
 }
 
+#[cfg(feature = "unstable")]
 impl embedded_io::Error for Error {
     fn kind(&self) -> embedded_io::ErrorKind {
         embedded_io::ErrorKind::Other
@@ -622,6 +624,7 @@ pub enum ConfigError {
     UnsupportedFifoThreshold,
 }
 
+#[cfg(feature = "unstable")]
 impl<M, T> SetConfig for Uart<'_, M, T>
 where
     T: Instance,
@@ -635,6 +638,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<M, T> SetConfig for UartRx<'_, M, T>
 where
     T: Instance,
@@ -648,6 +652,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<M, T> SetConfig for UartTx<'_, M, T>
 where
     T: Instance,
@@ -1460,18 +1465,22 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T, M> embedded_io::ErrorType for Uart<'_, M, T> {
     type Error = Error;
 }
 
+#[cfg(feature = "unstable")]
 impl<T, M> embedded_io::ErrorType for UartTx<'_, M, T> {
     type Error = Error;
 }
 
+#[cfg(feature = "unstable")]
 impl<T, M> embedded_io::ErrorType for UartRx<'_, M, T> {
     type Error = Error;
 }
 
+#[cfg(feature = "unstable")]
 impl<T, M> embedded_io::Read for Uart<'_, M, T>
 where
     T: Instance,
@@ -1482,6 +1491,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T, M> embedded_io::Read for UartRx<'_, M, T>
 where
     T: Instance,
@@ -1500,6 +1510,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T, M> embedded_io::ReadReady for Uart<'_, M, T>
 where
     T: Instance,
@@ -1510,6 +1521,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T, M> embedded_io::ReadReady for UartRx<'_, M, T>
 where
     T: Instance,
@@ -1520,6 +1532,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T, M> embedded_io::Write for Uart<'_, M, T>
 where
     T: Instance,
@@ -1534,6 +1547,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T, M> embedded_io::Write for UartTx<'_, M, T>
 where
     T: Instance,
@@ -1891,6 +1905,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T> embedded_io_async::Read for Uart<'_, Async, T>
 where
     T: Instance,
@@ -1903,6 +1918,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T> embedded_io_async::Read for UartRx<'_, Async, T>
 where
     T: Instance,
@@ -1915,6 +1931,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T> embedded_io_async::Write for Uart<'_, Async, T>
 where
     T: Instance,
@@ -1928,6 +1945,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<T> embedded_io_async::Write for UartTx<'_, Async, T>
 where
     T: Instance,

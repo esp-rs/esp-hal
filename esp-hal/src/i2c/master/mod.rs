@@ -44,6 +44,7 @@ use core::{
     task::{Context, Poll},
 };
 
+#[cfg(feature = "unstable")]
 use embassy_embedded_hal::SetConfig;
 use embedded_hal::i2c::Operation as EhalOperation;
 use fugit::HertzU32;
@@ -280,6 +281,7 @@ pub struct I2c<'d, DM: Mode, T = AnyI2c> {
     guard: PeripheralGuard,
 }
 
+#[cfg(feature = "unstable")]
 impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
     type Config = Config;
     type ConfigError = ConfigError;
