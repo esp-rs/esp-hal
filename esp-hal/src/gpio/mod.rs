@@ -308,7 +308,7 @@ pub trait RtcPinWithResistors: RtcPin {
 }
 
 /// Common trait implemented by pins
-pub trait Pin: Sealed + Unpin {
+pub trait Pin: Sealed {
     /// GPIO number
     fn number(&self) -> u8;
 
