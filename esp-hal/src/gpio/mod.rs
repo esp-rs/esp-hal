@@ -878,6 +878,11 @@ impl crate::private::Sealed for Io {}
 impl InterruptConfigurable for Io {
     /// Install the given interrupt handler replacing any previously set
     /// handler.
+    ///
+    /// Note that when using interrupt handlers registered by this function,
+    /// we clear the interrupt status register for you. This is NOT the case
+    /// if you register the interrupt handler directly, by defining a
+    /// `#[no_mangle] unsafe extern "C" fn GPIO()` function.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::GPIO);
