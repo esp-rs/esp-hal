@@ -1864,6 +1864,7 @@ where
     P: OutputPin,
 {
     /// Set the GPIO to output mode.
+    #[instability::unstable]
     pub fn set_as_output(&mut self) {
         self.pin.set_to_push_pull_output(private::Internal);
     }

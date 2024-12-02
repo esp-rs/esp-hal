@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `timer::Timer` trait has three new methods, `wait`, `async_interrupt_handler` and `peripheral_interrupt` (#2586)
 - Configuration structs in the I2C, SPI, and UART drivers now implement the Builder Lite pattern (#2614)
 - Added `I8080::apply_config`, `DPI::apply_config` and `Camera::apply_config` (#2610)
+- Introduced the `unstable` feature which will be used to restrict stable APIs to a subset of esp-hal. (#2628)
 
 ### Changed
 

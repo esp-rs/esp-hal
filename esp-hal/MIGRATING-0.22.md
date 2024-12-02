@@ -1,5 +1,11 @@
 # Migration Guide from 0.22.x to v1.0.0-beta.0
 
+Starting with this release, unstable parts of esp-hal will be gated behind the `unstable` feature.
+The `unstable` feature itself is unstable, we might change the way we hide APIs without notice.
+Unstable APIs are not covered by semver guarantees, they may break even between patch releases.
+
+Please refer to the documentation to see which APIs are marked as unstable.
+
 ## DMA changes
 
 ### Accessing channel objects
