@@ -120,6 +120,14 @@ mod tests {
     }
 
     #[test]
+    async fn waiting_for_level_does_not_hang(ctx: Context) {
+        let mut test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
+        let _test_gpio2 = Output::new(ctx.test_gpio2, Level::High);
+
+        test_gpio1.wait_for_high().await;
+    }
+
+    #[test]
     fn gpio_output(ctx: Context) {
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
 
