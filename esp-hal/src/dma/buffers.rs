@@ -194,14 +194,28 @@ impl ExternalBurstConfig {
 }
 
 impl InternalBurstConfig {
-    pub(super) fn is_burst_enabled(self) -> bool {
+    pub(super) const fn is_burst_enabled(self) -> bool {
         !matches!(self, Self::Disabled)
     }
 
+    // Size and address alignment as those come in pairs on current hardware.
     const fn min_dram_alignment(self, direction: TransferDirection) -> usize {
-        // IN transfers must be word aligned
         if matches!(direction, TransferDirection::In) {
-            4
+            // NOTE(danielb): commenting this check is incorrect as per TRM, but works.
+            //                we'll need to restore this once peripherals can read a
+            //                different amount of data than what is configured in the
+            //                buffer.
+            // if cfg!(esp32) {
+            //     // NOTE: The size must be word-aligned.
+            //     // NOTE: The buffer address must be word-aligned
+            //     4
+            // }
+            if self.is_burst_enabled() {
+                // As described in "Accessing Internal Memory" paragraphs in the various TRMs.
+                4
+            } else {
+                1
+            }
         } else {
             // OUT transfers have no alignment requirements, except for ESP32, which is
             // described below.

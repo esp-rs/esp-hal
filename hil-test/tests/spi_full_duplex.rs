@@ -184,7 +184,8 @@ mod tests {
     #[test]
     #[cfg(pcnt)]
     fn test_dma_read_dma_write_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 5;
+        const DMA_BUFFER_SIZE: usize = 8;
+        const TRANSFER_SIZE: usize = 5;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
@@ -200,27 +201,28 @@ mod tests {
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);
 
         for i in 1..4 {
-            dma_rx_buf.as_mut_slice().copy_from_slice(&[5, 5, 5, 5, 5]);
+            dma_rx_buf.as_mut_slice()[..TRANSFER_SIZE].copy_from_slice(&[5; TRANSFER_SIZE]);
             let transfer = spi
-                .read(dma_rx_buf.len(), dma_rx_buf)
+                .read(TRANSFER_SIZE, dma_rx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_rx_buf) = transfer.wait();
-            assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
+            assert_eq!(&dma_rx_buf.as_slice()[..TRANSFER_SIZE], &[0; TRANSFER_SIZE]);
 
             let transfer = spi
-                .write(dma_tx_buf.len(), dma_tx_buf)
+                .write(TRANSFER_SIZE, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_tx_buf) = transfer.wait();
-            assert_eq!(unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(unit.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 
     #[test]
     #[cfg(pcnt)]
     fn test_dma_read_dma_transfer_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 5;
+        const DMA_BUFFER_SIZE: usize = 8;
+        const TRANSFER_SIZE: usize = 5;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
@@ -236,20 +238,20 @@ mod tests {
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);
 
         for i in 1..4 {
-            dma_rx_buf.as_mut_slice().copy_from_slice(&[5, 5, 5, 5, 5]);
+            dma_rx_buf.as_mut_slice()[..TRANSFER_SIZE].copy_from_slice(&[5; TRANSFER_SIZE]);
             let transfer = spi
-                .read(dma_rx_buf.len(), dma_rx_buf)
+                .read(TRANSFER_SIZE, dma_rx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_rx_buf) = transfer.wait();
-            assert_eq!(dma_rx_buf.as_slice(), &[0, 0, 0, 0, 0]);
+            assert_eq!(&dma_rx_buf.as_slice()[..TRANSFER_SIZE], &[0; TRANSFER_SIZE]);
 
             let transfer = spi
-                .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+                .transfer(TRANSFER_SIZE, dma_rx_buf, TRANSFER_SIZE, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-            assert_eq!(unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(unit.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 
@@ -285,7 +287,9 @@ mod tests {
 
     #[test]
     fn test_asymmetric_dma_transfer(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(2, 4);
+        const WRITE_SIZE: usize = 4;
+        const READ_SIZE: usize = 2;
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4, 4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
@@ -293,22 +297,28 @@ mod tests {
 
         let spi = ctx.spi.with_dma(ctx.dma_channel);
         let transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, (dma_rx_buf, mut dma_tx_buf)) = transfer.wait();
-        assert_eq!(dma_tx_buf.as_slice()[0..2], dma_rx_buf.as_slice()[0..2]);
+        assert_eq!(
+            dma_tx_buf.as_slice()[0..READ_SIZE],
+            dma_rx_buf.as_slice()[0..READ_SIZE]
+        );
 
         // Try transfer again to make sure DMA isn't in a broken state.
 
         dma_tx_buf.fill(&[0xaa, 0xdd, 0xef, 0xbe]);
 
         let transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-        assert_eq!(dma_tx_buf.as_slice()[0..2], dma_rx_buf.as_slice()[0..2]);
+        assert_eq!(
+            dma_tx_buf.as_slice()[0..READ_SIZE],
+            dma_rx_buf.as_slice()[0..READ_SIZE]
+        );
     }
 
     #[test]
@@ -373,7 +383,8 @@ mod tests {
     #[test]
     #[cfg(pcnt)]
     async fn test_async_dma_read_dma_write_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 5;
+        const DMA_BUFFER_SIZE: usize = 8;
+        const TRANSFER_SIZE: usize = 5;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
@@ -388,25 +399,26 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let mut receive = [0; DMA_BUFFER_SIZE];
+        let mut receive = [0; TRANSFER_SIZE];
 
         // Fill the buffer where each byte has 3 pos edges.
-        let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
+        let transmit = [0b0110_1010; TRANSFER_SIZE];
 
         for i in 1..4 {
-            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
+            receive.copy_from_slice(&[5; TRANSFER_SIZE]);
             SpiBusAsync::read(&mut spi, &mut receive).await.unwrap();
-            assert_eq!(receive, [0, 0, 0, 0, 0]);
+            assert_eq!(receive, [0; TRANSFER_SIZE]);
 
             SpiBusAsync::write(&mut spi, &transmit).await.unwrap();
-            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 
     #[test]
     #[cfg(pcnt)]
     async fn test_async_dma_read_dma_transfer_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 5;
+        const DMA_BUFFER_SIZE: usize = 8;
+        const TRANSFER_SIZE: usize = 5;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
@@ -421,10 +433,10 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let mut receive = [0; DMA_BUFFER_SIZE];
+        let mut receive = [0; TRANSFER_SIZE];
 
         // Fill the buffer where each byte has 3 pos edges.
-        let transmit = [0b0110_1010; DMA_BUFFER_SIZE];
+        let transmit = [0b0110_1010; TRANSFER_SIZE];
 
         for i in 1..4 {
             receive.copy_from_slice(&[5, 5, 5, 5, 5]);
@@ -434,7 +446,7 @@ mod tests {
             SpiBusAsync::transfer(&mut spi, &mut receive, &transmit)
                 .await
                 .unwrap();
-            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * DMA_BUFFER_SIZE) as _);
+            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 

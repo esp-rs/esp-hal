@@ -77,7 +77,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Dma` structure has been removed. (#2545)
 - Removed `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
 - Removed `Camera::set_` functions (#2610)
-- Remove `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
 - `DmaTxBuf::{compute_chunk_size, compute_descriptor_count, new_with_block_size}` (#2543)
 
 ## [0.22.0] - 2024-11-20
