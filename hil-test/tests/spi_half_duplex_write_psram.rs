@@ -7,7 +7,7 @@
 use defmt::error;
 use esp_alloc as _;
 use esp_hal::{
-    dma::{BurstConfig, DmaRxBuf, DmaTxBuf, ExternalBurstConfig, InternalBurstConfig},
+    dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
     dma_buffers,
     dma_descriptors_chunk_size,
     gpio::interconnect::InputSignal,
@@ -88,15 +88,7 @@ mod tests {
 
         let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
         let buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
-        let mut dma_tx_buf = DmaTxBuf::new_with_config(
-            descriptors,
-            buffer,
-            BurstConfig {
-                internal: InternalBurstConfig::default(),
-                external: ExternalBurstConfig::Size32,
-            },
-        )
-        .unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new_with_config(descriptors, buffer, DMA_ALIGNMENT).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
@@ -146,15 +138,7 @@ mod tests {
 
         let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
         let buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
-        let dma_tx_buf = DmaTxBuf::new_with_config(
-            descriptors,
-            buffer,
-            BurstConfig {
-                internal: InternalBurstConfig::default(),
-                external: ExternalBurstConfig::Size32,
-            },
-        )
-        .unwrap();
+        let dma_tx_buf = DmaTxBuf::new_with_config(descriptors, buffer, DMA_ALIGNMENT).unwrap();
 
         let (rx, rxd, _, _) = dma_buffers!(1, 0);
         let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();

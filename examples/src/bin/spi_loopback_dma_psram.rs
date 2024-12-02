@@ -25,7 +25,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{BurstConfig, DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
+    dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
     peripheral::Peripheral,
     prelude::*,
     spi::{
@@ -76,15 +76,8 @@ fn main() -> ! {
         tx_buffer.len(),
         tx_descriptors.len()
     );
-    let mut dma_tx_buf = DmaTxBuf::new_with_config(
-        tx_descriptors,
-        tx_buffer,
-        BurstConfig {
-            external: DMA_ALIGNMENT,
-            ..BurstConfig::default()
-        },
-    )
-    .unwrap();
+    let mut dma_tx_buf =
+        DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, DMA_ALIGNMENT).unwrap();
     let (rx_buffer, rx_descriptors, _, _) = esp_hal::dma_buffers!(DMA_BUFFER_SIZE, 0);
     info!(
         "RX: {:p} len {} ({} descripters)",

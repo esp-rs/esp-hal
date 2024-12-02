@@ -121,6 +121,24 @@ cfg_if::cfg_if! {
                 Self::DEFAULT
             }
         }
+
+        impl From<InternalBurstConfig> for BurstConfig {
+            fn from(internal_memory: InternalBurstConfig) -> Self {
+                Self {
+                    external_memory: ExternalBurstConfig::DEFAULT,
+                    internal_memory,
+                }
+            }
+        }
+
+        impl From<ExternalBurstConfig> for BurstConfig {
+            fn from(external_memory: ExternalBurstConfig) -> Self {
+                Self {
+                    external_memory,
+                    internal_memory: InternalBurstConfig::DEFAULT,
+                }
+            }
+        }
     } else {
         /// Burst transfer configuration.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -462,12 +480,12 @@ impl DmaTxBuf {
     pub fn new_with_config(
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
-        config: BurstConfig,
+        config: impl Into<BurstConfig>,
     ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
             descriptors: DescriptorSet::new(descriptors)?,
             buffer,
-            burst: config,
+            burst: BurstConfig::default(),
         };
 
         let capacity = buf.capacity();
@@ -476,7 +494,12 @@ impl DmaTxBuf {
         Ok(buf)
     }
 
-    fn configure(&mut self, burst: BurstConfig, length: usize) -> Result<(), DmaBufError> {
+    fn configure(
+        &mut self,
+        burst: impl Into<BurstConfig>,
+        length: usize,
+    ) -> Result<(), DmaBufError> {
+        let burst = burst.into();
         self.set_length_fallible(length, burst)?;
 
         self.descriptors.link_with_buffer(
@@ -632,7 +655,12 @@ impl DmaRxBuf {
         Ok(buf)
     }
 
-    fn configure(&mut self, burst: BurstConfig, length: usize) -> Result<(), DmaBufError> {
+    fn configure(
+        &mut self,
+        burst: impl Into<BurstConfig>,
+        length: usize,
+    ) -> Result<(), DmaBufError> {
+        let burst = burst.into();
         self.set_length_fallible(length, burst)?;
 
         self.descriptors.link_with_buffer(
@@ -822,7 +850,12 @@ impl DmaRxTxBuf {
         Ok(buf)
     }
 
-    fn configure(&mut self, burst: BurstConfig, length: usize) -> Result<(), DmaBufError> {
+    fn configure(
+        &mut self,
+        burst: impl Into<BurstConfig>,
+        length: usize,
+    ) -> Result<(), DmaBufError> {
+        let burst = burst.into();
         self.set_length_fallible(length, burst)?;
 
         self.rx_descriptors.link_with_buffer(
