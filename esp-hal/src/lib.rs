@@ -482,7 +482,7 @@ use crate::{
 ///
 /// For usage examples, see the [config module documentation](crate::config).
 #[non_exhaustive]
-#[derive(Default)]
+#[derive(Default, procmacros::BuilderLite)]
 pub struct Config {
     /// The CPU clock configuration.
     pub cpu_clock: CpuClock,

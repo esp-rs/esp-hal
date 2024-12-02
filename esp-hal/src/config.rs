@@ -42,7 +42,7 @@ pub enum WatchdogStatus {
 
 /// Watchdog configuration.
 #[non_exhaustive]
-#[derive(Default)]
+#[derive(Default, procmacros::BuilderLite)]
 pub struct WatchdogConfig {
     #[cfg(not(any(esp32, esp32s2)))]
     /// Enable the super watchdog timer, which has a trigger time of slightly
