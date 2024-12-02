@@ -829,6 +829,7 @@ impl From<DmaBufError> for DmaError {
             DmaBufError::UnsupportedMemoryRegion => DmaError::UnsupportedMemoryRegion,
             DmaBufError::InvalidAlignment(err) => DmaError::InvalidAlignment(err),
             DmaBufError::InvalidChunkSize => DmaError::InvalidChunkSize,
+            DmaBufError::BufferTooSmall => DmaError::BufferTooSmall,
         }
     }
 }
