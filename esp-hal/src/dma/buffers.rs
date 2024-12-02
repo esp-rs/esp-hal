@@ -28,6 +28,7 @@ pub enum DmaBufError {
     InvalidChunkSize,
 }
 
+/// DMA buffer alignment errors.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaAlignmentError {

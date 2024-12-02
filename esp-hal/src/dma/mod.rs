@@ -1966,8 +1966,11 @@ where
                     if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
                         uses_psram = true;
                         // both the size and address of the buffer must be aligned
-                        if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
-                            return Err(DmaError::InvalidAlignment);
+                        if des.buffer as usize % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment(DmaAlignmentError::Address));
+                        }
+                        if des.size() % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment(DmaAlignmentError::Size));
                         }
                         crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
                     }
@@ -2255,8 +2258,11 @@ where
                     if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
                         uses_psram = true;
                         // both the size and address of the buffer must be aligned
-                        if des.buffer as usize % alignment != 0 && des.size() % alignment != 0 {
-                            return Err(DmaError::InvalidAlignment);
+                        if des.buffer as usize % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment(DmaAlignmentError::Address));
+                        }
+                        if des.size() % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment(DmaAlignmentError::Size));
                         }
                         crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
                     }
