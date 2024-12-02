@@ -29,7 +29,7 @@ macro_rules! esp_config_int {
     ( $ty:ty, $var:expr ) => {
         const {
             const BYTES: &[u8] = env!($var).as_bytes();
-            esp_config_int_parse!($ty, BYTES)
+            $crate::esp_config_int_parse!($ty, BYTES)
         }
     };
 }
