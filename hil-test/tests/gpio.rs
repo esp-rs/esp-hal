@@ -12,9 +12,9 @@ use critical_section::Mutex;
 use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, Input, Io, Level, Output, Pin, Pull},
+    interrupt::InterruptConfigurable,
     macros::handler,
     timer::timg::TimerGroup,
-    InterruptConfigurable,
 };
 use hil_test as _;
 
@@ -120,6 +120,14 @@ mod tests {
     }
 
     #[test]
+    async fn waiting_for_level_does_not_hang(ctx: Context) {
+        let mut test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
+        let _test_gpio2 = Output::new(ctx.test_gpio2, Level::High);
+
+        test_gpio1.wait_for_high().await;
+    }
+
+    #[test]
     fn gpio_output(ctx: Context) {
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
 
@@ -146,7 +154,7 @@ mod tests {
 
         fn set<T>(pin: &mut T, state: bool)
         where
-            T: embedded_hal_02::digital::v2::OutputPin,
+            T: embedded_hal::digital::OutputPin,
         {
             if state {
                 pin.set_high().ok();
@@ -157,7 +165,7 @@ mod tests {
 
         fn toggle<T>(pin: &mut T)
         where
-            T: embedded_hal_02::digital::v2::ToggleableOutputPin,
+            T: embedded_hal::digital::StatefulOutputPin,
         {
             pin.toggle().ok();
         }

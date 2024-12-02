@@ -16,7 +16,7 @@
 //! the peripherals in RTC system during chip Deep-sleep, and wake up the
 //! chip from Deep-sleep.
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### Configure a ULP Pin as Output
 //!

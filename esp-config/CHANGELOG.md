@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Users no longer have to manually import `esp_config_int_parse`. (#2630)
+
 ### Changed
 
 ### Removed

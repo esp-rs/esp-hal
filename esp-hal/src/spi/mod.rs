@@ -17,6 +17,7 @@ pub mod slave;
 /// SPI errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Error {
     /// Error occurred due to a DMA-related issue.
     DmaError(DmaError),

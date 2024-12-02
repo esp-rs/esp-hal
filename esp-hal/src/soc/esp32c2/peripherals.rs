@@ -25,7 +25,6 @@ crate::peripherals! {
         APB_CTRL <= APB_CTRL,
         ASSIST_DEBUG <= ASSIST_DEBUG,
         BT <= virtual,
-        DMA <= DMA (DMA_CH0),
         ECC <= ECC,
         EFUSE <= EFUSE,
         EXTMEM <= EXTMEM,
@@ -72,5 +71,8 @@ crate::peripherals! {
         (18, [Input, Output])
         (19, [Input, Output])
         (20, [Input, Output] (0 => U0RXD) ())
+    ],
+    dma_channels: [
+        DMA_CH0: DmaChannel0,
     ]
 }

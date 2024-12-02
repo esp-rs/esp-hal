@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{AnyGdmaChannel, Dma, DmaChannelConvert, DmaError, Mem2Mem},
+    dma::{AnyGdmaChannel, DmaChannelConvert, DmaError, Mem2Mem},
     dma_buffers,
     dma_buffers_chunk_size,
     dma_descriptors,
@@ -37,8 +37,7 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        let dma_channel = peripherals.DMA_CH0;
 
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c6, esp32h2))] {

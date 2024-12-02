@@ -34,11 +34,9 @@ use core::iter::{empty, once};
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::Dma,
     dma_loop_buffer,
     gpio::{Level, Output},
-    i2c,
-    i2c::master::I2c,
+    i2c::{self, master::I2c},
     lcd_cam::{
         lcd::{
             dpi::{Config, Dpi, Format, FrameTiming},
@@ -62,16 +60,13 @@ fn main() -> ! {
 
     let i2c = I2c::new(
         peripherals.I2C0,
-        i2c::master::Config {
-            frequency: 400.kHz(),
-            ..Default::default()
-        },
+        i2c::master::Config::default().with_frequency(400.kHz()),
     )
+    .unwrap()
     .with_sda(peripherals.GPIO47)
     .with_scl(peripherals.GPIO48);
 
-    let dma = Dma::new(peripherals.DMA);
-    let tx_channel = dma.channel2;
+    let tx_channel = peripherals.DMA_CH2;
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 
     let mut expander = Tca9554::new(i2c);
@@ -143,6 +138,7 @@ fn main() -> ! {
         polarity: Polarity::IdleLow,
         phase: Phase::ShiftLow,
     };
+    config.frequency = 16.MHz();
     config.format = Format {
         enable_2byte_mode: true,
         ..Default::default()
@@ -166,7 +162,8 @@ fn main() -> ! {
     config.de_idle_level = Level::Low;
     config.disable_black_region = false;
 
-    let mut dpi = Dpi::new(lcd_cam.lcd, tx_channel, 16.MHz(), config)
+    let mut dpi = Dpi::new(lcd_cam.lcd, tx_channel, config)
+        .unwrap()
         .with_vsync(vsync_pin)
         .with_hsync(peripherals.GPIO46)
         .with_de(peripherals.GPIO17)

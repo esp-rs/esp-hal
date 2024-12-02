@@ -14,13 +14,14 @@
 //!
 //! <em>PS: Note that the number of DMA channels is chip-specific.</em>
 
+use critical_section::CriticalSection;
+
 use crate::{
     dma::*,
     interrupt::Priority,
     macros::handler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
-    system::{self, PeripheralClockControl},
 };
 
 /// An arbitrary GDMA channel
@@ -60,6 +61,12 @@ impl Peripheral for AnyGdmaRxChannel {
     }
 }
 
+impl DmaChannelConvert<AnyGdmaRxChannel> for AnyGdmaRxChannel {
+    fn degrade(self) -> AnyGdmaRxChannel {
+        self
+    }
+}
+
 /// An arbitrary GDMA TX channel
 pub struct AnyGdmaTxChannel(u8);
 
@@ -71,7 +78,13 @@ impl Peripheral for AnyGdmaTxChannel {
     }
 }
 
-use embassy_sync::waitqueue::AtomicWaker;
+impl DmaChannelConvert<AnyGdmaTxChannel> for AnyGdmaTxChannel {
+    fn degrade(self) -> AnyGdmaTxChannel {
+        self
+    }
+}
+
+use crate::asynch::AtomicWaker;
 
 static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
 static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
@@ -764,53 +777,10 @@ crate::impl_dma_eligible! {
     }
 }
 
-/// GDMA Peripheral
-///
-/// This offers the available DMA channels.
-pub struct Dma<'d> {
-    _inner: PeripheralRef<'d, crate::peripherals::DMA>,
-    /// Channel 0
-    pub channel0: DmaChannel0,
-    /// Channel 1
-    #[cfg(not(esp32c2))]
-    pub channel1: DmaChannel1,
-    /// Channel 2
-    #[cfg(not(esp32c2))]
-    pub channel2: DmaChannel2,
-    /// Channel 3
-    #[cfg(esp32s3)]
-    pub channel3: DmaChannel3,
-    /// Channel 4
-    #[cfg(esp32s3)]
-    pub channel4: DmaChannel4,
-}
-
-impl<'d> Dma<'d> {
-    /// Create a DMA instance.
-    pub fn new(dma: impl Peripheral<P = crate::peripherals::DMA> + 'd) -> Dma<'d> {
-        crate::into_ref!(dma);
-
-        if PeripheralClockControl::enable(system::Peripheral::Gdma) {
-            PeripheralClockControl::reset(system::Peripheral::Gdma);
-        }
-        dma.misc_conf().modify(|_, w| w.ahbm_rst_inter().set_bit());
-        dma.misc_conf()
-            .modify(|_, w| w.ahbm_rst_inter().clear_bit());
-        dma.misc_conf().modify(|_, w| w.clk_en().set_bit());
-
-        unsafe {
-            Dma {
-                _inner: dma,
-                channel0: DmaChannel0::steal(),
-                #[cfg(not(esp32c2))]
-                channel1: DmaChannel1::steal(),
-                #[cfg(not(esp32c2))]
-                channel2: DmaChannel2::steal(),
-                #[cfg(esp32s3)]
-                channel3: DmaChannel3::steal(),
-                #[cfg(esp32s3)]
-                channel4: DmaChannel4::steal(),
-            }
-        }
-    }
+pub(super) fn init_dma(_cs: CriticalSection<'_>) {
+    let dma = unsafe { crate::soc::peripherals::DMA::steal() };
+    dma.misc_conf().modify(|_, w| w.ahbm_rst_inter().set_bit());
+    dma.misc_conf()
+        .modify(|_, w| w.ahbm_rst_inter().clear_bit());
+    dma.misc_conf().modify(|_, w| w.clk_en().set_bit());
 }

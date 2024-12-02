@@ -13,17 +13,26 @@
 
 use embassy_time::{Duration, Timer};
 use esp_hal::{
-    gpio::{AnyPin, Input, Io, Level, Output, Pull},
+    gpio::{AnyPin, Flex, Input, Io, Level, Output, Pull},
+    interrupt::InterruptConfigurable,
     macros::handler,
     timer::timg::TimerGroup,
-    InterruptConfigurable,
 };
 use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};
 
 #[no_mangle]
 unsafe extern "C" fn GPIO() {
-    // do nothing, prevents binding the default handler
+    // Prevents binding the default handler, but we need to clear the GPIO
+    // interrupts by hand.
+    let peripherals = esp_hal::peripherals::Peripherals::steal();
+
+    let (gpio1, _) = hil_test::common_test_pins!(peripherals);
+
+    // Using flex will not mutate the pin.
+    let mut gpio1 = Flex::new(gpio1);
+
+    gpio1.clear_interrupt();
 }
 
 #[handler]
@@ -70,6 +79,14 @@ mod tests {
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_hal_embassy::init(timg0.timer0);
+
+        // We need to enable the GPIO interrupt, otherwise the async Future's
+        // setup or Drop implementation hangs.
+        esp_hal::interrupt::enable(
+            esp_hal::peripherals::Interrupt::GPIO,
+            esp_hal::interrupt::Priority::Priority1,
+        )
+        .unwrap();
 
         let counter = drive_pins(gpio1, gpio2).await;
 

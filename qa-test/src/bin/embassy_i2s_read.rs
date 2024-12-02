@@ -12,65 +12,75 @@
 //! - DIN  =>  GPIO5
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: embassy-generic-timers
 
 #![no_std]
 #![no_main]
 
+use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    dma::Dma,
     dma_buffers,
     i2s::master::{DataFormat, I2s, Standard},
     prelude::*,
+    timer::timg::TimerGroup,
 };
 use esp_println::println;
 
-#[entry]
-fn main() -> ! {
+#[esp_hal_embassy::main]
+async fn main(_spawner: Spawner) {
+    println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let dma = Dma::new(peripherals.DMA);
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-    let dma_channel = dma.i2s0channel;
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-    let dma_channel = dma.channel0;
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
-    let (mut rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(4 * 4092, 0);
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+            let dma_channel = peripherals.DMA_I2S0;
+        } else {
+            let dma_channel = peripherals.DMA_CH0;
+        }
+    }
 
-    // Here we test that the type is
-    // 1) reasonably simple (or at least this will flag changes that may make it
-    // more complex)
-    // 2) can be spelled out by the user
+    let (rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(4092 * 4, 0);
+
     let i2s = I2s::new(
         peripherals.I2S0,
         Standard::Philips,
         DataFormat::Data16Channel16,
-        44100.Hz(),
+        44100u32.Hz(),
         dma_channel,
         rx_descriptors,
         tx_descriptors,
-    );
+    )
+    .into_async();
 
     #[cfg(not(feature = "esp32"))]
     let i2s = i2s.with_mclk(peripherals.GPIO0);
 
-    let mut i2s_rx = i2s
+    let i2s_rx = i2s
         .i2s_rx
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
         .with_din(peripherals.GPIO5)
         .build();
 
-    let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
-    println!("Started transfer");
+    let buffer = rx_buffer;
+    println!("Start");
 
+    let mut data = [0u8; 5000];
+    let mut transaction = i2s_rx.read_dma_circular_async(buffer).unwrap();
     loop {
-        let avail = transfer.available().unwrap();
+        let avail = transaction.available().await.unwrap();
+        println!("available {}", avail);
 
-        if avail > 0 {
-            let mut rcv = [0u8; 5000];
-            transfer.pop(&mut rcv[..avail]).unwrap();
-            println!("Received {:x?}...", &rcv[..30]);
-        }
+        let count = transaction.pop(&mut data).await.unwrap();
+        println!(
+            "got {} bytes, {:x?}..{:x?}",
+            count,
+            &data[..10],
+            &data[count - 10..count]
+        );
     }
 }

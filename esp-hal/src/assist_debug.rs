@@ -24,10 +24,9 @@
 //! - This driver has only blocking API
 
 use crate::{
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, ASSIST_DEBUG},
-    InterruptConfigurable,
 };
 
 /// The debug assist driver instance.

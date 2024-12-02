@@ -22,10 +22,11 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::Uart;
+//! # use esp_hal::uart::{Config, Uart};
 //!
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
+//!     Config::default(),
 //!     peripherals.GPIO1,
 //!     peripherals.GPIO2,
 //! ).unwrap();
@@ -53,7 +54,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{Config, Uart};
-//! # let mut uart1 = Uart::new_with_config(
+//! # let mut uart1 = Uart::new(
 //! #     peripherals.UART1,
 //! #     Config::default(),
 //! #     peripherals.GPIO1,
@@ -68,7 +69,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::uart::{Config, Uart};
-//! # let mut uart1 = Uart::new_with_config(
+//! # let mut uart1 = Uart::new(
 //! #     peripherals.UART1,
 //! #     Config::default(),
 //! #     peripherals.GPIO1,
@@ -86,12 +87,13 @@
 //! ### Inverting RX and TX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::Uart;
+//! # use esp_hal::uart::{Config, Uart};
 //!
 //! let (rx, _) = peripherals.GPIO2.split();
 //! let (_, tx) = peripherals.GPIO1.split();
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
+//!     Config::default(),
 //!     rx.inverted(),
 //!     tx.inverted(),
 //! ).unwrap();
@@ -101,11 +103,120 @@
 //! ### Constructing RX and TX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{UartTx, UartRx};
+//! # use esp_hal::uart::{Config, UartTx, UartRx};
 //!
-//! let tx = UartTx::new(peripherals.UART0, peripherals.GPIO1).unwrap();
-//! let rx = UartRx::new(peripherals.UART1, peripherals.GPIO2).unwrap();
+//! let tx = UartTx::new(
+//!     peripherals.UART0,
+//!     Config::default(),
+//!     peripherals.GPIO1,
+//! ).unwrap();
+//! let rx = UartRx::new(
+//!     peripherals.UART1,
+//!     Config::default(),
+//!     peripherals.GPIO2,
+//! ).unwrap();
 //! # }
+//! ```
+//! 
+//! ### Operation with interrupts that by UART/Serial
+//! Notice, that in practice a proper serial terminal should be used
+//! to connect to the board (espmonitor and espflash won't work)
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::uart::{AtCmdConfig, Config, Uart, UartInterrupt};
+//! # use esp_hal::prelude::*;
+//! let delay = Delay::new();
+//!
+//! // Default pins for UART/Serial communication
+#![cfg_attr(
+    esp32,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);"
+)]
+#![cfg_attr(
+    esp32c2,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);"
+)]
+#![cfg_attr(
+    esp32c3,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);"
+)]
+#![cfg_attr(
+    esp32c6,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);"
+)]
+#![cfg_attr(
+    esp32h2,
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);"
+)]
+#![cfg_attr(
+    any(esp32s2, esp32s3),
+    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);"
+)]
+//! let config = Config::default().rx_fifo_full_threshold(30);
+//!
+//! let mut uart0 = Uart::new(
+//!     peripherals.UART0,
+//!     config,
+//!     tx_pin,
+//!     rx_pin
+//! ).unwrap();
+//!
+//! uart0.set_interrupt_handler(interrupt_handler);
+//!
+//! critical_section::with(|cs| {
+//!     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
+//!     uart0.listen(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
+//!
+//!     SERIAL.borrow_ref_mut(cs).replace(uart0);
+//! });
+//!
+//! loop {
+//!     critical_section::with(|cs| {
+//!         let mut serial = SERIAL.borrow_ref_mut(cs);
+//!         let serial = serial.as_mut().unwrap();
+//!         writeln!(serial,
+//!             "Hello World! Send a single `#` character or send
+//!                 at least 30 characters to trigger interrupts.")
+//!         .ok();     
+//!     });
+//!     delay.delay(1.secs());
+//! }
+//! # }
+//!
+//! # use core::cell::RefCell;
+//! # use critical_section::Mutex;
+//! # use esp_hal::uart::Uart;
+//! static SERIAL: Mutex<RefCell<Option<Uart<esp_hal::Blocking>>>> =
+//!     Mutex::new(RefCell::new(None));
+//!
+//! # use esp_hal::uart::UartInterrupt;
+//! # use core::fmt::Write;
+//! #[handler]
+//! fn interrupt_handler() {
+//!     critical_section::with(|cs| {
+//!         let mut serial = SERIAL.borrow_ref_mut(cs);
+//!         let serial = serial.as_mut().unwrap();
+//!
+//!         let mut cnt = 0;
+//!         while let nb::Result::Ok(_c) = serial.read_byte() {
+//!             cnt += 1;
+//!         }
+//!         writeln!(serial, "Read {} bytes", cnt).ok();
+//!
+//!         let pending_interrupts = serial.interrupts();
+//!         writeln!(
+//!             serial,
+//!             "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
+//!             pending_interrupts.contains(UartInterrupt::AtCmd),
+//!             pending_interrupts.contains(UartInterrupt::RxFifoFull),
+//!         ).ok();
+//!
+//!         serial.clear_interrupts(
+//!             UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
+//!         );
+//!     });
+//! }
 //! ```
 //! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
@@ -116,11 +227,11 @@
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
 use embassy_embedded_hal::SetConfig;
-use embassy_sync::waitqueue::AtomicWaker;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
 use crate::{
+    asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
@@ -128,14 +239,13 @@ use crate::{
         OutputSignal,
         Pull,
     },
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{uart0::RegisterBlock, Interrupt},
     private::Internal,
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
-    InterruptConfigurable,
     Mode,
 };
 
@@ -144,6 +254,7 @@ const UART_FIFO_SIZE: u16 = 128;
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Error {
     /// An invalid configuration argument was provided.
     ///
@@ -189,21 +300,23 @@ impl embedded_io::Error for Error {
 
 // (outside of `config` module in order not to "use" it an extra time)
 /// UART clock source
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockSource {
     /// APB_CLK clock source (default for UART on all the chips except of
     /// esp32c6 and esp32h2)
+    #[cfg_attr(not(any(esp32c6, esp32h2, lp_uart)), default)]
     Apb,
-    #[cfg(not(any(esp32, esp32s2)))]
     /// RC_FAST_CLK clock source (17.5 MHz)
-    RcFast,
     #[cfg(not(any(esp32, esp32s2)))]
+    RcFast,
     /// XTAL_CLK clock source (default for UART on esp32c6 and esp32h2 and
     /// LP_UART)
+    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg_attr(any(esp32c6, esp32h2, lp_uart), default)]
     Xtal,
-    #[cfg(any(esp32, esp32s2))]
     /// REF_TICK clock source (derived from XTAL or RC_FAST, 1MHz)
+    #[cfg(any(esp32, esp32s2))]
     RefTick,
 }
 
@@ -217,7 +330,7 @@ const UART_TOUT_THRESH_DEFAULT: u8 = 10;
 /// This enum represents the various configurations for the number of data
 /// bits used in UART communication. The number of data bits defines the
 /// length of each transmitted or received data frame.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DataBits {
     /// 5 data bits per frame.
@@ -227,6 +340,7 @@ pub enum DataBits {
     /// 7 data bits per frame.
     DataBits7 = 2,
     /// 8 data bits per frame (most common).
+    #[default]
     DataBits8 = 3,
 }
 
@@ -236,10 +350,11 @@ pub enum DataBits {
 /// ensure that the data has not been corrupted during transmission. The
 /// parity bit is added to the data bits to make the number of 1-bits
 /// either even or odd.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Parity {
     /// No parity bit is used (most common).
+    #[default]
     ParityNone,
     /// Even parity: the parity bit is set to make the total number of
     /// 1-bits even.
@@ -254,10 +369,11 @@ pub enum Parity {
 /// The stop bit(s) signal the end of a data packet in UART communication.
 /// This enum defines the possible configurations for the number of stop
 /// bits.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum StopBits {
     /// 1 stop bit.
+    #[default]
     STOP1   = 1,
     /// 1.5 stop bits.
     STOP1P5 = 2,
@@ -266,8 +382,9 @@ pub enum StopBits {
 }
 
 /// UART Configuration
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct Config {
     /// The baud rate (speed) of the UART communication in bits per second
     /// (bps).
@@ -367,18 +484,10 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             baudrate: 115_200,
-            data_bits: DataBits::DataBits8,
-            parity: Parity::ParityNone,
-            stop_bits: StopBits::STOP1,
-            clock_source: {
-                cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c6, esp32h2, lp_uart))] {
-                        ClockSource::Xtal
-                    } else {
-                        ClockSource::Apb
-                    }
-                }
-            },
+            data_bits: Default::default(),
+            parity: Default::default(),
+            stop_bits: Default::default(),
+            clock_source: Default::default(),
             rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
             rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
         }
@@ -461,7 +570,7 @@ where
         self
     }
 
-    fn init(self, config: Config) -> Result<Uart<'d, M, T>, Error> {
+    fn init(self, config: Config) -> Result<Uart<'d, M, T>, ConfigError> {
         let rx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
         let tx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
 
@@ -503,13 +612,23 @@ pub struct UartRx<'d, M, T = AnyUart> {
     guard: PeripheralGuard,
 }
 
+/// A configuration error.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ConfigError {
+    /// The requested timeout is not supported.
+    UnsupportedTimeout,
+    /// The requested fifo threshold is not supported.
+    UnsupportedFifoThreshold,
+}
+
 impl<M, T> SetConfig for Uart<'_, M, T>
 where
     T: Instance,
     M: Mode,
 {
     type Config = Config;
-    type ConfigError = Error;
+    type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
         self.apply_config(config)
@@ -522,7 +641,7 @@ where
     M: Mode,
 {
     type Config = Config;
-    type ConfigError = Error;
+    type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
         self.apply_config(config)
@@ -535,7 +654,7 @@ where
     M: Mode,
 {
     type Config = Config;
-    type ConfigError = Error;
+    type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
         self.apply_config(config)
@@ -559,9 +678,8 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the RX half.
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), Error> {
-        self.uart.info().apply_config(config)?;
-        Ok(())
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.uart.info().apply_config(config)
     }
 
     /// Writes bytes
@@ -650,19 +768,10 @@ impl<'d> UartTx<'d, Blocking> {
     /// Create a new UART TX instance in [`Blocking`] mode.
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
-        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
-    ) -> Result<Self, Error> {
-        Self::new_typed(uart.map_into(), tx)
-    }
-
-    /// Create a new UART TX instance with configuration options in
-    /// [`Blocking`] mode.
-    pub fn new_with_config(
-        uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
         tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
-    ) -> Result<Self, Error> {
-        Self::new_with_config_typed(uart.map_into(), config, tx)
+    ) -> Result<Self, ConfigError> {
+        Self::new_typed(uart.map_into(), config, tx)
     }
 }
 
@@ -673,18 +782,9 @@ where
     /// Create a new UART TX instance in [`Blocking`] mode.
     pub fn new_typed(
         uart: impl Peripheral<P = T> + 'd,
-        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
-    ) -> Result<Self, Error> {
-        Self::new_with_config_typed(uart, Config::default(), tx)
-    }
-
-    /// Create a new UART TX instance with configuration options in
-    /// [`Blocking`] mode.
-    pub fn new_with_config_typed(
-        uart: impl Peripheral<P = T> + 'd,
         config: Config,
         tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, ConfigError> {
         let (_, uart_tx) = UartBuilder::<'d, Blocking, T>::new(uart)
             .with_tx(tx)
             .init(config)?
@@ -769,9 +869,8 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the TX half.
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), Error> {
-        self.uart.info().apply_config(config)?;
-        Ok(())
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.uart.info().apply_config(config)
     }
 
     /// Fill a buffer with received bytes
@@ -796,7 +895,7 @@ where
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
-                    xtensa_lx::interrupt::free(|_| {
+                    xtensa_lx::interrupt::free(|| {
                         *byte = fifo.read().rxfifo_rd_byte().bits();
                     });
                 } else {
@@ -908,19 +1007,10 @@ impl<'d> UartRx<'d, Blocking> {
     /// Create a new UART RX instance in [`Blocking`] mode.
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
-        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
-    ) -> Result<Self, Error> {
-        UartRx::new_typed(uart.map_into(), rx)
-    }
-
-    /// Create a new UART RX instance with configuration options in
-    /// [`Blocking`] mode.
-    pub fn new_with_config(
-        uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
         rx: impl Peripheral<P = impl PeripheralInput> + 'd,
-    ) -> Result<Self, Error> {
-        UartRx::new_with_config_typed(uart.map_into(), config, rx)
+    ) -> Result<Self, ConfigError> {
+        UartRx::new_typed(uart.map_into(), config, rx)
     }
 }
 
@@ -931,18 +1021,9 @@ where
     /// Create a new UART RX instance in [`Blocking`] mode.
     pub fn new_typed(
         uart: impl Peripheral<P = T> + 'd,
-        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
-    ) -> Result<Self, Error> {
-        Self::new_with_config_typed(uart, Config::default(), rx)
-    }
-
-    /// Create a new UART RX instance with configuration options in
-    /// [`Blocking`] mode.
-    pub fn new_with_config_typed(
-        uart: impl Peripheral<P = T> + 'd,
         config: Config,
         rx: impl Peripheral<P = impl PeripheralInput> + 'd,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, ConfigError> {
         let (uart_rx, _) = UartBuilder::new(uart).with_rx(rx).init(config)?.split();
 
         Ok(uart_rx)
@@ -991,21 +1072,11 @@ impl<'d> Uart<'d, Blocking> {
     /// Create a new UART instance in [`Blocking`] mode.
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
-        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
-        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
-    ) -> Result<Self, Error> {
-        Self::new_typed(uart.map_into(), rx, tx)
-    }
-
-    /// Create a new UART instance with configuration options in
-    /// [`Blocking`] mode.
-    pub fn new_with_config(
-        uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
         rx: impl Peripheral<P = impl PeripheralInput> + 'd,
         tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
-    ) -> Result<Self, Error> {
-        Self::new_with_config_typed(uart.map_into(), config, rx, tx)
+    ) -> Result<Self, ConfigError> {
+        Self::new_typed(uart.map_into(), config, rx, tx)
     }
 }
 
@@ -1016,20 +1087,10 @@ where
     /// Create a new UART instance in [`Blocking`] mode.
     pub fn new_typed(
         uart: impl Peripheral<P = T> + 'd,
-        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
-        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
-    ) -> Result<Self, Error> {
-        Self::new_with_config_typed(uart, Config::default(), rx, tx)
-    }
-
-    /// Create a new UART instance with configuration options in
-    /// [`Blocking`] mode.
-    pub fn new_with_config_typed(
-        uart: impl Peripheral<P = T> + 'd,
         config: Config,
         rx: impl Peripheral<P = impl PeripheralInput> + 'd,
         tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, ConfigError> {
         UartBuilder::new(uart).with_tx(tx).with_rx(rx).init(config)
     }
 
@@ -1058,6 +1119,7 @@ where
 /// List of exposed UART events.
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum UartInterrupt {
     /// Indicates that the received has detected the configured
     /// [`Uart::set_at_cmd`] character.
@@ -1151,26 +1213,6 @@ where
         sync_regs(register_block);
     }
 
-    /// Listen for the given interrupts
-    pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
-        self.tx.uart.info().enable_listen(interrupts.into(), true)
-    }
-
-    /// Unlisten the given interrupts
-    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
-        self.tx.uart.info().enable_listen(interrupts.into(), false)
-    }
-
-    /// Gets asserted interrupts
-    pub fn interrupts(&mut self) -> EnumSet<UartInterrupt> {
-        self.tx.uart.info().interrupts()
-    }
-
-    /// Resets asserted interrupts
-    pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
-        self.tx.uart.info().clear_interrupts(interrupts)
-    }
-
     /// Write a byte out over the UART
     pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
         self.tx.write_byte(word)
@@ -1187,13 +1229,13 @@ where
     }
 
     /// Change the configuration.
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), Error> {
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
         Ok(())
     }
 
     #[inline(always)]
-    fn init(&mut self, config: Config) -> Result<(), Error> {
+    fn init(&mut self, config: Config) -> Result<(), ConfigError> {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
                 // Nothing to do
@@ -1277,6 +1319,31 @@ where
     }
 }
 
+impl<T> Uart<'_, Blocking, T>
+where
+    T: Instance,
+{
+    /// Listen for the given interrupts
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
+        self.tx.uart.info().enable_listen(interrupts.into(), true)
+    }
+
+    /// Unlisten the given interrupts
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
+        self.tx.uart.info().enable_listen(interrupts.into(), false)
+    }
+
+    /// Gets asserted interrupts
+    pub fn interrupts(&mut self) -> EnumSet<UartInterrupt> {
+        self.tx.uart.info().interrupts()
+    }
+
+    /// Resets asserted interrupts
+    pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
+        self.tx.uart.info().clear_interrupts(interrupts)
+    }
+}
+
 impl<T, M> ufmt_write::uWrite for Uart<'_, M, T>
 where
     T: Instance,
@@ -1330,62 +1397,6 @@ where
         self.write_bytes(s.as_bytes())
             .map_err(|_| core::fmt::Error)?;
         Ok(())
-    }
-}
-
-impl<T, M> embedded_hal_02::serial::Write<u8> for Uart<'_, M, T>
-where
-    T: Instance,
-    M: Mode,
-{
-    type Error = Error;
-
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.tx.write(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.tx.flush()
-    }
-}
-
-impl<T, M> embedded_hal_02::serial::Write<u8> for UartTx<'_, M, T>
-where
-    T: Instance,
-    M: Mode,
-{
-    type Error = Error;
-
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx()
-    }
-}
-
-impl<T, M> embedded_hal_02::serial::Read<u8> for Uart<'_, M, T>
-where
-    T: Instance,
-    M: Mode,
-{
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.rx.read()
-    }
-}
-
-impl<T, M> embedded_hal_02::serial::Read<u8> for UartRx<'_, M, T>
-where
-    T: Instance,
-    M: Mode,
-{
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
     }
 }
 
@@ -1545,12 +1556,13 @@ where
     }
 }
 
-#[derive(EnumSetType, Debug)]
+#[derive(Debug, EnumSetType)]
 pub(crate) enum TxEvent {
     TxDone,
     TxFiFoEmpty,
 }
-#[derive(EnumSetType, Debug)]
+
+#[derive(Debug, EnumSetType)]
 pub(crate) enum RxEvent {
     FifoFull,
     CmdCharDetected,
@@ -1661,6 +1673,7 @@ struct UartTxFuture {
     state: &'static State,
     registered: bool,
 }
+
 impl UartTxFuture {
     fn new(uart: impl Peripheral<P = impl Instance>, events: impl Into<EnumSet<TxEvent>>) -> Self {
         crate::into_ref!(uart);
@@ -1974,9 +1987,14 @@ pub mod lp_uart {
     }
 
     impl LpUart {
-        /// Initialize the UART driver using the default configuration
+        /// Initialize the UART driver using the provided configuration
         // TODO: CTS and RTS pins
-        pub fn new(uart: LP_UART, _tx: LowPowerOutput<'_, 5>, _rx: LowPowerInput<'_, 4>) -> Self {
+        pub fn new(
+            uart: LP_UART,
+            config: Config,
+            _tx: LowPowerOutput<'_, 5>,
+            _rx: LowPowerInput<'_, 4>,
+        ) -> Self {
             let lp_io = unsafe { crate::peripherals::LP_IO::steal() };
             let lp_aon = unsafe { crate::peripherals::LP_AON::steal() };
 
@@ -1991,11 +2009,6 @@ pub mod lp_uart {
             lp_io.gpio(4).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
             lp_io.gpio(5).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
 
-            Self::new_with_config(uart, Config::default())
-        }
-
-        /// Initialize the UART driver using the provided configuration
-        pub fn new_with_config(uart: LP_UART, config: Config) -> Self {
             let mut me = Self { uart };
 
             // Set UART mode - do nothing for LP
@@ -2286,7 +2299,7 @@ impl Info {
         crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
     }
 
-    fn apply_config(&self, config: &Config) -> Result<(), Error> {
+    fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
         self.set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
         self.set_rx_timeout(config.rx_timeout, config.symbol_length())?;
         self.change_baud(config.baudrate, config.clock_source);
@@ -2304,13 +2317,13 @@ impl Info {
     /// Configures the RX-FIFO threshold
     ///
     /// # Errors
-    /// `Err(Error::InvalidArgument)` if provided value exceeds maximum value
+    /// [`Err(ConfigError::UnsupportedFifoThreshold)`][ConfigError::UnsupportedFifoThreshold] if provided value exceeds maximum value
     /// for SOC :
     /// - `esp32` **0x7F**
     /// - `esp32c6`, `esp32h2` **0xFF**
     /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
     /// - `esp32s3` **0x3FF**
-    fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), Error> {
+    fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         #[cfg(esp32)]
         const MAX_THRHD: u16 = 0x7F;
         #[cfg(any(esp32c6, esp32h2))]
@@ -2321,7 +2334,7 @@ impl Info {
         const MAX_THRHD: u16 = 0x3FF;
 
         if threshold > MAX_THRHD {
-            return Err(Error::InvalidArgument);
+            return Err(ConfigError::UnsupportedFifoThreshold);
         }
 
         self.register_block()
@@ -2338,12 +2351,13 @@ impl Info {
     /// triggering a timeout. Pass None to disable the timeout.
     ///
     ///  # Errors
-    /// `Err(Error::InvalidArgument)` if the provided value exceeds the maximum
-    /// value for SOC :
+    /// [`Err(ConfigError::UnsupportedTimeout)`][ConfigError::UnsupportedTimeout] if the provided value exceeds
+    /// the maximum value for SOC :
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
     ///   value you pass times the symbol size must be <= **0x3FF**
-    fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), Error> {
+    // TODO: the above should be a per-chip doc line.
+    fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), ConfigError> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 const MAX_THRHD: u8 = 0x7F; // 7 bits
@@ -2363,7 +2377,7 @@ impl Info {
             let timeout_reg = timeout as u16 * _symbol_len as u16;
 
             if timeout_reg > MAX_THRHD {
-                return Err(Error::InvalidArgument);
+                return Err(ConfigError::UnsupportedTimeout);
             }
 
             cfg_if::cfg_if! {

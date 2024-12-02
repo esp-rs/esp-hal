@@ -7,7 +7,7 @@
 #[cfg(esp32c6)]
 use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
-    dma::{Dma, DmaChannel0},
+    dma::DmaChannel0,
     gpio::{
         interconnect::{InputSignal, OutputSignal},
         NoPin,
@@ -57,8 +57,7 @@ mod tests {
         let (valid_loopback, valid) = valid.split();
         let pcnt = Pcnt::new(peripherals.PCNT);
         let pcnt_unit = pcnt.unit0;
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        let dma_channel = peripherals.DMA_CH0;
 
         let parl_io = peripherals.PARL_IO;
 

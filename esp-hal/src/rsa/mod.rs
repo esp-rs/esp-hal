@@ -24,14 +24,13 @@
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, RSA},
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
     Async,
     Blocking,
     Cpu,
-    InterruptConfigurable,
 };
 
 #[cfg_attr(esp32s2, path = "esp32sX.rs")]
@@ -379,11 +378,11 @@ where
 pub(crate) mod asynch {
     use core::task::Poll;
 
-    use embassy_sync::waitqueue::AtomicWaker;
     use portable_atomic::{AtomicBool, Ordering};
     use procmacros::handler;
 
     use crate::{
+        asynch::AtomicWaker,
         rsa::{
             Multi,
             Rsa,

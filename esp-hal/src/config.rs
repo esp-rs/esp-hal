@@ -22,10 +22,10 @@
 //! ### Custom initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! let mut config = esp_hal::Config::default();
-//! config.cpu_clock = CpuClock::max();
-//! config.watchdog.rwdt =
-//!     esp_hal::config::WatchdogStatus::Enabled(fugit::MicrosDurationU64::millis(1000 as u64));
+//! let config =
+//! esp_hal::Config::default().with_cpu_clock(CpuClock::max()).
+//!     with_watchdog(esp_hal::config::WatchdogConfig::default().
+//!     with_rwdt(esp_hal::config::WatchdogStatus::Enabled(fugit::MicrosDurationU64::millis(1000u64))));
 //! let peripherals = esp_hal::init(config);
 //! # }
 //! ```
@@ -42,7 +42,7 @@ pub enum WatchdogStatus {
 
 /// Watchdog configuration.
 #[non_exhaustive]
-#[derive(Default)]
+#[derive(Default, procmacros::BuilderLite)]
 pub struct WatchdogConfig {
     #[cfg(not(any(esp32, esp32s2)))]
     /// Enable the super watchdog timer, which has a trigger time of slightly

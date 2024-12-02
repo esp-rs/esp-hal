@@ -32,18 +32,61 @@
 //! method, which returns a 32-bit unsigned integer.
 //!
 //! ## Usage
-//! This driver implements the [Read](embedded_hal_02::blocking::rng::Read)
-//! trait from the `embedded_hal` crate, allowing you to generate random bytes
-//! by calling the `read` method. The driver also implements the traits from the
-//! [`rand_core`] crate.
+//! The driver implements the traits from the [`rand_core`] crate.
 //!
 //! [`rand_core`]: https://crates.io/crates/rand_core
 //!
 //! ## Examples
-//! Visit the [RNG] example for an example of using the RNG peripheral.
 //!
-//! [RNG]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/rng.rs
-
+//! ### Basic RNG operation
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::{prelude::*, rng::Rng};
+//!
+//! let mut rng = Rng::new(peripherals.RNG);
+//!
+//! // Generate a random word (u32):
+//! let rand_word = rng.random();
+//!
+//! // Fill a buffer with random bytes:
+//! let mut buf = [0u8; 16];
+//! rng.read(&mut buf);
+//!
+//! loop {}
+//! # }
+//! ```
+//! 
+//! ### TRNG operation
+/// ```rust, no_run
+#[doc = crate::before_snippet!()]
+/// # use esp_hal::rng::Trng;
+/// # use esp_hal::peripherals::Peripherals;
+/// # use esp_hal::peripherals::ADC1;
+/// # use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
+///
+/// let mut buf = [0u8; 16];
+///
+/// // ADC is not available from now
+/// let mut trng = Trng::new(peripherals.RNG, &mut peripherals.ADC1);
+/// trng.read(&mut buf);
+/// let mut true_rand = trng.random();
+/// let mut rng = trng.downgrade();
+/// // ADC is available now
+#[cfg_attr(esp32, doc = "let analog_pin = peripherals.GPIO32;")]
+#[cfg_attr(not(esp32), doc = "let analog_pin = peripherals.GPIO3;")]
+/// let mut adc1_config = AdcConfig::new();
+/// let mut adc1_pin = adc1_config.enable_pin(
+///     analog_pin,
+///     Attenuation::Attenuation11dB
+/// );
+/// let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
+/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+/// rng.read(&mut buf);
+/// true_rand = rng.random();
+/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+/// # }
+/// ```
 use core::marker::PhantomData;
 
 use crate::{
@@ -93,15 +136,6 @@ impl Rng {
     }
 }
 
-impl embedded_hal_02::blocking::rng::Read for Rng {
-    type Error = core::convert::Infallible;
-
-    fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.read(buffer);
-        Ok(())
-    }
-}
-
 impl rand_core::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
         self.random()
@@ -131,36 +165,6 @@ impl rand_core::RngCore for Rng {
 /// methods to generate random numbers and fill buffers with random bytes.
 /// Due to pulling the entropy source from the ADC, it uses the associated
 /// registers, so to use TRNG we need to "occupy" the ADC peripheral.
-///
-/// ```rust, no_run
-#[doc = crate::before_snippet!()]
-/// # use esp_hal::rng::Trng;
-/// # use esp_hal::peripherals::Peripherals;
-/// # use esp_hal::peripherals::ADC1;
-/// # use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
-///
-/// let mut buf = [0u8; 16];
-///
-/// // ADC is not available from now
-/// let mut trng = Trng::new(peripherals.RNG, &mut peripherals.ADC1);
-/// trng.read(&mut buf);
-/// let mut true_rand = trng.random();
-/// let mut rng = trng.downgrade();
-/// // ADC is available now
-#[cfg_attr(esp32, doc = "let analog_pin = peripherals.GPIO32;")]
-#[cfg_attr(not(esp32), doc = "let analog_pin = peripherals.GPIO3;")]
-/// let mut adc1_config = AdcConfig::new();
-/// let mut adc1_pin = adc1_config.enable_pin(
-///     analog_pin,
-///     Attenuation::Attenuation11dB
-/// );
-/// let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
-/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-/// rng.read(&mut buf);
-/// true_rand = rng.random();
-/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-/// # }
-/// ```
 pub struct Trng<'d> {
     /// The hardware random number generator instance.
     pub rng: Rng,
@@ -210,15 +214,6 @@ impl<'d> Trng<'d> {
 impl Drop for Trng<'_> {
     fn drop(&mut self) {
         crate::soc::trng::revert_trng();
-    }
-}
-
-impl embedded_hal_02::blocking::rng::Read for Trng<'_> {
-    type Error = core::convert::Infallible;
-    /// Fills the provided buffer with random bytes.
-    fn read(&mut self, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.rng.read(buffer);
-        Ok(())
     }
 }
 

@@ -3,7 +3,7 @@
 //! You need an ESP32, ESP32-S2 or ESP32-S3 with at least 2 MB of PSRAM memory.
 
 //% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: esp-hal/quad-psram
+//% FEATURES: esp-hal/quad-psram esp-alloc/internal-heap-stats
 
 #![no_std]
 #![no_main]
@@ -35,7 +35,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
+    let (start, size) = psram::psram_raw_parts(&peripherals.PSRAM);
     init_psram_heap(start, size);
 
     println!("Going to access PSRAM");
@@ -51,6 +51,8 @@ fn main() -> ! {
 
     let string = String::from("A string allocated in PSRAM");
     println!("'{}' allocated at {:p}", &string, string.as_ptr());
+
+    println!("{}", esp_alloc::HEAP.stats());
 
     println!("done");
 

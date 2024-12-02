@@ -31,11 +31,11 @@ use crate::{
     gpio::TouchPin,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, SENS, TOUCH},
+    prelude::*,
     private::{Internal, Sealed},
     rtc_cntl::Rtc,
     Async,
     Blocking,
-    InterruptConfigurable,
     Mode,
 };
 
@@ -527,10 +527,8 @@ mod asynch {
         task::{Context, Poll},
     };
 
-    use embassy_sync::waitqueue::AtomicWaker;
-
     use super::*;
-    use crate::{macros::ram, prelude::handler, Async};
+    use crate::{asynch::AtomicWaker, macros::ram, prelude::handler, Async};
 
     const NUM_TOUCH_PINS: usize = 10;
 

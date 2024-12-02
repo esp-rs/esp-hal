@@ -12,16 +12,118 @@
 //!
 //! ## Examples
 //! ### Initialization for RX
-//! See the [Parallel IO RX] example to learn how to initialize the RX and
-//! reading data.
 //!
-//! [Parallel IO RX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_rx.rs
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::gpio::NoPin;
+//! # use esp_hal::parl_io::{BitPackOrder, ParlIoRxOnly, RxFourBits};
 //!
+//! // Initialize DMA buffer and descriptors for data reception
+//! let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
+//! let dma_channel = peripherals.DMA_CH0;
+//!
+//! // Configure the 4-bit input pins and clock pin
+//! let mut rx_pins = RxFourBits::new(
+//!     peripherals.GPIO1,
+//!     peripherals.GPIO2,
+//!     peripherals.GPIO3,
+//!     peripherals.GPIO4,
+//! );
+//! let mut rx_clk_pin = NoPin;
+//!
+//! // Set up Parallel IO for 1MHz data input, with DMA and bit packing
+//! //  configuration
+//!  let parl_io = ParlIoRxOnly::new(
+//!     peripherals.PARL_IO,
+//!     dma_channel,
+//!     rx_descriptors,
+//!     1.MHz(),
+//! )
+//! .unwrap();
+//!
+//! let mut parl_io_rx = parl_io
+//!     .rx
+//!     .with_config(
+//!         &mut rx_pins,
+//!         &mut rx_clk_pin,
+//!         BitPackOrder::Msb,
+//!         Some(0xfff),
+//!     )
+//!     .unwrap();
+//!
+//! // Initialize the buffer and delay
+//! let mut buffer = rx_buffer;
+//! buffer.fill(0u8);
+//! let delay = Delay::new();
+//!
+//! loop {
+//!     // Read data via DMA and print received values
+//!     let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
+//!     transfer.wait().unwrap();
+//!
+//!     delay.delay_millis(500);
+//! }
+//! # }
+//! ```
+//! 
 //! ### Initialization for TX
-//! See the [Parallel IO TX] example to learn how to initialize the TX and
-//! transferring data.
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::parl_io::{BitPackOrder, ParlIoTxOnly, TxFourBits, SampleEdge, ClkOutPin, TxPinConfigWithValidPin};
 //!
-//! [Parallel IO TX]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/parl_io_tx.rs
+//! // Initialize DMA buffer and descriptors for data reception
+//! let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
+//! let dma_channel = peripherals.DMA_CH0;
+//!
+//! // Configure the 4-bit input pins and clock pin
+//! let tx_pins = TxFourBits::new(
+//!     peripherals.GPIO1,
+//!     peripherals.GPIO2,
+//!     peripherals.GPIO3,
+//!     peripherals.GPIO4,
+//! );
+//!
+//! let mut pin_conf = TxPinConfigWithValidPin::new(tx_pins, peripherals.GPIO5);
+//!
+//! // Set up Parallel IO for 1MHz data input, with DMA and bit packing
+//! //  configuration
+//!  let parl_io = ParlIoTxOnly::new(
+//!     peripherals.PARL_IO,
+//!     dma_channel,
+//!     tx_descriptors,
+//!     1.MHz(),
+//! )
+//! .unwrap();
+//!
+//! let mut clock_pin = ClkOutPin::new(peripherals.GPIO6);
+//! let mut parl_io_tx = parl_io
+//!     .tx
+//!     .with_config(
+//!         &mut pin_conf,
+//!         &mut clock_pin,
+//!         0,
+//!         SampleEdge::Normal,
+//!         BitPackOrder::Msb,
+//!     )
+//! .unwrap();
+//!
+//! let buffer = tx_buffer;
+//! for i in 0..buffer.len() {
+//!      buffer[i] = (i % 255) as u8;
+//! }
+//!
+//! let delay = Delay::new();
+//! loop {
+//!     let transfer = parl_io_tx.write_dma(&buffer).unwrap();
+//!     transfer.wait().unwrap();
+//!     delay.delay_millis(500);
+//! }
+//! # }
+//! ```
 
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
@@ -35,13 +137,14 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DescriptorChain,
-        DmaChannelConvert,
         DmaChannelFor,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
         DmaTransferRx,
         DmaTransferTx,
+        PeripheralRxChannel,
+        PeripheralTxChannel,
         ReadBuffer,
         Rx,
         RxChannelFor,
@@ -53,13 +156,12 @@ use crate::{
         interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
         NoPin,
     },
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{self, Peripheral},
     peripherals::{Interrupt, PARL_IO},
     system::{self, GenericPeripheralGuard},
     Async,
     Blocking,
-    InterruptConfigurable,
     Mode,
 };
 
@@ -811,7 +913,7 @@ pub struct ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, TxChannelFor<PARL_IO>>,
+    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>,
     tx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
@@ -892,7 +994,7 @@ pub struct ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
+    rx_channel: ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
     rx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
@@ -1013,7 +1115,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<DmaChannelFor<PARL_IO>>,
+        CH: DmaChannelFor<PARL_IO>,
     {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
@@ -1135,7 +1237,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<TxChannelFor<PARL_IO>>,
+        CH: TxChannelFor<PARL_IO>,
     {
         let guard = GenericPeripheralGuard::new();
         let tx_channel = ChannelTx::new(dma_channel.map(|ch| ch.degrade()));
@@ -1241,7 +1343,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
         frequency: HertzU32,
     ) -> Result<Self, Error>
     where
-        CH: DmaChannelConvert<RxChannelFor<PARL_IO>>,
+        CH: RxChannelFor<PARL_IO>,
     {
         let guard = GenericPeripheralGuard::new();
         let rx_channel = ChannelRx::new(dma_channel.map(|ch| ch.degrade()));
@@ -1433,7 +1535,7 @@ impl<'d, DM> DmaSupportTx for ParlIoTx<'d, DM>
 where
     DM: Mode,
 {
-    type TX = ChannelTx<'d, DM, TxChannelFor<PARL_IO>>;
+    type TX = ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -1475,7 +1577,7 @@ where
     }
 
     fn start_receive_bytes_dma(
-        rx_channel: &mut ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
+        rx_channel: &mut ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
         rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
@@ -1529,7 +1631,7 @@ impl<'d, DM> DmaSupportRx for ParlIoRx<'d, DM>
 where
     DM: Mode,
 {
-    type RX = ChannelRx<'d, DM, RxChannelFor<PARL_IO>>;
+    type RX = ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -1545,7 +1647,7 @@ pub struct TxCreator<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, TxChannelFor<PARL_IO>>,
+    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1555,7 +1657,7 @@ pub struct RxCreator<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
+    rx_channel: ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1565,7 +1667,7 @@ pub struct TxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, TxChannelFor<PARL_IO>>,
+    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1575,7 +1677,7 @@ pub struct RxCreatorFullDuplex<'d, DM>
 where
     DM: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, RxChannelFor<PARL_IO>>,
+    rx_channel: ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
@@ -1584,11 +1686,11 @@ where
 pub mod asynch {
     use core::task::Poll;
 
-    use embassy_sync::waitqueue::AtomicWaker;
     use procmacros::handler;
 
     use super::{private::Instance, Error, ParlIoRx, ParlIoTx, MAX_DMA_SIZE};
     use crate::{
+        asynch::AtomicWaker,
         dma::{asynch::DmaRxFuture, ReadBuffer, WriteBuffer},
         peripherals::Interrupt,
     };

@@ -25,7 +25,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaBufBlkSize, DmaRxBuf, DmaTxBuf},
+    dma::{DmaBufBlkSize, DmaRxBuf, DmaTxBuf},
     peripheral::Peripheral,
     prelude::*,
     spi::{
@@ -67,9 +67,6 @@ fn main() -> ! {
     let miso = unsafe { mosi.clone_unchecked() };
     let cs = peripherals.GPIO38;
 
-    let dma = Dma::new(peripherals.DMA);
-    let dma_channel = dma.channel0;
-
     let (_, tx_descriptors) =
         esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
     let tx_buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
@@ -91,19 +88,18 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     // Need to set miso first so that mosi can overwrite the
     // output connection (because we are using the same pin to loop back)
-    let mut spi = Spi::new_with_config(
+    let mut spi = Spi::new(
         peripherals.SPI2,
-        Config {
-            frequency: 100.kHz(),
-            mode: SpiMode::Mode0,
-            ..Config::default()
-        },
+        Config::default()
+            .with_frequency(100.kHz())
+            .with_mode(SpiMode::Mode0),
     )
+    .unwrap()
     .with_sck(sclk)
     .with_miso(miso)
     .with_mosi(mosi)
     .with_cs(cs)
-    .with_dma(dma_channel);
+    .with_dma(peripherals.DMA_CH0);
 
     delay.delay_millis(100); // delay to let the above messages display
 

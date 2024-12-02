@@ -26,7 +26,6 @@ crate::peripherals! {
         ASSIST_DEBUG <= ASSIST_DEBUG,
         ATOMIC <= ATOMIC,
         BT <= virtual,
-        DMA <= DMA (DMA_IN_CH0,DMA_IN_CH1,DMA_IN_CH2,DMA_OUT_CH0,DMA_OUT_CH1,DMA_OUT_CH2),
         DS <= DS,
         ECC <= ECC,
         EFUSE <= EFUSE,
@@ -130,5 +129,10 @@ crate::peripherals! {
         (28, [Input, Output] (0 => SPIHD) (0 => SPIHD))
         (29, [Input, Output] () (0 => SPICLK_MUX))
         (30, [Input, Output] (0 => SPID) (0 => SPID))
+    ],
+    dma_channels: [
+        DMA_CH0: DmaChannel0,
+        DMA_CH1: DmaChannel1,
+        DMA_CH2: DmaChannel2,
     ]
 }

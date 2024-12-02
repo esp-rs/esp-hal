@@ -9,11 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the `BuilderLite` derive macro which implements the Builder Lite pattern for a struct (#2614)
+
 ### Fixed
 
 ### Changed
 
+- Functions marked with `#[handler]` can now be referenced in `const` context. (#2559)
+
 ### Removed
+
+- Removed the `enum-dispatch`, `interrupt`, and `ram` features (#2594)
 
 ## [0.15.0] - 2024-11-20
 

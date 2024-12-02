@@ -6,15 +6,14 @@ pub(crate) mod state;
 
 use alloc::collections::vec_deque::VecDeque;
 use core::{
-    cell::{RefCell, RefMut},
     fmt::Debug,
     mem::{self, MaybeUninit},
     ptr::addr_of,
     time::Duration,
 };
 
-use critical_section::{CriticalSection, Mutex};
 use enumset::{EnumSet, EnumSetType};
+use esp_hal::sync::Locked;
 use esp_wifi_sys::include::{
     esp_eap_client_clear_ca_cert,
     esp_eap_client_clear_certificate_and_key,
@@ -952,11 +951,11 @@ const DATA_FRAME_SIZE: usize = MTU + ETHERNET_FRAME_HEADER_SIZE;
 const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
 const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
 
-pub(crate) static DATA_QUEUE_RX_AP: Mutex<RefCell<VecDeque<EspWifiPacketBuffer>>> =
-    Mutex::new(RefCell::new(VecDeque::new()));
+pub(crate) static DATA_QUEUE_RX_AP: Locked<VecDeque<EspWifiPacketBuffer>> =
+    Locked::new(VecDeque::new());
 
-pub(crate) static DATA_QUEUE_RX_STA: Mutex<RefCell<VecDeque<EspWifiPacketBuffer>>> =
-    Mutex::new(RefCell::new(VecDeque::new()));
+pub(crate) static DATA_QUEUE_RX_STA: Locked<VecDeque<EspWifiPacketBuffer>> =
+    Locked::new(VecDeque::new());
 
 /// Common errors.
 #[derive(Debug, Clone, Copy)]
@@ -1529,14 +1528,13 @@ unsafe extern "C" fn recv_cb_sta(
     eb: *mut c_types::c_void,
 ) -> esp_err_t {
     let packet = EspWifiPacketBuffer { buffer, len, eb };
-    // We must handle the result outside of the critical section because
+    // We must handle the result outside of the lock because
     // EspWifiPacketBuffer::drop must not be called in a critical section.
     // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
-    // are in a critical section.
-    if critical_section::with(|cs| {
-        let mut queue = DATA_QUEUE_RX_STA.borrow_ref_mut(cs);
+    // are in an interrupt-free context.
+    if DATA_QUEUE_RX_STA.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
             true
@@ -1563,9 +1561,8 @@ unsafe extern "C" fn recv_cb_ap(
     // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
-    // are in a critical section.
-    if critical_section::with(|cs| {
-        let mut queue = DATA_QUEUE_RX_AP.borrow_ref_mut(cs);
+    // are in an interrupt-free context.
+    if DATA_QUEUE_RX_AP.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
             true
@@ -1905,7 +1902,7 @@ mod sealed {
 
         fn wrap_config(config: Self::Config) -> Configuration;
 
-        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, VecDeque<EspWifiPacketBuffer>>;
+        fn data_queue_rx(self) -> &'static Locked<VecDeque<EspWifiPacketBuffer>>;
 
         fn can_send(self) -> bool {
             WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE
@@ -1928,13 +1925,12 @@ mod sealed {
         }
 
         fn rx_token(self) -> Option<(WifiRxToken<Self>, WifiTxToken<Self>)> {
-            let is_empty = critical_section::with(|cs| self.data_queue_rx(cs).is_empty());
+            let is_empty = self.data_queue_rx().with(|q| q.is_empty());
             if is_empty || !self.can_send() {
                 crate::timer::yield_task();
             }
 
-            let is_empty =
-                is_empty && critical_section::with(|cs| self.data_queue_rx(cs).is_empty());
+            let is_empty = is_empty && self.data_queue_rx().with(|q| q.is_empty());
 
             if !is_empty {
                 self.tx_token().map(|tx| (WifiRxToken { mode: self }, tx))
@@ -1967,8 +1963,8 @@ mod sealed {
             Configuration::Client(config)
         }
 
-        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, VecDeque<EspWifiPacketBuffer>> {
-            DATA_QUEUE_RX_STA.borrow_ref_mut(cs)
+        fn data_queue_rx(self) -> &'static Locked<VecDeque<EspWifiPacketBuffer>> {
+            &DATA_QUEUE_RX_STA
         }
 
         fn interface(self) -> wifi_interface_t {
@@ -2003,8 +1999,8 @@ mod sealed {
             Configuration::AccessPoint(config)
         }
 
-        fn data_queue_rx(self, cs: CriticalSection) -> RefMut<'_, VecDeque<EspWifiPacketBuffer>> {
-            DATA_QUEUE_RX_AP.borrow_ref_mut(cs)
+        fn data_queue_rx(self) -> &'static Locked<VecDeque<EspWifiPacketBuffer>> {
+            &DATA_QUEUE_RX_AP
         }
 
         fn interface(self) -> wifi_interface_t {
@@ -2321,7 +2317,7 @@ impl PromiscuousPkt<'_> {
             frame_type,
             len,
             data: core::slice::from_raw_parts(
-                (buf as *const u8).add(size_of::<wifi_pkt_rx_ctrl_t>()),
+                (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
                 len,
             ),
         }
@@ -2329,18 +2325,14 @@ impl PromiscuousPkt<'_> {
 }
 
 #[cfg(feature = "sniffer")]
-#[allow(clippy::type_complexity)]
-static SNIFFER_CB: Mutex<RefCell<Option<fn(PromiscuousPkt)>>> = Mutex::new(RefCell::new(None));
+static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt)>> = Locked::new(None);
 
 #[cfg(feature = "sniffer")]
 unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
-    critical_section::with(|cs| {
-        let Some(sniffer_callback) = *SNIFFER_CB.borrow_ref(cs) else {
-            return;
-        };
+    if let Some(sniffer_callback) = SNIFFER_CB.with(|callback| *callback) {
         let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
         sniffer_callback(promiscuous_pkt);
-    });
+    }
 }
 
 #[cfg(feature = "sniffer")]
@@ -2385,9 +2377,7 @@ impl Sniffer {
     }
     /// Set the callback for receiving a packet.
     pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt)) {
-        critical_section::with(|cs| {
-            *SNIFFER_CB.borrow_ref_mut(cs) = Some(cb);
-        });
+        SNIFFER_CB.with(|callback| *callback = Some(cb));
     }
 }
 
@@ -2675,21 +2665,19 @@ impl<MODE: Sealed> WifiRxToken<MODE> {
     where
         F: FnOnce(&mut [u8]) -> R,
     {
-        let mut data = critical_section::with(|cs| {
-            let mut queue = self.mode.data_queue_rx(cs);
-
+        let mut data = self.mode.data_queue_rx().with(|queue| {
             unwrap!(
                 queue.pop_front(),
                 "unreachable: transmit()/receive() ensures there is a packet to process"
             )
         });
 
-        // We handle the received data outside of the critical section because
+        // We handle the received data outside of the lock because
         // EspWifiPacketBuffer::drop must not be called in a critical section.
         // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
         // which will try to lock an internal mutex. If the mutex is already
         // taken, the function will try to trigger a context switch, which will
-        // fail if we are in a critical section.
+        // fail if we are in an interrupt-free context.
         let buffer = data.as_slice_mut();
         dump_packet_info(buffer);
 
@@ -3122,7 +3110,7 @@ macro_rules! esp_wifi_result {
 
 pub(crate) mod embassy {
     use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
-    use embassy_sync::waitqueue::AtomicWaker;
+    use esp_hal::asynch::AtomicWaker;
 
     use super::*;
 
@@ -3209,7 +3197,7 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
 mod asynch {
     use core::task::Poll;
 
-    use embassy_sync::waitqueue::AtomicWaker;
+    use esp_hal::asynch::AtomicWaker;
 
     use super::*;
 
@@ -3321,7 +3309,7 @@ mod asynch {
         }
 
         fn clear_events(events: impl Into<EnumSet<WifiEvent>>) {
-            critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove_all(events.into()));
+            WIFI_EVENTS.with(|evts| evts.get_mut().remove_all(events.into()));
         }
 
         /// Wait for one [`WifiEvent`].
@@ -3390,7 +3378,7 @@ mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
             self.event.waker().register(cx.waker());
-            if critical_section::with(|cs| WIFI_EVENTS.borrow_ref_mut(cs).remove(self.event)) {
+            if WIFI_EVENTS.with(|events| events.get_mut().remove(self.event)) {
                 Poll::Ready(())
             } else {
                 Poll::Pending
@@ -3417,8 +3405,8 @@ mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            let output = critical_section::with(|cs| {
-                let mut events = WIFI_EVENTS.borrow_ref_mut(cs);
+            let output = WIFI_EVENTS.with(|events| {
+                let events = events.get_mut();
                 let active = events.intersection(self.event);
                 events.remove_all(active);
                 active

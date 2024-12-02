@@ -8,7 +8,7 @@
 #[cfg(pcnt)]
 use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
-    dma::{Dma, DmaRxBuf, DmaTxBuf},
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Input, Level, Output, Pull},
     prelude::*,
@@ -200,24 +200,21 @@ mod tests {
         let _ = Input::new(&mut pin_mirror, Pull::Down);
         let _ = Input::new(&mut unconnected_pin, Pull::Down);
 
-        let dma = Dma::new(peripherals.DMA);
-
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let dma_channel = dma.spi2channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 
-        let spi = Spi::new_with_config(
+        let spi = Spi::new(
             peripherals.SPI2,
-            Config {
-                frequency: 100.kHz(),
-                mode: SpiMode::Mode0,
-                ..Config::default()
-            },
-        );
+            Config::default()
+                .with_frequency(100.kHz())
+                .with_mode(SpiMode::Mode0),
+        )
+        .unwrap();
 
         Context {
             spi,

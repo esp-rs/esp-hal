@@ -24,16 +24,14 @@
 //! #     }
 //! # };
 //! # use esp_hal::dma_loop_buffer;
-//! # use esp_hal::dma::{Dma, DmaPriority};
 //!
-//! # let dma = Dma::new(peripherals.DMA);
-//! # let channel = dma.channel0;
-//!
+//! # let channel = peripherals.DMA_CH0;
 //! # let mut dma_buf = dma_loop_buffer!(32);
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
 //! let mut config = dpi::Config::default();
+//! config.frequency = 1.MHz();
 //! config.clock_mode = ClockMode {
 //!     polarity: Polarity::IdleLow,
 //!     phase: Phase::ShiftLow,
@@ -61,7 +59,7 @@
 //! config.de_idle_level = Level::Low;
 //! config.disable_black_region = false;
 //!
-//! let mut dpi = Dpi::new(lcd_cam.lcd, channel, 1.MHz(), config)
+//! let mut dpi = Dpi::new(lcd_cam.lcd, channel, config).unwrap()
 //!     .with_vsync(peripherals.GPIO3)
 //!     .with_hsync(peripherals.GPIO46)
 //!     .with_de(peripherals.GPIO17)
@@ -102,17 +100,18 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use fugit::HertzU32;
+use fugit::{HertzU32, RateExtU32};
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelTx, DmaChannelConvert, DmaError, DmaPeripheral, DmaTxBuffer, Tx, TxChannelFor},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, Tx, TxChannelFor},
     gpio::{interconnect::PeripheralOutput, Level, OutputSignal},
     lcd_cam::{
         calculate_clkm,
         lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
         BitOrder,
         ByteOrder,
+        ClockError,
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
@@ -120,10 +119,18 @@ use crate::{
     Mode,
 };
 
+/// Errors that can occur when configuring the DPI peripheral.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ConfigError {
+    /// Clock configuration error.
+    Clock(ClockError),
+}
+
 /// Represents the RGB LCD interface.
 pub struct Dpi<'d, DM: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, Blocking, TxChannelFor<LCD_CAM>>,
+    tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
     _mode: PhantomData<DM>,
 }
 
@@ -135,29 +142,41 @@ where
     pub fn new<CH>(
         lcd: Lcd<'d, DM>,
         channel: impl Peripheral<P = CH> + 'd,
-        frequency: HertzU32,
         config: Config,
-    ) -> Self
+    ) -> Result<Self, ConfigError>
     where
-        CH: DmaChannelConvert<TxChannelFor<LCD_CAM>>,
+        CH: TxChannelFor<LCD_CAM>,
     {
         let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));
-        let lcd_cam = lcd.lcd_cam;
 
+        let mut this = Self {
+            lcd_cam: lcd.lcd_cam,
+            tx_channel,
+            _mode: PhantomData,
+        };
+
+        this.apply_config(&config)?;
+
+        Ok(this)
+    }
+
+    /// Applies the configuration to the peripheral.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
         let (i, divider) = calculate_clkm(
-            (frequency.to_Hz() * 2) as _,
+            (config.frequency.to_Hz() * 2) as _,
             &[
                 clocks.xtal_clock.to_Hz() as _,
                 clocks.cpu_clock.to_Hz() as _,
                 clocks.crypto_pwm_clock.to_Hz() as _,
             ],
-        );
+        )
+        .map_err(ConfigError::Clock)?;
 
-        lcd_cam.lcd_clock().write(|w| unsafe {
+        self.lcd_cam.lcd_clock().write(|w| unsafe {
             // Force enable the clock for all configuration registers.
             w.clk_en().set_bit();
             w.lcd_clk_sel().bits((i + 1) as _);
@@ -171,13 +190,15 @@ where
             w.lcd_ck_out_edge()
                 .bit(config.clock_mode.phase == Phase::ShiftHigh)
         });
-        lcd_cam.lcd_user().modify(|_, w| w.lcd_reset().set_bit());
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_reset().set_bit());
 
-        lcd_cam
+        self.lcd_cam
             .lcd_rgb_yuv()
             .write(|w| w.lcd_conv_bypass().clear_bit());
 
-        lcd_cam.lcd_user().modify(|_, w| {
+        self.lcd_cam.lcd_user().modify(|_, w| {
             if config.format.enable_2byte_mode {
                 w.lcd_8bits_order().bit(false);
                 w.lcd_byte_order()
@@ -200,7 +221,7 @@ where
         });
 
         let timing = &config.timing;
-        lcd_cam.lcd_ctrl().modify(|_, w| unsafe {
+        self.lcd_cam.lcd_ctrl().modify(|_, w| unsafe {
             // Enable RGB mode, and input VSYNC, HSYNC, and DE signals.
             w.lcd_rgb_mode_en().set_bit();
 
@@ -211,7 +232,7 @@ where
             w.lcd_vt_height()
                 .bits((timing.vertical_total_height as u16).saturating_sub(1))
         });
-        lcd_cam.lcd_ctrl1().modify(|_, w| unsafe {
+        self.lcd_cam.lcd_ctrl1().modify(|_, w| unsafe {
             w.lcd_vb_front()
                 .bits((timing.vertical_blank_front_porch as u8).saturating_sub(1));
             w.lcd_ha_width()
@@ -219,7 +240,7 @@ where
             w.lcd_ht_width()
                 .bits((timing.horizontal_total_width as u16).saturating_sub(1))
         });
-        lcd_cam.lcd_ctrl2().modify(|_, w| unsafe {
+        self.lcd_cam.lcd_ctrl2().modify(|_, w| unsafe {
             w.lcd_vsync_width()
                 .bits((timing.vsync_width as u8).saturating_sub(1));
             w.lcd_vsync_idle_pol().bit(config.vsync_idle_level.into());
@@ -231,7 +252,7 @@ where
             w.lcd_hsync_position().bits(timing.hsync_position as u8)
         });
 
-        lcd_cam.lcd_misc().modify(|_, w| unsafe {
+        self.lcd_cam.lcd_misc().modify(|_, w| unsafe {
             // TODO: Find out what this field actually does.
             // Set the threshold for Async Tx FIFO full event. (5 bits)
             w.lcd_afifo_threshold_num().bits((1 << 5) - 1);
@@ -247,13 +268,13 @@ where
             // Enable blank region when LCD sends data out.
             w.lcd_bk_en().bit(!config.disable_black_region)
         });
-        lcd_cam.lcd_dly_mode().modify(|_, w| unsafe {
+        self.lcd_cam.lcd_dly_mode().modify(|_, w| unsafe {
             w.lcd_de_mode().bits(config.de_mode as u8);
             w.lcd_hsync_mode().bits(config.hsync_mode as u8);
             w.lcd_vsync_mode().bits(config.vsync_mode as u8);
             w
         });
-        lcd_cam.lcd_data_dout_mode().modify(|_, w| unsafe {
+        self.lcd_cam.lcd_data_dout_mode().modify(|_, w| unsafe {
             w.dout0_mode().bits(config.output_bit_mode as u8);
             w.dout1_mode().bits(config.output_bit_mode as u8);
             w.dout2_mode().bits(config.output_bit_mode as u8);
@@ -272,13 +293,11 @@ where
             w.dout15_mode().bits(config.output_bit_mode as u8)
         });
 
-        lcd_cam.lcd_user().modify(|_, w| w.lcd_update().set_bit());
+        self.lcd_cam
+            .lcd_user()
+            .modify(|_, w| w.lcd_update().set_bit());
 
-        Self {
-            lcd_cam,
-            tx_channel,
-            _mode: PhantomData,
-        }
+        Ok(())
     }
 
     /// Assign the VSYNC pin for the LCD_CAM.
@@ -678,6 +697,9 @@ pub struct Config {
     /// Specifies the clock mode, including polarity and phase settings.
     pub clock_mode: ClockMode,
 
+    /// The frequency of the pixel clock.
+    pub frequency: HertzU32,
+
     /// Format of the byte data sent out.
     pub format: Format,
 
@@ -715,6 +737,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             clock_mode: Default::default(),
+            frequency: 1.MHz(),
             format: Default::default(),
             timing: Default::default(),
             vsync_idle_level: Level::Low,

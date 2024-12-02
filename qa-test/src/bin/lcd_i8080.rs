@@ -25,7 +25,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaTxBuf},
+    dma::DmaTxBuf,
     dma_tx_buffer,
     gpio::{Input, Level, Output, Pull},
     lcd_cam::{
@@ -47,8 +47,6 @@ fn main() -> ! {
     let lcd_wr = peripherals.GPIO47; // Write clock
     let lcd_te = peripherals.GPIO48; // Frame sync
 
-    let dma = Dma::new(peripherals.DMA);
-
     let dma_tx_buf = dma_tx_buffer!(4000).unwrap();
 
     let delay = Delay::new();
@@ -69,14 +67,11 @@ fn main() -> ! {
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let i8080 = I8080::new(
-        lcd_cam.lcd,
-        dma.channel0,
-        tx_pins,
-        20.MHz(),
-        Config::default(),
-    )
-    .with_ctrl_pins(lcd_rs, lcd_wr);
+    let mut i8080_config = Config::default();
+    i8080_config.frequency = 20.MHz();
+    let i8080 = I8080::new(lcd_cam.lcd, peripherals.DMA_CH0, tx_pins, i8080_config)
+        .unwrap()
+        .with_ctrl_pins(lcd_rs, lcd_wr);
 
     // Note: This isn't provided in the HAL since different drivers may require
     // different considerations, like how to manage the CS pin, the CD pin,

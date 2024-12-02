@@ -27,24 +27,25 @@ digest                   = { version = "0.10.7", default-features = false, optio
 document-features        = "0.2.10"
 embassy-embedded-hal     = "0.2.0"
 embassy-futures          = "0.1.1"
-embassy-sync             = "0.6.0"
+embassy-sync             = "0.6.1"
 embassy-usb-driver       = { version = "0.1.0", optional = true }
 embassy-usb-synopsys-otg = { version = "0.1.0", optional = true }
 embedded-can             = "0.4.1"
-embedded-hal-02          = { version = "0.2.7", features = ["unproven"], package = "embedded-hal" }
 embedded-hal             = "1.0.0"
 embedded-hal-async       = "1.0.0"
 embedded-hal-nb          = "1.0.0"
 embedded-io              = "0.6.1"
 embedded-io-async        = "0.6.1"
 enumset                  = "1.1.5"
+esp-build                = { version = "0.1.0", path = "../esp-build" }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                    = "0.3.7"
+instability              = "0.3"
 log                      = { version = "0.4.22", optional = true }
 nb                       = "1.1.0"
 paste                    = "1.0.15"
 portable-atomic          = { version = "1.9.0", default-features = false }
-procmacros               = { version = "0.15.0", features = ["enum-dispatch", "interrupt", "ram"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+procmacros               = { version = "0.15.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 strum                    = { version = "0.26.3", default-features = false, features = ["derive"] }
 void                     = { version = "1.0.2", default-features = false }
 usb-device               = { version = "0.3.2", optional = true }
@@ -104,19 +105,19 @@ log = ["dep:log"]
 
 # Chip Support Feature Flags
 # Target the ESP32.
-esp32   = ["dep:esp32",   "xtensa-lx-rt/esp32"]
+esp32   = ["dep:esp32", "procmacros/rtc-slow", "xtensa-lx-rt/esp32"]
 # Target the ESP32-C2.
 esp32c2 = ["dep:esp32c2", "portable-atomic/unsafe-assume-single-core"]
 # Target the ESP32-C3.
-esp32c3 = ["dep:esp32c3", "portable-atomic/unsafe-assume-single-core", "esp-riscv-rt/rtc-ram"]
+esp32c3 = ["dep:esp32c3", "esp-riscv-rt/rtc-ram", "portable-atomic/unsafe-assume-single-core"]
 # Target the ESP32-C6.
-esp32c6 = ["dep:esp32c6", "procmacros/has-lp-core", "esp-riscv-rt/rtc-ram"]
+esp32c6 = ["dep:esp32c6", "esp-riscv-rt/rtc-ram", "procmacros/has-lp-core"]
 # Target the ESP32-H2.
 esp32h2 = ["dep:esp32h2", "esp-riscv-rt/rtc-ram"]
 # Target the ESP32-S2.
-esp32s2 = ["dep:esp32s2", "portable-atomic/critical-section", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s2", "usb-otg"]
+esp32s2 = ["dep:esp32s2", "portable-atomic/critical-section", "procmacros/has-ulp-core", "procmacros/rtc-slow", "usb-otg", "xtensa-lx-rt/esp32s2"]
 # Target the ESP32-S3.
-esp32s3 = ["dep:esp32s3", "procmacros/has-ulp-core", "xtensa-lx-rt/esp32s3", "usb-otg"]
+esp32s3 = ["dep:esp32s3", "procmacros/has-ulp-core", "procmacros/rtc-slow", "usb-otg", "xtensa-lx-rt/esp32s3"]
 
 #! ### RISC-V Exclusive Feature Flags
 ## Move the stack to start of RAM to get zero-cost stack overflow protection
@@ -151,6 +152,9 @@ octal-psram = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["defmt", "bluetooth"]
+
+# Enables APIs that are not stable and thus come with no stability guarantees.
+unstable = []
 
 [lints.clippy]
 mixed_attributes_style = "allow"

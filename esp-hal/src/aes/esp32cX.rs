@@ -1,4 +1,4 @@
-use crate::aes::{Aes, Aes128, Aes256, AesFlavour, ALIGN_SIZE};
+use crate::aes::{Aes, Aes128, Aes256, AesFlavour, Mode, ALIGN_SIZE};
 
 impl Aes<'_> {
     pub(super) fn init(&mut self) {
@@ -25,11 +25,11 @@ impl Aes<'_> {
             .volatile_write_regset(self.aes.text_in(0).as_ptr(), block, 4);
     }
 
-    pub(super) fn write_mode(&mut self, mode: u32) {
-        self.aes.mode().write(|w| unsafe { w.bits(mode) });
+    pub(super) fn write_mode(&self, mode: Mode) {
+        self.aes.mode().write(|w| unsafe { w.bits(mode as _) });
     }
 
-    pub(super) fn write_start(&mut self) {
+    pub(super) fn write_start(&self) {
         self.aes.trigger().write(|w| w.trigger().set_bit());
     }
 

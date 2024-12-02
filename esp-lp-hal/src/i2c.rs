@@ -187,7 +187,8 @@ pub struct LpI2c {
 }
 
 impl LpI2c {
-    fn master_write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+    /// Writes bytes to slave with address `addr`
+    pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
         let mut cmd_iterator = CommandRegister::COMD0;
 
         // If SCL is busy, reset the Master FSM
@@ -272,7 +273,8 @@ impl LpI2c {
         Ok(())
     }
 
-    fn master_read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    /// Reads enough bytes from slave with `addr` to fill `buffer`
+    pub fn read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
         // Check size constraints
         if buffer.len() > 254 {
             return Err(Error::ExceedingFifo);
@@ -370,17 +372,14 @@ impl LpI2c {
         Ok(())
     }
 
-    fn master_write_read(
-        &mut self,
-        addr: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
-    ) -> Result<(), Error> {
+    /// Writes bytes to slave with address `addr` and then reads enough bytes
+    /// to fill `buffer` *in a single transaction*
+    pub fn write_read(&mut self, addr: u8, bytes: &[u8], buffer: &mut [u8]) -> Result<(), Error> {
         // It would be possible to combine the write and read in one transaction, but
         // filling the tx fifo with the current code is somewhat slow even in release
         // mode which can cause issues.
-        self.master_write(addr, bytes)?;
-        self.master_read(addr, buffer)?;
+        self.write(addr, bytes)?;
+        self.read(addr, buffer)?;
 
         Ok(())
     }
@@ -466,37 +465,5 @@ impl LpI2c {
         command_register.advance();
 
         Ok(())
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl embedded_hal_02::blocking::i2c::Read for LpI2c {
-    type Error = Error;
-
-    fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.master_read(address, buffer)
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl embedded_hal_02::blocking::i2c::Write for LpI2c {
-    type Error = Error;
-
-    fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.master_write(addr, bytes)
-    }
-}
-
-#[cfg(feature = "embedded-hal-02")]
-impl embedded_hal_02::blocking::i2c::WriteRead for LpI2c {
-    type Error = Error;
-
-    fn write_read(
-        &mut self,
-        address: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
-    ) -> Result<(), Self::Error> {
-        self.master_write_read(address, bytes, buffer)
     }
 }

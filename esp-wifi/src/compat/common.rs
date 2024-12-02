@@ -12,6 +12,7 @@ use esp_wifi_sys::include::malloc;
 use super::malloc::free;
 use crate::{
     binary::c_types::{c_int, c_void},
+    hal::sync::Locked,
     memory_fence::memory_fence,
     preempt::current_task,
     timer::yield_task,
@@ -27,36 +28,34 @@ struct Mutex {
 }
 
 pub(crate) struct ConcurrentQueue {
-    raw_queue: critical_section::Mutex<RefCell<RawQueue>>,
+    raw_queue: Locked<RawQueue>,
 }
 
 impl ConcurrentQueue {
     pub(crate) fn new(count: usize, item_size: usize) -> Self {
         Self {
-            raw_queue: critical_section::Mutex::new(RefCell::new(RawQueue::new(count, item_size))),
+            raw_queue: Locked::new(RawQueue::new(count, item_size)),
         }
     }
 
     fn release_storage(&mut self) {
-        critical_section::with(|cs| unsafe {
-            self.raw_queue.borrow_ref_mut(cs).release_storage();
-        })
+        self.raw_queue.with(|q| unsafe { q.release_storage() })
     }
 
     pub(crate) fn enqueue(&mut self, item: *mut c_void) -> i32 {
-        critical_section::with(|cs| unsafe { self.raw_queue.borrow_ref_mut(cs).enqueue(item) })
+        self.raw_queue.with(|q| unsafe { q.enqueue(item) })
     }
 
     pub(crate) fn try_dequeue(&mut self, item: *mut c_void) -> bool {
-        critical_section::with(|cs| unsafe { self.raw_queue.borrow_ref_mut(cs).try_dequeue(item) })
+        self.raw_queue.with(|q| unsafe { q.try_dequeue(item) })
     }
 
     pub(crate) fn remove(&mut self, item: *mut c_void) {
-        critical_section::with(|cs| unsafe { self.raw_queue.borrow_ref_mut(cs).remove(item) });
+        self.raw_queue.with(|q| unsafe { q.remove(item) })
     }
 
     pub(crate) fn count(&self) -> usize {
-        critical_section::with(|cs| unsafe { self.raw_queue.borrow_ref(cs).count() })
+        self.raw_queue.with(|q| unsafe { q.count() })
     }
 }
 

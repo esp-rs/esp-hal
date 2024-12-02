@@ -11,7 +11,7 @@
 //! `ESP32-S2` are using older `PDMA` controller, whenever other chips are using
 //! newer `GDMA` controller.
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### Initialize and utilize DMA controller in `SPI`
 //!
@@ -19,23 +19,18 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::{master::{Config, Spi}, SpiMode};
-//! # use esp_hal::dma::Dma;
-//! let dma = Dma::new(peripherals.DMA);
-#![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = dma.spi2channel;")]
-#![cfg_attr(not(any(esp32, esp32s2)), doc = "let dma_channel = dma.channel0;")]
+#![cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
+#![cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO2;
 //! let mosi = peripherals.GPIO4;
 //! let cs = peripherals.GPIO5;
 //!
-//! let mut spi = Spi::new_with_config(
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config {
-//!         frequency: 100.kHz(),
-//!         mode: SpiMode::Mode0,
-//!         ..Config::default()
-//!     },
+//!     Config::default().with_frequency(100.kHz()).with_mode(SpiMode::Mode0)
 //! )
+//! .unwrap()
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
 //! .with_miso(miso)
@@ -70,6 +65,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     soc::is_slice_in_dram,
+    system,
     Async,
     Blocking,
     Cpu,
@@ -944,38 +940,6 @@ pub trait DmaEligible {
     fn dma_peripheral(&self) -> DmaPeripheral;
 }
 
-/// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
-pub type DmaChannelFor<T> = <T as DmaEligible>::Dma;
-/// Helper type to get the DMA Rx channel for a peripheral.
-pub type RxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Rx;
-/// Helper type to get the DMA Tx channel for a peripheral.
-pub type TxChannelFor<T> = <DmaChannelFor<T> as DmaChannel>::Tx;
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! impl_dma_eligible {
-    ([$dma_ch:ident] $name:ident => $dma:ident) => {
-        impl $crate::dma::DmaEligible for $crate::peripherals::$name {
-            type Dma = $dma_ch;
-
-            fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
-                $crate::dma::DmaPeripheral::$dma
-            }
-        }
-    };
-
-    (
-        $dma_ch:ident {
-            $($(#[$cfg:meta])? $name:ident => $dma:ident,)*
-        }
-    ) => {
-        $(
-            $(#[$cfg])?
-            $crate::impl_dma_eligible!([$dma_ch] $name => $dma);
-        )*
-    };
-}
-
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct DescriptorChain {
@@ -1594,6 +1558,38 @@ impl RxCircularState {
 }
 
 #[doc(hidden)]
+#[macro_export]
+macro_rules! impl_dma_eligible {
+    ([$dma_ch:ident] $name:ident => $dma:ident) => {
+        impl $crate::dma::DmaEligible for $crate::peripherals::$name {
+            type Dma = $dma_ch;
+
+            fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
+                $crate::dma::DmaPeripheral::$dma
+            }
+        }
+    };
+
+    (
+        $dma_ch:ident {
+            $($(#[$cfg:meta])? $name:ident => $dma:ident,)*
+        }
+    ) => {
+        $(
+            $(#[$cfg])?
+            $crate::impl_dma_eligible!([$dma_ch] $name => $dma);
+        )*
+    };
+}
+
+/// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
+pub type PeripheralDmaChannel<T> = <T as DmaEligible>::Dma;
+/// Helper type to get the DMA Rx channel for a peripheral.
+pub type PeripheralRxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Rx;
+/// Helper type to get the DMA Tx channel for a peripheral.
+pub type PeripheralTxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Tx;
+
+#[doc(hidden)]
 pub trait DmaRxChannel:
     RxRegisterAccess + InterruptAccess<DmaRxInterrupt> + Peripheral<P = Self>
 {
@@ -1647,7 +1643,7 @@ pub trait DmaChannelExt: DmaChannel {
     note = "Not all channels are useable with all peripherals"
 )]
 #[doc(hidden)]
-pub trait DmaChannelConvert<DEG>: DmaChannel {
+pub trait DmaChannelConvert<DEG> {
     fn degrade(self) -> DEG;
 }
 
@@ -1655,6 +1651,92 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
     fn degrade(self) -> DEG {
         self
     }
+}
+
+/// Trait implemented for DMA channels that are compatible with a particular
+/// peripheral.
+///
+/// You can use this in places where a peripheral driver would expect a
+/// `DmaChannel` implementation.
+#[cfg_attr(pdma, doc = "")]
+#[cfg_attr(
+    pdma,
+    doc = "Note that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime."
+)]
+#[cfg_attr(pdma, doc = "")]
+/// ## Example
+///
+/// The following example demonstrates how this trait can be used to only accept
+/// types compatible with a specific peripheral.
+///
+/// ```rust,no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::spi::master::{Spi, SpiDma, Config, Instance as SpiInstance};
+/// use esp_hal::dma::DmaChannelFor;
+/// use esp_hal::peripheral::Peripheral;
+/// use esp_hal::Blocking;
+///
+/// fn configures_spi_dma<'d, S, CH>(
+///     spi: Spi<'d, Blocking, S>,
+///     channel: impl Peripheral<P = CH> + 'd,
+/// ) -> SpiDma<'d, Blocking, S>
+/// where
+///     S: SpiInstance,
+///     CH: DmaChannelFor<S> + 'd,
+///  {
+///     spi.with_dma(channel)
+/// }
+#[cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
+#[cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
+#[doc = ""]
+/// let spi = Spi::new(
+///     peripherals.SPI2,
+///     Config::default(),
+/// )
+/// .unwrap();
+///
+/// let spi_dma = configures_spi_dma(spi, dma_channel);
+/// # }
+/// ```
+pub trait DmaChannelFor<P: DmaEligible>:
+    DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>
+{
+}
+impl<P, CH> DmaChannelFor<P> for CH
+where
+    P: DmaEligible,
+    CH: DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>,
+{
+}
+
+/// Trait implemented for the RX half of split DMA channels that are compatible
+/// with a particular peripheral. Accepts complete DMA channels or split halves.
+///
+/// This trait is similar in use to [`DmaChannelFor`].
+///
+/// You can use this in places where a peripheral driver would expect a
+/// `DmaRxChannel` implementation.
+pub trait RxChannelFor<P: DmaEligible>: DmaChannelConvert<PeripheralRxChannel<P>> {}
+impl<P, RX> RxChannelFor<P> for RX
+where
+    P: DmaEligible,
+    RX: DmaChannelConvert<PeripheralRxChannel<P>>,
+{
+}
+
+/// Trait implemented for the TX half of split DMA channels that are compatible
+/// with a particular peripheral. Accepts complete DMA channels or split halves.
+///
+/// This trait is similar in use to [`DmaChannelFor`].
+///
+/// You can use this in places where a peripheral driver would expect a
+/// `DmaTxChannel` implementation.
+pub trait TxChannelFor<PER: DmaEligible>: DmaChannelConvert<PeripheralTxChannel<PER>> {}
+impl<P, TX> TxChannelFor<P> for TX
+where
+    P: DmaEligible,
+    TX: DmaChannelConvert<PeripheralTxChannel<P>>,
+{
 }
 
 /// The functions here are not meant to be used outside the HAL
@@ -1711,7 +1793,22 @@ pub trait Rx: crate::private::Sealed {
 
     fn clear_interrupts(&self);
 
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker;
+}
+
+// NOTE(p4): because the P4 has two different GDMAs, we won't be able to use
+// `GenericPeripheralGuard`.
+cfg_if::cfg_if! {
+    if #[cfg(pdma)] {
+        type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Dma as u8}>;
+    } else {
+        type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Gdma as u8}>;
+    }
+}
+
+fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
+    // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
+    system::GenericPeripheralGuard::new_with(init_dma)
 }
 
 // DMA receive channel
@@ -1724,6 +1821,7 @@ where
 {
     pub(crate) rx_impl: PeripheralRef<'a, CH>,
     pub(crate) _phantom: PhantomData<M>,
+    pub(crate) _guard: PeripheralGuard,
 }
 
 impl<'a, CH> ChannelRx<'a, Blocking, CH>
@@ -1733,6 +1831,9 @@ where
     /// Creates a new RX channel half.
     pub fn new(rx_impl: impl Peripheral<P = CH> + 'a) -> Self {
         crate::into_ref!(rx_impl);
+
+        let _guard = create_guard(&*rx_impl);
+
         #[cfg(gdma)]
         // clear the mem2mem mode to avoid failed DMA if this
         // channel was previously used for a mem2mem transfer.
@@ -1748,6 +1849,7 @@ where
         Self {
             rx_impl,
             _phantom: PhantomData,
+            _guard,
         }
     }
 
@@ -1760,6 +1862,7 @@ where
         ChannelRx {
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 
@@ -1790,6 +1893,7 @@ where
         ChannelRx {
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 }
@@ -1944,7 +2048,7 @@ where
         self.rx_impl.clear_all();
     }
 
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker {
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker {
         self.rx_impl.waker()
     }
 }
@@ -1993,7 +2097,7 @@ pub trait Tx: crate::private::Sealed {
 
     fn clear_interrupts(&self);
 
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker;
 
     fn last_out_dscr_address(&self) -> usize;
 }
@@ -2007,6 +2111,7 @@ where
 {
     pub(crate) tx_impl: PeripheralRef<'a, CH>,
     pub(crate) _phantom: PhantomData<M>,
+    pub(crate) _guard: PeripheralGuard,
 }
 
 impl<'a, CH> ChannelTx<'a, Blocking, CH>
@@ -2016,6 +2121,9 @@ where
     /// Creates a new TX channel half.
     pub fn new(tx_impl: impl Peripheral<P = CH> + 'a) -> Self {
         crate::into_ref!(tx_impl);
+
+        let _guard = create_guard(&*tx_impl);
+
         if let Some(interrupt) = tx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
                 crate::interrupt::disable(cpu, interrupt);
@@ -2025,6 +2133,7 @@ where
         Self {
             tx_impl,
             _phantom: PhantomData,
+            _guard,
         }
     }
 
@@ -2037,6 +2146,7 @@ where
         ChannelTx {
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 
@@ -2067,6 +2177,7 @@ where
         ChannelTx {
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 }
@@ -2218,7 +2329,7 @@ where
         self.tx_impl.pending_interrupts()
     }
 
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker {
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker {
         self.tx_impl.waker()
     }
 
@@ -2313,7 +2424,7 @@ pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
     fn is_listening(&self) -> EnumSet<T>;
     fn clear(&self, interrupts: impl Into<EnumSet<T>>);
     fn pending_interrupts(&self) -> EnumSet<T>;
-    fn waker(&self) -> &'static embassy_sync::waitqueue::AtomicWaker;
+    fn waker(&self) -> &'static crate::asynch::AtomicWaker;
 
     fn is_async(&self) -> bool;
     fn set_async(&self, is_async: bool);

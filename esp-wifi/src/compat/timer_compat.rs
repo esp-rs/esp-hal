@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
-use core::cell::RefCell;
 
-use critical_section::Mutex;
+use esp_hal::sync::Locked;
 
 use crate::binary::{
     c_types,
@@ -138,7 +137,7 @@ impl TimerQueue {
 
 unsafe impl Send for TimerQueue {}
 
-pub(crate) static TIMERS: Mutex<RefCell<TimerQueue>> = Mutex::new(RefCell::new(TimerQueue::new()));
+pub(crate) static TIMERS: Locked<TimerQueue> = Locked::new(TimerQueue::new());
 
 pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {
     compat_timer_arm_us(ets_timer, tmout * 1000, repeat);
@@ -156,8 +155,8 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
         repeat
     );
 
-    critical_section::with(|cs| {
-        if let Some(timer) = TIMERS.borrow_ref_mut(cs).find(ets_timer) {
+    TIMERS.with(|timers| {
+        if let Some(timer) = timers.find(ets_timer) {
             timer.started = systick;
             timer.timeout = ticks;
             timer.active = true;
@@ -170,8 +169,8 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
 
 pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
     trace!("timer disarm");
-    critical_section::with(|cs| {
-        if let Some(timer) = TIMERS.borrow_ref_mut(cs).find(ets_timer) {
+    TIMERS.with(|timers| {
+        if let Some(timer) = timers.find(ets_timer) {
             trace!("timer_disarm {:x}", timer.id());
             timer.active = false;
         } else {
@@ -182,8 +181,7 @@ pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
 
 pub fn compat_timer_done(ets_timer: *mut ets_timer) {
     trace!("timer done");
-    critical_section::with(|cs| {
-        let mut timers = TIMERS.borrow_ref_mut(cs);
+    TIMERS.with(|timers| {
         if let Some(timer) = timers.find(ets_timer) {
             trace!("timer_done {:x}", timer.id());
             timer.active = false;
@@ -211,8 +209,7 @@ pub(crate) fn compat_timer_setfn(
         pfunction,
         parg
     );
-    let set = critical_section::with(|cs| unsafe {
-        let mut timers = TIMERS.borrow_ref_mut(cs);
+    let set = TIMERS.with(|timers| unsafe {
         if let Some(timer) = timers.find(ets_timer) {
             timer.callback = TimerCallback::new(pfunction, parg);
             timer.active = false;

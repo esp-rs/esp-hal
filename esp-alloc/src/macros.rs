@@ -29,9 +29,9 @@ macro_rules! heap_allocator {
 /// ```
 #[macro_export]
 macro_rules! psram_allocator {
-    ($peripheral:expr,$psram_module:path) => {{
+    ($peripheral:expr, $psram_module:path) => {{
         use $psram_module as _psram;
-        let (start, size) = _psram::init_psram($peripheral, _psram::PsramConfig::default());
+        let (start, size) = _psram::psram_raw_parts(&$peripheral);
         unsafe {
             $crate::HEAP.add_region($crate::HeapRegion::new(
                 start,

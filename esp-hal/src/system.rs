@@ -5,10 +5,9 @@
 //! This `system` module defines the available radio peripherals and provides an
 //! interface to control and configure radio clocks.
 
-use core::sync::atomic::Ordering;
+use core::cell::RefCell;
 
-use critical_section::CriticalSection;
-use portable_atomic::AtomicUsize;
+use critical_section::{CriticalSection, Mutex};
 use strum::{EnumCount, EnumIter, IntoEnumIterator};
 
 use crate::peripherals::SYSTEM;
@@ -145,19 +144,22 @@ impl Peripheral {
     }
 }
 
-static PERIPHERAL_REF_COUNT: [AtomicUsize; Peripheral::COUNT] =
-    [const { AtomicUsize::new(0) }; Peripheral::COUNT];
+static PERIPHERAL_REF_COUNT: Mutex<RefCell<[usize; Peripheral::COUNT]>> =
+    Mutex::new(RefCell::new([0; Peripheral::COUNT]));
 
 /// Disable all peripherals.
 ///
 /// Peripherals listed in [KEEP_ENABLED] are NOT disabled.
 pub(crate) fn disable_peripherals() {
-    for p in Peripheral::iter() {
-        if KEEP_ENABLED.contains(&p) {
-            continue;
+    // Take the critical section up front to avoid taking it multiple times.
+    critical_section::with(|cs| {
+        for p in Peripheral::iter() {
+            if KEEP_ENABLED.contains(&p) {
+                continue;
+            }
+            PeripheralClockControl::enable_forced_with_cs(p, false, true, cs);
         }
-        PeripheralClockControl::enable_forced(p, false, true);
-    }
+    })
 }
 
 #[derive(Debug)]
@@ -166,12 +168,17 @@ pub(crate) struct PeripheralGuard {
 }
 
 impl PeripheralGuard {
-    pub(crate) fn new(p: Peripheral) -> Self {
+    pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
         if !KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p) {
             PeripheralClockControl::reset(p);
+            init();
         }
 
         Self { peripheral: p }
+    }
+
+    pub(crate) fn new(p: Peripheral) -> Self {
+        Self::new_with(p, || {})
     }
 }
 
@@ -187,13 +194,22 @@ impl Drop for PeripheralGuard {
 pub(crate) struct GenericPeripheralGuard<const P: u8> {}
 
 impl<const P: u8> GenericPeripheralGuard<P> {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new_with(init: fn(CriticalSection<'_>)) -> Self {
         let peripheral = unwrap!(Peripheral::try_from(P));
-        if !KEEP_ENABLED.contains(&peripheral) && PeripheralClockControl::enable(peripheral) {
-            PeripheralClockControl::reset(peripheral);
-        }
+        critical_section::with(|cs| {
+            if !KEEP_ENABLED.contains(&peripheral)
+                && PeripheralClockControl::enable_with_cs(peripheral, cs)
+            {
+                PeripheralClockControl::reset(peripheral);
+                init(cs);
+            }
+        });
 
         Self {}
+    }
+
+    pub(crate) fn new() -> Self {
+        Self::new_with(|_| {})
     }
 }
 
@@ -211,7 +227,7 @@ pub(crate) struct PeripheralClockControl;
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
-    fn enable_internal(peripheral: Peripheral, enable: bool, _cs: &CriticalSection<'_>) {
+    fn enable_internal(peripheral: Peripheral, enable: bool, _cs: CriticalSection<'_>) {
         debug!("Enable {:?} {}", peripheral, enable);
 
         let system = unsafe { &*SYSTEM::PTR };
@@ -595,7 +611,7 @@ impl PeripheralClockControl {
 
 #[cfg(any(esp32c6, esp32h2))]
 impl PeripheralClockControl {
-    fn enable_internal(peripheral: Peripheral, enable: bool, _cs: &CriticalSection<'_>) {
+    fn enable_internal(peripheral: Peripheral, enable: bool, _cs: CriticalSection<'_>) {
         debug!("Enable {:?} {}", peripheral, enable);
         let system = unsafe { &*SYSTEM::PTR };
 
@@ -971,6 +987,16 @@ impl PeripheralClockControl {
         Self::enable_forced(peripheral, true, false)
     }
 
+    /// Enables the given peripheral.
+    ///
+    /// This keeps track of enabling a peripheral - i.e. a peripheral
+    /// is only enabled with the first call attempt to enable it.
+    ///
+    /// Returns `true` if it actually enabled the peripheral.
+    pub(crate) fn enable_with_cs(peripheral: Peripheral, cs: CriticalSection<'_>) -> bool {
+        Self::enable_forced_with_cs(peripheral, true, false, cs)
+    }
+
     /// Disables the given peripheral.
     ///
     /// This keeps track of disabling a peripheral - i.e. it only
@@ -984,34 +1010,43 @@ impl PeripheralClockControl {
     }
 
     pub(crate) fn enable_forced(peripheral: Peripheral, enable: bool, force: bool) -> bool {
-        critical_section::with(|cs| {
-            if !force {
-                if enable {
-                    let prev =
-                        PERIPHERAL_REF_COUNT[peripheral as usize].fetch_add(1, Ordering::Relaxed);
-                    if prev > 0 {
-                        return false;
-                    }
-                } else {
-                    let prev =
-                        PERIPHERAL_REF_COUNT[peripheral as usize].fetch_sub(1, Ordering::Relaxed);
-                    assert!(prev != 0);
-                    if prev > 1 {
-                        return false;
-                    }
-                };
-            } else if !enable {
-                assert!(PERIPHERAL_REF_COUNT[peripheral as usize].swap(0, Ordering::Relaxed) == 0);
-            }
+        critical_section::with(|cs| Self::enable_forced_with_cs(peripheral, enable, force, cs))
+    }
 
-            if !enable {
-                Self::reset(peripheral);
-            }
+    pub(crate) fn enable_forced_with_cs(
+        peripheral: Peripheral,
+        enable: bool,
+        force: bool,
+        cs: CriticalSection<'_>,
+    ) -> bool {
+        let mut ref_counts = PERIPHERAL_REF_COUNT.borrow_ref_mut(cs);
+        let ref_count = &mut ref_counts[peripheral as usize];
+        if !force {
+            if enable {
+                let prev = *ref_count;
+                *ref_count += 1;
+                if prev > 0 {
+                    return false;
+                }
+            } else {
+                let prev = *ref_count;
+                *ref_count -= 1;
+                if prev > 1 {
+                    return false;
+                }
+                assert!(prev != 0);
+            };
+        } else if !enable {
+            assert!(*ref_count == 0);
+        }
 
-            Self::enable_internal(peripheral, enable, &cs);
+        if !enable {
+            Self::reset(peripheral);
+        }
 
-            true
-        })
+        Self::enable_internal(peripheral, enable, cs);
+
+        true
     }
 }
 

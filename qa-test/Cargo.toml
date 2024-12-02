@@ -13,11 +13,11 @@ embedded-graphics  = "0.8.1"
 embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc" }
 esp-backtrace      = { path = "../esp-backtrace", features = ["exception-handler", "panic-handler", "println"] }
-esp-hal            = { path = "../esp-hal" }
+esp-hal            = { path = "../esp-hal", features = ["unstable"] }
 esp-hal-embassy    = { path = "../esp-hal-embassy" }
 esp-println        = { path = "../esp-println", features = ["log"] }
 lis3dh-async       = "0.9.3"
-ssd1306            = "0.8.4"
+ssd1306            = "0.9.0"
 
 [features]
 esp32   = ["esp-backtrace/esp32",   "esp-hal/esp32",   "esp-hal-embassy/esp32",   "esp-println/esp32"]
@@ -32,5 +32,6 @@ embassy-generic-timers = ["embassy-time/generic-queue-8"]
 
 [profile.release]
 debug         = 2
+debug-assertions = true
 lto           = "fat"
 codegen-units = 1

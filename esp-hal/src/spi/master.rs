@@ -14,8 +14,6 @@
 //! If all you want to do is to communicate to a single device, and you initiate
 //! transactions yourself, there are a number of ways to achieve this:
 //!
-//! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
-//!   read/write single bytes at a time,
 //! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated
 //!   functions to initiate transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
@@ -30,10 +28,10 @@
 //!
 //! ## Usage
 //!
-//! The module implements several third-party traits from embedded-hal@0.2.x,
-//! embedded-hal@1.x.x and embassy-embedded-hal
+//! The module implements several third-party traits from embedded-hal@1.x.x
+//! and embassy-embedded-hal.
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### SPI Initialization
 //! ```rust, no_run
@@ -45,14 +43,11 @@
 //! let mosi = peripherals.GPIO1;
 //! let cs = peripherals.GPIO5;
 //!
-//! let mut spi = Spi::new_with_config(
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config {
-//!         frequency: 100.kHz(),
-//!         mode: SpiMode::Mode0,
-//!         ..Config::default()
-//!     },
+//!     Config::default().with_frequency(100.kHz()).with_mode(SpiMode::Mode0)
 //! )
+//! .unwrap()
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
 //! .with_miso(miso)
@@ -78,7 +73,7 @@ use procmacros::ram;
 use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
 use crate::{
     clock::Clocks,
-    dma::{DmaChannelConvert, DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
+    dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{interconnect::PeripheralOutput, InputSignal, NoPin, OutputSignal},
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
@@ -95,6 +90,7 @@ use crate::{
 #[cfg(gdma)]
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum SpiInterrupt {
     /// Indicates that the SPI transaction has completed successfully.
     ///
@@ -425,8 +421,9 @@ impl Address {
 }
 
 /// SPI peripheral configuration
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct Config {
     /// SPI clock frequency
     pub frequency: HertzU32,
@@ -507,16 +504,11 @@ where
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new(spi: impl Peripheral<P = impl Instance> + 'd) -> Spi<'d, Blocking> {
-        Self::new_with_config(spi, Config::default())
-    }
-
-    /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_with_config(
+    pub fn new(
         spi: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
-    ) -> Spi<'d, Blocking> {
-        Self::new_typed_with_config(spi.map_into(), config)
+    ) -> Result<Self, ConfigError> {
+        Self::new_typed(spi.map_into(), config)
     }
 
     /// Converts the SPI instance into async mode.
@@ -540,7 +532,7 @@ where
     /// operations.
     pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking, T>
     where
-        CH: DmaChannelConvert<DmaChannelFor<T>>,
+        CH: DmaChannelFor<T>,
     {
         SpiDma::new(self.spi, channel.map(|ch| ch.degrade()).into_ref())
     }
@@ -562,15 +554,10 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_typed(spi: impl Peripheral<P = T> + 'd) -> Spi<'d, M, T> {
-        Self::new_typed_with_config(spi, Config::default())
-    }
-
-    /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_typed_with_config(
+    pub fn new_typed(
         spi: impl Peripheral<P = T> + 'd,
         config: Config,
-    ) -> Spi<'d, M, T> {
+    ) -> Result<Self, ConfigError> {
         crate::into_ref!(spi);
 
         let guard = PeripheralGuard::new(spi.info().peripheral);
@@ -582,7 +569,7 @@ where
         };
 
         this.driver().init();
-        unwrap!(this.apply_config(&config)); // FIXME: update based on the resolution of https://github.com/esp-rs/esp-hal/issues/2416
+        this.apply_config(&config)?;
 
         let this = this
             .with_mosi(NoPin)
@@ -598,7 +585,7 @@ where
             unwrap!(this.driver().sio3_output).connect_to(NoPin);
         }
 
-        this
+        Ok(this)
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
@@ -806,44 +793,6 @@ where
     }
 }
 
-impl<M, T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, M, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-
-    fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-}
-
-impl<M, T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, M, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-        self.transfer(words)
-    }
-}
-
-impl<M, T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, M, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.write_bytes(words)?;
-        self.driver().flush()
-    }
-}
-
 mod dma {
     use core::{
         cmp::min,
@@ -856,18 +805,18 @@ mod dma {
         dma::{
             asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
-            DmaChannelFor,
             DmaRxBuf,
             DmaRxBuffer,
             DmaTxBuf,
             DmaTxBuffer,
             EmptyBuf,
+            PeripheralDmaChannel,
             Rx,
             Tx,
         },
+        interrupt::InterruptConfigurable,
         Async,
         Blocking,
-        InterruptConfigurable,
     };
 
     /// A DMA capable SPI instance.
@@ -883,7 +832,7 @@ mod dma {
         M: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, M, DmaChannelFor<T>>,
+        pub(crate) channel: Channel<'d, M, PeripheralDmaChannel<T>>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
@@ -997,7 +946,7 @@ mod dma {
     {
         pub(super) fn new(
             spi: PeripheralRef<'d, T>,
-            channel: PeripheralRef<'d, DmaChannelFor<T>>,
+            channel: PeripheralRef<'d, PeripheralDmaChannel<T>>,
         ) -> Self {
             let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
@@ -1858,30 +1807,6 @@ mod dma {
 
         fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
             self.apply_config(config)
-        }
-    }
-
-    impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for SpiDmaBus<'_, Blocking, T>
-    where
-        T: Instance,
-    {
-        type Error = Error;
-
-        fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-            self.transfer_in_place(words)?;
-            Ok(words)
-        }
-    }
-
-    impl<T> embedded_hal_02::blocking::spi::Write<u8> for SpiDmaBus<'_, Blocking, T>
-    where
-        T: Instance,
-    {
-        type Error = Error;
-
-        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.write(words)?;
-            Ok(())
         }
     }
 
@@ -2844,7 +2769,7 @@ impl Info {
 
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
-            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0-alpha.8/embedded_hal/spi/blocking/index.html#flushing)
+            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0/embedded_hal/spi/index.html#flushing)
             if i < num_chunks {
                 self.flush()?;
             }

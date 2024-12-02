@@ -12,32 +12,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Added SDMMC signals (#2556)
 - Added `set_priority` to the `DmaChannel` trait on GDMA devices (#2403, #2526)
 - Added `into_async` and `into_blocking` functions for `ParlIoTxOnly`, `ParlIoRxOnly` (#2526)
+- ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526, #2532)
+- DMA: `PeripheralDmaChannel` type aliasses and `DmaChannelFor` traits to improve usability. (#2532)
+- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
+- `esp_hal::asynch::AtomicWaker` that does not hold a global critical section (#2555)
+- `esp_hal::sync::RawMutex` for embassy-sync. (#2555)
 - ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526)
+- Added PSRAM configuration to `esp_hal::Config` if `quad-psram` or `octal-psram` is enabled (#2546)
+- Added `esp_hal::psram::psram_raw_parts` (#2546)
+- The timer drivers `OneShotTimer` & `PeriodicTimer` have `into_async` and `new_typed` methods (#2586)
+- `timer::Timer` trait has three new methods, `wait`, `async_interrupt_handler` and `peripheral_interrupt` (#2586)
+- Configuration structs in the I2C, SPI, and UART drivers now implement the Builder Lite pattern (#2614)
+- Added `I8080::apply_config`, `DPI::apply_config` and `Camera::apply_config` (#2610)
+- Introduced the `unstable` feature which will be used to restrict stable APIs to a subset of esp-hal. (#2628)
+- HAL configuration structs now implement the Builder Lite pattern (#2645)
+- Added `OutputOpenDrain::unlisten` (#2625)
+- Added `{Input, Flex}::wait_for` (#2625)
 
 ### Changed
 
-- DMA channel objects now implement `Peripheral` (#2526)
+- In addition to taking by value, peripheral drivers can now mutably borrow DMA channel objects. (#2526)
 - DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
 - The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
 - `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
-- `SystemTimer::set_unit_count` & `SystemTimer::configure_unit` (#2576)
 - `SystemTimer::set_unit_value` & `SystemTimer::configure_unit` (#2576)
-
-### Changed
-
 - `SystemTimer` no longer uses peripheral ref (#2576)
+- `TIMGX` no longer uses peripheral ref (#2581)
 - `SystemTimer::now` has been renamed `SystemTimer::unit_value(Unit)` (#2576)
 - `SpiDma` transfers now explicitly take a length along with the DMA buffer object (#2587)
+- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
+- `SystemTimer`s `Alarm`s are now type erased (#2576)
+- `TimerGroup` `Timer`s are now type erased (#2581)
+- PSRAM is now initialized automatically if `quad-psram` or `octal-psram` is enabled (#2546)
+- DMA channels are now available via the `Peripherals` struct, and have been renamed accordingly. (#2545)
+- Moved interrupt related items from lib.rs, moved to the `interrupt` module (#2613)
+- The timer drivers `OneShotTimer` & `PeriodicTimer` now have a `Mode` parameter and type erase the underlying driver by default (#2586)
+- `timer::Timer` has new trait requirements of `Into<AnyTimer>`, `'static` and `InterruptConfigurable` (#2586)
+- `systimer::etm::Event` no longer borrows the alarm indefinitely (#2586)
+- A number of public enums and structs in the I2C, SPI, and UART drivers have been marked with `#[non_exhaustive]` (#2614)
+- Interrupt handling related functions are only provided for Blocking UART. (#2610)
+- Changed how `Spi`, (split or unsplit) `Uart`, `LpUart`, `I8080`, `Camera`, `DPI` and `I2C` drivers are constructed (#2610)
+- I8080, camera, DPI: The various standalone configuration options have been merged into `Config` (#2610)
+- Dropped GPIO futures stop listening for interrupts (#2625)
 
 ### Fixed
 
+- Xtensa devices now correctly enable the `esp-hal-procmacros/rtc-slow` feature (#2594)
+- User-bound GPIO interrupt handlers should no longer interfere with async pins. (#2625)
+
 ### Removed
 
+- Remove more examples. Update doctests. (#2547)
 - The `configure` and `configure_for_async` DMA channel functions has been removed (#2403)
 - The DMA channel objects no longer have `tx` and `rx` fields. (#2526)
 - `SysTimerAlarms` has been removed, alarms are now part of the `SystemTimer` struct (#2576)
 - `FrozenUnit`, `AnyUnit`, `SpecificUnit`, `SpecificComparator`, `AnyComparator` have been removed from `systimer` (#2576)
 - Remove Dma[Rx|Tx]Buffer::length (#2587)
+- `esp_hal::psram::psram_range` (#2546)
+- The `Dma` structure has been removed. (#2545)
+- Removed `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
+- Removed `Camera::set_` functions (#2610)
 
 ## [0.22.0] - 2024-11-20
 

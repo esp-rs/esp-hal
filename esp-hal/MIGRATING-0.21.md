@@ -99,8 +99,8 @@ The constructors no longer take pins. Use `with_sda` and `with_scl` instead.
 ```diff
 -use esp_hal::i2c::I2c;
 +use esp_hal::i2c::{Config, I2c};
--let i2c = I2c::new_with_timeout(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz(), timeout);
-+I2c::new_with_config(
+-let i2c = I2c::new_with_timeout(peripherals.I2C0, sda, scl, 100.kHz(), timeout);
++let i2c = I2c::new(
 +    peripherals.I2C0,
 +    {
 +        let mut config = Config::default();
@@ -109,8 +109,8 @@ The constructors no longer take pins. Use `with_sda` and `with_scl` instead.
 +        config
 +    },
 +)
-+.with_sda(io.pins.gpio4)
-+.with_scl(io.pins.gpio5);
++.with_sda(sda)
++.with_scl(scl);
 ```
 
 ### The calculation of I2C timeout has changed

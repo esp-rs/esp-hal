@@ -7,11 +7,19 @@ This is a living document - make sure to check the latest version of this docume
 > [!NOTE]
 > Not all of the currently existing code follows this guideline, yet.
 
-In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines) apply to all projects in the ESP-RS GitHub organization where possible. (`C-RW-VALUE` and `C-SERDE` do not apply)
+In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines) apply to all projects in the ESP-RS GitHub organization where possible.
+  - Especially for public API but if possible also for internal APIs.
 
-Especially for public API but if possible also for internal APIs.
+## Amendments to the Rust API Guidelines
 
-The following paragraphs contain additional recommendations.
+- `C-RW-VALUE` and `C-SERDE` do not apply.
+- `C-COMMON-TRAITS`:
+  The set of traits to implement depend on the type. If nothing here applies, use your best judgement.
+  - Driver structures: `Debug/Display`, `PartialEq/Eq`
+  - Driver configuration: `Default`, `Debug/Display`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
+    - `Clone/Copy` depends on the size and contents of the structure. They should generally be implemented, unless there is a good reason not to.
+    - The `Default` configuration needs to make sense for a particular driver, and applying the default configuration must not fail.
+  - Error types: `Debug/Display`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
 
 ## Construction and Destruction of Drivers
 
@@ -22,24 +30,31 @@ The following paragraphs contain additional recommendations.
   - The peripheral instance type must default to a type that supports any of the peripheral instances.
   - The author must to use `crate::any_peripheral` to define the "any" peripheral instance type.
   - The driver must implement a `new` constructor that automatically converts the peripheral instance into the any type, and a `new_typed` that preserves the peripheral type.
+- If a driver is configurable, configuration options should be implemented as a `Config` struct in the same module where the driver is located.
+  - The driver's constructor should take the config struct by value, and it should return `Result<Self, ConfigError>`.
+  - The `ConfigError` enum should be separate from other `Error` enums used by the driver.
+  - The driver should implement `fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError>`.
+  - In case the driver's configuration is infallible (all possible combinations of options are supported by the hardware), the `ConfigError` should be implemented as an empty `enum`.
 - If a driver only supports a single peripheral instance, no instance type parameter is necessary.
 - If a driver implements both blocking and async operations, or only implements blocking operations, but may support asynchronous ones in the future, the driver's type signature must include a `crate::Mode` type parameter.
 - By default, constructors must configure the driver for blocking mode. The driver must implement `into_async` (and a matching `into_blocking`) function that reconfigures the driver.
   - `into_async` must configure the driver and/or the associated DMA channels. This most often means enabling an interrupt handler.
   - `into_blocking` must undo the configuration done by `into_async`.
-- The asynchronous driver implemntation must also expose the blocking methods (except for interrupt related functions).
+- The asynchronous driver implementation must also expose the blocking methods (except for interrupt related functions).
 - Drivers must have a `Drop` implementation resetting the peripheral to idle state. There are some exceptions to this:
-  - GPIO where common usage is to "set and drop" so they can't be changed 
+  - GPIO where common usage is to "set and drop" so they can't be changed
   - Where we don't want to disable the peripheral as it's used internally, for example SYSTIMER is used by `time::now()` API. See `KEEP_ENABLED` in src/system.rs
 - Consider using a builder-like pattern for driver construction.
 
 ## Interoperability
 
-- `cfg` gated `defmt` derives and impls are added to new structs and enums.
-    - see [this example](https://github.com/esp-rs/esp-hal/blob/df2b7bd8472cc1d18db0d9441156575570f59bb3/esp-hal/src/spi/mod.rs#L15)
-    - e.g. `#[cfg_attr(feature = "defmt", derive(defmt::Format))]`
 - Don't use `log::XXX!` macros directly - use the wrappers in `fmt.rs` (e.g. just `info!` instead of `log::info!` or importing `log::*`)!
 - Consider implementing common ecosystem traits, like the ones in `embedded-hal` or `embassy-embedded-hal`.
+  - Where the guidelines suggest implementing `Debug`, `defmt::Format` should also be implemented.
+    - The `defmt::Format` implementation needs to be gated behind the `defmt` feature.
+    - see [this example](https://github.com/esp-rs/esp-hal/blob/df2b7bd8472cc1d18db0d9441156575570f59bb3/esp-hal/src/spi/mod.rs#L15)
+    - e.g. `#[cfg_attr(feature = "defmt", derive(defmt::Format))]`
+  - Implementations of common, but unstable traits (e.g. `embassy_embedded_hal::SetConfig`) need to be gated with the `unstable` feature.
 
 ## API Surface
 
@@ -54,8 +69,8 @@ The following paragraphs contain additional recommendations.
 - Design APIs in a way that they are easy to use.
 - Driver API decisions should be assessed individually, don't _not_ just follow embedded-hal or other ecosystem trait crates. Expose the capabilities of the hardware. (Ecosystem traits are implemented on top of the inherent API)
 - Avoid type states and extraneous generics whenever possible
-    - These often lead to usability problems, and tend to just complicate things needlessly - sometimes it can be a good tradeoff to make a type not ZST
-    - Common cases of useless type info is storing pin information - this is usually not required after configuring the pins and will bloat the complexity of the type massively. When following the `PeripheralRef` pattern it's not needed in order to keep users from re-using the pin while in use
+  - These often lead to usability problems, and tend to just complicate things needlessly - sometimes it can be a good tradeoff to make a type not ZST
+  - Common cases of useless type info is storing pin information - this is usually not required after configuring the pins and will bloat the complexity of the type massively. When following the `PeripheralRef` pattern it's not needed in order to keep users from re-using the pin while in use
 - Avoiding `&mut self` when `&self` is safe to use. `&self` is generally easier to use as an API. Typical applications of this are where the methods just do writes to registers which don't have side effects.
 - Maintain order consistency in the API, such as in the case of pairs like RX/TX.
 - If your driver provides a way to listen for interrupts, the interrupts should be listed in a `derive(EnumSetType)` enum as opposed to one function per interrupt flag.
@@ -120,3 +135,5 @@ Modules should have the following documentation format:
     - Showing a snippet of a slightly more complex interaction, for example inverting the signals for a driver
     - Showing construction if it is more complex, or requires some non-obvious precursor steps. Think about this for drivers that take a generic instance to construct, rustdoc doesn't do a good job of showing what concrete things can be passed into a constructor.
   - For more complex scenarios, create an example.
+- Use rustdoc syntax for linking to other documentation items instead of markdown links where possible
+  - https://doc.rust-lang.org/rustdoc/write-documentation/linking-to-items-by-name.html

@@ -6,14 +6,13 @@
 //! logs from LP_UART. Make sure the LP RAM is cleared before loading the code.
 
 //% CHIPS: esp32c6
-//% FEATURES: embedded-hal-02
 
 #![no_std]
 #![no_main]
 
 use core::fmt::Write;
 
-use embedded_hal_02::blocking::delay::DelayMs;
+use embedded_hal::delay::DelayNs;
 use esp_lp_hal::{delay::Delay, prelude::*, uart::LpUart};
 use panic_halt as _;
 

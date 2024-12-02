@@ -12,7 +12,6 @@
 
 use esp_hal::{
     delay::Delay,
-    dma::Dma,
     dma_buffers,
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{DataFormat, I2s, I2sTx, Standard},
@@ -112,13 +111,11 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let dma = Dma::new(peripherals.DMA);
-
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let dma_channel = dma.i2s0channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_I2S0;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 

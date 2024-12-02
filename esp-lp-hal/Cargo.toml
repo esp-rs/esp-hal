@@ -28,7 +28,6 @@ test  = false
 cfg-if            = "1.0.0"
 document-features = "0.2.10"
 embedded-hal      = { version = "1.0.0",  optional = true }
-embedded-hal-02   = { version = "0.2.7",  optional = true, features = ["unproven"], package = "embedded-hal" }
 embedded-hal-nb   = { version = "1.0.0",  optional = true }
 embedded-io       = { version = "0.6.1",  optional = true }
 esp32c6-lp        = { version = "0.3.0", features = ["critical-section"], optional = true }
@@ -63,8 +62,6 @@ esp32s2 = ["dep:esp32s2-ulp", "procmacros/is-ulp-core"]
 esp32s3 = ["dep:esp32s3-ulp", "procmacros/is-ulp-core"]
 
 #! ### Trait Implementation Feature Flags
-## Implement the traits defined in the `0.2.x` release of `embedded-hal`.
-embedded-hal-02 = ["dep:embedded-hal-02"]
 ## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
 ## `embedded-hal-nb` for the relevant peripherals.
 embedded-hal = ["dep:embedded-hal", "dep:embedded-hal-nb"]
@@ -73,15 +70,15 @@ embedded-io = ["dep:embedded-io"]
 
 [[example]]
 name              = "blinky"
-required-features = ["embedded-hal-02"]
+required-features = []
 
 [[example]]
 name              = "i2c"
-required-features = ["embedded-hal-02", "esp32c6"]
+required-features = ["esp32c6"]
 
 [[example]]
 name              = "uart"
-required-features = ["embedded-hal-02", "esp32c6"]
+required-features = ["esp32c6"]
 
 [lints.rust]
 unexpected_cfgs = "allow"

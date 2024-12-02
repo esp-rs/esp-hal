@@ -787,14 +787,8 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => match Cpu::current() {
-                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
-                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int().read().bits(),
-            },
-            Self::Bank1 => match Cpu::current() {
-                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
-                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int1().read().bits(),
-            },
+            Self::Bank0 => unsafe { GPIO::steal() }.status().read().bits(),
+            Self::Bank1 => unsafe { GPIO::steal() }.status1().read().bits(),
         }
     }
 }

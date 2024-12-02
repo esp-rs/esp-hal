@@ -884,7 +884,7 @@ pub use asynch::SendFuture;
 mod asynch {
     use core::task::{Context, Poll};
 
-    use embassy_sync::waitqueue::AtomicWaker;
+    use esp_hal::asynch::AtomicWaker;
 
     use super::*;
 

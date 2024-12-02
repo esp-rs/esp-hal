@@ -7,7 +7,7 @@
 use defmt::error;
 use esp_alloc as _;
 use esp_hal::{
-    dma::{Dma, DmaBufBlkSize, DmaRxBuf, DmaTxBuf},
+    dma::{DmaBufBlkSize, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     dma_descriptors_chunk_size,
     gpio::interconnect::InputSignal,
@@ -57,20 +57,18 @@ mod tests {
         let (mosi, _) = hil_test::common_test_pins!(peripherals);
 
         let pcnt = Pcnt::new(peripherals.PCNT);
-        let dma = Dma::new(peripherals.DMA);
 
-        let dma_channel = dma.channel0;
+        let dma_channel = peripherals.DMA_CH0;
 
         let (mosi_loopback, mosi) = mosi.split();
 
-        let spi = Spi::new_with_config(
+        let spi = Spi::new(
             peripherals.SPI2,
-            Config {
-                frequency: 100.kHz(),
-                mode: SpiMode::Mode0,
-                ..Config::default()
-            },
+            Config::default()
+                .with_frequency(100.kHz())
+                .with_mode(SpiMode::Mode0),
         )
+        .unwrap()
         .with_sck(sclk)
         .with_mosi(mosi)
         .with_dma(dma_channel);

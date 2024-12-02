@@ -34,6 +34,70 @@
 //!   - `GPIO`
 //!   - `DMA`
 //!   - `system` (to configure and enable the I2S peripheral)
+//!
+//! ## Examples
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::dma::DmaTxBuf;
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::i2s::parallel::{I2sParallel, TxEightBits};
+//! # use esp_hal::prelude::*;
+//!
+//! const BUFFER_SIZE: usize = 256;
+//!
+//! let delay = Delay::new();
+//! let dma_channel = peripherals.DMA_I2S1;
+//! let i2s = peripherals.I2S1;
+//! let clock = peripherals.GPIO25;
+//!
+//! let pins = TxEightBits::new(
+//!     peripherals.GPIO16,
+//!     peripherals.GPIO4,
+//!     peripherals.GPIO17,
+//!     peripherals.GPIO18,
+//!     peripherals.GPIO5,
+//!     peripherals.GPIO19,
+//!     peripherals.GPIO12,
+//!     peripherals.GPIO14,
+//! );
+//!
+//! let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);
+//! let mut parallel = I2sParallel::new(
+//!     i2s,
+//!     dma_channel,
+//!     1.MHz(),
+//!     pins,
+//!     clock,
+//! ).into_async();
+//!
+//! for (i, data) in tx_buffer.chunks_mut(4).enumerate() {
+//!     let offset = i * 4;
+//!     // i2s parallel driver expects the buffer to be interleaved
+//!     data[0] = (offset + 2) as u8;
+//!     data[1] = (offset + 3) as u8;
+//!     data[2] = offset as u8;
+//!     data[3] = (offset + 1) as u8;
+//! }
+//!
+//! let mut tx_buf: DmaTxBuf =
+//!     DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed");
+//!
+//! // Sending 256 bytes.
+//! loop {
+//!     let xfer = match parallel.send(tx_buf) {
+//!         Ok(xfer) => xfer,
+//!         Err(_) => {
+//!             panic!("Failed to send buffer");
+//!         }
+//!     };
+//!     (parallel, tx_buf) = xfer.wait();
+//!     delay.delay_millis(10);
+//! }
+//! # }
+//! ```
+//!
 use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -46,14 +110,13 @@ use crate::{
         asynch::DmaTxFuture,
         Channel,
         ChannelTx,
-        DmaChannelConvert,
         DmaChannelFor,
         DmaEligible,
         DmaError,
         DmaPeripheral,
         DmaTxBuffer,
+        PeripheralTxChannel,
         Tx,
-        TxChannelFor,
     },
     gpio::{
         interconnect::{OutputConnection, PeripheralOutput},
@@ -179,7 +242,7 @@ where
     I: Instance,
 {
     instance: PeripheralRef<'d, I>,
-    tx_channel: ChannelTx<'d, DM, TxChannelFor<I>>,
+    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<I>>,
     _guard: PeripheralGuard,
 }
 
@@ -193,7 +256,7 @@ impl<'d> I2sParallel<'d, Blocking> {
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
-        CH: DmaChannelConvert<DmaChannelFor<AnyI2s>>,
+        CH: DmaChannelFor<AnyI2s>,
     {
         Self::new_typed(i2s.map_into(), channel, frequency, pins, clock_pin)
     }
@@ -212,7 +275,7 @@ where
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
-        CH: DmaChannelConvert<DmaChannelFor<I>>,
+        CH: DmaChannelFor<I>,
     {
         crate::into_ref!(i2s);
         crate::into_mapped_ref!(clock_pin);

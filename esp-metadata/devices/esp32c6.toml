@@ -80,6 +80,7 @@ symbols = [
     "phy",
     "bt",
     "wifi",
+    "wifi6",
     "ieee802154",
     "lp_core",
 

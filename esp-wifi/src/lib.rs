@@ -1,5 +1,5 @@
 #![cfg_attr(
-    docsrs,
+    all(docsrs, not(not_really_docsrs)),
     doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.esp-rs.org/esp-wifi/'>browse the <code>esp-wifi</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C3, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs might change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
 //! This documentation is built for the
@@ -22,16 +22,15 @@
 //! ```toml
 //! [dependencies.esp-wifi]
 //! # A supported chip needs to be specified, as well as specific use-case features
-//! features = ["esp32s3", "wifi", "esp-now"]
+#![doc = concat!(r#"features = [""#, esp_hal::chip!(), r#"", "wifi", "esp-now"]"#)]
 //! ```
-//!
+//! 
 //! ### Optimization Level
 //!
 //! It is necessary to build with optimization level 2 or 3 since otherwise, it
 //! might not even be able to connect or advertise.
 //!
 //! To make it work also for your debug builds add this to your `Cargo.toml`
-//!
 //! ```toml
 //! [profile.dev.package.esp-wifi]
 //! opt-level = 3
@@ -100,6 +99,7 @@ use hal::{
     rng::{Rng, Trng},
     system::RadioClockController,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
+    Blocking,
 };
 use portable_atomic::Ordering;
 
@@ -217,7 +217,7 @@ const _: () = {
     core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
 };
 
-type TimeBase = PeriodicTimer<'static, AnyTimer>;
+type TimeBase = PeriodicTimer<'static, Blocking, AnyTimer>;
 
 pub(crate) mod flags {
     use portable_atomic::{AtomicBool, AtomicUsize};
@@ -285,12 +285,7 @@ pub trait EspWifiTimerSource: private::Sealed {
 /// conflicting implementations.
 trait IntoAnyTimer: Into<AnyTimer> {}
 
-impl<T, DM> IntoAnyTimer for TimgTimer<T, DM>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for TimgTimer where Self: Into<AnyTimer> {}
 
 #[cfg(not(feature = "esp32"))]
 impl IntoAnyTimer for Alarm where Self: Into<AnyTimer> {}
@@ -314,12 +309,7 @@ impl EspWifiTimerSource for TimeBase {
 }
 
 impl private::Sealed for TimeBase {}
-impl<T, DM> private::Sealed for TimgTimer<T, DM>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl private::Sealed for TimgTimer where Self: Into<AnyTimer> {}
 #[cfg(not(feature = "esp32"))]
 impl private::Sealed for Alarm where Self: Into<AnyTimer> {}
 
@@ -429,7 +419,7 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     shutdown_timer_isr();
     crate::preempt::delete_all_tasks();
 
-    critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take());
+    crate::timer::TIMER.with(|timer| timer.take());
 
     crate::flags::ESP_WIFI_INITIALIZED.store(false, Ordering::Release);
 

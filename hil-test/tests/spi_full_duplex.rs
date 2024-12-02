@@ -12,7 +12,7 @@ use embedded_hal::spi::SpiBus;
 #[cfg(pcnt)]
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
-    dma::{Dma, DmaDescriptor, DmaRxBuf, DmaTxBuf},
+    dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, NoPin},
     peripheral::Peripheral,
@@ -61,13 +61,11 @@ mod tests {
         let sclk = peripherals.GPIO0;
         let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
-        let dma = Dma::new(peripherals.DMA);
-
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let dma_channel = dma.spi2channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 
@@ -75,16 +73,11 @@ mod tests {
         let (mosi_loopback_pcnt, mosi) = mosi.split();
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
-        let spi = Spi::new_with_config(
-            peripherals.SPI2,
-            Config {
-                frequency: 10.MHz(),
-                ..Config::default()
-            },
-        )
-        .with_sck(sclk)
-        .with_miso(unsafe { mosi.clone_unchecked() })
-        .with_mosi(mosi);
+        let spi = Spi::new(peripherals.SPI2, Config::default().with_frequency(10.MHz()))
+            .unwrap()
+            .with_sck(sclk)
+            .with_miso(unsafe { mosi.clone_unchecked() })
+            .with_mosi(mosi);
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
@@ -510,10 +503,7 @@ mod tests {
         // This means that without working cancellation, the test case should
         // fail.
         ctx.spi
-            .apply_config(&Config {
-                frequency: 80.kHz(),
-                ..Config::default()
-            })
+            .apply_config(&Config::default().with_frequency(80.kHz()))
             .unwrap();
 
         // Set up a large buffer that would trigger a timeout
@@ -536,10 +526,7 @@ mod tests {
     fn can_transmit_after_cancel(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         ctx.spi
-            .apply_config(&Config {
-                frequency: 80.kHz(),
-                ..Config::default()
-            })
+            .apply_config(&Config::default().with_frequency(80.kHz()))
             .unwrap();
 
         // Set up a large buffer that would trigger a timeout
@@ -556,11 +543,8 @@ mod tests {
         transfer.cancel();
         (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
 
-        spi.apply_config(&Config {
-            frequency: 10.MHz(),
-            ..Config::default()
-        })
-        .unwrap();
+        spi.apply_config(&Config::default().with_frequency(10.MHz()))
+            .unwrap();
 
         let transfer = spi
             .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)

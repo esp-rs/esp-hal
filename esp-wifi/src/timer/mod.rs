@@ -1,6 +1,4 @@
-use core::cell::RefCell;
-
-use critical_section::Mutex;
+use esp_hal::sync::Locked;
 
 #[cfg_attr(esp32, path = "timer_esp32.rs")]
 #[cfg_attr(esp32c2, path = "timer_esp32c2.rs")]
@@ -20,7 +18,7 @@ pub(crate) use chip_specific::*;
 
 use crate::TimeBase;
 
-pub(crate) static TIMER: Mutex<RefCell<Option<TimeBase>>> = Mutex::new(RefCell::new(None));
+pub(crate) static TIMER: Locked<Option<TimeBase>> = Locked::new(None);
 
 pub(crate) fn setup_timer_isr(timebase: TimeBase) {
     setup_radio_isr();

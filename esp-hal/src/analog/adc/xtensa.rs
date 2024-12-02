@@ -590,20 +590,6 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
     }
 }
 
-impl<'d, ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, AdcPin<PIN, ADCI, CS>>
-    for Adc<'d, ADCI>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8> + AdcChannel,
-    ADCI: RegisterAccess,
-    CS: AdcCalScheme<ADCI>,
-{
-    type Error = ();
-
-    fn read(&mut self, pin: &mut AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
-        self.read_oneshot(pin)
-    }
-}
-
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [

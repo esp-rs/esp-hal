@@ -14,7 +14,7 @@
 //! the peripherals in LP system during chip Deep-sleep, and wake up the
 //! chip from Deep-sleep.
 //!
-//! # Example
+//! ## Examples
 //!
 //! ## Configure a LP Pin as Output
 //!

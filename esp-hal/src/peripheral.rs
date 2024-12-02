@@ -246,10 +246,15 @@ mod peripheral_macros {
             peripherals: [
                 $(
                     $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
-                ), *$(,)?
+                ),* $(,)?
             ],
             pins: [
                 $( ( $pin:literal, $($pin_tokens:tt)* ) )*
+            ],
+            dma_channels: [
+                $(
+                    $channel_name:ident : $channel_ty:path
+                ),* $(,)?
             ]
         ) => {
 
@@ -279,6 +284,11 @@ mod peripheral_macros {
                     $(
                         #[doc = concat!("GPIO", stringify!($pin))]
                         pub [<GPIO $pin>]: $crate::gpio::GpioPin<$pin>,
+                    )*
+
+                    $(
+                        #[doc = concat!(stringify!($channel_name), " DMA channel.")]
+                        pub $channel_name: $crate::dma::$channel_ty,
                     )*
                 }
 
@@ -312,6 +322,10 @@ mod peripheral_macros {
 
                             $(
                                 [<GPIO $pin>]: $crate::gpio::GpioPin::<$pin>::steal(),
+                            )*
+
+                            $(
+                                $channel_name: $crate::dma::$channel_ty::steal(),
                             )*
                         }
                     }

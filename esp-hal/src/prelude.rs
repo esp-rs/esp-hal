@@ -33,11 +33,8 @@ mod imp {
         },
     };
     #[cfg(any(timg0, timg1))]
-    pub use crate::timer::timg::{
-        Instance as _esp_hal_timer_timg_Instance,
-        TimerGroupInstance as _esp_hal_timer_timg_TimerGroupInstance,
-    };
+    pub use crate::timer::timg::TimerGroupInstance as _esp_hal_timer_timg_TimerGroupInstance;
     #[cfg(any(systimer, timg0, timg1))]
     pub use crate::timer::Timer as _esp_hal_timer_Timer;
-    pub use crate::{clock::CpuClock, entry, macros::*, InterruptConfigurable};
+    pub use crate::{clock::CpuClock, entry, interrupt::InterruptConfigurable, macros::*};
 }

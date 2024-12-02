@@ -47,12 +47,32 @@
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-#[allow(unused)]
-use proc_macro::TokenStream;
+use darling::{ast::NestedMeta, Error, FromMeta};
+use proc_macro::{Span, TokenStream};
+use proc_macro2::Ident;
+use proc_macro_crate::{crate_name, FoundCrate};
+use proc_macro_error2::abort;
+use quote::{format_ident, quote};
+use syn::{
+    parse,
+    parse::Error as ParseError,
+    spanned::Spanned,
+    Data,
+    DataStruct,
+    GenericArgument,
+    Item,
+    ItemFn,
+    Path,
+    PathArguments,
+    PathSegment,
+    ReturnType,
+    Type,
+};
+
+use self::interrupt::{check_attr_whitelist, WhiteListCaller};
 
 #[cfg(feature = "embassy")]
 mod embassy;
-#[cfg(feature = "interrupt")]
 mod interrupt;
 #[cfg(any(
     feature = "is-lp-core",
@@ -62,7 +82,6 @@ mod interrupt;
 ))]
 mod lp_core;
 
-#[cfg(feature = "ram")]
 #[derive(Debug, Default, darling::FromMeta)]
 #[darling(default)]
 struct RamArgs {
@@ -80,7 +99,7 @@ struct RamArgs {
 /// # Options
 ///
 /// - `rtc_fast`: Use RTC fast RAM.
-/// - `rtc_slow`: Use RTC slow RAM. **Note**: not available on all targets
+/// - `rtc_slow`: Use RTC slow RAM. **Note**: not available on all targets.
 /// - `persistent`: Persist the contents of the `static` across resets. See [the
 ///   section below](#persistent) for details.
 /// - `zeroed`: Initialize the memory of the `static` to zero. The initializer
@@ -126,15 +145,9 @@ struct RamArgs {
 ///
 /// [`bytemuck::AnyBitPattern`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.AnyBitPattern.html
 /// [`bytemuck::Zeroable`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.Zeroable.html
-#[cfg(feature = "ram")]
 #[proc_macro_attribute]
 #[proc_macro_error2::proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
-    use darling::{ast::NestedMeta, Error, FromMeta};
-    use proc_macro::Span;
-    use proc_macro_error2::abort;
-    use syn::{parse, Item};
-
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
         Ok(v) => v,
         Err(e) => {
@@ -156,7 +169,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let item: Item = parse(input).expect("failed to parse input");
 
-    #[cfg(not(feature = "rtc_slow"))]
+    #[cfg(not(feature = "rtc-slow"))]
     if rtc_slow {
         abort!(
             Span::call_site(),
@@ -206,7 +219,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let trait_check = trait_check.map(|name| {
         use proc_macro_crate::{crate_name, FoundCrate};
 
-        let hal = proc_macro2::Ident::new(
+        let hal = Ident::new(
             if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
                 name
             } else {
@@ -240,18 +253,9 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// esp_hal::interrupt::Priority::Priority2)]`.
 ///
 /// If no priority is given, `Priority::min()` is assumed
-#[cfg(feature = "interrupt")]
-#[proc_macro_error2::proc_macro_error]
 #[proc_macro_attribute]
+#[proc_macro_error2::proc_macro_error]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
-    use darling::{ast::NestedMeta, FromMeta};
-    use proc_macro::Span;
-    use proc_macro2::Ident;
-    use proc_macro_crate::{crate_name, FoundCrate};
-    use syn::{parse::Error as ParseError, spanned::Spanned, ItemFn, ReturnType, Type};
-
-    use self::interrupt::{check_attr_whitelist, WhiteListCaller};
-
     #[derive(Debug, FromMeta)]
     struct MacroArgs {
         priority: Option<syn::Expr>,
@@ -332,7 +336,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         #f
 
         #[allow(non_upper_case_globals)]
-        #vis static #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
+        #vis const #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
     )
     .into()
 }
@@ -352,8 +356,8 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
 /// Marks the entry function of a LP core / ULP program.
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
-#[proc_macro_error2::proc_macro_error]
 #[proc_macro_attribute]
+#[proc_macro_error2::proc_macro_error]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     lp_core::entry(args, input)
 }
@@ -391,4 +395,128 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let f = syn::parse_macro_input!(item as syn::ItemFn);
 
     run(&args.meta, f, main()).unwrap_or_else(|x| x).into()
+}
+
+/// Automatically implement the [Builder Lite] pattern for a struct.
+///
+/// This will create an `impl` which contains methods for each field of a
+/// struct, allowing users to easily set the values. The generated methods will
+/// be the field name prefixed with `with_`, and calls to these methods can be
+/// chained as needed.
+///
+/// ## Example
+///
+/// ```rust, no_run
+/// #[derive(Default)]
+/// enum MyEnum {
+///     #[default]
+///     A,
+///     B,
+/// }
+///
+/// #[derive(Default, BuilderLite)]
+/// #[non_exhaustive]
+/// struct MyStruct {
+///     enum_field: MyEnum,
+///     bool_field: bool,
+///     option_field: Option<i32>,
+/// }
+///
+/// MyStruct::default()
+///     .with_enum_field(MyEnum::B)
+///     .with_bool_field(true)
+///     .with_option_field(-5);
+/// ```
+///
+/// [Builder Lite]: https://matklad.github.io/2022/05/29/builder-lite.html
+#[proc_macro_derive(BuilderLite)]
+pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(item as syn::DeriveInput);
+
+    let span = input.span();
+    let ident = input.ident;
+
+    let mut fns = Vec::new();
+    if let Data::Struct(DataStruct { fields, .. }) = &input.data {
+        for field in fields {
+            let field_ident = field.ident.as_ref().unwrap();
+            let field_type = &field.ty;
+
+            let function_ident = format_ident!("with_{}", field_ident);
+
+            let maybe_path_type = extract_type_path(field_type)
+                .and_then(|path| extract_option_segment(path))
+                .and_then(|path_seg| match path_seg.arguments {
+                    PathArguments::AngleBracketed(ref params) => params.args.first(),
+                    _ => None,
+                })
+                .and_then(|generic_arg| match *generic_arg {
+                    GenericArgument::Type(ref ty) => Some(ty),
+                    _ => None,
+                });
+
+            let (field_type, field_assigns) = if let Some(inner_type) = maybe_path_type {
+                (inner_type, quote! { Some(#field_ident) })
+            } else {
+                (field_type, quote! { #field_ident })
+            };
+
+            fns.push(quote! {
+                #[doc = concat!(" Assign the given value to the `", stringify!(#field_ident) ,"` field.")]
+                pub fn #function_ident(mut self, #field_ident: #field_type) -> Self {
+                    self.#field_ident = #field_assigns;
+                    self
+                }
+            });
+
+            if maybe_path_type.is_some() {
+                let function_ident = format_ident!("with_{}_none", field_ident);
+                fns.push(quote! {
+                    #[doc = concat!(" Set the value of `", stringify!(#field_ident), "` to `None`.")]
+                    pub fn #function_ident(mut self) -> Self {
+                        self.#field_ident = None;
+                        self
+                    }
+                });
+            }
+        }
+    } else {
+        return ParseError::new(
+            span,
+            "#[derive(Builder)] is only defined for structs, not for enums or unions!",
+        )
+        .to_compile_error()
+        .into();
+    }
+
+    let implementation = quote! {
+        #[automatically_derived]
+        impl #ident {
+            #(#fns)*
+        }
+    };
+
+    implementation.into()
+}
+
+// https://stackoverflow.com/a/56264023
+fn extract_type_path(ty: &Type) -> Option<&Path> {
+    match *ty {
+        Type::Path(ref typepath) if typepath.qself.is_none() => Some(&typepath.path),
+        _ => None,
+    }
+}
+
+// https://stackoverflow.com/a/56264023
+fn extract_option_segment(path: &Path) -> Option<&PathSegment> {
+    let idents_of_path = path.segments.iter().fold(String::new(), |mut acc, v| {
+        acc.push_str(&v.ident.to_string());
+        acc.push('|');
+        acc
+    });
+
+    vec!["Option|", "std|option|Option|", "core|option|Option|"]
+        .into_iter()
+        .find(|s| idents_of_path == *s)
+        .and_then(|_| path.segments.last())
 }

@@ -6,11 +6,11 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaRxBuf, DmaTxBuf},
+    dma::{DmaChannel, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::Level,
     lcd_cam::{
-        cam::{Camera, RxEightBits},
+        cam::{self, Camera, RxEightBits},
         lcd::{
             dpi,
             dpi::{Dpi, Format, FrameTiming},
@@ -55,12 +55,9 @@ mod tests {
     fn test_camera_can_receive_from_rgb(ctx: Context) {
         let peripherals = ctx.peripherals;
 
-        let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 
-        // TODO: use split channels once supported
-        let tx_channel = dma.channel2;
-        let rx_channel = dma.channel3;
+        let (rx_channel, tx_channel) = peripherals.DMA_CH2.split();
 
         let (vsync_in, vsync_out) = peripherals.GPIO6.split();
         let (hsync_in, hsync_out) = peripherals.GPIO7.split();
@@ -80,6 +77,7 @@ mod tests {
             polarity: Polarity::IdleHigh,
             phase: Phase::ShiftLow,
         };
+        config.frequency = 500u32.kHz();
         config.format = Format {
             enable_2byte_mode: false,
             ..Default::default()
@@ -103,7 +101,8 @@ mod tests {
         config.de_idle_level = Level::Low;
         config.disable_black_region = false;
 
-        let dpi = Dpi::new(lcd_cam.lcd, tx_channel, 500u32.kHz(), config)
+        let dpi = Dpi::new(lcd_cam.lcd, tx_channel, config)
+            .unwrap()
             .with_vsync(vsync_out)
             .with_hsync(hsync_out)
             .with_de(de_out)
@@ -117,12 +116,16 @@ mod tests {
             .with_data6(d6_out)
             .with_data7(d7_out);
 
+        let mut cam_config = cam::Config::default();
+        cam_config.frequency = 1u32.MHz();
+
         let camera = Camera::new(
             lcd_cam.cam,
             rx_channel,
             RxEightBits::new(d0_in, d1_in, d2_in, d3_in, d4_in, d5_in, d6_in, d7_in),
-            1u32.MHz(),
+            cam_config,
         )
+        .unwrap()
         .with_ctrl_pins_and_de(vsync_in, hsync_in, de_in)
         .with_pixel_clock(pclk_in);
 

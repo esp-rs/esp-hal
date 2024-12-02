@@ -9,12 +9,7 @@
 use aligned::{Aligned, A64};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    delay::Delay,
-    dma::{Dma, Mem2Mem},
-    dma_descriptors_chunk_size,
-    prelude::*,
-};
+use esp_hal::{delay::Delay, dma::Mem2Mem, dma_descriptors_chunk_size, prelude::*};
 use log::{error, info};
 extern crate alloc;
 
@@ -42,8 +37,8 @@ macro_rules! dma_alloc_buffer {
     }};
 }
 
-fn init_heap(psram: esp_hal::peripherals::PSRAM) {
-    let (start, size) = esp_hal::psram::init_psram(psram, esp_hal::psram::PsramConfig::default());
+fn init_heap(psram: &esp_hal::peripherals::PSRAM) {
+    let (start, size) = esp_hal::psram::psram_raw_parts(psram);
     info!("init_heap: start: {:p}", start);
     unsafe {
         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
@@ -59,19 +54,18 @@ fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    init_heap(&peripherals.PSRAM);
 
-    init_heap(peripherals.PSRAM);
     let delay = Delay::new();
 
     let mut extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
     let mut intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
-    let dma = Dma::new(peripherals.DMA);
     let dma_peripheral = peripherals.SPI2;
 
     let mut mem2mem = Mem2Mem::new_with_chunk_size(
-        dma.channel0,
+        peripherals.DMA_CH0,
         dma_peripheral,
         rx_descriptors,
         tx_descriptors,

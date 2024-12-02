@@ -9,8 +9,7 @@
 //!
 //! The I2C driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
-//! from the community. This includes the [`embedded-hal`] for both 0.2.x and
-//! 1.0.x versions.
+//! from the community, including the [`embedded-hal`].
 //!
 //! ## Examples
 //!
@@ -26,6 +25,7 @@
 //!     peripherals.I2C0,
 //!     Config::default(),
 //! )
+//! .unwrap()
 //! .with_sda(peripherals.GPIO1)
 //! .with_scl(peripherals.GPIO2);
 //!
@@ -35,7 +35,7 @@
 //! }
 //! # }
 //! ```
-//! [`embedded-hal`]: https://crates.io/crates/embedded-hal
+//! [`embedded-hal`]: https://docs.rs/embedded-hal/latest/embedded_hal/index.html
 
 use core::marker::PhantomData;
 #[cfg(not(esp32))]
@@ -45,14 +45,14 @@ use core::{
 };
 
 use embassy_embedded_hal::SetConfig;
-use embassy_sync::waitqueue::AtomicWaker;
 use embedded_hal::i2c::Operation as EhalOperation;
 use fugit::HertzU32;
 
 use crate::{
+    asynch::AtomicWaker,
     clock::Clocks,
     gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{
         i2c0::{RegisterBlock, COMD},
@@ -63,7 +63,6 @@ use crate::{
     Async,
     Blocking,
     Cpu,
-    InterruptConfigurable,
     Mode,
 };
 
@@ -88,6 +87,7 @@ const MAX_ITERATIONS: u32 = 1_000_000;
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Error {
     /// The transmission exceeded the FIFO size.
     ExceedingFifo,
@@ -108,14 +108,15 @@ pub enum Error {
 /// I2C-specific configuration errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum ConfigError {}
 
-#[derive(PartialEq)]
 // This enum is used to keep track of the last/next operation that was/will be
 // performed in an embedded-hal(-async) I2c::transaction. It is used to
 // determine whether a START condition should be issued at the start of the
 // current operation and whether a read needs an ack or a nack for the final
 // byte.
+#[derive(PartialEq)]
 enum OpKind {
     Write,
     Read,
@@ -219,6 +220,7 @@ enum Ack {
     Ack  = 0,
     Nack = 1,
 }
+
 impl From<u32> for Ack {
     fn from(ack: u32) -> Self {
         match ack {
@@ -228,6 +230,7 @@ impl From<u32> for Ack {
         }
     }
 }
+
 impl From<Ack> for u32 {
     fn from(ack: Ack) -> u32 {
         ack as u32
@@ -235,8 +238,9 @@ impl From<Ack> for u32 {
 }
 
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
     pub frequency: HertzU32,
@@ -282,44 +286,6 @@ impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
         self.apply_config(config)
-    }
-}
-
-impl<T> embedded_hal_02::blocking::i2c::Read for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.read(address, buffer)
-    }
-}
-
-impl<T> embedded_hal_02::blocking::i2c::Write for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.write(addr, bytes)
-    }
-}
-
-impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn write_read(
-        &mut self,
-        address: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
-    ) -> Result<(), Self::Error> {
-        self.write_read(address, bytes, buffer)
     }
 }
 
@@ -456,7 +422,10 @@ impl<'d> I2c<'d, Blocking> {
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new(i2c: impl Peripheral<P = impl Instance> + 'd, config: Config) -> Self {
+    pub fn new(
+        i2c: impl Peripheral<P = impl Instance> + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
         Self::new_typed(i2c.map_into(), config)
     }
 }
@@ -468,7 +437,10 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_typed(i2c: impl Peripheral<P = T> + 'd, config: Config) -> Self {
+    pub fn new_typed(
+        i2c: impl Peripheral<P = T> + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
         crate::into_ref!(i2c);
 
         let guard = PeripheralGuard::new(i2c.info().peripheral);
@@ -480,8 +452,9 @@ where
             guard,
         };
 
-        unwrap!(i2c.driver().setup(&i2c.config));
-        i2c
+        i2c.driver().setup(&i2c.config)?;
+
+        Ok(i2c)
     }
 
     // TODO: missing interrupt APIs

@@ -1,6 +1,7 @@
 //! Tools for working with Cargo.
 
 use std::{
+    ffi::OsStr,
     path::Path,
     process::{Command, Stdio},
 };
@@ -17,6 +18,16 @@ pub enum CargoAction {
 
 /// Execute cargo with the given arguments and from the specified directory.
 pub fn run(args: &[String], cwd: &Path) -> Result<()> {
+    run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [])
+}
+
+/// Execute cargo with the given arguments and from the specified directory.
+pub fn run_with_env<I, K, V>(args: &[String], cwd: &Path, envs: I) -> Result<()>
+where
+    I: IntoIterator<Item = (K, V)>,
+    K: AsRef<OsStr>,
+    V: AsRef<OsStr>,
+{
     if !cwd.is_dir() {
         bail!("The `cwd` argument MUST be a directory");
     }
@@ -30,6 +41,7 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
     let status = Command::new(get_cargo())
         .args(args)
         .current_dir(cwd)
+        .envs(envs)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit())
