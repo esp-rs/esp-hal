@@ -720,7 +720,7 @@ cfg_if::cfg_if! {
     }
 }
 
-crate::impl_dma_eligible! {
+crate::dma::impl_dma_eligible! {
     AnyGdmaChannel {
         #[cfg(spi2)]
         SPI2 => Spi2,
@@ -764,7 +764,7 @@ crate::impl_dma_eligible! {
 }
 
 #[cfg(any(esp32c6, esp32h2))]
-crate::impl_dma_eligible! {
+crate::dma::impl_dma_eligible! {
     AnyGdmaChannel {
         MEM2MEM4 => Mem2Mem4,
         MEM2MEM5 => Mem2Mem5,

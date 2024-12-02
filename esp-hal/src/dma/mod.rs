@@ -556,6 +556,7 @@ macro_rules! as_mut_byte_array {
         unsafe { &mut *($name.as_mut_ptr() as *mut [u8; $size]) }
     };
 }
+pub use as_mut_byte_array; // TODO: can be removed as soon as DMA is stabilized
 
 /// Convenience macro to create DMA buffers and descriptors with specific chunk
 /// size.
@@ -670,7 +671,7 @@ macro_rules! dma_buffers_impl {
 
         unsafe {
             (
-                $crate::as_mut_byte_array!(BUFFER, $size),
+                $crate::dma::as_mut_byte_array!(BUFFER, $size),
                 $crate::dma_descriptors_impl!($size, $chunk_size, is_circular = $circular),
             )
         }
@@ -1558,7 +1559,6 @@ impl RxCircularState {
 }
 
 #[doc(hidden)]
-#[macro_export]
 macro_rules! impl_dma_eligible {
     ([$dma_ch:ident] $name:ident => $dma:ident) => {
         impl $crate::dma::DmaEligible for $crate::peripherals::$name {
@@ -1577,10 +1577,12 @@ macro_rules! impl_dma_eligible {
     ) => {
         $(
             $(#[$cfg])?
-            $crate::impl_dma_eligible!([$dma_ch] $name => $dma);
+            $crate::dma::impl_dma_eligible!([$dma_ch] $name => $dma);
         )*
     };
 }
+
+pub(crate) use impl_dma_eligible; // TODO: can be removed as soon as DMA is stabilized
 
 /// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
 pub type PeripheralDmaChannel<T> = <T as DmaEligible>::Dma;

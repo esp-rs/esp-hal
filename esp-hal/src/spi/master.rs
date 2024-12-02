@@ -969,7 +969,7 @@ mod dma {
 
                 unwrap!(DmaTxBuf::new(
                     unsafe { &mut DESCRIPTORS[id] },
-                    crate::as_mut_byte_array!(BUFFERS[id], 4)
+                    crate::dma::as_mut_byte_array!(BUFFERS[id], 4)
                 ))
             };
 
