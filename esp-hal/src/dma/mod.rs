@@ -797,11 +797,11 @@ macro_rules! dma_loop_buffer {
 }
 
 /// DMA Errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaError {
     /// The alignment of data is invalid
-    InvalidAlignment,
+    InvalidAlignment(DmaAlignmentError),
     /// More descriptors are needed for the buffer size
     OutOfDescriptors,
     /// DescriptorError the DMA rejected the descriptor configuration. This
@@ -827,7 +827,7 @@ impl From<DmaBufError> for DmaError {
         match error {
             DmaBufError::InsufficientDescriptors => DmaError::OutOfDescriptors,
             DmaBufError::UnsupportedMemoryRegion => DmaError::UnsupportedMemoryRegion,
-            DmaBufError::InvalidAlignment => DmaError::InvalidAlignment,
+            DmaBufError::InvalidAlignment(err) => DmaError::InvalidAlignment(err),
             DmaBufError::InvalidChunkSize => DmaError::InvalidChunkSize,
         }
     }
@@ -1914,7 +1914,7 @@ where
 
         #[cfg(psram_dma)]
         self.rx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external.into());
+            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
         self.rx_impl.set_burst_mode(preparation.burst_transfer);
         self.rx_impl.set_descr_burst_mode(true);
         self.rx_impl.set_check_owner(preparation.check_owner);
@@ -2202,7 +2202,7 @@ where
 
         #[cfg(psram_dma)]
         self.tx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external.into());
+            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
         self.tx_impl.set_burst_mode(preparation.burst_transfer);
         self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);

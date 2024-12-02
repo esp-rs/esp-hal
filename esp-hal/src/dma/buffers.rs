@@ -8,6 +8,39 @@ use crate::soc::{is_slice_in_dram, is_slice_in_psram};
 #[cfg(psram_dma)]
 use crate::soc::{is_valid_psram_address, is_valid_ram_address};
 
+/// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum DmaBufError {
+    /// More descriptors are needed for the buffer size.
+    InsufficientDescriptors,
+
+    /// Descriptors or buffers are not located in a supported memory region.
+    UnsupportedMemoryRegion,
+
+    /// Buffer address or size is not properly aligned.
+    InvalidAlignment(DmaAlignmentError),
+
+    /// Invalid chunk size: must be > 0 and <= 4095.
+    InvalidChunkSize,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum DmaAlignmentError {
+    /// Buffer address is not properly aligned.
+    Address,
+
+    /// Buffer size is not properly aligned.
+    Size,
+}
+
+impl From<DmaAlignmentError> for DmaBufError {
+    fn from(err: DmaAlignmentError) -> Self {
+        DmaBufError::InvalidAlignment(err)
+    }
+}
+
 cfg_if::cfg_if! {
     if #[cfg(psram_dma)] {
         /// Burst size used when transferring to and from external memory.
@@ -64,19 +97,19 @@ cfg_if::cfg_if! {
             /// Configures the burst size for PSRAM transfers.
             ///
             /// Burst mode is always enabled for PSRAM transfers.
-            pub external: ExternalBurstConfig,
+            pub external_memory: ExternalBurstConfig,
 
             /// Enables or disables the burst mode for internal memory transfers.
             ///
             /// The burst size is not configurable.
-            pub internal: InternalBurstConfig,
+            pub internal_memory: InternalBurstConfig,
         }
 
         impl BurstConfig {
             /// The default burst mode configuration.
             pub const DEFAULT: Self = Self {
-                external: ExternalBurstConfig::DEFAULT,
-                internal: InternalBurstConfig::DEFAULT,
+                external_memory: ExternalBurstConfig::DEFAULT,
+                internal_memory: InternalBurstConfig::DEFAULT,
             };
         }
 
@@ -175,7 +208,7 @@ const fn max(a: usize, b: usize) -> usize {
 impl BurstConfig {
     delegate::delegate! {
         #[cfg(psram_dma)]
-        to self.internal {
+        to self.internal_memory {
             pub(super) const fn min_dram_alignment(self, direction: TransferDirection) -> usize;
             pub(super) fn is_burst_enabled(self) -> bool;
         }
@@ -192,7 +225,7 @@ impl BurstConfig {
         let alignment = max(in_alignment, out_alignment);
 
         #[cfg(psram_dma)]
-        let alignment = max(alignment, self.external as usize);
+        let alignment = max(alignment, self.external_memory as usize);
 
         alignment
     }
@@ -213,7 +246,7 @@ impl BurstConfig {
             if #[cfg(psram_dma)] {
                 let mut alignment = alignment;
                 if is_valid_psram_address(_buffer.as_ptr() as usize) {
-                    alignment = max(alignment, self.external.min_psram_alignment(direction));
+                    alignment = max(alignment, self.external_memory.min_psram_alignment(direction));
                 }
             }
         }
@@ -227,9 +260,24 @@ impl BurstConfig {
         4096 - self.min_alignment(buffer, direction)
     }
 
-    fn is_buffer_aligned(self, buffer: &[u8], direction: TransferDirection) -> bool {
+    fn ensure_buffer_aligned(
+        self,
+        buffer: &[u8],
+        direction: TransferDirection,
+    ) -> Result<(), DmaAlignmentError> {
         let alignment = self.min_alignment(buffer, direction);
-        buffer.as_ptr() as usize % alignment == 0
+        if buffer.as_ptr() as usize % alignment != 0 {
+            return Err(DmaAlignmentError::Address);
+        }
+
+        // NB: the TRMs suggest that buffer length don't need to be aligned, but
+        // for IN transfers, we configure the DMA descriptors' size field, which needs
+        // to be aligned.
+        if direction == TransferDirection::In && buffer.len() % alignment != 0 {
+            return Err(DmaAlignmentError::Size);
+        }
+
+        Ok(())
     }
 
     fn ensure_buffer_compatible(
@@ -244,9 +292,7 @@ impl BurstConfig {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
-        if !self.is_buffer_aligned(buffer, direction) {
-            return Err(DmaBufError::InvalidAlignment);
-        }
+        self.ensure_buffer_aligned(buffer, direction)?;
 
         Ok(())
     }
@@ -373,20 +419,6 @@ pub unsafe trait DmaRxBuffer {
 /// descriptors/buffers.
 pub struct BufView<T>(T);
 
-/// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
-#[derive(Debug, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum DmaBufError {
-    /// More descriptors are needed for the buffer size
-    InsufficientDescriptors,
-    /// Descriptors or buffers are not located in a supported memory region
-    UnsupportedMemoryRegion,
-    /// Buffer is not aligned to the required size
-    InvalidAlignment,
-    /// Invalid chunk size: must be > 0 and <= 4095
-    InvalidChunkSize,
-}
-
 /// DMA transmit buffer
 ///
 /// This is a contiguous buffer linked together by DMA descriptors of length
@@ -442,13 +474,12 @@ impl DmaTxBuf {
     }
 
     fn configure(&mut self, burst: BurstConfig, length: usize) -> Result<(), DmaBufError> {
-        burst.ensure_buffer_compatible(self.buffer, TransferDirection::Out)?;
+        self.set_length_fallible(length, burst)?;
 
         self.descriptors.link_with_buffer(
             self.buffer,
             burst.max_chunk_size_for(self.buffer, TransferDirection::Out),
         )?;
-        self.set_length_fallible(length, burst)?;
 
         self.burst = burst;
         Ok(())
@@ -480,7 +511,7 @@ impl DmaTxBuf {
     }
 
     fn set_length_fallible(&mut self, len: usize, burst: BurstConfig) -> Result<(), DmaBufError> {
-        assert!(len <= self.buffer.len());
+        burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::Out)?;
 
         self.descriptors.set_tx_length(
             len,
@@ -596,13 +627,12 @@ impl DmaRxBuf {
     }
 
     fn configure(&mut self, burst: BurstConfig, length: usize) -> Result<(), DmaBufError> {
-        burst.ensure_buffer_compatible(self.buffer, TransferDirection::In)?;
+        self.set_length_fallible(length, burst)?;
 
         self.descriptors.link_with_buffer(
             self.buffer,
             burst.max_chunk_size_for(self.buffer, TransferDirection::In),
         )?;
-        self.set_length_fallible(length, burst)?;
 
         self.burst = burst;
         Ok(())
@@ -635,11 +665,11 @@ impl DmaRxBuf {
     }
 
     fn set_length_fallible(&mut self, len: usize, burst: BurstConfig) -> Result<(), DmaBufError> {
-        assert!(len <= self.buffer.len());
+        burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::In)?;
 
         self.descriptors.set_rx_length(
             len,
-            burst.max_chunk_size_for(self.buffer, TransferDirection::In),
+            burst.max_chunk_size_for(&self.buffer[..len], TransferDirection::In),
         )
     }
 
@@ -784,8 +814,7 @@ impl DmaRxTxBuf {
     }
 
     fn configure(&mut self, burst: BurstConfig, length: usize) -> Result<(), DmaBufError> {
-        burst.ensure_buffer_compatible(self.buffer, TransferDirection::In)?;
-        burst.ensure_buffer_compatible(self.buffer, TransferDirection::Out)?;
+        self.set_length_fallible(length, burst)?;
 
         self.rx_descriptors.link_with_buffer(
             self.buffer,
@@ -796,7 +825,6 @@ impl DmaRxTxBuf {
             burst.max_chunk_size_for(self.buffer, TransferDirection::Out),
         )?;
 
-        self.set_length_fallible(length, burst)?;
         self.burst = burst;
 
         Ok(())
@@ -849,7 +877,8 @@ impl DmaRxTxBuf {
     }
 
     fn set_length_fallible(&mut self, len: usize, burst: BurstConfig) -> Result<(), DmaBufError> {
-        assert!(len <= self.buffer.len());
+        burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::In)?;
+        burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::Out)?;
 
         self.rx_descriptors.set_rx_length(
             len,
