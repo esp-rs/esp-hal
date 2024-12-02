@@ -90,22 +90,17 @@ mod adapter {
 mod adapter {
     use core::task::Waker;
 
-    use embassy_time::Instant;
-
-    pub(super) type RawQueue = embassy_time::queue_generic::Queue<
+    pub(super) type RawQueue = embassy_time_queue_driver::queue_generic::Queue<
         { esp_config::esp_config_int!(usize, "ESP_HAL_EMBASSY_GENERIC_QUEUE_SIZE") },
     >;
 
     pub(super) fn dequeue(q: &mut RawQueue, now: u64) -> u64 {
-        q.next_expiration(Instant::from_ticks(now)).as_ticks()
+        q.next_expiration(now)
     }
 
     impl super::TimerQueue {
         pub fn schedule_wake(&self, waker: &Waker, at: u64) {
-            if self
-                .inner
-                .with(|q| q.schedule_wake(Instant::from_ticks(at), waker))
-            {
+            if self.inner.with(|q| q.schedule_wake(at, waker)) {
                 self.arm_alarm(at);
             }
         }
