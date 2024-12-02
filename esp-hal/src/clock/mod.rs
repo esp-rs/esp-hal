@@ -38,26 +38,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! // Initialize with the highest possible frequency for this chip
-//! let peripherals = esp_hal::init({
-//!     let mut config = esp_hal::Config::default();
-//!     config.cpu_clock = CpuClock::max();
-//!     config
-//! });
-//!
-//! // Initialize with custom clock frequency
-//! // let peripherals = esp_hal::init({
-//! //    let mut config = esp_hal::Config::default();
-#![cfg_attr(
-    not(any(esp32c2, esp32h2)),
-    doc = "//    config.cpu_clock = CpuClock::Clock160MHz;"
-)]
-#![cfg_attr(esp32c2, doc = "//    config.cpu_clock = CpuClock::Clock120MHz;")]
-#![cfg_attr(esp32h2, doc = "//    config.cpu_clock = CpuClock::Clock96MHz;")]
-//! //    config
-//! // });
-//! //
-//! // Initialize with default clock frequency for this chip
-//! // let peripherals = esp_hal::init(esp_hal::Config::default());
+//! let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+//! let peripherals = esp_hal::init(config);
 //! # }
 //! ```
 

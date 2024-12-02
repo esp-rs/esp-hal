@@ -169,8 +169,7 @@ mod tests {
                 // FIXME: max speed fails...?
                 let config = esp_hal::Config::default();
             } else {
-                let mut config = esp_hal::Config::default();
-                config.cpu_clock = CpuClock::max();
+                let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
             }
         }
 

@@ -75,12 +75,8 @@
 //!
 //! #[entry]
 //! fn main() -> ! {
-//!     let peripherals = esp_hal::init({
-//!         let mut config = esp_hal::Config::default();
-//!         // Configure the CPU to run at the maximum frequency.
-//!         config.cpu_clock = CpuClock::max();
-//!         config
-//!     });
+//!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+//!     let peripherals = esp_hal::init(config);
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
 //!     let mut led = Output::new(peripherals.GPIO0, Level::High);
@@ -482,7 +478,7 @@ use crate::{
 ///
 /// For usage examples, see the [config module documentation](crate::config).
 #[non_exhaustive]
-#[derive(Default)]
+#[derive(Default, procmacros::BuilderLite)]
 pub struct Config {
     /// The CPU clock configuration.
     pub cpu_clock: CpuClock,

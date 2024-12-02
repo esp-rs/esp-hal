@@ -54,11 +54,8 @@ mod tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let peripherals = esp_hal::init({
-            let mut config = esp_hal::Config::default();
-            config.cpu_clock = CpuClock::max();
-            config
-        });
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let peripherals = esp_hal::init(config);
 
         let ecc = Ecc::new(peripherals.ECC);
         let rng = Rng::new(peripherals.RNG);
