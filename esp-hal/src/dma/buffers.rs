@@ -12,6 +12,9 @@ use crate::soc::{is_valid_psram_address, is_valid_ram_address};
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaBufError {
+    /// The buffer is smaller than the requested size.
+    BufferTooSmall,
+
     /// More descriptors are needed for the buffer size.
     InsufficientDescriptors,
 
@@ -511,6 +514,9 @@ impl DmaTxBuf {
     }
 
     fn set_length_fallible(&mut self, len: usize, burst: BurstConfig) -> Result<(), DmaBufError> {
+        if len > self.capacity() {
+            return Err(DmaBufError::BufferTooSmall);
+        }
         burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::Out)?;
 
         self.descriptors.set_tx_length(
@@ -665,6 +671,9 @@ impl DmaRxBuf {
     }
 
     fn set_length_fallible(&mut self, len: usize, burst: BurstConfig) -> Result<(), DmaBufError> {
+        if len > self.capacity() {
+            return Err(DmaBufError::BufferTooSmall);
+        }
         burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::In)?;
 
         self.descriptors.set_rx_length(
@@ -877,6 +886,9 @@ impl DmaRxTxBuf {
     }
 
     fn set_length_fallible(&mut self, len: usize, burst: BurstConfig) -> Result<(), DmaBufError> {
+        if len > self.capacity() {
+            return Err(DmaBufError::BufferTooSmall);
+        }
         burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::In)?;
         burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::Out)?;
 
