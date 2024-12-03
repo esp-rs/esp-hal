@@ -773,10 +773,15 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 fn lint_package(chip: &Chip, path: &Path, args: &[&str], fix: bool) -> Result<()> {
     log::info!("Linting package: {}", path.display());
 
-    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
+    let builder = CargoArgsBuilder::default().subcommand("clippy");
 
-    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
-    builder = builder.toolchain(toolchain);
+    let mut builder = if chip.is_xtensa() {
+        // We only overwrite Xtensas so that externally set nightly/stable toolchains
+        // are not overwritten.
+        builder.toolchain("esp")
+    } else {
+        builder
+    };
 
     for arg in args {
         builder = builder.arg(arg.to_string());
