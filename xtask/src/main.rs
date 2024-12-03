@@ -644,7 +644,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         &[
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
-                            &format!("--features={chip},executors,defmt,integrated-timers"),
+                            &format!("--features={chip},executors,defmt,integrated-timers,esp-hal/unstable"),
                         ],
                         args.fix,
                     )?;
@@ -718,7 +718,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!("--features={chip},defmt,sys-logs");
+                    let mut features = format!("--features={chip},defmt,sys-logs,esp-hal/unstable");
 
                     if device.contains("wifi") {
                         features.push_str(",esp-now,sniffer")

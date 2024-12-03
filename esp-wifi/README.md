@@ -8,6 +8,8 @@
 
 A WiFi, BLE and ESP-NOW driver for Espressif microcontrollers.
 
+Note that this crate currently requires you to enable the `unstable` feature on `esp-hal`.
+
 ## Current support
 
 If a cell contains an em dash (&mdash;) this means that the particular feature is not present for a chip. A check mark (✓) means that some driver implementation exists. A Tilde (&tilde;) means it is implemented but buggy. An empty cell means that the feature is present in the chip but not implemented yet.

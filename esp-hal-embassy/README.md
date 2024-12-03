@@ -8,6 +8,8 @@
 
 [Embassy] support for `esp-hal`.
 
+Note that this crate currently requires you to enable the `unstable` feature on `esp-hal`.
+
 [embassy]: https://github.com/embassy-rs/embassy
 
 ## [Documentation]
@@ -16,7 +18,7 @@
 
 ## Minimum Supported Rust Version (MSRV)
 
-This crate is guaranteed to compile on stable Rust 1.76 and up. It _might_
+This crate is guaranteed to compile on stable Rust 1.79 and up. It _might_
 compile with older versions but that may change in any new patch release.
 
 ## License
