@@ -627,7 +627,6 @@ pub enum ConfigError {
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<M, T> SetConfig for Uart<'_, M, T>
 where
     T: Instance,
@@ -643,7 +642,6 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<M, T> SetConfig for UartRx<'_, M, T>
 where
     T: Instance,
@@ -658,7 +656,6 @@ where
 }
 
 #[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<M, T> SetConfig for UartTx<'_, M, T>
 where
@@ -1474,13 +1471,11 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ErrorType for Uart<'_, M, T> {
     type Error = Error;
 }
 
 #[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ErrorType for UartTx<'_, M, T> {
     type Error = Error;
@@ -1488,13 +1483,11 @@ impl<T, M> embedded_io::ErrorType for UartTx<'_, M, T> {
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ErrorType for UartRx<'_, M, T> {
     type Error = Error;
 }
 
 #[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::Read for Uart<'_, M, T>
 where
@@ -1507,7 +1500,6 @@ where
 }
 
 #[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::Read for UartRx<'_, M, T>
 where
@@ -1529,7 +1521,6 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ReadReady for Uart<'_, M, T>
 where
     T: Instance,
@@ -1542,7 +1533,6 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ReadReady for UartRx<'_, M, T>
 where
     T: Instance,
@@ -1554,7 +1544,6 @@ where
 }
 
 #[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::Write for Uart<'_, M, T>
 where
@@ -1571,7 +1560,6 @@ where
 }
 
 #[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::Write for UartTx<'_, M, T>
 where

@@ -651,7 +651,6 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<M, T> SetConfig for Spi<'_, M, T>
 where
     T: Instance,
@@ -1170,7 +1169,6 @@ mod dma {
     }
 
     #[cfg(any(doc, feature = "unstable"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<M, T> SetConfig for SpiDma<'_, M, T>
     where
