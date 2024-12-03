@@ -266,13 +266,20 @@ impl BurstConfig {
         alignment
     }
 
+    const fn chunk_size_for_alignment(alignment: usize) -> usize {
+        // DMA descriptors have a 12-bit field for the size/length of the buffer they
+        // point at. As there is no such thing as 0-byte alignment, this means the
+        // maximum size is 4095 bytes.
+        4096 - alignment
+    }
+
     /// Calculates a chunk size that is compatible with the current burst
     /// configuration's alignment requirements.
     ///
     /// This is an over-estimation so that Descriptors can be safely used with
     /// any DMA channel in any direction.
     pub const fn max_compatible_chunk_size(self) -> usize {
-        4096 - self.min_compatible_alignment()
+        Self::chunk_size_for_alignment(self.min_compatible_alignment())
     }
 
     fn min_alignment(self, _buffer: &[u8], direction: TransferDirection) -> usize {
@@ -293,7 +300,7 @@ impl BurstConfig {
     // Note: this function ignores address alignment as we assume the buffers are
     // aligned.
     fn max_chunk_size_for(self, buffer: &[u8], direction: TransferDirection) -> usize {
-        4096 - self.min_alignment(buffer, direction)
+        Self::chunk_size_for_alignment(self.min_alignment(buffer, direction))
     }
 
     fn ensure_buffer_aligned(
