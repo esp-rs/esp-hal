@@ -53,7 +53,14 @@ fn transfer_read(
     command: Command,
 ) -> (SpiUnderTest, DmaRxBuf) {
     let transfer = spi
-        .half_duplex_read(SpiDataMode::Quad, command, Address::None, 0, dma_rx_buf)
+        .half_duplex_read(
+            SpiDataMode::Quad,
+            command,
+            Address::None,
+            0,
+            dma_rx_buf.len(),
+            dma_rx_buf,
+        )
         .map_err(|e| e.0)
         .unwrap();
     transfer.wait()
@@ -74,6 +81,7 @@ fn transfer_write(
                 SpiDataMode::Quad,
             ),
             0,
+            dma_tx_buf.len(),
             dma_tx_buf,
         )
         .map_err(|e| e.0)

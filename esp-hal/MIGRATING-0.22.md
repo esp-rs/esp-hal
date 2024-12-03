@@ -273,3 +273,24 @@ is not compatible with the hardware.
 +    cam_config,
  )
 ```
+
+## SpiDma now requires you specify the transfer length explicitly
+
+```diff
+  dma_tx_buf.set_length(5 /* or greater */);
+- spi_dma.write(dma_tx_buf);
++ spi_dma.write(5, dma_tx_buf);
+```
+
+```diff
+  dma_rx_buf.set_length(5 /* or greater */);
+- spi_dma.read(dma_rx_buf);
++ spi_dma.read(5, dma_rx_buf);
+```
+
+```diff
+  dma_rx_buf.set_length(5 /* or greater */);
+  dma_tx_buf.set_length(5 /* or greater */);
+- spi_dma.transfer(dma_rx_buf, dma_tx_buf);
++ spi_dma.transfer(5, dma_rx_buf, 5, dma_tx_buf);
+```
