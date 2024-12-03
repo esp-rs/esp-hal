@@ -2324,14 +2324,17 @@ impl Info {
     /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
     /// - `esp32s3` **0x3FF**
     fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
-        #[cfg(esp32)]
-        const MAX_THRHD: u16 = 0x7F;
-        #[cfg(any(esp32c6, esp32h2))]
-        const MAX_THRHD: u16 = 0xFF;
-        #[cfg(any(esp32c3, esp32c2, esp32s2))]
-        const MAX_THRHD: u16 = 0x1FF;
-        #[cfg(esp32s3)]
-        const MAX_THRHD: u16 = 0x3FF;
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                const MAX_THRHD: u16 = 0x7F;
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                const MAX_THRHD: u16 = 0xFF;
+            } else if #[cfg(any(esp32c3, esp32c2, esp32s2))] {
+                const MAX_THRHD: u16 = 0x1FF;
+            } else if #[cfg(esp32s3)] {
+                const MAX_THRHD: u16 = 0x3FF;
+            }
+        }
 
         if threshold > MAX_THRHD {
             return Err(ConfigError::UnsupportedFifoThreshold);
