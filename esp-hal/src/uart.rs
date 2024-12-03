@@ -374,11 +374,11 @@ pub enum Parity {
 pub enum StopBits {
     /// 1 stop bit.
     #[default]
-    STOP1   = 1,
+    Stop1   = 1,
     /// 1.5 stop bits.
-    STOP1P5 = 2,
+    Stop1P5 = 2,
     /// 2 stop bits.
-    STOP2   = 3,
+    Stop2   = 3,
 }
 
 /// UART Configuration
@@ -461,7 +461,7 @@ impl Config {
             _ => 1,
         };
         length += match self.stop_bits {
-            StopBits::STOP1 => 1,
+            StopBits::Stop1 => 1,
             _ => 2, // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
         };
         length
@@ -2549,13 +2549,13 @@ impl Info {
         #[cfg(esp32)]
         {
             // workaround for hardware issue, when UART stop bit set as 2-bit mode.
-            if stop_bits == StopBits::STOP2 {
+            if stop_bits == StopBits::Stop2 {
                 self.register_block()
                     .rs485_conf()
-                    .modify(|_, w| w.dl1_en().bit(stop_bits == StopBits::STOP2));
+                    .modify(|_, w| w.dl1_en().bit(stop_bits == StopBits::Stop2));
 
                 self.register_block().conf0().modify(|_, w| {
-                    if stop_bits == StopBits::STOP2 {
+                    if stop_bits == StopBits::Stop2 {
                         unsafe { w.stop_bit_num().bits(1) }
                     } else {
                         unsafe { w.stop_bit_num().bits(stop_bits as u8) }
