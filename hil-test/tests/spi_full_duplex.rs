@@ -197,6 +197,9 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
+        dma_rx_buf.set_length(TRANSFER_SIZE);
+        dma_tx_buf.set_length(TRANSFER_SIZE);
+
         // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);
 
@@ -233,6 +236,9 @@ mod tests {
         unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        dma_rx_buf.set_length(TRANSFER_SIZE);
+        dma_tx_buf.set_length(TRANSFER_SIZE);
 
         // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);

@@ -345,6 +345,8 @@ pub enum TransferDirection {
 }
 
 /// Holds all the information needed to configure a DMA channel for a transfer.
+#[derive(PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Preparation {
     /// The descriptor the DMA will start from.
     pub start: *mut DmaDescriptor,

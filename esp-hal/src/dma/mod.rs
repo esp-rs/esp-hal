@@ -1908,6 +1908,9 @@ where
     ) -> Result<(), DmaError> {
         debug_assert_eq!(preparation.direction, TransferDirection::In);
 
+        debug!("Preparing RX transfer {:?}", preparation);
+        trace!("First descriptor {:?}", unsafe { &*preparation.start });
+
         #[cfg(psram_dma)]
         if preparation.accesses_psram && !self.rx_impl.can_access_psram() {
             return Err(DmaError::UnsupportedMemoryRegion);
@@ -2198,6 +2201,9 @@ where
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
         debug_assert_eq!(preparation.direction, TransferDirection::Out);
+
+        debug!("Preparing TX transfer {:?}", preparation);
+        trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
         #[cfg(psram_dma)]
         if preparation.accesses_psram && !self.tx_impl.can_access_psram() {
