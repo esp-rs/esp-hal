@@ -204,10 +204,12 @@ macro_rules! unstable {
         $(
             $(#[$meta])*
             #[cfg(feature = "unstable")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
             pub mod $module;
 
             $(#[$meta])*
             #[cfg(not(feature = "unstable"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
             #[allow(unused)]
             pub(crate) mod $module;
         )*
