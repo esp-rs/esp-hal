@@ -44,6 +44,7 @@ print-float-registers = [] # TODO support esp32p4
 # additional functionality:
 colors               = []
 coredump             = []
+coredump-all         = []
 custom-halt          = []
 custom-pre-backtrace = []
 exception-handler    = []

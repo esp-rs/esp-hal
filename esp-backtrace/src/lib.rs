@@ -65,7 +65,7 @@ fn set_color_code(code: &str) {
     }
 }
 
-#[cfg(feature = "coredump")]
+#[cfg(any(feature = "coredump", feature = "coredump-all"))]
 pub(crate) mod coredump;
 
 #[cfg_attr(target_arch = "riscv32", path = "riscv.rs")]
@@ -77,7 +77,10 @@ extern "C" {
     static _stack_end: u32;
 }
 
-#[cfg(all(feature = "panic-handler", not(feature = "coredump")))]
+#[cfg(all(
+    feature = "panic-handler",
+    not(any(feature = "coredump", feature = "coredump-all"))
+))]
 #[panic_handler]
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     pre_backtrace();
@@ -121,7 +124,10 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     halt();
 }
 
-#[cfg(all(feature = "panic-handler", feature = "coredump"))]
+#[cfg(all(
+    feature = "panic-handler",
+    any(feature = "coredump", feature = "coredump-all")
+))]
 #[panic_handler]
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     #[cfg(feature = "colors")]
