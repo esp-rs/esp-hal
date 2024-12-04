@@ -1,5 +1,6 @@
-use core::{arch::asm, fmt::Display, ptr::addr_of};
+use core::{arch::asm, fmt::Display};
 
+#[cfg(feature = "exception-handler")]
 use super::*;
 use crate::MAX_BACKTRACE_ADDRESSES;
 
@@ -521,7 +522,7 @@ unsafe fn __user_exception(cause: ExceptionCause, context: Context) {
     let mut writer = crate::coredump::DumpWriter {};
 
     let start = regs.ar[1] - 256;
-    let end = addr_of!(_stack_start) as u32;
+    let end = core::ptr::addr_of!(_stack_start) as u32;
     let len = (end - start) as usize;
 
     let slice = unsafe { core::slice::from_raw_parts(start as *const u8, len) };

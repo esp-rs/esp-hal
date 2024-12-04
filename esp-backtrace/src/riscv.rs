@@ -1,5 +1,6 @@
 use core::arch::asm;
 
+#[cfg(feature = "exception-handler")]
 use super::*;
 use crate::MAX_BACKTRACE_ADDRESSES;
 
@@ -300,8 +301,6 @@ fn exception_handler(context: TrapFrame) -> ! {
 #[cfg(all(feature = "exception-handler", feature = "coredump"))]
 #[export_name = "ExceptionHandler"]
 fn exception_handler(context: &TrapFrame) -> ! {
-    use core::ptr::addr_of;
-
     let mepc = context.pc;
     let code = context.mcause & 0xff;
     let mtval = context.mtval;
@@ -383,7 +382,7 @@ fn exception_handler(context: &TrapFrame) -> ! {
     let mut writer = crate::coredump::DumpWriter {};
 
     let start = regs.x2 - 256;
-    let end = addr_of!(_stack_start) as u32;
+    let end = core::ptr::addr_of!(_stack_start) as u32;
     let len = (end - start) as usize;
 
     let slice = unsafe { core::slice::from_raw_parts(start as *const u8, len) };

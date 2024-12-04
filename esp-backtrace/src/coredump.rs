@@ -231,10 +231,8 @@ pub fn dump<W: Writer>(writer: &mut W, regs: &Registers, mem: Memory) {
     // header for the register info
     writer.write_program_header(
         SegmentType::Note,
-        HEADER_SIZE + 2 * PROGRAM_HEADER_SIZE + mem.slice.len() as u32, /* we have 2 program
-                                                                         * header entries and
-                                                                         * first data is the
-                                                                         * memory block */
+        // we have 2 program header entries and first data is the memory block
+        HEADER_SIZE + 2 * PROGRAM_HEADER_SIZE + mem.slice.len() as u32,
         0,
         (core::mem::size_of::<RegisterInfo>() + REG_INFO_HEADER_SIZE) as u32,
         6,
@@ -296,10 +294,10 @@ impl<'a, W: Writer> CoreDumpWriter<'a, W> {
         self.writer.write(&[0x04, 0x00]); // CORE file
 
         #[cfg(target_arch = "riscv32")]
-        self.writer.write(&[0xf3, 0x00]); // machine (RISCV) !!!!
+        self.writer.write(&[0xf3, 0x00]); // machine (RISCV)
 
         #[cfg(target_arch = "xtensa")]
-        self.writer.write(&[0x5e, 0x00]); // machine (Xtensa) !!!!
+        self.writer.write(&[0x5e, 0x00]); // machine (Xtensa)
 
         self.writer.write(&[0x01, 0x00, 0x00, 0x00]); // version
         self.writer.write(&[0x00, 0x00, 0x00, 0x00]); // entry
