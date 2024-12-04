@@ -138,7 +138,15 @@ This will use software-interrupt 3 which isn't available for anything else to wa
             // sections in Xtensa are implemented via increasing `PS.INTLEVEL`.
             // The critical section ends here. Take care not add code after
             // `waiti` if it needs to be inside the CS.
-            unsafe { core::arch::asm!("waiti 0") };
+            // Do not lower INTLEVEL below the current value.
+            match token & 0x0F {
+                0 => unsafe { core::arch::asm!("waiti 0") },
+                1 => unsafe { core::arch::asm!("waiti 1") },
+                2 => unsafe { core::arch::asm!("waiti 2") },
+                3 => unsafe { core::arch::asm!("waiti 3") },
+                4 => unsafe { core::arch::asm!("waiti 4") },
+                _ => unsafe { core::arch::asm!("waiti 5") },
+            }
         }
         // If this races and some waker sets the signal, we'll reset it, but still poll.
         SIGNAL_WORK_THREAD_MODE[cpu].store(false, Ordering::Relaxed);

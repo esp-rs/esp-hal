@@ -7,16 +7,46 @@
 #![no_std]
 #![no_main]
 
+use esp_hal::{
+    delay::Delay,
+    interrupt::{
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
+        InterruptHandler,
+        Priority,
+    },
+    peripherals::Peripherals,
+    sync::{Locked, PriorityLock},
+};
 use hil_test as _;
+
+fn test_access_at_priority(peripherals: Peripherals, priority: Priority) {
+    static LOCK: PriorityLock = PriorityLock::new(Priority::Priority1);
+
+    extern "C" fn access<const INT: u8>() {
+        unsafe { SoftwareInterrupt::<INT>::steal().reset() };
+        let l = unsafe { LOCK.acquire() };
+        unsafe { LOCK.release(l) };
+        embedded_test::export::check_outcome(());
+    }
+
+    let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+
+    let mut prio_2_interrupt = sw_ints.software_interrupt1;
+
+    prio_2_interrupt.set_interrupt_handler(InterruptHandler::new(access::<1>, priority));
+
+    prio_2_interrupt.raise();
+    loop {}
+}
 
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
-    use esp_hal::sync::Locked;
+    use super::*;
 
     #[init]
-    fn init() {
-        esp_hal::init(esp_hal::Config::default());
+    fn init() -> Peripherals {
+        esp_hal::init(esp_hal::Config::default())
     }
 
     #[test]
@@ -54,5 +84,69 @@ mod tests {
                 *f = true;
             });
         });
+    }
+
+    #[test]
+    fn priority_lock_tests(peripherals: Peripherals) {
+        use portable_atomic::{AtomicU32, Ordering};
+
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+        extern "C" fn increment<const INT: u8>() {
+            unsafe { SoftwareInterrupt::<INT>::steal().reset() };
+            COUNTER.fetch_add(1, Ordering::AcqRel);
+        }
+
+        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+
+        let mut prio_1_interrupt = sw_ints.software_interrupt0;
+        let mut prio_2_interrupt = sw_ints.software_interrupt1;
+
+        prio_1_interrupt
+            .set_interrupt_handler(InterruptHandler::new(increment::<0>, Priority::Priority1));
+        prio_2_interrupt
+            .set_interrupt_handler(InterruptHandler::new(increment::<1>, Priority::Priority2));
+
+        let lock = PriorityLock::new(Priority::Priority1);
+
+        let delay = Delay::new();
+
+        // Lock does nothing unless taken
+
+        prio_1_interrupt.raise();
+        // Software interrupts may not trigger immediately and there may be some
+        // instructions executed after `raise`. We need to wait a short while
+        // to ensure that the interrupt has been serviced before reading the counter.
+        delay.delay_millis(1);
+        assert_eq!(COUNTER.load(Ordering::Acquire), 1);
+
+        // Taking the lock masks the lower priority interrupt
+
+        let token = unsafe { lock.acquire() };
+
+        prio_1_interrupt.raise();
+        delay.delay_millis(1);
+        assert_eq!(COUNTER.load(Ordering::Acquire), 1); // not incremented
+
+        // Taken lock does not mask higher priority interrupts
+        prio_2_interrupt.raise();
+        delay.delay_millis(1);
+        assert_eq!(COUNTER.load(Ordering::Acquire), 2);
+
+        // Releasing the lock unmasks the lower priority interrupt
+        unsafe { lock.release(token) };
+        delay.delay_millis(1);
+        assert_eq!(COUNTER.load(Ordering::Acquire), 3);
+    }
+
+    #[test]
+    fn priority_lock_allows_access_from_equal_priority(peripherals: Peripherals) {
+        test_access_at_priority(peripherals, Priority::Priority1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn priority_lock_panics_on_higher_priority_access(peripherals: Peripherals) {
+        test_access_at_priority(peripherals, Priority::Priority2);
     }
 }
