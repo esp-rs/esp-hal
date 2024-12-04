@@ -451,11 +451,14 @@ impl Default for Config {
 }
 
 /// Configuration errors.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConfigError {}
 
 /// SPI peripheral driver
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     _mode: PhantomData<M>,
@@ -1748,7 +1751,7 @@ mod dma {
             buffer: &mut [u8],
         ) -> Result<(), Error> {
             if buffer.len() > self.rx_buf.capacity() {
-                return Err(Error::DmaError(DmaError::Overflow));
+                return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
             self.rx_buf.set_length(buffer.len());
@@ -1782,7 +1785,7 @@ mod dma {
             buffer: &[u8],
         ) -> Result<(), Error> {
             if buffer.len() > self.tx_buf.capacity() {
-                return Err(Error::DmaError(DmaError::Overflow));
+                return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
             self.tx_buf.fill(buffer);

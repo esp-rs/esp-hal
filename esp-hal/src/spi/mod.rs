@@ -20,6 +20,8 @@ pub mod slave;
 #[non_exhaustive]
 pub enum Error {
     /// Error occurred due to a DMA-related issue.
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     DmaError(DmaError),
     /// Error indicating that the maximum DMA transfer size was exceeded.
     MaxDmaTransferSizeExceeded,
@@ -33,9 +35,19 @@ pub enum Error {
     Unknown,
 }
 
+#[doc(hidden)]
+#[cfg(any(doc, feature = "unstable"))]
 impl From<DmaError> for Error {
     fn from(value: DmaError) -> Self {
         Error::DmaError(value)
+    }
+}
+
+#[doc(hidden)]
+#[cfg(not(any(doc, feature = "unstable")))]
+impl From<DmaError> for Error {
+    fn from(_value: DmaError) -> Self {
+        Error::Unknown
     }
 }
 
