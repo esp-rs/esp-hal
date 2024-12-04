@@ -44,6 +44,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - Drivers must have a `Drop` implementation resetting the peripheral to idle state. There are some exceptions to this:
   - GPIO where common usage is to "set and drop" so they can't be changed
   - Where we don't want to disable the peripheral as it's used internally, for example SYSTIMER is used by `time::now()` API. See `KEEP_ENABLED` in src/system.rs
+  - A driver doesn't need to do anything special for deinitialization and has a `PeripheralGuard` field which implements the disabling and resetting of the peripheral.
 - Consider using a builder-like pattern for driver construction.
 
 ## Interoperability
@@ -86,7 +87,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - If necessary provide further context as comments (consider linking to code, PRs, TRM - make sure to use permanent links, e.g. include the hash when linking to a Git repository, include the revision, page number etc. when linking to TRMs)
 - Generally, follow common "good practices" and idiomatic Rust style
 - All `Future` objects (public or private) must be marked with ``#[must_use = "futures do nothing unless you `.await` or poll them"]``.
-- Prefer `cfg_if!` over multiple exclusive `#[cfg]` attributes. `cfg_if!` visually divides the options, often results in simpler conditions and simplifies adding new branches in the future.
+- Prefer `cfg_if!` (or, if the branches just pick between separate values of the same variable, `cfg!()`) over multiple exclusive `#[cfg]` attributes. `cfg_if!`/`cfg!()` visually divide the options, often results in simpler conditions and simplifies adding new branches in the future.
 
 ## Driver implementation
 
