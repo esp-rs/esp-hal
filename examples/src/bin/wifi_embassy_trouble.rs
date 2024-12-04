@@ -5,7 +5,7 @@
 //! - automatically notifies subscribers every second
 //!
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/ble
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/ble esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]

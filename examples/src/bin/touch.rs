@@ -7,6 +7,7 @@
 //! pad on a PCB).
 
 //% CHIPS: esp32
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]

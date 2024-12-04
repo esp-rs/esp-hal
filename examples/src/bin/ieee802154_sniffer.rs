@@ -3,6 +3,7 @@
 //! Besides the runtime changeable channel and the output format it's almost identical to ieee802154_receive_all_frames
 
 //% CHIPS: esp32c6 esp32h2
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]

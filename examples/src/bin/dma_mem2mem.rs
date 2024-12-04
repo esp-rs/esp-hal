@@ -1,6 +1,6 @@
 //! Uses DMA to copy memory to memory.
 
-//% FEATURES: esp-hal/log
+//% FEATURES: esp-hal/log esp-hal/unstable
 //% CHIPS: esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]

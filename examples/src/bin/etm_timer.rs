@@ -4,6 +4,7 @@
 //! - LED => GPIO2
 
 //% CHIPS: esp32c6 esp32h2
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]

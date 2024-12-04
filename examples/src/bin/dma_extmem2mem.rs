@@ -1,6 +1,6 @@
 //! Uses DMA to copy psram to internal memory.
 
-//% FEATURES: esp-hal/log esp-hal/octal-psram aligned
+//% FEATURES: esp-hal/log esp-hal/octal-psram aligned esp-hal/unstable
 //% CHIPS: esp32s3
 
 #![no_std]
