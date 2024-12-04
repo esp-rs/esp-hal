@@ -15,7 +15,7 @@ pub mod master;
 pub mod slave;
 
 /// SPI errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Error {
@@ -62,7 +62,7 @@ impl embedded_hal::spi::Error for Error {
 ///
 /// These modes control the clock signal's idle state and when data is sampled
 /// and shifted.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiMode {
     /// Mode 0 (CPOL = 0, CPHA = 0): Clock is low when idle, data is captured on
@@ -80,7 +80,7 @@ pub enum SpiMode {
 }
 
 /// SPI Bit Order
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiBitOrder {
     /// Most Significant Bit (MSB) is transmitted first.
@@ -90,7 +90,7 @@ pub enum SpiBitOrder {
 }
 
 /// SPI data mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiDataMode {
     /// `Single` Data Mode - 1 bit, 2 wires.

@@ -89,7 +89,7 @@ use crate::{
 
 /// Enumeration of possible SPI interrupt events.
 #[cfg(gdma)]
-#[derive(Debug, EnumSetType)]
+#[derive(Debug, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum SpiInterrupt {
@@ -113,7 +113,7 @@ const MAX_DMA_SIZE: usize = 32736;
 /// Used to define specific commands sent over the SPI bus.
 /// Can be [Command::None] if command phase should be suppressed.
 #[non_exhaustive]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Command {
     /// No command is sent.
@@ -229,7 +229,7 @@ impl Command {
 /// This can be used to specify the address phase of SPI transactions.
 /// Can be [Address::None] if address phase should be suppressed.
 #[non_exhaustive]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Address {
     /// No address phase.
@@ -421,7 +421,7 @@ impl Address {
 }
 
 /// SPI peripheral configuration
-#[derive(Clone, Copy, Debug, procmacros::BuilderLite)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {

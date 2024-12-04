@@ -794,7 +794,7 @@ macro_rules! dma_loop_buffer {
 }
 
 /// DMA Errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaError {
     /// The alignment of data is invalid
