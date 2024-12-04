@@ -366,6 +366,8 @@ impl Peripheral for Timer {
 }
 
 /// A timer within a Timer Group.
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Timer {
     register_block: *const RegisterBlock,
     timer: u8,

@@ -90,6 +90,8 @@ macro_rules! any_peripheral {
     }) => {
         paste::paste! {
             $(#[$meta])*
+            #[derive(Debug, PartialEq)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             $vis struct $name([< $name Inner >]);
             impl $crate::private::Sealed for $name {}
 
@@ -106,12 +108,56 @@ macro_rules! any_peripheral {
                 }
             }
 
+            $(#[$meta])*
+            #[derive(Debug, PartialEq)]
             enum [< $name Inner >] {
                 $(
                     $(#[cfg($variant_meta)])*
                     $variant($inner),
                 )*
             }
+
+            #[cfg(feature = "defmt")]
+            impl defmt::Format for [< $name Inner >] {
+                fn format(&self, fmt: defmt::Formatter<'_>) {
+                    match self {
+                        $(
+                            $(#[cfg($variant_meta)])*
+                            [< $name Inner >]::$variant(inner) => inner.format(fmt),
+                        )*
+                    }
+                }
+            }
+
+            $(
+                // Any == Specific
+                $(#[cfg($variant_meta)])*
+                impl PartialEq<$inner> for [< $name Inner >] {
+                    fn eq(&self, _other: &$inner) -> bool {
+                        matches!(self, [< $name Inner >]::$variant(_))
+                    }
+                }
+                $(#[cfg($variant_meta)])*
+                impl PartialEq<$inner> for $name {
+                    fn eq(&self, other: &$inner) -> bool {
+                        &self.0 == other
+                    }
+                }
+
+                // Specific == Any
+                $(#[cfg($variant_meta)])*
+                impl PartialEq<[< $name Inner >]> for $inner {
+                    fn eq(&self, other: &[< $name Inner >]) -> bool {
+                        other == self
+                    }
+                }
+                $(#[cfg($variant_meta)])*
+                impl PartialEq<$name> for $inner {
+                    fn eq(&self, other: &$name) -> bool {
+                        other == self
+                    }
+                }
+            )*
 
             $(
                 $(#[cfg($variant_meta)])*

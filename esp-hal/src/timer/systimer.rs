@@ -152,6 +152,7 @@ impl SystemTimer {
 #[cfg_attr(not(esp32s2), doc = "52-bit")]
 /// counter.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Unit {
     /// Unit 0
     Unit0 = 0,
@@ -264,7 +265,8 @@ impl Unit {
 }
 
 /// An alarm unit
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Alarm {
     comp: u8,
     unit: Unit,

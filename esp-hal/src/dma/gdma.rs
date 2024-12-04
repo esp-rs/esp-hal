@@ -583,6 +583,8 @@ macro_rules! impl_channel {
         paste::paste! {
             /// A description of a specific GDMA channel
             #[non_exhaustive]
+            #[derive(Debug, PartialEq, Eq)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             pub struct [<DmaChannel $num>] {}
 
             impl $crate::private::Sealed for [<DmaChannel $num>] {}
