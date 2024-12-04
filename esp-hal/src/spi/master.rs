@@ -444,8 +444,8 @@ impl Default for Config {
         Config {
             frequency: 1_u32.MHz(),
             mode: SpiMode::Mode0,
-            read_bit_order: SpiBitOrder::MSBFirst,
-            write_bit_order: SpiBitOrder::MSBFirst,
+            read_bit_order: SpiBitOrder::MsbFirst,
+            write_bit_order: SpiBitOrder::MsbFirst,
         }
     }
 }
@@ -2669,12 +2669,12 @@ impl Info {
         let reg_block = self.register_block();
 
         let read_value = match read_order {
-            SpiBitOrder::MSBFirst => 0,
-            SpiBitOrder::LSBFirst => 1,
+            SpiBitOrder::MsbFirst => 0,
+            SpiBitOrder::LsbFirst => 1,
         };
         let write_value = match write_order {
-            SpiBitOrder::MSBFirst => 0,
-            SpiBitOrder::LSBFirst => 1,
+            SpiBitOrder::MsbFirst => 0,
+            SpiBitOrder::LsbFirst => 1,
         };
         reg_block.ctrl().modify(|_, w| unsafe {
             w.rd_bit_order().bits(read_value);
@@ -2688,12 +2688,12 @@ impl Info {
         let reg_block = self.register_block();
 
         let read_value = match read_order {
-            SpiBitOrder::MSBFirst => false,
-            SpiBitOrder::LSBFirst => true,
+            SpiBitOrder::MsbFirst => false,
+            SpiBitOrder::LsbFirst => true,
         };
         let write_value = match write_order {
-            SpiBitOrder::MSBFirst => false,
-            SpiBitOrder::LSBFirst => true,
+            SpiBitOrder::MsbFirst => false,
+            SpiBitOrder::LsbFirst => true,
         };
         reg_block.ctrl().modify(|_, w| {
             w.rd_bit_order().bit(read_value);

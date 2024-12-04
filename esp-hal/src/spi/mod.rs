@@ -72,9 +72,9 @@ pub enum SpiMode {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiBitOrder {
     /// Most Significant Bit (MSB) is transmitted first.
-    MSBFirst,
+    MsbFirst,
     /// Least Significant Bit (LSB) is transmitted first.
-    LSBFirst,
+    LsbFirst,
 }
 
 /// SPI data mode
