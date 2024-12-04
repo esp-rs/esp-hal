@@ -169,7 +169,7 @@ impl Priority {
 
 /// The interrupts reserved by the HAL
 #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
-pub static RESERVED_INTERRUPTS: &[usize] = INTERRUPT_TO_PRIORITY;
+pub static RESERVED_INTERRUPTS: &[usize] = PRIORITY_TO_INTERRUPT;
 
 /// # Safety
 ///
