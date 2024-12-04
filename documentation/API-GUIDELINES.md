@@ -44,6 +44,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - Drivers must have a `Drop` implementation resetting the peripheral to idle state. There are some exceptions to this:
   - GPIO where common usage is to "set and drop" so they can't be changed
   - Where we don't want to disable the peripheral as it's used internally, for example SYSTIMER is used by `time::now()` API. See `KEEP_ENABLED` in src/system.rs
+  - A driver doesn't need to do anything special for deinitialization and has a `PeripheralGuard` field which implements the disabling and resetting of the peripheral.
 - Consider using a builder-like pattern for driver construction.
 
 ## Interoperability
