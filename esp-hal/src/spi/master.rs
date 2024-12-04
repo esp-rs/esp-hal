@@ -511,21 +511,21 @@ impl<'d> Spi<'d, Blocking> {
     ) -> Result<Self, ConfigError> {
         Self::new_typed(spi.map_into(), config)
     }
-
-    /// Converts the SPI instance into async mode.
-    pub fn into_async(self) -> Spi<'d, Async> {
-        Spi {
-            spi: self.spi,
-            _mode: PhantomData,
-            guard: self.guard,
-        }
-    }
 }
 
 impl<'d, T> Spi<'d, Blocking, T>
 where
     T: Instance,
 {
+    /// Converts the SPI instance into async mode.
+    pub fn into_async(self) -> Spi<'d, Async, T> {
+        Spi {
+            spi: self.spi,
+            _mode: PhantomData,
+            guard: self.guard,
+        }
+    }
+
     /// Configures the SPI instance to use DMA with the specified channel.
     ///
     /// This method prepares the SPI instance for DMA transfers using SPI
@@ -539,9 +539,12 @@ where
     }
 }
 
-impl<'d> Spi<'d, Async> {
+impl<'d, T> Spi<'d, Async, T>
+where
+    T: Instance,
+{
     /// Converts the SPI instance into blocking mode.
-    pub fn into_blocking(self) -> Spi<'d, Blocking> {
+    pub fn into_blocking(self) -> Spi<'d, Blocking, T> {
         Spi {
             spi: self.spi,
             _mode: PhantomData,

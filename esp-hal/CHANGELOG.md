@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Xtensa devices now correctly enable the `esp-hal-procmacros/rtc-slow` feature (#2594)
 - User-bound GPIO interrupt handlers should no longer interfere with async pins. (#2625)
+- `spi::master::Spi::{into_async, into_blocking}` are now correctly available on the typed driver, to. (#2674)
 
 ### Removed
 
