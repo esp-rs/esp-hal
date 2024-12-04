@@ -652,7 +652,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
-                        let features = format!("--features={chip},sys-logs");
+                        let features = format!("--features={chip},sys-logs,esp-hal/unstable");
                         lint_package(
                             chip,
                             &path,
