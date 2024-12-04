@@ -870,7 +870,7 @@ fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
     let target = target_triple(args.package, &chip)?;
-    let features = vec![chip.to_string()];
+    let features = vec![chip.to_string(), "unstable".to_string()];
 
     // We need `nightly` for building the doc tests, unfortunately:
     let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };

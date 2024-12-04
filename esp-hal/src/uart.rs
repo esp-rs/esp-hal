@@ -226,6 +226,7 @@
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
+#[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
@@ -292,6 +293,8 @@ impl embedded_hal_nb::serial::Error for Error {
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl embedded_io::Error for Error {
     fn kind(&self) -> embedded_io::ErrorKind {
         embedded_io::ErrorKind::Other
@@ -622,6 +625,8 @@ pub enum ConfigError {
     UnsupportedFifoThreshold,
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<M, T> SetConfig for Uart<'_, M, T>
 where
     T: Instance,
@@ -635,6 +640,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<M, T> SetConfig for UartRx<'_, M, T>
 where
     T: Instance,
@@ -648,6 +655,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<M, T> SetConfig for UartTx<'_, M, T>
 where
     T: Instance,
@@ -1460,18 +1469,26 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ErrorType for Uart<'_, M, T> {
     type Error = Error;
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ErrorType for UartTx<'_, M, T> {
     type Error = Error;
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ErrorType for UartRx<'_, M, T> {
     type Error = Error;
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::Read for Uart<'_, M, T>
 where
     T: Instance,
@@ -1482,6 +1499,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::Read for UartRx<'_, M, T>
 where
     T: Instance,
@@ -1500,6 +1519,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ReadReady for Uart<'_, M, T>
 where
     T: Instance,
@@ -1510,6 +1531,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::ReadReady for UartRx<'_, M, T>
 where
     T: Instance,
@@ -1520,6 +1543,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::Write for Uart<'_, M, T>
 where
     T: Instance,
@@ -1534,6 +1559,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T, M> embedded_io::Write for UartTx<'_, M, T>
 where
     T: Instance,
@@ -1891,6 +1918,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T> embedded_io_async::Read for Uart<'_, Async, T>
 where
     T: Instance,
@@ -1903,6 +1932,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T> embedded_io_async::Read for UartRx<'_, Async, T>
 where
     T: Instance,
@@ -1915,6 +1946,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T> embedded_io_async::Write for Uart<'_, Async, T>
 where
     T: Instance,
@@ -1928,6 +1961,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<T> embedded_io_async::Write for UartTx<'_, Async, T>
 where
     T: Instance,

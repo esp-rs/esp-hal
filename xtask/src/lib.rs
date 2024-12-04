@@ -157,13 +157,19 @@ pub fn build_documentation(workspace: &Path, package: Package, chip: Chip) -> Re
 fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
     let chip_name = &config.name();
 
-    match (package, chip_name.as_str()) {
-        (Package::EspHal, "esp32") => vec!["quad-psram".to_owned(), "ci".to_owned()],
-        (Package::EspHal, "esp32s2") => vec!["quad-psram".to_owned(), "ci".to_owned()],
-        (Package::EspHal, "esp32s3") => vec!["quad-psram".to_owned(), "ci".to_owned()],
-        (Package::EspHal, _) => vec!["ci".to_owned()],
-        (Package::EspWifi, _) => {
-            let mut features = vec![];
+    let mut features = vec![];
+    match package {
+        Package::EspHal => {
+            features.push("unstable".to_owned());
+            features.push("ci".to_owned());
+            match chip_name.as_str() {
+                "esp32" => features.push("quad-psram".to_owned()),
+                "esp32s2" => features.push("quad-psram".to_owned()),
+                "esp32s3" => features.push("quad-psram".to_owned()),
+                _ => {}
+            };
+        }
+        Package::EspWifi => {
             if config.contains("wifi") {
                 features.push("wifi".to_owned());
                 features.push("esp-now".to_owned());
@@ -178,10 +184,10 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             if config.contains("wifi") && config.contains("ble") {
                 features.push("coex".to_owned());
             }
-            features
         }
-        _ => vec![],
+        _ => {}
     }
+    features
 }
 
 /// Load all examples at the given path, and parse their metadata.

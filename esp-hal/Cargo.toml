@@ -25,17 +25,17 @@ defmt                    = { version = "0.3.8", optional = true }
 delegate                 = "0.13.1"
 digest                   = { version = "0.10.7", default-features = false, optional = true }
 document-features        = "0.2.10"
-embassy-embedded-hal     = "0.2.0"
+embassy-embedded-hal     = { version = "0.2.0", optional = true }
 embassy-futures          = "0.1.1"
 embassy-sync             = "0.6.1"
 embassy-usb-driver       = { version = "0.1.0", optional = true }
 embassy-usb-synopsys-otg = { version = "0.1.0", optional = true }
-embedded-can             = "0.4.1"
+embedded-can             = { version = "0.4.1", optional = true }
 embedded-hal             = "1.0.0"
 embedded-hal-async       = "1.0.0"
 embedded-hal-nb          = "1.0.0"
-embedded-io              = "0.6.1"
-embedded-io-async        = "0.6.1"
+embedded-io              = { version = "0.6.1", optional = true }
+embedded-io-async        = { version = "0.6.1", optional = true }
 enumset                  = "1.1.5"
 esp-build                = { version = "0.1.0", path = "../esp-build" }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
@@ -153,8 +153,18 @@ octal-psram = []
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["defmt", "bluetooth"]
 
-# Enables APIs that are not stable and thus come with no stability guarantees.
-unstable = []
+#! ### Unstable APIs
+#! Unstable APIs are drivers and features that are not yet ready for general use.
+#! They may be incomplete, have bugs, or be subject to change without notice.
+#! Unstable APIs are not covered by semver guarantees.
+
+## Enables APIs that are not stable and thus come with no stability guarantees.
+unstable = [
+    "dep:embassy-embedded-hal",
+    "dep:embedded-can",
+    "dep:embedded-io",
+    "dep:embedded-io-async",
+]
 
 [lints.clippy]
 mixed_attributes_style = "allow"

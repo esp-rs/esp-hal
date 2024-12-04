@@ -61,6 +61,7 @@
 use core::marker::PhantomData;
 
 pub use dma::*;
+#[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
 #[cfg(gdma)]
 use enumset::EnumSet;
@@ -648,6 +649,8 @@ where
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<M, T> SetConfig for Spi<'_, M, T>
 where
     T: Instance,
@@ -1168,6 +1171,8 @@ mod dma {
         }
     }
 
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<M, T> SetConfig for SpiDma<'_, M, T>
     where
         T: Instance,
@@ -1797,6 +1802,8 @@ mod dma {
         }
     }
 
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<M, T> SetConfig for SpiDmaBus<'_, M, T>
     where
         T: Instance,
