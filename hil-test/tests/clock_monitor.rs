@@ -13,7 +13,7 @@ struct Context<'a> {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -26,7 +26,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_estimated_clock(mut ctx: Context<'static>) {
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32c2")] {

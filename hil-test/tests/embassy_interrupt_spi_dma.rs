@@ -75,12 +75,11 @@ async fn interrupt_driven_task(mut i2s_tx: esp_hal::i2s::master::I2sTx<'static, 
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod test {
     use super::*;
 
     #[test]
-    #[timeout(3)]
     async fn dma_does_not_lock_up_when_used_in_different_executors() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
@@ -199,7 +198,6 @@ mod test {
     // Reproducer of https://github.com/esp-rs/esp-hal/issues/2369
     #[cfg(multi_core)]
     #[test]
-    #[timeout(3)]
     async fn dma_does_not_lock_up_on_core_1() {
         use embassy_time::Timer;
         use esp_hal::peripherals::SPI2;

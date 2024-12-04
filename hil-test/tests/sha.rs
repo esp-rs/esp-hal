@@ -158,7 +158,7 @@ pub struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 6)]
 mod tests {
     use super::*;
 
@@ -181,7 +181,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(6)]
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     fn test_sha_512_224(mut ctx: Context) {
         let expected_output = [
@@ -247,7 +246,6 @@ mod tests {
     /// A rolling test that loops between hasher for every step to test
     /// interleaving. This specifically test the Sha trait implementation
     #[test]
-    #[timeout(5)]
     fn test_sha_rolling(mut ctx: Context) {
         #[allow(unused)]
         with_random_data(ctx.rng, |sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
@@ -331,7 +329,6 @@ mod tests {
     /// A rolling test that loops between hasher for every step to test
     /// interleaving. This specifically test the Digest trait implementation
     #[test]
-    #[timeout(5)]
     fn test_for_digest_rolling(mut ctx: Context) {
         #[allow(unused)]
         with_random_data(ctx.rng, |sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {

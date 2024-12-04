@@ -19,7 +19,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -51,7 +51,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_send_receive(mut ctx: Context) {
         let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3]).unwrap();
         block!(ctx.twai.transmit(&frame)).unwrap();

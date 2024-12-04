@@ -11,7 +11,7 @@ use esp_hal::rom::{crc, md5};
 use hil_test as _;
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -19,7 +19,6 @@ mod tests {
     fn init() {}
 
     #[test]
-    #[timeout(3)]
     fn test_crc() {
         let data = "123456789";
 
@@ -43,7 +42,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_md5() {
         let sentence = "The quick brown fox jumps over a lazy dog";
 

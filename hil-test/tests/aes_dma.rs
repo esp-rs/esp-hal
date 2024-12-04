@@ -15,7 +15,7 @@ use hil_test as _;
 const DMA_BUFFER_SIZE: usize = 16;
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -25,7 +25,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_aes_128_dma_encryption(peripherals: Peripherals) {
         let dma_channel = peripherals.DMA_CH0;
 
@@ -64,7 +63,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_aes_128_dma_decryption(peripherals: Peripherals) {
         let dma_channel = peripherals.DMA_CH0;
 
@@ -102,7 +100,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_aes_256_dma_encryption(peripherals: Peripherals) {
         let dma_channel = peripherals.DMA_CH0;
 
@@ -141,7 +138,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_aes_256_dma_decryption(peripherals: Peripherals) {
         let dma_channel = peripherals.DMA_CH0;
 

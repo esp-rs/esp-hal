@@ -43,7 +43,7 @@ struct Context<'d> {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -72,7 +72,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_i8080_8bit(ctx: Context<'static>) {
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
@@ -88,7 +87,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_i8080_8bit_is_seen_by_pcnt(ctx: Context<'static>) {
         // FIXME: Update this test to exercise all the I8080 output signals once the
         // issue with configuring pins as outputs after inputs have been sorted
@@ -198,7 +196,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_i8080_16bit_is_seen_by_pcnt(ctx: Context<'static>) {
         // FIXME: Update this test to exercise all the I8080 output signals once the
         // issue with configuring pins as outputs after inputs have been sorted

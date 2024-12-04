@@ -94,7 +94,7 @@ impl BitbangSpi {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 10, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -136,7 +136,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(10)]
     fn test_basic(mut ctx: Context) {
         const DMA_SIZE: usize = 32;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_SIZE);

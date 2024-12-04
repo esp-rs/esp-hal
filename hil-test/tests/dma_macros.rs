@@ -22,7 +22,7 @@ pub(crate) const fn compute_circular_size(size: usize, chunk_size: usize) -> usi
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     // defmt::* is load-bearing, it ensures that the assert in dma_buffers! is not
     // using defmt's non-const assert. Doing so would result in a compile error.
@@ -32,7 +32,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[timeout(3)]
     fn test_dma_descriptors_same_size() {
         use esp_hal::dma::CHUNK_SIZE;
         let (rx_descriptors, tx_descriptors) = esp_hal::dma_descriptors!(DATA_SIZE);
@@ -42,7 +41,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_descriptors_different_size() {
         use esp_hal::dma::CHUNK_SIZE;
         const RX_SIZE: usize = DATA_SIZE / 2;
@@ -53,7 +51,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_circular_descriptors_same_size() {
         use esp_hal::dma::CHUNK_SIZE;
         let (rx_descriptors, tx_descriptors) = esp_hal::dma_circular_descriptors!(DATA_SIZE);
@@ -69,7 +66,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_circular_descriptors_different_size() {
         use esp_hal::dma::CHUNK_SIZE;
         const RX_SIZE: usize = DATA_SIZE / 2;
@@ -86,7 +82,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_buffers_same_size() {
         use esp_hal::dma::CHUNK_SIZE;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
@@ -99,7 +94,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_buffers_different_size() {
         use esp_hal::dma::CHUNK_SIZE;
         const RX_SIZE: usize = DATA_SIZE / 2;
@@ -114,7 +108,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_circular_buffers_same_size() {
         use esp_hal::dma::CHUNK_SIZE;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
@@ -133,7 +126,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_circular_buffers_different_size() {
         use esp_hal::dma::CHUNK_SIZE;
         const RX_SIZE: usize = CHUNK_SIZE * 2;
@@ -153,7 +145,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_descriptors_chunk_size_same_size() {
         const CHUNK_SIZE: usize = 2048;
         let (rx_descriptors, tx_descriptors) =
@@ -164,7 +155,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_descriptors_chunk_size_different_size() {
         const CHUNK_SIZE: usize = 2048;
         const RX_SIZE: usize = DATA_SIZE / 2;
@@ -176,7 +166,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_circular_buffers_chunk_size_same_size() {
         const CHUNK_SIZE: usize = 2048;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
@@ -195,7 +184,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_circular_buffers_chunk_size_different_size() {
         const CHUNK_SIZE: usize = 2048;
         const RX_SIZE: usize = DATA_SIZE / 2;
@@ -215,7 +203,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_tx_buffer() {
         use esp_hal::dma::{DmaBufError, DmaTxBuf};
         const TX_SIZE: usize = DATA_SIZE;

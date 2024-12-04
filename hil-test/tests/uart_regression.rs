@@ -6,7 +6,7 @@
 #![no_main]
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use esp_hal::{
         gpio::OutputPin,
@@ -17,7 +17,6 @@ mod tests {
     use nb::block;
 
     #[test]
-    #[timeout(3)]
     fn test_that_creating_tx_does_not_cause_a_pulse() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 

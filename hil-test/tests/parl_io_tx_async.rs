@@ -43,7 +43,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use defmt::info;
 
@@ -76,7 +76,6 @@ mod tests {
 
     #[cfg(esp32c6)]
     #[test]
-    #[timeout(3)]
     async fn test_parl_io_tx_async_16bit_valid_clock_count(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
         let tx_buffer = [0u16; BUFFER_SIZE];
@@ -124,7 +123,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     async fn test_parl_io_tx_async_8bit_valid_clock_count(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
         let tx_buffer = [0u8; BUFFER_SIZE];

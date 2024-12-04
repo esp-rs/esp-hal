@@ -19,7 +19,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -36,7 +36,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_send_receive(mut ctx: Context) {
         let byte = [0x42];
 
@@ -48,7 +47,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_send_receive_bytes(mut ctx: Context) {
         let bytes = [0x42, 0x43, 0x44];
         let mut buf = [0u8; 3];

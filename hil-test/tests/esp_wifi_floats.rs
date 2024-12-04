@@ -50,7 +50,7 @@ cfg_if::cfg_if! {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -63,7 +63,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn fpu_is_enabled() {
         let result = super::run_float_calc(2.0);
         assert_eq!(result, 4.0);
@@ -71,7 +70,6 @@ mod tests {
 
     #[cfg(multi_core)]
     #[test]
-    #[timeout(3)]
     fn fpu_is_enabled_on_core1(peripherals: Peripherals) {
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
@@ -95,7 +93,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn fpu_stays_enabled_with_wifi(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         let _init = esp_wifi::init(
@@ -125,7 +122,6 @@ mod tests {
 
     #[cfg(multi_core)]
     #[test]
-    #[timeout(3)]
     fn fpu_stays_enabled_with_wifi_on_core1(peripherals: Peripherals) {
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 

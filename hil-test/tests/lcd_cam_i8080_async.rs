@@ -28,7 +28,7 @@ struct Context<'d> {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -48,7 +48,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     async fn test_i8080_8bit(ctx: Context<'static>) {
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 

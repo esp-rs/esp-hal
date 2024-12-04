@@ -10,7 +10,7 @@
 use hil_test as _;
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use esp_hal::sync::Locked;
 
@@ -20,7 +20,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn critical_section_is_reentrant() {
         let mut flag = false;
 
@@ -34,7 +33,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn locked_can_provide_mutable_access() {
         let flag = Locked::new(false);
 

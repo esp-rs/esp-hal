@@ -69,7 +69,7 @@ async fn test_async_delay_ms(mut timer: impl DelayNs, duration: u32) {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 2, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -82,7 +82,6 @@ mod tests {
 
     #[cfg(systimer)]
     #[test]
-    #[timeout(2)]
     async fn test_systimer_async_delay_ns(ctx: Context) {
         let alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
 
@@ -90,7 +89,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(2)]
     async fn test_timg0_async_delay_ns(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
 
@@ -101,7 +99,6 @@ mod tests {
 
     #[cfg(timg1)]
     #[test]
-    #[timeout(2)]
     async fn test_timg1_async_delay_ns(ctx: Context) {
         let timg1 = TimerGroup::new(ctx.peripherals.TIMG1);
 
@@ -112,7 +109,6 @@ mod tests {
 
     #[cfg(systimer)]
     #[test]
-    #[timeout(2)]
     async fn test_systimer_async_delay_us(ctx: Context) {
         let alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
 
@@ -120,7 +116,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(2)]
     async fn test_timg0_async_delay_us(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
 
@@ -131,7 +126,6 @@ mod tests {
 
     #[cfg(timg1)]
     #[test]
-    #[timeout(2)]
     async fn test_timg1_async_delay_us(ctx: Context) {
         let timg1 = TimerGroup::new(ctx.peripherals.TIMG1);
 
@@ -142,7 +136,6 @@ mod tests {
 
     #[cfg(systimer)]
     #[test]
-    #[timeout(2)]
     async fn test_systimer_async_delay_ms(ctx: Context) {
         let alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
 
@@ -150,7 +143,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(2)]
     async fn test_timg0_async_delay_ms(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
 
@@ -161,7 +153,6 @@ mod tests {
 
     #[cfg(timg1)]
     #[test]
-    #[timeout(2)]
     async fn test_timg1_async_delay_ms(ctx: Context) {
         let timg1 = TimerGroup::new(ctx.peripherals.TIMG1);
 

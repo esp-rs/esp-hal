@@ -39,7 +39,7 @@ pub fn interrupt_handler() {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use embassy_time::{Duration, Timer};
     use esp_hal::gpio::{Event, Flex, OutputOpenDrain};
@@ -69,7 +69,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     async fn async_edge(ctx: Context) {
         let counter = AtomicUsize::new(0);
         let Context {
@@ -100,7 +99,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     async fn a_pin_can_wait(ctx: Context) {
         let mut first = Input::new(ctx.test_gpio1, Pull::Down);
 
@@ -114,7 +112,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn gpio_input(ctx: Context) {
         let test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         // `InputPin`:
@@ -123,7 +120,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     async fn waiting_for_level_does_not_hang(ctx: Context) {
         let mut test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         let _test_gpio2 = Output::new(ctx.test_gpio2, Level::High);
@@ -132,7 +128,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn gpio_output(ctx: Context) {
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
 
@@ -153,7 +148,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn gpio_output_embedded_hal_0_2(ctx: Context) {
         let test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
@@ -201,7 +195,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn gpio_output_embedded_hal_1_0(ctx: Context) {
         let test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
@@ -249,7 +242,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn gpio_interrupt(ctx: Context) {
         let mut test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
@@ -287,7 +279,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn gpio_od(ctx: Context) {
         let mut test_gpio1 = OutputOpenDrain::new(ctx.test_gpio1, Level::High, Pull::Up);
         let mut test_gpio2 = OutputOpenDrain::new(ctx.test_gpio2, Level::High, Pull::Up);
@@ -334,7 +325,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn gpio_flex(ctx: Context) {
         let mut test_gpio1 = Flex::new(ctx.test_gpio1);
         let mut test_gpio2 = Flex::new(ctx.test_gpio2);
@@ -377,7 +367,6 @@ mod tests {
     // Tests touch pin (GPIO2) as AnyPin and Output
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
-    #[timeout(3)]
     fn gpio_touch_anypin_output(ctx: Context) {
         let any_pin2 = ctx.test_gpio1;
         let any_pin3 = ctx.test_gpio2;
@@ -392,7 +381,6 @@ mod tests {
     // Tests touch pin (GPIO2) as AnyPin and Input
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
-    #[timeout(3)]
     fn gpio_touch_anypin_input(ctx: Context) {
         let any_pin2 = ctx.test_gpio1;
         let any_pin3 = ctx.test_gpio2;
@@ -406,7 +394,6 @@ mod tests {
 
     #[cfg(esp32)]
     #[test]
-    #[timeout(3)]
     fn can_configure_rtcio_pins_as_input() {
         let pin = unsafe { esp_hal::gpio::GpioPin::<37>::steal() };
 
