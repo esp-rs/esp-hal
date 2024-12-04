@@ -153,7 +153,12 @@ octal-psram = []
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["defmt", "bluetooth"]
 
-# Enables APIs that are not stable and thus come with no stability guarantees.
+#! ### Unstable APIs
+#! Unstable APIs are drivers and features that are not yet ready for general use.
+#! They may be incomplete, have bugs, or be subject to change without notice.
+#! Unstable APIs are not covered by semver guarantees.
+
+## Enables APIs that are not stable and thus come with no stability guarantees.
 unstable = [
     "dep:embassy-embedded-hal",
     "dep:embedded-can",
