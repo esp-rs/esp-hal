@@ -13,7 +13,9 @@ fn main() {
         panic!("Only one of `custom-halt` and `halt-cores` can be enabled");
     }
 
-    if cfg!(feature = "coredump") && !cfg!(feature = "exception-handler") {
+    if (cfg!(feature = "coredump") || cfg!(feature = "coredump-all"))
+        && !cfg!(feature = "exception-handler")
+    {
         panic!("coredumps need the `exception-handler` feature");
     }
 }

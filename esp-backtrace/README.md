@@ -31,6 +31,8 @@ When using the panic and/or exception handler make sure to include `use esp_back
 | exception-handler    | Include an exception handler, will add `esp-println` as a dependency                                               |
 | println              | Use `esp-println` to print messages                                                                                |
 | defmt                | Use `defmt` logging to print messages\* (check [example](https://github.com/playfulFence/backtrace-defmt-example)) |
+| coredump             | Create a coredump file, need `exception-handler` feature                                                           |
+| coredump-all         | Create a coredump file containing the whole SRAM memory, need `exception-handler` feature                          |
 | colors               | Print messages in red\*                                                                                            |
 | halt-cores           | Halt both CPUs on ESP32 / ESP32-S3 instead of doing a `loop {}` in case of a panic or exception                    |
 | semihosting          | Call `semihosting::process::abort()` on panic.                                                                     |

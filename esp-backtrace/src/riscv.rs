@@ -220,7 +220,10 @@ pub(crate) fn backtrace_internal(
     result
 }
 
-#[cfg(all(feature = "exception-handler", not(feature = "coredump")))]
+#[cfg(all(
+    feature = "exception-handler",
+    not(any(feature = "coredump", feature = "coredump-all"))
+))]
 #[export_name = "ExceptionHandler"]
 fn exception_handler(context: TrapFrame) -> ! {
     pre_backtrace();
@@ -298,7 +301,10 @@ fn exception_handler(context: TrapFrame) -> ! {
     halt();
 }
 
-#[cfg(all(feature = "exception-handler", feature = "coredump"))]
+#[cfg(all(
+    feature = "exception-handler",
+    any(feature = "coredump", feature = "coredump-all")
+))]
 #[export_name = "ExceptionHandler"]
 fn exception_handler(context: &TrapFrame) -> ! {
     let mepc = context.pc;
@@ -381,8 +387,16 @@ fn exception_handler(context: &TrapFrame) -> ! {
 
     let mut writer = crate::coredump::DumpWriter {};
 
+    #[cfg(feature = "coredump")]
     let start = regs.x2 - 256;
+    #[cfg(feature = "coredump-all")]
+    let start = crate::RAM.0;
+
+    #[cfg(feature = "coredump")]
     let end = core::ptr::addr_of!(_stack_start) as u32;
+    #[cfg(feature = "coredump-all")]
+    let end = crate::RAM.1;
+
     let len = (end - start) as usize;
 
     let slice = unsafe { core::slice::from_raw_parts(start as *const u8, len) };
