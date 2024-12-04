@@ -1,5 +1,5 @@
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: esp-hal/unstable
+//% FEATURES: esp-ieee802154 esp-hal/unstable
 
 #![no_std]
 #![no_main]
