@@ -101,10 +101,7 @@ pub enum SpiInterrupt {
 }
 
 /// The size of the FIFO buffer for SPI
-#[cfg(not(esp32s2))]
-const FIFO_SIZE: usize = 64;
-#[cfg(esp32s2)]
-const FIFO_SIZE: usize = 72;
+const FIFO_SIZE: usize = if cfg!(esp32s2) { 72 } else { 64 };
 
 /// Padding byte for empty write transfers
 const EMPTY_WRITE_PAD: u8 = 0x00;
@@ -115,6 +112,7 @@ const MAX_DMA_SIZE: usize = 32736;
 ///
 /// Used to define specific commands sent over the SPI bus.
 /// Can be [Command::None] if command phase should be suppressed.
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Command {
@@ -230,6 +228,7 @@ impl Command {
 ///
 /// This can be used to specify the address phase of SPI transactions.
 /// Can be [Address::None] if address phase should be suppressed.
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Address {

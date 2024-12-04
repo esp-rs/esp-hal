@@ -87,6 +87,9 @@ pub enum SpiDataMode {
     Dual,
     /// `Quad` Data Mode - 4 bit, 4 wires
     Quad,
+    #[cfg(spi_octal)]
+    /// `Octal` Data Mode - 8 bit, 8 wires
+    Octal,
 }
 
 crate::any_peripheral! {
