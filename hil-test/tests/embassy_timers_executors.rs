@@ -122,7 +122,7 @@ fn set_up_embassy_with_systimer(peripherals: Peripherals) {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod test {
     use super::*;
     use crate::test_cases::*;
@@ -135,7 +135,6 @@ mod test {
     }
 
     #[test]
-    #[timeout(3)]
     async fn test_one_shot_timg(peripherals: Peripherals) {
         set_up_embassy_with_timg0(peripherals);
 
@@ -143,7 +142,6 @@ mod test {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
     async fn test_one_shot_systimer(peripherals: Peripherals) {
         set_up_embassy_with_systimer(peripherals);
@@ -152,7 +150,6 @@ mod test {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_periodic_timg(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
 
@@ -160,7 +157,6 @@ mod test {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_systimer(peripherals: Peripherals) {
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
@@ -169,7 +165,6 @@ mod test {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_periodic_oneshot_timg(peripherals: Peripherals) {
         let mut timg0 = TimerGroup::new(peripherals.TIMG0);
         run_test_periodic_timer(&mut timg0.timer0);
@@ -177,7 +172,6 @@ mod test {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_oneshot_systimer(peripherals: Peripherals) {
         let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
@@ -186,7 +180,6 @@ mod test {
     }
 
     #[test]
-    #[timeout(3)]
     async fn test_join_timg(peripherals: Peripherals) {
         set_up_embassy_with_timg0(peripherals);
 
@@ -194,7 +187,6 @@ mod test {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
     async fn test_join_systimer(peripherals: Peripherals) {
         set_up_embassy_with_systimer(peripherals);
@@ -204,7 +196,6 @@ mod test {
 
     /// Test that the ticker works in tasks ran by the interrupt executors.
     #[test]
-    #[timeout(3)]
     #[cfg(not(feature = "esp32"))]
     async fn test_interrupt_executor(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
@@ -257,7 +248,6 @@ mod test {
 
     /// Test that timg0 and systimer don't have vastly different tick rates.
     #[test]
-    #[timeout(3)]
     async fn tick_test_timer_tick_rates(peripherals: Peripherals) {
         set_up_embassy_with_timg0(peripherals);
 

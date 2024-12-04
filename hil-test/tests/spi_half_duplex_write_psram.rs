@@ -44,7 +44,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -81,7 +81,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
         const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size32;
@@ -133,7 +132,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
         const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size32; // matches dcache line size

@@ -49,7 +49,7 @@ const fn compute_mprime(modulus: &U512) -> u32 {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 5)]
 mod tests {
     use super::*;
 
@@ -63,7 +63,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(5)]
     fn test_modular_exponentiation(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
             1601059419, 3994655875, 2600857657, 1530060852, 64828275, 4221878473, 2751381085,
@@ -90,7 +89,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(5)]
     fn test_modular_multiplication(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
             1868256644, 833470784, 4187374062, 2684021027, 191862388, 1279046003, 1929899870,
@@ -113,7 +111,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(5)]
     fn test_multiplication(mut ctx: Context<'static>) {
         const EXPECTED_OUTPUT: [u32; U1024::LIMBS] = [
             1264702968, 3552243420, 2602501218, 498422249, 2431753435, 2307424767, 349202767,

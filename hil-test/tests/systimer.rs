@@ -87,7 +87,7 @@ fn target_fail_test_if_called_twice() {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -103,7 +103,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn target_interrupt_is_handled(ctx: Context) {
         let mut alarm0 = OneShotTimer::new(ctx.alarm0);
 
@@ -120,7 +119,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn target_interrupt_is_handled_once(ctx: Context) {
         let mut alarm0 = OneShotTimer::new(ctx.alarm0);
         let mut alarm1 = PeriodicTimer::new(ctx.alarm1);
@@ -145,7 +143,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn periodic_interrupt_is_handled(ctx: Context) {
         let mut alarm1 = PeriodicTimer::new(ctx.alarm1);
 

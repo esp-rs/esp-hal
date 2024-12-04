@@ -158,7 +158,7 @@ pub struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 6)]
 mod tests {
     use super::*;
 
@@ -216,6 +216,7 @@ mod tests {
     /// A test that runs a hashing on a digest of every size between 1 and 200
     /// inclusively.
     #[test]
+    #[timeout(15)]
     fn test_digest_of_size_1_to_200(mut ctx: Context) {
         for i in 1..=200 {
             assert_sha::<Sha1, 20>(&mut ctx.sha, &SOURCE_DATA[..i]);

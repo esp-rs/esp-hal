@@ -21,7 +21,7 @@ fn time_moves_forward_during<F: FnOnce(Context)>(ctx: Context, f: F) {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -35,7 +35,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_current_time(ctx: Context) {
         let t1 = esp_hal::time::now();
         ctx.delay.delay_millis(500);
@@ -47,7 +46,6 @@ mod tests {
 
     #[cfg(systimer)]
     #[test]
-    #[timeout(3)]
     fn test_current_time_construct_systimer(ctx: Context) {
         time_moves_forward_during(ctx, |_| {
             // construct the timer in between calls to current_time
@@ -59,7 +57,6 @@ mod tests {
 
     #[cfg(esp32)]
     #[test]
-    #[timeout(3)]
     fn test_current_time_construct_timg0(ctx: Context) {
         time_moves_forward_during(ctx, |_| {
             // construct the timer in between calls to current_time

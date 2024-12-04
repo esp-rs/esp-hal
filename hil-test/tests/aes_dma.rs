@@ -15,7 +15,7 @@ use hil_test as _;
 const DMA_BUFFER_SIZE: usize = 16;
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 

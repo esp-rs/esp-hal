@@ -39,7 +39,7 @@ pub fn interrupt_handler() {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use embassy_time::{Duration, Timer};
     use esp_hal::gpio::{Event, Flex, OutputOpenDrain};

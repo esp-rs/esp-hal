@@ -6,7 +6,7 @@
 #![no_main]
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use esp_hal::{timer::timg::TimerGroup, usb_serial_jtag::UsbSerialJtag};
     use hil_test as _;

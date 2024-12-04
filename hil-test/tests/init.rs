@@ -16,12 +16,11 @@ use esp_hal::{
 use hil_test as _;
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
     #[test]
-    #[timeout(3)]
     fn test_feeding_timg0_wdt() {
         let peripherals = esp_hal::init({
             let mut config = Config::default();
@@ -41,7 +40,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(timg1)]
     fn test_feeding_timg1_wdt() {
         let peripherals = esp_hal::init({
@@ -62,7 +60,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_feeding_timg0_wdt_max_clock() {
         let peripherals = esp_hal::init({
             let mut config = Config::default();
@@ -100,7 +97,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_default_config() {
         esp_hal::init(Config::default());
 

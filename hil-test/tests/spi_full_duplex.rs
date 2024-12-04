@@ -50,7 +50,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -98,7 +98,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_symmetric_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00u8; 4];
@@ -109,7 +108,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_asymmetric_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00; 4];
@@ -121,7 +119,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_asymmetric_write(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
@@ -140,7 +137,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_asymmetric_write_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
@@ -159,7 +155,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_symmetric_transfer_huge_buffer(mut ctx: Context) {
         let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
@@ -172,7 +167,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_symmetric_transfer_huge_buffer_no_alloc(mut ctx: Context) {
         let mut write = [0x55u8; 4096];
         for byte in 0..write.len() {
@@ -188,7 +182,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 5;
@@ -225,7 +218,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 5;
@@ -292,7 +284,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_asymmetric_dma_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(2, 4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -321,7 +312,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_bus_symmetric_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -341,7 +331,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_bus_asymmetric_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -361,7 +350,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_dma_bus_symmetric_transfer_huge_buffer(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4096;
 
@@ -383,7 +371,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     async fn test_async_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 5;
@@ -417,7 +404,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     async fn test_async_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 5;
@@ -453,7 +439,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_write_read(ctx: Context) {
         let spi = ctx
             .spi
@@ -497,7 +482,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(2)]
     fn cancel_stops_transaction(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         // This means that without working cancellation, the test case should
@@ -522,7 +506,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn can_transmit_after_cancel(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         ctx.spi
@@ -560,7 +543,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     async fn cancelling_an_awaited_transfer_does_nothing(ctx: Context) {
         // Set up a large buffer that would trigger a timeout
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();

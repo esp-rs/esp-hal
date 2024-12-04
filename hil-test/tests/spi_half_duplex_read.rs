@@ -25,7 +25,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -61,7 +61,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin(mut ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
@@ -109,7 +108,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spidmabus_reads_correctly_from_gpio_pin(mut ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 

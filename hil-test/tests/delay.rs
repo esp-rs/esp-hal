@@ -14,7 +14,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 2)]
 mod tests {
     use super::*;
 
@@ -27,7 +27,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(2)]
     fn delay_ns(mut ctx: Context) {
         let t1 = esp_hal::time::now();
         ctx.delay.delay_ns(600_000_000);
@@ -42,7 +41,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(2)]
     fn delay_700millis(ctx: Context) {
         let t1 = esp_hal::time::now();
         ctx.delay.delay_millis(700);
@@ -57,7 +55,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(2)]
     fn delay_1_500_000us(mut ctx: Context) {
         let t1 = esp_hal::time::now();
         ctx.delay.delay_us(1_500_000);

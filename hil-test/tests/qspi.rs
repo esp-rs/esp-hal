@@ -184,7 +184,7 @@ fn execute_write(
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -230,7 +230,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_0(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -241,7 +240,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_1(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -252,7 +250,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_2(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -263,7 +260,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_3(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -274,7 +270,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_and_reads_correctly_pin_0(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -285,7 +280,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_and_reads_correctly_pin_1(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -296,7 +290,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_and_reads_correctly_pin_2(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -307,7 +300,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_and_reads_correctly_pin_3(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -318,7 +310,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_0(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
@@ -342,7 +333,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_1(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
@@ -376,7 +366,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_2(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
@@ -410,7 +399,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_3(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled

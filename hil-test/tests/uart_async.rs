@@ -17,7 +17,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -35,7 +35,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     async fn test_send_receive(mut ctx: Context) {
         const SEND: &[u8] = b"Hello ESP32";
         let mut buf = [0u8; SEND.len()];
