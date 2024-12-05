@@ -756,6 +756,8 @@ macro_rules! ImplPdmaChannel {
         paste::paste! {
             #[doc = concat!("DMA channel suitable for ", stringify!([< $instance:upper >]))]
             #[non_exhaustive]
+            #[derive(Debug, PartialEq, Eq)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             pub struct [<$instance DmaChannel>] {}
 
             impl $crate::private::Sealed for [<$instance DmaChannel>] {}

@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HAL configuration structs now implement the Builder Lite pattern (#2645)
 - Added `OutputOpenDrain::unlisten` (#2625)
 - Added `{Input, Flex}::wait_for` (#2625)
+- Peripheral singletons now implement `Debug`, `PartialEq`, `defmt::Format` and `Eq` (except AnyPeripherals) (#2682)
 
 ### Changed
 
