@@ -773,6 +773,11 @@ where
                     data_mode = address.mode();
                     address = Address::None;
                 }
+
+                if dummy > 0 {
+                    // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                    return Err(Error::Unsupported);
+                }
             }
         }
 
@@ -1098,6 +1103,11 @@ mod dma {
             address: Address,
             dummy: u8,
         ) -> Result<(), Error> {
+            if dummy > 0 {
+                // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                return Err(Error::Unsupported);
+            }
+
             let bytes_to_write = address.width().div_ceil(8);
             // The address register is read in big-endian order,
             // we have to prepare the emulated write in the same way.
