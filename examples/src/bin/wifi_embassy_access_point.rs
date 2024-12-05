@@ -15,6 +15,8 @@
 #![no_std]
 #![no_main]
 
+use core::str::FromStr;
+
 use embassy_executor::Spawner;
 use embassy_net::{
     tcp::TcpSocket,
@@ -54,6 +56,8 @@ macro_rules! mk_static {
     }};
 }
 
+const GW_IP_ADDR_ENV: Option<&'static str> = option_env!("GATEWAY_IP");
+
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
@@ -89,9 +93,12 @@ async fn main(spawner: Spawner) -> ! {
         }
     }
 
+    let gw_ip_addr_str = GW_IP_ADDR_ENV.unwrap_or("192.168.2.1");
+    let gw_ip_addr = Ipv4Address::from_str(gw_ip_addr_str).expect("failed to parse gateway ip");
+
     let config = embassy_net::Config::ipv4_static(StaticConfigV4 {
-        address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
-        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+        address: Ipv4Cidr::new(gw_ip_addr, 24),
+        gateway: Some(gw_ip_addr),
         dns_servers: Default::default(),
     });
 
@@ -110,6 +117,7 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(&stack)).ok();
+    spawner.spawn(run_dhcp(&stack, gw_ip_addr_str)).ok();
 
     let mut rx_buffer = [0; 1536];
     let mut tx_buffer = [0; 1536];
@@ -120,8 +128,16 @@ async fn main(spawner: Spawner) -> ! {
         }
         Timer::after(Duration::from_millis(500)).await;
     }
-    println!("Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
-    println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
+    println!(
+        "Connect to the AP `esp-wifi` and point your browser to http://{gw_ip_addr_str}:8080/"
+    );
+    println!("DHCP is enabled so there's no need to configure a static IP, just in case:");
+    while !stack.is_config_up() {
+        Timer::after(Duration::from_millis(100)).await
+    }
+    stack
+        .config_v4()
+        .inspect(|c| println!("ipv4 config: {c:?}"));
 
     let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
     socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
@@ -194,6 +210,49 @@ async fn main(spawner: Spawner) -> ! {
         Timer::after(Duration::from_millis(1000)).await;
 
         socket.abort();
+    }
+}
+
+#[embassy_executor::task]
+async fn run_dhcp(
+    stack: &'static Stack<WifiDevice<'static, WifiApDevice>>,
+    gw_ip_addr: &'static str,
+) {
+    use core::net::{Ipv4Addr, SocketAddrV4};
+
+    use edge_dhcp::{
+        io::{self, DEFAULT_SERVER_PORT},
+        server::{Server, ServerOptions},
+    };
+    use edge_nal::UdpBind;
+    use edge_nal_embassy::{Udp, UdpBuffers};
+
+    let ip = Ipv4Addr::from_str(gw_ip_addr).expect("dhcp task failed to parse gw ip");
+
+    let mut buf = [0u8; 1500];
+
+    let mut gw_buf = [Ipv4Addr::UNSPECIFIED];
+
+    let buffers = UdpBuffers::<3, 1024, 1024, 10>::new();
+    let unbound_socket = Udp::new(stack, &buffers);
+    let mut bound_socket = unbound_socket
+        .bind(core::net::SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::UNSPECIFIED,
+            DEFAULT_SERVER_PORT,
+        )))
+        .await
+        .unwrap();
+
+    loop {
+        _ = io::server::run(
+            &mut Server::<64>::new(ip),
+            &ServerOptions::new(ip, Some(&mut gw_buf)),
+            &mut bound_socket,
+            &mut buf,
+        )
+        .await
+        .inspect_err(|e| log::warn!("DHCP server error: {e:?}"));
+        Timer::after(Duration::from_millis(500)).await;
     }
 }
 
