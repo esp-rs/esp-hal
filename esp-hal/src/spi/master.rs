@@ -739,7 +739,7 @@ where
             dummy,
             buffer.is_empty(),
             data_mode,
-        );
+        )?;
 
         self.driver().configure_datalen(buffer.len(), 0);
         self.driver().start_operation();
@@ -788,7 +788,7 @@ where
             dummy,
             buffer.is_empty(),
             data_mode,
-        );
+        )?;
 
         if !buffer.is_empty() {
             // re-using the full-duplex write here
@@ -1117,7 +1117,7 @@ mod dma {
                 dummy,
                 bytes_to_write == 0,
                 address.mode(),
-            );
+            )?;
 
             // FIXME: we could use self.start_transfer_dma if the address buffer was part of
             // the (yet-to-be-created) State struct.
@@ -1413,7 +1413,7 @@ mod dma {
                 dummy,
                 bytes_to_read == 0,
                 data_mode,
-            );
+            )?;
 
             self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
         }
@@ -1478,7 +1478,7 @@ mod dma {
                 dummy,
                 bytes_to_write == 0,
                 data_mode,
-            );
+            )?;
 
             self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
         }
@@ -2423,7 +2423,7 @@ impl Info {
         cmd_mode: SpiDataMode,
         address_mode: SpiDataMode,
         data_mode: SpiDataMode,
-    ) {
+    ) -> Result<(), Error> {
         let reg_block = self.register_block();
         reg_block.ctrl().modify(|_, w| {
             w.fcmd_dual().bit(cmd_mode == SpiDataMode::Dual);
@@ -2437,6 +2437,7 @@ impl Info {
             w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
             w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
         });
+        Ok(())
     }
 
     #[cfg(esp32)]
@@ -2445,11 +2446,12 @@ impl Info {
         cmd_mode: SpiDataMode,
         address_mode: SpiDataMode,
         data_mode: SpiDataMode,
-    ) {
+    ) -> Result<(), Error> {
         let reg_block = self.register_block();
         match cmd_mode {
             SpiDataMode::Single => (),
-            _ => panic!("Only 1-bit command supported"),
+            // FIXME: more detailed error - Only 1-bit commands are supported.
+            _ => return Err(Error::Unsupported),
         }
 
         match address_mode {
@@ -2484,8 +2486,11 @@ impl Info {
                     w.fwrite_quad().clear_bit()
                 });
             }
-            _ => panic!("Unsupported combination of data-modes"),
+            // FIXME: more detailed error - Unsupported combination of data-modes,
+            _ => return Err(Error::Unsupported),
         }
+
+        Ok(())
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
@@ -2871,8 +2876,8 @@ impl Info {
         dummy: u8,
         no_mosi_miso: bool,
         data_mode: SpiDataMode,
-    ) {
-        self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+    ) -> Result<(), Error> {
+        self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
 
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
@@ -2913,6 +2918,8 @@ impl Info {
 
         // set cmd, address, dummy cycles
         self.set_up_common_phases(cmd, address, dummy);
+
+        Ok(())
     }
 
     fn set_up_common_phases(&self, cmd: Command, address: Address, dummy: u8) {
