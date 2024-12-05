@@ -396,7 +396,7 @@ where
     }
 }
 
-impl<'d, DM: Mode> core::fmt::Debug for I8080<'d, DM> {
+impl<DM: Mode> core::fmt::Debug for I8080<'_, DM> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
     }
@@ -470,7 +470,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> I8080Transfer<'d, BUF, DM> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> Deref for I8080Transfer<'d, BUF, DM> {
+impl<BUF: DmaTxBuffer, DM: Mode> Deref for I8080Transfer<'_, BUF, DM> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -478,7 +478,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> Deref for I8080Transfer<'d, BUF, DM> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> DerefMut for I8080Transfer<'d, BUF, DM> {
+impl<BUF: DmaTxBuffer, DM: Mode> DerefMut for I8080Transfer<'_, BUF, DM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buf_view
     }
@@ -523,7 +523,7 @@ impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> Drop for I8080Transfer<'d, BUF, DM> {
+impl<BUF: DmaTxBuffer, DM: Mode> Drop for I8080Transfer<'_, BUF, DM> {
     fn drop(&mut self) {
         self.stop_peripherals();
 
@@ -645,7 +645,7 @@ impl<'d> TxEightBits<'d> {
     }
 }
 
-impl<'d> TxPins for TxEightBits<'d> {
+impl TxPins for TxEightBits<'_> {
     fn configure(&mut self) {
         const SIGNALS: [OutputSignal; 8] = [
             OutputSignal::LCD_DATA_0,
@@ -706,7 +706,7 @@ impl<'d> TxSixteenBits<'d> {
     }
 }
 
-impl<'d> TxPins for TxSixteenBits<'d> {
+impl TxPins for TxSixteenBits<'_> {
     fn configure(&mut self) {
         const SIGNALS: [OutputSignal; 16] = [
             OutputSignal::LCD_DATA_0,

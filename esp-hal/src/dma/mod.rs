@@ -1898,7 +1898,7 @@ where
     }
 }
 
-impl<'a, M, CH> ChannelRx<'a, M, CH>
+impl<M, CH> ChannelRx<'_, M, CH>
 where
     M: Mode,
     CH: DmaRxChannel,
@@ -2182,7 +2182,7 @@ where
     }
 }
 
-impl<'a, M, CH> ChannelTx<'a, M, CH>
+impl<M, CH> ChannelTx<'_, M, CH>
 where
     M: Mode,
     CH: DmaTxChannel,

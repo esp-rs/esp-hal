@@ -772,7 +772,7 @@ fn lint_package(path: &Path, args: &[&str], fix: bool) -> Result<()> {
     // build in release to reuse example artifacts
     let cargo_args = builder.arg("--release");
     let cargo_args = if fix {
-        cargo_args.arg("--fix").arg("--lib")
+        cargo_args.arg("--fix").arg("--lib").arg("--allow-dirty")
     } else {
         cargo_args.arg("--").arg("-D").arg("warnings")
     };
