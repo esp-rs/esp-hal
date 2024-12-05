@@ -31,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Added DHCP support to wifi embassy access point example.
 - In addition to taking by value, peripheral drivers can now mutably borrow DMA channel objects. (#2526)
 - DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
 - The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
