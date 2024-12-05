@@ -118,37 +118,37 @@ const MAX_DMA_SIZE: usize = 32736;
 pub enum Command {
     /// No command is sent.
     None,
-    /// Command1.
+    /// A 1-bit command.
     Command1(u16, SpiDataMode),
-    /// Command2.
+    /// A 2-bit command.
     Command2(u16, SpiDataMode),
-    /// Command3.
+    /// A 3-bit command.
     Command3(u16, SpiDataMode),
-    /// Command4.
+    /// A 4-bit command.
     Command4(u16, SpiDataMode),
-    /// Command5.
+    /// A 5-bit command.
     Command5(u16, SpiDataMode),
-    /// Command6.
+    /// A 6-bit command.
     Command6(u16, SpiDataMode),
-    /// Command7.
+    /// A 7-bit command.
     Command7(u16, SpiDataMode),
-    /// Command8.
+    /// A 8-bit command.
     Command8(u16, SpiDataMode),
-    /// Command9.
+    /// A 9-bit command.
     Command9(u16, SpiDataMode),
-    /// Command10.
+    /// A 10-bit command.
     Command10(u16, SpiDataMode),
-    /// Command11.
+    /// A 11-bit command.
     Command11(u16, SpiDataMode),
-    /// Command12.
+    /// A 12-bit command.
     Command12(u16, SpiDataMode),
-    /// Command13.
+    /// A 13-bit command.
     Command13(u16, SpiDataMode),
-    /// Command14.
+    /// A 14-bit command.
     Command14(u16, SpiDataMode),
-    /// Command15.
+    /// A 15-bit command.
     Command15(u16, SpiDataMode),
-    /// Command16.
+    /// A 16-bit command.
     Command16(u16, SpiDataMode),
 }
 
@@ -234,69 +234,69 @@ impl Command {
 pub enum Address {
     /// No address phase.
     None,
-    /// Address with 1-bit.
+    /// A 1-bit address.
     Address1(u32, SpiDataMode),
-    /// Address with 2-bit.
+    /// A 2-bit address.
     Address2(u32, SpiDataMode),
-    /// Address with 3-bit.
+    /// A 3-bit address.
     Address3(u32, SpiDataMode),
-    /// Address with 4-bit.
+    /// A 4-bit address.
     Address4(u32, SpiDataMode),
-    /// Address with 5-bit.
+    /// A 5-bit address.
     Address5(u32, SpiDataMode),
-    /// Address with 6-bit.
+    /// A 6-bit address.
     Address6(u32, SpiDataMode),
-    /// Address with 7-bit.
+    /// A 7-bit address.
     Address7(u32, SpiDataMode),
-    /// Address with 8-bit.
+    /// A 8-bit address.
     Address8(u32, SpiDataMode),
-    /// Address with 9-bit.
+    /// A 9-bit address.
     Address9(u32, SpiDataMode),
-    /// Address with 10-bit.
+    /// A 10-bit address.
     Address10(u32, SpiDataMode),
-    /// Address with 11-bit.
+    /// A 11-bit address.
     Address11(u32, SpiDataMode),
-    /// Address with 12-bit.
+    /// A 12-bit address.
     Address12(u32, SpiDataMode),
-    /// Address with 13-bit.
+    /// A 13-bit address.
     Address13(u32, SpiDataMode),
-    /// Address with 14-bit.
+    /// A 14-bit address.
     Address14(u32, SpiDataMode),
-    /// Address with 15-bit.
+    /// A 15-bit address.
     Address15(u32, SpiDataMode),
-    /// Address with 16-bit.
+    /// A 16-bit address.
     Address16(u32, SpiDataMode),
-    /// Address with 17-bit.
+    /// A 17-bit address.
     Address17(u32, SpiDataMode),
-    /// Address with 18-bit.
+    /// A 18-bit address.
     Address18(u32, SpiDataMode),
-    /// Address with 19-bit.
+    /// A 19-bit address.
     Address19(u32, SpiDataMode),
-    /// Address with 20-bit.
+    /// A 20-bit address.
     Address20(u32, SpiDataMode),
-    /// Address with 21-bit.
+    /// A 21-bit address.
     Address21(u32, SpiDataMode),
-    /// Address with 22-bit.
+    /// A 22-bit address.
     Address22(u32, SpiDataMode),
-    /// Address with 23-bit.
+    /// A 23-bit address.
     Address23(u32, SpiDataMode),
-    /// Address with 24-bit.
+    /// A 24-bit address.
     Address24(u32, SpiDataMode),
-    /// Address with 25-bit.
+    /// A 25-bit address.
     Address25(u32, SpiDataMode),
-    /// Address with 26-bit.
+    /// A 26-bit address.
     Address26(u32, SpiDataMode),
-    /// Address with 27-bit.
+    /// A 27-bit address.
     Address27(u32, SpiDataMode),
-    /// Address with 28-bit.
+    /// A 28-bit address.
     Address28(u32, SpiDataMode),
-    /// Address with 29-bit.
+    /// A 29-bit address.
     Address29(u32, SpiDataMode),
-    /// Address with 30-bit.
+    /// A 30-bit address.
     Address30(u32, SpiDataMode),
-    /// Address with 31-bit.
+    /// A 31-bit address.
     Address31(u32, SpiDataMode),
-    /// Address with 32-bit.
+    /// A 32-bit address.
     Address32(u32, SpiDataMode),
 }
 
@@ -425,10 +425,10 @@ impl Address {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
-    /// SPI clock frequency
+    /// SPI bus clock frequency.
     pub frequency: HertzU32,
 
-    /// SPI mode
+    /// SPI sample/shift mode.
     pub mode: SpiMode,
 
     /// Bit order of the read data.
