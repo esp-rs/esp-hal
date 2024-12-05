@@ -41,7 +41,6 @@
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO2;
 //! let mosi = peripherals.GPIO1;
-//! let cs = peripherals.GPIO5;
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
@@ -50,8 +49,7 @@
 //! .unwrap()
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
-//! .with_miso(miso)
-//! .with_cs(cs);
+//! .with_miso(miso);
 //! # }
 //! ```
 //! 
@@ -529,6 +527,7 @@ where
     /// This method prepares the SPI instance for DMA transfers using SPI
     /// and returns an instance of `SpiDma` that supports DMA
     /// operations.
+    #[instability::unstable]
     pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking, T>
     where
         CH: DmaChannelFor<T>,
@@ -636,6 +635,7 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI CS
     /// signal.
+    #[instability::unstable]
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
         cs.set_to_push_pull_output(private::Internal);
@@ -711,6 +711,7 @@ where
     T: Instance,
 {
     /// Half-duplex read.
+    #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
         data_mode: SpiDataMode,
@@ -744,6 +745,7 @@ where
     }
 
     /// Half-duplex write.
+    #[instability::unstable]
     pub fn half_duplex_write(
         &mut self,
         data_mode: SpiDataMode,
