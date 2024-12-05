@@ -1960,7 +1960,7 @@ mod dma {
                     spi.wait_for_idle_async().await;
 
                     let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                    assert_eq!(bytes_read, read_chunk.len());
+                    debug_assert_eq!(bytes_read, read_chunk.len());
                 }
 
                 spi.defuse();
@@ -1995,7 +1995,7 @@ mod dma {
                     spi.wait_for_idle_async().await;
 
                     let bytes_read = self.rx_buf.read_received_data(chunk);
-                    assert_eq!(bytes_read, chunk.len());
+                    debug_assert_eq!(bytes_read, chunk.len());
                 }
 
                 spi.defuse();
