@@ -488,10 +488,6 @@ where
     }
 
     /// Write bytes to SPI.
-    ///
-    /// Copies the content of `words` in chunks of 64 bytes into the SPI
-    /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         self.driver().write_bytes(words)?;
         self.driver().flush()?;
