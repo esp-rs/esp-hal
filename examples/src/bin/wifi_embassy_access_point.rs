@@ -243,14 +243,17 @@ async fn run_dhcp(
         .await
         .unwrap();
 
-    _ = io::server::run(
-        &mut Server::<64>::new(ip),
-        &ServerOptions::new(ip, Some(&mut gw_buf)),
-        &mut bound_socket,
-        &mut buf,
-    )
-    .await
-    .inspect_err(|e| log::warn!("DHCP server failed: {e:?}"));
+    loop {
+        _ = io::server::run(
+            &mut Server::<64>::new(ip),
+            &ServerOptions::new(ip, Some(&mut gw_buf)),
+            &mut bound_socket,
+            &mut buf,
+        )
+        .await
+        .inspect_err(|e| log::warn!("DHCP server error: {e:?}"));
+        Timer::after(Duration::from_millis(500)).await;
+    }
 }
 
 #[embassy_executor::task]
