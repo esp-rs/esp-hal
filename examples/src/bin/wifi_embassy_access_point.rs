@@ -56,7 +56,7 @@ macro_rules! mk_static {
     }};
 }
 
-const GW_IP_ADDR: &str = env!("GATEWAY_IP");
+const GW_IP_ADDR_ENV: Option<&'static str> = option_env!("GATEWAY_IP");
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
@@ -93,7 +93,8 @@ async fn main(spawner: Spawner) -> ! {
         }
     }
 
-    let gw_ip_addr = Ipv4Address::from_str(GW_IP_ADDR).expect("failed to parse gateway ip");
+    let gw_ip_addr_str = GW_IP_ADDR_ENV.unwrap_or("192.168.2.1");
+    let gw_ip_addr = Ipv4Address::from_str(gw_ip_addr_str).expect("failed to parse gateway ip");
 
     let config = embassy_net::Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(gw_ip_addr, 24),
@@ -116,7 +117,7 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(&stack)).ok();
-    spawner.spawn(run_dhcp(&stack, GW_IP_ADDR)).ok();
+    spawner.spawn(run_dhcp(&stack, gw_ip_addr_str)).ok();
 
     let mut rx_buffer = [0; 1536];
     let mut tx_buffer = [0; 1536];
@@ -127,7 +128,9 @@ async fn main(spawner: Spawner) -> ! {
         }
         Timer::after(Duration::from_millis(500)).await;
     }
-    println!("Connect to the AP `esp-wifi` and point your browser to http://{GW_IP_ADDR}:8080/");
+    println!(
+        "Connect to the AP `esp-wifi` and point your browser to http://{gw_ip_addr_str}:8080/"
+    );
     println!("DHCP is enabled so there's no need to configure a static IP, just in case:");
     while !stack.is_config_up() {
         Timer::after(Duration::from_millis(100)).await
