@@ -815,17 +815,11 @@ mod dma {
             asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
             DmaRxBuf,
-            DmaRxBuffer,
             DmaTxBuf,
-            DmaTxBuffer,
             EmptyBuf,
             PeripheralDmaChannel,
-            Rx,
-            Tx,
         },
         interrupt::InterruptConfigurable,
-        Async,
-        Blocking,
     };
 
     /// A DMA capable SPI instance.
@@ -1836,7 +1830,6 @@ mod dma {
         };
 
         use super::*;
-        use crate::Async;
 
         struct DropGuard<I, F: FnOnce(I)> {
             inner: ManuallyDrop<I>,
