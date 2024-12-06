@@ -250,14 +250,14 @@ fn not_enough_timers() -> ! {
 }
 
 pub(crate) struct TimerQueueDriver {
-    #[cfg(feature = "single-queue")]
+    #[cfg(any(feature = "single-queue", not(feature = "integrated-timers")))]
     pub(crate) inner: crate::timer_queue::TimerQueue,
 }
 
 impl TimerQueueDriver {
     const fn new() -> Self {
         Self {
-            #[cfg(feature = "single-queue")]
+            #[cfg(any(feature = "single-queue", not(feature = "integrated-timers")))]
             inner: crate::timer_queue::TimerQueue::new(Priority::max()),
         }
     }
