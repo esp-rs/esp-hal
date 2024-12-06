@@ -18,6 +18,7 @@ critical-section          = "1.2.0"
 defmt                     = { version = "0.3.8", optional = true }
 document-features         = "0.2.10"
 embassy-executor          = { version = "0.6.3", optional = true }
+embassy-sync              = { version = "0.6.1" }
 embassy-time              = { version = "0.3.0" }
 embassy-time-driver       = { version = "0.1.0", features = [ "tick-hz-1_000_000" ] }
 embassy-time-queue-driver = { version = "0.1.0" }
@@ -54,7 +55,7 @@ executors = ["dep:embassy-executor", "esp-hal/__esp_hal_embassy"]
 integrated-timers = ["embassy-executor?/integrated-timers", "executors"]
 ## Implement a generic timer queue. This option is useful if you intend to use a different executor
 ## than `embassy-executor`.
-generic-queue = ["single-queue"]
+generic-queue = ["single-queue", "embassy-time-queue-driver/generic-queue-const-generic"]
 ## Use a single, global timer queue. This option only needs a single alarm, no matter how many
 ## executors are used.
 single-queue = []

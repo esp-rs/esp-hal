@@ -61,7 +61,10 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     )]
     pub fn new() -> Self {
         Self {
-            inner: InnerExecutor::new((THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut ()),
+            inner: InnerExecutor::new(
+                Priority::Priority1,
+                (THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut (),
+            ),
             not_send: PhantomData,
         }
     }

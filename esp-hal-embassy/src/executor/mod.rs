@@ -1,8 +1,9 @@
 use embassy_executor::raw;
+use esp_hal::interrupt::Priority;
 
 pub use self::{interrupt::*, thread::*};
 #[cfg(not(feature = "single-queue"))]
-use crate::{time_driver::set_up_alarm, timer_queue::TimerQueue};
+use crate::timer_queue::TimerQueue;
 
 mod interrupt;
 mod thread;
@@ -41,19 +42,16 @@ impl InnerExecutor {
     /// pass `context` to it.
     ///
     /// See [`Executor`] docs for details on the pender.
-    pub(crate) fn new(context: *mut ()) -> Self {
+    pub(crate) fn new(_prio: Priority, context: *mut ()) -> Self {
         Self {
             inner: raw::Executor::new(context),
             #[cfg(not(feature = "single-queue"))]
-            timer_queue: TimerQueue::new(),
+            timer_queue: TimerQueue::new(_prio),
         }
     }
 
     pub(crate) fn init(&self) {
         #[cfg(not(feature = "single-queue"))]
-        unsafe {
-            self.timer_queue
-                .set_alarm(set_up_alarm(self as *const _ as *mut ()));
-        }
+        self.timer_queue.set_context(self as *const _ as *mut ());
     }
 }
