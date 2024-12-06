@@ -24,7 +24,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 ## Construction and Destruction of Drivers
 
 - Drivers must take peripherals via the `PeripheralRef` pattern - they don't consume peripherals directly.
-- If a driver requires pins, those pins must be configured using `fn with_signal_name(self, pin: impl Peripheral<P = InputConnection> + 'd) -> Self)` or `fn with_signal_name(self, pin: impl Peripheral<P = OutputConnection> + 'd) -> Self)`
+- If a driver requires pins, those pins should be configured using `fn with_signal_name(self, pin: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self` or `fn with_signal_name(self, pin: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self`
 - If a driver supports multiple peripheral instances (for example, I2C0 is one such instance):
   - The peripheral instance type must be positioned as the last type parameter of the driver type.
   - The peripheral instance type must default to a type that supports any of the peripheral instances.
