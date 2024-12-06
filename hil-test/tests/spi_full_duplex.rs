@@ -9,7 +9,6 @@
 #![no_main]
 
 use embedded_hal::spi::SpiBus;
-#[cfg(pcnt)]
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
     dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
@@ -108,11 +107,36 @@ mod tests {
     }
 
     #[test]
+    async fn test_async_symmetric_transfer(ctx: Context) {
+        let write = [0xde, 0xad, 0xbe, 0xef];
+        let mut read: [u8; 4] = [0x00u8; 4];
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::transfer(&mut spi, &mut read[..], &write[..])
+            .await
+            .expect("Symmetric transfer failed");
+        assert_eq!(write, read);
+    }
+
+    #[test]
     fn test_asymmetric_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00; 4];
 
         SpiBus::transfer(&mut ctx.spi, &mut read[0..2], &write[..])
+            .expect("Asymmetric transfer failed");
+        assert_eq!(write[0], read[0]);
+        assert_eq!(read[2], 0x00u8);
+    }
+
+    #[test]
+    async fn test_async_asymmetric_transfer(ctx: Context) {
+        let write = [0xde, 0xad, 0xbe, 0xef];
+        let mut read: [u8; 4] = [0x00; 4];
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::transfer(&mut spi, &mut read[0..2], &write[..])
+            .await
             .expect("Asymmetric transfer failed");
         assert_eq!(write[0], read[0]);
         assert_eq!(read[2], 0x00u8);
@@ -138,6 +162,27 @@ mod tests {
 
     #[test]
     #[cfg(pcnt)]
+    async fn test_async_asymmetric_write(ctx: Context) {
+        let write = [0xde, 0xad, 0xbe, 0xef];
+
+        let unit = ctx.pcnt_unit;
+
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::write(&mut spi, &write[..])
+            .await
+            .expect("Asymmetric write failed");
+        // Flush because we're not reading, so the write may happen in the background
+        SpiBusAsync::flush(&mut spi).await.expect("Flush failed");
+
+        assert_eq!(unit.value(), 9);
+    }
+
+    #[test]
+    #[cfg(pcnt)]
     fn test_asymmetric_write_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
@@ -155,26 +200,80 @@ mod tests {
     }
 
     #[test]
+    #[cfg(pcnt)]
+    async fn test_async_asymmetric_write_transfer(ctx: Context) {
+        let write = [0xde, 0xad, 0xbe, 0xef];
+
+        let unit = ctx.pcnt_unit;
+
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::transfer(&mut spi, &mut [], &write[..])
+            .await
+            .expect("Asymmetric transfer failed");
+        // Flush because we're not reading, so the write may happen in the background
+        SpiBusAsync::flush(&mut spi).await.expect("Flush failed");
+
+        assert_eq!(unit.value(), 9);
+    }
+
+    #[test]
     fn test_symmetric_transfer_huge_buffer(mut ctx: Context) {
-        let mut write = [0x55u8; 4096];
+        let write = &mut ctx.tx_buffer[0..4096];
         for byte in 0..write.len() {
             write[byte] = byte as u8;
         }
-        let mut read = [0x00u8; 4096];
+        let read = &mut ctx.rx_buffer[0..4096];
 
         SpiBus::transfer(&mut ctx.spi, &mut read[..], &write[..]).expect("Huge transfer failed");
         assert_eq!(write, read);
     }
 
     #[test]
-    fn test_symmetric_transfer_huge_buffer_no_alloc(mut ctx: Context) {
-        let mut write = [0x55u8; 4096];
+    async fn test_async_symmetric_transfer_huge_buffer(ctx: Context) {
+        let write = &mut ctx.tx_buffer[0..4096];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+        let read = &mut ctx.rx_buffer[0..4096];
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::transfer(&mut spi, &mut read[..], &write[..])
+            .await
+            .expect("Huge transfer failed");
+        for idx in 0..write.len() {
+            assert_eq!(write[idx], read[idx], "Mismatch at index {}", idx);
+        }
+    }
+
+    #[test]
+    fn test_symmetric_transfer_huge_buffer_in_place(mut ctx: Context) {
+        let write = &mut ctx.tx_buffer[0..4096];
         for byte in 0..write.len() {
             write[byte] = byte as u8;
         }
 
         ctx.spi
             .transfer_in_place(&mut write[..])
+            .expect("Huge transfer failed");
+        for byte in 0..write.len() {
+            assert_eq!(write[byte], byte as u8);
+        }
+    }
+
+    #[test]
+    async fn test_async_symmetric_transfer_huge_buffer_in_place(ctx: Context) {
+        let write = &mut ctx.tx_buffer[0..4096];
+        for byte in 0..write.len() {
+            write[byte] = byte as u8;
+        }
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::transfer_in_place(&mut spi, &mut write[..])
+            .await
             .expect("Huge transfer failed");
         for byte in 0..write.len() {
             assert_eq!(write[byte], byte as u8);
