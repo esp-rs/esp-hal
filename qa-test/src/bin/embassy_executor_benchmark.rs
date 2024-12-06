@@ -3,7 +3,7 @@
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: esp-hal-embassy/integrated-timers
 // FEATURES: esp-hal-embassy/integrated-timers esp-hal-embassy/single-queue
-// FEATURES: embassy-generic-timers
+// FEATURES:
 
 #![no_std]
 #![no_main]

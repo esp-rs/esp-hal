@@ -2,7 +2,7 @@
 
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6 esp32h2
 //% FEATURES: integrated-timers
-//% FEATURES: generic-queue
+//% FEATURES:
 
 #![no_std]
 #![no_main]

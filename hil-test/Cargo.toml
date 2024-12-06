@@ -290,7 +290,6 @@ embassy = [
     "embedded-test/external-executor",
     "dep:esp-hal-embassy",
 ]
-generic-queue = ["esp-hal-embassy?/generic-queue"]
 integrated-timers = ["esp-hal-embassy?/integrated-timers"]
 octal-psram = ["esp-hal/octal-psram", "esp-alloc"]
 
