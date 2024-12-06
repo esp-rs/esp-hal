@@ -4,7 +4,7 @@
 //! concurrently.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy esp-hal-embassy/integrated-timers
+//% FEATURES: embassy esp-hal-embassy/integrated-timers esp-hal/unstable
 
 #![no_std]
 #![no_main]

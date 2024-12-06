@@ -17,6 +17,9 @@
 //!
 //! ### Importing
 //!
+//! Note that this crate currently requires you to enable the `unstable` feature
+//! on `esp-hal`.
+//!
 //! Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
 //!
 //! ```toml

@@ -151,6 +151,7 @@ pub use xtensa_lx;
 #[cfg(xtensa)]
 pub use xtensa_lx_rt::{self, entry};
 
+// TODO what should we reexport stably?
 #[cfg(any(esp32, esp32s3))]
 pub use self::soc::cpu_control;
 #[cfg(efuse)]
@@ -163,12 +164,6 @@ pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
 pub use self::soc::ulp_core;
 
-#[cfg(aes)]
-pub mod aes;
-#[cfg(any(adc, dac))]
-pub mod analog;
-#[cfg(assist_debug)]
-pub mod assist_debug;
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
 
@@ -176,75 +171,105 @@ pub mod config;
 
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;
-#[cfg(any(gdma, pdma))]
-pub mod dma;
-#[cfg(ecc)]
-pub mod ecc;
-#[cfg(soc_etm)]
-pub mod etm;
 #[cfg(gpio)]
 pub mod gpio;
-#[cfg(hmac)]
-pub mod hmac;
 #[cfg(any(i2c0, i2c1))]
 pub mod i2c;
-#[cfg(any(i2s0, i2s1))]
-pub mod i2s;
 #[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub mod interrupt;
-#[cfg(lcd_cam)]
-pub mod lcd_cam;
-#[cfg(ledc)]
-pub mod ledc;
-#[cfg(any(mcpwm0, mcpwm1))]
-pub mod mcpwm;
-#[cfg(usb0)]
-pub mod otg_fs;
-#[cfg(parl_io)]
-pub mod parl_io;
-#[cfg(pcnt)]
-pub mod pcnt;
 pub mod peripheral;
 pub mod prelude;
 #[cfg(any(hmac, sha))]
 mod reg_access;
-#[cfg(any(lp_clkrst, rtc_cntl))]
-pub mod reset;
-#[cfg(rmt)]
-pub mod rmt;
-#[cfg(rng)]
-pub mod rng;
-pub mod rom;
-#[cfg(rsa)]
-pub mod rsa;
-#[cfg(any(lp_clkrst, rtc_cntl))]
-pub mod rtc_cntl;
-#[cfg(sha)]
-pub mod sha;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
-#[cfg(any(dport, hp_sys, pcr, system))]
-pub mod system;
-pub mod time;
-#[cfg(any(systimer, timg0, timg1))]
-pub mod timer;
-#[cfg(touch)]
-pub mod touch;
-#[cfg(trace0)]
-pub mod trace;
-#[cfg(any(twai0, twai1))]
-pub mod twai;
 #[cfg(any(uart0, uart1, uart2))]
 pub mod uart;
-#[cfg(usb_device)]
-pub mod usb_serial_jtag;
-
-pub mod debugger;
-
-#[doc(hidden)]
-pub mod sync;
 
 pub mod macros;
+pub mod rom;
+
+pub mod debugger;
+#[doc(hidden)]
+pub mod sync;
+pub mod time;
+
+// can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
+#[doc(hidden)]
+macro_rules! unstable {
+    ($(
+        $(#[$meta:meta])*
+        pub mod $module:ident;
+    )*) => {
+        $(
+            $(#[$meta])*
+            #[cfg(feature = "unstable")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            pub mod $module;
+
+            $(#[$meta])*
+            #[cfg(not(feature = "unstable"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            #[allow(unused)]
+            pub(crate) mod $module;
+        )*
+    };
+}
+
+unstable! {
+    #[cfg(aes)]
+    pub mod aes;
+    #[cfg(any(adc, dac))]
+    pub mod analog;
+    #[cfg(assist_debug)]
+    pub mod assist_debug;
+    #[cfg(any(gdma, pdma))]
+    pub mod dma;
+    #[cfg(ecc)]
+    pub mod ecc;
+    #[cfg(soc_etm)]
+    pub mod etm;
+    #[cfg(hmac)]
+    pub mod hmac;
+    #[cfg(any(i2s0, i2s1))]
+    pub mod i2s;
+    #[cfg(lcd_cam)]
+    pub mod lcd_cam;
+    #[cfg(ledc)]
+    pub mod ledc;
+    #[cfg(any(mcpwm0, mcpwm1))]
+    pub mod mcpwm;
+    #[cfg(usb0)]
+    pub mod otg_fs;
+    #[cfg(parl_io)]
+    pub mod parl_io;
+    #[cfg(pcnt)]
+    pub mod pcnt;
+    #[cfg(any(lp_clkrst, rtc_cntl))]
+    pub mod reset;
+    #[cfg(rmt)]
+    pub mod rmt;
+    #[cfg(rng)]
+    pub mod rng;
+    #[cfg(rsa)]
+    pub mod rsa;
+    #[cfg(any(lp_clkrst, rtc_cntl))]
+    pub mod rtc_cntl;
+    #[cfg(sha)]
+    pub mod sha;
+    #[cfg(any(dport, hp_sys, pcr, system))]
+    pub mod system;
+    #[cfg(any(systimer, timg0, timg1))]
+    pub mod timer;
+    #[cfg(touch)]
+    pub mod touch;
+    #[cfg(trace0)]
+    pub mod trace;
+    #[cfg(any(twai0, twai1))]
+    pub mod twai;
+    #[cfg(usb_device)]
+    pub mod usb_serial_jtag;
+}
 
 /// State of the CPU saved when entering exception or interrupt
 pub mod trapframe {
@@ -309,6 +334,7 @@ pub(crate) mod private {
     }
 }
 
+#[cfg(feature = "unstable")]
 #[doc(hidden)]
 pub use private::Internal;
 

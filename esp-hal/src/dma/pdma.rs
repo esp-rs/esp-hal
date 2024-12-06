@@ -920,11 +920,11 @@ ImplPdmaChannel!(AnyI2s, I2sRegisterBlock, I2s1, I2S1, [I2s1]);
 // Specific peripherals use specific channels. Note that this may be overly
 // restrictive (ESP32 allows configuring 2 SPI DMA channels between 3 different
 // peripherals), but for the current set of restrictions this is sufficient.
-crate::impl_dma_eligible!([Spi2DmaChannel] SPI2 => Spi2);
-crate::impl_dma_eligible!([Spi3DmaChannel] SPI3 => Spi3);
-crate::impl_dma_eligible!([I2s0DmaChannel] I2S0 => I2s0);
+crate::dma::impl_dma_eligible!([Spi2DmaChannel] SPI2 => Spi2);
+crate::dma::impl_dma_eligible!([Spi3DmaChannel] SPI3 => Spi3);
+crate::dma::impl_dma_eligible!([I2s0DmaChannel] I2S0 => I2s0);
 #[cfg(i2s1)]
-crate::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
+crate::dma::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
 
 pub(super) fn init_dma(_cs: CriticalSection<'_>) {
     #[cfg(esp32)]

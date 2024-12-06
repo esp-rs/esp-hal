@@ -7,6 +7,7 @@
 //! - DM => GPIO19
 
 //% CHIPS: esp32s2 esp32s3
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]

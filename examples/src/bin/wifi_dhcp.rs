@@ -6,7 +6,7 @@
 //! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]

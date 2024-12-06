@@ -7,7 +7,7 @@
 //! - DM => GPIO19
 
 //% CHIPS: esp32s2 esp32s3
-//% FEATURES: embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers esp-hal/unstable
 
 #![no_std]
 #![no_main]

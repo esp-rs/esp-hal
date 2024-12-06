@@ -595,6 +595,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
             match package {
                 Package::EspBacktrace => {
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
@@ -607,7 +608,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspHal => {
-                    let mut features = format!("--features={chip},ci");
+                    let mut features = format!("--features={chip},ci,unstable");
 
                     // Cover all esp-hal features where a device is supported
                     if device.contains("usb0") {
@@ -625,6 +626,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
 
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
@@ -637,11 +639,12 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspHalEmbassy => {
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
-                            &format!("--features={chip},executors,defmt,integrated-timers"),
+                            &format!("--features={chip},executors,defmt,integrated-timers,esp-hal/unstable"),
                         ],
                         args.fix,
                     )?;
@@ -649,8 +652,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
-                        let features = format!("--features={chip},sys-logs");
+                        let features = format!("--features={chip},sys-logs,esp-hal/unstable");
                         lint_package(
+                            chip,
                             &path,
                             &[
                                 "-Zbuild-std=core",
@@ -664,6 +668,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::EspLpHal => {
                     if device.contains("lp_core") {
                         lint_package(
+                            chip,
                             &path,
                             &[
                                 "-Zbuild-std=core",
@@ -677,6 +682,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspPrintln => {
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
@@ -690,6 +696,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::EspRiscvRt => {
                     if matches!(device.arch(), Arch::RiscV) {
                         lint_package(
+                            chip,
                             &path,
                             &["-Zbuild-std=core", &format!("--target={}", chip.target())],
                             args.fix,
@@ -699,6 +706,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspStorage => {
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
@@ -710,7 +718,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!("--features={chip},defmt,sys-logs");
+                    let mut features = format!("--features={chip},defmt,sys-logs,esp-hal/unstable");
 
                     if device.contains("wifi") {
                         features.push_str(",esp-now,sniffer")
@@ -722,6 +730,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         features.push_str(",coex")
                     }
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core,alloc",
@@ -736,6 +745,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::XtensaLxRt => {
                     if matches!(device.arch(), Arch::Xtensa) {
                         lint_package(
+                            chip,
                             &path,
                             &[
                                 "-Zbuild-std=core",
@@ -752,7 +762,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::Examples | Package::HilTest | Package::QaTest => {}
 
                 // By default, no `clippy` arguments are required:
-                _ => lint_package(&path, &[], args.fix)?,
+                _ => lint_package(chip, &path, &[], args.fix)?,
             }
         }
     }
@@ -760,10 +770,18 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     Ok(())
 }
 
-fn lint_package(path: &Path, args: &[&str], fix: bool) -> Result<()> {
+fn lint_package(chip: &Chip, path: &Path, args: &[&str], fix: bool) -> Result<()> {
     log::info!("Linting package: {}", path.display());
 
-    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
+    let builder = CargoArgsBuilder::default().subcommand("clippy");
+
+    let mut builder = if chip.is_xtensa() {
+        // We only overwrite Xtensas so that externally set nightly/stable toolchains
+        // are not overwritten.
+        builder.toolchain("esp")
+    } else {
+        builder
+    };
 
     for arg in args {
         builder = builder.arg(arg.to_string());

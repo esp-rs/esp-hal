@@ -6,6 +6,9 @@
 //! This library is intended to be used to implement support for higher-level
 //! communication protocols, for example [esp-openthread].
 //!
+//! Note that this crate currently requires you to enable the `unstable` feature
+//! on `esp-hal`.
+//!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 //! [esp-openthread]: https://github.com/esp-rs/esp-openthread
 //!
