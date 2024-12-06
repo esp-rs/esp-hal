@@ -290,7 +290,6 @@ esp32s3 = [
 embassy = [
     "dep:esp-hal-embassy",
 ]
-generic-queue = ["embassy", "esp-hal-embassy?/generic-queue"]
 integrated-timers = ["embassy", "esp-hal-embassy?/integrated-timers"]
 octal-psram = ["esp-hal/octal-psram", "esp-alloc"]
 
