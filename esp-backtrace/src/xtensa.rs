@@ -1,5 +1,7 @@
 use core::{arch::asm, fmt::Display};
 
+#[cfg(feature = "exception-handler")]
+use super::*;
 use crate::MAX_BACKTRACE_ADDRESSES;
 
 // subtract 3 from the return address
@@ -421,4 +423,132 @@ pub(crate) fn backtrace_internal(
     }
 
     result
+}
+
+#[cfg(all(
+    feature = "exception-handler",
+    not(any(feature = "coredump", feature = "coredump-all"))
+))]
+#[no_mangle]
+#[link_section = ".rwtext"]
+unsafe fn __user_exception(cause: ExceptionCause, context: Context) {
+    pre_backtrace();
+
+    #[cfg(feature = "colors")]
+    set_color_code(RED);
+
+    // Unfortunately, a different formatter string is used
+    #[cfg(not(feature = "defmt"))]
+    esp_println::println!("\n\nException occurred '{}'", cause);
+
+    #[cfg(feature = "defmt")]
+    defmt::error!("\n\nException occurred '{}'", cause);
+
+    println!("{:?}", context);
+
+    let backtrace = backtrace_internal(context.A1, 0);
+    for e in backtrace {
+        if let Some(addr) = e {
+            println!("0x{:x}", addr);
+        }
+    }
+    println!("");
+    println!("");
+    println!("");
+
+    #[cfg(feature = "colors")]
+    set_color_code(RESET);
+
+    #[cfg(feature = "semihosting")]
+    semihosting::process::abort();
+
+    #[cfg(not(feature = "semihosting"))]
+    halt();
+}
+
+#[cfg(all(
+    feature = "exception-handler",
+    any(feature = "coredump", feature = "coredump-all")
+))]
+#[no_mangle]
+#[link_section = ".rwtext"]
+unsafe fn __user_exception(cause: ExceptionCause, context: Context) {
+    #[cfg(feature = "colors")]
+    set_color_code(RED);
+
+    if cause != ExceptionCause::Syscall {
+        // Unfortunately, a different formatter string is used
+        #[cfg(not(feature = "defmt"))]
+        esp_println::println!("\n\nException occurred '{}'", cause);
+
+        #[cfg(feature = "defmt")]
+        defmt::error!("\n\nException occurred '{}'", cause);
+    }
+
+    #[cfg(feature = "colors")]
+    set_color_code(RESET);
+
+    fn sanitize(addr: u32) -> u32 {
+        if (addr & 0x8000_0000) != 0 {
+            (addr & 0x3fff_ffff) | 0x4000_0000
+        } else {
+            addr
+        }
+    }
+
+    let mut regs = coredump::Registers {
+        pc: sanitize(context.PC),
+        ps: context.PS & !0b10000,
+        lbeg: context.LBEG,
+        lend: context.LEND,
+        lcount: context.LCOUNT,
+        sar: context.SAR,
+        windowbase: 0b0000,
+        windowstart: 0b0000,
+        ..Default::default()
+    };
+
+    regs.ar[0] = sanitize(context.A0);
+    regs.ar[1] = context.A1;
+    regs.ar[2] = context.A2;
+    regs.ar[3] = context.A3;
+    regs.ar[4] = context.A4;
+    regs.ar[5] = context.A5;
+    regs.ar[6] = context.A6;
+    regs.ar[7] = context.A7;
+    regs.ar[8] = context.A8;
+    regs.ar[9] = context.A9;
+    regs.ar[10] = context.A10;
+    regs.ar[11] = context.A11;
+    regs.ar[12] = context.A12;
+    regs.ar[13] = context.A13;
+    regs.ar[14] = context.A14;
+    regs.ar[15] = context.A15;
+
+    let mut writer = crate::coredump::DumpWriter {};
+
+    #[cfg(feature = "coredump")]
+    let start = regs.ar[1] - 256;
+    #[cfg(feature = "coredump-all")]
+    let start = crate::RAM.0;
+
+    #[cfg(feature = "coredump")]
+    let end = core::ptr::addr_of!(_stack_start) as u32;
+    #[cfg(feature = "coredump-all")]
+    let end = crate::RAM.1;
+
+    let len = (end - start) as usize;
+
+    let slice = unsafe { core::slice::from_raw_parts(start as *const u8, len) };
+    let mem = coredump::Memory { start, slice };
+
+    println!("@COREDUMP");
+    coredump::dump(&mut writer, &regs, mem);
+    println!("@ENDCOREDUMP");
+
+    #[cfg(feature = "semihosting")]
+    semihosting::process::abort();
+
+    #[cfg(not(feature = "semihosting"))]
+    halt();
 }

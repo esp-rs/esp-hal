@@ -1,5 +1,7 @@
 use core::arch::asm;
 
+#[cfg(feature = "exception-handler")]
+use super::*;
 use crate::MAX_BACKTRACE_ADDRESSES;
 
 // subtract 4 from the return address
@@ -216,4 +218,200 @@ pub(crate) fn backtrace_internal(
     }
 
     result
+}
+
+#[cfg(all(
+    feature = "exception-handler",
+    not(any(feature = "coredump", feature = "coredump-all"))
+))]
+#[export_name = "ExceptionHandler"]
+fn exception_handler(context: TrapFrame) -> ! {
+    pre_backtrace();
+
+    let mepc = context.pc;
+    let code = context.mcause & 0xff;
+    let mtval = context.mtval;
+
+    #[cfg(feature = "colors")]
+    set_color_code(RED);
+
+    if code == 14 {
+        println!("");
+        println!(
+            "Stack overflow detected at 0x{:x} called by 0x{:x}",
+            mepc, context.ra
+        );
+        println!("");
+    } else {
+        let code = match code {
+            0 => "Instruction address misaligned",
+            1 => "Instruction access fault",
+            2 => "Illegal instruction",
+            3 => "Breakpoint",
+            4 => "Load address misaligned",
+            5 => "Load access fault",
+            6 => "Store/AMO address misaligned",
+            7 => "Store/AMO access fault",
+            8 => "Environment call from U-mode",
+            9 => "Environment call from S-mode",
+            10 => "Reserved",
+            11 => "Environment call from M-mode",
+            12 => "Instruction page fault",
+            13 => "Load page fault",
+            14 => "Reserved",
+            15 => "Store/AMO page fault",
+            _ => "UNKNOWN",
+        };
+
+        println!(
+            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}",
+            code, mepc, mtval
+        );
+
+        #[cfg(not(feature = "defmt"))]
+        println!("{:x?}", context);
+
+        #[cfg(feature = "defmt")]
+        println!("{:?}", context);
+
+        let backtrace = backtrace_internal(context.s0 as u32, 0);
+        if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
+            println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
+        }
+        for addr in backtrace.into_iter().flatten() {
+            #[cfg(all(feature = "colors", feature = "println"))]
+            println!("{}0x{:x}", RED, addr - RA_OFFSET);
+
+            #[cfg(not(all(feature = "colors", feature = "println")))]
+            println!("0x{:x}", addr - RA_OFFSET);
+        }
+    }
+
+    println!("");
+    println!("");
+    println!("");
+
+    #[cfg(feature = "colors")]
+    set_color_code(RESET);
+
+    #[cfg(feature = "semihosting")]
+    semihosting::process::abort();
+
+    #[cfg(not(feature = "semihosting"))]
+    halt();
+}
+
+#[cfg(all(
+    feature = "exception-handler",
+    any(feature = "coredump", feature = "coredump-all")
+))]
+#[export_name = "ExceptionHandler"]
+fn exception_handler(context: &TrapFrame) -> ! {
+    let mepc = context.pc;
+    let code = context.mcause & 0xff;
+    let mtval = context.mtval;
+
+    #[cfg(feature = "colors")]
+    set_color_code(RED);
+
+    if code == 14 {
+        println!("");
+        println!(
+            "Stack overflow detected at 0x{:x} called by 0x{:x}",
+            mepc, context.ra
+        );
+        println!("");
+    } else if code != 11 {
+        let code = match code {
+            0 => "Instruction address misaligned",
+            1 => "Instruction access fault",
+            2 => "Illegal instruction",
+            3 => "Breakpoint",
+            4 => "Load address misaligned",
+            5 => "Load access fault",
+            6 => "Store/AMO address misaligned",
+            7 => "Store/AMO access fault",
+            8 => "Environment call from U-mode",
+            9 => "Environment call from S-mode",
+            10 => "Reserved",
+            11 => "Environment call from M-mode",
+            12 => "Instruction page fault",
+            13 => "Load page fault",
+            14 => "Reserved",
+            15 => "Store/AMO page fault",
+            _ => "UNKNOWN",
+        };
+
+        println!(
+            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}",
+            code, mepc, mtval
+        );
+    }
+    #[cfg(feature = "colors")]
+    set_color_code(RESET);
+
+    let regs = coredump::Registers {
+        pc: context.pc as u32,
+        x1: context.ra as u32,
+        x2: context.sp as u32,
+        x3: context.gp as u32,
+        x4: context.tp as u32,
+        x5: context.t0 as u32,
+        x6: context.t1 as u32,
+        x7: context.t2 as u32,
+        x8: context.s0 as u32,
+        x9: context.s1 as u32,
+        x10: context.a0 as u32,
+        x11: context.a1 as u32,
+        x12: context.a2 as u32,
+        x13: context.a3 as u32,
+        x14: context.a4 as u32,
+        x15: context.a5 as u32,
+        x16: context.a6 as u32,
+        x17: context.a7 as u32,
+        x18: context.s2 as u32,
+        x19: context.s3 as u32,
+        x20: context.s4 as u32,
+        x21: context.s5 as u32,
+        x22: context.s6 as u32,
+        x23: context.s7 as u32,
+        x24: context.s8 as u32,
+        x25: context.s9 as u32,
+        x26: context.s10 as u32,
+        x27: context.s11 as u32,
+        x28: context.t3 as u32,
+        x29: context.t4 as u32,
+        x30: context.t5 as u32,
+        x31: context.t6 as u32,
+    };
+
+    let mut writer = crate::coredump::DumpWriter {};
+
+    #[cfg(feature = "coredump")]
+    let start = regs.x2 - 256;
+    #[cfg(feature = "coredump-all")]
+    let start = crate::RAM.0;
+
+    #[cfg(feature = "coredump")]
+    let end = core::ptr::addr_of!(_stack_start) as u32;
+    #[cfg(feature = "coredump-all")]
+    let end = crate::RAM.1;
+
+    let len = (end - start) as usize;
+
+    let slice = unsafe { core::slice::from_raw_parts(start as *const u8, len) };
+    let mem = coredump::Memory {
+        start: start as u32,
+        slice,
+    };
+
+    println!("@COREDUMP");
+    coredump::dump(&mut writer, &regs, mem);
+    println!("@ENDCOREDUMP");
+
+    #[cfg(feature = "semihosting")]
+    semihosting::process::abort();
+
+    #[cfg(not(feature = "semihosting"))]
+    halt();
 }
