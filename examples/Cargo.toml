@@ -74,3 +74,9 @@ incremental      = false
 opt-level        = 3
 lto = 'fat'
 overflow-checks  = false
+
+[patch.crates-io]
+embassy-executor    = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time        = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time-queue-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }

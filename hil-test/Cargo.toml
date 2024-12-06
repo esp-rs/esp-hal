@@ -290,12 +290,8 @@ embassy = [
     "embedded-test/external-executor",
     "dep:esp-hal-embassy",
 ]
-generic-queue = [
-    "embassy-time/generic-queue-64"
-]
-integrated-timers = [
-    "esp-hal-embassy/integrated-timers",
-]
+generic-queue = ["esp-hal-embassy?/generic-queue"]
+integrated-timers = ["esp-hal-embassy?/integrated-timers"]
 octal-psram = ["esp-hal/octal-psram", "esp-alloc"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
@@ -316,3 +312,9 @@ incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = false
+
+[patch.crates-io]
+embassy-executor    = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time        = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time-queue-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
