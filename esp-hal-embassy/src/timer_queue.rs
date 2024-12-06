@@ -71,7 +71,7 @@ impl embassy_time_queue_driver::TimerQueue for crate::time_driver::TimerQueueDri
         #[cfg(feature = "integrated-timers")]
         let waker = embassy_executor::raw::task_from_waker(waker);
 
-        #[cfg(not(feature = "single-queue"))]
+        #[cfg(all(feature = "integrated-timers", not(feature = "single-queue")))]
         unsafe {
             let executor = &*(waker.executor().unwrap_unchecked()
                 as *const embassy_executor::raw::Executor)
@@ -79,7 +79,7 @@ impl embassy_time_queue_driver::TimerQueue for crate::time_driver::TimerQueueDri
             executor.timer_queue.schedule_wake(waker, at);
         }
 
-        #[cfg(feature = "single-queue")]
+        #[cfg(any(feature = "single-queue", not(feature = "integrated-timers")))]
         self.inner.schedule_wake(waker, at);
     }
 }
