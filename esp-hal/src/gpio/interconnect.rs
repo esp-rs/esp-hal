@@ -28,13 +28,13 @@ use crate::{
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
 /// [`PeripheralOutput`] as arguments instead of pin types.
-pub trait PeripheralInput: Into<InputConnection> + 'static {}
+pub trait PeripheralInput: Into<InputConnection> + 'static + crate::private::Sealed {}
 
 /// A signal that can be connected to a peripheral input and/or output.
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
 /// [`PeripheralInput`] as arguments instead of pin types.
-pub trait PeripheralOutput: Into<OutputConnection> + 'static {}
+pub trait PeripheralOutput: Into<OutputConnection> + 'static + crate::private::Sealed {}
 
 // Pins
 impl<P: InputPin> PeripheralInput for P {}
