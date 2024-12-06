@@ -2,7 +2,7 @@ use embassy_executor::raw;
 use esp_hal::interrupt::Priority;
 
 pub use self::{interrupt::*, thread::*};
-#[cfg(not(feature = "single-queue"))]
+#[cfg(not(single_queue))]
 use crate::timer_queue::TimerQueue;
 
 mod interrupt;
@@ -31,7 +31,7 @@ fn __pender(context: *mut ()) {
 #[repr(C)]
 pub(crate) struct InnerExecutor {
     inner: raw::Executor,
-    #[cfg(not(feature = "single-queue"))]
+    #[cfg(not(single_queue))]
     pub(crate) timer_queue: TimerQueue,
 }
 
@@ -45,13 +45,13 @@ impl InnerExecutor {
     pub(crate) fn new(_prio: Priority, context: *mut ()) -> Self {
         Self {
             inner: raw::Executor::new(context),
-            #[cfg(not(feature = "single-queue"))]
+            #[cfg(not(single_queue))]
             timer_queue: TimerQueue::new(_prio),
         }
     }
 
     pub(crate) fn init(&self) {
-        #[cfg(not(feature = "single-queue"))]
+        #[cfg(not(single_queue))]
         self.timer_queue.set_context(self as *const _ as *mut ());
     }
 }

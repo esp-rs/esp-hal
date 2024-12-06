@@ -121,7 +121,7 @@ impl EmbassyTimer {
             .with(|available_timers| *available_timers = Some(timers));
     }
 
-    #[cfg(not(feature = "single-queue"))]
+    #[cfg(not(single_queue))]
     pub(crate) fn set_callback_ctx(&self, alarm: AlarmHandle, ctx: *const ()) {
         self.alarms[alarm.id].inner.with(|alarm| {
             alarm.callback.set(ctx.cast_mut());
@@ -250,26 +250,26 @@ fn not_enough_timers() -> ! {
 }
 
 pub(crate) struct TimerQueueDriver {
-    #[cfg(any(feature = "single-queue", not(feature = "integrated-timers")))]
+    #[cfg(single_queue)]
     pub(crate) inner: crate::timer_queue::TimerQueue,
 }
 
 impl TimerQueueDriver {
     const fn new() -> Self {
         Self {
-            #[cfg(any(feature = "single-queue", not(feature = "integrated-timers")))]
+            #[cfg(single_queue)]
             inner: crate::timer_queue::TimerQueue::new(Priority::max()),
         }
     }
 
     fn handle_alarm(&self, _ctx: *const ()) {
-        #[cfg(not(feature = "single-queue"))]
+        #[cfg(integrated_timers)]
         {
             let executor = unsafe { &*_ctx.cast::<crate::executor::InnerExecutor>() };
             executor.timer_queue.dispatch();
         }
 
-        #[cfg(feature = "single-queue")]
+        #[cfg(single_queue)]
         self.inner.dispatch();
     }
 }
@@ -280,7 +280,7 @@ pub(crate) fn set_up_alarm(priority: Priority, _ctx: *mut ()) -> AlarmHandle {
             .allocate_alarm(priority)
             .unwrap_or_else(|| not_enough_timers())
     };
-    #[cfg(not(feature = "single-queue"))]
+    #[cfg(not(single_queue))]
     DRIVER.set_callback_ctx(alarm, _ctx);
     alarm
 }
