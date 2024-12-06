@@ -222,7 +222,7 @@ cfg_if::cfg_if! {
 /// A generic lock that wraps [`single_core::RawLock`] and
 /// [`multicore::AtomicLock`] and tracks whether the caller has locked
 /// recursively.
-struct InnerLock<L: single_core::RawLock> {
+struct GenericRawMutex<L: single_core::RawLock> {
     lock: L,
     #[cfg(multi_core)]
     inner: multicore::AtomicLock,
@@ -230,9 +230,9 @@ struct InnerLock<L: single_core::RawLock> {
     is_locked: Cell<bool>,
 }
 
-unsafe impl<L: single_core::RawLock> Sync for InnerLock<L> {}
+unsafe impl<L: single_core::RawLock> Sync for GenericRawMutex<L> {}
 
-impl<L: single_core::RawLock> InnerLock<L> {
+impl<L: single_core::RawLock> GenericRawMutex<L> {
     /// Create a new lock.
     pub const fn new(lock: L) -> Self {
         Self {
@@ -252,7 +252,7 @@ impl<L: single_core::RawLock> InnerLock<L> {
     /// - The returned token must be passed to the corresponding `release` call.
     /// - The caller must ensure to release the locks in the reverse order they
     ///   were acquired.
-    pub unsafe fn acquire(&self) -> critical_section::RawRestoreState {
+    unsafe fn acquire(&self) -> critical_section::RawRestoreState {
         cfg_if::cfg_if! {
             if #[cfg(single_core)] {
                 let mut tkn = unsafe { self.lock.enter() };
@@ -305,7 +305,7 @@ impl<L: single_core::RawLock> InnerLock<L> {
     /// - The caller must ensure to release the locks in the reverse order they
     ///   were acquired.
     /// - Each release call must be paired with an acquire call.
-    pub unsafe fn release(&self, token: critical_section::RawRestoreState) {
+    unsafe fn release(&self, token: critical_section::RawRestoreState) {
         if token & REENTRY_FLAG == 0 {
             #[cfg(multi_core)]
             self.inner.unlock();
@@ -316,24 +316,40 @@ impl<L: single_core::RawLock> InnerLock<L> {
             self.lock.exit(token)
         }
     }
+
+    /// Runs the callback with this lock locked.
+    ///
+    /// Note that this function is not reentrant, calling it reentrantly will
+    /// panic.
+    pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        let _token = LockGuard::new(self);
+        f()
+    }
 }
 
-/// A lock that can be used to protect shared resources.
-pub struct Lock {
-    inner: InnerLock<single_core::InterruptLock>,
+/// A mutual exclusion primitive.
+///
+/// This lock disables interrupts on the current core while locked.
+#[cfg_attr(
+    multi_core,
+    doc = r#"It needs a bit of memory, but it does not take a global critical
+    section, making it preferrable for use in multi-core systems."#
+)]
+pub struct RawMutex {
+    inner: GenericRawMutex<single_core::InterruptLock>,
 }
 
-impl Default for Lock {
+impl Default for RawMutex {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Lock {
+impl RawMutex {
     /// Create a new lock.
     pub const fn new() -> Self {
         Self {
-            inner: InnerLock::new(single_core::InterruptLock),
+            inner: GenericRawMutex::new(single_core::InterruptLock),
         }
     }
 
@@ -361,51 +377,76 @@ impl Lock {
     pub unsafe fn release(&self, token: critical_section::RawRestoreState) {
         self.inner.release(token);
     }
+
+    /// Runs the callback with this lock locked.
+    ///
+    /// Note that this function is not reentrant, calling it reentrantly will
+    /// panic.
+    pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.inner.lock(f)
+    }
 }
 
-/// A lock that can be used to protect shared resources.
-///
-/// The lock is priority-limited, meaning it can only be used below a certain
-/// priority level and will not block interrupts above that level.
+unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawMutex {
+    #[allow(clippy::declare_interior_mutable_const)]
+    const INIT: Self = Self::new();
+
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        // embassy_sync semantics allow reentrancy.
+        let _token = LockGuard::new_reentrant(&self.inner);
+        f()
+    }
+}
+
+/// A mutual exclusion primitive that only disables a limited range of
+/// interrupts.
 ///
 /// Trying to acquire or release the lock at a higher priority level will panic.
-pub struct PriorityLock {
-    inner: InnerLock<single_core::PriorityLock>,
+pub struct RawPriorityLimitedMutex {
+    inner: GenericRawMutex<single_core::PriorityLock>,
 }
 
-impl PriorityLock {
-    /// Create a new lock.
+impl RawPriorityLimitedMutex {
+    /// Create a new lock that is accessible at or below the given `priority`.
     pub const fn new(priority: Priority) -> Self {
         Self {
-            inner: InnerLock::new(single_core::PriorityLock(priority)),
+            inner: GenericRawMutex::new(single_core::PriorityLock(priority)),
         }
     }
 
-    /// Acquires the lock.
-    pub unsafe fn acquire(&self) -> critical_section::RawRestoreState {
-        self.inner.acquire()
+    /// Runs the callback with this lock locked.
+    ///
+    /// Note that this function is not reentrant, calling it reentrantly will
+    /// panic.
+    pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.inner.lock(f)
     }
+}
 
-    /// Releases the lock.
-    pub unsafe fn release(&self, token: critical_section::RawRestoreState) {
-        self.inner.release(token);
+unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawPriorityLimitedMutex {
+    #[allow(clippy::declare_interior_mutable_const)]
+    const INIT: Self = Self::new(Priority::max());
+
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        // embassy_sync semantics allow reentrancy.
+        let _token = LockGuard::new_reentrant(&self.inner);
+        f()
     }
 }
 
 // Prefer this over a critical-section as this allows you to have multiple
 // locks active at the same time rather than using the global mutex that is
 // critical-section.
-pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
-    let _token = LockGuard::new(&lock.inner);
-    f()
+pub(crate) fn lock<T>(lock: &RawMutex, f: impl FnOnce() -> T) -> T {
+    lock.lock(f)
 }
 
-/// Data protected by a [Lock].
+/// Data protected by a [RawMutex].
 ///
 /// This is largely equivalent to a `Mutex<RefCell<T>>`, but accessing the inner
 /// data doesn't hold a critical section on multi-core systems.
 pub struct Locked<T> {
-    lock_state: Lock,
+    lock_state: RawMutex,
     data: UnsafeCell<T>,
 }
 
@@ -413,7 +454,7 @@ impl<T> Locked<T> {
     /// Create a new instance
     pub const fn new(data: T) -> Self {
         Self {
-            lock_state: Lock::new(),
+            lock_state: RawMutex::new(),
             data: UnsafeCell::new(data),
         }
     }
@@ -432,7 +473,7 @@ struct CriticalSection;
 
 critical_section::set_impl!(CriticalSection);
 
-static CRITICAL_SECTION: Lock = Lock::new();
+static CRITICAL_SECTION: RawMutex = RawMutex::new();
 
 unsafe impl critical_section::Impl for CriticalSection {
     unsafe fn acquire() -> critical_section::RawRestoreState {
@@ -444,46 +485,19 @@ unsafe impl critical_section::Impl for CriticalSection {
     }
 }
 
-/// A mutual exclusion primitive.
-///
-/// This is an implementation of `embassy_sync::blocking_mutex::raw::RawMutex`.
-/// It needs a bit of memory, but it does not take a global critical section,
-/// making it preferrable for use in multi-core systems.
-///
-/// On single core systems, this is equivalent to `CriticalSectionRawMutex`.
-pub struct RawMutex(Lock);
-
-impl RawMutex {
-    /// Create a new mutex.
-    #[allow(clippy::new_without_default)]
-    pub const fn new() -> Self {
-        Self(Lock::new())
-    }
-}
-
-unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawMutex {
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: Self = Self(Lock::new());
-
-    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        let _token = LockGuard::new_reentrant(&self.0.inner);
-        f()
-    }
-}
-
 struct LockGuard<'a, L: single_core::RawLock> {
-    lock: &'a InnerLock<L>,
+    lock: &'a GenericRawMutex<L>,
     token: critical_section::RawRestoreState,
 }
 
 impl<'a, L: single_core::RawLock> LockGuard<'a, L> {
-    fn new(lock: &'a InnerLock<L>) -> Self {
+    fn new(lock: &'a GenericRawMutex<L>) -> Self {
         let this = Self::new_reentrant(lock);
         assert!(this.token & REENTRY_FLAG == 0, "lock is not reentrant");
         this
     }
 
-    fn new_reentrant(lock: &'a InnerLock<L>) -> Self {
+    fn new_reentrant(lock: &'a GenericRawMutex<L>) -> Self {
         let token = unsafe {
             // SAFETY: the same lock will be released when dropping the guard.
             // This ensures that the lock is released on the same thread, in the reverse
@@ -498,34 +512,5 @@ impl<'a, L: single_core::RawLock> LockGuard<'a, L> {
 impl<L: single_core::RawLock> Drop for LockGuard<'_, L> {
     fn drop(&mut self) {
         unsafe { self.lock.release(self.token) };
-    }
-}
-
-/// A mutual exclusion primitive with a limited priority level.
-///
-/// This is an implementation of `embassy_sync::blocking_mutex::raw::RawMutex`
-/// that is limited to a certain priority level. It needs a bit of memory, but
-/// it does not take a global critical section, making it preferrable for use in
-/// multi-core systems.
-///
-/// The mutex can only be used below a certain priority level and will not block
-/// interrupts above that level. Trying to acquire or release the mutex at a
-/// higher priority level will panic.
-pub struct RawPriorityLimitedMutex(PriorityLock);
-
-impl RawPriorityLimitedMutex {
-    /// Create a new mutex.
-    pub const fn new(prio: Priority) -> Self {
-        Self(PriorityLock::new(prio))
-    }
-}
-
-unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawPriorityLimitedMutex {
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: Self = Self::new(Priority::max());
-
-    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        let _token = LockGuard::new_reentrant(&self.0.inner);
-        f()
     }
 }

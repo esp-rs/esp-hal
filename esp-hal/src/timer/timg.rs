@@ -76,13 +76,13 @@ use crate::{
     peripheral::Peripheral,
     peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
     private::Sealed,
-    sync::{lock, Lock},
+    sync::{lock, RawMutex},
     system::PeripheralClockControl,
 };
 
 const NUM_TIMG: usize = 1 + cfg!(timg1) as usize;
 
-static INT_ENA_LOCK: [Lock; NUM_TIMG] = [const { Lock::new() }; NUM_TIMG];
+static INT_ENA_LOCK: [RawMutex; NUM_TIMG] = [const { RawMutex::new() }; NUM_TIMG];
 
 /// A timer group consisting of
 #[cfg_attr(not(timg_timer1), doc = "a general purpose timer")]

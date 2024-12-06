@@ -15,17 +15,16 @@ use esp_hal::{
         Priority,
     },
     peripherals::Peripherals,
-    sync::{Locked, PriorityLock},
+    sync::{Locked, RawPriorityLimitedMutex},
 };
 use hil_test as _;
 
 fn test_access_at_priority(peripherals: Peripherals, priority: Priority) {
-    static LOCK: PriorityLock = PriorityLock::new(Priority::Priority1);
+    static LOCK: RawPriorityLimitedMutex = RawPriorityLimitedMutex::new(Priority::Priority1);
 
     extern "C" fn access<const INT: u8>() {
         unsafe { SoftwareInterrupt::<INT>::steal().reset() };
-        let l = unsafe { LOCK.acquire() };
-        unsafe { LOCK.release(l) };
+        LOCK.lock(|| {});
         embedded_test::export::check_outcome(());
     }
 
@@ -107,7 +106,7 @@ mod tests {
         prio_2_interrupt
             .set_interrupt_handler(InterruptHandler::new(increment::<1>, Priority::Priority2));
 
-        let lock = PriorityLock::new(Priority::Priority1);
+        let lock = RawPriorityLimitedMutex::new(Priority::Priority1);
 
         let delay = Delay::new();
 
@@ -121,20 +120,18 @@ mod tests {
         assert_eq!(COUNTER.load(Ordering::Acquire), 1);
 
         // Taking the lock masks the lower priority interrupt
+        lock.lock(|| {
+            prio_1_interrupt.raise();
+            delay.delay_millis(1);
+            assert_eq!(COUNTER.load(Ordering::Acquire), 1); // not incremented
 
-        let token = unsafe { lock.acquire() };
-
-        prio_1_interrupt.raise();
-        delay.delay_millis(1);
-        assert_eq!(COUNTER.load(Ordering::Acquire), 1); // not incremented
-
-        // Taken lock does not mask higher priority interrupts
-        prio_2_interrupt.raise();
-        delay.delay_millis(1);
-        assert_eq!(COUNTER.load(Ordering::Acquire), 2);
+            // Taken lock does not mask higher priority interrupts
+            prio_2_interrupt.raise();
+            delay.delay_millis(1);
+            assert_eq!(COUNTER.load(Ordering::Acquire), 2);
+        });
 
         // Releasing the lock unmasks the lower priority interrupt
-        unsafe { lock.release(token) };
         delay.delay_millis(1);
         assert_eq!(COUNTER.load(Ordering::Acquire), 3);
     }
