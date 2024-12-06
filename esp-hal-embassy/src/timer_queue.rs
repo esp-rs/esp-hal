@@ -20,7 +20,7 @@ unsafe impl Sync for TimerQueue {}
 impl TimerQueue {
     pub(crate) const fn new(prio: Priority) -> Self {
         Self {
-            inner: Mutex::const_new(RawPriorityLimitedMutex::new(prio), RawQueue::new()),
+            inner: Mutex::const_new(RawPriorityLimitedMutex::new(prio), adapter::RawQueue::new()),
             priority: prio,
             #[cfg(not(single_queue))]
             context: Cell::new(core::ptr::null_mut()),
@@ -76,11 +76,11 @@ impl embassy_time_queue_driver::TimerQueue for crate::time_driver::TimerQueueDri
             let executor = &*(waker.executor().unwrap_unchecked()
                 as *const embassy_executor::raw::Executor)
                 .cast::<crate::executor::InnerExecutor>();
-            executor.timer_queue.schedule_wake(waker, at);
+            executor.timer_queue.schedule_wake(at, waker);
         }
 
         #[cfg(single_queue)]
-        self.inner.schedule_wake(waker, at);
+        self.inner.schedule_wake(at, waker);
     }
 }
 
@@ -95,8 +95,8 @@ mod adapter {
     }
 
     impl super::TimerQueue {
-        pub fn schedule_wake(&self, task: raw::TaskRef, at: u64) {
-            if unsafe { self.inner.lock(|q| q.schedule_wake(task, at)) } {
+        pub fn schedule_wake(&self, at: u64, task: raw::TaskRef) {
+            if unsafe { self.inner.lock(|q| q.schedule_wake(at, task)) } {
                 self.arm_alarm(at);
             }
         }
@@ -116,7 +116,7 @@ mod adapter {
     }
 
     impl super::TimerQueue {
-        pub fn schedule_wake(&self, waker: &Waker, at: u64) {
+        pub fn schedule_wake(&self, at: u64, waker: &Waker) {
             if self.inner.lock(|q| q.schedule_wake(at, waker)) {
                 self.arm_alarm(at);
             }
