@@ -1,5 +1,3 @@
-use core::ops::Range;
-
 /// Size of PSRAM
 ///
 /// [PsramSize::AutoDetect] will try to detect the size of PSRAM
@@ -26,15 +24,9 @@ impl PsramSize {
     }
 }
 
-/// Returns the address range available in external memory.
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
-pub(crate) fn psram_range(_psram: &crate::peripherals::PSRAM) -> Range<usize> {
-    unsafe { super::MAPPED_PSRAM.memory_range.clone() }
-}
-
 /// Returns the address and size of the available in external memory.
 #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
-pub fn psram_raw_parts(psram: &crate::peripherals::PSRAM) -> (*mut u8, usize) {
-    let range = psram_range(psram);
+pub fn psram_raw_parts(_psram: &crate::peripherals::PSRAM) -> (*mut u8, usize) {
+    let range = crate::soc::psram_range();
     (range.start as *mut u8, range.end - range.start)
 }

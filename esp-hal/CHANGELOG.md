@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `OutputOpenDrain::unlisten` (#2625)
 - Added `{Input, Flex}::wait_for` (#2625)
 - Peripheral singletons now implement `Debug`, `PartialEq`, `defmt::Format` and `Eq` (except AnyPeripherals) (#2682)
+- `BurstConfig`, a device-specific configuration for configuring DMA transfers in burst mode (#2543)
+- `{DmaRxBuf, DmaTxBuf, DmaRxTxBuf}::set_burst_config` (#2543)
 
 ### Changed
 
@@ -76,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Dma` structure has been removed. (#2545)
 - Removed `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
 - Removed `Camera::set_` functions (#2610)
+- `DmaTxBuf::{compute_chunk_size, compute_descriptor_count, new_with_block_size}` (#2543)
 
 ## [0.22.0] - 2024-11-20
 

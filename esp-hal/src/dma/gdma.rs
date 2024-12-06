@@ -194,6 +194,11 @@ impl RegisterAccess for AnyGdmaTxChannel {
             .out_conf1()
             .modify(|_, w| unsafe { w.out_ext_mem_bk_size().bits(size as u8) });
     }
+
+    #[cfg(psram_dma)]
+    fn can_access_psram(&self) -> bool {
+        true
+    }
 }
 
 impl TxRegisterAccess for AnyGdmaTxChannel {
@@ -430,6 +435,11 @@ impl RegisterAccess for AnyGdmaRxChannel {
         self.ch()
             .in_conf1()
             .modify(|_, w| unsafe { w.in_ext_mem_bk_size().bits(size as u8) });
+    }
+
+    #[cfg(psram_dma)]
+    fn can_access_psram(&self) -> bool {
+        true
     }
 }
 

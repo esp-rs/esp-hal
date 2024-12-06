@@ -72,4 +72,7 @@ symbols = [
     "uart_support_wakeup_int",
     "ulp_supported",
     "riscv_coproc_supported",
+
+    # Other capabilities
+    "psram_dma",
 ]
