@@ -20,7 +20,7 @@ unsafe impl Sync for TimerQueue {}
 impl TimerQueue {
     pub(crate) const fn new(prio: Priority) -> Self {
         Self {
-            inner: Mutex::const_new(RawPriorityLimitedMutex::new(prio), adapter::new_queue()),
+            inner: Mutex::const_new(RawPriorityLimitedMutex::new(prio), RawQueue::new()),
             priority: prio,
             #[cfg(not(single_queue))]
             context: Cell::new(core::ptr::null_mut()),
@@ -90,12 +90,8 @@ mod adapter {
 
     pub(super) type RawQueue = raw::timer_queue::TimerQueue;
 
-    pub(super) const fn new_queue() -> RawQueue {
-        raw::timer_queue::TimerQueue::new()
-    }
-
     pub(super) fn dequeue(q: &RawQueue, now: u64) -> u64 {
-        unsafe { q.next_expiration(now, embassy_executor::raw::wake_task) }
+        unsafe { q.next_expiration(now, raw::wake_task) }
     }
 
     impl super::TimerQueue {
@@ -109,25 +105,19 @@ mod adapter {
 
 #[cfg(generic_timers)]
 mod adapter {
-    use core::{cell::RefCell, task::Waker};
+    use core::task::Waker;
 
-    pub(super) type RawQueue = RefCell<
-        embassy_time_queue_driver::queue_generic::Queue<
-            { esp_config::esp_config_int!(usize, "ESP_HAL_EMBASSY_GENERIC_QUEUE_SIZE") },
-        >,
+    pub(super) type RawQueue = embassy_time_queue_driver::queue_generic::RefCellQueue<
+        { esp_config::esp_config_int!(usize, "ESP_HAL_EMBASSY_GENERIC_QUEUE_SIZE") },
     >;
 
-    pub(super) const fn new_queue() -> RawQueue {
-        RefCell::new(embassy_time_queue_driver::queue_generic::Queue::new())
-    }
-
     pub(super) fn dequeue(q: &RawQueue, now: u64) -> u64 {
-        q.borrow_mut().next_expiration(now)
+        q.next_expiration(now)
     }
 
     impl super::TimerQueue {
         pub fn schedule_wake(&self, waker: &Waker, at: u64) {
-            if self.inner.lock(|q| q.borrow_mut().schedule_wake(at, waker)) {
+            if self.inner.lock(|q| q.schedule_wake(at, waker)) {
                 self.arm_alarm(at);
             }
         }
