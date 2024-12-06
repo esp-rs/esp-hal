@@ -37,7 +37,7 @@ lto           = "fat"
 codegen-units = 1
 
 [patch.crates-io]
-embassy-executor    = { path = "C:/_Hobby/CardIo/embassy/embassy-executor" }
-embassy-time        = { path = "C:/_Hobby/CardIo/embassy/embassy-time" }
-embassy-time-driver = { path = "C:/_Hobby/CardIo/embassy/embassy-time-driver" }
-embassy-time-queue-driver = { path = "C:/_Hobby/CardIo/embassy/embassy-time-queue-driver" }
+embassy-executor    = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time        = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time-queue-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
