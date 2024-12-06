@@ -195,7 +195,6 @@ pub mod asynch {
                 extra_rx_fifo_words: RX_FIFO_EXTRA_SIZE_WORDS,
                 endpoint_count: Usb::ENDPOINT_COUNT,
                 phy_type: PhyType::InternalFullSpeed,
-                quirk_setup_late_cnak: quirk_setup_late_cnak(),
                 calculate_trdt_fn: |_| 5,
             };
             Self {
@@ -342,29 +341,13 @@ pub mod asynch {
         }
     }
 
-    fn quirk_setup_late_cnak() -> bool {
-        // Our CID register is 4 bytes offset from what's in embassy-usb-synopsys-otg
-        let cid = unsafe {
-            Driver::REGISTERS
-                .as_ptr()
-                .cast::<u32>()
-                .add(0x40)
-                .read_volatile()
-        };
-        // ESP32-Sx has a different CID register value, too
-        cid == 0x4f54_400a || cid & 0xf000 == 0x1000
-    }
-
     #[handler(priority = crate::interrupt::Priority::max())]
     fn interrupt_handler() {
-        let setup_late_cnak = quirk_setup_late_cnak();
-
         unsafe {
             on_interrupt(
                 Driver::REGISTERS,
                 &STATE,
                 Usb::ENDPOINT_COUNT,
-                setup_late_cnak,
             )
         }
     }
