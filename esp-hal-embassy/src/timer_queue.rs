@@ -1,4 +1,4 @@
-#[cfg(not(feature = "single-queue"))]
+#[cfg(not(single_queue))]
 use core::cell::Cell;
 use core::cell::UnsafeCell;
 
@@ -10,7 +10,7 @@ use crate::time_driver::{set_up_alarm, AlarmHandle};
 pub(crate) struct TimerQueue {
     inner: Mutex<RawPriorityLimitedMutex, adapter::RawQueue>,
     priority: Priority,
-    #[cfg(not(feature = "single-queue"))]
+    #[cfg(not(single_queue))]
     context: Cell<*mut ()>,
     alarm: UnsafeCell<Option<AlarmHandle>>,
 }
@@ -22,23 +22,23 @@ impl TimerQueue {
         Self {
             inner: Mutex::const_new(RawPriorityLimitedMutex::new(prio), adapter::new_queue()),
             priority: prio,
-            #[cfg(not(feature = "single-queue"))]
+            #[cfg(not(single_queue))]
             context: Cell::new(core::ptr::null_mut()),
             alarm: UnsafeCell::new(None),
         }
     }
 
-    #[cfg(not(feature = "single-queue"))]
+    #[cfg(not(single_queue))]
     pub(crate) fn set_context(&self, context: *mut ()) {
         self.context.set(context);
     }
 
-    #[cfg(not(feature = "single-queue"))]
+    #[cfg(not(single_queue))]
     fn context(&self) -> *mut () {
         self.context.get()
     }
 
-    #[cfg(feature = "single-queue")]
+    #[cfg(single_queue)]
     fn context(&self) -> *mut () {
         core::ptr::null_mut()
     }
@@ -68,10 +68,10 @@ impl TimerQueue {
 
 impl embassy_time_queue_driver::TimerQueue for crate::time_driver::TimerQueueDriver {
     fn schedule_wake(&'static self, at: u64, waker: &core::task::Waker) {
-        #[cfg(feature = "integrated-timers")]
+        #[cfg(integrated_timers)]
         let waker = embassy_executor::raw::task_from_waker(waker);
 
-        #[cfg(all(feature = "integrated-timers", not(feature = "single-queue")))]
+        #[cfg(not(single_queue))]
         unsafe {
             let executor = &*(waker.executor().unwrap_unchecked()
                 as *const embassy_executor::raw::Executor)
@@ -79,12 +79,12 @@ impl embassy_time_queue_driver::TimerQueue for crate::time_driver::TimerQueueDri
             executor.timer_queue.schedule_wake(waker, at);
         }
 
-        #[cfg(any(feature = "single-queue", not(feature = "integrated-timers")))]
+        #[cfg(single_queue)]
         self.inner.schedule_wake(waker, at);
     }
 }
 
-#[cfg(feature = "integrated-timers")]
+#[cfg(integrated_timers)]
 mod adapter {
     use embassy_executor::raw;
 
@@ -107,7 +107,7 @@ mod adapter {
     }
 }
 
-#[cfg(not(feature = "integrated-timers"))]
+#[cfg(generic_timers)]
 mod adapter {
     use core::{cell::RefCell, task::Waker};
 
