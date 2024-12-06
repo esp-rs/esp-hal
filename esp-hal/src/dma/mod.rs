@@ -897,7 +897,7 @@ pub enum DmaPeripheral {
     Mem2Mem5  = 5,
     #[cfg(not(esp32c2))]
     Aes       = 6,
-    #[cfg(gdma)]
+    #[cfg(any(esp32s2, gdma))]
     Sha       = 7,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     Adc       = 8,

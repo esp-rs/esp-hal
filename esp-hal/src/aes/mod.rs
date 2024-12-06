@@ -227,7 +227,7 @@ pub enum Endianness {
 /// transfer, which can significantly speed up operations when dealing with
 /// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
 /// CTR, CFB8, and CFB128.
-#[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
+#[cfg(any(esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
 pub mod dma {
     use crate::{
         aes::{Key, Mode},
@@ -449,7 +449,7 @@ pub mod dma {
             Ok(())
         }
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c3, esp32s2, esp32s3))]
         fn reset_aes(&self) {
             unsafe {
                 let s = crate::peripherals::SYSTEM::steal();

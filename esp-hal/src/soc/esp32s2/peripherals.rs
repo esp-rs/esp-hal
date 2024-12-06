@@ -119,5 +119,6 @@ crate::peripherals! {
         DMA_SPI2: Spi2DmaChannel,
         DMA_SPI3: Spi3DmaChannel,
         DMA_I2S0: I2s0DmaChannel,
+        DMA_CRYPTO: CryptoDmaChannel,
     ]
 }
