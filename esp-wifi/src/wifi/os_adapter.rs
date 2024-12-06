@@ -10,7 +10,7 @@ pub(crate) mod os_adapter_chip_specific;
 use core::{cell::RefCell, ptr::addr_of_mut};
 
 use enumset::EnumSet;
-use esp_hal::sync::{Lock, Locked};
+use esp_hal::sync::{Locked, RawMutex};
 
 use super::WifiEvent;
 use crate::{
@@ -35,7 +35,7 @@ use crate::{
     timer::yield_task,
 };
 
-static WIFI_LOCK: Lock = Lock::new();
+static WIFI_LOCK: RawMutex = RawMutex::new();
 
 static mut QUEUE_HANDLE: *mut ConcurrentQueue = core::ptr::null_mut();
 

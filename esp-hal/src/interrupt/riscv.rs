@@ -117,7 +117,7 @@ pub enum CpuInterrupt {
 }
 
 /// Interrupt priority levels.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 pub enum Priority {
@@ -164,6 +164,32 @@ impl Priority {
     /// Minimum interrupt priority
     pub const fn min() -> Priority {
         Priority::Priority1
+    }
+}
+
+impl TryFrom<u8> for Priority {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Priority::None),
+            1 => Ok(Priority::Priority1),
+            2 => Ok(Priority::Priority2),
+            3 => Ok(Priority::Priority3),
+            4 => Ok(Priority::Priority4),
+            5 => Ok(Priority::Priority5),
+            6 => Ok(Priority::Priority6),
+            7 => Ok(Priority::Priority7),
+            8 => Ok(Priority::Priority8),
+            9 => Ok(Priority::Priority9),
+            10 => Ok(Priority::Priority10),
+            11 => Ok(Priority::Priority11),
+            12 => Ok(Priority::Priority12),
+            13 => Ok(Priority::Priority13),
+            14 => Ok(Priority::Priority14),
+            15 => Ok(Priority::Priority15),
+            _ => Err(Error::InvalidInterruptPriority),
+        }
     }
 }
 
