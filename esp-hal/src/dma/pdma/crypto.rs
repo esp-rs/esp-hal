@@ -1,4 +1,3 @@
-use esp32s2::crypto_dma::aes_sha_select::SELECT;
 use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{
@@ -67,6 +66,7 @@ impl RegisterAccess for CryptoDmaTxChannel {
     }
 
     fn set_peripheral(&self, peripheral: u8) {
+        use esp32s2::crypto_dma::aes_sha_select::SELECT;
         let peripheral = match peripheral {
             p if p == DmaPeripheral::Aes as u8 => SELECT::Aes,
             p if p == DmaPeripheral::Sha as u8 => SELECT::Sha,
@@ -265,6 +265,7 @@ impl RegisterAccess for CryptoDmaRxChannel {
     }
 
     fn set_peripheral(&self, peripheral: u8) {
+        use esp32s2::crypto_dma::aes_sha_select::SELECT;
         let peripheral = match peripheral {
             p if p == DmaPeripheral::Aes as u8 => SELECT::Aes,
             p if p == DmaPeripheral::Sha as u8 => SELECT::Sha,
