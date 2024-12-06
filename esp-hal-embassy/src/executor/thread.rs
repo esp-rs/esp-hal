@@ -3,9 +3,9 @@
 use core::marker::PhantomData;
 
 use embassy_executor::Spawner;
-use esp_hal::Cpu;
 #[cfg(multi_core)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, macros::handler};
+use esp_hal::{interrupt::Priority, Cpu};
 #[cfg(low_power_wait)]
 use portable_atomic::{AtomicBool, Ordering};
 
@@ -76,7 +76,10 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         }
 
         Self {
-            inner: InnerExecutor::new((THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut ()),
+            inner: InnerExecutor::new(
+                Priority::Priority1,
+                (THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut (),
+            ),
             not_send: PhantomData,
         }
     }
