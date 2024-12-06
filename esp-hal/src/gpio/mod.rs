@@ -757,6 +757,7 @@ impl Bank1GpioRegisterAccess {
 }
 
 /// GPIO pin
+#[non_exhaustive]
 pub struct GpioPin<const GPIONUM: u8>;
 
 /// Type-erased GPIO pin
