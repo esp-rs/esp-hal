@@ -41,7 +41,6 @@
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO2;
 //! let mosi = peripherals.GPIO1;
-//! let cs = peripherals.GPIO5;
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
@@ -50,8 +49,7 @@
 //! .unwrap()
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
-//! .with_miso(miso)
-//! .with_cs(cs);
+//! .with_miso(miso);
 //! # }
 //! ```
 //! 
@@ -89,7 +87,7 @@ use crate::{
 
 /// Enumeration of possible SPI interrupt events.
 #[cfg(gdma)]
-#[derive(Debug, EnumSetType)]
+#[derive(Debug, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum SpiInterrupt {
@@ -101,10 +99,7 @@ pub enum SpiInterrupt {
 }
 
 /// The size of the FIFO buffer for SPI
-#[cfg(not(esp32s2))]
-const FIFO_SIZE: usize = 64;
-#[cfg(esp32s2)]
-const FIFO_SIZE: usize = 72;
+const FIFO_SIZE: usize = if cfg!(esp32s2) { 72 } else { 64 };
 
 /// Padding byte for empty write transfers
 const EMPTY_WRITE_PAD: u8 = 0x00;
@@ -115,42 +110,43 @@ const MAX_DMA_SIZE: usize = 32736;
 ///
 /// Used to define specific commands sent over the SPI bus.
 /// Can be [Command::None] if command phase should be suppressed.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Command {
     /// No command is sent.
     None,
-    /// Command1.
+    /// A 1-bit command.
     Command1(u16, SpiDataMode),
-    /// Command2.
+    /// A 2-bit command.
     Command2(u16, SpiDataMode),
-    /// Command3.
+    /// A 3-bit command.
     Command3(u16, SpiDataMode),
-    /// Command4.
+    /// A 4-bit command.
     Command4(u16, SpiDataMode),
-    /// Command5.
+    /// A 5-bit command.
     Command5(u16, SpiDataMode),
-    /// Command6.
+    /// A 6-bit command.
     Command6(u16, SpiDataMode),
-    /// Command7.
+    /// A 7-bit command.
     Command7(u16, SpiDataMode),
-    /// Command8.
+    /// A 8-bit command.
     Command8(u16, SpiDataMode),
-    /// Command9.
+    /// A 9-bit command.
     Command9(u16, SpiDataMode),
-    /// Command10.
+    /// A 10-bit command.
     Command10(u16, SpiDataMode),
-    /// Command11.
+    /// A 11-bit command.
     Command11(u16, SpiDataMode),
-    /// Command12.
+    /// A 12-bit command.
     Command12(u16, SpiDataMode),
-    /// Command13.
+    /// A 13-bit command.
     Command13(u16, SpiDataMode),
-    /// Command14.
+    /// A 14-bit command.
     Command14(u16, SpiDataMode),
-    /// Command15.
+    /// A 15-bit command.
     Command15(u16, SpiDataMode),
-    /// Command16.
+    /// A 16-bit command.
     Command16(u16, SpiDataMode),
 }
 
@@ -230,74 +226,75 @@ impl Command {
 ///
 /// This can be used to specify the address phase of SPI transactions.
 /// Can be [Address::None] if address phase should be suppressed.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Address {
     /// No address phase.
     None,
-    /// Address with 1-bit.
+    /// A 1-bit address.
     Address1(u32, SpiDataMode),
-    /// Address with 2-bit.
+    /// A 2-bit address.
     Address2(u32, SpiDataMode),
-    /// Address with 3-bit.
+    /// A 3-bit address.
     Address3(u32, SpiDataMode),
-    /// Address with 4-bit.
+    /// A 4-bit address.
     Address4(u32, SpiDataMode),
-    /// Address with 5-bit.
+    /// A 5-bit address.
     Address5(u32, SpiDataMode),
-    /// Address with 6-bit.
+    /// A 6-bit address.
     Address6(u32, SpiDataMode),
-    /// Address with 7-bit.
+    /// A 7-bit address.
     Address7(u32, SpiDataMode),
-    /// Address with 8-bit.
+    /// A 8-bit address.
     Address8(u32, SpiDataMode),
-    /// Address with 9-bit.
+    /// A 9-bit address.
     Address9(u32, SpiDataMode),
-    /// Address with 10-bit.
+    /// A 10-bit address.
     Address10(u32, SpiDataMode),
-    /// Address with 11-bit.
+    /// A 11-bit address.
     Address11(u32, SpiDataMode),
-    /// Address with 12-bit.
+    /// A 12-bit address.
     Address12(u32, SpiDataMode),
-    /// Address with 13-bit.
+    /// A 13-bit address.
     Address13(u32, SpiDataMode),
-    /// Address with 14-bit.
+    /// A 14-bit address.
     Address14(u32, SpiDataMode),
-    /// Address with 15-bit.
+    /// A 15-bit address.
     Address15(u32, SpiDataMode),
-    /// Address with 16-bit.
+    /// A 16-bit address.
     Address16(u32, SpiDataMode),
-    /// Address with 17-bit.
+    /// A 17-bit address.
     Address17(u32, SpiDataMode),
-    /// Address with 18-bit.
+    /// A 18-bit address.
     Address18(u32, SpiDataMode),
-    /// Address with 19-bit.
+    /// A 19-bit address.
     Address19(u32, SpiDataMode),
-    /// Address with 20-bit.
+    /// A 20-bit address.
     Address20(u32, SpiDataMode),
-    /// Address with 21-bit.
+    /// A 21-bit address.
     Address21(u32, SpiDataMode),
-    /// Address with 22-bit.
+    /// A 22-bit address.
     Address22(u32, SpiDataMode),
-    /// Address with 23-bit.
+    /// A 23-bit address.
     Address23(u32, SpiDataMode),
-    /// Address with 24-bit.
+    /// A 24-bit address.
     Address24(u32, SpiDataMode),
-    /// Address with 25-bit.
+    /// A 25-bit address.
     Address25(u32, SpiDataMode),
-    /// Address with 26-bit.
+    /// A 26-bit address.
     Address26(u32, SpiDataMode),
-    /// Address with 27-bit.
+    /// A 27-bit address.
     Address27(u32, SpiDataMode),
-    /// Address with 28-bit.
+    /// A 28-bit address.
     Address28(u32, SpiDataMode),
-    /// Address with 29-bit.
+    /// A 29-bit address.
     Address29(u32, SpiDataMode),
-    /// Address with 30-bit.
+    /// A 30-bit address.
     Address30(u32, SpiDataMode),
-    /// Address with 31-bit.
+    /// A 31-bit address.
     Address31(u32, SpiDataMode),
-    /// Address with 32-bit.
+    /// A 32-bit address.
     Address32(u32, SpiDataMode),
 }
 
@@ -422,14 +419,14 @@ impl Address {
 }
 
 /// SPI peripheral configuration
-#[derive(Clone, Copy, Debug, procmacros::BuilderLite)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
-    /// SPI clock frequency
+    /// SPI bus clock frequency.
     pub frequency: HertzU32,
 
-    /// SPI mode
+    /// SPI sample/shift mode.
     pub mode: SpiMode,
 
     /// Bit order of the read data.
@@ -445,18 +442,21 @@ impl Default for Config {
         Config {
             frequency: 1_u32.MHz(),
             mode: SpiMode::Mode0,
-            read_bit_order: SpiBitOrder::MSBFirst,
-            write_bit_order: SpiBitOrder::MSBFirst,
+            read_bit_order: SpiBitOrder::MsbFirst,
+            write_bit_order: SpiBitOrder::MsbFirst,
         }
     }
 }
 
 /// Configuration errors.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConfigError {}
 
 /// SPI peripheral driver
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Spi<'d, M, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     _mode: PhantomData<M>,
@@ -486,10 +486,6 @@ where
     }
 
     /// Write bytes to SPI.
-    ///
-    /// Copies the content of `words` in chunks of 64 bytes into the SPI
-    /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         self.driver().write_bytes(words)?;
         self.driver().flush()?;
@@ -531,6 +527,7 @@ where
     /// This method prepares the SPI instance for DMA transfers using SPI
     /// and returns an instance of `SpiDma` that supports DMA
     /// operations.
+    #[instability::unstable]
     pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking, T>
     where
         CH: DmaChannelFor<T>,
@@ -638,6 +635,7 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI CS
     /// signal.
+    #[instability::unstable]
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
         cs.set_to_push_pull_output(private::Internal);
@@ -713,6 +711,7 @@ where
     T: Instance,
 {
     /// Half-duplex read.
+    #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
         data_mode: SpiDataMode,
@@ -737,7 +736,7 @@ where
             dummy,
             buffer.is_empty(),
             data_mode,
-        );
+        )?;
 
         self.driver().configure_datalen(buffer.len(), 0);
         self.driver().start_operation();
@@ -746,6 +745,7 @@ where
     }
 
     /// Half-duplex write.
+    #[instability::unstable]
     pub fn half_duplex_write(
         &mut self,
         data_mode: SpiDataMode,
@@ -775,6 +775,11 @@ where
                     data_mode = address.mode();
                     address = Address::None;
                 }
+
+                if dummy > 0 {
+                    // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                    return Err(Error::Unsupported);
+                }
             }
         }
 
@@ -786,7 +791,7 @@ where
             dummy,
             buffer.is_empty(),
             data_mode,
-        );
+        )?;
 
         if !buffer.is_empty() {
             // re-using the full-duplex write here
@@ -812,17 +817,11 @@ mod dma {
             asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
             DmaRxBuf,
-            DmaRxBuffer,
             DmaTxBuf,
-            DmaTxBuffer,
             EmptyBuf,
             PeripheralDmaChannel,
-            Rx,
-            Tx,
         },
         interrupt::InterruptConfigurable,
-        Async,
-        Blocking,
     };
 
     /// A DMA capable SPI instance.
@@ -1100,6 +1099,11 @@ mod dma {
             address: Address,
             dummy: u8,
         ) -> Result<(), Error> {
+            if dummy > 0 {
+                // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                return Err(Error::Unsupported);
+            }
+
             let bytes_to_write = address.width().div_ceil(8);
             // The address register is read in big-endian order,
             // we have to prepare the emulated write in the same way.
@@ -1115,7 +1119,7 @@ mod dma {
                 dummy,
                 bytes_to_write == 0,
                 address.mode(),
-            );
+            )?;
 
             // FIXME: we could use self.start_transfer_dma if the address buffer was part of
             // the (yet-to-be-created) State struct.
@@ -1411,7 +1415,7 @@ mod dma {
                 dummy,
                 bytes_to_read == 0,
                 data_mode,
-            );
+            )?;
 
             self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
         }
@@ -1476,7 +1480,7 @@ mod dma {
                 dummy,
                 bytes_to_write == 0,
                 data_mode,
-            );
+            )?;
 
             self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
         }
@@ -1749,7 +1753,7 @@ mod dma {
             buffer: &mut [u8],
         ) -> Result<(), Error> {
             if buffer.len() > self.rx_buf.capacity() {
-                return Err(Error::DmaError(DmaError::Overflow));
+                return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
             self.rx_buf.set_length(buffer.len());
@@ -1783,7 +1787,7 @@ mod dma {
             buffer: &[u8],
         ) -> Result<(), Error> {
             if buffer.len() > self.tx_buf.capacity() {
-                return Err(Error::DmaError(DmaError::Overflow));
+                return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
             self.tx_buf.fill(buffer);
@@ -1828,7 +1832,6 @@ mod dma {
         };
 
         use super::*;
-        use crate::Async;
 
         struct DropGuard<I, F: FnOnce(I)> {
             inner: ManuallyDrop<I>,
@@ -1952,7 +1955,7 @@ mod dma {
                     spi.wait_for_idle_async().await;
 
                     let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                    assert_eq!(bytes_read, read_chunk.len());
+                    debug_assert_eq!(bytes_read, read_chunk.len());
                 }
 
                 spi.defuse();
@@ -1987,7 +1990,7 @@ mod dma {
                     spi.wait_for_idle_async().await;
 
                     let bytes_read = self.rx_buf.read_received_data(chunk);
-                    assert_eq!(bytes_read, chunk.len());
+                    debug_assert_eq!(bytes_read, chunk.len());
                 }
 
                 spi.defuse();
@@ -2421,7 +2424,7 @@ impl Info {
         cmd_mode: SpiDataMode,
         address_mode: SpiDataMode,
         data_mode: SpiDataMode,
-    ) {
+    ) -> Result<(), Error> {
         let reg_block = self.register_block();
         reg_block.ctrl().modify(|_, w| {
             w.fcmd_dual().bit(cmd_mode == SpiDataMode::Dual);
@@ -2435,6 +2438,7 @@ impl Info {
             w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
             w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
         });
+        Ok(())
     }
 
     #[cfg(esp32)]
@@ -2443,11 +2447,12 @@ impl Info {
         cmd_mode: SpiDataMode,
         address_mode: SpiDataMode,
         data_mode: SpiDataMode,
-    ) {
+    ) -> Result<(), Error> {
         let reg_block = self.register_block();
         match cmd_mode {
             SpiDataMode::Single => (),
-            _ => panic!("Only 1-bit command supported"),
+            // FIXME: more detailed error - Only 1-bit commands are supported.
+            _ => return Err(Error::Unsupported),
         }
 
         match address_mode {
@@ -2482,8 +2487,11 @@ impl Info {
                     w.fwrite_quad().clear_bit()
                 });
             }
-            _ => panic!("Unsupported combination of data-modes"),
+            // FIXME: more detailed error - Unsupported combination of data-modes,
+            _ => return Err(Error::Unsupported),
         }
+
+        Ok(())
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
@@ -2670,12 +2678,12 @@ impl Info {
         let reg_block = self.register_block();
 
         let read_value = match read_order {
-            SpiBitOrder::MSBFirst => 0,
-            SpiBitOrder::LSBFirst => 1,
+            SpiBitOrder::MsbFirst => 0,
+            SpiBitOrder::LsbFirst => 1,
         };
         let write_value = match write_order {
-            SpiBitOrder::MSBFirst => 0,
-            SpiBitOrder::LSBFirst => 1,
+            SpiBitOrder::MsbFirst => 0,
+            SpiBitOrder::LsbFirst => 1,
         };
         reg_block.ctrl().modify(|_, w| unsafe {
             w.rd_bit_order().bits(read_value);
@@ -2689,12 +2697,12 @@ impl Info {
         let reg_block = self.register_block();
 
         let read_value = match read_order {
-            SpiBitOrder::MSBFirst => false,
-            SpiBitOrder::LSBFirst => true,
+            SpiBitOrder::MsbFirst => false,
+            SpiBitOrder::LsbFirst => true,
         };
         let write_value = match write_order {
-            SpiBitOrder::MSBFirst => false,
-            SpiBitOrder::LSBFirst => true,
+            SpiBitOrder::MsbFirst => false,
+            SpiBitOrder::LsbFirst => true,
         };
         reg_block.ctrl().modify(|_, w| {
             w.rd_bit_order().bit(read_value);
@@ -2869,8 +2877,8 @@ impl Info {
         dummy: u8,
         no_mosi_miso: bool,
         data_mode: SpiDataMode,
-    ) {
-        self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+    ) -> Result<(), Error> {
+        self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
 
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
@@ -2911,6 +2919,8 @@ impl Info {
 
         // set cmd, address, dummy cycles
         self.set_up_common_phases(cmd, address, dummy);
+
+        Ok(())
     }
 
     fn set_up_common_phases(&self, cmd: Command, address: Address, dummy: u8) {

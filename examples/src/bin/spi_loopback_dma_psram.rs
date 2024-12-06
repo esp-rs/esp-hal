@@ -16,7 +16,7 @@
 //! If your module is quad PSRAM then you need to change the `psram` feature in the
 //! in the features line below to `quad-psram`.
 
-//% FEATURES: esp-hal/log esp-hal/octal-psram
+//% FEATURES: esp-hal/log esp-hal/octal-psram esp-hal/unstable
 //% CHIPS: esp32s3
 
 #![no_std]

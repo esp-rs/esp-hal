@@ -29,7 +29,7 @@ pub(crate) const KEEP_ENABLED: &[Peripheral] = &[
 // FIXME: This enum needs to be public because it's exposed via a bunch of traits, but it's not
 // useful to users.
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy, PartialEq, EnumCount, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumCount, EnumIter)]
 #[repr(u8)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Peripheral {
@@ -162,7 +162,8 @@ pub(crate) fn disable_peripherals() {
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct PeripheralGuard {
     peripheral: Peripheral,
 }

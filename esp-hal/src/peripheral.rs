@@ -18,6 +18,8 @@ use core::{
 ///
 /// but it is the size of `T` not the size
 /// of a pointer. This is useful if T is a zero sized type.
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeripheralRef<'a, T> {
     inner: T,
     _lifetime: PhantomData<&'a mut T>,
