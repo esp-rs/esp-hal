@@ -97,7 +97,7 @@ mod adapter {
     impl super::TimerQueue {
         pub fn schedule_wake(&self, at: u64, task: raw::TaskRef) {
             if unsafe { self.inner.lock(|q| q.schedule_wake(at, task)) } {
-                self.arm_alarm(at);
+                self.dispatch();
             }
         }
     }
@@ -118,7 +118,7 @@ mod adapter {
     impl super::TimerQueue {
         pub fn schedule_wake(&self, at: u64, waker: &Waker) {
             if self.inner.lock(|q| q.schedule_wake(at, waker)) {
-                self.arm_alarm(at);
+                self.dispatch();
             }
         }
     }
