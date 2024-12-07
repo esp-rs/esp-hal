@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-check-cfg=cfg(single_queue)");
     println!("cargo:rustc-check-cfg=cfg(generic_timers)");
 
-    if cfg!(feature = "integrated_timers") {
+    if cfg!(feature = "integrated-timers") {
         println!("cargo:rustc-cfg=integrated_timers");
         if cfg!(feature = "single-queue") {
             println!("cargo:rustc-cfg=single_queue");
