@@ -263,7 +263,7 @@ impl TimerQueueDriver {
     }
 
     fn handle_alarm(&self, _ctx: *const ()) {
-        #[cfg(integrated_timers)]
+        #[cfg(all(integrated_timers, not(single_queue)))]
         {
             let executor = unsafe { &*_ctx.cast::<crate::executor::InnerExecutor>() };
             executor.timer_queue.dispatch();
