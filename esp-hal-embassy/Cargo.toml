@@ -21,7 +21,7 @@ embassy-executor          = { version = "0.6.3", optional = true }
 embassy-sync              = { version = "0.6.1" }
 embassy-time              = { version = "0.3.0" }
 embassy-time-driver       = { version = "0.1.0", features = [ "tick-hz-1_000_000" ] }
-embassy-time-queue-driver = { version = "0.1.0", features = ["generic-queue-const-generic"] }
+embassy-time-queue-driver = { version = "0.1.0" }
 esp-config                = { version = "0.2.0", path = "../esp-config" }
 esp-hal                   = { version = "0.22.0", path = "../esp-hal" }
 log                       = { version = "0.4.22", optional = true }
@@ -53,7 +53,7 @@ log = ["dep:log"]
 executors = ["dep:embassy-executor", "esp-hal/__esp_hal_embassy"]
 ## Use the executor-integrated `embassy-time` timer queue. If not set, the crate provides a generic
 ## timer queue that can be used with any executor.
-integrated-timers = ["embassy-executor?/integrated-timers", "executors"]
+integrated-timers = ["embassy-time-queue-driver/integrated-timers", "executors"]
 ## Use a single, global timer queue. This option only needs a single alarm, no matter how many
 ## executors are used. Ignored if `integrated-timers` is not set.
 single-queue = []
