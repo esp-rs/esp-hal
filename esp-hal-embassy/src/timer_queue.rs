@@ -73,6 +73,8 @@ impl embassy_time_queue_driver::TimerQueue for crate::time_driver::TimerQueueDri
 
         #[cfg(not(single_queue))]
         unsafe {
+            // FIXME: this is UB, use Exposed Provenance API (or something better) when
+            // available. Expose provenance in `InnerExecutor::init`, and use it here.
             let executor = &*(waker.executor().unwrap_unchecked()
                 as *const embassy_executor::raw::Executor)
                 .cast::<crate::executor::InnerExecutor>();
