@@ -49,8 +49,9 @@ pub use self::executor::{Executor, InterruptExecutor};
 use self::time_driver::{EmbassyTimer, Timer};
 
 #[cfg(feature = "executors")]
-mod executor;
+pub(crate) mod executor;
 mod time_driver;
+mod timer_queue;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
