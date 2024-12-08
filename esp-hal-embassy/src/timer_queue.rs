@@ -88,17 +88,46 @@ impl embassy_time_queue_driver::TimerQueue for crate::time_driver::TimerQueueDri
 
 #[cfg(integrated_timers)]
 mod adapter {
+    use core::cell::RefCell;
+
     use embassy_executor::raw;
 
-    pub(super) type RawQueue = raw::timer_queue::TimerQueue;
+    type Q = embassy_time_queue_driver::queue_integrated::TimerQueue;
+
+    /// A simple wrapper around a `Queue` to provide interior mutability.
+    pub struct RefCellQueue {
+        inner: RefCell<Q>,
+    }
+
+    impl RefCellQueue {
+        /// Creates a new timer queue.
+        pub const fn new() -> Self {
+            Self {
+                inner: RefCell::new(Q::new()),
+            }
+        }
+
+        /// Schedules a task to run at a specific time, and returns whether any
+        /// changes were made.
+        pub fn schedule_wake(&self, at: u64, waker: raw::TaskRef) -> bool {
+            self.inner.borrow_mut().schedule_wake(at, waker)
+        }
+
+        /// Dequeues expired timers and returns the next alarm time.
+        pub fn next_expiration(&self, now: u64) -> u64 {
+            self.inner.borrow_mut().next_expiration(now)
+        }
+    }
+
+    pub(super) type RawQueue = RefCellQueue;
 
     pub(super) fn dequeue(q: &RawQueue, now: u64) -> u64 {
-        unsafe { q.next_expiration(now, raw::wake_task) }
+        q.next_expiration(now)
     }
 
     impl super::TimerQueue {
         pub fn schedule_wake(&self, at: u64, task: raw::TaskRef) {
-            if unsafe { self.inner.lock(|q| q.schedule_wake(at, task)) } {
+            if self.inner.lock(|q| q.schedule_wake(at, task)) {
                 self.dispatch();
             }
         }
@@ -107,11 +136,38 @@ mod adapter {
 
 #[cfg(generic_timers)]
 mod adapter {
-    use core::task::Waker;
+    use core::{cell::RefCell, task::Waker};
 
-    pub(super) type RawQueue = embassy_time_queue_driver::queue_generic::RefCellQueue<
+    type Q = embassy_time_queue_driver::queue_generic::ConstGenericQueue<
         { esp_config::esp_config_int!(usize, "ESP_HAL_EMBASSY_GENERIC_QUEUE_SIZE") },
     >;
+
+    /// A simple wrapper around a `Queue` to provide interior mutability.
+    pub struct RefCellQueue {
+        inner: RefCell<Q>,
+    }
+
+    impl RefCellQueue {
+        /// Creates a new timer queue.
+        pub const fn new() -> Self {
+            Self {
+                inner: RefCell::new(Q::new()),
+            }
+        }
+
+        /// Schedules a task to run at a specific time, and returns whether any
+        /// changes were made.
+        pub fn schedule_wake(&self, at: u64, waker: &core::task::Waker) -> bool {
+            self.inner.borrow_mut().schedule_wake(at, waker)
+        }
+
+        /// Dequeues expired timers and returns the next alarm time.
+        pub fn next_expiration(&self, now: u64) -> u64 {
+            self.inner.borrow_mut().next_expiration(now)
+        }
+    }
+
+    pub(super) type RawQueue = RefCellQueue;
 
     pub(super) fn dequeue(q: &RawQueue, now: u64) -> u64 {
         q.next_expiration(now)
