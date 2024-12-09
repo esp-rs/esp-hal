@@ -207,7 +207,11 @@ impl Default for RegisterInfo {
     }
 }
 
-pub fn dump<W: Writer>(writer: &mut W, regs: &Registers, mem: Memory) {
+pub fn dump<W: embedded_io::Write>(
+    writer: &mut W,
+    regs: &Registers,
+    mem: Memory,
+) -> Result<(), W::Error> {
     let mut writer = CoreDumpWriter::new(writer);
 
     let reg_info: RegisterInfo = {
@@ -216,7 +220,7 @@ pub fn dump<W: Writer>(writer: &mut W, regs: &Registers, mem: Memory) {
         reg_info
     };
 
-    writer.elf_header();
+    writer.elf_header()?;
 
     // header for the memory region
     writer.write_program_header(
@@ -226,7 +230,7 @@ pub fn dump<W: Writer>(writer: &mut W, regs: &Registers, mem: Memory) {
         mem.slice.len() as u32,
         6,
         0,
-    );
+    )?;
 
     // header for the register info
     writer.write_program_header(
@@ -237,10 +241,10 @@ pub fn dump<W: Writer>(writer: &mut W, regs: &Registers, mem: Memory) {
         (core::mem::size_of::<RegisterInfo>() + REG_INFO_HEADER_SIZE) as u32,
         6,
         0,
-    );
+    )?;
 
     // write memory contents
-    writer.writer.write(mem.slice);
+    writer.writer.write(mem.slice)?;
 
     // write register info
     let mut reg_info_bytes = [0x0u8; core::mem::size_of::<RegisterInfo>() + REG_INFO_HEADER_SIZE];
@@ -258,61 +262,61 @@ pub fn dump<W: Writer>(writer: &mut W, regs: &Registers, mem: Memory) {
     writer.writer.write(&[
         0x08, 0x00, 0x00, 0x00, 0xcc, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x43, 0x4f, 0x52,
         0x45, 0x00, 0x00, 0x00, 0x00,
-    ]);
+    ])?;
 
     #[cfg(target_arch = "xtensa")]
     writer.writer.write(&[
         0x08, 0x00, 0x00, 0x00, 0x4c, 0x02, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x43, 0x4f, 0x52,
         0x45, 0x00, 0x00, 0x00, 0x00,
-    ]);
+    ])?;
 
-    writer.writer.write(&reg_info_bytes);
+    writer.writer.write(&reg_info_bytes)?;
+
+    Ok(())
 }
 
-pub trait Writer {
-    fn write(&mut self, buffer: &[u8]);
-}
-
-struct CoreDumpWriter<'a, W: Writer> {
+struct CoreDumpWriter<'a, W: embedded_io::Write> {
     writer: &'a mut W,
 }
 
-impl<'a, W: Writer> CoreDumpWriter<'a, W> {
+impl<'a, W: embedded_io::Write> CoreDumpWriter<'a, W> {
     pub fn new(writer: &'a mut W) -> Self {
         Self { writer }
     }
 
-    fn elf_header(&mut self) {
-        self.writer.write(&[0x7f, b'E', b'L', b'F']);
-        self.writer.write(&[0x01]); // 32 bit
-        self.writer.write(&[0x01]); // little endian
-        self.writer.write(&[0x01]); // version
-        self.writer.write(&[0x00]); // ABI
-        self.writer.write(&[0x00]); // ABI version
-        self.writer
-            .write(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]); // padding
-        self.writer.write(&[0x04, 0x00]); // CORE file
+    fn elf_header(&mut self) -> Result<(), W::Error> {
+        let _ = self.writer.write(&[0x7f, b'E', b'L', b'F'])?;
+        let _ = self.writer.write(&[0x01])?; // 32 bit
+        let _ = self.writer.write(&[0x01])?; // little endian
+        let _ = self.writer.write(&[0x01])?; // version
+        let _ = self.writer.write(&[0x00])?; // ABI
+        let _ = self.writer.write(&[0x00])?; // ABI version
+        let _ = self
+            .writer
+            .write(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])?; // padding
+        let _ = self.writer.write(&[0x04, 0x00])?; // CORE file
 
         #[cfg(target_arch = "riscv32")]
-        self.writer.write(&[0xf3, 0x00]); // machine (RISCV)
+        let _ = self.writer.write(&[0xf3, 0x00])?; // machine (RISCV)
 
         #[cfg(target_arch = "xtensa")]
-        self.writer.write(&[0x5e, 0x00]); // machine (Xtensa)
+        let _ = self.writer.write(&[0x5e, 0x00])?; // machine (Xtensa)
 
-        self.writer.write(&[0x01, 0x00, 0x00, 0x00]); // version
-        self.writer.write(&[0x00, 0x00, 0x00, 0x00]); // entry
-        self.writer.write(&[0x34, 0x00, 0x00, 0x00]); // start of program header
-        self.writer.write(&[0x00, 0x00, 0x00, 0x00]); // start of section header
-        self.writer.write(&[0x00, 0x00, 0x00, 0x00]); // flags
-        self.writer.write(&[0x34, 0x00]); // ehsize
-        self.writer.write(&[0x20, 0x00]); // size of a program header table entry.
-        self.writer.write(&[0x02, 0x00]); // number of entries in the program header table !!!! here 2: one memory block
-                                          // and the registers as a note
-        self.writer.write(&[0x28, 0x00]); // size of a section header table entry.
-        self.writer.write(&[0x00, 0x00]); // number of section headers
-        self.writer.write(&[0x00, 0x00]); // index of the section header table
-                                          // entry that contains the section
-                                          // names
+        let _ = self.writer.write(&[0x01, 0x00, 0x00, 0x00])?; // version
+        let _ = self.writer.write(&[0x00, 0x00, 0x00, 0x00])?; // entry
+        let _ = self.writer.write(&[0x34, 0x00, 0x00, 0x00])?; // start of program header
+        let _ = self.writer.write(&[0x00, 0x00, 0x00, 0x00])?; // start of section header
+        let _ = self.writer.write(&[0x00, 0x00, 0x00, 0x00])?; // flags
+        let _ = self.writer.write(&[0x34, 0x00])?; // ehsize
+        let _ = self.writer.write(&[0x20, 0x00])?; // size of a program header table entry.
+        let _ = self.writer.write(&[0x02, 0x00])?; // number of entries in the program header table !!!! here 2: one memory block
+                                                   // and the registers as a note
+        let _ = self.writer.write(&[0x28, 0x00])?; // size of a section header table entry.
+        let _ = self.writer.write(&[0x00, 0x00])?; // number of section headers
+        let _ = self.writer.write(&[0x00, 0x00])?; // index of the section header table
+                                                   // entry that contains the section
+                                                   // name
+        Ok(())
     }
 
     fn write_program_header(
@@ -323,25 +327,42 @@ impl<'a, W: Writer> CoreDumpWriter<'a, W> {
         size: u32,
         flags: u32,
         align: u32,
-    ) {
-        self.writer.write(&(stype as u32).to_le_bytes()); // type
-        self.writer.write(&offset.to_le_bytes()); // offset in file
-        self.writer.write(&addr.to_le_bytes()); // vaddr
-        self.writer.write(&addr.to_le_bytes()); // paddr
-        self.writer.write(&size.to_le_bytes()); // file size
-        self.writer.write(&size.to_le_bytes()); // memory size
-        self.writer.write(&flags.to_le_bytes()); // flags
-        self.writer.write(&align.to_le_bytes()); // align
+    ) -> Result<(), W::Error> {
+        let _ = self.writer.write(&(stype as u32).to_le_bytes())?; // type
+        let _ = self.writer.write(&offset.to_le_bytes())?; // offset in file
+        let _ = self.writer.write(&addr.to_le_bytes())?; // vaddr
+        let _ = self.writer.write(&addr.to_le_bytes())?; // paddr
+        let _ = self.writer.write(&size.to_le_bytes())?; // file size
+        let _ = self.writer.write(&size.to_le_bytes())?; // memory size
+        let _ = self.writer.write(&flags.to_le_bytes())?; // flags
+        let _ = self.writer.write(&align.to_le_bytes())?; // align
+        Ok(())
     }
 }
 
+#[derive(Debug)]
 pub struct DumpWriter {}
 
-impl Writer for DumpWriter {
-    fn write(&mut self, buffer: &[u8]) {
-        for b in buffer.iter() {
+impl embedded_io::Error for DumpWriter {
+    fn kind(&self) -> embedded_io::ErrorKind {
+        embedded_io::ErrorKind::Other
+    }
+}
+
+impl embedded_io::ErrorType for DumpWriter {
+    type Error = core::convert::Infallible;
+}
+
+impl embedded_io::Write for DumpWriter {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        for b in buf.iter() {
             #[cfg(feature = "println")]
             esp_println::print!("{:02x}", b);
         }
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
