@@ -11,29 +11,28 @@ use esp_println as _;
 
 const MAX_BACKTRACE_ADDRESSES: usize = 10;
 
-#[cfg(feature = "esp32")]
-const RAM: (u32, u32) = (0x3FFA_E000, 0x4000_0000);
+const RAM: (u32, u32) = (
+    convert(env!("REGION-DRAM-START")),
+    convert(env!("REGION-DRAM-END")),
+);
 
-#[cfg(feature = "esp32c2")]
-const RAM: (u32, u32) = (0x3FCA_0000, 0x3FCE_0000);
+// We know esp-metadata already parsed the values and the env var contains
+// the expected format
+const fn convert(s: &str) -> u32 {
+    let mut r = 0u32;
+    let mut i = 0;
+    let bytes = s.as_bytes();
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c >= b'0' && c <= b'9' {
+            r *= 10;
+            r += (c - b'0') as u32;
+        }
 
-#[cfg(feature = "esp32c3")]
-const RAM: (u32, u32) = (0x3FC8_0000, 0x3FCE_0000);
-
-#[cfg(feature = "esp32c6")]
-const RAM: (u32, u32) = (0x4080_0000, 0x4088_0000);
-
-#[cfg(feature = "esp32h2")]
-const RAM: (u32, u32) = (0x4080_0000, 0x4085_0000);
-
-#[cfg(feature = "esp32p4")]
-const RAM: (u32, u32) = (0x4FF0_0000, 0x4FFC_0000);
-
-#[cfg(feature = "esp32s2")]
-const RAM: (u32, u32) = (0x3FFB_0000, 0x4000_0000);
-
-#[cfg(feature = "esp32s3")]
-const RAM: (u32, u32) = (0x3FC8_8000, 0x3FD0_0000);
+        i += 1;
+    }
+    r
+}
 
 #[cfg(feature = "colors")]
 const RESET: &str = "\u{001B}[0m";
