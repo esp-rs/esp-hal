@@ -2,7 +2,7 @@
 name         = "esp-backtrace"
 version      = "0.14.2"
 edition      = "2021"
-rust-version = "1.76.0"
+rust-version = "1.79.0"
 description  = "Bare-metal backtrace support for Espressif devices"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
@@ -18,7 +18,8 @@ semihosting = { version = "0.1.17", optional = true }
 embedded-io = { version = "0.6.1", optional = true }
 
 [build-dependencies]
-esp-build = { version = "0.1.0", path = "../esp-build" }
+esp-build       = { version = "0.1.0", path = "../esp-build" }
+esp-metadata    = { version = "0.4.0", path = "../esp-metadata" }
 
 [features]
 default = ["colors"]

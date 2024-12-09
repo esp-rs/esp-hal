@@ -75,3 +75,5 @@ symbols = [
     "pm_support_touch_sensor_wakeup",
     "ulp_supported",
 ]
+
+memory = [{ name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 }]

@@ -35,9 +35,9 @@ pub(crate) mod registers {
 
 pub(crate) mod constants {
     /// The lower bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_LOW: usize = 0x3FCA_0000;
+    pub const SOC_DRAM_LOW: usize = super::super::SOC_DRAM_LOW;
     /// The upper bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_HIGH: usize = 0x3FCE_0000;
+    pub const SOC_DRAM_HIGH: usize = super::super::SOC_DRAM_HIGH;
 
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);

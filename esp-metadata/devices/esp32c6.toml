@@ -97,3 +97,5 @@ symbols = [
     "uart_support_wakeup_int",
     "pm_support_ext1_wakeup",
 ]
+
+memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
