@@ -478,7 +478,7 @@ type LockInner<'a> = critical_section::CriticalSection<'a>;
 #[derive(Clone, Copy)]
 struct LockToken<'a>(LockInner<'a>);
 
-impl<'a> LockToken<'a> {
+impl LockToken<'_> {
     #[allow(unused)]
     unsafe fn conjure() -> Self {
         #[cfg(feature = "critical-section")]

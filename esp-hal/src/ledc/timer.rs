@@ -369,7 +369,7 @@ impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
 
 #[cfg(esp32)]
 /// Timer HW implementation for HighSpeed timers
-impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
+impl TimerHW<HighSpeed> for Timer<'_, HighSpeed> {
     /// Get the current source timer frequency from the HW
     fn freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|source| match source {

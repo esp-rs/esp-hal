@@ -327,7 +327,7 @@ where
     }
 }
 
-impl<'d, ADC1> Adc<'d, ADC1> {
+impl<ADC1> Adc<'_, ADC1> {
     /// Enable the Hall sensor
     pub fn enable_hall_sensor() {
         unsafe { &*RTC_IO::ptr() }
