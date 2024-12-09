@@ -406,7 +406,7 @@ fn exception_handler(context: &TrapFrame) -> ! {
     };
 
     println!("@COREDUMP");
-    coredump::dump(&mut writer, &regs, mem);
+    coredump::dump(&mut writer, &regs, mem).ok();
     println!("@ENDCOREDUMP");
 
     #[cfg(feature = "semihosting")]

@@ -543,7 +543,7 @@ unsafe fn __user_exception(cause: ExceptionCause, context: Context) {
     let mem = coredump::Memory { start, slice };
 
     println!("@COREDUMP");
-    coredump::dump(&mut writer, &regs, mem);
+    coredump::dump(&mut writer, &regs, mem).ok();
     println!("@ENDCOREDUMP");
 
     #[cfg(feature = "semihosting")]
