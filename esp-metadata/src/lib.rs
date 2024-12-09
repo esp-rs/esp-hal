@@ -152,12 +152,20 @@ impl Chip {
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct MemoryRegion {
+    name: String,
+    start: u32,
+    end: u32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct Device {
     pub name: String,
     pub arch: Arch,
     pub cores: Cores,
     pub peripherals: Vec<String>,
     pub symbols: Vec<String>,
+    pub memory: Vec<MemoryRegion>,
 }
 
 /// Device configuration file format.
@@ -205,6 +213,14 @@ impl Config {
         &self.device.symbols
     }
 
+    /// Memory regions.
+    ///
+    /// Will be available as env-variables `REGION-<NAME>-START` /
+    /// `REGION-<NAME>-END`
+    pub fn memory(&self) -> &[MemoryRegion] {
+        &self.device.memory
+    }
+
     /// All configuration values for the device.
     pub fn all(&self) -> impl Iterator<Item = &str> + '_ {
         [
@@ -229,6 +245,22 @@ impl Config {
         for symbol in self.all() {
             println!("cargo:rustc-cfg={symbol}");
         }
+
+        // Define env-vars for all memory regions
+        for memory in self.memory() {
+            println!("cargo:rustc-cfg=has_{}_region", memory.name.to_lowercase());
+
+            println!(
+                "cargo::rustc-env=REGION-{}-START={}",
+                memory.name.to_uppercase(),
+                memory.start
+            );
+            println!(
+                "cargo::rustc-env=REGION-{}-END={}",
+                memory.name.to_uppercase(),
+                memory.end
+            );
+        }
     }
 }
 
@@ -245,6 +277,12 @@ fn define_all_possible_symbols() {
         for symbol in config.all() {
             // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
             println!("cargo:rustc-check-cfg=cfg({})", symbol);
+        }
+        for memory in config.memory() {
+            println!(
+                "cargo:rustc-check-cfg=cfg(has_{}_region)",
+                memory.name.to_lowercase()
+            );
         }
     }
 }
