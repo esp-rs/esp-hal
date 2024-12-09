@@ -248,6 +248,8 @@ impl Config {
 
         // Define env-vars for all memory regions
         for memory in self.memory() {
+            println!("cargo:rustc-cfg=has_{}_region", memory.name.to_lowercase());
+
             println!(
                 "cargo::rustc-env=REGION-{}-START={}",
                 memory.name.to_uppercase(),
@@ -275,6 +277,12 @@ fn define_all_possible_symbols() {
         for symbol in config.all() {
             // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
             println!("cargo:rustc-check-cfg=cfg({})", symbol);
+        }
+        for memory in config.memory() {
+            println!(
+                "cargo:rustc-check-cfg=cfg(has_{}_region)",
+                memory.name.to_lowercase()
+            );
         }
     }
 }
