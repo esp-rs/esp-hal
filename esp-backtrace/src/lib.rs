@@ -90,13 +90,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 
     println!("");
     println!("====================== PANIC ======================");
-
-    #[cfg(not(feature = "defmt"))]
     println!("{}", info);
-
-    #[cfg(feature = "defmt")]
-    println!("{}", defmt::Display2Format(info));
-
     println!("");
     println!("Backtrace:");
     println!("");
@@ -135,12 +129,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 
     println!("");
     println!("====================== PANIC ======================");
-
-    #[cfg(not(feature = "defmt"))]
     println!("{}", info);
-
-    #[cfg(feature = "defmt")]
-    println!("{}", defmt::Display2Format(info));
 
     #[cfg(feature = "colors")]
     set_color_code(RESET);
