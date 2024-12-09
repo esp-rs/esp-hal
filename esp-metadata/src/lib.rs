@@ -214,8 +214,9 @@ impl Config {
     }
 
     /// Memory regions.
-    /// 
-    /// Will be available as env-variables `REGION-<NAME>-START` / `REGION-<NAME>-END`
+    ///
+    /// Will be available as env-variables `REGION-<NAME>-START` /
+    /// `REGION-<NAME>-END`
     pub fn memory(&self) -> &[MemoryRegion] {
         &self.device.memory
     }
