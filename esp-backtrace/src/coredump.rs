@@ -355,9 +355,9 @@ impl embedded_io::ErrorType for DumpWriter {
 
 impl embedded_io::Write for DumpWriter {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        for b in buf.iter() {
+        for _b in buf.iter() {
             #[cfg(feature = "println")]
-            esp_println::print!("{:02x}", b);
+            esp_println::print!("{:02x}", _b);
         }
         Ok(buf.len())
     }

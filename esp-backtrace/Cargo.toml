@@ -12,9 +12,9 @@ default-target = "riscv32imc-unknown-none-elf"
 features       = ["esp32c3", "panic-handler", "exception-handler", "println", "esp-println/uart"]
 
 [dependencies]
-defmt       = { version = "0.3.8",  optional = true }
+defmt       = { version = "0.3.10",  optional = true }
 esp-println = { version = "0.12.0", optional = true, default-features = false, path = "../esp-println" }
-semihosting = { version = "0.1.15", optional = true }
+semihosting = { version = "0.1.17", optional = true }
 embedded-io = { version = "0.6.1", optional = true }
 
 [build-dependencies]
