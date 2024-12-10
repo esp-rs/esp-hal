@@ -75,6 +75,9 @@ impl Alarm {
 }
 
 pub(super) struct EmbassyTimer {
+    #[cfg(single_queue)]
+    pub(crate) inner: crate::timer_queue::TimerQueue,
+
     alarms: [Alarm; MAX_SUPPORTED_ALARM_COUNT],
     available_timers: Locked<Option<&'static mut [Timer]>>,
 }
@@ -97,6 +100,8 @@ macro_rules! alarms {
 
 const MAX_SUPPORTED_ALARM_COUNT: usize = 7;
 embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
+    #[cfg(single_queue)]
+    inner: crate::timer_queue::TimerQueue::new(Priority::max()),
     alarms: alarms!(0, 1, 2, 3, 4, 5, 6),
     available_timers: Locked::new(None),
 });
@@ -129,7 +134,7 @@ impl EmbassyTimer {
     }
 
     fn on_interrupt(&self, id: usize) {
-        let ctx = self.alarms[id].inner.with(|alarm| {
+        let _ctx = self.alarms[id].inner.with(|alarm| {
             if let AlarmState::Initialized(timer) = &mut alarm.state {
                 timer.clear_interrupt();
                 alarm.callback.get()
@@ -141,7 +146,14 @@ impl EmbassyTimer {
             }
         });
 
-        TIMER_QUEUE_DRIVER.handle_alarm(ctx);
+        #[cfg(all(integrated_timers, not(single_queue)))]
+        {
+            let executor = unsafe { &*_ctx.cast::<crate::executor::InnerExecutor>() };
+            executor.timer_queue.dispatch();
+        }
+
+        #[cfg(single_queue)]
+        self.inner.dispatch();
     }
 
     /// Returns `true` if the timer was armed, `false` if the timestamp is in
@@ -238,6 +250,22 @@ impl Driver for EmbassyTimer {
     fn now(&self) -> u64 {
         now().ticks()
     }
+
+    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
+        #[cfg(not(single_queue))]
+        unsafe {
+            let task = embassy_executor::raw::task_from_waker(waker);
+            // FIXME: this is UB, use Exposed Provenance API (or something better) when
+            // available. Expose provenance in `InnerExecutor::init`, and use it here.
+            let executor = &*(task.executor().unwrap_unchecked()
+                as *const embassy_executor::raw::Executor)
+                .cast::<crate::executor::InnerExecutor>();
+            executor.timer_queue.schedule_wake(at, waker);
+        }
+
+        #[cfg(single_queue)]
+        self.inner.schedule_wake(at, waker);
+    }
 }
 
 #[cold]
@@ -247,31 +275,6 @@ fn not_enough_timers() -> ! {
     // extremely long strings. Also, if log is used, this avoids storing the string
     // twice.
     panic!("There are not enough timers to allocate a new alarm. Call esp_hal_embassy::init() with the correct number of timers, or consider either using the single-queue feature or disabling integrated-timers.");
-}
-
-pub(crate) struct TimerQueueDriver {
-    #[cfg(single_queue)]
-    pub(crate) inner: crate::timer_queue::TimerQueue,
-}
-
-impl TimerQueueDriver {
-    const fn new() -> Self {
-        Self {
-            #[cfg(single_queue)]
-            inner: crate::timer_queue::TimerQueue::new(Priority::max()),
-        }
-    }
-
-    fn handle_alarm(&self, _ctx: *const ()) {
-        #[cfg(all(integrated_timers, not(single_queue)))]
-        {
-            let executor = unsafe { &*_ctx.cast::<crate::executor::InnerExecutor>() };
-            executor.timer_queue.dispatch();
-        }
-
-        #[cfg(single_queue)]
-        self.inner.dispatch();
-    }
 }
 
 pub(crate) fn set_up_alarm(priority: Priority, _ctx: *mut ()) -> AlarmHandle {
@@ -284,5 +287,3 @@ pub(crate) fn set_up_alarm(priority: Priority, _ctx: *mut ()) -> AlarmHandle {
     DRIVER.set_callback_ctx(alarm, _ctx);
     alarm
 }
-
-embassy_time_queue_driver::timer_queue_impl!(static TIMER_QUEUE_DRIVER: TimerQueueDriver = TimerQueueDriver::new());
