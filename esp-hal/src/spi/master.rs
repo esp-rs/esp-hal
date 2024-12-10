@@ -3005,7 +3005,7 @@ impl Driver {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
                 self.register_block().slave().modify(|_, w| {
-                    reg_block.slave().read().trans_inten().bit(enable)
+                    w.trans_inten().bit(enable)
                 });
             } else {
                 self.register_block().dma_int_ena().write(|w| {
