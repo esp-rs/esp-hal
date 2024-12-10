@@ -71,6 +71,7 @@ use procmacros::ram;
 
 use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
 use crate::{
+    asynch::AtomicWaker,
     clock::Clocks,
     dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{interconnect::PeripheralOutput, InputSignal, NoPin, OutputSignal},
@@ -465,10 +466,13 @@ pub struct Spi<'d, Dm, T = AnySpi> {
 
 impl<Dm, T> Spi<'_, Dm, T>
 where
-    T: Instance,
+    T: MasterInstance,
 {
-    fn driver(&self) -> &'static Info {
-        self.spi.info()
+    fn driver(&self) -> Driver {
+        Driver {
+            info: self.spi.info(),
+            state: self.spi.state(),
+        }
     }
 
     /// Read a byte from SPI.
@@ -511,7 +515,7 @@ impl<'d> Spi<'d, Blocking> {
 
 impl<'d, T> Spi<'d, Blocking, T>
 where
-    T: Instance,
+    T: MasterInstance,
 {
     /// Converts the SPI instance into async mode.
     pub fn into_async(self) -> Spi<'d, Async, T> {
@@ -538,7 +542,7 @@ where
 
 impl<'d, T> Spi<'d, Async, T>
 where
-    T: Instance,
+    T: MasterInstance,
 {
     /// Converts the SPI instance into blocking mode.
     pub fn into_blocking(self) -> Spi<'d, Blocking, T> {
@@ -557,7 +561,7 @@ where
 
 impl<'d, Dm, T> Spi<'d, Dm, T>
 where
-    T: Instance,
+    T: MasterInstance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new_typed(
@@ -583,12 +587,12 @@ where
             .with_sck(NoPin)
             .with_cs(NoPin);
 
-        let is_qspi = this.driver().sio2_input.is_some();
+        let is_qspi = this.driver().info.sio2_input.is_some();
         if is_qspi {
-            unwrap!(this.driver().sio2_input).connect_to(NoPin);
-            unwrap!(this.driver().sio2_output).connect_to(NoPin);
-            unwrap!(this.driver().sio3_input).connect_to(NoPin);
-            unwrap!(this.driver().sio3_output).connect_to(NoPin);
+            unwrap!(this.driver().info.sio2_input).connect_to(NoPin);
+            unwrap!(this.driver().info.sio2_output).connect_to(NoPin);
+            unwrap!(this.driver().info.sio3_input).connect_to(NoPin);
+            unwrap!(this.driver().info.sio3_output).connect_to(NoPin);
         }
 
         Ok(this)
@@ -603,8 +607,8 @@ where
         mosi.enable_output(true, private::Internal);
         mosi.enable_input(true, private::Internal);
 
-        self.driver().mosi.connect_to(&mut mosi);
-        self.driver().sio0_input.connect_to(&mut mosi);
+        self.driver().info.mosi.connect_to(&mut mosi);
+        self.driver().info.sio0_input.connect_to(&mut mosi);
 
         self
     }
@@ -618,8 +622,8 @@ where
         miso.enable_input(true, private::Internal);
         miso.enable_output(true, private::Internal);
 
-        self.driver().miso.connect_to(&mut miso);
-        self.driver().sio1_output.connect_to(&mut miso);
+        self.driver().info.miso.connect_to(&mut miso);
+        self.driver().info.sio1_output.connect_to(&mut miso);
 
         self
     }
@@ -631,7 +635,7 @@ where
     pub fn with_sck<SCK: PeripheralOutput>(self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_mapped_ref!(sclk);
         sclk.set_to_push_pull_output(private::Internal);
-        self.driver().sclk.connect_to(sclk);
+        self.driver().info.sclk.connect_to(sclk);
 
         self
     }
@@ -644,7 +648,7 @@ where
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
         cs.set_to_push_pull_output(private::Internal);
-        self.driver().cs.connect_to(cs);
+        self.driver().info.cs.connect_to(cs);
 
         self
     }
@@ -659,7 +663,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm, T> SetConfig for Spi<'_, Dm, T>
 where
-    T: Instance,
+    T: MasterInstance,
     Dm: Mode,
 {
     type Config = Config;
@@ -672,7 +676,7 @@ where
 
 impl<'d, Dm, T> Spi<'d, Dm, T>
 where
-    T: QspiInstance,
+    T: MasterInstance + QspiInstance,
 {
     /// Assign the SIO2 pin for the SPI instance.
     ///
@@ -686,8 +690,8 @@ where
         sio2.enable_input(true, private::Internal);
         sio2.enable_output(true, private::Internal);
 
-        unwrap!(self.driver().sio2_input).connect_to(&mut sio2);
-        unwrap!(self.driver().sio2_output).connect_to(&mut sio2);
+        unwrap!(self.driver().info.sio2_input).connect_to(&mut sio2);
+        unwrap!(self.driver().info.sio2_output).connect_to(&mut sio2);
 
         self
     }
@@ -704,8 +708,8 @@ where
         sio3.enable_input(true, private::Internal);
         sio3.enable_output(true, private::Internal);
 
-        unwrap!(self.driver().sio3_input).connect_to(&mut sio3);
-        unwrap!(self.driver().sio3_output).connect_to(&mut sio3);
+        unwrap!(self.driver().info.sio3_input).connect_to(&mut sio3);
+        unwrap!(self.driver().info.sio3_output).connect_to(&mut sio3);
 
         self
     }
@@ -713,7 +717,7 @@ where
 
 impl<Dm, T> Spi<'_, Dm, T>
 where
-    T: Instance,
+    T: MasterInstance,
 {
     /// Half-duplex read.
     #[instability::unstable]
@@ -838,7 +842,7 @@ mod dma {
     /// embedded-hal traits.
     pub struct SpiDma<'d, Dm, T = AnySpi>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
@@ -852,14 +856,14 @@ mod dma {
 
     impl<Dm, T> crate::private::Sealed for SpiDma<'_, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
     }
 
     impl<'d, T> SpiDma<'d, Blocking, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         /// Converts the SPI instance into async mode.
         pub fn into_async(self) -> SpiDma<'d, Async, T> {
@@ -877,7 +881,7 @@ mod dma {
 
     impl<'d, T> SpiDma<'d, Async, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         /// Converts the SPI instance into async mode.
         pub fn into_blocking(self) -> SpiDma<'d, Blocking, T> {
@@ -895,7 +899,7 @@ mod dma {
 
     impl<Dm, T> core::fmt::Debug for SpiDma<'_, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         /// Formats the `SpiDma` instance for debugging purposes.
@@ -909,13 +913,13 @@ mod dma {
 
     impl<T> InterruptConfigurable for SpiDma<'_, Blocking, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         /// Sets the interrupt handler
         ///
         /// Interrupts are not enabled at the peripheral level here.
         fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-            let interrupt = self.driver().interrupt;
+            let interrupt = self.driver().info.interrupt;
             for core in crate::Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
@@ -927,7 +931,7 @@ mod dma {
     #[cfg(gdma)]
     impl<T> SpiDma<'_, Blocking, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         /// Listen for the given interrupts
         pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
@@ -952,7 +956,7 @@ mod dma {
 
     impl<'d, T> SpiDma<'d, Blocking, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         pub(super) fn new(
             spi: PeripheralRef<'d, T>,
@@ -996,16 +1000,19 @@ mod dma {
 
     impl<'d, Dm, T> SpiDma<'d, Dm, T>
     where
+        T: MasterInstance,
         Dm: Mode,
-        T: Instance,
     {
-        fn driver(&self) -> &'static Info {
-            self.spi.info()
+        fn driver(&self) -> Driver {
+            Driver {
+                info: self.spi.info(),
+                state: self.spi.state(),
+            }
         }
 
         fn dma_driver(&self) -> DmaDriver {
             DmaDriver {
-                info: self.driver(),
+                driver: self.driver(),
                 dma_peripheral: self.spi.dma_peripheral(),
             }
         }
@@ -1187,7 +1194,7 @@ mod dma {
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<Dm, T> SetConfig for SpiDma<'_, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         type Config = Config;
@@ -1204,7 +1211,7 @@ mod dma {
     /// transfer status.
     pub struct SpiDmaTransfer<'d, Dm, Buf, T = AnySpi>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         spi_dma: ManuallyDrop<SpiDma<'d, Dm, T>>,
@@ -1213,7 +1220,7 @@ mod dma {
 
     impl<'d, Dm, T, Buf> SpiDmaTransfer<'d, Dm, Buf, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         fn new(spi_dma: SpiDma<'d, Dm, T>, dma_buf: Buf) -> Self {
@@ -1257,7 +1264,7 @@ mod dma {
 
     impl<Dm, T, Buf> Drop for SpiDmaTransfer<'_, Dm, Buf, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         fn drop(&mut self) {
@@ -1275,7 +1282,7 @@ mod dma {
 
     impl<T, Buf> SpiDmaTransfer<'_, Async, Buf, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         /// Waits for the DMA transfer to complete asynchronously.
         ///
@@ -1287,7 +1294,7 @@ mod dma {
 
     impl<'d, Dm, T> SpiDma<'d, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         /// # Safety:
@@ -1526,8 +1533,7 @@ mod dma {
     /// buffers.
     pub struct SpiDmaBus<'d, Dm, T = AnySpi>
     where
-        T: Instance,
-
+        T: MasterInstance,
         Dm: Mode,
     {
         spi_dma: SpiDma<'d, Dm, T>,
@@ -1537,14 +1543,14 @@ mod dma {
 
     impl<Dm, T> crate::private::Sealed for SpiDmaBus<'_, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
     }
 
     impl<'d, T> SpiDmaBus<'d, Blocking, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         /// Converts the SPI instance into async mode.
         pub fn into_async(self) -> SpiDmaBus<'d, Async, T> {
@@ -1558,7 +1564,7 @@ mod dma {
 
     impl<'d, T> SpiDmaBus<'d, Async, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         /// Converts the SPI instance into async mode.
         pub fn into_blocking(self) -> SpiDmaBus<'d, Blocking, T> {
@@ -1572,7 +1578,7 @@ mod dma {
 
     impl<'d, Dm, T> SpiDmaBus<'d, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         /// Creates a new `SpiDmaBus` with the specified SPI instance and DMA
@@ -1588,7 +1594,7 @@ mod dma {
 
     impl<T> InterruptConfigurable for SpiDmaBus<'_, Blocking, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         /// Sets the interrupt handler
         ///
@@ -1601,7 +1607,7 @@ mod dma {
     #[cfg(gdma)]
     impl<T> SpiDmaBus<'_, Blocking, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         /// Listen for the given interrupts
         pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
@@ -1626,7 +1632,7 @@ mod dma {
 
     impl<Dm, T> SpiDmaBus<'_, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         fn wait_for_idle(&mut self) {
@@ -1818,7 +1824,7 @@ mod dma {
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<Dm, T> SetConfig for SpiDmaBus<'_, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
         Dm: Mode,
     {
         type Config = Config;
@@ -1878,7 +1884,7 @@ mod dma {
 
         impl<T> SpiDmaBus<'_, Async, T>
         where
-            T: Instance,
+            T: MasterInstance,
         {
             /// Fill the given buffer with data from the bus.
             pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
@@ -2006,7 +2012,7 @@ mod dma {
 
         impl<T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, Async, T>
         where
-            T: Instance,
+            T: MasterInstance,
         {
             async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.read_async(words).await
@@ -2038,7 +2044,7 @@ mod dma {
 
         impl<Dm, T> ErrorType for SpiDmaBus<'_, Dm, T>
         where
-            T: Instance,
+            T: MasterInstance,
             Dm: Mode,
         {
             type Error = Error;
@@ -2046,7 +2052,7 @@ mod dma {
 
         impl<Dm, T> SpiBus for SpiDmaBus<'_, Dm, T>
         where
-            T: Instance,
+            T: MasterInstance,
             Dm: Mode,
         {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
@@ -2086,7 +2092,7 @@ mod ehal1 {
 
     impl<Dm, T> FullDuplex for Spi<'_, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
             self.driver().read_byte()
@@ -2099,7 +2105,7 @@ mod ehal1 {
 
     impl<Dm, T> SpiBus for Spi<'_, Dm, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
             self.driver().read_bytes(words)
@@ -2166,7 +2172,7 @@ mod ehal1 {
 
     impl<T> SpiBusAsync for Spi<'_, Async, T>
     where
-        T: Instance,
+        T: MasterInstance,
     {
         async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
             self.driver().read_bytes_async(words).await
@@ -2287,14 +2293,14 @@ pub struct Info {
 }
 
 struct DmaDriver {
-    info: &'static Info,
+    driver: Driver,
     dma_peripheral: crate::dma::DmaPeripheral,
 }
 
 impl DmaDriver {
     fn abort_transfer(&self) {
-        self.info.configure_datalen(1, 1);
-        self.info.update();
+        self.driver.configure_datalen(1, 1);
+        self.driver.update();
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2309,7 +2315,7 @@ impl DmaDriver {
         rx: &mut RX,
         tx: &mut TX,
     ) -> Result<(), Error> {
-        let reg_block = self.info.register_block();
+        let reg_block = self.driver.register_block();
 
         #[cfg(esp32s2)]
         {
@@ -2318,7 +2324,7 @@ impl DmaDriver {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        self.info.configure_datalen(rx_len, tx_len);
+        self.driver.configure_datalen(rx_len, tx_len);
 
         // enable the MISO and MOSI if needed
         reg_block
@@ -2353,7 +2359,7 @@ impl DmaDriver {
         #[cfg(gdma)]
         self.reset_dma();
 
-        self.info.start_operation();
+        self.driver.start_operation();
 
         Ok(())
     }
@@ -2362,7 +2368,7 @@ impl DmaDriver {
         #[cfg(gdma)]
         {
             // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
-            let reg_block = self.info.register_block();
+            let reg_block = self.driver().register_block();
             reg_block.dma_conf().modify(|_, w| {
                 w.dma_tx_ena().set_bit();
                 w.dma_rx_ena().set_bit()
@@ -2388,7 +2394,7 @@ impl DmaDriver {
                 w.dma_afifo_rst().bit(bit)
             });
         }
-        let reg_block = self.info.register_block();
+        let reg_block = self.driver.register_block();
         set_reset_bit(reg_block, true);
         set_reset_bit(reg_block, false);
         self.clear_dma_interrupts();
@@ -2396,7 +2402,7 @@ impl DmaDriver {
 
     #[cfg(gdma)]
     fn clear_dma_interrupts(&self) {
-        let reg_block = self.info.register_block();
+        let reg_block = self.driver.register_block();
         reg_block.dma_int_clr().write(|w| {
             w.dma_infifo_full_err().clear_bit_by_one();
             w.dma_outfifo_empty_err().clear_bit_by_one();
@@ -2408,7 +2414,7 @@ impl DmaDriver {
 
     #[cfg(pdma)]
     fn clear_dma_interrupts(&self) {
-        let reg_block = self.info.register_block();
+        let reg_block = self.driver.register_block();
         reg_block.dma_int_clr().write(|w| {
             w.inlink_dscr_empty().clear_bit_by_one();
             w.outlink_dscr_error().clear_bit_by_one();
@@ -2423,12 +2429,17 @@ impl DmaDriver {
     }
 }
 
+struct Driver {
+    info: &'static Info,
+    state: &'static State,
+}
+
 // private implementation bits
 // FIXME: split this up into peripheral versions
-impl Info {
+impl Driver {
     /// Returns the register block for this SPI instance.
     pub fn register_block(&self) -> &RegisterBlock {
-        unsafe { &*self.register_block }
+        unsafe { &*self.info.register_block }
     }
 
     /// Initialize for full-duplex 1 bit mode
@@ -3143,6 +3154,9 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
+// TODO: this macro needs to move to one level up, and it needs to describe the
+// hardware fully. The master module should extend it with the master specific
+// details.
 macro_rules! spi_instance {
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident $(, $sio2:ident, $sio3:ident)?) => {
         paste::paste! {
@@ -3214,12 +3228,66 @@ impl Instance for super::AnySpi {
 
 impl QspiInstance for super::AnySpi {}
 
+struct State {
+    waker: AtomicWaker,
+}
+
+fn handle_async<I: MasterInstance>(instance: I) {
+    todo!()
+}
+
+#[doc(hidden)]
+pub trait MasterInstance: Instance {
+    fn state(&self) -> &'static State;
+    fn handler(&self) -> InterruptHandler;
+}
+
+macro_rules! master_instance {
+    ($peri:ident) => {
+        impl MasterInstance for $crate::peripherals::$peri {
+            fn state(&self) -> &'static State {
+                static STATE: State = State {
+                    waker: AtomicWaker::new(),
+                };
+
+                &STATE
+            }
+
+            fn handler(&self) -> InterruptHandler {
+                #[$crate::macros::handler]
+                fn handle() {
+                    handle_async(unsafe { $crate::peripherals::$peri::steal() })
+                }
+
+                handle
+            }
+        }
+    };
+}
+
+master_instance!(SPI2);
+#[cfg(spi3)]
+master_instance!(SPI3);
+
+impl MasterInstance for super::AnySpi {
+    delegate::delegate! {
+        to match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn state(&self) -> &'static State;
+            fn handler(&self) -> InterruptHandler;
+        }
+    }
+}
+
 struct SpiFuture<'a> {
-    driver: &'a Info,
+    driver: &'a Driver,
 }
 
 impl<'a> SpiFuture<'a> {
-    pub fn new(driver: &'a Info) -> Self {
+    pub fn new(driver: &'a Driver) -> Self {
         Self { driver }
     }
 
@@ -3251,7 +3319,7 @@ impl Future for SpiFuture<'_> {
             return Poll::Ready(());
         }
 
-        cx.waker().wake_by_ref();
+        self.driver.state.waker.register(cx.waker());
         Poll::Pending
     }
 }
