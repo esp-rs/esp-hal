@@ -579,7 +579,7 @@ where
     }
 
     /// Sends `words` to the slave. Returns the `words` received from the slave
-    pub async fn transfer_async<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
+    pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.driver().transfer_in_place_async(words).await
     }
 }
@@ -2258,7 +2258,7 @@ mod ehal1 {
         }
 
         async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.transfer_async(words).await.map(|_| ())
+            self.transfer_in_place_async(words).await
         }
 
         async fn flush(&mut self) -> Result<(), Self::Error> {
@@ -3048,13 +3048,13 @@ impl Driver {
     }
 
     #[cfg_attr(place_spi_driver_in_ram, ram)]
-    async fn transfer_in_place_async<'w>(&self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
+    async fn transfer_in_place_async(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes_async(chunk).await?;
             self.read_bytes_from_fifo(chunk)?;
         }
 
-        Ok(words)
+        Ok(())
     }
 
     fn start_operation(&self) {
