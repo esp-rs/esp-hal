@@ -206,7 +206,6 @@ global_asm!(
     "
 );
 
-
 cfg_global_asm!(
     "
     // Save processor state to stack.
