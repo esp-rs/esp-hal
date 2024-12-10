@@ -78,11 +78,14 @@ use crate::{
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
+    prelude::InterruptConfigurable,
     private,
+    private::Sealed,
     spi::AnySpi,
     system::PeripheralGuard,
     Async,
     Blocking,
+    Cpu,
     Mode,
 };
 
@@ -464,6 +467,8 @@ pub struct Spi<'d, M, T = AnySpi> {
     guard: PeripheralGuard,
 }
 
+impl<M: Mode, T: MasterInstance> Sealed for Spi<'_, M, T> {}
+
 impl<M, T> Spi<'_, M, T>
 where
     T: MasterInstance,
@@ -518,7 +523,8 @@ where
     T: MasterInstance,
 {
     /// Converts the SPI instance into async mode.
-    pub fn into_async(self) -> Spi<'d, Async, T> {
+    pub fn into_async(mut self) -> Spi<'d, Async, T> {
+        self.set_interrupt_handler(self.spi.handler());
         Spi {
             spi: self.spi,
             _mode: PhantomData,
@@ -540,12 +546,30 @@ where
     }
 }
 
+impl<T> InterruptConfigurable for Spi<'_, Blocking, T>
+where
+    T: MasterInstance,
+{
+    /// Sets the interrupt handler
+    ///
+    /// Interrupts are not enabled at the peripheral level here.
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        let interrupt = self.driver().info.interrupt;
+        for core in Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
+        }
+        unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+    }
+}
+
 impl<'d, T> Spi<'d, Async, T>
 where
     T: MasterInstance,
 {
     /// Converts the SPI instance into blocking mode.
     pub fn into_blocking(self) -> Spi<'d, Blocking, T> {
+        crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
         Spi {
             spi: self.spi,
             _mode: PhantomData,
@@ -2368,7 +2392,7 @@ impl DmaDriver {
         #[cfg(gdma)]
         {
             // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
-            let reg_block = self.driver().register_block();
+            let reg_block = self.driver.register_block();
             reg_block.dma_conf().modify(|_, w| {
                 w.dma_tx_ena().set_bit();
                 w.dma_rx_ena().set_bit()
@@ -2948,6 +2972,55 @@ impl Driver {
         Ok(())
     }
 
+    // FIXME EnumSet flag
+    fn clear_done_interrupt(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                self.register_block().slave().modify(|_, w| {
+                    w.trans_done().clear_bit()
+                });
+            } else {
+                self.register_block().dma_int_clr().write(|w| {
+                    w.trans_done().clear_bit_by_one()
+                });
+            }
+        }
+    }
+
+    fn is_transfer_done(&self) -> bool {
+        let reg_block = self.register_block();
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                reg_block.slave().read().trans_done().bit_is_set()
+            } else {
+                reg_block.dma_int_raw().read().trans_done().bit_is_set()
+            }
+        }
+    }
+
+    fn enable_listen_for_trans_done(&self, enable: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                self.register_block().slave().modify(|_, w| {
+                    reg_block.slave().read().trans_inten().bit(enable)
+                });
+            } else {
+                self.register_block().dma_int_ena().write(|w| {
+                    w.trans_done().bit(enable)
+                });
+            }
+        }
+    }
+
+    fn start_listening(&self) {
+        self.enable_listen_for_trans_done(true);
+    }
+
+    fn stop_listening(&self) {
+        self.enable_listen_for_trans_done(false);
+    }
+
     fn busy(&self) -> bool {
         let reg_block = self.register_block();
         reg_block.cmd().read().usr().bit_is_set()
@@ -2992,21 +3065,6 @@ impl Driver {
         self.clear_done_interrupt();
         self.start_operation();
         SpiFuture::new(self).await;
-    }
-
-    // FIXME EnumSet flag
-    fn clear_done_interrupt(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                self.register_block().slave().modify(|_, w| {
-                    w.trans_done().clear_bit()
-                });
-            } else {
-                self.register_block().dma_int_clr().write(|w| {
-                    w.trans_done().clear_bit_by_one()
-                });
-            }
-        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -3232,12 +3290,20 @@ impl Instance for super::AnySpi {
 
 impl QspiInstance for super::AnySpi {}
 
-struct State {
+#[doc(hidden)]
+pub struct State {
     waker: AtomicWaker,
 }
 
 fn handle_async<I: MasterInstance>(instance: I) {
-    todo!()
+    let state = instance.state();
+    let info = instance.info();
+
+    let driver = Driver { info, state };
+    if driver.is_transfer_done() {
+        state.waker.wake();
+        driver.stop_listening();
+    }
 }
 
 #[doc(hidden)]
@@ -3294,18 +3360,6 @@ impl<'a> SpiFuture<'a> {
     pub fn new(driver: &'a Driver) -> Self {
         Self { driver }
     }
-
-    fn is_done(&self) -> bool {
-        let reg_block = self.driver.register_block();
-
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                reg_block.slave().read().trans_done().bit_is_set()
-            } else {
-                reg_block.dma_int_raw().read().trans_done().bit_is_set()
-            }
-        }
-    }
 }
 
 use core::{
@@ -3318,12 +3372,19 @@ impl Future for SpiFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.is_done() {
+        if self.driver.is_transfer_done() {
             self.driver.clear_done_interrupt();
             return Poll::Ready(());
         }
 
+        self.driver.start_listening();
         self.driver.state.waker.register(cx.waker());
         Poll::Pending
+    }
+}
+
+impl Drop for SpiFuture<'_> {
+    fn drop(&mut self) {
+        self.driver.stop_listening();
     }
 }
