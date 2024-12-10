@@ -2211,7 +2211,6 @@ mod ehal1 {
                 }
 
                 if read_inc > 0 {
-                    SpiBusAsync::flush(self).await?;
                     self.driver()
                         .read_bytes_from_fifo(&mut read[read_from..read_to])?;
                 }
@@ -2228,7 +2227,7 @@ mod ehal1 {
 
         async fn flush(&mut self) -> Result<(), Self::Error> {
             // All operations currently flush so this is no-op.
-            self.driver().flush_async().await
+            Ok(())
         }
     }
 }
@@ -2863,31 +2862,15 @@ impl Info {
     ///
     /// Copies the content of `words` in chunks of 64 bytes into the SPI
     /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed. This function will return before
-    /// all bytes of the last chunk to transmit have been sent to the wire. If
-    /// you must ensure that the whole messages was written correctly, use
-    /// [`Self::flush`].
+    /// sequential transfers are performed.
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     async fn write_bytes_async(&self, words: &[u8]) -> Result<(), Error> {
-        let num_chunks = words.len() / FIFO_SIZE;
-
-        // Flush in case previous writes have not completed yet, required as per
-        // embedded-hal documentation (#1369).
-        self.flush_async().await?;
-
         // The fifo has a limited fixed size, so the data must be chunked and then
         // transmitted
-        for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
+        for chunk in words.chunks(FIFO_SIZE) {
             self.configure_datalen(0, chunk.len());
             self.fill_fifo(chunk);
-            self.start_operation();
-
-            // Wait for all chunks to complete except the last one.
-            // The function is allowed to return before the bus is idle.
-            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0/embedded_hal/spi/index.html#flushing)
-            if i < num_chunks {
-                self.flush_async().await?;
-            }
+            self.start_operation_async().await;
         }
         Ok(())
     }
@@ -2920,7 +2903,6 @@ impl Info {
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes_async(&empty_array[0..chunk.len()]).await?;
-            self.flush_async().await?;
             self.read_bytes_from_fifo(chunk)?;
         }
         Ok(())
@@ -2964,16 +2946,6 @@ impl Info {
         Ok(())
     }
 
-    // Check if the bus is busy and if it is wait for it to be idle
-    async fn flush_async(&self) -> Result<(), Error> {
-        while self.busy() {
-            // wait for bus to be clear
-            // TODO: replace this with waiting for the proper interrupt
-            embassy_futures::yield_now().await;
-        }
-        Ok(())
-    }
-
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn transfer<'w>(&self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
@@ -2989,7 +2961,6 @@ impl Info {
     async fn transfer_in_place_async<'w>(&self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes_async(chunk).await?;
-            self.flush_async().await?;
             self.read_bytes_from_fifo(chunk)?;
         }
 
@@ -3000,6 +2971,27 @@ impl Info {
         let reg_block = self.register_block();
         self.update();
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
+    }
+
+    async fn start_operation_async(&self) {
+        self.clear_done_interrupt();
+        self.start_operation();
+        SpiFuture::new(self).await;
+    }
+
+    // FIXME EnumSet flag
+    fn clear_done_interrupt(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                self.register_block().slave().modify(|_, w| {
+                    w.trans_done().clear_bit()
+                });
+            } else {
+                self.register_block().dma_int_clr().write(|w| {
+                    w.trans_done().clear_bit_by_one()
+                });
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -3221,3 +3213,45 @@ impl Instance for super::AnySpi {
 }
 
 impl QspiInstance for super::AnySpi {}
+
+struct SpiFuture<'a> {
+    driver: &'a Info,
+}
+
+impl<'a> SpiFuture<'a> {
+    pub fn new(driver: &'a Info) -> Self {
+        Self { driver }
+    }
+
+    fn is_done(&self) -> bool {
+        let reg_block = self.driver.register_block();
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                reg_block.slave().read().trans_done().bit_is_set()
+            } else {
+                reg_block.dma_int_raw().read().trans_done().bit_is_set()
+            }
+        }
+    }
+}
+
+use core::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+impl Future for SpiFuture<'_> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.is_done() {
+            self.driver.clear_done_interrupt();
+            return Poll::Ready(());
+        }
+
+        cx.waker().wake_by_ref();
+        Poll::Pending
+    }
+}
