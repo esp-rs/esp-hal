@@ -56,15 +56,11 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let mut rng = Rng::new(peripherals.RNG);
 
     let init = &*mk_static!(
         EspWifiController<'static>,
-        init(
-            timg0.timer0,
-            Rng::new(peripherals.RNG),
-            peripherals.RADIO_CLK,
-        )
-        .unwrap()
+        init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap()
     );
 
     let wifi = peripherals.WIFI;
@@ -84,7 +80,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
-    let seed = 1234; // very random, very secure seed
+    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     // Init network stack
     let stack = &*mk_static!(
