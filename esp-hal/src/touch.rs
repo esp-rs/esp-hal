@@ -90,7 +90,7 @@ pub struct Touch<'d, TOUCHMODE: TouchMode, MODE: Mode> {
     _touch_mode: PhantomData<TOUCHMODE>,
     _mode: PhantomData<MODE>,
 }
-impl<'d, TOUCHMODE: TouchMode, MODE: Mode> Touch<'d, TOUCHMODE, MODE> {
+impl<TOUCHMODE: TouchMode, MODE: Mode> Touch<'_, TOUCHMODE, MODE> {
     /// Common initialization of the touch peripheral.
     fn initialize_common(config: Option<TouchConfig>) {
         let rtccntl = unsafe { &*RTC_CNTL::ptr() };

@@ -315,7 +315,7 @@ pub mod dma {
         }
     }
 
-    impl<'d, M, T> SpiDma<'d, M, T>
+    impl<M, T> SpiDma<'_, M, T>
     where
         M: Mode,
         T: InstanceDma,

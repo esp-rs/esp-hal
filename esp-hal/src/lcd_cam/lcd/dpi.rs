@@ -661,7 +661,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> DpiTransfer<'d, BUF, DM> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> Deref for DpiTransfer<'d, BUF, DM> {
+impl<BUF: DmaTxBuffer, DM: Mode> Deref for DpiTransfer<'_, BUF, DM> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -669,13 +669,13 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> Deref for DpiTransfer<'d, BUF, DM> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> DerefMut for DpiTransfer<'d, BUF, DM> {
+impl<BUF: DmaTxBuffer, DM: Mode> DerefMut for DpiTransfer<'_, BUF, DM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> Drop for DpiTransfer<'d, BUF, DM> {
+impl<BUF: DmaTxBuffer, DM: Mode> Drop for DpiTransfer<'_, BUF, DM> {
     fn drop(&mut self) {
         self.stop_peripherals();
 
