@@ -3003,9 +3003,13 @@ impl Driver {
 
     fn enable_listen_for_trans_done(&self, enable: bool) {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
+            if #[cfg(esp32)] {
                 self.register_block().slave().modify(|_, w| {
                     w.trans_inten().bit(enable)
+                });
+            } else if #[cfg(esp32s2)] {
+                self.register_block().slave().modify(|_, w| {
+                    w.int_trans_done_en().bit(enable)
                 });
             } else {
                 self.register_block().dma_int_ena().write(|w| {
