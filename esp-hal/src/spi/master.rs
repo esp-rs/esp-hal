@@ -467,11 +467,11 @@ pub struct Spi<'d, Dm, T = AnySpi> {
     guard: PeripheralGuard,
 }
 
-impl<Dm: Mode, T: MasterInstance> Sealed for Spi<'_, Dm, T> {}
+impl<Dm: Mode, T: Instance> Sealed for Spi<'_, Dm, T> {}
 
 impl<Dm, T> Spi<'_, Dm, T>
 where
-    T: MasterInstance,
+    T: Instance,
     Dm: Mode,
 {
     fn driver(&self) -> Driver {
@@ -512,7 +512,7 @@ where
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new(
-        spi: impl Peripheral<P = impl Instance> + 'd,
+        spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
         config: Config,
     ) -> Result<Self, ConfigError> {
         Self::new_typed(spi.map_into(), config)
@@ -521,7 +521,7 @@ impl<'d> Spi<'d, Blocking> {
 
 impl<'d, T> Spi<'d, Blocking, T>
 where
-    T: MasterInstance,
+    T: Instance,
 {
     /// Converts the SPI instance into async mode.
     pub fn into_async(mut self) -> Spi<'d, Async, T> {
@@ -549,7 +549,7 @@ where
 
 impl<T> InterruptConfigurable for Spi<'_, Blocking, T>
 where
-    T: MasterInstance,
+    T: Instance,
 {
     /// Sets the interrupt handler
     ///
@@ -566,7 +566,7 @@ where
 
 impl<'d, T> Spi<'d, Async, T>
 where
-    T: MasterInstance,
+    T: Instance,
 {
     /// Converts the SPI instance into blocking mode.
     pub fn into_blocking(self) -> Spi<'d, Blocking, T> {
@@ -586,7 +586,7 @@ where
 
 impl<'d, Dm, T> Spi<'d, Dm, T>
 where
-    T: MasterInstance,
+    T: Instance,
     Dm: Mode,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
@@ -689,7 +689,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm, T> SetConfig for Spi<'_, Dm, T>
 where
-    T: MasterInstance,
+    T: Instance,
     Dm: Mode,
 {
     type Config = Config;
@@ -702,7 +702,7 @@ where
 
 impl<'d, Dm, T> Spi<'d, Dm, T>
 where
-    T: MasterInstance + QspiInstance,
+    T: Instance + QspiInstance,
     Dm: Mode,
 {
     /// Assign the SIO2 pin for the SPI instance.
@@ -744,7 +744,7 @@ where
 
 impl<Dm, T> Spi<'_, Dm, T>
 where
-    T: MasterInstance,
+    T: Instance,
     Dm: Mode,
 {
     /// Half-duplex read.
@@ -870,7 +870,7 @@ mod dma {
     /// embedded-hal traits.
     pub struct SpiDma<'d, Dm, T = AnySpi>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
@@ -884,14 +884,14 @@ mod dma {
 
     impl<Dm, T> crate::private::Sealed for SpiDma<'_, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
     }
 
     impl<'d, T> SpiDma<'d, Blocking, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         /// Converts the SPI instance into async mode.
         pub fn into_async(self) -> SpiDma<'d, Async, T> {
@@ -909,7 +909,7 @@ mod dma {
 
     impl<'d, T> SpiDma<'d, Async, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         /// Converts the SPI instance into async mode.
         pub fn into_blocking(self) -> SpiDma<'d, Blocking, T> {
@@ -927,7 +927,7 @@ mod dma {
 
     impl<Dm, T> core::fmt::Debug for SpiDma<'_, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         /// Formats the `SpiDma` instance for debugging purposes.
@@ -941,7 +941,7 @@ mod dma {
 
     impl<T> InterruptConfigurable for SpiDma<'_, Blocking, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         /// Sets the interrupt handler
         ///
@@ -959,7 +959,7 @@ mod dma {
     #[cfg(gdma)]
     impl<T> SpiDma<'_, Blocking, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         /// Listen for the given interrupts
         pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
@@ -984,7 +984,7 @@ mod dma {
 
     impl<'d, T> SpiDma<'d, Blocking, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         pub(super) fn new(
             spi: PeripheralRef<'d, T>,
@@ -1028,7 +1028,7 @@ mod dma {
 
     impl<'d, Dm, T> SpiDma<'d, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         fn driver(&self) -> Driver {
@@ -1222,7 +1222,7 @@ mod dma {
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<Dm, T> SetConfig for SpiDma<'_, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         type Config = Config;
@@ -1239,7 +1239,7 @@ mod dma {
     /// transfer status.
     pub struct SpiDmaTransfer<'d, Dm, Buf, T = AnySpi>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         spi_dma: ManuallyDrop<SpiDma<'d, Dm, T>>,
@@ -1248,7 +1248,7 @@ mod dma {
 
     impl<'d, Dm, T, Buf> SpiDmaTransfer<'d, Dm, Buf, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         fn new(spi_dma: SpiDma<'d, Dm, T>, dma_buf: Buf) -> Self {
@@ -1292,7 +1292,7 @@ mod dma {
 
     impl<Dm, T, Buf> Drop for SpiDmaTransfer<'_, Dm, Buf, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         fn drop(&mut self) {
@@ -1310,7 +1310,7 @@ mod dma {
 
     impl<T, Buf> SpiDmaTransfer<'_, Async, Buf, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         /// Waits for the DMA transfer to complete asynchronously.
         ///
@@ -1322,7 +1322,7 @@ mod dma {
 
     impl<'d, Dm, T> SpiDma<'d, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         /// # Safety:
@@ -1561,7 +1561,7 @@ mod dma {
     /// buffers.
     pub struct SpiDmaBus<'d, Dm, T = AnySpi>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         spi_dma: SpiDma<'d, Dm, T>,
@@ -1571,14 +1571,14 @@ mod dma {
 
     impl<Dm, T> crate::private::Sealed for SpiDmaBus<'_, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
     }
 
     impl<'d, T> SpiDmaBus<'d, Blocking, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         /// Converts the SPI instance into async mode.
         pub fn into_async(self) -> SpiDmaBus<'d, Async, T> {
@@ -1592,7 +1592,7 @@ mod dma {
 
     impl<'d, T> SpiDmaBus<'d, Async, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         /// Converts the SPI instance into async mode.
         pub fn into_blocking(self) -> SpiDmaBus<'d, Blocking, T> {
@@ -1606,7 +1606,7 @@ mod dma {
 
     impl<'d, Dm, T> SpiDmaBus<'d, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         /// Creates a new `SpiDmaBus` with the specified SPI instance and DMA
@@ -1622,7 +1622,7 @@ mod dma {
 
     impl<T> InterruptConfigurable for SpiDmaBus<'_, Blocking, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         /// Sets the interrupt handler
         ///
@@ -1635,7 +1635,7 @@ mod dma {
     #[cfg(gdma)]
     impl<T> SpiDmaBus<'_, Blocking, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         /// Listen for the given interrupts
         pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
@@ -1660,7 +1660,7 @@ mod dma {
 
     impl<Dm, T> SpiDmaBus<'_, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         fn wait_for_idle(&mut self) {
@@ -1852,7 +1852,7 @@ mod dma {
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<Dm, T> SetConfig for SpiDmaBus<'_, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         type Config = Config;
@@ -1912,7 +1912,7 @@ mod dma {
 
         impl<T> SpiDmaBus<'_, Async, T>
         where
-            T: MasterInstance,
+            T: Instance,
         {
             /// Fill the given buffer with data from the bus.
             pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
@@ -2040,7 +2040,7 @@ mod dma {
 
         impl<T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, Async, T>
         where
-            T: MasterInstance,
+            T: Instance,
         {
             async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.read_async(words).await
@@ -2072,7 +2072,7 @@ mod dma {
 
         impl<Dm, T> ErrorType for SpiDmaBus<'_, Dm, T>
         where
-            T: MasterInstance,
+            T: Instance,
             Dm: Mode,
         {
             type Error = Error;
@@ -2080,7 +2080,7 @@ mod dma {
 
         impl<Dm, T> SpiBus for SpiDmaBus<'_, Dm, T>
         where
-            T: MasterInstance,
+            T: Instance,
             Dm: Mode,
         {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
@@ -2120,7 +2120,7 @@ mod ehal1 {
 
     impl<Dm, T> FullDuplex for Spi<'_, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
@@ -2134,7 +2134,7 @@ mod ehal1 {
 
     impl<Dm, T> SpiBus for Spi<'_, Dm, T>
     where
-        T: MasterInstance,
+        T: Instance,
         Dm: Mode,
     {
         fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
@@ -2202,7 +2202,7 @@ mod ehal1 {
 
     impl<T> SpiBusAsync for Spi<'_, Async, T>
     where
-        T: MasterInstance,
+        T: Instance,
     {
         async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
             self.driver().read_bytes_async(words).await
@@ -2269,13 +2269,13 @@ mod ehal1 {
 }
 
 /// SPI peripheral instance.
-pub trait Instance: private::Sealed + Into<AnySpi> + DmaEligible + 'static {
+pub trait PeripheralInstance: private::Sealed + Into<AnySpi> + DmaEligible + 'static {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;
 }
 
 /// Marker trait for QSPI-capable SPI peripherals.
-pub trait QspiInstance: Instance {}
+pub trait QspiInstance: PeripheralInstance {}
 
 /// Peripheral data describing a particular SPI instance.
 #[non_exhaustive]
@@ -3228,7 +3228,7 @@ unsafe impl Sync for Info {}
 macro_rules! spi_instance {
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident $(, $sio2:ident, $sio3:ident)?) => {
         paste::paste! {
-            impl Instance for crate::peripherals::[<SPI $num>] {
+            impl PeripheralInstance for crate::peripherals::[<SPI $num>] {
                 #[inline(always)]
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
@@ -3282,7 +3282,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl Instance for super::AnySpi {
+impl PeripheralInstance for super::AnySpi {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,
@@ -3301,7 +3301,7 @@ pub struct State {
     waker: AtomicWaker,
 }
 
-fn handle_async<I: MasterInstance>(instance: I) {
+fn handle_async<I: Instance>(instance: I) {
     let state = instance.state();
     let info = instance.info();
 
@@ -3313,14 +3313,14 @@ fn handle_async<I: MasterInstance>(instance: I) {
 }
 
 #[doc(hidden)]
-pub trait MasterInstance: Instance {
+pub trait Instance: PeripheralInstance {
     fn state(&self) -> &'static State;
     fn handler(&self) -> InterruptHandler;
 }
 
 macro_rules! master_instance {
     ($peri:ident) => {
-        impl MasterInstance for $crate::peripherals::$peri {
+        impl Instance for $crate::peripherals::$peri {
             fn state(&self) -> &'static State {
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
@@ -3345,7 +3345,7 @@ master_instance!(SPI2);
 #[cfg(spi3)]
 master_instance!(SPI3);
 
-impl MasterInstance for super::AnySpi {
+impl Instance for super::AnySpi {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,
