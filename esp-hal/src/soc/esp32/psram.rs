@@ -702,7 +702,7 @@ pub(crate) mod utils {
         unsafe {
             let spi = &*crate::peripherals::SPI1::PTR;
             // We need to clear last bit of INT_EN field here.
-            spi.slave().modify(|_, w| w.trans_done().clear_bit());
+            spi.slave().modify(|_, w| w.trans_inten().clear_bit());
             // SPI_CPOL & SPI_CPHA
             spi.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
             spi.user().modify(|_, w| w.ck_out_edge().clear_bit());
