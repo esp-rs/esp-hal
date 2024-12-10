@@ -66,33 +66,11 @@ impl TimerQueue {
     }
 }
 
-impl embassy_time_queue_driver::TimerQueue for crate::time_driver::TimerQueueDriver {
-    fn schedule_wake(&'static self, at: u64, waker: &core::task::Waker) {
-        #[cfg(integrated_timers)]
-        let waker = embassy_executor::raw::task_from_waker(waker);
-
-        #[cfg(not(single_queue))]
-        unsafe {
-            // FIXME: this is UB, use Exposed Provenance API (or something better) when
-            // available. Expose provenance in `InnerExecutor::init`, and use it here.
-            let executor = &*(waker.executor().unwrap_unchecked()
-                as *const embassy_executor::raw::Executor)
-                .cast::<crate::executor::InnerExecutor>();
-            executor.timer_queue.schedule_wake(at, waker);
-        }
-
-        #[cfg(single_queue)]
-        self.inner.schedule_wake(at, waker);
-    }
-}
-
 #[cfg(integrated_timers)]
 mod adapter {
     use core::cell::RefCell;
 
-    use embassy_executor::raw;
-
-    type Q = embassy_time_queue_driver::queue_integrated::TimerQueue;
+    type Q = embassy_time_queue_driver::queue_integrated::Queue;
 
     /// A simple wrapper around a `Queue` to provide interior mutability.
     pub struct RefCellQueue {
@@ -109,7 +87,7 @@ mod adapter {
 
         /// Schedules a task to run at a specific time, and returns whether any
         /// changes were made.
-        pub fn schedule_wake(&self, at: u64, waker: raw::TaskRef) -> bool {
+        pub fn schedule_wake(&self, at: u64, waker: &core::task::Waker) -> bool {
             self.inner.borrow_mut().schedule_wake(at, waker)
         }
 
@@ -126,7 +104,7 @@ mod adapter {
     }
 
     impl super::TimerQueue {
-        pub fn schedule_wake(&self, at: u64, task: raw::TaskRef) {
+        pub fn schedule_wake(&self, at: u64, task: &core::task::Waker) {
             if self.inner.lock(|q| q.schedule_wake(at, task)) {
                 self.dispatch();
             }
