@@ -175,8 +175,6 @@ mod tests {
         SpiBusAsync::write(&mut spi, &write[..])
             .await
             .expect("Asymmetric write failed");
-        // Flush because we're not reading, so the write may happen in the background
-        SpiBusAsync::flush(&mut spi).await.expect("Flush failed");
 
         assert_eq!(unit.value(), 9);
     }
@@ -214,8 +212,6 @@ mod tests {
         SpiBusAsync::transfer(&mut spi, &mut [], &write[..])
             .await
             .expect("Asymmetric transfer failed");
-        // Flush because we're not reading, so the write may happen in the background
-        SpiBusAsync::flush(&mut spi).await.expect("Flush failed");
 
         assert_eq!(unit.value(), 9);
     }
