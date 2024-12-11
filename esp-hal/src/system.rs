@@ -403,15 +403,15 @@ impl PeripheralClockControl {
     /// Resets the given peripheral
     pub(crate) fn reset(peripheral: Peripheral) {
         debug!("Reset {:?}", peripheral);
-        let system = unsafe { &*SYSTEM::PTR };
+        let system = unsafe { SYSTEM::steal() };
 
         #[cfg(esp32)]
-        let (perip_rst_en0, peri_rst_en) = { (&system.perip_rst_en(), &system.peri_rst_en()) };
+        let (perip_rst_en0, peri_rst_en) = (system.perip_rst_en(), system.peri_rst_en());
         #[cfg(not(esp32))]
-        let perip_rst_en0 = { &system.perip_rst_en0() };
+        let perip_rst_en0 = system.perip_rst_en0();
 
         #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
-        let perip_rst_en1 = { &system.perip_rst_en1() };
+        let perip_rst_en1 = system.perip_rst_en1();
 
         critical_section::with(|_cs| match peripheral {
             #[cfg(spi2)]
