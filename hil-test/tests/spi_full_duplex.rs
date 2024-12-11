@@ -181,6 +181,31 @@ mod tests {
 
     #[test]
     #[cfg(pcnt)]
+    async fn async_write_after_sync_write_waits_for_flush(ctx: Context) {
+        let write = [0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef];
+
+        let unit = ctx.pcnt_unit;
+
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        let mut spi = ctx.spi.into_async();
+
+        // Slow down SCLK so that transferring the buffer takes a while.
+        spi.apply_config(&Config::default().with_frequency(80.kHz()))
+            .expect("Apply config failed");
+
+        SpiBus::write(&mut spi, &write[..]).expect("Sync write failed");
+        SpiBusAsync::write(&mut spi, &write[..])
+            .await
+            .expect("Async write failed");
+
+        assert_eq!(unit.value(), 34);
+    }
+
+    #[test]
+    #[cfg(pcnt)]
     fn test_asymmetric_write_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
