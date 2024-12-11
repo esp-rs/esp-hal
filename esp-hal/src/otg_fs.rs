@@ -62,15 +62,11 @@ pub struct Usb<'d> {
 
 impl<'d> Usb<'d> {
     /// Creates a new `Usb` instance.
-    pub fn new<P, M>(
+    pub fn new(
         usb0: impl Peripheral<P = peripherals::USB0> + 'd,
-        _usb_dp: impl Peripheral<P = P> + 'd,
-        _usb_dm: impl Peripheral<P = M> + 'd,
-    ) -> Self
-    where
-        P: UsbDp + Send + Sync,
-        M: UsbDm + Send + Sync,
-    {
+        _usb_dp: impl Peripheral<P = impl UsbDp> + 'd,
+        _usb_dm: impl Peripheral<P = impl UsbDm> + 'd,
+    ) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self {
