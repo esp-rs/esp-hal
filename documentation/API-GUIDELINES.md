@@ -86,6 +86,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - Every line of code is a liability. Take some time to see if your implementation can be simplified before opening a PR.
 - If you are porting code from ESP-IDF (or anything else), please include a link WITH the commit hash in it, and please highlight the relevant line(s) of code
 - If necessary provide further context as comments (consider linking to code, PRs, TRM - make sure to use permanent links, e.g. include the hash when linking to a Git repository, include the revision, page number etc. when linking to TRMs)
+- Prefer line comments (//) to block comments (/* ... */)
 - Generally, follow common "good practices" and idiomatic Rust style
 - All `Future` objects (public or private) must be marked with ``#[must_use = "futures do nothing unless you `.await` or poll them"]``.
 - Prefer `cfg_if!` (or, if the branches just pick between separate values of the same variable, `cfg!()`) over multiple exclusive `#[cfg]` attributes. `cfg_if!`/`cfg!()` visually divide the options, often results in simpler conditions and simplifies adding new branches in the future.
