@@ -284,10 +284,10 @@ pub mod asynch {
         }
 
         fn disable(&mut self) {
-            crate::interrupt::disable(Cpu::ProCpu, crate::peripherals::Interrupt::USB);
+            crate::interrupt::disable(Cpu::ProCpu, peripherals::Interrupt::USB);
 
             #[cfg(multi_core)]
-            crate::interrupt::disable(Cpu::AppCpu, crate::peripherals::Interrupt::USB);
+            crate::interrupt::disable(Cpu::AppCpu, peripherals::Interrupt::USB);
 
             Usb::_disable();
         }
