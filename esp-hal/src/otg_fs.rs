@@ -231,13 +231,11 @@ pub mod asynch {
         fn start(self, control_max_packet_size: u16) -> (Self::Bus, Self::ControlPipe) {
             let (bus, cp) = self.inner.start(control_max_packet_size);
 
-            (
-                Bus {
-                    inner: bus,
-                    inited: false,
-                },
-                cp,
-            )
+            let mut bus = Bus { inner: bus };
+
+            bus.init();
+
+            (bus, cp)
         }
     }
 
@@ -245,7 +243,6 @@ pub mod asynch {
     // We need a custom wrapper implementation to handle custom initialization.
     pub struct Bus<'d> {
         inner: OtgBus<'d, MAX_EP_COUNT>,
-        inited: bool,
     }
 
     impl<'d> Bus<'d> {
@@ -298,11 +295,6 @@ pub mod asynch {
 
     impl<'d> embassy_usb_driver::Bus for Bus<'d> {
         async fn poll(&mut self) -> Event {
-            if !self.inited {
-                self.init();
-                self.inited = true;
-            }
-
             self.inner.poll().await
         }
 
