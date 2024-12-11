@@ -81,7 +81,7 @@ impl<'d> Usb<'d> {
 
     fn _enable() {
         unsafe {
-            let usb_wrap = &*peripherals::USB_WRAP::PTR;
+            let usb_wrap = peripherals::USB_WRAP::steal();
             usb_wrap.otg_conf().modify(|_, w| {
                 w.usb_pad_enable().set_bit();
                 w.phy_sel().clear_bit();
@@ -89,21 +89,23 @@ impl<'d> Usb<'d> {
                 w.ahb_clk_force_on().set_bit();
                 w.phy_clk_force_on().set_bit()
             });
-
-            #[cfg(esp32s3)]
-            {
-                let rtc = &*peripherals::LPWR::PTR;
-                rtc.usb_conf()
-                    .modify(|_, w| w.sw_hw_usb_phy_sel().set_bit().sw_usb_phy_sel().set_bit());
-            }
-
-            use crate::gpio::Level;
-
-            InputSignal::USB_OTG_IDDIG.connect_to(Level::High); // connected connector is mini-B side
-            InputSignal::USB_SRP_BVALID.connect_to(Level::High); // HIGH to force USB device mode
-            InputSignal::USB_OTG_VBUSVALID.connect_to(Level::High); // receiving a valid Vbus from device
-            InputSignal::USB_OTG_AVALID.connect_to(Level::Low);
         }
+
+        #[cfg(esp32s3)]
+        unsafe {
+            let rtc = peripherals::LPWR::steal();
+            rtc.usb_conf().modify(|_, w| {
+                w.sw_hw_usb_phy_sel().set_bit();
+                w.sw_usb_phy_sel().set_bit()
+            });
+        }
+
+        use crate::gpio::Level;
+
+        InputSignal::USB_OTG_IDDIG.connect_to(Level::High); // connected connector is mini-B side
+        InputSignal::USB_SRP_BVALID.connect_to(Level::High); // HIGH to force USB device mode
+        InputSignal::USB_OTG_VBUSVALID.connect_to(Level::High); // receiving a valid Vbus from device
+        InputSignal::USB_OTG_AVALID.connect_to(Level::Low);
     }
 
     fn _disable() {
