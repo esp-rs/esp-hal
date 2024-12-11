@@ -23,54 +23,13 @@ mod single_core {
 
     impl PriorityLock {
         fn current_priority() -> Priority {
-            cfg_if::cfg_if! {
-                if #[cfg(plic)] {
-                    let plic = unsafe { &*crate::peripherals::PLIC_MX::PTR };
-                    let prev_interrupt_priority = plic.mxint_thresh().read().cpu_mxint_thresh().bits().saturating_sub(1);
-                } else if #[cfg(all(riscv, not(plic)))] {
-                    let intr = unsafe { &*crate::peripherals::INTERRUPT_CORE0::PTR };
-                    let prev_interrupt_priority = intr.cpu_int_thresh().read().bits().saturating_sub(1) as u8;
-                } else if #[cfg(xtensa)] {
-                    let ps: u32;
-                    unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
-
-                    let prev_interrupt_priority = ps as u8 & 0x0F;
-                } else {
-                    compile_error!("Unsupported architecture")
-                }
-            };
-
-            unwrap!(Priority::try_from(prev_interrupt_priority))
+            crate::interrupt::current_runlevel()
         }
 
         /// Prevents interrupts above `level` from firing and returns the
         /// current run level.
         unsafe fn change_current_level(level: Priority) -> Priority {
-            cfg_if::cfg_if! {
-                if #[cfg(plic)] {
-                    let plic = &*crate::peripherals::PLIC_MX::PTR;
-                    let prev_interrupt_priority = plic.mxint_thresh().read().cpu_mxint_thresh().bits().saturating_sub(1);
-                    plic.mxint_thresh().write(|w| w.cpu_mxint_thresh().bits(level as u8 + 1));
-                } else if #[cfg(all(riscv, not(plic)))] {
-                    let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
-                    let prev_interrupt_priority = intr.cpu_int_thresh().read().bits().saturating_sub(1) as u8;
-                    intr.cpu_int_thresh().write(|w| w.bits(level as u32 + 1));
-                } else if #[cfg(xtensa)] {
-                    let token: u32;
-                    match level {
-                        Priority::None => core::arch::asm!("rsil {0}, 0", out(reg) token),
-                        Priority::Priority1 => core::arch::asm!("rsil {0}, 1", out(reg) token),
-                        Priority::Priority2 => core::arch::asm!("rsil {0}, 2", out(reg) token),
-                        Priority::Priority3 => core::arch::asm!("rsil {0}, 3", out(reg) token),
-                    };
-
-                    let prev_interrupt_priority = token as u8 & 0x0F;
-                } else {
-                    compile_error!("Unsupported architecture")
-                }
-            };
-
-            unwrap!(Priority::try_from(prev_interrupt_priority))
+            crate::interrupt::change_current_runlevel(level)
         }
     }
 

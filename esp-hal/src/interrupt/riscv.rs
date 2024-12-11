@@ -707,6 +707,34 @@ mod classic {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         intr.cpu_int_thresh().write(|w| w.bits(stored_prio));
     }
+
+    /// Get the current run level (the level below which interrupts are masked).
+    pub(crate) fn current_runlevel() -> Priority {
+        let intr = unsafe { crate::peripherals::INTERRUPT_CORE0::steal() };
+        let prev_interrupt_priority = intr.cpu_int_thresh().read().bits().saturating_sub(1) as u8;
+
+        unwrap!(Priority::try_from(prev_interrupt_priority))
+    }
+
+    /// Changes the current run level (the level below which interrupts are
+    /// masked), and returns the previous run level.
+    ///
+    /// # Safety
+    ///
+    /// This function must only be used to raise the runlevel and to restore it
+    /// to a previous value. It must not be used to arbitrarily lower the
+    /// runlevel.
+    pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
+        let prev_interrupt_priority = current_runlevel();
+
+        // The CPU responds to interrupts `>= level`, but we want to also disable
+        // interrupts at `level` so we set the threshold to `level + 1`.
+        crate::peripherals::INTERRUPT_CORE0::steal()
+            .cpu_int_thresh()
+            .write(|w| w.bits(level as u32 + 1));
+
+        prev_interrupt_priority
+    }
 }
 
 #[cfg(plic)]
@@ -842,5 +870,37 @@ mod plic {
         let plic = &*crate::peripherals::PLIC_MX::PTR;
         plic.mxint_thresh()
             .write(|w| w.cpu_mxint_thresh().bits(stored_prio as u8));
+    }
+
+    /// Get the current run level (the level below which interrupts are masked).
+    pub(crate) fn current_runlevel() -> Priority {
+        let prev_interrupt_priority = unsafe { crate::peripherals::PLIC_MX::steal() }
+            .mxint_thresh()
+            .read()
+            .cpu_mxint_thresh()
+            .bits()
+            .saturating_sub(1);
+
+        unwrap!(Priority::try_from(prev_interrupt_priority))
+    }
+
+    /// Changes the current run level (the level below which interrupts are
+    /// masked), and returns the previous run level.
+    ///
+    /// # Safety
+    ///
+    /// This function must only be used to raise the runlevel and to restore it
+    /// to a previous value. It must not be used to arbitrarily lower the
+    /// runlevel.
+    pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
+        let prev_interrupt_priority = current_runlevel();
+
+        // The CPU responds to interrupts `>= level`, but we want to also disable
+        // interrupts at `level` so we set the threshold to `level + 1`.
+        crate::peripherals::PLIC_MX::steal()
+            .mxint_thresh()
+            .write(|w| w.cpu_mxint_thresh().bits(level as u8 + 1));
+
+        prev_interrupt_priority
     }
 }
