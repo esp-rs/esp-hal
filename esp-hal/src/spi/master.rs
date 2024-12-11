@@ -578,8 +578,24 @@ where
         }
     }
 
+    /// Waits for the completion of previous operations.
+    pub async fn flush_async(&mut self) -> Result<(), Error> {
+        let driver = self.driver();
+
+        if !driver.busy() {
+            return Ok(());
+        }
+
+        SpiFuture::new(&driver).await;
+
+        Ok(())
+    }
+
     /// Sends `words` to the slave. Returns the `words` received from the slave
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        // We need to flush because the blocking transfer functions may return while a
+        // transfer is still in progress.
+        self.flush_async().await?;
         self.driver().transfer_in_place_async(words).await
     }
 }
@@ -2205,10 +2221,16 @@ mod ehal1 {
         T: Instance,
     {
         async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+            // We need to flush because the blocking transfer functions may return while a
+            // transfer is still in progress.
+            self.flush_async().await?;
             self.driver().read_bytes_async(words).await
         }
 
         async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+            // We need to flush because the blocking transfer functions may return while a
+            // transfer is still in progress.
+            self.flush_async().await?;
             self.driver().write_bytes_async(words).await
         }
 
@@ -2262,8 +2284,7 @@ mod ehal1 {
         }
 
         async fn flush(&mut self) -> Result<(), Self::Error> {
-            // All operations currently flush so this is no-op.
-            Ok(())
+            self.flush_async().await
         }
     }
 }
@@ -3383,8 +3404,8 @@ impl Future for SpiFuture<'_> {
             return Poll::Ready(());
         }
 
-        self.driver.start_listening();
         self.driver.state.waker.register(cx.waker());
+        self.driver.start_listening();
         Poll::Pending
     }
 }
