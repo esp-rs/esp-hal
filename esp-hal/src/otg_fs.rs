@@ -164,6 +164,7 @@ pub mod asynch {
     /// Asynchronous USB driver.
     pub struct Driver<'d> {
         inner: OtgDriver<'d, MAX_EP_COUNT>,
+        _usb: Usb<'d>,
     }
 
     impl<'d> Driver<'d> {
@@ -179,7 +180,7 @@ pub mod asynch {
         ///
         /// Must be large enough to fit all OUT endpoint max packet sizes.
         /// Endpoint allocation will fail if it is too small.
-        pub fn new(_peri: Usb<'d>, ep_out_buffer: &'d mut [u8], config: Config) -> Self {
+        pub fn new(peri: Usb<'d>, ep_out_buffer: &'d mut [u8], config: Config) -> Self {
             // From `synopsys-usb-otg` crate:
             // This calculation doesn't correspond to one in a Reference Manual.
             // In fact, the required number of words is higher than indicated in RM.
@@ -198,6 +199,7 @@ pub mod asynch {
             };
             Self {
                 inner: OtgDriver::new(ep_out_buffer, instance, config),
+                _usb: peri,
             }
         }
     }
@@ -231,7 +233,10 @@ pub mod asynch {
         fn start(self, control_max_packet_size: u16) -> (Self::Bus, Self::ControlPipe) {
             let (bus, cp) = self.inner.start(control_max_packet_size);
 
-            let mut bus = Bus { inner: bus };
+            let mut bus = Bus {
+                inner: bus,
+                _usb: self._usb,
+            };
 
             bus.init();
 
@@ -243,6 +248,7 @@ pub mod asynch {
     // We need a custom wrapper implementation to handle custom initialization.
     pub struct Bus<'d> {
         inner: OtgBus<'d, MAX_EP_COUNT>,
+        _usb: Usb<'d>,
     }
 
     impl<'d> Bus<'d> {
