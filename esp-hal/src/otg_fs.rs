@@ -260,23 +260,21 @@ pub mod asynch {
             while !r.grstctl().read().ahbidl() {}
 
             // Configure as device.
-            r.gusbcfg().write(|w| {
+            r.gusbcfg().modify(|w| {
                 // Force device mode
                 w.set_fdmod(true);
                 w.set_srpcap(false);
-                // Enable internal full-speed PHY
-                w.set_physel(true);
             });
-            self.inner.config_v1();
 
             // Perform core soft-reset
+            while !r.grstctl().read().ahbidl() {}
             r.grstctl().modify(|w| w.set_csrst(true));
             while r.grstctl().read().csrst() {}
 
-            r.pcgcctl().modify(|w| {
-                // Disable power down
-                w.set_stppclk(false);
-            });
+            self.inner.config_v1();
+
+            // Enable PHY clock
+            r.pcgcctl().write(|w| w.0 = 0);
 
             unsafe {
                 crate::interrupt::bind_interrupt(
