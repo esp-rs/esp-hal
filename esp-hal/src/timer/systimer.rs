@@ -26,7 +26,7 @@ use crate::{
     interrupt::{self, InterruptConfigurable, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
-    sync::{lock, Lock},
+    sync::{lock, RawMutex},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     Cpu,
 };
@@ -628,8 +628,8 @@ impl Peripheral for Alarm {
 
 impl crate::private::Sealed for Alarm {}
 
-static CONF_LOCK: Lock = Lock::new();
-static INT_ENA_LOCK: Lock = Lock::new();
+static CONF_LOCK: RawMutex = RawMutex::new();
+static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 // Async functionality of the system timer.
 mod asynch {

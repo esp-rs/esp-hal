@@ -1,6 +1,6 @@
 use core::cell::Cell;
 
-use embassy_time_driver::{AlarmHandle, Driver};
+use embassy_time_driver::Driver;
 use esp_hal::{
     interrupt::{InterruptHandler, Priority},
     prelude::*,
@@ -12,24 +12,49 @@ use esp_hal::{
 
 pub type Timer = OneShotTimer<'static, Blocking, AnyTimer>;
 
+/// Alarm handle, assigned by the driver.
+#[derive(Clone, Copy)]
+pub(crate) struct AlarmHandle {
+    id: usize,
+}
+
+impl AlarmHandle {
+    /// Create an AlarmHandle
+    ///
+    /// Safety: May only be called by the current global Driver impl.
+    /// The impl is allowed to rely on the fact that all `AlarmHandle` instances
+    /// are created by itself in unsafe code (e.g. indexing operations)
+    pub unsafe fn new(id: usize) -> Self {
+        Self { id }
+    }
+
+    pub fn update(&self, expiration: u64) -> bool {
+        if expiration == u64::MAX {
+            true
+        } else {
+            DRIVER.set_alarm(*self, expiration)
+        }
+    }
+}
+
 enum AlarmState {
     Created(extern "C" fn()),
-    Allocated(extern "C" fn()),
     Initialized(&'static mut Timer),
 }
 impl AlarmState {
-    fn initialize(timer: &'static mut Timer, interrupt_handler: extern "C" fn()) -> AlarmState {
+    fn initialize(timer: &'static mut Timer, interrupt_handler: InterruptHandler) -> AlarmState {
         // If the driver is initialized, bind the interrupt handler to the
         // timer. This ensures that alarms allocated after init are correctly
         // bound to the core that created the executor.
-        timer.set_interrupt_handler(InterruptHandler::new(interrupt_handler, Priority::max()));
+        timer.set_interrupt_handler(interrupt_handler);
         timer.enable_interrupt(true);
         AlarmState::Initialized(timer)
     }
 }
 
 struct AlarmInner {
-    pub callback: Cell<(*const (), *mut ())>,
+    pub callback: Cell<*const ()>,
+
     pub state: AlarmState,
 }
 
@@ -43,7 +68,7 @@ impl Alarm {
     pub const fn new(handler: extern "C" fn()) -> Self {
         Self {
             inner: Locked::new(AlarmInner {
-                callback: Cell::new((core::ptr::null(), core::ptr::null_mut())),
+                callback: Cell::new(core::ptr::null_mut()),
                 state: AlarmState::Created(handler),
             }),
         }
@@ -78,7 +103,7 @@ embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTime
 });
 
 impl EmbassyTimer {
-    pub(super) fn init(mut timers: &'static mut [Timer]) {
+    pub(super) fn init(timers: &'static mut [Timer]) {
         assert!(
             timers.len() <= MAX_SUPPORTED_ALARM_COUNT,
             "Maximum {} timers can be used.",
@@ -91,33 +116,21 @@ impl EmbassyTimer {
             timer.stop();
         });
 
-        // Initialize already allocated timers
-        for alarm in DRIVER.alarms.iter() {
-            timers = alarm.inner.with(move |alarm| {
-                if let AlarmState::Allocated(interrupt_handler) = alarm.state {
-                    // Pluck off a timer
-
-                    let Some((timer, remaining_timers)) = timers.split_first_mut() else {
-                        not_enough_timers();
-                    };
-
-                    alarm.state = AlarmState::initialize(timer, interrupt_handler);
-
-                    remaining_timers
-                } else {
-                    timers
-                }
-            });
-        }
-
         // Store the available timers
         DRIVER
             .available_timers
             .with(|available_timers| *available_timers = Some(timers));
     }
 
+    #[cfg(not(single_queue))]
+    pub(crate) fn set_callback_ctx(&self, alarm: AlarmHandle, ctx: *const ()) {
+        self.alarms[alarm.id].inner.with(|alarm| {
+            alarm.callback.set(ctx.cast_mut());
+        })
+    }
+
     fn on_interrupt(&self, id: usize) {
-        let (cb, ctx) = self.alarms[id].inner.with(|alarm| {
+        let ctx = self.alarms[id].inner.with(|alarm| {
             if let AlarmState::Initialized(timer) = &mut alarm.state {
                 timer.clear_interrupt();
                 alarm.callback.get()
@@ -129,15 +142,7 @@ impl EmbassyTimer {
             }
         });
 
-        let cb: fn(*mut ()) = unsafe {
-            // Safety:
-            // - we can ignore the possibility of `f` being unset (null) because of the
-            //   safety contract of `allocate_alarm`.
-            // - other than that we only store valid function pointers into alarm.callback
-            core::mem::transmute(cb)
-        };
-
-        cb(ctx);
+        TIMER_QUEUE_DRIVER.handle_alarm(ctx);
     }
 
     /// Returns `true` if the timer was armed, `false` if the timestamp is in
@@ -157,14 +162,8 @@ impl EmbassyTimer {
             false
         }
     }
-}
 
-impl Driver for EmbassyTimer {
-    fn now(&self) -> u64 {
-        now().ticks()
-    }
-
-    unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
+    pub(crate) unsafe fn allocate_alarm(&self, priority: Priority) -> Option<AlarmHandle> {
         for (i, alarm) in self.alarms.iter().enumerate() {
             let handle = alarm.inner.with(|alarm| {
                 let AlarmState::Created(interrupt_handler) = alarm.state else {
@@ -189,15 +188,15 @@ impl Driver for EmbassyTimer {
                 });
 
                 alarm.state = match timer {
-                    Some(timer) => AlarmState::initialize(timer, interrupt_handler),
+                    Some(timer) => AlarmState::initialize(
+                        timer,
+                        InterruptHandler::new(interrupt_handler, priority),
+                    ),
 
-                    None => {
-                        // No timers are available yet, mark the alarm as allocated.
-                        AlarmState::Allocated(interrupt_handler)
-                    }
+                    None => panic!(),
                 };
 
-                Some(AlarmHandle::new(i as u8))
+                Some(AlarmHandle::new(i))
             });
 
             if handle.is_some() {
@@ -208,16 +207,8 @@ impl Driver for EmbassyTimer {
         None
     }
 
-    fn set_alarm_callback(&self, alarm: AlarmHandle, callback: fn(*mut ()), ctx: *mut ()) {
-        let n = alarm.id() as usize;
-
-        self.alarms[n].inner.with(|alarm| {
-            alarm.callback.set((callback as *const (), ctx));
-        })
-    }
-
-    fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
-        let alarm = &self.alarms[alarm.id() as usize];
+    pub(crate) fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
+        let alarm = &self.alarms[alarm.id];
 
         // If `embassy-executor/integrated-timers` is enabled and there are no pending
         // timers, embassy still calls `set_alarm` with `u64::MAX`. By returning
@@ -244,11 +235,55 @@ impl Driver for EmbassyTimer {
     }
 }
 
+impl Driver for EmbassyTimer {
+    fn now(&self) -> u64 {
+        now().ticks()
+    }
+}
+
 #[cold]
 #[track_caller]
 fn not_enough_timers() -> ! {
     // This is wrapped in a separate function because rustfmt does not like
     // extremely long strings. Also, if log is used, this avoids storing the string
     // twice.
-    panic!("There are not enough timers to allocate a new alarm. Call esp_hal_embassy::init() with the correct number of timers, or consider using one of the embassy-timer/generic-queue-X features.");
+    panic!("There are not enough timers to allocate a new alarm. Call esp_hal_embassy::init() with the correct number of timers, or consider either using the single-queue feature or disabling integrated-timers.");
 }
+
+pub(crate) struct TimerQueueDriver {
+    #[cfg(single_queue)]
+    pub(crate) inner: crate::timer_queue::TimerQueue,
+}
+
+impl TimerQueueDriver {
+    const fn new() -> Self {
+        Self {
+            #[cfg(single_queue)]
+            inner: crate::timer_queue::TimerQueue::new(Priority::max()),
+        }
+    }
+
+    fn handle_alarm(&self, _ctx: *const ()) {
+        #[cfg(all(integrated_timers, not(single_queue)))]
+        {
+            let executor = unsafe { &*_ctx.cast::<crate::executor::InnerExecutor>() };
+            executor.timer_queue.dispatch();
+        }
+
+        #[cfg(single_queue)]
+        self.inner.dispatch();
+    }
+}
+
+pub(crate) fn set_up_alarm(priority: Priority, _ctx: *mut ()) -> AlarmHandle {
+    let alarm = unsafe {
+        DRIVER
+            .allocate_alarm(priority)
+            .unwrap_or_else(|| not_enough_timers())
+    };
+    #[cfg(not(single_queue))]
+    DRIVER.set_callback_ctx(alarm, _ctx);
+    alarm
+}
+
+embassy_time_queue_driver::timer_queue_impl!(static TIMER_QUEUE_DRIVER: TimerQueueDriver = TimerQueueDriver::new());

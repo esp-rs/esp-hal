@@ -28,10 +28,14 @@ esp32h2 = ["esp-backtrace/esp32h2", "esp-hal/esp32h2", "esp-hal-embassy/esp32h2"
 esp32s2 = ["esp-backtrace/esp32s2", "esp-hal/esp32s2", "esp-hal-embassy/esp32s2", "esp-println/esp32s2"]
 esp32s3 = ["esp-backtrace/esp32s3", "esp-hal/esp32s3", "esp-hal-embassy/esp32s3", "esp-println/esp32s3"]
 
-embassy-generic-timers = ["embassy-time/generic-queue-8"]
-
 [profile.release]
 debug         = 2
 debug-assertions = true
 lto           = "fat"
 codegen-units = 1
+
+[patch.crates-io]
+embassy-executor    = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time        = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-time-queue-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }

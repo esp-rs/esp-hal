@@ -340,7 +340,7 @@ mod vectored {
     use super::*;
 
     /// Interrupt priority levels.
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[repr(u8)]
     pub enum Priority {
@@ -363,6 +363,20 @@ mod vectored {
         /// Minimum interrupt priority
         pub const fn min() -> Priority {
             Priority::Priority1
+        }
+    }
+
+    impl TryFrom<u8> for Priority {
+        type Error = Error;
+
+        fn try_from(value: u8) -> Result<Self, Self::Error> {
+            match value {
+                0 => Ok(Priority::None),
+                1 => Ok(Priority::Priority1),
+                2 => Ok(Priority::Priority2),
+                3 => Ok(Priority::Priority3),
+                _ => Err(Error::InvalidInterrupt),
+            }
         }
     }
 
