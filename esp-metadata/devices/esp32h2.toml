@@ -77,3 +77,5 @@ symbols = [
     "rom_crc_be",
     "rom_md5_bsd",
 ]
+
+memory = [{ name = "dram", start = 0x4080_0000, end = 0x4085_0000 }]
