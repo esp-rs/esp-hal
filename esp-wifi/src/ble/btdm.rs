@@ -25,11 +25,13 @@ static PACKET_SENT: AtomicBool = AtomicBool::new(true);
 
 #[repr(C)]
 struct VhciHostCallbacks {
-    notify_host_send_available: extern "C" fn(), /* callback used to notify that the host can
-                                                  * send packet to controller */
-    notify_host_recv: extern "C" fn(*mut u8, u16) -> i32, /* callback used to notify that the
-                                                           * controller has a packet to send to
-                                                           * the host */
+    // callback used to notify that the host can
+    // send packet to controller
+    notify_host_send_available: extern "C" fn(),
+    // callback used to notify that the
+    // controller has a packet to send to
+    // the host
+    notify_host_recv: extern "C" fn(*mut u8, u16) -> i32,
 }
 
 extern "C" {

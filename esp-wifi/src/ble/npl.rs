@@ -233,9 +233,11 @@ extern "C" {
     pub(crate) fn bt_bb_v2_init_cmplx(value: u8);
 
     pub(crate) fn r_ble_hci_trans_cfg_hs(
-        evt: Option<unsafe extern "C" fn(cmd: *const u8, arg: *const c_void) -> i32>, /* ble_hci_trans_rx_cmd_fn */
+        // ble_hci_trans_rx_cmd_fn
+        evt: Option<unsafe extern "C" fn(cmd: *const u8, arg: *const c_void) -> i32>,
         evt_arg: *const c_void,
-        acl_cb: Option<unsafe extern "C" fn(om: *const OsMbuf, arg: *const c_void) -> i32>, /* ble_hci_trans_rx_acl_fn */
+        // ble_hci_trans_rx_acl_fn
+        acl_cb: Option<unsafe extern "C" fn(om: *const OsMbuf, arg: *const c_void) -> i32>,
         acl_arg: *const c_void,
     );
 

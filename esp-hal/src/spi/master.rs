@@ -2516,13 +2516,12 @@ impl Info {
             // Using APB frequency directly will give us the best result here.
             reg_val = 1 << 31;
         } else {
-            /* For best duty cycle resolution, we want n to be as close to 32 as
-             * possible, but we also need a pre/n combo that gets us as close as
-             * possible to the intended frequency. To do this, we bruteforce n and
-             * calculate the best pre to go along with that. If there's a choice
-             * between pre/n combos that give the same result, use the one with the
-             * higher n.
-             */
+            // For best duty cycle resolution, we want n to be as close to 32 as
+            // possible, but we also need a pre/n combo that gets us as close as
+            // possible to the intended frequency. To do this, we bruteforce n and
+            // calculate the best pre to go along with that. If there's a choice
+            // between pre/n combos that give the same result, use the one with the
+            // higher n.
 
             let mut pre: i32;
             let mut bestn: i32 = -1;
@@ -2530,14 +2529,12 @@ impl Info {
             let mut besterr: i32 = 0;
             let mut errval: i32;
 
-            /* Start at n = 2. We need to be able to set h/l so we have at least
-             * one high and one low pulse.
-             */
+            // Start at n = 2. We need to be able to set h/l so we have at least
+            // one high and one low pulse.
 
             for n in 2..64 {
-                /* Effectively, this does:
-                 *   pre = round((APB_CLK_FREQ / n) / frequency)
-                 */
+                // Effectively, this does:
+                // pre = round((APB_CLK_FREQ / n) / frequency)
 
                 pre = ((apb_clk_freq.raw() as i32 / n) + (frequency.raw() as i32 / 2))
                     / frequency.raw() as i32;
@@ -2562,9 +2559,8 @@ impl Info {
             pre = bestpre;
             let l: i32 = n;
 
-            /* Effectively, this does:
-             *   h = round((duty_cycle * n) / 256)
-             */
+            // Effectively, this does:
+            // h = round((duty_cycle * n) / 256)
 
             let mut h: i32 = (duty_cycle * n + 127) / 256;
             if h <= 0 {
