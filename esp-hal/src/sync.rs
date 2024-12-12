@@ -1,52 +1,109 @@
-//! Under construction: This is public only for tests, please avoid using it.
+//! Under construction: This is public only for tests, please avoid using it
+//! directly.
 
 #[cfg(single_core)]
 use core::cell::Cell;
 use core::cell::UnsafeCell;
 
+use crate::interrupt::Priority;
+
 mod single_core {
     use core::sync::atomic::{compiler_fence, Ordering};
 
-    pub unsafe fn disable_interrupts() -> critical_section::RawRestoreState {
-        cfg_if::cfg_if! {
-            if #[cfg(riscv)] {
-                let mut mstatus = 0u32;
-                core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-                let token = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
-            } else if #[cfg(xtensa)] {
-                let token: critical_section::RawRestoreState;
-                core::arch::asm!("rsil {0}, 5", out(reg) token);
-            } else {
-                compile_error!("Unsupported architecture")
-            }
-        };
+    use crate::interrupt::Priority;
 
-        // Ensure no subsequent memory accesses are reordered to before interrupts are
-        // disabled.
-        compiler_fence(Ordering::SeqCst);
-
-        token
+    /// Trait for single-core locks.
+    pub trait RawLock {
+        unsafe fn enter(&self) -> critical_section::RawRestoreState;
+        unsafe fn exit(&self, token: critical_section::RawRestoreState);
     }
 
-    pub unsafe fn reenable_interrupts(token: critical_section::RawRestoreState) {
-        // Ensure no preceeding memory accesses are reordered to after interrupts are
-        // enabled.
-        compiler_fence(Ordering::SeqCst);
+    /// A lock that disables interrupts below a certain priority.
+    pub struct PriorityLock(pub Priority);
 
-        cfg_if::cfg_if! {
-            if #[cfg(riscv)] {
-                if token != 0 {
-                    esp_riscv_rt::riscv::interrupt::enable();
+    impl PriorityLock {
+        fn current_priority() -> Priority {
+            crate::interrupt::current_runlevel()
+        }
+
+        /// Prevents interrupts above `level` from firing and returns the
+        /// current run level.
+        unsafe fn change_current_level(level: Priority) -> Priority {
+            crate::interrupt::change_current_runlevel(level)
+        }
+    }
+
+    impl RawLock for PriorityLock {
+        unsafe fn enter(&self) -> critical_section::RawRestoreState {
+            let prev_interrupt_priority = unsafe { Self::change_current_level(self.0) };
+            assert!(prev_interrupt_priority <= self.0);
+
+            // Ensure no subsequent memory accesses are reordered to before interrupts are
+            // disabled.
+            compiler_fence(Ordering::SeqCst);
+
+            prev_interrupt_priority as _
+        }
+
+        unsafe fn exit(&self, token: critical_section::RawRestoreState) {
+            assert!(Self::current_priority() <= self.0);
+            // Ensure no preceeding memory accesses are reordered to after interrupts are
+            // enabled.
+            compiler_fence(Ordering::SeqCst);
+
+            #[cfg(xtensa)]
+            let token = token as u8;
+
+            let priority = unwrap!(Priority::try_from(token));
+            unsafe { Self::change_current_level(priority) };
+        }
+    }
+
+    /// A lock that disables interrupts.
+    pub struct InterruptLock;
+
+    impl RawLock for InterruptLock {
+        unsafe fn enter(&self) -> critical_section::RawRestoreState {
+            cfg_if::cfg_if! {
+                if #[cfg(riscv)] {
+                    let mut mstatus = 0u32;
+                    core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
+                    let token = ((mstatus & 0b1000) != 0) as critical_section::RawRestoreState;
+                } else if #[cfg(xtensa)] {
+                    let token: critical_section::RawRestoreState;
+                    core::arch::asm!("rsil {0}, 5", out(reg) token);
+                } else {
+                    compile_error!("Unsupported architecture")
                 }
-            } else if #[cfg(xtensa)] {
-                // Reserved bits in the PS register, these must be written as 0.
-                const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
-                debug_assert!(token & RESERVED_MASK == 0);
-                core::arch::asm!(
-                    "wsr.ps {0}",
-                    "rsync", in(reg) token)
-            } else {
-                compile_error!("Unsupported architecture")
+            };
+
+            // Ensure no subsequent memory accesses are reordered to before interrupts are
+            // disabled.
+            compiler_fence(Ordering::SeqCst);
+
+            token
+        }
+
+        unsafe fn exit(&self, token: critical_section::RawRestoreState) {
+            // Ensure no preceeding memory accesses are reordered to after interrupts are
+            // enabled.
+            compiler_fence(Ordering::SeqCst);
+
+            cfg_if::cfg_if! {
+                if #[cfg(riscv)] {
+                    if token != 0 {
+                        esp_riscv_rt::riscv::interrupt::enable();
+                    }
+                } else if #[cfg(xtensa)] {
+                    // Reserved bits in the PS register, these must be written as 0.
+                    const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
+                    debug_assert!(token & RESERVED_MASK == 0);
+                    core::arch::asm!(
+                        "wsr.ps {0}",
+                        "rsync", in(reg) token)
+                } else {
+                    compile_error!("Unsupported architecture")
+                }
             }
         }
     }
@@ -121,26 +178,24 @@ cfg_if::cfg_if! {
     }
 }
 
-/// A lock that can be used to protect shared resources.
-pub struct Lock {
+/// A generic lock that wraps [`single_core::RawLock`] and
+/// [`multicore::AtomicLock`] and tracks whether the caller has locked
+/// recursively.
+struct GenericRawMutex<L: single_core::RawLock> {
+    lock: L,
     #[cfg(multi_core)]
     inner: multicore::AtomicLock,
     #[cfg(single_core)]
     is_locked: Cell<bool>,
 }
 
-unsafe impl Sync for Lock {}
+unsafe impl<L: single_core::RawLock> Sync for GenericRawMutex<L> {}
 
-impl Default for Lock {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Lock {
+impl<L: single_core::RawLock> GenericRawMutex<L> {
     /// Create a new lock.
-    pub const fn new() -> Self {
+    pub const fn new(lock: L) -> Self {
         Self {
+            lock,
             #[cfg(multi_core)]
             inner: multicore::AtomicLock::new(),
             #[cfg(single_core)]
@@ -156,10 +211,10 @@ impl Lock {
     /// - The returned token must be passed to the corresponding `release` call.
     /// - The caller must ensure to release the locks in the reverse order they
     ///   were acquired.
-    pub unsafe fn acquire(&self) -> critical_section::RawRestoreState {
+    unsafe fn acquire(&self) -> critical_section::RawRestoreState {
         cfg_if::cfg_if! {
             if #[cfg(single_core)] {
-                let mut tkn = unsafe { single_core::disable_interrupts() };
+                let mut tkn = unsafe { self.lock.enter() };
                 let was_locked = self.is_locked.replace(true);
                 if was_locked {
                     tkn |= REENTRY_FLAG;
@@ -175,7 +230,7 @@ impl Lock {
                 // context with the same `current_thread_id`, so it would be allowed to lock the
                 // resource in a theoretically incorrect way.
                 let try_lock = |current_thread_id| {
-                    let mut tkn = unsafe { single_core::disable_interrupts() };
+                    let mut tkn = unsafe { self.lock.enter() };
 
                     match self.inner.try_lock(current_thread_id) {
                         Ok(()) => Some(tkn),
@@ -184,7 +239,7 @@ impl Lock {
                             Some(tkn)
                         }
                         Err(_) => {
-                            unsafe { single_core::reenable_interrupts(tkn) };
+                            unsafe { self.lock.exit(tkn) };
                             None
                         }
                     }
@@ -209,7 +264,7 @@ impl Lock {
     /// - The caller must ensure to release the locks in the reverse order they
     ///   were acquired.
     /// - Each release call must be paired with an acquire call.
-    pub unsafe fn release(&self, token: critical_section::RawRestoreState) {
+    unsafe fn release(&self, token: critical_section::RawRestoreState) {
         if token & REENTRY_FLAG == 0 {
             #[cfg(multi_core)]
             self.inner.unlock();
@@ -217,25 +272,140 @@ impl Lock {
             #[cfg(single_core)]
             self.is_locked.set(false);
 
-            single_core::reenable_interrupts(token);
+            self.lock.exit(token)
         }
+    }
+
+    /// Runs the callback with this lock locked.
+    ///
+    /// Note that this function is not reentrant, calling it reentrantly will
+    /// panic.
+    pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        let _token = LockGuard::new(self);
+        f()
+    }
+}
+
+/// A mutual exclusion primitive.
+///
+/// This lock disables interrupts on the current core while locked.
+#[cfg_attr(
+    multi_core,
+    doc = r#"It needs a bit of memory, but it does not take a global critical
+    section, making it preferrable for use in multi-core systems."#
+)]
+pub struct RawMutex {
+    inner: GenericRawMutex<single_core::InterruptLock>,
+}
+
+impl Default for RawMutex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RawMutex {
+    /// Create a new lock.
+    pub const fn new() -> Self {
+        Self {
+            inner: GenericRawMutex::new(single_core::InterruptLock),
+        }
+    }
+
+    /// Acquires the lock.
+    ///
+    /// # Safety
+    ///
+    /// - Each release call must be paired with an acquire call.
+    /// - The returned token must be passed to the corresponding `release` call.
+    /// - The caller must ensure to release the locks in the reverse order they
+    ///   were acquired.
+    pub unsafe fn acquire(&self) -> critical_section::RawRestoreState {
+        self.inner.acquire()
+    }
+
+    /// Releases the lock.
+    ///
+    /// # Safety
+    ///
+    /// - This function must only be called if the lock was acquired by the
+    ///   current thread.
+    /// - The caller must ensure to release the locks in the reverse order they
+    ///   were acquired.
+    /// - Each release call must be paired with an acquire call.
+    pub unsafe fn release(&self, token: critical_section::RawRestoreState) {
+        self.inner.release(token);
+    }
+
+    /// Runs the callback with this lock locked.
+    ///
+    /// Note that this function is not reentrant, calling it reentrantly will
+    /// panic.
+    pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.inner.lock(f)
+    }
+}
+
+unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawMutex {
+    #[allow(clippy::declare_interior_mutable_const)]
+    const INIT: Self = Self::new();
+
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        // embassy_sync semantics allow reentrancy.
+        let _token = LockGuard::new_reentrant(&self.inner);
+        f()
+    }
+}
+
+/// A mutual exclusion primitive that only disables a limited range of
+/// interrupts.
+///
+/// Trying to acquire or release the lock at a higher priority level will panic.
+pub struct RawPriorityLimitedMutex {
+    inner: GenericRawMutex<single_core::PriorityLock>,
+}
+
+impl RawPriorityLimitedMutex {
+    /// Create a new lock that is accessible at or below the given `priority`.
+    pub const fn new(priority: Priority) -> Self {
+        Self {
+            inner: GenericRawMutex::new(single_core::PriorityLock(priority)),
+        }
+    }
+
+    /// Runs the callback with this lock locked.
+    ///
+    /// Note that this function is not reentrant, calling it reentrantly will
+    /// panic.
+    pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.inner.lock(f)
+    }
+}
+
+unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawPriorityLimitedMutex {
+    #[allow(clippy::declare_interior_mutable_const)]
+    const INIT: Self = Self::new(Priority::max());
+
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        // embassy_sync semantics allow reentrancy.
+        let _token = LockGuard::new_reentrant(&self.inner);
+        f()
     }
 }
 
 // Prefer this over a critical-section as this allows you to have multiple
 // locks active at the same time rather than using the global mutex that is
 // critical-section.
-pub(crate) fn lock<T>(lock: &Lock, f: impl FnOnce() -> T) -> T {
-    let _token = LockGuard::new(lock);
-    f()
+pub(crate) fn lock<T>(lock: &RawMutex, f: impl FnOnce() -> T) -> T {
+    lock.lock(f)
 }
 
-/// Data protected by a [Lock].
+/// Data protected by a [RawMutex].
 ///
 /// This is largely equivalent to a `Mutex<RefCell<T>>`, but accessing the inner
 /// data doesn't hold a critical section on multi-core systems.
 pub struct Locked<T> {
-    lock_state: Lock,
+    lock_state: RawMutex,
     data: UnsafeCell<T>,
 }
 
@@ -243,7 +413,7 @@ impl<T> Locked<T> {
     /// Create a new instance
     pub const fn new(data: T) -> Self {
         Self {
-            lock_state: Lock::new(),
+            lock_state: RawMutex::new(),
             data: UnsafeCell::new(data),
         }
     }
@@ -262,7 +432,7 @@ struct CriticalSection;
 
 critical_section::set_impl!(CriticalSection);
 
-static CRITICAL_SECTION: Lock = Lock::new();
+static CRITICAL_SECTION: RawMutex = RawMutex::new();
 
 unsafe impl critical_section::Impl for CriticalSection {
     unsafe fn acquire() -> critical_section::RawRestoreState {
@@ -274,46 +444,19 @@ unsafe impl critical_section::Impl for CriticalSection {
     }
 }
 
-/// A mutual exclusion primitive.
-///
-/// This is an implementation of `embassy_sync::blocking_mutex::raw::RawMutex`.
-/// It needs a bit of memory, but it does not take a global critical section,
-/// making it preferrable for use in multi-core systems.
-///
-/// On single core systems, this is equivalent to `CriticalSectionRawMutex`.
-pub struct RawMutex(Lock);
-
-impl RawMutex {
-    /// Create a new mutex.
-    #[allow(clippy::new_without_default)]
-    pub const fn new() -> Self {
-        Self(Lock::new())
-    }
-}
-
-unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawMutex {
-    #[allow(clippy::declare_interior_mutable_const)]
-    const INIT: Self = Self(Lock::new());
-
-    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        let _token = LockGuard::new_reentrant(&self.0);
-        f()
-    }
-}
-
-struct LockGuard<'a> {
-    lock: &'a Lock,
+struct LockGuard<'a, L: single_core::RawLock> {
+    lock: &'a GenericRawMutex<L>,
     token: critical_section::RawRestoreState,
 }
 
-impl<'a> LockGuard<'a> {
-    fn new(lock: &'a Lock) -> Self {
+impl<'a, L: single_core::RawLock> LockGuard<'a, L> {
+    fn new(lock: &'a GenericRawMutex<L>) -> Self {
         let this = Self::new_reentrant(lock);
         assert!(this.token & REENTRY_FLAG == 0, "lock is not reentrant");
         this
     }
 
-    fn new_reentrant(lock: &'a Lock) -> Self {
+    fn new_reentrant(lock: &'a GenericRawMutex<L>) -> Self {
         let token = unsafe {
             // SAFETY: the same lock will be released when dropping the guard.
             // This ensures that the lock is released on the same thread, in the reverse
@@ -325,7 +468,7 @@ impl<'a> LockGuard<'a> {
     }
 }
 
-impl Drop for LockGuard<'_> {
+impl<L: single_core::RawLock> Drop for LockGuard<'_, L> {
     fn drop(&mut self) {
         unsafe { self.lock.release(self.token) };
     }
