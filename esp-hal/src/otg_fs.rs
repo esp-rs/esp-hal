@@ -62,15 +62,11 @@ pub struct Usb<'d> {
 
 impl<'d> Usb<'d> {
     /// Creates a new `Usb` instance.
-    pub fn new<P, M>(
+    pub fn new(
         usb0: impl Peripheral<P = peripherals::USB0> + 'd,
-        _usb_dp: impl Peripheral<P = P> + 'd,
-        _usb_dm: impl Peripheral<P = M> + 'd,
-    ) -> Self
-    where
-        P: UsbDp + Send + Sync,
-        M: UsbDm + Send + Sync,
-    {
+        _usb_dp: impl Peripheral<P = impl UsbDp> + 'd,
+        _usb_dm: impl Peripheral<P = impl UsbDm> + 'd,
+    ) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self {
@@ -81,7 +77,7 @@ impl<'d> Usb<'d> {
 
     fn _enable() {
         unsafe {
-            let usb_wrap = &*peripherals::USB_WRAP::PTR;
+            let usb_wrap = peripherals::USB_WRAP::steal();
             usb_wrap.otg_conf().modify(|_, w| {
                 w.usb_pad_enable().set_bit();
                 w.phy_sel().clear_bit();
@@ -89,21 +85,23 @@ impl<'d> Usb<'d> {
                 w.ahb_clk_force_on().set_bit();
                 w.phy_clk_force_on().set_bit()
             });
-
-            #[cfg(esp32s3)]
-            {
-                let rtc = &*peripherals::LPWR::PTR;
-                rtc.usb_conf()
-                    .modify(|_, w| w.sw_hw_usb_phy_sel().set_bit().sw_usb_phy_sel().set_bit());
-            }
-
-            use crate::gpio::Level;
-
-            InputSignal::USB_OTG_IDDIG.connect_to(Level::High); // connected connector is mini-B side
-            InputSignal::USB_SRP_BVALID.connect_to(Level::High); // HIGH to force USB device mode
-            InputSignal::USB_OTG_VBUSVALID.connect_to(Level::High); // receiving a valid Vbus from device
-            InputSignal::USB_OTG_AVALID.connect_to(Level::Low);
         }
+
+        #[cfg(esp32s3)]
+        unsafe {
+            let rtc = peripherals::LPWR::steal();
+            rtc.usb_conf().modify(|_, w| {
+                w.sw_hw_usb_phy_sel().set_bit();
+                w.sw_usb_phy_sel().set_bit()
+            });
+        }
+
+        use crate::gpio::Level;
+
+        InputSignal::USB_OTG_IDDIG.connect_to(Level::High); // connected connector is mini-B side
+        InputSignal::USB_SRP_BVALID.connect_to(Level::High); // HIGH to force USB device mode
+        InputSignal::USB_OTG_VBUSVALID.connect_to(Level::High); // receiving a valid Vbus from device
+        InputSignal::USB_OTG_AVALID.connect_to(Level::Low);
     }
 
     fn _disable() {
@@ -166,6 +164,7 @@ pub mod asynch {
     /// Asynchronous USB driver.
     pub struct Driver<'d> {
         inner: OtgDriver<'d, MAX_EP_COUNT>,
+        _usb: Usb<'d>,
     }
 
     impl<'d> Driver<'d> {
@@ -181,7 +180,7 @@ pub mod asynch {
         ///
         /// Must be large enough to fit all OUT endpoint max packet sizes.
         /// Endpoint allocation will fail if it is too small.
-        pub fn new(_peri: Usb<'d>, ep_out_buffer: &'d mut [u8], config: Config) -> Self {
+        pub fn new(peri: Usb<'d>, ep_out_buffer: &'d mut [u8], config: Config) -> Self {
             // From `synopsys-usb-otg` crate:
             // This calculation doesn't correspond to one in a Reference Manual.
             // In fact, the required number of words is higher than indicated in RM.
@@ -199,6 +198,7 @@ pub mod asynch {
             };
             Self {
                 inner: OtgDriver::new(ep_out_buffer, instance, config),
+                _usb: peri,
             }
         }
     }
@@ -232,13 +232,14 @@ pub mod asynch {
         fn start(self, control_max_packet_size: u16) -> (Self::Bus, Self::ControlPipe) {
             let (bus, cp) = self.inner.start(control_max_packet_size);
 
-            (
-                Bus {
-                    inner: bus,
-                    inited: false,
-                },
-                cp,
-            )
+            let mut bus = Bus {
+                inner: bus,
+                _usb: self._usb,
+            };
+
+            bus.init();
+
+            (bus, cp)
         }
     }
 
@@ -246,7 +247,7 @@ pub mod asynch {
     // We need a custom wrapper implementation to handle custom initialization.
     pub struct Bus<'d> {
         inner: OtgBus<'d, MAX_EP_COUNT>,
-        inited: bool,
+        _usb: Usb<'d>,
     }
 
     impl<'d> Bus<'d> {
@@ -259,42 +260,39 @@ pub mod asynch {
             while !r.grstctl().read().ahbidl() {}
 
             // Configure as device.
-            r.gusbcfg().write(|w| {
+            r.gusbcfg().modify(|w| {
                 // Force device mode
                 w.set_fdmod(true);
                 w.set_srpcap(false);
-                // Enable internal full-speed PHY
-                w.set_physel(true);
             });
-            self.inner.config_v1();
 
             // Perform core soft-reset
+            while !r.grstctl().read().ahbidl() {}
             r.grstctl().modify(|w| w.set_csrst(true));
             while r.grstctl().read().csrst() {}
 
-            r.pcgcctl().modify(|w| {
-                // Disable power down
-                w.set_stppclk(false);
-            });
+            self.inner.config_v1();
+
+            // Enable PHY clock
+            r.pcgcctl().write(|w| w.0 = 0);
 
             unsafe {
                 crate::interrupt::bind_interrupt(
                     crate::peripherals::Interrupt::USB,
                     interrupt_handler.handler(),
                 );
-                crate::interrupt::enable(
-                    crate::peripherals::Interrupt::USB,
-                    interrupt_handler.priority(),
-                )
-                .unwrap();
             }
+            unwrap!(crate::interrupt::enable(
+                crate::peripherals::Interrupt::USB,
+                interrupt_handler.priority(),
+            ));
         }
 
         fn disable(&mut self) {
-            crate::interrupt::disable(Cpu::ProCpu, crate::peripherals::Interrupt::USB);
+            crate::interrupt::disable(Cpu::ProCpu, peripherals::Interrupt::USB);
 
             #[cfg(multi_core)]
-            crate::interrupt::disable(Cpu::AppCpu, crate::peripherals::Interrupt::USB);
+            crate::interrupt::disable(Cpu::AppCpu, peripherals::Interrupt::USB);
 
             Usb::_disable();
         }
@@ -302,11 +300,6 @@ pub mod asynch {
 
     impl<'d> embassy_usb_driver::Bus for Bus<'d> {
         async fn poll(&mut self) -> Event {
-            if !self.inited {
-                self.init();
-                self.inited = true;
-            }
-
             self.inner.poll().await
         }
 
