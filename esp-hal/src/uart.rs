@@ -404,7 +404,7 @@ pub struct Config {
     pub rx_fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
     pub rx_timeout: Option<u8>,
-    /// Optionally disable forced checks on incoming RX inputs.
+    /// Optionally disable forced checks on incoming RX data.
     pub disable_rx_input_checks: bool,
 }
 
