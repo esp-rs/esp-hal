@@ -2352,6 +2352,7 @@ impl Info {
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
+        self.change_disable_rx_input_checks(config.disable_rx_input_checks);
 
         // Reset Tx/Rx FIFOs
         self.rxfifo_reset();
@@ -2617,6 +2618,12 @@ impl Info {
         self.register_block()
             .conf0()
             .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+    }
+
+    fn change_disable_rx_input_checks(&self, disable: bool) {
+        self.register_block()
+            .conf0()
+            .modify(|_, w| w.rx_filter_en().bit(!disable));
     }
 
     fn rxfifo_reset(&self) {
