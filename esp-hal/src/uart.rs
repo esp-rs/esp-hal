@@ -404,6 +404,8 @@ pub struct Config {
     pub rx_fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
     pub rx_timeout: Option<u8>,
+    /// Optionally disable forced checks on incoming RX inputs.
+    pub disable_rx_input_checks: bool,
 }
 
 impl Config {
@@ -481,6 +483,12 @@ impl Config {
         self.rx_timeout = timeout;
         self
     }
+
+    /// Disables forced checks on incoming RX inputs.
+    pub fn disable_rx_input_checks(mut self, disable: bool) -> Self {
+        self.disable_rx_input_checks = disable;
+        self
+    }
 }
 
 impl Default for Config {
@@ -493,6 +501,7 @@ impl Default for Config {
             clock_source: Default::default(),
             rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
             rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
+            disable_rx_input_checks: false,
         }
     }
 }
@@ -1268,9 +1277,11 @@ where
 
         // Setting err_wr_mask stops uart from storing data when data is wrong according
         // to reference manual
-        self.register_block()
-            .conf0()
-            .modify(|_, w| w.err_wr_mask().set_bit());
+        if !config.disable_rx_input_checks {
+            self.register_block()
+                .conf0()
+                .modify(|_, w| w.err_wr_mask().set_bit());
+        }
 
         crate::rom::ets_delay_us(15);
 
