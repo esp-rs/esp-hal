@@ -2623,7 +2623,7 @@ impl Info {
     fn change_disable_rx_input_checks(&self, disable: bool) {
         self.register_block()
             .conf0()
-            .modify(|_, w| w.rx_filter_en().bit(!disable));
+            .modify(|_, w| w.err_wr_mask().bit(!disable));
     }
 
     fn rxfifo_reset(&self) {
