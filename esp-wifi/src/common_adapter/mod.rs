@@ -200,13 +200,7 @@ pub unsafe extern "C" fn puts(s: *const u8) {
 
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
 #[no_mangle]
-static mut WIFI_EVENT: esp_event_base_t = const {
-    if let Ok(str) = core::ffi::CStr::from_bytes_with_nul(b"WIFI_EVENT\0") {
-        str.as_ptr()
-    } else {
-        ::core::panic!()
-    }
-};
+static mut WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
 // stuff needed by wpa-supplicant
 #[no_mangle]
