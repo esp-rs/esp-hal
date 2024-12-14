@@ -1,5 +1,3 @@
-use core::ptr::addr_of;
-
 use esp_wifi_sys::include::timeval;
 use hal::macros::ram;
 
@@ -201,10 +199,14 @@ pub unsafe extern "C" fn puts(s: *const u8) {
 }
 
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
-static mut EVT: i8 = 0;
 #[no_mangle]
-#[allow(unused_unsafe)]
-static mut WIFI_EVENT: esp_event_base_t = unsafe { addr_of!(EVT) };
+static mut WIFI_EVENT: esp_event_base_t = const {
+    if let Ok(str) = core::ffi::CStr::from_bytes_with_nul(b"WIFI_EVENT\0") {
+        str.as_ptr()
+    } else {
+        ::core::panic!()
+    }
+};
 
 // stuff needed by wpa-supplicant
 #[no_mangle]
