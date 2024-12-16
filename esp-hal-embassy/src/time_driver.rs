@@ -256,16 +256,14 @@ impl Driver for EmbassyTimer {
         unsafe {
             // If we have multiple queues, we have integrated timers and our own timer queue
             // implementation.
-            use embassy_executor::raw::{Executor as RawExecutor, TaskRef};
+            use embassy_executor::raw::Executor as RawExecutor;
             use portable_atomic::{AtomicPtr, Ordering};
 
             let task = embassy_executor::raw::task_from_waker(waker);
 
-            let mut executor = unsafe {
-                // SAFETY: it is impossible to schedule a task that has not yet been spawned,
-                // so the executor is guaranteed to be set to a non-null value.
-                task.executor().unwrap_unchecked() as *const RawExecutor
-            };
+            // SAFETY: it is impossible to schedule a task that has not yet been spawned,
+            // so the executor is guaranteed to be set to a non-null value.
+            let mut executor = task.executor().unwrap_unchecked() as *const RawExecutor;
 
             let owner = task
                 .timer_queue_item()
