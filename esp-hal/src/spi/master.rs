@@ -2925,7 +2925,7 @@ impl Driver {
         for chunk in words.chunks(FIFO_SIZE) {
             self.configure_datalen(0, chunk.len());
             self.fill_fifo(chunk);
-            self.start_operation_async().await;
+            self.execute_operation_async().await;
         }
         Ok(())
     }
@@ -3082,7 +3082,7 @@ impl Driver {
     }
 
     /// Starts the operation and waits for it to complete.
-    async fn start_operation_async(&self) {
+    async fn execute_operation_async(&self) {
         self.clear_done_interrupt();
         self.start_operation();
         SpiFuture::new(self).await;
@@ -3316,6 +3316,7 @@ pub struct State {
     waker: AtomicWaker,
 }
 
+#[cfg_attr(place_spi_driver_in_ram, ram)]
 fn handle_async<I: Instance>(instance: I) {
     let state = instance.state();
     let info = instance.info();
@@ -3346,6 +3347,7 @@ macro_rules! master_instance {
 
             fn handler(&self) -> InterruptHandler {
                 #[$crate::macros::handler]
+                #[cfg_attr(place_spi_driver_in_ram, ram)]
                 fn handle() {
                     handle_async(unsafe { $crate::peripherals::$peri::steal() })
                 }
