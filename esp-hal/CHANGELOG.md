@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dropped GPIO futures stop listening for interrupts (#2625)
 - UART driver's `StopBits` enum variants now correctly use UpperCamelCase (#2669)
 - The `PeripheralInput` and `PeripheralOutput` traits are now sealed (#2690)
+- `esp_hal::sync::Lock` has been renamed to RawMutex (#2684)
 
 ### Fixed
 
