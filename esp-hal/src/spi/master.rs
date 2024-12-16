@@ -2888,12 +2888,9 @@ impl Driver {
 
     /// Write bytes to SPI.
     ///
-    /// Copies the content of `words` in chunks of 64 bytes into the SPI
-    /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed. This function will return before
-    /// all bytes of the last chunk to transmit have been sent to the wire. If
-    /// you must ensure that the whole messages was written correctly, use
-    /// [`Self::flush`].
+    /// This function will return before all bytes of the last chunk to transmit
+    /// have been sent to the wire. If you must ensure that the whole
+    /// messages was written correctly, use [`Self::flush`].
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn write_bytes(&self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
@@ -2921,10 +2918,6 @@ impl Driver {
     }
 
     /// Write bytes to SPI.
-    ///
-    /// Copies the content of `words` in chunks of 64 bytes into the SPI
-    /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed.
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     async fn write_bytes_async(&self, words: &[u8]) -> Result<(), Error> {
         // The fifo has a limited fixed size, so the data must be chunked and then
@@ -3088,6 +3081,7 @@ impl Driver {
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
     }
 
+    /// Starts the operation and waits for it to complete.
     async fn start_operation_async(&self) {
         self.clear_done_interrupt();
         self.start_operation();
