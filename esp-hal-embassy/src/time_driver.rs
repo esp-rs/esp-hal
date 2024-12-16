@@ -254,12 +254,48 @@ impl Driver for EmbassyTimer {
     fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
         #[cfg(not(single_queue))]
         unsafe {
+            // If we have multiple queues, we have integrated timers and our own timer queue
+            // implementation.
+            use embassy_executor::raw::{Executor as RawExecutor, TaskRef};
+            use portable_atomic::{AtomicPtr, Ordering};
+
             let task = embassy_executor::raw::task_from_waker(waker);
+
+            let mut executor = unsafe {
+                // SAFETY: it is impossible to schedule a task that has not yet been spawned,
+                // so the executor is guaranteed to be set to a non-null value.
+                task.executor().unwrap_unchecked() as *const RawExecutor
+            };
+
+            let owner = task
+                .timer_queue_item()
+                .payload
+                .as_ref::<AtomicPtr<RawExecutor>>();
+
+            // Try to take ownership over the timer item.
+            let owner = owner.compare_exchange(
+                core::ptr::null_mut(),
+                executor.cast_mut(),
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            );
+
+            // We can't take ownership, but we may still be able to enqueue the task. Point
+            // at the current owner.
+            if let Err(owner) = owner {
+                executor = owner;
+            };
+
+            // It is possible that the task's owner changes in the mean time. It doesn't
+            // matter, at this point the only interesting question is: can we enqueue in the
+            // currently loaded owner's timer queue?
+
+            // Try to enqueue in the current owner's timer queue. This will fail if the
+            // owner has a lower priority ceiling than the current context.
+
             // FIXME: this is UB, use Exposed Provenance API (or something better) when
             // available. Expose provenance in `InnerExecutor::init`, and use it here.
-            let executor = &*(task.executor().unwrap_unchecked()
-                as *const embassy_executor::raw::Executor)
-                .cast::<crate::executor::InnerExecutor>();
+            let executor = &*(executor.cast::<crate::executor::InnerExecutor>());
             executor.timer_queue.schedule_wake(at, waker);
         }
 
