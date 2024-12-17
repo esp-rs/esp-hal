@@ -62,7 +62,7 @@ single-queue = []
 unexpected_cfgs = "allow"
 
 [patch.crates-io]
-embassy-executor    = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
-embassy-time        = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
-embassy-time-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
-embassy-time-queue-driver = { git = "https://github.com/bugadani/embassy", branch = "refactor" }
+embassy-executor    = { git = "https://github.com/bugadani/embassy", branch = "timer-queue-special" }
+embassy-time        = { git = "https://github.com/bugadani/embassy", branch = "timer-queue-special" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy", branch = "timer-queue-special" }
+embassy-time-queue-driver = { git = "https://github.com/bugadani/embassy", branch = "timer-queue-special" }
