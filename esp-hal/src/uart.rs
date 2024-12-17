@@ -616,7 +616,7 @@ pub struct UartRx<'d, Dm, T = AnyUart> {
 }
 
 /// A configuration error.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConfigError {
     /// The requested timeout is not supported.
