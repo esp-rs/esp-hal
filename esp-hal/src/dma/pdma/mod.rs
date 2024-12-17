@@ -194,7 +194,7 @@ pub(super) fn init_dma(_cs: CriticalSection<'_>) {
     }
 }
 
-impl<'d, CH, M> Channel<'d, M, CH>
+impl<CH, M> Channel<'_, M, CH>
 where
     CH: DmaChannel,
     M: Mode,

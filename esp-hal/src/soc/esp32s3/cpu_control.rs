@@ -127,7 +127,7 @@ pub struct AppCoreGuard<'a> {
     phantom: PhantomData<&'a ()>,
 }
 
-impl<'a> Drop for AppCoreGuard<'a> {
+impl Drop for AppCoreGuard<'_> {
     fn drop(&mut self) {
         unsafe {
             internal_park_core(Cpu::AppCpu);
@@ -259,6 +259,7 @@ impl<'d> CpuControl<'d> {
     where
         F: FnOnce(),
     {
+        #[allow(static_mut_refs)] // FIXME
         match START_CORE1_FUNCTION.take() {
             Some(entry) => {
                 let entry = unsafe { ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>()) };

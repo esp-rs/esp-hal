@@ -109,9 +109,9 @@ impl<'d> Usb<'d> {
     }
 }
 
-unsafe impl<'d> Sync for Usb<'d> {}
+unsafe impl Sync for Usb<'_> {}
 
-unsafe impl<'d> UsbPeripheral for Usb<'d> {
+unsafe impl UsbPeripheral for Usb<'_> {
     const REGISTERS: *const () = peripherals::USB0::ptr() as *const ();
 
     const HIGH_SPEED: bool = false;
@@ -250,7 +250,7 @@ pub mod asynch {
         _usb: Usb<'d>,
     }
 
-    impl<'d> Bus<'d> {
+    impl Bus<'_> {
         fn init(&mut self) {
             Usb::_enable();
 
@@ -328,7 +328,7 @@ pub mod asynch {
         }
     }
 
-    impl<'d> Drop for Bus<'d> {
+    impl Drop for Bus<'_> {
         fn drop(&mut self) {
             Bus::disable(self);
         }
