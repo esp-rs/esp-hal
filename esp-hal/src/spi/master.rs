@@ -1654,9 +1654,9 @@ mod dma {
             }
         }
 
-        /// Deconstruct `SpiDmaBus` back into `SpiDma` to allow for manual
+        /// Splits `SpiDmaBus` back into `SpiDma` to allow for manual
         /// buffer control
-        pub fn deconstruct(self) -> (SpiDma<'d, M, T>, DmaRxBuf, DmaTxBuf) {
+        pub fn split(self) -> (SpiDma<'d, M, T>, DmaRxBuf, DmaTxBuf) {
             (self.spi_dma, self.rx_buf, self.tx_buf)
         }
     }
