@@ -3083,6 +3083,7 @@ impl Driver {
 
     /// Starts the operation and waits for it to complete.
     async fn execute_operation_async(&self) {
+        self.stop_listening();
         self.clear_done_interrupt();
         self.start_operation();
         SpiFuture::new(self).await;
