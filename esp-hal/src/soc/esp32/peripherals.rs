@@ -72,7 +72,7 @@ crate::peripherals! {
         UART2 <= UART2,
         UHCI0 <= UHCI0,
         UHCI1 <= UHCI1,
-        WIFI <= virtual,
+        WIFI <= WIFI,
     ],
     pins: [
         (0, [Input, Output, Analog, RtcIo, Touch] (5 => EMAC_TX_CLK) (1 => CLK_OUT1))
