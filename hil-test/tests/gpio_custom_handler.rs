@@ -6,7 +6,9 @@
 //! async API works for user handlers automatically.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: integrated-timers
+//% FEATURES:
+//% FEATURES: esp-hal-embassy/single-queue
+//% FEATURES: esp-hal-embassy/generic-queue
 
 #![no_std]
 #![no_main]

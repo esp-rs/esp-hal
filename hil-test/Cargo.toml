@@ -290,7 +290,6 @@ embassy = [
     "embedded-test/external-executor",
     "dep:esp-hal-embassy",
 ]
-integrated-timers = ["esp-hal-embassy?/integrated-timers"]
 octal-psram = ["esp-hal/octal-psram", "esp-alloc"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
