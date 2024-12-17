@@ -155,7 +155,7 @@ where
     }
 }
 
-impl<'d, T> OneShotTimer<'d, Async, T>
+impl<T> OneShotTimer<'_, Async, T>
 where
     T: Timer,
 {
@@ -197,7 +197,7 @@ where
     }
 }
 
-impl<'d, M, T> OneShotTimer<'d, M, T>
+impl<M, T> OneShotTimer<'_, M, T>
 where
     M: Mode,
     T: Timer,
@@ -329,7 +329,7 @@ where
     }
 }
 
-impl<'d, M, T> PeriodicTimer<'d, M, T>
+impl<M, T> PeriodicTimer<'_, M, T>
 where
     M: Mode,
     T: Timer,

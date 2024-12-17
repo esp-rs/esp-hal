@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
 ### Added
 
 ### Changed
 
+- Bump MSRV to 1.83 (#2615)
+
 ### Fixed
+
 - Fixed triggering a debug-assertion during scan (#2612)
 
 ### Removed

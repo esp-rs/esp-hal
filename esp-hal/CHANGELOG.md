@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
 ### Added
 
 - ESP32-S3: Added SDMMC signals (#2556)
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bump MSRV to 1.83 (#2615)
 - In addition to taking by value, peripheral drivers can now mutably borrow DMA channel objects. (#2526)
 - DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
 - The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
@@ -199,8 +201,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2c::transaction is now able to transmit data of arbitrary length (#2481)
 
 ## [0.21.0]
-
-- Bump MSRV to 1.79.0 (#1971)
 
 ### Added
 

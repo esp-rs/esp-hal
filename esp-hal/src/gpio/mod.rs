@@ -2459,7 +2459,7 @@ mod asynch {
         pin: Flex<'d, P>,
     }
 
-    impl<'d, P: InputPin> PinFuture<'d, P> {
+    impl<P: InputPin> PinFuture<'_, P> {
         fn pin_mask(&self) -> u32 {
             let bank = self.pin.gpio_bank(private::Internal);
             1 << (self.pin.number() - bank.offset())
