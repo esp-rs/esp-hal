@@ -1654,11 +1654,9 @@ mod dma {
             }
         }
 
-        /// Swap dma buffers
-        pub fn swap_buffers(&mut self, rx_buf: DmaRxBuf, tx_buf: DmaTxBuf) -> (DmaRxBuf, DmaTxBuf) {
-            self.wait_for_idle();
-            core::mem::swap(self.rx_buf, rx_buf);
-            core::mem::swap(self.tx_buf, tx_buf);
+        /// Deconstruct `SpiDmaBus` back into `SpiDma` to allow for manual buffer control
+        pub fn deconstruct(self) -> (SpiDma<'d, M, T>, DmaRxBuf, DmaTxBuf) {
+            (self.spi_dma, self.rx_buf, self.tx_buf)
         }
     }
 
