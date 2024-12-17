@@ -47,7 +47,7 @@ impl TimerQueue {
         core::ptr::null_mut()
     }
 
-    pub fn alarm(&self) -> AlarmHandle {
+    fn alarm(&self) -> AlarmHandle {
         unsafe {
             let alarm = &mut *self.alarm.get();
             *alarm.get_or_insert_with(|| set_up_alarm(self.priority, self.context()))
