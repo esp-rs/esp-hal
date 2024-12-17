@@ -92,19 +92,19 @@ pub enum ConfigError {
 }
 
 /// Represents the I8080 LCD interface.
-pub struct I8080<'d, DM: Mode> {
+pub struct I8080<'d, Dm: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
-    _mode: PhantomData<DM>,
+    _mode: PhantomData<Dm>,
 }
 
-impl<'d, DM> I8080<'d, DM>
+impl<'d, Dm> I8080<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P, CH>(
-        lcd: Lcd<'d, DM>,
+        lcd: Lcd<'d, Dm>,
         channel: impl Peripheral<P = CH> + 'd,
         mut pins: P,
         config: Config,
@@ -300,7 +300,7 @@ where
         cmd: impl Into<Command<W>>,
         dummy: u8,
         mut data: BUF,
-    ) -> Result<I8080Transfer<'d, BUF, DM>, (DmaError, Self, BUF)> {
+    ) -> Result<I8080Transfer<'d, BUF, Dm>, (DmaError, Self, BUF)> {
         let cmd = cmd.into();
 
         // Reset LCD control unit and Async Tx FIFO
@@ -396,7 +396,7 @@ where
     }
 }
 
-impl<DM: Mode> core::fmt::Debug for I8080<'_, DM> {
+impl<Dm: Mode> core::fmt::Debug for I8080<'_, Dm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
     }
@@ -404,12 +404,12 @@ impl<DM: Mode> core::fmt::Debug for I8080<'_, DM> {
 
 /// Represents an ongoing (or potentially finished) transfer using the I8080 LCD
 /// interface
-pub struct I8080Transfer<'d, BUF: DmaTxBuffer, DM: Mode> {
-    i8080: ManuallyDrop<I8080<'d, DM>>,
+pub struct I8080Transfer<'d, BUF: DmaTxBuffer, Dm: Mode> {
+    i8080: ManuallyDrop<I8080<'d, Dm>>,
     buf_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> I8080Transfer<'d, BUF, DM> {
+impl<'d, BUF: DmaTxBuffer, Dm: Mode> I8080Transfer<'d, BUF, Dm> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         self.i8080
@@ -421,7 +421,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> I8080Transfer<'d, BUF, DM> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn cancel(mut self) -> (I8080<'d, DM>, BUF) {
+    pub fn cancel(mut self) -> (I8080<'d, Dm>, BUF) {
         self.stop_peripherals();
         let (_, i8080, buf) = self.wait();
         (i8080, buf)
@@ -431,7 +431,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> I8080Transfer<'d, BUF, DM> {
     ///
     /// Note: This also clears the transfer interrupt so it can be used in
     /// interrupt handlers to "handle" the interrupt.
-    pub fn wait(mut self) -> (Result<(), DmaError>, I8080<'d, DM>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, I8080<'d, Dm>, BUF) {
         while !self.is_done() {}
 
         // Clear "done" interrupt.
@@ -470,7 +470,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> I8080Transfer<'d, BUF, DM> {
     }
 }
 
-impl<BUF: DmaTxBuffer, DM: Mode> Deref for I8080Transfer<'_, BUF, DM> {
+impl<BUF: DmaTxBuffer, Dm: Mode> Deref for I8080Transfer<'_, BUF, Dm> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -478,7 +478,7 @@ impl<BUF: DmaTxBuffer, DM: Mode> Deref for I8080Transfer<'_, BUF, DM> {
     }
 }
 
-impl<BUF: DmaTxBuffer, DM: Mode> DerefMut for I8080Transfer<'_, BUF, DM> {
+impl<BUF: DmaTxBuffer, Dm: Mode> DerefMut for I8080Transfer<'_, BUF, Dm> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buf_view
     }
@@ -523,7 +523,7 @@ impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
     }
 }
 
-impl<BUF: DmaTxBuffer, DM: Mode> Drop for I8080Transfer<'_, BUF, DM> {
+impl<BUF: DmaTxBuffer, Dm: Mode> Drop for I8080Transfer<'_, BUF, Dm> {
     fn drop(&mut self) {
         self.stop_peripherals();
 

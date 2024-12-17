@@ -128,19 +128,19 @@ pub enum ConfigError {
 }
 
 /// Represents the RGB LCD interface.
-pub struct Dpi<'d, DM: Mode> {
+pub struct Dpi<'d, Dm: Mode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
-    _mode: PhantomData<DM>,
+    _mode: PhantomData<Dm>,
 }
 
-impl<'d, DM> Dpi<'d, DM>
+impl<'d, Dm> Dpi<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// Create a new instance of the RGB/DPI driver.
     pub fn new<CH>(
-        lcd: Lcd<'d, DM>,
+        lcd: Lcd<'d, Dm>,
         channel: impl Peripheral<P = CH> + 'd,
         config: Config,
     ) -> Result<Self, ConfigError>
@@ -548,7 +548,7 @@ where
         mut self,
         next_frame_en: bool,
         mut buf: TX,
-    ) -> Result<DpiTransfer<'d, TX, DM>, (DmaError, Self, TX)> {
+    ) -> Result<DpiTransfer<'d, TX, Dm>, (DmaError, Self, TX)> {
         let result = unsafe {
             self.tx_channel
                 .prepare_transfer(DmaPeripheral::LcdCam, &mut buf)
@@ -587,12 +587,12 @@ where
 
 /// Represents an ongoing (or potentially finished) transfer using the RGB LCD
 /// interface
-pub struct DpiTransfer<'d, BUF: DmaTxBuffer, DM: Mode> {
-    dpi: ManuallyDrop<Dpi<'d, DM>>,
+pub struct DpiTransfer<'d, BUF: DmaTxBuffer, Dm: Mode> {
+    dpi: ManuallyDrop<Dpi<'d, Dm>>,
     buffer_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, BUF: DmaTxBuffer, DM: Mode> DpiTransfer<'d, BUF, DM> {
+impl<'d, BUF: DmaTxBuffer, Dm: Mode> DpiTransfer<'d, BUF, Dm> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         self.dpi
@@ -604,7 +604,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> DpiTransfer<'d, BUF, DM> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(mut self) -> (Dpi<'d, DM>, BUF) {
+    pub fn stop(mut self) -> (Dpi<'d, Dm>, BUF) {
         self.stop_peripherals();
         let (dpi, view) = self.release();
         (dpi, BUF::from_view(view))
@@ -614,7 +614,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> DpiTransfer<'d, BUF, DM> {
     ///
     /// Note: If you specified `next_frame_en` as true in [Dpi::send], you're
     /// just waiting for a DMA error when you call this.
-    pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, DM>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, Dm>, BUF) {
         while !self.is_done() {
             core::hint::spin_loop();
         }
@@ -637,7 +637,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> DpiTransfer<'d, BUF, DM> {
         (result, dpi, BUF::from_view(view))
     }
 
-    fn release(mut self) -> (Dpi<'d, DM>, BUF::View) {
+    fn release(mut self) -> (Dpi<'d, Dm>, BUF::View) {
         // SAFETY: Since forget is called on self, we know that self.dpi and
         // self.buffer_view won't be touched again.
         let result = unsafe {
@@ -661,7 +661,7 @@ impl<'d, BUF: DmaTxBuffer, DM: Mode> DpiTransfer<'d, BUF, DM> {
     }
 }
 
-impl<BUF: DmaTxBuffer, DM: Mode> Deref for DpiTransfer<'_, BUF, DM> {
+impl<BUF: DmaTxBuffer, Dm: Mode> Deref for DpiTransfer<'_, BUF, Dm> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -669,13 +669,13 @@ impl<BUF: DmaTxBuffer, DM: Mode> Deref for DpiTransfer<'_, BUF, DM> {
     }
 }
 
-impl<BUF: DmaTxBuffer, DM: Mode> DerefMut for DpiTransfer<'_, BUF, DM> {
+impl<BUF: DmaTxBuffer, Dm: Mode> DerefMut for DpiTransfer<'_, BUF, Dm> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<BUF: DmaTxBuffer, DM: Mode> Drop for DpiTransfer<'_, BUF, DM> {
+impl<BUF: DmaTxBuffer, Dm: Mode> Drop for DpiTransfer<'_, BUF, Dm> {
     fn drop(&mut self) {
         self.stop_peripherals();
 

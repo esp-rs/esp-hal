@@ -119,9 +119,9 @@ pub trait Timer: Into<AnyTimer> + InterruptConfigurable + 'static + crate::priva
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<'d, M, T = AnyTimer> {
+pub struct OneShotTimer<'d, Dm, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
-    _ph: PhantomData<M>,
+    _ph: PhantomData<Dm>,
 }
 
 impl<'d> OneShotTimer<'d, Blocking> {
@@ -197,9 +197,9 @@ where
     }
 }
 
-impl<M, T> OneShotTimer<'_, M, T>
+impl<Dm, T> OneShotTimer<'_, Dm, T>
 where
-    M: Mode,
+    Dm: Mode,
     T: Timer,
 {
     /// Delay for *at least* `ms` milliseconds.
@@ -267,16 +267,16 @@ where
     }
 }
 
-impl<M, T> crate::private::Sealed for OneShotTimer<'_, M, T>
+impl<Dm, T> crate::private::Sealed for OneShotTimer<'_, Dm, T>
 where
     T: Timer,
-    M: Mode,
+    Dm: Mode,
 {
 }
 
-impl<M, T> InterruptConfigurable for OneShotTimer<'_, M, T>
+impl<Dm, T> InterruptConfigurable for OneShotTimer<'_, Dm, T>
 where
-    M: Mode,
+    Dm: Mode,
     T: Timer,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
@@ -303,9 +303,9 @@ where
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<'d, M, T = AnyTimer> {
+pub struct PeriodicTimer<'d, Dm, T = AnyTimer> {
     inner: PeripheralRef<'d, T>,
-    _ph: PhantomData<M>,
+    _ph: PhantomData<Dm>,
 }
 
 impl<'d> PeriodicTimer<'d, Blocking> {
@@ -329,9 +329,9 @@ where
     }
 }
 
-impl<M, T> PeriodicTimer<'_, M, T>
+impl<Dm, T> PeriodicTimer<'_, Dm, T>
 where
-    M: Mode,
+    Dm: Mode,
     T: Timer,
 {
     /// Start a new count down.
@@ -390,11 +390,11 @@ where
     }
 }
 
-impl<M, T> crate::private::Sealed for PeriodicTimer<'_, M, T> where T: Timer {}
+impl<Dm, T> crate::private::Sealed for PeriodicTimer<'_, Dm, T> where T: Timer {}
 
-impl<M, T> InterruptConfigurable for PeriodicTimer<'_, M, T>
+impl<Dm, T> InterruptConfigurable for PeriodicTimer<'_, Dm, T>
 where
-    M: Mode,
+    Dm: Mode,
     T: Timer,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {

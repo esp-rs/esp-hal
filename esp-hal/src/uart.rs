@@ -537,15 +537,15 @@ impl AtCmdConfig {
     }
 }
 
-struct UartBuilder<'d, M, T = AnyUart> {
+struct UartBuilder<'d, Dm, T = AnyUart> {
     uart: PeripheralRef<'d, T>,
-    phantom: PhantomData<M>,
+    phantom: PhantomData<Dm>,
 }
 
-impl<'d, M, T> UartBuilder<'d, M, T>
+impl<'d, Dm, T> UartBuilder<'d, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn new(uart: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(uart);
@@ -573,7 +573,7 @@ where
         self
     }
 
-    fn init(self, config: Config) -> Result<Uart<'d, M, T>, ConfigError> {
+    fn init(self, config: Config) -> Result<Uart<'d, Dm, T>, ConfigError> {
         let rx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
         let tx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
 
@@ -596,22 +596,22 @@ where
 }
 
 /// UART (Full-duplex)
-pub struct Uart<'d, M, T = AnyUart> {
-    rx: UartRx<'d, M, T>,
-    tx: UartTx<'d, M, T>,
+pub struct Uart<'d, Dm, T = AnyUart> {
+    rx: UartRx<'d, Dm, T>,
+    tx: UartTx<'d, Dm, T>,
 }
 
 /// UART (Transmit)
-pub struct UartTx<'d, M, T = AnyUart> {
+pub struct UartTx<'d, Dm, T = AnyUart> {
     uart: PeripheralRef<'d, T>,
-    phantom: PhantomData<M>,
+    phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
 }
 
 /// UART (Receive)
-pub struct UartRx<'d, M, T = AnyUart> {
+pub struct UartRx<'d, Dm, T = AnyUart> {
     uart: PeripheralRef<'d, T>,
-    phantom: PhantomData<M>,
+    phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
 }
 
@@ -627,10 +627,10 @@ pub enum ConfigError {
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<M, T> SetConfig for Uart<'_, M, T>
+impl<Dm, T> SetConfig for Uart<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     type Config = Config;
     type ConfigError = ConfigError;
@@ -642,10 +642,10 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<M, T> SetConfig for UartRx<'_, M, T>
+impl<Dm, T> SetConfig for UartRx<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     type Config = Config;
     type ConfigError = ConfigError;
@@ -657,10 +657,10 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<M, T> SetConfig for UartTx<'_, M, T>
+impl<Dm, T> SetConfig for UartTx<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     type Config = Config;
     type ConfigError = ConfigError;
@@ -670,10 +670,10 @@ where
     }
 }
 
-impl<'d, M, T> UartTx<'d, M, T>
+impl<'d, Dm, T> UartTx<'d, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     /// Configure RTS pin
     pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
@@ -861,10 +861,10 @@ fn sync_regs(_register_block: &RegisterBlock) {
     }
 }
 
-impl<'d, M, T> UartRx<'d, M, T>
+impl<'d, Dm, T> UartRx<'d, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     /// Configure CTS pin
     pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
@@ -1142,10 +1142,10 @@ pub enum UartInterrupt {
     RxFifoFull,
 }
 
-impl<'d, M, T> Uart<'d, M, T>
+impl<'d, Dm, T> Uart<'d, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     /// Configure CTS pin
     pub fn with_cts(mut self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
@@ -1168,7 +1168,7 @@ where
     ///
     /// This is particularly useful when having two tasks correlating to
     /// transmitting and receiving.
-    pub fn split(self) -> (UartRx<'d, M, T>, UartTx<'d, M, T>) {
+    pub fn split(self) -> (UartRx<'d, Dm, T>, UartTx<'d, Dm, T>) {
         (self.rx, self.tx)
     }
 
@@ -1353,10 +1353,10 @@ where
     }
 }
 
-impl<T, M> ufmt_write::uWrite for Uart<'_, M, T>
+impl<T, Dm> ufmt_write::uWrite for Uart<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     type Error = Error;
 
@@ -1371,10 +1371,10 @@ where
     }
 }
 
-impl<T, M> ufmt_write::uWrite for UartTx<'_, M, T>
+impl<T, Dm> ufmt_write::uWrite for UartTx<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     type Error = Error;
 
@@ -1385,10 +1385,10 @@ where
     }
 }
 
-impl<T, M> core::fmt::Write for Uart<'_, M, T>
+impl<T, Dm> core::fmt::Write for Uart<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
@@ -1396,10 +1396,10 @@ where
     }
 }
 
-impl<T, M> core::fmt::Write for UartTx<'_, M, T>
+impl<T, Dm> core::fmt::Write for UartTx<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
@@ -1409,42 +1409,42 @@ where
     }
 }
 
-impl<T, M> embedded_hal_nb::serial::ErrorType for Uart<'_, M, T> {
+impl<T, Dm> embedded_hal_nb::serial::ErrorType for Uart<'_, Dm, T> {
     type Error = Error;
 }
 
-impl<T, M> embedded_hal_nb::serial::ErrorType for UartTx<'_, M, T> {
+impl<T, Dm> embedded_hal_nb::serial::ErrorType for UartTx<'_, Dm, T> {
     type Error = Error;
 }
 
-impl<T, M> embedded_hal_nb::serial::ErrorType for UartRx<'_, M, T> {
+impl<T, Dm> embedded_hal_nb::serial::ErrorType for UartRx<'_, Dm, T> {
     type Error = Error;
 }
 
-impl<T, M> embedded_hal_nb::serial::Read for Uart<'_, M, T>
+impl<T, Dm> embedded_hal_nb::serial::Read for Uart<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.read_byte()
     }
 }
 
-impl<T, M> embedded_hal_nb::serial::Read for UartRx<'_, M, T>
+impl<T, Dm> embedded_hal_nb::serial::Read for UartRx<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.read_byte()
     }
 }
 
-impl<T, M> embedded_hal_nb::serial::Write for Uart<'_, M, T>
+impl<T, Dm> embedded_hal_nb::serial::Write for Uart<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte(word)
@@ -1455,10 +1455,10 @@ where
     }
 }
 
-impl<T, M> embedded_hal_nb::serial::Write for UartTx<'_, M, T>
+impl<T, Dm> embedded_hal_nb::serial::Write for UartTx<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte(word)
@@ -1471,28 +1471,28 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T, M> embedded_io::ErrorType for Uart<'_, M, T> {
+impl<T, Dm> embedded_io::ErrorType for Uart<'_, Dm, T> {
     type Error = Error;
 }
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T, M> embedded_io::ErrorType for UartTx<'_, M, T> {
+impl<T, Dm> embedded_io::ErrorType for UartTx<'_, Dm, T> {
     type Error = Error;
 }
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T, M> embedded_io::ErrorType for UartRx<'_, M, T> {
+impl<T, Dm> embedded_io::ErrorType for UartRx<'_, Dm, T> {
     type Error = Error;
 }
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T, M> embedded_io::Read for Uart<'_, M, T>
+impl<T, Dm> embedded_io::Read for Uart<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.rx.read(buf)
@@ -1501,10 +1501,10 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T, M> embedded_io::Read for UartRx<'_, M, T>
+impl<T, Dm> embedded_io::Read for UartRx<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         if buf.is_empty() {
@@ -1521,10 +1521,10 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T, M> embedded_io::ReadReady for Uart<'_, M, T>
+impl<T, Dm> embedded_io::ReadReady for Uart<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
         self.rx.read_ready()
@@ -1533,10 +1533,10 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T, M> embedded_io::ReadReady for UartRx<'_, M, T>
+impl<T, Dm> embedded_io::ReadReady for UartRx<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
         Ok(self.rx_fifo_count() > 0)
@@ -1545,10 +1545,10 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T, M> embedded_io::Write for Uart<'_, M, T>
+impl<T, Dm> embedded_io::Write for Uart<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.tx.write(buf)
@@ -1561,10 +1561,10 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T, M> embedded_io::Write for UartTx<'_, M, T>
+impl<T, Dm> embedded_io::Write for UartTx<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_bytes(buf)

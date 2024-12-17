@@ -44,9 +44,9 @@ mod rsa_spec_impl;
 pub use rsa_spec_impl::operand_sizes;
 
 /// RSA peripheral container
-pub struct Rsa<'d, DM: crate::Mode> {
+pub struct Rsa<'d, Dm: crate::Mode> {
     rsa: PeripheralRef<'d, RSA>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
     _guard: GenericPeripheralGuard<{ PeripheralEnable::Rsa as u8 }>,
 }
 
@@ -93,7 +93,7 @@ impl<'d> Rsa<'d, Async> {
     }
 }
 
-impl<'d, DM: crate::Mode> Rsa<'d, DM> {
+impl<'d, Dm: crate::Mode> Rsa<'d, Dm> {
     fn new_internal(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
         crate::into_ref!(rsa);
 
@@ -215,12 +215,12 @@ use implement_op;
 /// used to find the `(base ^ exponent) mod modulus`.
 ///
 /// Each operand is a little endian byte array of the same size
-pub struct RsaModularExponentiation<'a, 'd, T: RsaMode, DM: crate::Mode> {
-    rsa: &'a mut Rsa<'d, DM>,
+pub struct RsaModularExponentiation<'a, 'd, T: RsaMode, Dm: crate::Mode> {
+    rsa: &'a mut Rsa<'d, Dm>,
     phantom: PhantomData<T>,
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'a, 'd, T, DM>
+impl<'a, 'd, T: RsaMode, Dm: crate::Mode, const N: usize> RsaModularExponentiation<'a, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -231,7 +231,7 @@ where
     ///
     /// For more information refer to 24.3.2 of <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>.
     pub fn new(
-        rsa: &'a mut Rsa<'d, DM>,
+        rsa: &'a mut Rsa<'d, Dm>,
         exponent: &T::InputType,
         modulus: &T::InputType,
         m_prime: u32,
@@ -281,12 +281,12 @@ where
 /// used to find the `(operand a * operand b) mod modulus`.
 ///
 /// Each operand is a little endian byte array of the same size
-pub struct RsaModularMultiplication<'a, 'd, T: RsaMode, DM: crate::Mode> {
-    rsa: &'a mut Rsa<'d, DM>,
+pub struct RsaModularMultiplication<'a, 'd, T: RsaMode, Dm: crate::Mode> {
+    rsa: &'a mut Rsa<'d, Dm>,
     phantom: PhantomData<T>,
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'a, 'd, T, DM>
+impl<'a, 'd, T: RsaMode, Dm: crate::Mode, const N: usize> RsaModularMultiplication<'a, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -298,7 +298,7 @@ where
     ///
     /// For more information refer to 20.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf>.
     pub fn new(
-        rsa: &'a mut Rsa<'d, DM>,
+        rsa: &'a mut Rsa<'d, Dm>,
         operand_a: &T::InputType,
         modulus: &T::InputType,
         r: &T::InputType,
@@ -336,17 +336,17 @@ where
 /// be used to find the `operand a * operand b`.
 ///
 /// Each operand is a little endian byte array of the same size
-pub struct RsaMultiplication<'a, 'd, T: RsaMode + Multi, DM: crate::Mode> {
-    rsa: &'a mut Rsa<'d, DM>,
+pub struct RsaMultiplication<'a, 'd, T: RsaMode + Multi, Dm: crate::Mode> {
+    rsa: &'a mut Rsa<'d, Dm>,
     phantom: PhantomData<T>,
 }
 
-impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'a, 'd, T, DM>
+impl<'a, 'd, T: RsaMode + Multi, Dm: crate::Mode, const N: usize> RsaMultiplication<'a, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Creates an instance of `RsaMultiplication`.
-    pub fn new(rsa: &'a mut Rsa<'d, DM>, operand_a: &T::InputType) -> Self {
+    pub fn new(rsa: &'a mut Rsa<'d, Dm>, operand_a: &T::InputType) -> Self {
         Self::write_mode(rsa);
         rsa.write_operand_a(operand_a);
 

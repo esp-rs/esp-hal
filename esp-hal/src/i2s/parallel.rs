@@ -236,13 +236,13 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
 }
 
 /// I2S Parallel Interface
-pub struct I2sParallel<'d, DM, I = AnyI2s>
+pub struct I2sParallel<'d, Dm, I = AnyI2s>
 where
-    DM: Mode,
+    Dm: Mode,
     I: Instance,
 {
     instance: PeripheralRef<'d, I>,
-    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<I>>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<I>>,
     _guard: PeripheralGuard,
 }
 
@@ -323,16 +323,16 @@ where
     }
 }
 
-impl<'d, I, DM> I2sParallel<'d, DM, I>
+impl<'d, I, Dm> I2sParallel<'d, Dm, I>
 where
     I: Instance,
-    DM: Mode,
+    Dm: Mode,
 {
     /// Write data to the I2S peripheral
     pub fn send<BUF: DmaTxBuffer>(
         mut self,
         mut data: BUF,
-    ) -> Result<I2sParallelTransfer<'d, BUF, DM, I>, (DmaError, Self, BUF)> {
+    ) -> Result<I2sParallelTransfer<'d, BUF, Dm, I>, (DmaError, Self, BUF)> {
         self.instance.tx_reset();
         self.instance.tx_fifo_reset();
         let result = unsafe {
@@ -354,21 +354,21 @@ where
 
 /// Represents an ongoing (or potentially finished) transfer using the i2s
 /// parallel interface
-pub struct I2sParallelTransfer<'d, BUF, DM, I = AnyI2s>
+pub struct I2sParallelTransfer<'d, BUF, Dm, I = AnyI2s>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: Mode,
 {
-    i2s: ManuallyDrop<I2sParallel<'d, DM, I>>,
+    i2s: ManuallyDrop<I2sParallel<'d, Dm, I>>,
     buf_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, I, BUF, DM> I2sParallelTransfer<'d, BUF, DM, I>
+impl<'d, I, BUF, Dm> I2sParallelTransfer<'d, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: Mode,
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
@@ -376,7 +376,7 @@ where
     }
 
     /// Wait for the transfer to finish
-    pub fn wait(mut self) -> (I2sParallel<'d, DM, I>, BUF) {
+    pub fn wait(mut self) -> (I2sParallel<'d, Dm, I>, BUF) {
         self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
         let view = unsafe { ManuallyDrop::take(&mut self.buf_view) };
@@ -401,11 +401,11 @@ where
     }
 }
 
-impl<I, BUF, DM> Deref for I2sParallelTransfer<'_, BUF, DM, I>
+impl<I, BUF, Dm> Deref for I2sParallelTransfer<'_, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: Mode,
 {
     type Target = BUF::View;
 
@@ -414,22 +414,22 @@ where
     }
 }
 
-impl<I, BUF, DM> DerefMut for I2sParallelTransfer<'_, BUF, DM, I>
+impl<I, BUF, Dm> DerefMut for I2sParallelTransfer<'_, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: Mode,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buf_view
     }
 }
 
-impl<I, BUF, DM> Drop for I2sParallelTransfer<'_, BUF, DM, I>
+impl<I, BUF, Dm> Drop for I2sParallelTransfer<'_, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: Mode,
 {
     fn drop(&mut self) {
         self.stop_peripherals();

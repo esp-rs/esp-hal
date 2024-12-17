@@ -17,12 +17,12 @@ pub mod dpi;
 pub mod i8080;
 
 /// Represents an LCD interface.
-pub struct Lcd<'d, DM: crate::Mode> {
+pub struct Lcd<'d, Dm: crate::Mode> {
     /// The `LCD_CAM` peripheral reference for managing the LCD functionality.
     pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,
 
     /// A marker for the mode of operation (blocking or asynchronous).
-    pub(crate) _mode: core::marker::PhantomData<DM>,
+    pub(crate) _mode: core::marker::PhantomData<Dm>,
 
     pub(super) _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }

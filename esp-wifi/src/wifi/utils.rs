@@ -16,7 +16,7 @@ fn timestamp() -> smoltcp::time::Instant {
     )
 }
 
-fn setup_iface<MODE: WifiDeviceMode>(device: &mut WifiDevice<'_, MODE>, mode: MODE) -> Interface {
+fn setup_iface<Dm: WifiDeviceMode>(device: &mut WifiDevice<'_, Dm>, mode: Dm) -> Interface {
     let mac = mode.mac_address();
     let hw_address = HardwareAddress::Ethernet(EthernetAddress::from_bytes(&mac));
 
@@ -26,11 +26,11 @@ fn setup_iface<MODE: WifiDeviceMode>(device: &mut WifiDevice<'_, MODE>, mode: MO
 }
 
 /// Convenient way to create an `smoltcp` ethernet interface
-pub fn create_network_interface<'d, MODE: WifiDeviceMode>(
+pub fn create_network_interface<'d, Dm: WifiDeviceMode>(
     inited: &'d EspWifiController<'d>,
     device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-    mode: MODE,
-) -> Result<(Interface, WifiDevice<'d, MODE>, WifiController<'d>), WifiError> {
+    mode: Dm,
+) -> Result<(Interface, WifiDevice<'d, Dm>, WifiController<'d>), WifiError> {
     let (mut device, controller) = crate::wifi::new_with_mode(inited, device, mode)?;
 
     let iface = setup_iface(&mut device, mode);

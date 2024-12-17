@@ -274,16 +274,16 @@ impl Default for Config {
 }
 
 /// I2C driver
-pub struct I2c<'d, DM: Mode, T = AnyI2c> {
+pub struct I2c<'d, Dm: Mode, T = AnyI2c> {
     i2c: PeripheralRef<'d, T>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
     config: Config,
     guard: PeripheralGuard,
 }
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
+impl<T: Instance, Dm: Mode> SetConfig for I2c<'_, Dm, T> {
     type Config = Config;
     type ConfigError = ConfigError;
 
@@ -292,11 +292,11 @@ impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
     }
 }
 
-impl<T, DM: Mode> embedded_hal::i2c::ErrorType for I2c<'_, DM, T> {
+impl<T, Dm: Mode> embedded_hal::i2c::ErrorType for I2c<'_, Dm, T> {
     type Error = Error;
 }
 
-impl<T, DM: Mode> embedded_hal::i2c::I2c for I2c<'_, DM, T>
+impl<T, Dm: Mode> embedded_hal::i2c::I2c for I2c<'_, Dm, T>
 where
     T: Instance,
 {
@@ -310,7 +310,7 @@ where
     }
 }
 
-impl<'d, T, DM: Mode> I2c<'d, DM, T>
+impl<'d, T, Dm: Mode> I2c<'d, Dm, T>
 where
     T: Instance,
 {
