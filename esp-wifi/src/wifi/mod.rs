@@ -2077,10 +2077,7 @@ pub struct WifiDevice<'d, Dm: WifiDeviceMode> {
 }
 
 impl<'d, Dm: WifiDeviceMode> WifiDevice<'d, Dm> {
-    pub(crate) fn new(
-        _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
-        mode: Dm,
-    ) -> Self {
+    pub(crate) fn new(_device: PeripheralRef<'d, crate::hal::peripherals::WIFI>, mode: Dm) -> Self {
         Self { _device, mode }
     }
 
