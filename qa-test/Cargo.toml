@@ -35,7 +35,7 @@ lto           = "fat"
 codegen-units = 1
 
 [patch.crates-io]
-embassy-executor    = { git = "https://github.com/bugadani/embassy", branch = "timer-queue-special" }
-embassy-time        = { git = "https://github.com/bugadani/embassy", branch = "timer-queue-special" }
-embassy-time-driver = { git = "https://github.com/bugadani/embassy", branch = "timer-queue-special" }
-embassy-time-queue-driver = { git = "https://github.com/bugadani/embassy", branch = "timer-queue-special" }
+embassy-executor    = { git = "https://github.com/embassy-rs/embassy", rev = "0c245892c6812538f4f51b784ed8afa1ce47f25d" }
+embassy-time        = { git = "https://github.com/embassy-rs/embassy", rev = "0c245892c6812538f4f51b784ed8afa1ce47f25d" }
+embassy-time-driver = { git = "https://github.com/embassy-rs/embassy", rev = "0c245892c6812538f4f51b784ed8afa1ce47f25d" }
+embassy-time-queue-driver = { git = "https://github.com/embassy-rs/embassy", rev = "0c245892c6812538f4f51b784ed8afa1ce47f25d" }
