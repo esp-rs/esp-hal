@@ -51,12 +51,6 @@ defmt = ["dep:defmt", "embassy-executor?/defmt", "esp-hal/defmt"]
 log = ["dep:log"]
 ## Provide `Executor` and `InterruptExecutor`
 executors = ["dep:embassy-executor", "esp-hal/__esp_hal_embassy"]
-## Use a single generic timer queue that can be used with any executor. If not set, the crate
-## provides an executor-integrated timer queue which does not need a set capacity.
-generic-queue = ["embassy-time-queue-driver/_generic-queue"]
-## Use a single, global timer queue. This option only needs a single alarm, no matter how many
-## executors are used. Ignored if `generic-queue` is set.
-single-queue = []
 
 [lints.rust]
 unexpected_cfgs = "allow"

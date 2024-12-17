@@ -1,10 +1,10 @@
-use std::{error::Error, str::FromStr};
+use std::{error::Error as StdError, str::FromStr};
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, Validator, Value};
+use esp_config::{generate_config, Error, Validator, Value};
 use esp_metadata::{Chip, Config};
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn StdError>> {
     // NOTE: update when adding new device support!
     // Ensure that exactly one chip has been specified:
     assert_unique_used_features!(
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     config.define_symbols();
 
     // emit config
-    generate_config(
+    let crate_config = generate_config(
         "esp_hal_embassy",
         &[(
             "low-power-wait",
@@ -52,7 +52,29 @@ fn main() -> Result<(), Box<dyn Error>> {
             "The size of the generic queue. Only used if `generic-queue` is enabled.",
             Value::Integer(64),
             Some(Validator::PositiveInteger),
-        )],
+        ),
+        (
+            "timer-queue",
+            "The flavour of the timer queue provided by this crate. Accepts one of 'single-integrated', 'multiple-integrated' or 'generic'. Integrated queues require the 'executors' feature to be enabled.",
+            Value::String(if cfg!(feature = "executors") {
+                String::from("single-integrated")
+            } else {
+                String::from("generic")
+            }),
+            Some(Validator::Custom(Box::new(|value| {
+               let Value::String(string) = value else {
+                     return Err(Error::Validation(String::from("Expected a string")));
+               };
+
+                match string.as_str() {
+                    "single-integrated" => Ok(()), // preferred for ease of use
+                    "multiple-integrated" => Ok(()), // preferred for performance
+                    "generic" => Ok(()), // allows using embassy-time without the embassy executors
+                    _ => Err(Error::Validation(format!("Expected 'single-integrated', 'multiple-integrated' or 'generic', found {string}")))
+                }
+            })))
+        )
+    ],
         true,
     );
 
@@ -60,14 +82,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-check-cfg=cfg(single_queue)");
     println!("cargo:rustc-check-cfg=cfg(generic_timers)");
 
-    if cfg!(feature = "generic-queue") {
-        println!("cargo:rustc-cfg=generic_timers");
-        println!("cargo:rustc-cfg=single_queue");
-    } else {
-        println!("cargo:rustc-cfg=integrated_timers");
-        if cfg!(feature = "single-queue") {
+    match &crate_config["ESP_HAL_EMBASSY_TIMER_QUEUE"] {
+        Value::String(s) if s.as_str() == "single-integrated" => {
+            println!("cargo:rustc-cfg=integrated_timers");
             println!("cargo:rustc-cfg=single_queue");
         }
+        Value::String(s) if s.as_str() == "multiple-integrated" => {
+            println!("cargo:rustc-cfg=integrated_timers");
+        }
+        Value::String(s) if s.as_str() == "generic" => {
+            println!("cargo:rustc-cfg=generic-timers");
+            println!("cargo:rustc-cfg=single_queue");
+        }
+        _ => unreachable!(),
     }
 
     Ok(())
