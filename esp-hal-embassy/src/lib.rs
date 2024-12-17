@@ -143,7 +143,7 @@ impl_array!(4);
 /// - A mutable static array of `OneShotTimer` instances
 /// - A 2, 3, 4 element array of `AnyTimer` instances
 ///
-/// Note that if you use the `integrated-timers` feature,
+/// Note that unless you use the `generic-queue` or the `single-queue` feature,
 /// you need to pass as many timers as you start executors.
 ///
 /// # Examples

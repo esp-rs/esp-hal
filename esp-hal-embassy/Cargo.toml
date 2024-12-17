@@ -55,7 +55,7 @@ executors = ["dep:embassy-executor", "esp-hal/__esp_hal_embassy"]
 ## provides an executor-integrated timer queue which does not need a set capacity.
 generic-queue = ["embassy-time-queue-driver/_generic-queue"]
 ## Use a single, global timer queue. This option only needs a single alarm, no matter how many
-## executors are used. Ignored if `integrated-timers` is not set.
+## executors are used. Ignored if `generic-queue` is set.
 single-queue = []
 
 [lints.rust]

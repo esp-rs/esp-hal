@@ -221,7 +221,7 @@ impl EmbassyTimer {
     pub(crate) fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
         let alarm = &self.alarms[alarm.id];
 
-        // If `embassy-executor/integrated-timers` is enabled and there are no pending
+        // If integrated timers are used and there are no pending
         // timers, embassy still calls `set_alarm` with `u64::MAX`. By returning
         // `true` we signal that no re-polling is necessary.
         if timestamp == u64::MAX {

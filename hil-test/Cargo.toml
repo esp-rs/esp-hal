@@ -290,7 +290,6 @@ esp32s3 = [
 embassy = [
     "dep:esp-hal-embassy",
 ]
-integrated-timers = ["embassy", "esp-hal-embassy?/integrated-timers"]
 octal-psram = ["esp-hal/octal-psram", "esp-alloc"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
