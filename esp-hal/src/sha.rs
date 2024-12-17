@@ -550,7 +550,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::FixedOutput for ShaDige
     }
 }
 
-/// This macro implements the Sha<'a, DM> trait for a specified Sha algorithm
+/// This macro implements the Sha<'a, Dm> trait for a specified Sha algorithm
 /// and a set of parameters
 macro_rules! impl_sha {
     ($name: ident, $mode_bits: tt, $digest_length: tt, $chunk_length: tt) => {

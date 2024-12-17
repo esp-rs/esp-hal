@@ -844,9 +844,9 @@ impl ContainsValidSignalPin for RxEightBits<'_> {}
 #[cfg(esp32c6)]
 impl ContainsValidSignalPin for RxSixteenBits<'_> {}
 
-impl<'d, DM> TxCreatorFullDuplex<'d, DM>
+impl<'d, Dm> TxCreatorFullDuplex<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// Configure TX to use the given pins and settings
     pub fn with_config<P, CP>(
@@ -856,7 +856,7 @@ where
         idle_value: u16,
         sample_edge: SampleEdge,
         bit_order: BitPackOrder,
-    ) -> Result<ParlIoTx<'d, DM>, Error>
+    ) -> Result<ParlIoTx<'d, Dm>, Error>
     where
         P: FullDuplex + TxPins + ConfigurePins,
         CP: TxClkPin,
@@ -876,9 +876,9 @@ where
     }
 }
 
-impl<'d, DM> TxCreator<'d, DM>
+impl<'d, Dm> TxCreator<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// Configure TX to use the given pins and settings
     pub fn with_config<P, CP>(
@@ -888,7 +888,7 @@ where
         idle_value: u16,
         sample_edge: SampleEdge,
         bit_order: BitPackOrder,
-    ) -> Result<ParlIoTx<'d, DM>, Error>
+    ) -> Result<ParlIoTx<'d, Dm>, Error>
     where
         P: TxPins + ConfigurePins,
         CP: TxClkPin,
@@ -909,27 +909,27 @@ where
 }
 
 /// Parallel IO TX channel
-pub struct ParlIoTx<'d, DM>
+pub struct ParlIoTx<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
     tx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
-impl<DM> core::fmt::Debug for ParlIoTx<'_, DM>
+impl<Dm> core::fmt::Debug for ParlIoTx<'_, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ParlIoTx").finish()
     }
 }
 
-impl<'d, DM> RxCreatorFullDuplex<'d, DM>
+impl<'d, Dm> RxCreatorFullDuplex<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// Configure RX to use the given pins and settings
     pub fn with_config<P, CP>(
@@ -938,7 +938,7 @@ where
         clk_pin: &'d mut CP,
         bit_order: BitPackOrder,
         timeout_ticks: Option<u16>,
-    ) -> Result<ParlIoRx<'d, DM>, Error>
+    ) -> Result<ParlIoRx<'d, Dm>, Error>
     where
         P: FullDuplex + RxPins + ConfigurePins,
         CP: RxClkPin,
@@ -959,9 +959,9 @@ where
     }
 }
 
-impl<'d, DM> RxCreator<'d, DM>
+impl<'d, Dm> RxCreator<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// Configure RX to use the given pins and settings
     pub fn with_config<P, CP>(
@@ -970,7 +970,7 @@ where
         clk_pin: &'d mut CP,
         bit_order: BitPackOrder,
         timeout_ticks: Option<u16>,
-    ) -> Result<ParlIoRx<'d, DM>, Error>
+    ) -> Result<ParlIoRx<'d, Dm>, Error>
     where
         P: RxPins + ConfigurePins,
         CP: RxClkPin,
@@ -990,18 +990,18 @@ where
 }
 
 /// Parallel IO RX channel
-pub struct ParlIoRx<'d, DM>
+pub struct ParlIoRx<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
     rx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
-impl<DM> core::fmt::Debug for ParlIoRx<'_, DM>
+impl<Dm> core::fmt::Debug for ParlIoRx<'_, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ParlIoTx").finish()
@@ -1093,16 +1093,16 @@ fn internal_clear_interrupts(interrupts: EnumSet<ParlIoInterrupt>) {
 /// Parallel IO in full duplex mode
 ///
 /// Full duplex mode might limit the maximum possible bit width.
-pub struct ParlIoFullDuplex<'d, DM>
+pub struct ParlIoFullDuplex<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// The transmitter (TX) channel responsible for handling DMA transfers in
     /// the parallel I/O full-duplex operation.
-    pub tx: TxCreatorFullDuplex<'d, DM>,
+    pub tx: TxCreatorFullDuplex<'d, Dm>,
     /// The receiver (RX) channel responsible for handling DMA transfers in the
     /// parallel I/O full-duplex operation.
-    pub rx: RxCreatorFullDuplex<'d, DM>,
+    pub rx: RxCreatorFullDuplex<'d, Dm>,
 }
 
 impl<'d> ParlIoFullDuplex<'d, Blocking> {
@@ -1219,13 +1219,13 @@ impl<'d> ParlIoFullDuplex<'d, Async> {
 }
 
 /// Parallel IO in half duplex / TX only mode
-pub struct ParlIoTxOnly<'d, DM>
+pub struct ParlIoTxOnly<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// The transmitter (TX) channel responsible for handling DMA transfers in
     /// the parallel I/O operation.
-    pub tx: TxCreator<'d, DM>,
+    pub tx: TxCreator<'d, Dm>,
 }
 
 impl<'d> ParlIoTxOnly<'d, Blocking> {
@@ -1325,13 +1325,13 @@ impl InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
 }
 
 /// Parallel IO in half duplex / RX only mode
-pub struct ParlIoRxOnly<'d, DM>
+pub struct ParlIoRxOnly<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// The receiver (RX) channel responsible for handling DMA transfers in the
     /// parallel I/O operation.
-    pub rx: RxCreator<'d, DM>,
+    pub rx: RxCreator<'d, Dm>,
 }
 
 impl<'d> ParlIoRxOnly<'d, Blocking> {
@@ -1461,9 +1461,9 @@ fn internal_init(frequency: HertzU32) -> Result<(), Error> {
     Ok(())
 }
 
-impl<DM> ParlIoTx<'_, DM>
+impl<Dm> ParlIoTx<'_, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// Perform a DMA write.
     ///
@@ -1516,9 +1516,9 @@ where
     }
 }
 
-impl<DM> DmaSupport for ParlIoTx<'_, DM>
+impl<Dm> DmaSupport for ParlIoTx<'_, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         while !Instance::is_tx_eof() {}
@@ -1531,11 +1531,11 @@ where
     }
 }
 
-impl<'d, DM> DmaSupportTx for ParlIoTx<'d, DM>
+impl<'d, Dm> DmaSupportTx for ParlIoTx<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
-    type TX = ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>;
+    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -1546,9 +1546,9 @@ where
     }
 }
 
-impl<'d, DM> ParlIoRx<'d, DM>
+impl<'d, Dm> ParlIoRx<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     /// Perform a DMA read.
     ///
@@ -1577,7 +1577,7 @@ where
     }
 
     fn start_receive_bytes_dma(
-        rx_channel: &mut ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
+        rx_channel: &mut ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
         rx_chain: &mut DescriptorChain,
         ptr: *mut u8,
         len: usize,
@@ -1605,9 +1605,9 @@ where
     }
 }
 
-impl<DM> DmaSupport for ParlIoRx<'_, DM>
+impl<Dm> DmaSupport for ParlIoRx<'_, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         loop {
@@ -1627,11 +1627,11 @@ where
     }
 }
 
-impl<'d, DM> DmaSupportRx for ParlIoRx<'d, DM>
+impl<'d, Dm> DmaSupportRx for ParlIoRx<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
-    type RX = ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>;
+    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -1643,41 +1643,41 @@ where
 }
 
 /// Creates a TX channel
-pub struct TxCreator<'d, DM>
+pub struct TxCreator<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
 /// Creates a RX channel
-pub struct RxCreator<'d, DM>
+pub struct RxCreator<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
 /// Creates a TX channel
-pub struct TxCreatorFullDuplex<'d, DM>
+pub struct TxCreatorFullDuplex<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
-    tx_channel: ChannelTx<'d, DM, PeripheralTxChannel<PARL_IO>>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
 /// Creates a RX channel
-pub struct RxCreatorFullDuplex<'d, DM>
+pub struct RxCreatorFullDuplex<'d, Dm>
 where
-    DM: Mode,
+    Dm: Mode,
 {
-    rx_channel: ChannelRx<'d, DM, PeripheralRxChannel<PARL_IO>>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }

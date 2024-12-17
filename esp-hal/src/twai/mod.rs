@@ -662,18 +662,18 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TwaiConfiguration<'d, DM: crate::Mode, T = AnyTwai> {
+pub struct TwaiConfiguration<'d, Dm: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     filter: Option<(FilterType, [u8; 8])>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
     mode: TwaiMode,
     _guard: PeripheralGuard,
 }
 
-impl<'d, DM, T> TwaiConfiguration<'d, DM, T>
+impl<'d, Dm, T> TwaiConfiguration<'d, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
+    Dm: crate::Mode,
 {
     fn new_internal<TX: PeripheralOutput, RX: PeripheralInput>(
         twai: impl Peripheral<P = T> + 'd,
@@ -906,7 +906,7 @@ where
 
     /// Put the peripheral into Operation Mode, allowing the transmission and
     /// reception of packets using the new object.
-    pub fn start(self) -> Twai<'d, DM, T> {
+    pub fn start(self) -> Twai<'d, Dm, T> {
         self.apply_filter();
         self.set_mode(self.mode);
 
@@ -1075,17 +1075,17 @@ where
 ///
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
-pub struct Twai<'d, DM: crate::Mode, T = AnyTwai> {
+pub struct Twai<'d, Dm: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
-    tx: TwaiTx<'d, DM, T>,
-    rx: TwaiRx<'d, DM, T>,
-    phantom: PhantomData<DM>,
+    tx: TwaiTx<'d, Dm, T>,
+    rx: TwaiRx<'d, Dm, T>,
+    phantom: PhantomData<Dm>,
 }
 
-impl<'d, T, DM> Twai<'d, DM, T>
+impl<'d, T, Dm> Twai<'d, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
+    Dm: crate::Mode,
 {
     fn mode(&self) -> TwaiMode {
         let mode = self.twai.register_block().mode().read();
@@ -1101,7 +1101,7 @@ where
 
     /// Stop the peripheral, putting it into reset mode and enabling
     /// reconfiguration.
-    pub fn stop(self) -> TwaiConfiguration<'d, DM, T> {
+    pub fn stop(self) -> TwaiConfiguration<'d, Dm, T> {
         // Put the peripheral into reset/configuration mode by setting the reset mode
         // bit.
         self.twai
@@ -1190,22 +1190,22 @@ where
 
     /// Consumes this `Twai` instance and splits it into transmitting and
     /// receiving halves.
-    pub fn split(self) -> (TwaiRx<'d, DM, T>, TwaiTx<'d, DM, T>) {
+    pub fn split(self) -> (TwaiRx<'d, Dm, T>, TwaiTx<'d, Dm, T>) {
         (self.rx, self.tx)
     }
 }
 
 /// Interface to the TWAI transmitter part.
-pub struct TwaiTx<'d, DM: crate::Mode, T = AnyTwai> {
+pub struct TwaiTx<'d, Dm: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
 }
 
-impl<DM, T> TwaiTx<'_, DM, T>
+impl<Dm, T> TwaiTx<'_, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
+    Dm: crate::Mode,
 {
     /// Transmit a frame.
     ///
@@ -1239,16 +1239,16 @@ where
 }
 
 /// Interface to the TWAI receiver part.
-pub struct TwaiRx<'d, DM: crate::Mode, T = AnyTwai> {
+pub struct TwaiRx<'d, Dm: crate::Mode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
 }
 
-impl<DM, T> TwaiRx<'_, DM, T>
+impl<Dm, T> TwaiRx<'_, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
+    Dm: crate::Mode,
 {
     /// Receive a frame
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
@@ -1335,10 +1335,10 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
 }
 
 #[cfg(any(doc, feature = "unstable"))]
-impl<DM, T> embedded_can::nb::Can for Twai<'_, DM, T>
+impl<Dm, T> embedded_can::nb::Can for Twai<'_, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
+    Dm: crate::Mode,
 {
     type Frame = EspTwaiFrame;
     type Error = EspTwaiError;
