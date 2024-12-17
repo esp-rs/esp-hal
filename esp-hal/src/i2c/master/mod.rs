@@ -86,7 +86,7 @@ const I2C_CHUNK_SIZE: usize = 254;
 const MAX_ITERATIONS: u32 = 1_000_000;
 
 /// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Error {
@@ -126,6 +126,7 @@ enum OpKind {
 /// I2C operation.
 ///
 /// Several operations can be combined as part of a transaction.
+#[derive(Debug, PartialEq, Eq, Hash, strum::Display)]
 pub enum Operation<'a> {
     /// Write data from the provided buffer.
     Write(&'a [u8]),
@@ -239,7 +240,7 @@ impl From<Ack> for u32 {
 }
 
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
@@ -263,6 +264,13 @@ pub struct Config {
     pub timeout: Option<u32>,
 }
 
+impl core::hash::Hash for Config {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.frequency.to_Hz().hash(state); // `HertzU32` doesn't implement `Hash`
+        self.timeout.hash(state);
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         use fugit::RateExtU32;
@@ -274,6 +282,8 @@ impl Default for Config {
 }
 
 /// I2C driver
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct I2c<'d, Dm: DriverMode, T = AnyI2c> {
     i2c: PeripheralRef<'d, T>,
     phantom: PhantomData<Dm>,
@@ -934,6 +944,7 @@ fn configure_clock(
 }
 
 /// Peripheral data describing a particular I2C instance.
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this I2C instance.
@@ -969,6 +980,14 @@ impl Info {
         unsafe { &*self.register_block }
     }
 }
+
+impl PartialEq for Info {
+    fn eq(&self, other: &Self) -> bool {
+        self.register_block == other.register_block
+    }
+}
+
+unsafe impl Sync for Info {}
 
 #[allow(dead_code)] // Some versions don't need `state`
 struct Driver<'a> {
@@ -2105,14 +2124,6 @@ impl Driver<'_> {
         Ok(())
     }
 }
-
-impl PartialEq for Info {
-    fn eq(&self, other: &Self) -> bool {
-        self.register_block == other.register_block
-    }
-}
-
-unsafe impl Sync for Info {}
 
 /// Peripheral state for an I2C instance.
 #[non_exhaustive]
