@@ -308,7 +308,7 @@ fn not_enough_timers() -> ! {
     // This is wrapped in a separate function because rustfmt does not like
     // extremely long strings. Also, if log is used, this avoids storing the string
     // twice.
-    panic!("There are not enough timers to allocate a new alarm. Call esp_hal_embassy::init() with the correct number of timers, or consider either using the single-queue feature or disabling integrated-timers.");
+    panic!("There are not enough timers to allocate a new alarm. Call esp_hal_embassy::init() with the correct number of timers, or consider either using the `single-queue` or the `generic-queue` feature.");
 }
 
 pub(crate) fn set_up_alarm(priority: Priority, _ctx: *mut ()) -> AlarmHandle {
