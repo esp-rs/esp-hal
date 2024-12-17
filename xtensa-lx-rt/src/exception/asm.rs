@@ -20,7 +20,7 @@ use crate::cfg_global_asm;
 // `Context` struct in context.rs
 global_asm!(
     "
-    .set XT_STK_PC,             0
+    .set XT_STK_PC,              0
     .set XT_STK_PS,              4
     .set XT_STK_A0,              8
     .equ XT_STK_A1,             12
