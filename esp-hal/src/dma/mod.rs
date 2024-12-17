@@ -18,7 +18,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
-//! # use esp_hal::spi::{master::{Config, Spi}, SpiMode};
+//! # use esp_hal::spi::{master::{Config, Spi}, Mode};
 #![cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
 #![cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
 //! let sclk = peripherals.GPIO0;
@@ -28,7 +28,7 @@
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config::default().with_frequency(100.kHz()).with_mode(SpiMode::Mode0)
+//!     Config::default().with_frequency(100.kHz()).with_mode(Mode::Mode0)
 //! )
 //! .unwrap()
 //! .with_sck(sclk)

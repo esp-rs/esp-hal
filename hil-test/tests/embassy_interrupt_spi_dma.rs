@@ -16,7 +16,7 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Config, Spi},
-        SpiMode,
+        Mode,
     },
     timer::AnyTimer,
     Async,
@@ -121,7 +121,7 @@ mod test {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(10000.kHz())
-                .with_mode(SpiMode::Mode0),
+                .with_mode(Mode::Mode0),
         )
         .unwrap()
         .with_miso(unsafe { mosi.clone_unchecked() })
@@ -135,7 +135,7 @@ mod test {
             peripherals.SPI3,
             Config::default()
                 .with_frequency(10000.kHz())
-                .with_mode(SpiMode::Mode0),
+                .with_mode(Mode::Mode0),
         )
         .unwrap()
         .with_dma(dma_channel2)
@@ -229,7 +229,7 @@ mod test {
                 peripherals.spi,
                 Config::default()
                     .with_frequency(100.kHz())
-                    .with_mode(SpiMode::Mode0),
+                    .with_mode(Mode::Mode0),
             )
             .unwrap()
             .with_dma(peripherals.dma_channel)

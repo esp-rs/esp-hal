@@ -64,7 +64,7 @@ impl embedded_hal::spi::Error for Error {
 /// and shifted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SpiMode {
+pub enum Mode {
     /// Mode 0 (CPOL = 0, CPHA = 0): Clock is low when idle, data is captured on
     /// the rising edge and propagated on the falling edge.
     Mode0,
@@ -82,7 +82,7 @@ pub enum SpiMode {
 /// SPI Bit Order
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SpiBitOrder {
+pub enum BitOrder {
     /// Most Significant Bit (MSB) is transmitted first.
     MsbFirst,
     /// Least Significant Bit (LSB) is transmitted first.
@@ -92,7 +92,7 @@ pub enum SpiBitOrder {
 /// SPI data mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SpiDataMode {
+pub enum DataMode {
     /// `Single` Data Mode - 1 bit, 2 wires.
     Single,
     /// `Dual` Data Mode - 2 bit, 2 wires

@@ -36,7 +36,7 @@ use esp_hal::{
     dma_buffers,
     gpio::{Input, Level, Output, Pull},
     prelude::*,
-    spi::{slave::Spi, SpiMode},
+    spi::{slave::Spi, Mode},
 };
 use esp_println::println;
 
@@ -64,7 +64,7 @@ fn main() -> ! {
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
-    let mut spi = Spi::new(peripherals.SPI2, SpiMode::Mode0)
+    let mut spi = Spi::new(peripherals.SPI2, Mode::Mode0)
         .with_sck(slave_sclk)
         .with_mosi(slave_mosi)
         .with_miso(slave_miso)

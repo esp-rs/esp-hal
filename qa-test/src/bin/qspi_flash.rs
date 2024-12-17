@@ -35,8 +35,8 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Address, Command, Config, Spi},
-        SpiDataMode,
-        SpiMode,
+        DataMode,
+        Mode,
     },
 };
 use esp_println::{print, println};
@@ -79,7 +79,7 @@ fn main() -> ! {
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
-            .with_mode(SpiMode::Mode0),
+            .with_mode(Mode::Mode0),
     )
     .unwrap()
     .with_sck(sclk)
@@ -96,8 +96,8 @@ fn main() -> ! {
     dma_tx_buf.set_length(0);
     let transfer = spi
         .half_duplex_write(
-            SpiDataMode::Single,
-            Command::Command8(0x06, SpiDataMode::Single),
+            DataMode::Single,
+            Command::Command8(0x06, DataMode::Single),
             Address::None,
             0,
             0,
@@ -111,9 +111,9 @@ fn main() -> ! {
     // erase sector
     let transfer = spi
         .half_duplex_write(
-            SpiDataMode::Single,
-            Command::Command8(0x20, SpiDataMode::Single),
-            Address::Address24(0x000000, SpiDataMode::Single),
+            DataMode::Single,
+            Command::Command8(0x20, DataMode::Single),
+            Address::Address24(0x000000, DataMode::Single),
             0,
             dma_tx_buf.len(),
             dma_tx_buf,
@@ -126,8 +126,8 @@ fn main() -> ! {
     // write enable
     let transfer = spi
         .half_duplex_write(
-            SpiDataMode::Single,
-            Command::Command8(0x06, SpiDataMode::Single),
+            DataMode::Single,
+            Command::Command8(0x06, DataMode::Single),
             Address::None,
             0,
             dma_tx_buf.len(),
@@ -144,9 +144,9 @@ fn main() -> ! {
     dma_tx_buf.as_mut_slice()[0..][..5].copy_from_slice(&b"Hello"[..]);
     let transfer = spi
         .half_duplex_write(
-            SpiDataMode::Quad,
-            Command::Command8(0x32, SpiDataMode::Single),
-            Address::Address24(0x000000, SpiDataMode::Single),
+            DataMode::Quad,
+            Command::Command8(0x32, DataMode::Single),
+            Address::Address24(0x000000, DataMode::Single),
             0,
             dma_tx_buf.len(),
             dma_tx_buf,
@@ -160,9 +160,9 @@ fn main() -> ! {
         // quad fast read
         let transfer = spi
             .half_duplex_read(
-                SpiDataMode::Quad,
-                Command::Command8(0xeb, SpiDataMode::Single),
-                Address::Address32(0x000000 << 8, SpiDataMode::Quad),
+                DataMode::Quad,
+                Command::Command8(0xeb, DataMode::Single),
+                Address::Address32(0x000000 << 8, DataMode::Quad),
                 4,
                 dma_rx_buf.len(),
                 dma_rx_buf,

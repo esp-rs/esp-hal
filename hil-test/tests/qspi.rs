@@ -14,8 +14,8 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
-        SpiDataMode,
-        SpiMode,
+        DataMode,
+        Mode,
     },
     Blocking,
 };
@@ -31,9 +31,9 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        const COMMAND_DATA_MODES: [SpiDataMode; 1] = [SpiDataMode::Single];
+        const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::Single];
     } else {
-        const COMMAND_DATA_MODES: [SpiDataMode; 2] = [SpiDataMode::Single, SpiDataMode::Quad];
+        const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::Single, DataMode::Quad];
     }
 }
 
@@ -54,7 +54,7 @@ fn transfer_read(
 ) -> (SpiUnderTest, DmaRxBuf) {
     let transfer = spi
         .half_duplex_read(
-            SpiDataMode::Quad,
+            DataMode::Quad,
             command,
             Address::None,
             0,
@@ -70,15 +70,15 @@ fn transfer_write(
     spi: SpiUnderTest,
     dma_tx_buf: DmaTxBuf,
     write: u8,
-    command_data_mode: SpiDataMode,
+    command_data_mode: DataMode,
 ) -> (SpiUnderTest, DmaTxBuf) {
     let transfer = spi
         .half_duplex_write(
-            SpiDataMode::Quad,
+            DataMode::Quad,
             Command::Command8(write as u16, command_data_mode),
             Address::Address24(
                 write as u32 | (write as u32) << 8 | (write as u32) << 16,
-                SpiDataMode::Quad,
+                DataMode::Quad,
             ),
             0,
             dma_tx_buf.len(),
@@ -154,7 +154,7 @@ fn execute_write(
         assert_eq!(unit0.value() + unit1.value(), 8);
 
         if data_on_multiple_pins {
-            if command_data_mode == SpiDataMode::Single {
+            if command_data_mode == DataMode::Single {
                 assert_eq!(unit0.value(), 1);
                 assert_eq!(unit1.value(), 7);
             } else {
@@ -172,7 +172,7 @@ fn execute_write(
         assert_eq!(unit0.value() + unit1.value(), 4);
 
         if data_on_multiple_pins {
-            if command_data_mode == SpiDataMode::Single {
+            if command_data_mode == DataMode::Single {
                 assert_eq!(unit0.value(), 1);
                 assert_eq!(unit1.value(), 3);
             } else {
@@ -212,7 +212,7 @@ mod tests {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
-                .with_mode(SpiMode::Mode0),
+                .with_mode(Mode::Mode0),
         )
         .unwrap();
 

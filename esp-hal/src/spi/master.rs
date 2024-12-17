@@ -36,7 +36,7 @@
 //! ### SPI Initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::spi::SpiMode;
+//! # use esp_hal::spi::Mode;
 //! # use esp_hal::spi::master::{Config, Spi};
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO2;
@@ -44,7 +44,7 @@
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config::default().with_frequency(100.kHz()).with_mode(SpiMode::Mode0)
+//!     Config::default().with_frequency(100.kHz()).with_mode(Mode::Mode0)
 //! )
 //! .unwrap()
 //! .with_sck(sclk)
@@ -69,7 +69,7 @@ use fugit::HertzU32;
 #[cfg(place_spi_driver_in_ram)]
 use procmacros::ram;
 
-use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
+use super::{BitOrder, DataMode, DmaError, Error, Mode};
 use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
@@ -121,37 +121,37 @@ pub enum Command {
     /// No command is sent.
     None,
     /// A 1-bit command.
-    Command1(u16, SpiDataMode),
+    Command1(u16, DataMode),
     /// A 2-bit command.
-    Command2(u16, SpiDataMode),
+    Command2(u16, DataMode),
     /// A 3-bit command.
-    Command3(u16, SpiDataMode),
+    Command3(u16, DataMode),
     /// A 4-bit command.
-    Command4(u16, SpiDataMode),
+    Command4(u16, DataMode),
     /// A 5-bit command.
-    Command5(u16, SpiDataMode),
+    Command5(u16, DataMode),
     /// A 6-bit command.
-    Command6(u16, SpiDataMode),
+    Command6(u16, DataMode),
     /// A 7-bit command.
-    Command7(u16, SpiDataMode),
+    Command7(u16, DataMode),
     /// A 8-bit command.
-    Command8(u16, SpiDataMode),
+    Command8(u16, DataMode),
     /// A 9-bit command.
-    Command9(u16, SpiDataMode),
+    Command9(u16, DataMode),
     /// A 10-bit command.
-    Command10(u16, SpiDataMode),
+    Command10(u16, DataMode),
     /// A 11-bit command.
-    Command11(u16, SpiDataMode),
+    Command11(u16, DataMode),
     /// A 12-bit command.
-    Command12(u16, SpiDataMode),
+    Command12(u16, DataMode),
     /// A 13-bit command.
-    Command13(u16, SpiDataMode),
+    Command13(u16, DataMode),
     /// A 14-bit command.
-    Command14(u16, SpiDataMode),
+    Command14(u16, DataMode),
     /// A 15-bit command.
-    Command15(u16, SpiDataMode),
+    Command15(u16, DataMode),
     /// A 16-bit command.
-    Command16(u16, SpiDataMode),
+    Command16(u16, DataMode),
 }
 
 impl Command {
@@ -199,9 +199,9 @@ impl Command {
         }
     }
 
-    fn mode(&self) -> SpiDataMode {
+    fn mode(&self) -> DataMode {
         match self {
-            Command::None => SpiDataMode::Single,
+            Command::None => DataMode::Single,
             Command::Command1(_, mode)
             | Command::Command2(_, mode)
             | Command::Command3(_, mode)
@@ -237,69 +237,69 @@ pub enum Address {
     /// No address phase.
     None,
     /// A 1-bit address.
-    Address1(u32, SpiDataMode),
+    Address1(u32, DataMode),
     /// A 2-bit address.
-    Address2(u32, SpiDataMode),
+    Address2(u32, DataMode),
     /// A 3-bit address.
-    Address3(u32, SpiDataMode),
+    Address3(u32, DataMode),
     /// A 4-bit address.
-    Address4(u32, SpiDataMode),
+    Address4(u32, DataMode),
     /// A 5-bit address.
-    Address5(u32, SpiDataMode),
+    Address5(u32, DataMode),
     /// A 6-bit address.
-    Address6(u32, SpiDataMode),
+    Address6(u32, DataMode),
     /// A 7-bit address.
-    Address7(u32, SpiDataMode),
+    Address7(u32, DataMode),
     /// A 8-bit address.
-    Address8(u32, SpiDataMode),
+    Address8(u32, DataMode),
     /// A 9-bit address.
-    Address9(u32, SpiDataMode),
+    Address9(u32, DataMode),
     /// A 10-bit address.
-    Address10(u32, SpiDataMode),
+    Address10(u32, DataMode),
     /// A 11-bit address.
-    Address11(u32, SpiDataMode),
+    Address11(u32, DataMode),
     /// A 12-bit address.
-    Address12(u32, SpiDataMode),
+    Address12(u32, DataMode),
     /// A 13-bit address.
-    Address13(u32, SpiDataMode),
+    Address13(u32, DataMode),
     /// A 14-bit address.
-    Address14(u32, SpiDataMode),
+    Address14(u32, DataMode),
     /// A 15-bit address.
-    Address15(u32, SpiDataMode),
+    Address15(u32, DataMode),
     /// A 16-bit address.
-    Address16(u32, SpiDataMode),
+    Address16(u32, DataMode),
     /// A 17-bit address.
-    Address17(u32, SpiDataMode),
+    Address17(u32, DataMode),
     /// A 18-bit address.
-    Address18(u32, SpiDataMode),
+    Address18(u32, DataMode),
     /// A 19-bit address.
-    Address19(u32, SpiDataMode),
+    Address19(u32, DataMode),
     /// A 20-bit address.
-    Address20(u32, SpiDataMode),
+    Address20(u32, DataMode),
     /// A 21-bit address.
-    Address21(u32, SpiDataMode),
+    Address21(u32, DataMode),
     /// A 22-bit address.
-    Address22(u32, SpiDataMode),
+    Address22(u32, DataMode),
     /// A 23-bit address.
-    Address23(u32, SpiDataMode),
+    Address23(u32, DataMode),
     /// A 24-bit address.
-    Address24(u32, SpiDataMode),
+    Address24(u32, DataMode),
     /// A 25-bit address.
-    Address25(u32, SpiDataMode),
+    Address25(u32, DataMode),
     /// A 26-bit address.
-    Address26(u32, SpiDataMode),
+    Address26(u32, DataMode),
     /// A 27-bit address.
-    Address27(u32, SpiDataMode),
+    Address27(u32, DataMode),
     /// A 28-bit address.
-    Address28(u32, SpiDataMode),
+    Address28(u32, DataMode),
     /// A 29-bit address.
-    Address29(u32, SpiDataMode),
+    Address29(u32, DataMode),
     /// A 30-bit address.
-    Address30(u32, SpiDataMode),
+    Address30(u32, DataMode),
     /// A 31-bit address.
-    Address31(u32, SpiDataMode),
+    Address31(u32, DataMode),
     /// A 32-bit address.
-    Address32(u32, SpiDataMode),
+    Address32(u32, DataMode),
 }
 
 impl Address {
@@ -383,9 +383,9 @@ impl Address {
         matches!(self, Address::None)
     }
 
-    fn mode(&self) -> SpiDataMode {
+    fn mode(&self) -> DataMode {
         match self {
-            Address::None => SpiDataMode::Single,
+            Address::None => DataMode::Single,
             Address::Address1(_, mode)
             | Address::Address2(_, mode)
             | Address::Address3(_, mode)
@@ -431,13 +431,13 @@ pub struct Config {
     pub frequency: HertzU32,
 
     /// SPI sample/shift mode.
-    pub mode: SpiMode,
+    pub mode: Mode,
 
     /// Bit order of the read data.
-    pub read_bit_order: SpiBitOrder,
+    pub read_bit_order: BitOrder,
 
     /// Bit order of the written data.
-    pub write_bit_order: SpiBitOrder,
+    pub write_bit_order: BitOrder,
 }
 
 impl Default for Config {
@@ -445,9 +445,9 @@ impl Default for Config {
         use fugit::RateExtU32;
         Config {
             frequency: 1_u32.MHz(),
-            mode: SpiMode::Mode0,
-            read_bit_order: SpiBitOrder::MsbFirst,
-            write_bit_order: SpiBitOrder::MsbFirst,
+            mode: Mode::Mode0,
+            read_bit_order: BitOrder::MsbFirst,
+            write_bit_order: BitOrder::MsbFirst,
         }
     }
 }
@@ -767,7 +767,7 @@ where
     #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
-        data_mode: SpiDataMode,
+        data_mode: DataMode,
         cmd: Command,
         address: Address,
         dummy: u8,
@@ -801,7 +801,7 @@ where
     #[instability::unstable]
     pub fn half_duplex_write(
         &mut self,
-        data_mode: SpiDataMode,
+        data_mode: DataMode,
         cmd: Command,
         address: Address,
         dummy: u8,
@@ -1456,7 +1456,7 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         unsafe fn start_half_duplex_read(
             &mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
@@ -1481,7 +1481,7 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         pub fn half_duplex_read<RX: DmaRxBuffer>(
             mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
@@ -1512,7 +1512,7 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         unsafe fn start_half_duplex_write(
             &mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
@@ -1523,7 +1523,7 @@ mod dma {
             {
                 // On the ESP32, if we don't have data, the address is always sent
                 // on a single line, regardless of its data mode.
-                if bytes_to_write == 0 && address.mode() != SpiDataMode::Single {
+                if bytes_to_write == 0 && address.mode() != DataMode::Single {
                     return self.set_up_address_workaround(cmd, address, dummy);
                 }
             }
@@ -1546,7 +1546,7 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         pub fn half_duplex_write<TX: DmaTxBuffer>(
             mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
@@ -1801,7 +1801,7 @@ mod dma {
         /// Half-duplex read.
         pub fn half_duplex_read(
             &mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
@@ -1835,7 +1835,7 @@ mod dma {
         /// Half-duplex write.
         pub fn half_duplex_write(
             &mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
@@ -2550,22 +2550,22 @@ impl Driver {
     #[cfg(not(esp32))]
     fn init_spi_data_mode(
         &self,
-        cmd_mode: SpiDataMode,
-        address_mode: SpiDataMode,
-        data_mode: SpiDataMode,
+        cmd_mode: DataMode,
+        address_mode: DataMode,
+        data_mode: DataMode,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         reg_block.ctrl().modify(|_, w| {
-            w.fcmd_dual().bit(cmd_mode == SpiDataMode::Dual);
-            w.fcmd_quad().bit(cmd_mode == SpiDataMode::Quad);
-            w.faddr_dual().bit(address_mode == SpiDataMode::Dual);
-            w.faddr_quad().bit(address_mode == SpiDataMode::Quad);
-            w.fread_dual().bit(data_mode == SpiDataMode::Dual);
-            w.fread_quad().bit(data_mode == SpiDataMode::Quad)
+            w.fcmd_dual().bit(cmd_mode == DataMode::Dual);
+            w.fcmd_quad().bit(cmd_mode == DataMode::Quad);
+            w.faddr_dual().bit(address_mode == DataMode::Dual);
+            w.faddr_quad().bit(address_mode == DataMode::Quad);
+            w.fread_dual().bit(data_mode == DataMode::Dual);
+            w.fread_quad().bit(data_mode == DataMode::Quad)
         });
         reg_block.user().modify(|_, w| {
-            w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
-            w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
+            w.fwrite_dual().bit(data_mode == DataMode::Dual);
+            w.fwrite_quad().bit(data_mode == DataMode::Quad)
         });
         Ok(())
     }
@@ -2573,45 +2573,45 @@ impl Driver {
     #[cfg(esp32)]
     fn init_spi_data_mode(
         &self,
-        cmd_mode: SpiDataMode,
-        address_mode: SpiDataMode,
-        data_mode: SpiDataMode,
+        cmd_mode: DataMode,
+        address_mode: DataMode,
+        data_mode: DataMode,
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         match cmd_mode {
-            SpiDataMode::Single => (),
+            DataMode::Single => (),
             // FIXME: more detailed error - Only 1-bit commands are supported.
             _ => return Err(Error::Unsupported),
         }
 
         match address_mode {
-            SpiDataMode::Single => {
+            DataMode::Single => {
                 reg_block.ctrl().modify(|_, w| {
                     w.fread_dio().clear_bit();
                     w.fread_qio().clear_bit();
-                    w.fread_dual().bit(data_mode == SpiDataMode::Dual);
-                    w.fread_quad().bit(data_mode == SpiDataMode::Quad)
+                    w.fread_dual().bit(data_mode == DataMode::Dual);
+                    w.fread_quad().bit(data_mode == DataMode::Quad)
                 });
 
                 reg_block.user().modify(|_, w| {
                     w.fwrite_dio().clear_bit();
                     w.fwrite_qio().clear_bit();
-                    w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
-                    w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
+                    w.fwrite_dual().bit(data_mode == DataMode::Dual);
+                    w.fwrite_quad().bit(data_mode == DataMode::Quad)
                 });
             }
             address_mode if address_mode == data_mode => {
                 reg_block.ctrl().modify(|_, w| {
                     w.fastrd_mode().set_bit();
-                    w.fread_dio().bit(address_mode == SpiDataMode::Dual);
-                    w.fread_qio().bit(address_mode == SpiDataMode::Quad);
+                    w.fread_dio().bit(address_mode == DataMode::Dual);
+                    w.fread_qio().bit(address_mode == DataMode::Quad);
                     w.fread_dual().clear_bit();
                     w.fread_quad().clear_bit()
                 });
 
                 reg_block.user().modify(|_, w| {
-                    w.fwrite_dio().bit(address_mode == SpiDataMode::Dual);
-                    w.fwrite_qio().bit(address_mode == SpiDataMode::Quad);
+                    w.fwrite_dio().bit(address_mode == DataMode::Dual);
+                    w.fwrite_qio().bit(address_mode == DataMode::Quad);
                     w.fwrite_dual().clear_bit();
                     w.fwrite_quad().clear_bit()
                 });
@@ -2759,7 +2759,7 @@ impl Driver {
         Ok(())
     }
 
-    fn set_data_mode(&self, data_mode: SpiMode) {
+    fn set_data_mode(&self, data_mode: Mode) {
         let reg_block = self.register_block();
 
         cfg_if::cfg_if! {
@@ -2772,11 +2772,11 @@ impl Driver {
 
         pin_reg.modify(|_, w| {
             w.ck_idle_edge()
-                .bit(matches!(data_mode, SpiMode::Mode2 | SpiMode::Mode3))
+                .bit(matches!(data_mode, Mode::Mode2 | Mode::Mode3))
         });
         reg_block.user().modify(|_, w| {
             w.ck_out_edge()
-                .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode2))
+                .bit(matches!(data_mode, Mode::Mode1 | Mode::Mode2))
         });
     }
 
@@ -2799,16 +2799,16 @@ impl Driver {
     }
 
     #[cfg(not(any(esp32, esp32c3, esp32s2)))]
-    fn set_bit_order(&self, read_order: SpiBitOrder, write_order: SpiBitOrder) {
+    fn set_bit_order(&self, read_order: BitOrder, write_order: BitOrder) {
         let reg_block = self.register_block();
 
         let read_value = match read_order {
-            SpiBitOrder::MsbFirst => 0,
-            SpiBitOrder::LsbFirst => 1,
+            BitOrder::MsbFirst => 0,
+            BitOrder::LsbFirst => 1,
         };
         let write_value = match write_order {
-            SpiBitOrder::MsbFirst => 0,
-            SpiBitOrder::LsbFirst => 1,
+            BitOrder::MsbFirst => 0,
+            BitOrder::LsbFirst => 1,
         };
         reg_block.ctrl().modify(|_, w| unsafe {
             w.rd_bit_order().bits(read_value);
@@ -2818,16 +2818,16 @@ impl Driver {
     }
 
     #[cfg(any(esp32, esp32c3, esp32s2))]
-    fn set_bit_order(&self, read_order: SpiBitOrder, write_order: SpiBitOrder) {
+    fn set_bit_order(&self, read_order: BitOrder, write_order: BitOrder) {
         let reg_block = self.register_block();
 
         let read_value = match read_order {
-            SpiBitOrder::MsbFirst => false,
-            SpiBitOrder::LsbFirst => true,
+            BitOrder::MsbFirst => false,
+            BitOrder::LsbFirst => true,
         };
         let write_value = match write_order {
-            SpiBitOrder::MsbFirst => false,
-            SpiBitOrder::LsbFirst => true,
+            BitOrder::MsbFirst => false,
+            BitOrder::LsbFirst => true,
         };
         reg_block.ctrl().modify(|_, w| {
             w.rd_bit_order().bit(read_value);
@@ -3098,7 +3098,7 @@ impl Driver {
         dummy_idle: bool,
         dummy: u8,
         no_mosi_miso: bool,
-        data_mode: SpiDataMode,
+        data_mode: DataMode,
     ) -> Result<(), Error> {
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
 
