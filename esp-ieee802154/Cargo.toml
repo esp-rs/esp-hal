@@ -2,7 +2,7 @@
 name         = "esp-ieee802154"
 version      = "0.4.0"
 edition      = "2021"
-rust-version = "1.76.0"
+rust-version = "1.83.0"
 description  = "Low-level IEEE 802.15.4 driver for the ESP32-C6 and ESP32-H2"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
