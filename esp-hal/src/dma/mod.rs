@@ -1808,13 +1808,13 @@ fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
-pub struct ChannelRx<'a, M, CH>
+pub struct ChannelRx<'a, Dm, CH>
 where
-    M: Mode,
+    Dm: Mode,
     CH: DmaRxChannel,
 {
     pub(crate) rx_impl: PeripheralRef<'a, CH>,
-    pub(crate) _phantom: PhantomData<M>,
+    pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: PeripheralGuard,
 }
 
@@ -1892,9 +1892,9 @@ where
     }
 }
 
-impl<M, CH> ChannelRx<'_, M, CH>
+impl<Dm, CH> ChannelRx<'_, Dm, CH>
 where
-    M: Mode,
+    Dm: Mode,
     CH: DmaRxChannel,
 {
     /// Configure the channel.
@@ -1936,16 +1936,16 @@ where
     }
 }
 
-impl<M, CH> crate::private::Sealed for ChannelRx<'_, M, CH>
+impl<Dm, CH> crate::private::Sealed for ChannelRx<'_, Dm, CH>
 where
-    M: Mode,
+    Dm: Mode,
     CH: DmaRxChannel,
 {
 }
 
-impl<M, CH> Rx for ChannelRx<'_, M, CH>
+impl<Dm, CH> Rx for ChannelRx<'_, Dm, CH>
 where
-    M: Mode,
+    Dm: Mode,
     CH: DmaRxChannel,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
@@ -2108,13 +2108,13 @@ pub trait Tx: crate::private::Sealed {
 
 /// DMA transmit channel
 #[doc(hidden)]
-pub struct ChannelTx<'a, M, CH>
+pub struct ChannelTx<'a, Dm, CH>
 where
-    M: Mode,
+    Dm: Mode,
     CH: DmaTxChannel,
 {
     pub(crate) tx_impl: PeripheralRef<'a, CH>,
-    pub(crate) _phantom: PhantomData<M>,
+    pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: PeripheralGuard,
 }
 
@@ -2186,9 +2186,9 @@ where
     }
 }
 
-impl<M, CH> ChannelTx<'_, M, CH>
+impl<Dm, CH> ChannelTx<'_, Dm, CH>
 where
-    M: Mode,
+    Dm: Mode,
     CH: DmaTxChannel,
 {
     /// Configure the channel priority.
@@ -2230,16 +2230,16 @@ where
     }
 }
 
-impl<M, CH> crate::private::Sealed for ChannelTx<'_, M, CH>
+impl<Dm, CH> crate::private::Sealed for ChannelTx<'_, Dm, CH>
 where
-    M: Mode,
+    Dm: Mode,
     CH: DmaTxChannel,
 {
 }
 
-impl<M, CH> Tx for ChannelTx<'_, M, CH>
+impl<Dm, CH> Tx for ChannelTx<'_, Dm, CH>
 where
-    M: Mode,
+    Dm: Mode,
     CH: DmaTxChannel,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
@@ -2448,15 +2448,15 @@ pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
 
 /// DMA Channel
 #[non_exhaustive]
-pub struct Channel<'d, M, CH>
+pub struct Channel<'d, Dm, CH>
 where
-    M: Mode,
+    Dm: Mode,
     CH: DmaChannel,
 {
     /// RX half of the channel
-    pub rx: ChannelRx<'d, M, CH::Rx>,
+    pub rx: ChannelRx<'d, Dm, CH::Rx>,
     /// TX half of the channel
-    pub tx: ChannelTx<'d, M, CH::Tx>,
+    pub tx: ChannelTx<'d, Dm, CH::Tx>,
 }
 
 impl<'d, CH> Channel<'d, Blocking, CH>

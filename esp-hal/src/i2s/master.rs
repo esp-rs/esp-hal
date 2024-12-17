@@ -250,15 +250,15 @@ impl DataFormat {
 
 /// Instance of the I2S peripheral driver
 #[non_exhaustive]
-pub struct I2s<'d, M, T = AnyI2s>
+pub struct I2s<'d, Dm, T = AnyI2s>
 where
     T: RegisterAccess,
-    M: Mode,
+    Dm: Mode,
 {
     /// Handles the reception (RX) side of the I2S peripheral.
-    pub i2s_rx: RxCreator<'d, M, T>,
+    pub i2s_rx: RxCreator<'d, Dm, T>,
     /// Handles the transmission (TX) side of the I2S peripheral.
-    pub i2s_tx: TxCreator<'d, M, T>,
+    pub i2s_tx: TxCreator<'d, Dm, T>,
 }
 
 impl<'d, T> I2s<'d, Blocking, T>
@@ -308,10 +308,10 @@ where
     }
 }
 
-impl<DmaMode, T> I2s<'_, DmaMode, T>
+impl<Dm, T> I2s<'_, Dm, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     /// Sets the interrupt handler
     ///
@@ -346,17 +346,17 @@ where
     }
 }
 
-impl<DmaMode, I> crate::private::Sealed for I2s<'_, DmaMode, I>
+impl<Dm, I> crate::private::Sealed for I2s<'_, Dm, I>
 where
     I: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
 }
 
-impl<DmaMode, I> InterruptConfigurable for I2s<'_, DmaMode, I>
+impl<Dm, I> InterruptConfigurable for I2s<'_, Dm, I>
 where
     I: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         I2s::set_interrupt_handler(self, handler);
@@ -441,10 +441,10 @@ where
     }
 }
 
-impl<'d, M, T> I2s<'d, M, T>
+impl<'d, Dm, T> I2s<'d, Dm, T>
 where
     T: RegisterAccess,
-    M: Mode,
+    Dm: Mode,
 {
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
     pub fn with_mclk<P: PeripheralOutput>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
@@ -457,31 +457,31 @@ where
 }
 
 /// I2S TX channel
-pub struct I2sTx<'d, DmaMode, T = AnyI2s>
+pub struct I2sTx<'d, Dm, T = AnyI2s>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     i2s: PeripheralRef<'d, T>,
-    tx_channel: ChannelTx<'d, DmaMode, PeripheralTxChannel<T>>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<T>>,
     tx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
 
-impl<DmaMode, T> core::fmt::Debug for I2sTx<'_, DmaMode, T>
+impl<Dm, T> core::fmt::Debug for I2sTx<'_, Dm, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I2sTx").finish()
     }
 }
 
-impl<DmaMode, T> DmaSupport for I2sTx<'_, DmaMode, T>
+impl<Dm, T> DmaSupport for I2sTx<'_, Dm, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         self.i2s.wait_for_tx_done();
@@ -492,12 +492,12 @@ where
     }
 }
 
-impl<'d, DmaMode, T> DmaSupportTx for I2sTx<'d, DmaMode, T>
+impl<'d, Dm, T> DmaSupportTx for I2sTx<'d, Dm, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
-    type TX = ChannelTx<'d, DmaMode, PeripheralTxChannel<T>>;
+    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<T>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -508,10 +508,10 @@ where
     }
 }
 
-impl<DmaMode, T> I2sTx<'_, DmaMode, T>
+impl<Dm, T> I2sTx<'_, Dm, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
         self.start_tx_transfer(&data, false)?;
@@ -529,7 +529,7 @@ where
     ) -> Result<(), Error>
     where
         TXBUF: ReadBuffer,
-        DmaMode: Mode,
+        Dm: Mode,
     {
         let (ptr, len) = unsafe { words.read_buffer() };
 
@@ -590,31 +590,31 @@ where
 }
 
 /// I2S RX channel
-pub struct I2sRx<'d, DmaMode, T = AnyI2s>
+pub struct I2sRx<'d, Dm, T = AnyI2s>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     i2s: PeripheralRef<'d, T>,
-    rx_channel: ChannelRx<'d, DmaMode, PeripheralRxChannel<T>>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<T>>,
     rx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
 
-impl<DmaMode, T> core::fmt::Debug for I2sRx<'_, DmaMode, T>
+impl<Dm, T> core::fmt::Debug for I2sRx<'_, Dm, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I2sRx").finish()
     }
 }
 
-impl<DmaMode, T> DmaSupport for I2sRx<'_, DmaMode, T>
+impl<Dm, T> DmaSupport for I2sRx<'_, Dm, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         self.i2s.wait_for_rx_done();
@@ -625,12 +625,12 @@ where
     }
 }
 
-impl<'d, DmaMode, T> DmaSupportRx for I2sRx<'d, DmaMode, T>
+impl<'d, Dm, T> DmaSupportRx for I2sRx<'d, Dm, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
-    type RX = ChannelRx<'d, DmaMode, PeripheralRxChannel<T>>;
+    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<T>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -641,10 +641,10 @@ where
     }
 }
 
-impl<DmaMode, T> I2sRx<'_, DmaMode, T>
+impl<Dm, T> I2sRx<'_, Dm, T>
 where
     T: RegisterAccess,
-    DmaMode: Mode,
+    Dm: Mode,
 {
     fn read_bytes(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
         self.start_rx_transfer(&mut data, false)?;
@@ -760,23 +760,23 @@ mod private {
         Mode,
     };
 
-    pub struct TxCreator<'d, M, T>
+    pub struct TxCreator<'d, Dm, T>
     where
         T: RegisterAccess,
-        M: Mode,
+        Dm: Mode,
     {
         pub i2s: PeripheralRef<'d, T>,
-        pub tx_channel: ChannelTx<'d, M, PeripheralTxChannel<T>>,
+        pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<T>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
 
-    impl<'d, M, T> TxCreator<'d, M, T>
+    impl<'d, Dm, T> TxCreator<'d, Dm, T>
     where
-        M: Mode,
+        Dm: Mode,
         T: RegisterAccess,
     {
-        pub fn build(self) -> I2sTx<'d, M, T> {
+        pub fn build(self) -> I2sTx<'d, Dm, T> {
             let peripheral = self.i2s.peripheral();
             I2sTx {
                 i2s: self.i2s,
@@ -820,23 +820,23 @@ mod private {
         }
     }
 
-    pub struct RxCreator<'d, M, T>
+    pub struct RxCreator<'d, Dm, T>
     where
         T: RegisterAccess,
-        M: Mode,
+        Dm: Mode,
     {
         pub i2s: PeripheralRef<'d, T>,
-        pub rx_channel: ChannelRx<'d, M, PeripheralRxChannel<T>>,
+        pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<T>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
 
-    impl<'d, M, T> RxCreator<'d, M, T>
+    impl<'d, Dm, T> RxCreator<'d, Dm, T>
     where
-        M: Mode,
+        Dm: Mode,
         T: RegisterAccess,
     {
-        pub fn build(self) -> I2sRx<'d, M, T> {
+        pub fn build(self) -> I2sRx<'d, Dm, T> {
             let peripheral = self.i2s.peripheral();
             I2sRx {
                 i2s: self.i2s,

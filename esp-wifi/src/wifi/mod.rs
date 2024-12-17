@@ -1789,16 +1789,16 @@ pub(crate) fn wifi_start_scan(
 /// [`Configuration::Client`] or [`Configuration::AccessPoint`].
 ///
 /// If you want to use AP-STA mode, use `[new_ap_sta]`.
-pub fn new_with_config<'d, MODE: WifiDeviceMode>(
+pub fn new_with_config<'d, Dm: WifiDeviceMode>(
     inited: &'d EspWifiController<'d>,
     device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-    config: MODE::Config,
-) -> Result<(WifiDevice<'d, MODE>, WifiController<'d>), WifiError> {
+    config: Dm::Config,
+) -> Result<(WifiDevice<'d, Dm>, WifiController<'d>), WifiError> {
     crate::hal::into_ref!(device);
 
     Ok((
-        WifiDevice::new(unsafe { device.clone_unchecked() }, MODE::new()),
-        WifiController::new_with_config(inited, device, MODE::wrap_config(config))?,
+        WifiDevice::new(unsafe { device.clone_unchecked() }, Dm::new()),
+        WifiController::new_with_config(inited, device, Dm::wrap_config(config))?,
     ))
 }
 
@@ -1807,12 +1807,12 @@ pub fn new_with_config<'d, MODE: WifiDeviceMode>(
 ///
 /// This function will panic if the mode is [`WifiMode::ApSta`].
 /// If you want to use AP-STA mode, use `[new_ap_sta]`.
-pub fn new_with_mode<'d, MODE: WifiDeviceMode>(
+pub fn new_with_mode<'d, Dm: WifiDeviceMode>(
     inited: &'d EspWifiController<'d>,
     device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-    _mode: MODE,
-) -> Result<(WifiDevice<'d, MODE>, WifiController<'d>), WifiError> {
-    new_with_config(inited, device, <MODE as Sealed>::Config::default())
+    _mode: Dm,
+) -> Result<(WifiDevice<'d, Dm>, WifiController<'d>), WifiError> {
+    new_with_config(inited, device, <Dm as Sealed>::Config::default())
 }
 
 /// Creates a new [WifiDevice] and [WifiController] in AP-STA mode, with a
@@ -2071,15 +2071,15 @@ impl WifiDeviceMode for WifiApDevice {
 }
 
 /// A wifi device implementing smoltcp's Device trait.
-pub struct WifiDevice<'d, MODE: WifiDeviceMode> {
+pub struct WifiDevice<'d, Dm: WifiDeviceMode> {
     _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
-    mode: MODE,
+    mode: Dm,
 }
 
-impl<'d, MODE: WifiDeviceMode> WifiDevice<'d, MODE> {
+impl<'d, Dm: WifiDeviceMode> WifiDevice<'d, Dm> {
     pub(crate) fn new(
         _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
-        mode: MODE,
+        mode: Dm,
     ) -> Self {
         Self { _device, mode }
     }
@@ -2092,14 +2092,14 @@ impl<'d, MODE: WifiDeviceMode> WifiDevice<'d, MODE> {
     /// Receives data from the Wi-Fi device (only when `smoltcp` feature is
     /// disabled).
     #[cfg(not(feature = "smoltcp"))]
-    pub fn receive(&mut self) -> Option<(WifiRxToken<MODE>, WifiTxToken<MODE>)> {
+    pub fn receive(&mut self) -> Option<(WifiRxToken<Dm>, WifiTxToken<Dm>)> {
         self.mode.rx_token()
     }
 
     /// Transmits data through the Wi-Fi device (only when `smoltcp` feature is
     /// disabled).
     #[cfg(not(feature = "smoltcp"))]
-    pub fn transmit(&mut self) -> Option<WifiTxToken<MODE>> {
+    pub fn transmit(&mut self) -> Option<WifiTxToken<Dm>> {
         self.mode.tx_token()
     }
 }
@@ -2619,13 +2619,13 @@ impl<'d> WifiController<'d> {
 
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
 #[cfg(feature = "smoltcp")]
-impl<MODE: WifiDeviceMode> Device for WifiDevice<'_, MODE> {
+impl<Dm: WifiDeviceMode> Device for WifiDevice<'_, Dm> {
     type RxToken<'a>
-        = WifiRxToken<MODE>
+        = WifiRxToken<Dm>
     where
         Self: 'a;
     type TxToken<'a>
-        = WifiTxToken<MODE>
+        = WifiTxToken<Dm>
     where
         Self: 'a;
 
@@ -2654,11 +2654,11 @@ impl<MODE: WifiDeviceMode> Device for WifiDevice<'_, MODE> {
 
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct WifiRxToken<MODE: Sealed> {
-    mode: MODE,
+pub struct WifiRxToken<Dm: Sealed> {
+    mode: Dm,
 }
 
-impl<MODE: Sealed> WifiRxToken<MODE> {
+impl<Dm: Sealed> WifiRxToken<Dm> {
     /// Consumes the RX token and applies the callback function to the received
     /// data buffer.
     pub fn consume_token<R, F>(self, f: F) -> R
@@ -2686,7 +2686,7 @@ impl<MODE: Sealed> WifiRxToken<MODE> {
 }
 
 #[cfg(feature = "smoltcp")]
-impl<MODE: Sealed> RxToken for WifiRxToken<MODE> {
+impl<Dm: Sealed> RxToken for WifiRxToken<Dm> {
     fn consume<R, F>(self, f: F) -> R
     where
         F: FnOnce(&mut [u8]) -> R,
@@ -2697,11 +2697,11 @@ impl<MODE: Sealed> RxToken for WifiRxToken<MODE> {
 
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct WifiTxToken<MODE: Sealed> {
-    mode: MODE,
+pub struct WifiTxToken<Dm: Sealed> {
+    mode: Dm,
 }
 
-impl<MODE: Sealed> WifiTxToken<MODE> {
+impl<Dm: Sealed> WifiTxToken<Dm> {
     /// Consumes the TX token and applies the callback function to the received
     /// data buffer.
     pub fn consume_token<R, F>(self, len: usize, f: F) -> R
@@ -2726,7 +2726,7 @@ impl<MODE: Sealed> WifiTxToken<MODE> {
 }
 
 #[cfg(feature = "smoltcp")]
-impl<MODE: Sealed> TxToken for WifiTxToken<MODE> {
+impl<Dm: Sealed> TxToken for WifiTxToken<Dm> {
     fn consume<R, F>(self, len: usize, f: F) -> R
     where
         F: FnOnce(&mut [u8]) -> R,
@@ -3124,7 +3124,7 @@ pub(crate) mod embassy {
     pub(crate) static STA_RECEIVE_WAKER: AtomicWaker = AtomicWaker::new();
     pub(crate) static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
 
-    impl<MODE: WifiDeviceMode> RxToken for WifiRxToken<MODE> {
+    impl<Dm: WifiDeviceMode> RxToken for WifiRxToken<Dm> {
         fn consume<R, F>(self, f: F) -> R
         where
             F: FnOnce(&mut [u8]) -> R,
@@ -3133,7 +3133,7 @@ pub(crate) mod embassy {
         }
     }
 
-    impl<MODE: WifiDeviceMode> TxToken for WifiTxToken<MODE> {
+    impl<Dm: WifiDeviceMode> TxToken for WifiTxToken<Dm> {
         fn consume<R, F>(self, len: usize, f: F) -> R
         where
             F: FnOnce(&mut [u8]) -> R,
@@ -3142,13 +3142,13 @@ pub(crate) mod embassy {
         }
     }
 
-    impl<MODE: WifiDeviceMode> Driver for WifiDevice<'_, MODE> {
+    impl<Dm: WifiDeviceMode> Driver for WifiDevice<'_, Dm> {
         type RxToken<'a>
-            = WifiRxToken<MODE>
+            = WifiRxToken<Dm>
         where
             Self: 'a;
         type TxToken<'a>
-            = WifiTxToken<MODE>
+            = WifiTxToken<Dm>
         where
             Self: 'a;
 

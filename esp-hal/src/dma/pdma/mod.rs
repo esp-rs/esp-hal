@@ -194,10 +194,10 @@ pub(super) fn init_dma(_cs: CriticalSection<'_>) {
     }
 }
 
-impl<CH, M> Channel<'_, M, CH>
+impl<CH, Dm> Channel<'_, Dm, CH>
 where
     CH: DmaChannel,
-    M: Mode,
+    Dm: Mode,
 {
     /// Asserts that the channel is compatible with the given peripheral.
     pub fn runtime_ensure_compatible(&self, peripheral: &PeripheralRef<'_, impl DmaEligible>) {

@@ -28,11 +28,11 @@ use crate::{
 /// This is a pseudo-peripheral that allows for memory to memory transfers.
 /// It is not a real peripheral, but a way to use the DMA engine for memory
 /// to memory transfers.
-pub struct Mem2Mem<'d, M>
+pub struct Mem2Mem<'d, Dm>
 where
-    M: Mode,
+    Dm: Mode,
 {
-    channel: Channel<'d, M, AnyGdmaChannel>,
+    channel: Channel<'d, Dm, AnyGdmaChannel>,
     rx_chain: DescriptorChain,
     tx_chain: DescriptorChain,
     peripheral: DmaPeripheral,
@@ -123,9 +123,9 @@ impl<'d> Mem2Mem<'d, Blocking> {
     }
 }
 
-impl<M> Mem2Mem<'_, M>
+impl<Dm> Mem2Mem<'_, Dm>
 where
-    M: Mode,
+    Dm: Mode,
 {
     /// Start a memory to memory transfer.
     pub fn start_transfer<'t, TXBUF, RXBUF>(
@@ -156,9 +156,9 @@ where
     }
 }
 
-impl<MODE> DmaSupport for Mem2Mem<'_, MODE>
+impl<Dm> DmaSupport for Mem2Mem<'_, Dm>
 where
-    MODE: Mode,
+    Dm: Mode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         while !self.channel.rx.is_done() {}
@@ -169,11 +169,11 @@ where
     }
 }
 
-impl<'d, M> DmaSupportRx for Mem2Mem<'d, M>
+impl<'d, Dm> DmaSupportRx for Mem2Mem<'d, Dm>
 where
-    M: Mode,
+    Dm: Mode,
 {
-    type RX = ChannelRx<'d, M, AnyGdmaRxChannel>;
+    type RX = ChannelRx<'d, Dm, AnyGdmaRxChannel>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.channel.rx

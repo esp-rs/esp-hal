@@ -457,13 +457,13 @@ pub enum ConfigError {}
 /// SPI peripheral driver
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Spi<'d, M, T = AnySpi> {
+pub struct Spi<'d, Dm, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
-    _mode: PhantomData<M>,
+    _mode: PhantomData<Dm>,
     guard: PeripheralGuard,
 }
 
-impl<M, T> Spi<'_, M, T>
+impl<Dm, T> Spi<'_, Dm, T>
 where
     T: Instance,
 {
@@ -550,7 +550,7 @@ where
     }
 }
 
-impl<'d, M, T> Spi<'d, M, T>
+impl<'d, Dm, T> Spi<'d, Dm, T>
 where
     T: Instance,
 {
@@ -652,10 +652,10 @@ where
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<M, T> SetConfig for Spi<'_, M, T>
+impl<Dm, T> SetConfig for Spi<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: Mode,
 {
     type Config = Config;
     type ConfigError = ConfigError;
@@ -665,7 +665,7 @@ where
     }
 }
 
-impl<'d, M, T> Spi<'d, M, T>
+impl<'d, Dm, T> Spi<'d, Dm, T>
 where
     T: QspiInstance,
 {
@@ -706,7 +706,7 @@ where
     }
 }
 
-impl<M, T> Spi<'_, M, T>
+impl<Dm, T> Spi<'_, Dm, T>
 where
     T: Instance,
 {
@@ -831,13 +831,13 @@ mod dma {
     /// [`SpiDmaBus`] via `with_buffers` to get access
     /// to a DMA capable SPI bus that implements the
     /// embedded-hal traits.
-    pub struct SpiDma<'d, M, T = AnySpi>
+    pub struct SpiDma<'d, Dm, T = AnySpi>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, M, PeripheralDmaChannel<T>>,
+        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<T>>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
@@ -845,10 +845,10 @@ mod dma {
         guard: PeripheralGuard,
     }
 
-    impl<M, T> crate::private::Sealed for SpiDma<'_, M, T>
+    impl<Dm, T> crate::private::Sealed for SpiDma<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
     }
 
@@ -888,10 +888,10 @@ mod dma {
         }
     }
 
-    impl<M, T> core::fmt::Debug for SpiDma<'_, M, T>
+    impl<Dm, T> core::fmt::Debug for SpiDma<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
         /// Formats the `SpiDma` instance for debugging purposes.
         ///
@@ -989,9 +989,9 @@ mod dma {
         }
     }
 
-    impl<'d, M, T> SpiDma<'d, M, T>
+    impl<'d, Dm, T> SpiDma<'d, Dm, T>
     where
-        M: Mode,
+        Dm: Mode,
         T: Instance,
     {
         fn driver(&self) -> &'static Info {
@@ -1173,17 +1173,17 @@ mod dma {
             self,
             dma_rx_buf: DmaRxBuf,
             dma_tx_buf: DmaTxBuf,
-        ) -> SpiDmaBus<'d, M, T> {
+        ) -> SpiDmaBus<'d, Dm, T> {
             SpiDmaBus::new(self, dma_rx_buf, dma_tx_buf)
         }
     }
 
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    impl<M, T> SetConfig for SpiDma<'_, M, T>
+    impl<Dm, T> SetConfig for SpiDma<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
         type Config = Config;
         type ConfigError = ConfigError;
@@ -1197,21 +1197,21 @@ mod dma {
     ///
     /// This structure holds references to the SPI instance, DMA buffers, and
     /// transfer status.
-    pub struct SpiDmaTransfer<'d, M, Buf, T = AnySpi>
+    pub struct SpiDmaTransfer<'d, Dm, Buf, T = AnySpi>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
-        spi_dma: ManuallyDrop<SpiDma<'d, M, T>>,
+        spi_dma: ManuallyDrop<SpiDma<'d, Dm, T>>,
         dma_buf: ManuallyDrop<Buf>,
     }
 
-    impl<'d, M, T, Buf> SpiDmaTransfer<'d, M, Buf, T>
+    impl<'d, Dm, T, Buf> SpiDmaTransfer<'d, Dm, Buf, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
-        fn new(spi_dma: SpiDma<'d, M, T>, dma_buf: Buf) -> Self {
+        fn new(spi_dma: SpiDma<'d, Dm, T>, dma_buf: Buf) -> Self {
             Self {
                 spi_dma: ManuallyDrop::new(spi_dma),
                 dma_buf: ManuallyDrop::new(dma_buf),
@@ -1230,7 +1230,7 @@ mod dma {
         ///
         /// This method blocks until the transfer is finished and returns the
         /// `SpiDma` instance and the associated buffer.
-        pub fn wait(mut self) -> (SpiDma<'d, M, T>, Buf) {
+        pub fn wait(mut self) -> (SpiDma<'d, Dm, T>, Buf) {
             self.spi_dma.wait_for_idle();
             let retval = unsafe {
                 (
@@ -1250,10 +1250,10 @@ mod dma {
         }
     }
 
-    impl<M, T, Buf> Drop for SpiDmaTransfer<'_, M, Buf, T>
+    impl<Dm, T, Buf> Drop for SpiDmaTransfer<'_, Dm, Buf, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
         fn drop(&mut self) {
             if !self.is_done() {
@@ -1280,10 +1280,10 @@ mod dma {
         }
     }
 
-    impl<'d, M, T> SpiDma<'d, M, T>
+    impl<'d, Dm, T> SpiDma<'d, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
         /// # Safety:
         ///
@@ -1309,7 +1309,7 @@ mod dma {
             mut self,
             bytes_to_write: usize,
             mut buffer: TX,
-        ) -> Result<SpiDmaTransfer<'d, M, TX, T>, (Error, Self, TX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, TX, T>, (Error, Self, TX)> {
             self.wait_for_idle();
 
             match unsafe { self.start_dma_write(bytes_to_write, &mut buffer) } {
@@ -1342,7 +1342,7 @@ mod dma {
             mut self,
             bytes_to_read: usize,
             mut buffer: RX,
-        ) -> Result<SpiDmaTransfer<'d, M, RX, T>, (Error, Self, RX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, RX, T>, (Error, Self, RX)> {
             self.wait_for_idle();
             match unsafe { self.start_dma_read(bytes_to_read, &mut buffer) } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
@@ -1378,7 +1378,7 @@ mod dma {
             mut rx_buffer: RX,
             bytes_to_write: usize,
             mut tx_buffer: TX,
-        ) -> Result<SpiDmaTransfer<'d, M, (RX, TX), T>, (Error, Self, RX, TX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, (RX, TX), T>, (Error, Self, RX, TX)> {
             self.wait_for_idle();
             match unsafe {
                 self.start_dma_transfer(
@@ -1431,7 +1431,7 @@ mod dma {
             dummy: u8,
             bytes_to_read: usize,
             mut buffer: RX,
-        ) -> Result<SpiDmaTransfer<'d, M, RX, T>, (Error, Self, RX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, RX, T>, (Error, Self, RX)> {
             self.wait_for_idle();
 
             match unsafe {
@@ -1496,7 +1496,7 @@ mod dma {
             dummy: u8,
             bytes_to_write: usize,
             mut buffer: TX,
-        ) -> Result<SpiDmaTransfer<'d, M, TX, T>, (Error, Self, TX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, TX, T>, (Error, Self, TX)> {
             self.wait_for_idle();
 
             match unsafe {
@@ -1519,21 +1519,21 @@ mod dma {
     ///
     /// This structure is responsible for managing SPI transfers using DMA
     /// buffers.
-    pub struct SpiDmaBus<'d, M, T = AnySpi>
+    pub struct SpiDmaBus<'d, Dm, T = AnySpi>
     where
         T: Instance,
 
-        M: Mode,
+        Dm: Mode,
     {
-        spi_dma: SpiDma<'d, M, T>,
+        spi_dma: SpiDma<'d, Dm, T>,
         rx_buf: DmaRxBuf,
         tx_buf: DmaTxBuf,
     }
 
-    impl<M, T> crate::private::Sealed for SpiDmaBus<'_, M, T>
+    impl<Dm, T> crate::private::Sealed for SpiDmaBus<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
     }
 
@@ -1565,14 +1565,14 @@ mod dma {
         }
     }
 
-    impl<'d, M, T> SpiDmaBus<'d, M, T>
+    impl<'d, Dm, T> SpiDmaBus<'d, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
         /// Creates a new `SpiDmaBus` with the specified SPI instance and DMA
         /// buffers.
-        pub fn new(spi_dma: SpiDma<'d, M, T>, rx_buf: DmaRxBuf, tx_buf: DmaTxBuf) -> Self {
+        pub fn new(spi_dma: SpiDma<'d, Dm, T>, rx_buf: DmaRxBuf, tx_buf: DmaTxBuf) -> Self {
             Self {
                 spi_dma,
                 rx_buf,
@@ -1619,10 +1619,10 @@ mod dma {
         }
     }
 
-    impl<M, T> SpiDmaBus<'_, M, T>
+    impl<Dm, T> SpiDmaBus<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
         fn wait_for_idle(&mut self) {
             self.spi_dma.wait_for_idle();
@@ -1811,10 +1811,10 @@ mod dma {
 
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    impl<M, T> SetConfig for SpiDmaBus<'_, M, T>
+    impl<Dm, T> SetConfig for SpiDmaBus<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: Mode,
     {
         type Config = Config;
         type ConfigError = ConfigError;
@@ -2031,18 +2031,18 @@ mod dma {
 
         use super::*;
 
-        impl<M, T> ErrorType for SpiDmaBus<'_, M, T>
+        impl<Dm, T> ErrorType for SpiDmaBus<'_, Dm, T>
         where
             T: Instance,
-            M: Mode,
+            Dm: Mode,
         {
             type Error = Error;
         }
 
-        impl<M, T> SpiBus for SpiDmaBus<'_, M, T>
+        impl<Dm, T> SpiBus for SpiDmaBus<'_, Dm, T>
         where
             T: Instance,
-            M: Mode,
+            Dm: Mode,
         {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.read(words)
@@ -2074,11 +2074,11 @@ mod ehal1 {
 
     use super::*;
 
-    impl<M, T> embedded_hal::spi::ErrorType for Spi<'_, M, T> {
+    impl<Dm, T> embedded_hal::spi::ErrorType for Spi<'_, Dm, T> {
         type Error = Error;
     }
 
-    impl<M, T> FullDuplex for Spi<'_, M, T>
+    impl<Dm, T> FullDuplex for Spi<'_, Dm, T>
     where
         T: Instance,
     {
@@ -2091,7 +2091,7 @@ mod ehal1 {
         }
     }
 
-    impl<M, T> SpiBus for Spi<'_, M, T>
+    impl<Dm, T> SpiBus for Spi<'_, Dm, T>
     where
         T: Instance,
     {
