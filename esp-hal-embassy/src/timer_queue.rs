@@ -1,14 +1,15 @@
 #[cfg(not(single_queue))]
 use core::cell::Cell;
-use core::cell::UnsafeCell;
+use core::cell::{RefCell, UnsafeCell};
 
 use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{interrupt::Priority, sync::RawPriorityLimitedMutex};
+use queue_impl::RawQueue;
 
 use crate::time_driver::{set_up_alarm, AlarmHandle};
 
 pub(crate) struct TimerQueue {
-    inner: Mutex<RawPriorityLimitedMutex, adapter::RawQueue>,
+    inner: Mutex<RawPriorityLimitedMutex, RefCell<RawQueue>>,
     priority: Priority,
     #[cfg(not(single_queue))]
     context: Cell<*mut ()>,
@@ -20,7 +21,10 @@ unsafe impl Sync for TimerQueue {}
 impl TimerQueue {
     pub(crate) const fn new(prio: Priority) -> Self {
         Self {
-            inner: Mutex::const_new(RawPriorityLimitedMutex::new(prio), adapter::RawQueue::new()),
+            inner: Mutex::const_new(
+                RawPriorityLimitedMutex::new(prio),
+                RefCell::new(RawQueue::new()),
+            ),
             priority: prio,
             #[cfg(not(single_queue))]
             context: Cell::new(core::ptr::null_mut()),
@@ -52,7 +56,7 @@ impl TimerQueue {
 
     pub fn dispatch(&self) {
         let now = esp_hal::time::now().ticks();
-        let next_expiration = self.inner.lock(|q| adapter::dequeue(q, now));
+        let next_expiration = self.inner.lock(|q| q.borrow_mut().next_expiration(now));
         self.arm_alarm(next_expiration);
     }
 
@@ -61,36 +65,33 @@ impl TimerQueue {
 
         while !alarm.update(next_expiration) {
             // next_expiration is in the past, dequeue and find a new expiration
-            next_expiration = self.inner.lock(|q| adapter::dequeue(q, next_expiration));
+            next_expiration = self
+                .inner
+                .lock(|q| q.borrow_mut().next_expiration(next_expiration));
         }
     }
 
     pub fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
-        if self.inner.lock(|q| q.schedule_wake(at, waker)) {
+        if self.inner.lock(|q| q.borrow_mut().schedule_wake(at, waker)) {
             self.dispatch();
         }
     }
 }
 
 #[cfg(integrated_timers)]
-mod adapter {
-    use core::{
-        cell::{Cell, RefCell},
-        cmp::min,
-        ptr,
-        task::Waker,
-    };
+mod queue_impl {
+    use core::{cell::Cell, cmp::min, ptr, task::Waker};
 
     use embassy_executor::raw::TaskRef;
     use portable_atomic::{AtomicPtr, Ordering};
 
     /// Copy of the embassy integrated timer queue, that clears the owner upon
     /// dequeueing.
-    pub struct Q {
+    pub(super) struct RawQueue {
         head: Cell<Option<TaskRef>>,
     }
 
-    impl Q {
+    impl RawQueue {
         /// Creates a new timer queue.
         pub const fn new() -> Self {
             Self {
@@ -177,75 +178,11 @@ mod adapter {
             }
         }
     }
-
-    /// A simple wrapper around a `Queue` to provide interior mutability.
-    pub struct RefCellQueue {
-        inner: RefCell<Q>,
-    }
-
-    impl RefCellQueue {
-        /// Creates a new timer queue.
-        pub const fn new() -> Self {
-            Self {
-                inner: RefCell::new(Q::new()),
-            }
-        }
-
-        /// Schedules a task to run at a specific time, and returns whether any
-        /// changes were made.
-        pub fn schedule_wake(&self, at: u64, waker: &core::task::Waker) -> bool {
-            self.inner.borrow_mut().schedule_wake(at, waker)
-        }
-
-        /// Dequeues expired timers and returns the next alarm time.
-        pub fn next_expiration(&self, now: u64) -> u64 {
-            self.inner.borrow_mut().next_expiration(now)
-        }
-    }
-
-    pub(super) type RawQueue = RefCellQueue;
-
-    pub(super) fn dequeue(q: &RawQueue, now: u64) -> u64 {
-        q.next_expiration(now)
-    }
 }
 
 #[cfg(generic_timers)]
-mod adapter {
-    use core::{cell::RefCell, task::Waker};
-
-    type Q = embassy_time_queue_driver::queue_generic::ConstGenericQueue<
+mod queue_impl {
+    pub(super) type RawQueue = embassy_time_queue_driver::queue_generic::ConstGenericQueue<
         { esp_config::esp_config_int!(usize, "ESP_HAL_EMBASSY_GENERIC_QUEUE_SIZE") },
     >;
-
-    /// A simple wrapper around a `Queue` to provide interior mutability.
-    pub struct RefCellQueue {
-        inner: RefCell<Q>,
-    }
-
-    impl RefCellQueue {
-        /// Creates a new timer queue.
-        pub const fn new() -> Self {
-            Self {
-                inner: RefCell::new(Q::new()),
-            }
-        }
-
-        /// Schedules a task to run at a specific time, and returns whether any
-        /// changes were made.
-        pub fn schedule_wake(&self, at: u64, waker: &core::task::Waker) -> bool {
-            self.inner.borrow_mut().schedule_wake(at, waker)
-        }
-
-        /// Dequeues expired timers and returns the next alarm time.
-        pub fn next_expiration(&self, now: u64) -> u64 {
-            self.inner.borrow_mut().next_expiration(now)
-        }
-    }
-
-    pub(super) type RawQueue = RefCellQueue;
-
-    pub(super) fn dequeue(q: &RawQueue, now: u64) -> u64 {
-        q.next_expiration(now)
-    }
 }
