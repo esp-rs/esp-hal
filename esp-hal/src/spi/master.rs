@@ -1654,9 +1654,9 @@ mod dma {
             }
         }
 
-        /// Splits `SpiDmaBus` back into `SpiDma` to allow for manual
-        /// buffer control
+        /// Splits [SpiDmaBus] back into [SpiDma], [DmaRxBuf] and [DmaTxBuf].
         pub fn split(self) -> (SpiDma<'d, M, T>, DmaRxBuf, DmaTxBuf) {
+            self.wait_for_idle();
             (self.spi_dma, self.rx_buf, self.tx_buf)
         }
     }
