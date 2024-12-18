@@ -131,6 +131,7 @@ impl core::fmt::Display for Error {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
+    /// Provided bus frequency is invalid for the current configuration.
     InvalidFrequency,
     InvalidTimeout,
 }
@@ -926,8 +927,11 @@ fn configure_clock(
 
         register_block.scl_high_period().write(|w| {
             #[cfg(not(esp32))] // ESP32 does not have a wait_high field
-            w.scl_wait_high_period()
-                .bits(scl_wait_high_period.try_into().map_err(|_| Error::InvalidZeroLength)?);
+            w.scl_wait_high_period().bits(
+                scl_wait_high_period
+                    .try_into()
+                    .map_err(|_| Error::InvalidFrequency)?,
+            );
             w.scl_high_period().bits(scl_high_period as u16)
         });
 
@@ -962,7 +966,7 @@ fn configure_clock(
                 if let Some(timeout_value) = timeout {
                     register_block.to().write(|w| w.time_out().bits(timeout_value));
                 } else {
-                    return Err(Error::InvalidZeroLength);
+                    return Err(Error::InvalidTimeout);
                 }
             } else {
                 register_block
@@ -1070,7 +1074,7 @@ impl Driver<'_> {
                 let clock = clocks.xtal_clock.convert();
             }
         }
-        self.set_frequency(clock, config.frequency, config.timeout);
+        self.set_frequency(clock, config.frequency, config.timeout)?;
 
         self.update_config();
 
@@ -1114,7 +1118,12 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) -> Result<(), ConfigError> {
+    fn set_frequency(
+        &self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+        timeout: Option<u32>,
+    ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1188,7 +1197,12 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) -> Result<(), ConfigError> {
+    fn set_frequency(
+        &self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+        timeout: Option<u32>,
+    ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1238,7 +1252,12 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) -> Result<(), ConfigError> {
+    fn set_frequency(
+        &self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+        timeout: Option<u32>,
+    ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
