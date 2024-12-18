@@ -70,6 +70,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           ldproxy: false
+          version: 1.83.0.1
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
