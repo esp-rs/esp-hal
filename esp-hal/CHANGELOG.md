@@ -86,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpiBitOrder`, `SpiDataMode`, `SpiMode` were renamed to `BitOder`, `DataMode` and `Mode` (#2828)
 - `crate::Mode` was renamed to `crate::DriverMode` (#2828)
 - Renamed some I2C error variants (#2844)
+- I2C: Prefer compile-time checks over runtime checks where possible, prefer a fallible API over panics. (#2831)
 
 ### Fixed
 
