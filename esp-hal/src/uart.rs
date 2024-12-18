@@ -32,7 +32,7 @@
 //! ).unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! The UART controller can be configured to invert the polarity of the pins.
 //! This is achieved by inverting the desired pins, and then constructing the
 //! UART instance using the inverted pins.
@@ -64,7 +64,7 @@
 //! uart1.write_bytes(b"Hello, world!").expect("write error!");
 //! # }
 //! ```
-//!
+//! 
 //! ### Splitting the UART into RX and TX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -83,7 +83,7 @@
 //! let byte = rx.read_byte().expect("read error!");
 //! # }
 //! ```
-//!
+//! 
 //! ### Inverting RX and TX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -99,7 +99,7 @@
 //! ).unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! ### Constructing RX and TX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -117,7 +117,7 @@
 //! ).unwrap();
 //! # }
 //! ```
-//!
+//! 
 //! ### Operation with interrupts that by UART/Serial
 //! Notice, that in practice a proper serial terminal should be used
 //! to connect to the board (espmonitor and espflash won't work)
@@ -218,7 +218,7 @@
 //!     });
 //! }
 //! ```
-//!
+//! 
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
