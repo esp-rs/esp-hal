@@ -63,6 +63,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - API documentation must be provided for every new driver and API.
 - Private details should not leak into the public API, and should be made private where technically possible.
   - Implementation details that _need_ to be public should be marked with `#[doc(hidden)]` and a comment as to why it needs to be public.
+    - For the time being, this includes any `Instance` traits, and `State` or `Info` structs as well.
   - Functions which technically need to be public but shouldn't be callable by the user need to be sealed.
     - see [this example in Rust's core library](https://github.com/rust-lang/rust/blob/044a28a4091f2e1a5883f7fa990223f8b200a2cd/library/core/src/error.rs#L89-L100)
 - Any public traits, that **must not** be implemented downstream need to be `Sealed`.
