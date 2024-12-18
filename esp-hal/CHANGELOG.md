@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA channels (`AnyGdmaChannel`, `SpiDmaChannel`, `I2sDmaChannel`, `CryptoDmaChannel`) and their RX/TX halves now implement `Debug` and `defmt::Format` (#2823)
 - `DmaDescriptor` and `DmaDescriptorFlags` now implement `PartialEq` and `Eq` (#2823)
 - More interrupts are available in `esp_hal::spi::master::SpiInterrupt`
+- More interrupts are available in `esp_hal::spi::master::SpiInterrupt` (#2833)
 
 ### Changed
 
