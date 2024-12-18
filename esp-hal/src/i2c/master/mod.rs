@@ -133,6 +133,7 @@ impl core::fmt::Display for Error {
 pub enum ConfigError {
     /// Provided bus frequency is invalid for the current configuration.
     InvalidFrequency,
+    /// The specified timeout passed to `Config` is invalid.
     InvalidTimeout,
 }
 
@@ -925,13 +926,14 @@ fn configure_clock(
             .scl_low_period()
             .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
+        #[cfg(not(esp32))]
+        let scl_wait_high_period = scl_wait_high_period
+            .try_into()
+            .map_err(|_| ConfigError::InvalidFrequency)?;
+
         register_block.scl_high_period().write(|w| {
             #[cfg(not(esp32))] // ESP32 does not have a wait_high field
-            w.scl_wait_high_period().bits(
-                scl_wait_high_period
-                    .try_into()
-                    .map_err(|_| Error::InvalidFrequency)?,
-            );
+            w.scl_wait_high_period().bits(scl_wait_high_period);
             w.scl_high_period().bits(scl_high_period as u16)
         });
 
@@ -966,7 +968,7 @@ fn configure_clock(
                 if let Some(timeout_value) = timeout {
                     register_block.to().write(|w| w.time_out().bits(timeout_value));
                 } else {
-                    return Err(Error::InvalidTimeout);
+                    return Err(ConfigError::InvalidTimeout);
                 }
             } else {
                 register_block
@@ -1191,6 +1193,8 @@ impl Driver<'_> {
             scl_stop_hold_time,
             timeout,
         )?;
+
+        Ok(())
     }
 
     #[cfg(esp32s2)]
@@ -1246,6 +1250,8 @@ impl Driver<'_> {
             scl_stop_hold_time,
             timeout.map(|to_bus| (to_bus * 2 * half_cycle).min(0xFF_FFFF)),
         )?;
+
+        Ok(())
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
@@ -1321,6 +1327,8 @@ impl Driver<'_> {
                 raw.min(0x1F)
             }),
         )?;
+
+        Ok(())
     }
 
     #[cfg(any(esp32, esp32s2))]
@@ -1732,7 +1740,7 @@ impl Driver<'_> {
 
     #[cfg(not(any(esp32, esp32s2)))]
     /// Fills the TX FIFO with data from the provided slice.
-    fn fill_tx_fifo(&self, bytes: &[u8]) -> usize {
+    fn fill_tx_fifo(&self, bytes: &[u8]) -> Result<usize, Error> {
         let mut index = 0;
         while index < bytes.len()
             && !self
@@ -1757,7 +1765,7 @@ impl Driver<'_> {
                 .int_clr()
                 .write(|w| w.txfifo_ovf().clear_bit_by_one());
         }
-        index
+        Ok(index)
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
@@ -1807,7 +1815,7 @@ impl Driver<'_> {
 
     #[cfg(any(esp32, esp32s2))]
     /// Fills the TX FIFO with data from the provided slice.
-    fn fill_tx_fifo(&self, bytes: &[u8]) -> usize {
+    fn fill_tx_fifo(&self, bytes: &[u8]) -> Result<usize, Error> {
         // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
         // FIFO apparently it would be possible by using non-fifo mode
         // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
@@ -1820,7 +1828,7 @@ impl Driver<'_> {
             write_fifo(self.register_block(), *b);
         }
 
-        bytes.len()
+        Ok(bytes.len())
     }
 
     #[cfg(any(esp32, esp32s2))]
@@ -1918,7 +1926,7 @@ impl Driver<'_> {
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
-        let index = self.fill_tx_fifo(bytes);
+        let index = self.fill_tx_fifo(bytes)?;
         self.start_transmission();
 
         Ok(index)
