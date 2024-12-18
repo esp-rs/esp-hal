@@ -18,7 +18,7 @@ use core::{
 ///
 /// but it is the size of `T` not the size
 /// of a pointer. This is useful if T is a zero sized type.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeripheralRef<'a, T> {
     inner: T,
@@ -383,7 +383,7 @@ mod peripheral_macros {
     /// Macro to create a peripheral structure.
     macro_rules! create_peripheral {
         ($name:ident <= virtual) => {
-            #[derive(Debug, PartialEq, Eq)]
+            #[derive(Debug)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             #[non_exhaustive]
             #[allow(non_camel_case_types)]

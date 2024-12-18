@@ -265,7 +265,7 @@ impl Unit {
 }
 
 /// An alarm unit
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Alarm {
     comp: u8,
