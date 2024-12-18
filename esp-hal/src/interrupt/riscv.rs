@@ -12,6 +12,7 @@
 //! interrupt15() => Priority::Priority15
 //! ```
 
+pub(crate) use esp_riscv_rt::riscv::interrupt::free;
 pub use esp_riscv_rt::TrapFrame;
 use riscv::register::{mcause, mtvec};
 
