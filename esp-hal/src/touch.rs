@@ -85,12 +85,12 @@ pub struct TouchConfig {
 }
 
 /// This struct marks a successfully initialized touch peripheral
-pub struct Touch<'d, TOUCHMODE: TouchMode, Dm: Mode> {
+pub struct Touch<'d, Tm: TouchMode, Dm: Mode> {
     _inner: PeripheralRef<'d, TOUCH>,
-    _touch_mode: PhantomData<TOUCHMODE>,
+    _touch_mode: PhantomData<Tm>,
     _mode: PhantomData<Dm>,
 }
-impl<TOUCHMODE: TouchMode, Dm: Mode> Touch<'_, TOUCHMODE, Dm> {
+impl<Tm: TouchMode, Dm: Mode> Touch<'_, Tm, Dm> {
     /// Common initialization of the touch peripheral.
     fn initialize_common(config: Option<TouchConfig>) {
         let rtccntl = unsafe { &*RTC_CNTL::ptr() };
@@ -318,9 +318,9 @@ impl<'d> Touch<'d, Continuous, Async> {
 }
 
 /// A pin that is configured as a TouchPad.
-pub struct TouchPad<P: TouchPin, TOUCHMODE: TouchMode, Dm: Mode> {
+pub struct TouchPad<P: TouchPin, Tm: TouchMode, Dm: Mode> {
     pin: P,
-    _touch_mode: PhantomData<TOUCHMODE>,
+    _touch_mode: PhantomData<Tm>,
     _mode: PhantomData<Dm>,
 }
 impl<P: TouchPin> TouchPad<P, OneShot, Blocking> {
@@ -362,13 +362,13 @@ impl<P: TouchPin> TouchPad<P, OneShot, Blocking> {
             .modify(|_, w| w.touch_start_en().set_bit());
     }
 }
-impl<P: TouchPin, TOUCHMODE: TouchMode, Dm: Mode> TouchPad<P, TOUCHMODE, Dm> {
+impl<P: TouchPin, Tm: TouchMode, Dm: Mode> TouchPad<P, Tm, Dm> {
     /// Construct a new instance of [`TouchPad`].
     ///
     /// ## Parameters:
     /// - `pin`: The pin that gets configured as touch pad
     /// - `touch`: The [`Touch`] struct indicating that touch is configured.
-    pub fn new(pin: P, _touch: &Touch<'_, TOUCHMODE, Dm>) -> Self {
+    pub fn new(pin: P, _touch: &Touch<'_, Tm, Dm>) -> Self {
         // TODO revert this on drop
         pin.set_touch(Internal);
 
@@ -400,7 +400,7 @@ impl<P: TouchPin, TOUCHMODE: TouchMode, Dm: Mode> TouchPad<P, TOUCHMODE, Dm> {
         }
     }
 }
-impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Blocking> {
+impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     /// Blocking read of the current touch pad capacitance counter.
     ///
     /// Usually a lower value means higher capacitance, thus indicating touch
@@ -581,7 +581,7 @@ mod asynch {
         internal_disable_interrupts();
     }
 
-    impl<P: TouchPin, TOUCHMODE: TouchMode> TouchPad<P, TOUCHMODE, Async> {
+    impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Async> {
         /// Wait for the pad to be touched.
         pub async fn wait_for_touch(&mut self, threshold: u16) {
             self.pin.set_threshold(threshold, Internal);
