@@ -1628,7 +1628,7 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
         cntry_code[2] = crate::CONFIG.country_code_operating_class;
 
         let country = wifi_country_t {
-            cc: core::mem::transmute::<[u8; 3], [i8; 3]>(cntry_code), // [u8] -> [i8] conversion
+            cc: core::mem::transmute::<[u8; 3], [core::ffi::c_char; 3]>(cntry_code),
             schan: 1,
             nchan: 13,
             max_tx_power: 20,
