@@ -48,14 +48,8 @@ fn main() -> Result<(), Box<dyn StdError>> {
             None
         ),
         (
-            "generic-queue-size",
-            "The size of the generic queue. Only used if `generic-queue` is enabled.",
-            Value::Integer(64),
-            Some(Validator::PositiveInteger),
-        ),
-        (
             "timer-queue",
-            "The flavour of the timer queue provided by this crate. Accepts one of 'single-integrated', 'multiple-integrated' or 'generic'. Integrated queues require the 'executors' feature to be enabled.",
+            "<p>The flavour of the timer queue provided by this crate. Accepts one of 'single-integrated', 'multiple-integrated' or 'generic'. Integrated queues require the 'executors' feature to be enabled.</p><p>If you use embassy-executor, the 'single-integrated' queue is recommended for ease of use, while the 'multiple-integrated' queue is recommended for performance. The 'generic' queue allows using embassy-time without the embassy executors.</p>",
             Value::String(if cfg!(feature = "executors") {
                 String::from("single-integrated")
             } else {
@@ -73,7 +67,13 @@ fn main() -> Result<(), Box<dyn StdError>> {
                     _ => Err(Error::Validation(format!("Expected 'single-integrated', 'multiple-integrated' or 'generic', found {string}")))
                 }
             })))
-        )
+        ),
+        (
+            "generic-queue-size",
+            "The size of the generic queue. Only used if the `generic` timer-queue flavour is selected.",
+            Value::Integer(64),
+            Some(Validator::PositiveInteger),
+        ),
     ],
         true,
     );
@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
             println!("cargo:rustc-cfg=integrated_timers");
         }
         Value::String(s) if s.as_str() == "generic" => {
-            println!("cargo:rustc-cfg=generic-timers");
+            println!("cargo:rustc-cfg=generic_timers");
             println!("cargo:rustc-cfg=single_queue");
         }
         _ => unreachable!(),
