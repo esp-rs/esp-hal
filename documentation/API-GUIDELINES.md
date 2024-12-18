@@ -19,7 +19,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
   - Driver configuration: `Default`, `Debug`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
     - `Clone/Copy` depends on the size and contents of the structure. They should generally be implemented, unless there is a good reason not to.
     - The `Default` configuration needs to make sense for a particular driver, and applying the default configuration must not fail.
-  - Error types: `Debug`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
+  - Error types: `Debug`, `PartialEq/Eq`, `Clone/Copy`, `Hash`, `Error`, `Display`
 
 ## Construction and Destruction of Drivers
 
