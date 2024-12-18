@@ -1334,7 +1334,7 @@ impl Driver<'_> {
     #[cfg(any(esp32, esp32s2))]
     async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
         if buffer.len() > 32 {
-            return Err(Error::ExceedingTransactionSize);
+            return Err(Error::ExceedingFifo);
         }
 
         self.wait_for_completion(false).await?;
@@ -1507,7 +1507,7 @@ impl Driver<'_> {
         // see https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
         if buffer.len() > 32 {
-            return Err(Error::ExceedingTransactionSize);
+            return Err(Error::ExceedingFifo);
         }
 
         // wait for completion - then we can just read the data from FIFO
@@ -1821,7 +1821,7 @@ impl Driver<'_> {
         // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
         if bytes.len() > 31 {
-            return Err(Error::ExceedingTransactionSize);
+            return Err(Error::ExceedingFifo);
         }
 
         for b in bytes {
