@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `BurstConfig`, a device-specific configuration for configuring DMA transfers in burst mode (#2543)
 - `{DmaRxBuf, DmaTxBuf, DmaRxTxBuf}::set_burst_config` (#2543)
 - ESP32-S2: DMA support for AES (#2699)
+- Added `transfer_in_place_async` and embedded-hal-async implementation to `Spi` (#2691)
 
 ### Changed
 
