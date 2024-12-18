@@ -80,7 +80,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 /// A configuration error.

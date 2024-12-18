@@ -116,7 +116,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 /// Errors that can occur when configuring the DPI peripheral.

@@ -128,7 +128,7 @@ use crate::{
     system::PeripheralGuard,
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 #[doc(hidden)]

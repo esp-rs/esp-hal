@@ -36,7 +36,7 @@ use crate::{
     rtc_cntl::Rtc,
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 /// A marker trait describing the mode the touch pad is set to.

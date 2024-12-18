@@ -104,7 +104,7 @@ use crate::{
     system::PeripheralGuard,
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 #[derive(Debug, EnumSetType)]
@@ -757,7 +757,7 @@ mod private {
         peripheral::{Peripheral, PeripheralRef},
         peripherals::{Interrupt, I2S0},
         private,
-        Mode,
+        DriverMode,
     };
 
     pub struct TxCreator<'d, Dm, T>

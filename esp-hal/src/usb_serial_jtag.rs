@@ -142,7 +142,7 @@ use crate::{
     Async,
     Blocking,
     Cpu,
-    Mode,
+    DriverMode,
 };
 
 /// Custom USB serial error type

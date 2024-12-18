@@ -162,7 +162,7 @@ use crate::{
     system::{self, GenericPeripheralGuard},
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 #[allow(unused)]
