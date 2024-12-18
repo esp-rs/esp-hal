@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `{DmaRxBuf, DmaTxBuf, DmaRxTxBuf}::set_burst_config` (#2543)
 - ESP32-S2: DMA support for AES (#2699)
 - Added `transfer_in_place_async` and embedded-hal-async implementation to `Spi` (#2691)
+- `InterruptHandler` now implements `Hash` and `defmt::Format` (#2830)
 
 ### Changed
 
