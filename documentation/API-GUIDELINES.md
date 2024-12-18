@@ -14,12 +14,12 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 
 - `C-RW-VALUE` and `C-SERDE` do not apply.
 - `C-COMMON-TRAITS`:
-  The set of traits to implement depend on the type. If nothing here applies, use your best judgement.
-  - Driver structures: `Debug/Display`, `PartialEq/Eq`
-  - Driver configuration: `Default`, `Debug/Display`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
+  The set of traits to implement depend on the type and use case. In esp-hal, we can highlight a few such use cases and provide recommendations what should be implemented. If nothing here applies, use your best judgement.
+  - Driver structures: `Debug`
+  - Driver configuration: `Default`, `Debug`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
     - `Clone/Copy` depends on the size and contents of the structure. They should generally be implemented, unless there is a good reason not to.
     - The `Default` configuration needs to make sense for a particular driver, and applying the default configuration must not fail.
-  - Error types: `Debug/Display`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
+  - Error types: `Debug`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
 
 ## Construction and Destruction of Drivers
 
