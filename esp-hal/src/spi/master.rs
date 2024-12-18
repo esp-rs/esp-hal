@@ -97,34 +97,11 @@ pub enum SpiInterrupt {
     /// transmitting and receiving data.
     TransDone,
 
-    /// Triggered when the length of GDMA RX FIFO is shorter than that of actual
-    /// data transferred.
-    #[cfg(gdma)]
-    DmaInfifoFullErr,
-
-    /// Triggered when the length of GDMA TX FIFO is shorter than that of actual
-    /// data transferred.
-    #[cfg(gdma)]
-    DmaOutfifoEmptyErr,
-
     /// Triggered at the end of End_SEG_TRANS transfer in GP-SPI2 slave
     /// segmented transfer mode or at the end of configurable segmented transfer
     /// as master.
     #[cfg(any(esp32s2, gdma))]
     DmaSegTransDone,
-
-    /// Triggered when a Magic error occurs in CONF buffer during configurable
-    /// segmented transfer as master.
-    #[cfg(any(esp32s2, gdma))]
-    SegMagicErr,
-
-    /// Triggered by RX AFIFO write-full error in GP-SPI2 as master.
-    #[cfg(gdma)]
-    RxAfifoWfullErr,
-
-    /// Triggered by TX AFIFO read-empty error in GP-SPI2 as master.
-    #[cfg(gdma)]
-    TxAfifoRemptyErr,
 
     /// Used and triggered by software. Only used for user defined function.
     #[cfg(gdma)]
@@ -2770,7 +2747,6 @@ impl Driver {
                         match interrupt {
                             SpiInterrupt::TransDone => w.int_trans_done_en().bit(enable),
                             SpiInterrupt::DmaSegTransDone => w.int_dma_seg_trans_en().bit(enable),
-                            SpiInterrupt::SegMagicErr => w.seg_magic_err_int_en().bit(enable),
                         };
                     }
                     w
@@ -2780,12 +2756,7 @@ impl Driver {
                     for interrupt in interrupts {
                         match interrupt {
                             SpiInterrupt::TransDone => w.trans_done().bit(enable),
-                            SpiInterrupt::DmaInfifoFullErr => w.dma_infifo_full_err().bit(enable),
-                            SpiInterrupt::DmaOutfifoEmptyErr => w.dma_outfifo_empty_err().bit(enable),
                             SpiInterrupt::DmaSegTransDone => w.dma_seg_trans_done().bit(enable),
-                            SpiInterrupt::SegMagicErr => w.seg_magic_err().bit(enable),
-                            SpiInterrupt::RxAfifoWfullErr => w.mst_rx_afifo_wfull_err().bit(enable),
-                            SpiInterrupt::TxAfifoRemptyErr => w.mst_tx_afifo_rempty_err().bit(enable),
                             SpiInterrupt::App2 => w.app2().bit(enable),
                             SpiInterrupt::App1 => w.app1().bit(enable),
                         };
@@ -2813,32 +2784,14 @@ impl Driver {
                 if reg_block.hold().read().dma_seg_trans_done().bit() {
                     res.insert(SpiInterrupt::DmaSegTransDone);
                 }
-                if reg_block.slv_rdbuf_dlen().read().seg_magic_err().bit() {
-                    res.insert(SpiInterrupt::SegMagicErr);
-                }
             } else {
                 let ints = reg_block.dma_int_raw().read();
 
                 if ints.trans_done().bit() {
                     res.insert(SpiInterrupt::TransDone);
                 }
-                if ints.dma_infifo_full_err().bit() {
-                    res.insert(SpiInterrupt::DmaInfifoFullErr);
-                }
-                if ints.dma_outfifo_empty_err().bit() {
-                    res.insert(SpiInterrupt::DmaOutfifoEmptyErr);
-                }
                 if ints.dma_seg_trans_done().bit() {
                     res.insert(SpiInterrupt::DmaSegTransDone);
-                }
-                if ints.seg_magic_err().bit() {
-                    res.insert(SpiInterrupt::SegMagicErr);
-                }
-                if ints.mst_rx_afifo_wfull_err().bit() {
-                    res.insert(SpiInterrupt::RxAfifoWfullErr);
-                }
-                if ints.mst_tx_afifo_rempty_err().bit() {
-                    res.insert(SpiInterrupt::TxAfifoRemptyErr);
                 }
                 if ints.app2().bit() {
                     res.insert(SpiInterrupt::App2);
@@ -2876,11 +2829,6 @@ impl Driver {
                                 .hold()
                                 .modify(|_, w| w.dma_seg_trans_done().clear_bit());
                         }
-                        SpiInterrupt::SegMagicErr => {
-                            reg_block
-                                .slv_rdbuf_dlen()
-                                .modify(|_, w| w.seg_magic_err().clear_bit());
-                        }
                     }
                 }
             } else {
@@ -2888,16 +2836,7 @@ impl Driver {
                     for interrupt in interrupts {
                         match interrupt {
                             SpiInterrupt::TransDone => w.trans_done().clear_bit_by_one(),
-                            SpiInterrupt::DmaInfifoFullErr => w.dma_infifo_full_err().clear_bit_by_one(),
-                            SpiInterrupt::DmaOutfifoEmptyErr => {
-                                w.dma_outfifo_empty_err().clear_bit_by_one()
-                            }
                             SpiInterrupt::DmaSegTransDone => w.dma_seg_trans_done().clear_bit_by_one(),
-                            SpiInterrupt::SegMagicErr => w.seg_magic_err().clear_bit_by_one(),
-                            SpiInterrupt::RxAfifoWfullErr => w.mst_rx_afifo_wfull_err().clear_bit_by_one(),
-                            SpiInterrupt::TxAfifoRemptyErr => {
-                                w.mst_tx_afifo_rempty_err().clear_bit_by_one()
-                            }
                             SpiInterrupt::App2 => w.app2().clear_bit_by_one(),
                             SpiInterrupt::App1 => w.app1().clear_bit_by_one(),
                         };
