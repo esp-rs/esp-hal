@@ -662,7 +662,7 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TwaiConfiguration<'d, Dm: crate::Mode, T = AnyTwai> {
+pub struct TwaiConfiguration<'d, Dm: crate::DriverMode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     filter: Option<(FilterType, [u8; 8])>,
     phantom: PhantomData<Dm>,
@@ -673,7 +673,7 @@ pub struct TwaiConfiguration<'d, Dm: crate::Mode, T = AnyTwai> {
 impl<'d, Dm, T> TwaiConfiguration<'d, Dm, T>
 where
     T: Instance,
-    Dm: crate::Mode,
+    Dm: crate::DriverMode,
 {
     fn new_internal<TX: PeripheralOutput, RX: PeripheralInput>(
         twai: impl Peripheral<P = T> + 'd,
@@ -1075,7 +1075,7 @@ where
 ///
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
-pub struct Twai<'d, Dm: crate::Mode, T = AnyTwai> {
+pub struct Twai<'d, Dm: crate::DriverMode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     tx: TwaiTx<'d, Dm, T>,
     rx: TwaiRx<'d, Dm, T>,
@@ -1085,7 +1085,7 @@ pub struct Twai<'d, Dm: crate::Mode, T = AnyTwai> {
 impl<'d, T, Dm> Twai<'d, Dm, T>
 where
     T: Instance,
-    Dm: crate::Mode,
+    Dm: crate::DriverMode,
 {
     fn mode(&self) -> TwaiMode {
         let mode = self.twai.register_block().mode().read();
@@ -1196,7 +1196,7 @@ where
 }
 
 /// Interface to the TWAI transmitter part.
-pub struct TwaiTx<'d, Dm: crate::Mode, T = AnyTwai> {
+pub struct TwaiTx<'d, Dm: crate::DriverMode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
@@ -1205,7 +1205,7 @@ pub struct TwaiTx<'d, Dm: crate::Mode, T = AnyTwai> {
 impl<Dm, T> TwaiTx<'_, Dm, T>
 where
     T: Instance,
-    Dm: crate::Mode,
+    Dm: crate::DriverMode,
 {
     /// Transmit a frame.
     ///
@@ -1239,7 +1239,7 @@ where
 }
 
 /// Interface to the TWAI receiver part.
-pub struct TwaiRx<'d, Dm: crate::Mode, T = AnyTwai> {
+pub struct TwaiRx<'d, Dm: crate::DriverMode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
@@ -1248,7 +1248,7 @@ pub struct TwaiRx<'d, Dm: crate::Mode, T = AnyTwai> {
 impl<Dm, T> TwaiRx<'_, Dm, T>
 where
     T: Instance,
-    Dm: crate::Mode,
+    Dm: crate::DriverMode,
 {
     /// Receive a frame
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
@@ -1338,7 +1338,7 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
 impl<Dm, T> embedded_can::nb::Can for Twai<'_, Dm, T>
 where
     T: Instance,
-    Dm: crate::Mode,
+    Dm: crate::DriverMode,
 {
     type Frame = EspTwaiFrame;
     type Error = EspTwaiError;

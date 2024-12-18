@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// Represents a combined LCD and Camera interface.
-pub struct LcdCam<'d, Dm: crate::Mode> {
+pub struct LcdCam<'d, Dm: crate::DriverMode> {
     /// The LCD interface.
     pub lcd: Lcd<'d, Dm>,
     /// The Camera interface.

@@ -51,7 +51,7 @@ use crate::{
     Async,
     Blocking,
     Cpu,
-    Mode,
+    DriverMode,
 };
 
 #[cfg(systimer)]
@@ -199,7 +199,7 @@ where
 
 impl<Dm, T> OneShotTimer<'_, Dm, T>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     T: Timer,
 {
     /// Delay for *at least* `ms` milliseconds.
@@ -270,13 +270,13 @@ where
 impl<Dm, T> crate::private::Sealed for OneShotTimer<'_, Dm, T>
 where
     T: Timer,
-    Dm: Mode,
+    Dm: DriverMode,
 {
 }
 
 impl<Dm, T> InterruptConfigurable for OneShotTimer<'_, Dm, T>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     T: Timer,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
@@ -331,7 +331,7 @@ where
 
 impl<Dm, T> PeriodicTimer<'_, Dm, T>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     T: Timer,
 {
     /// Start a new count down.
@@ -394,7 +394,7 @@ impl<Dm, T> crate::private::Sealed for PeriodicTimer<'_, Dm, T> where T: Timer {
 
 impl<Dm, T> InterruptConfigurable for PeriodicTimer<'_, Dm, T>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     T: Timer,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {

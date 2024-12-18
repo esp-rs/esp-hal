@@ -69,7 +69,7 @@ use crate::{
     Async,
     Blocking,
     Cpu,
-    Mode,
+    DriverMode,
 };
 
 trait Word: crate::private::Sealed {}
@@ -1810,7 +1810,7 @@ fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
 #[doc(hidden)]
 pub struct ChannelRx<'a, Dm, CH>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     CH: DmaRxChannel,
 {
     pub(crate) rx_impl: PeripheralRef<'a, CH>,
@@ -1894,7 +1894,7 @@ where
 
 impl<Dm, CH> ChannelRx<'_, Dm, CH>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     CH: DmaRxChannel,
 {
     /// Configure the channel.
@@ -1938,14 +1938,14 @@ where
 
 impl<Dm, CH> crate::private::Sealed for ChannelRx<'_, Dm, CH>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     CH: DmaRxChannel,
 {
 }
 
 impl<Dm, CH> Rx for ChannelRx<'_, Dm, CH>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     CH: DmaRxChannel,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
@@ -2110,7 +2110,7 @@ pub trait Tx: crate::private::Sealed {
 #[doc(hidden)]
 pub struct ChannelTx<'a, Dm, CH>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     CH: DmaTxChannel,
 {
     pub(crate) tx_impl: PeripheralRef<'a, CH>,
@@ -2188,7 +2188,7 @@ where
 
 impl<Dm, CH> ChannelTx<'_, Dm, CH>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     CH: DmaTxChannel,
 {
     /// Configure the channel priority.
@@ -2232,14 +2232,14 @@ where
 
 impl<Dm, CH> crate::private::Sealed for ChannelTx<'_, Dm, CH>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     CH: DmaTxChannel,
 {
 }
 
 impl<Dm, CH> Tx for ChannelTx<'_, Dm, CH>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     CH: DmaTxChannel,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
@@ -2450,7 +2450,7 @@ pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
 #[non_exhaustive]
 pub struct Channel<'d, Dm, CH>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     CH: DmaChannel,
 {
     /// RX half of the channel

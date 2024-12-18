@@ -36,7 +36,7 @@ use crate::{
 };
 
 /// The ECC Accelerator driver instance
-pub struct Ecc<'d, DM: crate::Mode> {
+pub struct Ecc<'d, DM: crate::DriverMode> {
     ecc: PeripheralRef<'d, ECC>,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     phantom: PhantomData<DM>,
@@ -125,7 +125,7 @@ impl InterruptConfigurable for Ecc<'_, crate::Blocking> {
     }
 }
 
-impl<DM: crate::Mode> Ecc<'_, DM> {
+impl<DM: crate::DriverMode> Ecc<'_, DM> {
     /// Resets the ECC peripheral.
     pub fn reset(&mut self) {
         self.ecc.mult_conf().reset()

@@ -32,7 +32,7 @@
 //! ).unwrap();
 //! # }
 //! ```
-//! 
+//!
 //! The UART controller can be configured to invert the polarity of the pins.
 //! This is achieved by inverting the desired pins, and then constructing the
 //! UART instance using the inverted pins.
@@ -64,7 +64,7 @@
 //! uart1.write_bytes(b"Hello, world!").expect("write error!");
 //! # }
 //! ```
-//! 
+//!
 //! ### Splitting the UART into RX and TX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -83,7 +83,7 @@
 //! let byte = rx.read_byte().expect("read error!");
 //! # }
 //! ```
-//! 
+//!
 //! ### Inverting RX and TX Pins
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -99,7 +99,7 @@
 //! ).unwrap();
 //! # }
 //! ```
-//! 
+//!
 //! ### Constructing RX and TX Components
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -117,7 +117,7 @@
 //! ).unwrap();
 //! # }
 //! ```
-//! 
+//!
 //! ### Operation with interrupts that by UART/Serial
 //! Notice, that in practice a proper serial terminal should be used
 //! to connect to the board (espmonitor and espflash won't work)
@@ -178,7 +178,7 @@
 //!         writeln!(serial,
 //!             "Hello World! Send a single `#` character or send
 //!                 at least 30 characters to trigger interrupts.")
-//!         .ok();     
+//!         .ok();
 //!     });
 //!     delay.delay(1.secs());
 //! }
@@ -218,7 +218,7 @@
 //!     });
 //! }
 //! ```
-//! 
+//!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
@@ -247,7 +247,7 @@ use crate::{
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 const UART_FIFO_SIZE: u16 = 128;
@@ -545,7 +545,7 @@ struct UartBuilder<'d, Dm, T = AnyUart> {
 impl<'d, Dm, T> UartBuilder<'d, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn new(uart: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(uart);
@@ -630,7 +630,7 @@ pub enum ConfigError {
 impl<Dm, T> SetConfig for Uart<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Config = Config;
     type ConfigError = ConfigError;
@@ -645,7 +645,7 @@ where
 impl<Dm, T> SetConfig for UartRx<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Config = Config;
     type ConfigError = ConfigError;
@@ -660,7 +660,7 @@ where
 impl<Dm, T> SetConfig for UartTx<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Config = Config;
     type ConfigError = ConfigError;
@@ -673,7 +673,7 @@ where
 impl<'d, Dm, T> UartTx<'d, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Configure RTS pin
     pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
@@ -864,7 +864,7 @@ fn sync_regs(_register_block: &RegisterBlock) {
 impl<'d, Dm, T> UartRx<'d, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Configure CTS pin
     pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
@@ -1145,7 +1145,7 @@ pub enum UartInterrupt {
 impl<'d, Dm, T> Uart<'d, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Configure CTS pin
     pub fn with_cts(mut self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
@@ -1356,7 +1356,7 @@ where
 impl<T, Dm> ufmt_write::uWrite for Uart<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 
@@ -1374,7 +1374,7 @@ where
 impl<T, Dm> ufmt_write::uWrite for UartTx<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 
@@ -1388,7 +1388,7 @@ where
 impl<T, Dm> core::fmt::Write for Uart<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
@@ -1399,7 +1399,7 @@ where
 impl<T, Dm> core::fmt::Write for UartTx<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
@@ -1424,7 +1424,7 @@ impl<T, Dm> embedded_hal_nb::serial::ErrorType for UartRx<'_, Dm, T> {
 impl<T, Dm> embedded_hal_nb::serial::Read for Uart<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.read_byte()
@@ -1434,7 +1434,7 @@ where
 impl<T, Dm> embedded_hal_nb::serial::Read for UartRx<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.read_byte()
@@ -1444,7 +1444,7 @@ where
 impl<T, Dm> embedded_hal_nb::serial::Write for Uart<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte(word)
@@ -1458,7 +1458,7 @@ where
 impl<T, Dm> embedded_hal_nb::serial::Write for UartTx<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte(word)
@@ -1492,7 +1492,7 @@ impl<T, Dm> embedded_io::ErrorType for UartRx<'_, Dm, T> {
 impl<T, Dm> embedded_io::Read for Uart<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.rx.read(buf)
@@ -1504,7 +1504,7 @@ where
 impl<T, Dm> embedded_io::Read for UartRx<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         if buf.is_empty() {
@@ -1524,7 +1524,7 @@ where
 impl<T, Dm> embedded_io::ReadReady for Uart<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
         self.rx.read_ready()
@@ -1536,7 +1536,7 @@ where
 impl<T, Dm> embedded_io::ReadReady for UartRx<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
         Ok(self.rx_fifo_count() > 0)
@@ -1548,7 +1548,7 @@ where
 impl<T, Dm> embedded_io::Write for Uart<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.tx.write(buf)
@@ -1564,7 +1564,7 @@ where
 impl<T, Dm> embedded_io::Write for UartTx<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_bytes(buf)

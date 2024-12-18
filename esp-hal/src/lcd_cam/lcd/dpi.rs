@@ -128,7 +128,7 @@ pub enum ConfigError {
 }
 
 /// Represents the RGB LCD interface.
-pub struct Dpi<'d, Dm: Mode> {
+pub struct Dpi<'d, Dm: DriverMode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
     _mode: PhantomData<Dm>,
@@ -136,7 +136,7 @@ pub struct Dpi<'d, Dm: Mode> {
 
 impl<'d, Dm> Dpi<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Create a new instance of the RGB/DPI driver.
     pub fn new<CH>(
@@ -587,12 +587,12 @@ where
 
 /// Represents an ongoing (or potentially finished) transfer using the RGB LCD
 /// interface
-pub struct DpiTransfer<'d, BUF: DmaTxBuffer, Dm: Mode> {
+pub struct DpiTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
     dpi: ManuallyDrop<Dpi<'d, Dm>>,
     buffer_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, BUF: DmaTxBuffer, Dm: Mode> DpiTransfer<'d, BUF, Dm> {
+impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         self.dpi
@@ -661,7 +661,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: Mode> DpiTransfer<'d, BUF, Dm> {
     }
 }
 
-impl<BUF: DmaTxBuffer, Dm: Mode> Deref for DpiTransfer<'_, BUF, Dm> {
+impl<BUF: DmaTxBuffer, Dm: DriverMode> Deref for DpiTransfer<'_, BUF, Dm> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -669,13 +669,13 @@ impl<BUF: DmaTxBuffer, Dm: Mode> Deref for DpiTransfer<'_, BUF, Dm> {
     }
 }
 
-impl<BUF: DmaTxBuffer, Dm: Mode> DerefMut for DpiTransfer<'_, BUF, Dm> {
+impl<BUF: DmaTxBuffer, Dm: DriverMode> DerefMut for DpiTransfer<'_, BUF, Dm> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<BUF: DmaTxBuffer, Dm: Mode> Drop for DpiTransfer<'_, BUF, Dm> {
+impl<BUF: DmaTxBuffer, Dm: DriverMode> Drop for DpiTransfer<'_, BUF, Dm> {
     fn drop(&mut self) {
         self.stop_peripherals();
 

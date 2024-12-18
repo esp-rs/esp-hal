@@ -353,7 +353,7 @@ pub use impl_for_chip::{ChannelCreator, Rmt};
 
 impl<'d, Dm> Rmt<'d, Dm>
 where
-    Dm: crate::Mode,
+    Dm: crate::DriverMode,
 {
     pub(crate) fn new_internal(
         peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
@@ -425,7 +425,7 @@ impl InterruptConfigurable for Rmt<'_, Blocking> {
     }
 }
 
-fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal<Dm>, Dm: crate::Mode>(
+fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal<Dm>, Dm: crate::DriverMode>(
     pin: impl Peripheral<P = P> + 'd,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
@@ -462,7 +462,12 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal<Dm>, Dm: cr
     Ok(T::new())
 }
 
-fn configure_tx_channel<'d, P: PeripheralOutput, T: TxChannelInternal<Dm>, Dm: crate::Mode>(
+fn configure_tx_channel<
+    'd,
+    P: PeripheralOutput,
+    T: TxChannelInternal<Dm>,
+    Dm: crate::DriverMode,
+>(
     pin: impl Peripheral<P = P> + 'd,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
@@ -746,7 +751,7 @@ mod impl_for_chip {
     /// RMT Instance
     pub struct Rmt<'d, Dm>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         pub(super) peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
         /// RMT Channel 0.
@@ -762,7 +767,7 @@ mod impl_for_chip {
 
     impl<'d, Dm> Rmt<'d, Dm>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         pub(super) fn create(
             peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
@@ -795,7 +800,7 @@ mod impl_for_chip {
     /// RMT Channel Creator
     pub struct ChannelCreator<Dm, const CHANNEL: u8>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         phantom: PhantomData<Dm>,
         _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
@@ -826,7 +831,7 @@ mod impl_for_chip {
     /// RMT Instance
     pub struct Rmt<'d, Dm>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         pub(super) peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
         /// RMT Channel 0.
@@ -850,7 +855,7 @@ mod impl_for_chip {
 
     impl<'d, Dm> Rmt<'d, Dm>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         pub(super) fn create(
             peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
@@ -898,7 +903,7 @@ mod impl_for_chip {
     /// RMT Channel Creator
     pub struct ChannelCreator<Dm, const CHANNEL: u8>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         phantom: PhantomData<Dm>,
         _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
@@ -953,7 +958,7 @@ mod impl_for_chip {
     /// RMT Instance
     pub struct Rmt<'d, Dm>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         pub(super) peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
         /// RMT Channel 0.
@@ -969,7 +974,7 @@ mod impl_for_chip {
 
     impl<'d, Dm> Rmt<'d, Dm>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         pub(super) fn create(
             peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
@@ -1002,7 +1007,7 @@ mod impl_for_chip {
     /// RMT Channel Creator
     pub struct ChannelCreator<Dm, const CHANNEL: u8>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         phantom: PhantomData<Dm>,
         _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
@@ -1041,7 +1046,7 @@ mod impl_for_chip {
     /// RMT Instance
     pub struct Rmt<'d, Dm>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         pub(super) peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
         /// RMT Channel 0.
@@ -1065,7 +1070,7 @@ mod impl_for_chip {
 
     impl<'d, Dm> Rmt<'d, Dm>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         pub(super) fn create(
             peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
@@ -1114,7 +1119,7 @@ mod impl_for_chip {
     /// RMT Channel Creator
     pub struct ChannelCreator<Dm, const CHANNEL: u8>
     where
-        Dm: crate::Mode,
+        Dm: crate::DriverMode,
     {
         phantom: PhantomData<Dm>,
         _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
@@ -1146,7 +1151,7 @@ mod impl_for_chip {
 #[non_exhaustive]
 pub struct Channel<Dm, const CHANNEL: u8>
 where
-    Dm: crate::Mode,
+    Dm: crate::DriverMode,
 {
     phantom: PhantomData<Dm>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
@@ -1532,7 +1537,7 @@ pub enum Event {
 #[doc(hidden)]
 pub trait TxChannelInternal<Dm>
 where
-    Dm: crate::Mode,
+    Dm: crate::DriverMode,
 {
     const CHANNEL: u8;
 
@@ -1628,7 +1633,7 @@ where
 #[doc(hidden)]
 pub trait RxChannelInternal<Dm>
 where
-    Dm: crate::Mode,
+    Dm: crate::DriverMode,
 {
     const CHANNEL: u8;
 
@@ -1765,7 +1770,7 @@ mod chip_specific {
     macro_rules! impl_tx_channel {
         ($signal:ident, $ch_num:literal) => {
             paste::paste! {
-                impl<Dm> $crate::rmt::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::Mode {
+                impl<Dm> $crate::rmt::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
@@ -1928,7 +1933,7 @@ mod chip_specific {
     macro_rules! impl_rx_channel {
         ($signal:ident, $ch_num:literal, $ch_index:literal) => {
             paste::paste! {
-                impl<Dm> $crate::rmt::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::Mode {
+                impl<Dm> $crate::rmt::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
@@ -2119,7 +2124,7 @@ mod chip_specific {
     macro_rules! impl_tx_channel {
         ($signal:ident, $ch_num:literal) => {
             paste::paste! {
-                impl<Dm> super::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::Mode {
+                impl<Dm> super::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {
@@ -2272,7 +2277,7 @@ mod chip_specific {
     macro_rules! impl_rx_channel {
         ($signal:ident, $ch_num:literal) => {
             paste::paste! {
-                impl<Dm> super::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::Mode {
+                impl<Dm> super::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
                     const CHANNEL: u8 = $ch_num;
 
                     fn new() -> Self {

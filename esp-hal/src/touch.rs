@@ -85,12 +85,12 @@ pub struct TouchConfig {
 }
 
 /// This struct marks a successfully initialized touch peripheral
-pub struct Touch<'d, Tm: TouchMode, Dm: Mode> {
+pub struct Touch<'d, Tm: TouchMode, Dm: DriverMode> {
     _inner: PeripheralRef<'d, TOUCH>,
     _touch_mode: PhantomData<Tm>,
     _mode: PhantomData<Dm>,
 }
-impl<Tm: TouchMode, Dm: Mode> Touch<'_, Tm, Dm> {
+impl<Tm: TouchMode, Dm: DriverMode> Touch<'_, Tm, Dm> {
     /// Common initialization of the touch peripheral.
     fn initialize_common(config: Option<TouchConfig>) {
         let rtccntl = unsafe { &*RTC_CNTL::ptr() };
@@ -318,7 +318,7 @@ impl<'d> Touch<'d, Continuous, Async> {
 }
 
 /// A pin that is configured as a TouchPad.
-pub struct TouchPad<P: TouchPin, Tm: TouchMode, Dm: Mode> {
+pub struct TouchPad<P: TouchPin, Tm: TouchMode, Dm: DriverMode> {
     pin: P,
     _touch_mode: PhantomData<Tm>,
     _mode: PhantomData<Dm>,
@@ -362,7 +362,7 @@ impl<P: TouchPin> TouchPad<P, OneShot, Blocking> {
             .modify(|_, w| w.touch_start_en().set_bit());
     }
 }
-impl<P: TouchPin, Tm: TouchMode, Dm: Mode> TouchPad<P, Tm, Dm> {
+impl<P: TouchPin, Tm: TouchMode, Dm: DriverMode> TouchPad<P, Tm, Dm> {
     /// Construct a new instance of [`TouchPad`].
     ///
     /// ## Parameters:

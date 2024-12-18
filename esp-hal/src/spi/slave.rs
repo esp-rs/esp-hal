@@ -188,7 +188,7 @@ pub mod dma {
             Tx,
             WriteBuffer,
         },
-        Mode,
+        DriverMode,
     };
 
     impl<'d, T> Spi<'d, Blocking, T>
@@ -221,7 +221,7 @@ pub mod dma {
     pub struct SpiDma<'d, Dm, T = AnySpi>
     where
         T: InstanceDma,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<T>>,
@@ -233,7 +233,7 @@ pub mod dma {
     impl<Dm, T> core::fmt::Debug for SpiDma<'_, Dm, T>
     where
         T: InstanceDma,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("SpiDma").finish()
@@ -243,7 +243,7 @@ pub mod dma {
     impl<Dm, T> DmaSupport for SpiDma<'_, Dm, T>
     where
         T: InstanceDma,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
             while !((!is_tx || self.channel.tx.is_done())
@@ -262,7 +262,7 @@ pub mod dma {
     impl<'d, Dm, T> DmaSupportTx for SpiDma<'d, Dm, T>
     where
         T: InstanceDma,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         type TX = ChannelTx<'d, Dm, PeripheralTxChannel<T>>;
 
@@ -278,7 +278,7 @@ pub mod dma {
     impl<'d, Dm, T> DmaSupportRx for SpiDma<'d, Dm, T>
     where
         T: InstanceDma,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         type RX = ChannelRx<'d, Dm, PeripheralRxChannel<T>>;
 
@@ -317,7 +317,7 @@ pub mod dma {
 
     impl<Dm, T> SpiDma<'_, Dm, T>
     where
-        Dm: Mode,
+        Dm: DriverMode,
         T: InstanceDma,
     {
         fn driver(&self) -> DmaDriver {

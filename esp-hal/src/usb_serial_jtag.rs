@@ -168,7 +168,7 @@ pub struct UsbSerialJtagRx<'d, Dm> {
 
 impl<'d, Dm> UsbSerialJtagTx<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn new_inner(peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         crate::into_ref!(peripheral);
@@ -247,7 +247,7 @@ where
 
 impl<'d, Dm> UsbSerialJtagRx<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn new_inner(peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         crate::into_ref!(peripheral);
@@ -363,7 +363,7 @@ impl InterruptConfigurable for UsbSerialJtag<'_, Blocking> {
 
 impl<'d, Dm> UsbSerialJtag<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn new_inner(usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         // Do NOT reset the peripheral. Doing so will result in a broken USB JTAG
@@ -486,7 +486,7 @@ impl Instance for USB_DEVICE {
 
 impl<Dm> core::fmt::Write for UsbSerialJtag<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         core::fmt::Write::write_str(&mut self.tx, s)
@@ -495,7 +495,7 @@ where
 
 impl<Dm> core::fmt::Write for UsbSerialJtagTx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.write_bytes(s.as_bytes())
@@ -506,7 +506,7 @@ where
 
 impl<Dm> ufmt_write::uWrite for UsbSerialJtag<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 
@@ -523,7 +523,7 @@ where
 
 impl<Dm> ufmt_write::uWrite for UsbSerialJtagTx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 
@@ -544,28 +544,28 @@ where
 
 impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtag<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 }
 
 impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtagTx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 }
 
 impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtagRx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 }
 
 impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtag<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         embedded_hal_nb::serial::Read::read(&mut self.rx)
@@ -574,7 +574,7 @@ where
 
 impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.read_byte()
@@ -583,7 +583,7 @@ where
 
 impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtag<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         embedded_hal_nb::serial::Write::write(&mut self.tx, word)
@@ -596,7 +596,7 @@ where
 
 impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.write_byte_nb(word)
@@ -611,7 +611,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::ErrorType for UsbSerialJtag<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 }
@@ -620,7 +620,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::ErrorType for UsbSerialJtagTx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 }
@@ -629,7 +629,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::ErrorType for UsbSerialJtagRx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Error = Error;
 }
@@ -638,7 +638,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::Read for UsbSerialJtag<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         embedded_io::Read::read(&mut self.rx, buf)
@@ -649,7 +649,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::Read for UsbSerialJtagRx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         loop {
@@ -665,7 +665,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::Write for UsbSerialJtag<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         embedded_io::Write::write(&mut self.tx, buf)
@@ -680,7 +680,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::Write for UsbSerialJtagTx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_bytes(buf)?;

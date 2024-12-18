@@ -86,7 +86,7 @@ use crate::{
     Async,
     Blocking,
     Cpu,
-    Mode,
+    DriverMode,
 };
 
 /// Enumeration of possible SPI interrupt events.
@@ -467,12 +467,12 @@ pub struct Spi<'d, Dm, T = AnySpi> {
     guard: PeripheralGuard,
 }
 
-impl<Dm: Mode, T: Instance> Sealed for Spi<'_, Dm, T> {}
+impl<Dm: DriverMode, T: Instance> Sealed for Spi<'_, Dm, T> {}
 
 impl<Dm, T> Spi<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn driver(&self) -> Driver {
         Driver {
@@ -603,7 +603,7 @@ where
 impl<'d, Dm, T> Spi<'d, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
     pub fn new_typed(
@@ -706,7 +706,7 @@ where
 impl<Dm, T> SetConfig for Spi<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Config = Config;
     type ConfigError = ConfigError;
@@ -719,7 +719,7 @@ where
 impl<'d, Dm, T> Spi<'d, Dm, T>
 where
     T: Instance + QspiInstance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Assign the SIO2 pin for the SPI instance.
     ///
@@ -761,7 +761,7 @@ where
 impl<Dm, T> Spi<'_, Dm, T>
 where
     T: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Half-duplex read.
     #[instability::unstable]
@@ -887,7 +887,7 @@ mod dma {
     pub struct SpiDma<'d, Dm, T = AnySpi>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
         pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<T>>,
@@ -901,7 +901,7 @@ mod dma {
     impl<Dm, T> crate::private::Sealed for SpiDma<'_, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
     }
 
@@ -944,7 +944,7 @@ mod dma {
     impl<Dm, T> core::fmt::Debug for SpiDma<'_, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         /// Formats the `SpiDma` instance for debugging purposes.
         ///
@@ -1045,7 +1045,7 @@ mod dma {
     impl<'d, Dm, T> SpiDma<'d, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         fn driver(&self) -> Driver {
             Driver {
@@ -1239,7 +1239,7 @@ mod dma {
     impl<Dm, T> SetConfig for SpiDma<'_, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         type Config = Config;
         type ConfigError = ConfigError;
@@ -1256,7 +1256,7 @@ mod dma {
     pub struct SpiDmaTransfer<'d, Dm, Buf, T = AnySpi>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         spi_dma: ManuallyDrop<SpiDma<'d, Dm, T>>,
         dma_buf: ManuallyDrop<Buf>,
@@ -1265,7 +1265,7 @@ mod dma {
     impl<'d, Dm, T, Buf> SpiDmaTransfer<'d, Dm, Buf, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         fn new(spi_dma: SpiDma<'d, Dm, T>, dma_buf: Buf) -> Self {
             Self {
@@ -1309,7 +1309,7 @@ mod dma {
     impl<Dm, T, Buf> Drop for SpiDmaTransfer<'_, Dm, Buf, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         fn drop(&mut self) {
             if !self.is_done() {
@@ -1339,7 +1339,7 @@ mod dma {
     impl<'d, Dm, T> SpiDma<'d, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         /// # Safety:
         ///
@@ -1578,7 +1578,7 @@ mod dma {
     pub struct SpiDmaBus<'d, Dm, T = AnySpi>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         spi_dma: SpiDma<'d, Dm, T>,
         rx_buf: DmaRxBuf,
@@ -1588,7 +1588,7 @@ mod dma {
     impl<Dm, T> crate::private::Sealed for SpiDmaBus<'_, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
     }
 
@@ -1623,7 +1623,7 @@ mod dma {
     impl<'d, Dm, T> SpiDmaBus<'d, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         /// Creates a new `SpiDmaBus` with the specified SPI instance and DMA
         /// buffers.
@@ -1677,7 +1677,7 @@ mod dma {
     impl<Dm, T> SpiDmaBus<'_, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         fn wait_for_idle(&mut self) {
             self.spi_dma.wait_for_idle();
@@ -1869,7 +1869,7 @@ mod dma {
     impl<Dm, T> SetConfig for SpiDmaBus<'_, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         type Config = Config;
         type ConfigError = ConfigError;
@@ -2089,7 +2089,7 @@ mod dma {
         impl<Dm, T> ErrorType for SpiDmaBus<'_, Dm, T>
         where
             T: Instance,
-            Dm: Mode,
+            Dm: DriverMode,
         {
             type Error = Error;
         }
@@ -2097,7 +2097,7 @@ mod dma {
         impl<Dm, T> SpiBus for SpiDmaBus<'_, Dm, T>
         where
             T: Instance,
-            Dm: Mode,
+            Dm: DriverMode,
         {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.read(words)
@@ -2137,7 +2137,7 @@ mod ehal1 {
     impl<Dm, T> FullDuplex for Spi<'_, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
             self.driver().read_byte()
@@ -2151,7 +2151,7 @@ mod ehal1 {
     impl<Dm, T> SpiBus for Spi<'_, Dm, T>
     where
         T: Instance,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
             self.driver().read_bytes(words)
