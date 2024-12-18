@@ -1,3 +1,9 @@
+//! Timer waiter queue.
+//!
+//! This module implements the timer queue, which is managed by the time driver.
+//! The timer queue contains wakers and their expiration times, and is used to
+//! wake tasks at the correct time.
+
 #[cfg(not(single_queue))]
 use core::cell::Cell;
 use core::cell::{RefCell, UnsafeCell};

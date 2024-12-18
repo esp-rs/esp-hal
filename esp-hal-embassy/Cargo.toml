@@ -21,7 +21,7 @@ embassy-executor          = { version = "0.6.3", features = ["timer-item-payload
 embassy-sync              = { version = "0.6.1" }
 embassy-time              = { version = "0.3.0" }
 embassy-time-driver       = { version = "0.1.0", features = [ "tick-hz-1_000_000" ] }
-embassy-time-queue-driver = { version = "0.1.0" }
+embassy-time-queue-driver = { version = "0.1.0", features = ["_generic-queue"] }
 esp-config                = { version = "0.2.0", path = "../esp-config" }
 esp-hal                   = { version = "0.22.0", path = "../esp-hal" }
 log                       = { version = "0.4.22", optional = true }

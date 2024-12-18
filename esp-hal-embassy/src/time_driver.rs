@@ -1,3 +1,9 @@
+//! Embassy time driver implementation
+//!
+//! The time driver is responsible for keeping time, as well as to manage the
+//! wait queue for embassy-time.
+
+#[cfg(not(single_queue))]
 use core::cell::Cell;
 
 use embassy_time_driver::Driver;
@@ -52,12 +58,19 @@ impl AlarmState {
 }
 
 struct AlarmInner {
-    pub callback: Cell<*const ()>,
+    /// If multiple queues are used, we store the appropriate timer queue here.
+    // FIXME: we currently store the executor, but we could probably avoid an addition by actually
+    // storing a reference to the timer queue.
+    #[cfg(not(single_queue))]
+    pub context: Cell<*const ()>,
 
     pub state: AlarmState,
 }
 
 struct Alarm {
+    // FIXME: we should be able to use priority-limited locks here, but we can initialize alarms
+    // while running at an arbitrary priority level. We need to rework alarm allocation to only use
+    // a critical section to allocate an alarm, but not when using it.
     pub inner: Locked<AlarmInner>,
 }
 
@@ -67,14 +80,34 @@ impl Alarm {
     pub const fn new(handler: extern "C" fn()) -> Self {
         Self {
             inner: Locked::new(AlarmInner {
-                callback: Cell::new(core::ptr::null_mut()),
+                #[cfg(not(single_queue))]
+                context: Cell::new(core::ptr::null_mut()),
                 state: AlarmState::Created(handler),
             }),
         }
     }
 }
 
+/// embassy requires us to implement the [embassy_time_driver::Driver] trait,
+/// which we do here. This trait needs us to be able to tell the current time,
+/// as well as to schedule a wake-up at a certain time.
+///
+/// We are free to choose how we implement these features, and we provide three
+/// options:
+///
+/// - If the `generic` feature is enabled, we implement a single timer queue,
+///   using the implementation provided by embassy-time-queue-driver.
+/// - If the `single-integrated` feature is enabled, we implement a single timer
+///   queue, using our own integrated timer implementation. Our implementation
+///   is a copy of the embassy integrated timer queue, with the addition of
+///   clearing the "owner" information upon dequeueing.
+/// - If the `multiple-integrated` feature is enabled, we provide a separate
+///   timer queue for each executor. We store a separate timer queue for each
+///   executor, and we use the scheduled task's owner to determine which queue
+///   to use. This mode allows us to use less disruptive locks around the timer
+///   queue, but requires more timers - one per timer queue.
 pub(super) struct EmbassyTimer {
+    /// The timer queue, if we use a single one (single-integrated, or generic).
     #[cfg(single_queue)]
     pub(crate) inner: crate::timer_queue::TimerQueue,
 
@@ -98,8 +131,13 @@ macro_rules! alarms {
     };
 }
 
+// TODO: we can reduce this to 1 for single_queue, but that would break current
+// tests. Resolve when tests can use separate configuration sets, or update
+// tests to always pass a single timer.
 const MAX_SUPPORTED_ALARM_COUNT: usize = 7;
+
 embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTimer {
+    // Single queue, needs maximum priority.
     #[cfg(single_queue)]
     inner: crate::timer_queue::TimerQueue::new(Priority::max()),
     alarms: alarms!(0, 1, 2, 3, 4, 5, 6),
@@ -129,15 +167,18 @@ impl EmbassyTimer {
     #[cfg(not(single_queue))]
     pub(crate) fn set_callback_ctx(&self, alarm: AlarmHandle, ctx: *const ()) {
         self.alarms[alarm.id].inner.with(|alarm| {
-            alarm.callback.set(ctx.cast_mut());
+            alarm.context.set(ctx.cast_mut());
         })
     }
 
     fn on_interrupt(&self, id: usize) {
+        // On interrupt, we clear the alarm that was triggered...
+        #[cfg_attr(single_queue, allow(clippy::let_unit_value))]
         let _ctx = self.alarms[id].inner.with(|alarm| {
             if let AlarmState::Initialized(timer) = &mut alarm.state {
                 timer.clear_interrupt();
-                alarm.callback.get()
+                #[cfg(not(single_queue))]
+                alarm.context.get()
             } else {
                 unsafe {
                     // SAFETY: `on_interrupt` is registered right when the alarm is initialized.
@@ -146,12 +187,15 @@ impl EmbassyTimer {
             }
         });
 
+        // ... and process the timer queue if we have one. For multiple queues, the
+        // timer queue is stored in the alarm's context.
         #[cfg(all(integrated_timers, not(single_queue)))]
         {
             let executor = unsafe { &*_ctx.cast::<crate::executor::InnerExecutor>() };
             executor.timer_queue.dispatch();
         }
 
+        // If we have a single queue, it lives in this struct.
         #[cfg(single_queue)]
         self.inner.dispatch();
     }
@@ -174,6 +218,16 @@ impl EmbassyTimer {
         }
     }
 
+    /// Allocate an alarm, if possible.
+    ///
+    /// Returns `None` if there are no available alarms.
+    ///
+    /// When using multiple timer queues, the `priority` parameter indicates the
+    /// priority of the interrupt handler. It is 1 for thread-mode
+    /// executors, or equals to the priority of an interrupt executor.
+    ///
+    /// When using a single timer queue, the `priority` parameter is always the
+    /// highest value possible.
     pub(crate) unsafe fn allocate_alarm(&self, priority: Priority) -> Option<AlarmHandle> {
         for (i, alarm) in self.alarms.iter().enumerate() {
             let handle = alarm.inner.with(|alarm| {
@@ -182,9 +236,6 @@ impl EmbassyTimer {
                 };
 
                 let timer = self.available_timers.with(|available_timers| {
-                    // `allocate_alarm` may be called before `esp_hal_embassy::init()`. If
-                    // `timers` is `None`, we return `None` to signal that the alarm cannot be
-                    // initialized yet. These alarms will be initialized when `init` is called.
                     if let Some(timers) = available_timers.take() {
                         // If the driver is initialized, we can allocate a timer.
                         // If this fails, we can't do anything about it.
@@ -192,20 +243,16 @@ impl EmbassyTimer {
                             not_enough_timers();
                         };
                         *available_timers = Some(rest);
-                        Some(timer)
+                        timer
                     } else {
-                        None
+                        panic!("schedule_wake called before esp_hal_embassy::init()")
                     }
                 });
 
-                alarm.state = match timer {
-                    Some(timer) => AlarmState::initialize(
-                        timer,
-                        InterruptHandler::new(interrupt_handler, priority),
-                    ),
-
-                    None => panic!(),
-                };
+                alarm.state = AlarmState::initialize(
+                    timer,
+                    InterruptHandler::new(interrupt_handler, priority),
+                );
 
                 Some(AlarmHandle::new(i))
             });
@@ -218,15 +265,11 @@ impl EmbassyTimer {
         None
     }
 
-    pub(crate) fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
+    /// Set an alarm to fire at a certain timestamp.
+    ///
+    /// Returns `false` if the timestamp is in the past.
+    fn set_alarm(&self, alarm: AlarmHandle, timestamp: u64) -> bool {
         let alarm = &self.alarms[alarm.id];
-
-        // If integrated timers are used and there are no pending
-        // timers, embassy still calls `set_alarm` with `u64::MAX`. By returning
-        // `true` we signal that no re-polling is necessary.
-        if timestamp == u64::MAX {
-            return true;
-        }
 
         // The hardware fires the alarm even if timestamp is lower than the current
         // time. In this case the interrupt handler will pend a wake-up when we exit the
@@ -240,7 +283,11 @@ impl EmbassyTimer {
             if let AlarmState::Initialized(timer) = &mut alarm.state {
                 Self::arm(timer, timestamp)
             } else {
-                panic!("set_alarm called before esp_hal_embassy::init()")
+                unsafe {
+                    // SAFETY: We only create `AlarmHandle` instances after the alarm is
+                    // initialized.
+                    core::hint::unreachable_unchecked()
+                }
             }
         })
     }
