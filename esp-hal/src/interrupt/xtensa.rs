@@ -372,7 +372,7 @@ mod vectored {
     use super::*;
 
     /// Interrupt priority levels.
-    #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[repr(u8)]
     pub enum Priority {

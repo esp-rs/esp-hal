@@ -118,7 +118,8 @@ pub trait InterruptConfigurable: crate::private::Sealed {
     multi_core,
     doc = "**Note**: Interrupts are handled on the core they were setup on, if a driver is initialized on core 0, and moved to core 1, core 0 will still handle the interrupt."
 )]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct InterruptHandler {
     f: extern "C" fn(),
     prio: Priority,
