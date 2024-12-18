@@ -2755,19 +2755,11 @@ impl Driver {
         let reg_block = self.register_block();
 
         cfg_if::cfg_if! {
-            if #[cfg(gdma)] {
-                reg_block.dma_int_ena().modify(|_, w| {
+            if #[cfg(esp32)] {
+                reg_block.slave().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
-                            SpiInterrupt::TransDone => w.trans_done().bit(enable),
-                            SpiInterrupt::DmaInfifoFullErr => w.dma_infifo_full_err().bit(enable),
-                            SpiInterrupt::DmaOutfifoEmptyErr => w.dma_outfifo_empty_err().bit(enable),
-                            SpiInterrupt::DmaSegTransDone => w.dma_seg_trans_done().bit(enable),
-                            SpiInterrupt::SegMagicErr => w.seg_magic_err().bit(enable),
-                            SpiInterrupt::RxAfifoWfullErr => w.mst_rx_afifo_wfull_err().bit(enable),
-                            SpiInterrupt::TxAfifoRemptyErr => w.mst_tx_afifo_rempty_err().bit(enable),
-                            SpiInterrupt::App2 => w.app2().bit(enable),
-                            SpiInterrupt::App1 => w.app1().bit(enable),
+                            SpiInterrupt::TransDone => w.trans_inten().bit(enable),
                         };
                     }
                     w
@@ -2784,16 +2776,23 @@ impl Driver {
                     w
                 });
             } else {
-                reg_block.slave().modify(|_, w| {
+                reg_block.dma_int_ena().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
-                            SpiInterrupt::TransDone => w.trans_inten().bit(enable),
+                            SpiInterrupt::TransDone => w.trans_done().bit(enable),
+                            SpiInterrupt::DmaInfifoFullErr => w.dma_infifo_full_err().bit(enable),
+                            SpiInterrupt::DmaOutfifoEmptyErr => w.dma_outfifo_empty_err().bit(enable),
+                            SpiInterrupt::DmaSegTransDone => w.dma_seg_trans_done().bit(enable),
+                            SpiInterrupt::SegMagicErr => w.seg_magic_err().bit(enable),
+                            SpiInterrupt::RxAfifoWfullErr => w.mst_rx_afifo_wfull_err().bit(enable),
+                            SpiInterrupt::TxAfifoRemptyErr => w.mst_tx_afifo_rempty_err().bit(enable),
+                            SpiInterrupt::App2 => w.app2().bit(enable),
+                            SpiInterrupt::App1 => w.app1().bit(enable),
                         };
                     }
                     w
                 });
             }
-
         }
     }
 
@@ -2803,8 +2802,22 @@ impl Driver {
         let reg_block = self.register_block();
 
         cfg_if::cfg_if! {
-            if #[cfg(gdma)] {
-                let ints = reg_block.dma_int_st().read();
+            if #[cfg(esp32)] {
+                if reg_block.slave().read().trans_done().bit() {
+                    res.insert(SpiInterrupt::TransDone);
+                }
+            } else if #[cfg(esp32s2)] {
+                if reg_block.slave().read().trans_done().bit() {
+                    res.insert(SpiInterrupt::TransDone);
+                }
+                if reg_block.hold().read().dma_seg_trans_done().bit() {
+                    res.insert(SpiInterrupt::DmaSegTransDone);
+                }
+                if reg_block.slv_rdbuf_dlen().read().seg_magic_err().bit() {
+                    res.insert(SpiInterrupt::SegMagicErr);
+                }
+            } else {
+                let ints = reg_block.dma_int_raw().read();
 
                 if ints.trans_done().bit() {
                     res.insert(SpiInterrupt::TransDone);
@@ -2833,20 +2846,6 @@ impl Driver {
                 if ints.app1().bit() {
                     res.insert(SpiInterrupt::App1);
                 }
-            } else if #[cfg(esp32s2)] {
-                if reg_block.slave().read().trans_done().bit() {
-                    res.insert(SpiInterrupt::TransDone);
-                }
-                if reg_block.hold().read().dma_seg_trans_done().bit() {
-                    res.insert(SpiInterrupt::DmaSegTransDone);
-                }
-                if reg_block.slv_rdbuf_dlen().read().seg_magic_err().bit() {
-                    res.insert(SpiInterrupt::SegMagicErr);
-                }
-            } else {
-                if reg_block.slave().read().trans_done().bit() {
-                    res.insert(SpiInterrupt::TransDone);
-                }
             }
         }
 
@@ -2857,27 +2856,14 @@ impl Driver {
     fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
         let reg_block = self.register_block();
         cfg_if::cfg_if! {
-            if #[cfg(gdma)] {
-                reg_block.dma_int_clr().write(|w| {
-                    for interrupt in interrupts {
-                        match interrupt {
-                            SpiInterrupt::TransDone => w.trans_done().clear_bit_by_one(),
-                            SpiInterrupt::DmaInfifoFullErr => w.dma_infifo_full_err().clear_bit_by_one(),
-                            SpiInterrupt::DmaOutfifoEmptyErr => {
-                                w.dma_outfifo_empty_err().clear_bit_by_one()
-                            }
-                            SpiInterrupt::DmaSegTransDone => w.dma_seg_trans_done().clear_bit_by_one(),
-                            SpiInterrupt::SegMagicErr => w.seg_magic_err().clear_bit_by_one(),
-                            SpiInterrupt::RxAfifoWfullErr => w.mst_rx_afifo_wfull_err().clear_bit_by_one(),
-                            SpiInterrupt::TxAfifoRemptyErr => {
-                                w.mst_tx_afifo_rempty_err().clear_bit_by_one()
-                            }
-                            SpiInterrupt::App2 => w.app2().clear_bit_by_one(),
-                            SpiInterrupt::App1 => w.app1().clear_bit_by_one(),
-                        };
+            if #[cfg(esp32)] {
+                for interrupt in interrupts {
+                    match interrupt {
+                        SpiInterrupt::TransDone => {
+                            reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
+                        }
                     }
-                    w
-                });
+                }
             } else if #[cfg(esp32s2)] {
                 for interrupt in interrupts {
                     match interrupt {
@@ -2898,13 +2884,26 @@ impl Driver {
                     }
                 }
             } else {
-                for interrupt in interrupts {
-                    match interrupt {
-                        SpiInterrupt::TransDone => {
-                            reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
-                        }
+                reg_block.dma_int_clr().write(|w| {
+                    for interrupt in interrupts {
+                        match interrupt {
+                            SpiInterrupt::TransDone => w.trans_done().clear_bit_by_one(),
+                            SpiInterrupt::DmaInfifoFullErr => w.dma_infifo_full_err().clear_bit_by_one(),
+                            SpiInterrupt::DmaOutfifoEmptyErr => {
+                                w.dma_outfifo_empty_err().clear_bit_by_one()
+                            }
+                            SpiInterrupt::DmaSegTransDone => w.dma_seg_trans_done().clear_bit_by_one(),
+                            SpiInterrupt::SegMagicErr => w.seg_magic_err().clear_bit_by_one(),
+                            SpiInterrupt::RxAfifoWfullErr => w.mst_rx_afifo_wfull_err().clear_bit_by_one(),
+                            SpiInterrupt::TxAfifoRemptyErr => {
+                                w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+                            }
+                            SpiInterrupt::App2 => w.app2().clear_bit_by_one(),
+                            SpiInterrupt::App1 => w.app1().clear_bit_by_one(),
+                        };
                     }
-                }
+                    w
+                });
             }
         }
     }
