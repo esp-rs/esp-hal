@@ -1732,8 +1732,8 @@ mod dma {
 
                 unsafe {
                     self.spi_dma.start_dma_transfer(
-                        chunk.len(),
                         0,
+                        chunk.len(),
                         &mut EmptyBuf,
                         &mut self.tx_buf,
                     )?;

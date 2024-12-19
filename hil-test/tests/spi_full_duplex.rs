@@ -448,6 +448,39 @@ mod tests {
     }
 
     #[test]
+    #[cfg(pcnt)]
+    fn test_dma_bus_read_write_pcnt(ctx: Context) {
+        const TRANSFER_SIZE: usize = 4;
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+        ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
+        ctx.pcnt_unit
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        let mut spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel)
+            .with_buffers(dma_rx_buf, dma_tx_buf);
+
+        // Fill the buffer where each byte has 3 pos edges.
+        let tx_buf = [0b0110_1010; TRANSFER_SIZE];
+        let mut rx_buf = [0; TRANSFER_SIZE];
+
+        for i in 1..4 {
+            // Preset as 5, expect 0 repeated receive
+            rx_buf.copy_from_slice(&[5; TRANSFER_SIZE]);
+            spi.read(&mut rx_buf).unwrap();
+            assert_eq!(rx_buf, [0; TRANSFER_SIZE]);
+
+            spi.write(&tx_buf).unwrap();
+            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+        }
+    }
+
+    #[test]
     fn test_dma_bus_symmetric_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
