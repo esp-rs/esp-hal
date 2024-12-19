@@ -15,14 +15,14 @@
 #![no_std]
 #![no_main]
 
-use core::str::FromStr;
+use core::{net::Ipv4Addr, str::FromStr};
 
 use embassy_executor::Spawner;
 use embassy_net::{
     tcp::TcpSocket,
     IpListenEndpoint,
-    Ipv4Address,
     Ipv4Cidr,
+    Runner,
     Stack,
     StackResources,
     StaticConfigV4,
@@ -90,7 +90,7 @@ async fn main(spawner: Spawner) -> ! {
     }
 
     let gw_ip_addr_str = GW_IP_ADDR_ENV.unwrap_or("192.168.2.1");
-    let gw_ip_addr = Ipv4Address::from_str(gw_ip_addr_str).expect("failed to parse gateway ip");
+    let gw_ip_addr = Ipv4Addr::from_str(gw_ip_addr_str).expect("failed to parse gateway ip");
 
     let config = embassy_net::Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(gw_ip_addr, 24),
@@ -101,19 +101,16 @@ async fn main(spawner: Spawner) -> ! {
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     // Init network stack
-    let stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiApDevice>>,
-        Stack::new(
-            wifi_interface,
-            config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed
-        )
+    let (stack, runner) = embassy_net::new(
+        wifi_interface,
+        config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
     );
 
     spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(&stack)).ok();
-    spawner.spawn(run_dhcp(&stack, gw_ip_addr_str)).ok();
+    spawner.spawn(net_task(runner)).ok();
+    spawner.spawn(run_dhcp(stack, gw_ip_addr_str)).ok();
 
     let mut rx_buffer = [0; 1536];
     let mut tx_buffer = [0; 1536];
@@ -135,7 +132,7 @@ async fn main(spawner: Spawner) -> ! {
         .config_v4()
         .inspect(|c| println!("ipv4 config: {c:?}"));
 
-    let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
+    let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
     socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
     loop {
         println!("Wait for connection...");
@@ -210,10 +207,7 @@ async fn main(spawner: Spawner) -> ! {
 }
 
 #[embassy_executor::task]
-async fn run_dhcp(
-    stack: &'static Stack<WifiDevice<'static, WifiApDevice>>,
-    gw_ip_addr: &'static str,
-) {
+async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
     use core::net::{Ipv4Addr, SocketAddrV4};
 
     use edge_dhcp::{
@@ -279,6 +273,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
-    stack.run().await
+async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiApDevice>>) {
+    runner.run().await
 }
