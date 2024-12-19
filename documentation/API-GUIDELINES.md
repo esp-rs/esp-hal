@@ -80,6 +80,8 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - If a driver only implements a subset of a peripheral's capabilities, it should be placed in the `peripheral::subcategory` module.
   - For example, if a driver implements the slave-mode I2C driver, it should be placed into `i2c::slave`.
   - This helps us reducing the need of introducing breaking changes if we implement additional functionalities.
+- Avoid abbreviations and contractions in the API, where possible.
+  - Saving a few characters may introduce ambiguity, e.g `SpiTransDone`, is it `Transmit` or `Transfer`?
 
 ## Maintainability
 

@@ -99,7 +99,7 @@ pub enum Error {
     /// The arbitration for the bus was lost.
     ArbitrationLost,
     /// The execution of the I2C command was incomplete.
-    ExecIncomplete,
+    ExecutionIncomplete,
     /// The number of commands issued exceeded the limit.
     CommandNrExceeded,
     /// Zero length read or write operation.
