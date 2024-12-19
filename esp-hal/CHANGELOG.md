@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DmaRxBuf`, `DmaTxBuf` and `DmaRxTxBuf` now implement `Debug` and `defmt::Format` (#2823)
 - DMA channels (`AnyGdmaChannel`, `SpiDmaChannel`, `I2sDmaChannel`, `CryptoDmaChannel`) and their RX/TX halves now implement `Debug` and `defmt::Format` (#2823)
 - `DmaDescriptor` and `DmaDescriptorFlags` now implement `PartialEq` and `Eq` (#2823)
+- `gpio::{Event, WakeEvent, GpioRegisterAccess}` now implement `Debug`, `Eq`, `PartialEq` and `Hash` (#2842)
+- `gpio::{Level, Pull, AlternateFunction, RtcFunction}` now implement `Hash` (#2842)
+- `gpio::{GpioPin, AnyPin, Io, Output, OutputOpenDrain, Input, Flex}` now implement `Debug`, `defmt::Format` (#2842)
 
 ### Changed
 
