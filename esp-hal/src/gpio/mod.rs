@@ -930,8 +930,11 @@ fn handle_pin_interrupts(user_handler: fn()) {
             intr_bits -= 1 << pin_pos;
 
             let pin_nr = pin_pos as u8 + bank.offset();
-            asynch::PIN_WAKERS[pin_nr as usize].wake();
-            set_int_enable(pin_nr, Some(0), 0, false);
+
+            crate::interrupt::free(|| {
+                asynch::PIN_WAKERS[pin_nr as usize].wake();
+                set_int_enable(pin_nr, Some(0), 0, false);
+            });
         }
 
         bank.write_interrupt_status_clear(intrs);

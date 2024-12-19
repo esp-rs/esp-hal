@@ -399,4 +399,33 @@ mod tests {
 
         _ = Input::new(pin, Pull::Down);
     }
+
+    #[test]
+    fn interrupt_executor_is_not_frozen(ctx: Context) {
+        use esp_hal::interrupt::{software::SoftwareInterrupt, Priority};
+        use esp_hal_embassy::InterruptExecutor;
+        use static_cell::StaticCell;
+
+        static INTERRUPT_EXECUTOR: StaticCell<InterruptExecutor<1>> = StaticCell::new();
+        let interrupt_executor = INTERRUPT_EXECUTOR.init(InterruptExecutor::new(unsafe {
+            SoftwareInterrupt::<1>::steal()
+        }));
+
+        let spawner = interrupt_executor.start(Priority::max());
+
+        spawner.must_spawn(test_task(ctx.test_gpio1.degrade()));
+
+        #[embassy_executor::task]
+        async fn test_task(pin: AnyPin) {
+            let mut pin = Input::new(pin, Pull::Down);
+
+            // This line must return, even if the executor
+            // is running at a higher priority than the GPIO handler.
+            pin.wait_for_low().await;
+
+            embedded_test::export::check_outcome(());
+        }
+
+        loop {}
+    }
 }

@@ -904,7 +904,7 @@ where
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
-                    xtensa_lx::interrupt::free(|| {
+                    crate::interrupt::free(|| {
                         *byte = fifo.read().rxfifo_rd_byte().bits();
                     });
                 } else {
