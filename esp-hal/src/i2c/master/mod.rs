@@ -138,7 +138,7 @@ pub enum ConfigError {
 impl core::error::Error for ConfigError {}
 
 impl core::fmt::Display for ConfigError {
-    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             ConfigError::InvalidFrequency => write!(
                 f,
