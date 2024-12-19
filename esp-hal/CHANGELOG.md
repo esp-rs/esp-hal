@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA channels (`AnyGdmaChannel`, `SpiDmaChannel`, `I2sDmaChannel`, `CryptoDmaChannel`) and their RX/TX halves now implement `Debug` and `defmt::Format` (#2823)
 - `DmaDescriptor` and `DmaDescriptorFlags` now implement `PartialEq` and `Eq` (#2823)
 
+- Test changelog entry, to be filled out (#2840)
+
 ### Changed
 
 - Bump MSRV to 1.83 (#2615)
