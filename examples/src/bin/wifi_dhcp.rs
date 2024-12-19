@@ -13,6 +13,7 @@
 #![no_main]
 
 extern crate alloc;
+use core::net::Ipv4Addr;
 
 use blocking_network_stack::Stack;
 use embedded_io::*;
@@ -38,7 +39,7 @@ use esp_wifi::{
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
-    wire::{DhcpOption, IpAddress, Ipv4Address},
+    wire::{DhcpOption, IpAddress},
 };
 
 const SSID: &str = env!("SSID");
@@ -133,7 +134,7 @@ fn main() -> ! {
         socket.work();
 
         socket
-            .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+            .open(IpAddress::Ipv4(Ipv4Addr::new(142, 250, 185, 115)), 80)
             .unwrap();
 
         socket
