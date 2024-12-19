@@ -133,8 +133,6 @@ impl core::fmt::Display for Error {
 pub enum ConfigError {
     /// Provided bus frequency is invalid for the current configuration.
     InvalidFrequency,
-    /// The specified timeout passed to `Config` is invalid.
-    InvalidTimeout,
 }
 
 impl core::error::Error for ConfigError {}
@@ -965,11 +963,9 @@ fn configure_clock(
         // timeout mechanism
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                if let Some(timeout_value) = timeout {
-                    register_block.to().write(|w| w.time_out().bits(timeout_value));
-                } else {
-                    return Err(ConfigError::InvalidTimeout);
-                }
+                register_block
+                    .to()
+                    .write(|w| w.time_out().bits(unwrap!(timeout)));
             } else {
                 register_block
                     .to()
