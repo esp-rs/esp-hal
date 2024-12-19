@@ -463,6 +463,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
 
             fns.push(quote! {
                 #[doc = concat!(" Assign the given value to the `", stringify!(#field_ident) ,"` field.")]
+                #[must_use]
                 pub fn #function_ident(mut self, #field_ident: #field_type) -> Self {
                     self.#field_ident = #field_assigns;
                     self
@@ -473,6 +474,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
                 let function_ident = format_ident!("with_{}_none", field_ident);
                 fns.push(quote! {
                     #[doc = concat!(" Set the value of `", stringify!(#field_ident), "` to `None`.")]
+                    #[must_use]
                     pub fn #function_ident(mut self) -> Self {
                         self.#field_ident = None;
                         self
