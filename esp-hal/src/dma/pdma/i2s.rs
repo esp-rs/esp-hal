@@ -5,6 +5,8 @@ use crate::{asynch::AtomicWaker, dma::*, peripheral::Peripheral, peripherals::In
 pub(super) type I2sRegisterBlock = crate::peripherals::i2s0::RegisterBlock;
 
 /// The RX half of an arbitrary I2S DMA channel.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyI2sDmaRxChannel(pub(crate) AnyI2sDmaChannel);
 
 impl crate::private::Sealed for AnyI2sDmaRxChannel {}
@@ -18,6 +20,8 @@ impl Peripheral for AnyI2sDmaRxChannel {
 }
 
 /// The TX half of an arbitrary I2S DMA channel.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyI2sDmaTxChannel(pub(crate) AnyI2sDmaChannel);
 
 impl crate::private::Sealed for AnyI2sDmaTxChannel {}

@@ -25,6 +25,8 @@ use crate::{
 };
 
 /// An arbitrary GDMA channel
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyGdmaChannel(u8);
 
 impl Peripheral for AnyGdmaChannel {
@@ -51,6 +53,8 @@ impl DmaChannel for AnyGdmaChannel {
 }
 
 /// An arbitrary GDMA RX channel
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyGdmaRxChannel(u8);
 
 impl Peripheral for AnyGdmaRxChannel {
@@ -68,6 +72,8 @@ impl DmaChannelConvert<AnyGdmaRxChannel> for AnyGdmaRxChannel {
 }
 
 /// An arbitrary GDMA TX channel
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyGdmaTxChannel(u8);
 
 impl Peripheral for AnyGdmaTxChannel {

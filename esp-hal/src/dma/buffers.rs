@@ -650,6 +650,8 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
 /// This is a contiguous buffer linked together by DMA descriptors of length
 /// 4092. It can only be used for receiving data from a peripheral's FIFO.
 /// See [DmaTxBuf] for transmitting data.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaRxBuf {
     descriptors: DescriptorSet<'static>,
     buffer: &'static mut [u8],
@@ -841,6 +843,8 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
 /// descriptors of length 4092 each.
 /// It can be used for simultaneously transmitting to and receiving from a
 /// peripheral's FIFO. These are typically full-duplex transfers.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaRxTxBuf {
     rx_descriptors: DescriptorSet<'static>,
     tx_descriptors: DescriptorSet<'static>,

@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HAL configuration structs now implement the Builder Lite pattern (#2645)
 - Added `OutputOpenDrain::unlisten` (#2625)
 - Added `{Input, Flex}::wait_for` (#2625)
-- Peripheral singletons now implement `Debug` and `defmt::Format` (except AnyPeripherals) (#2682, #2834)
+- Peripheral singletons now implement `Debug` and `defmt::Format` (#2682, #2834)
 - `BurstConfig`, a device-specific configuration for configuring DMA transfers in burst mode (#2543)
 - `{DmaRxBuf, DmaTxBuf, DmaRxTxBuf}::set_burst_config` (#2543)
 - ESP32-S2: DMA support for AES (#2699)
@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `i2c::master::Config` now implements `PartialEq`, `Eq`, ans `Hash` (#2825)
 - `i2c::master::I2c` now implements `Debug`, `PartialEq`, and `Eq` (#2825)
 - `i2c::master::Info` now implements `Debug` (#2825)
+- `spi::master::Config` now implements `Hash` (#2823)
+- `spi::master` drivers now implement `Debug` and `defmt::Format` (#2823)
+- `DmaRxBuf`, `DmaTxBuf` and `DmaRxTxBuf` now implement `Debug` and `defmt::Format` (#2823)
+- DMA channels (`AnyGdmaChannel`, `SpiDmaChannel`, `I2sDmaChannel`, `CryptoDmaChannel`) and their RX/TX halves now implement `Debug` and `defmt::Format` (#2823)
+- `DmaDescriptor` and `DmaDescriptorFlags` now implement `PartialEq` and `Eq` (#2823)
 
 ### Changed
 

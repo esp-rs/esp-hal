@@ -53,7 +53,7 @@ macro_rules! impl_pdma_channel {
         paste::paste! {
             #[doc = concat!("DMA channel suitable for ", stringify!([< $instance:upper >]))]
             #[non_exhaustive]
-            #[derive(Debug, PartialEq, Eq)]
+            #[derive(Debug)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             pub struct [<$instance DmaChannel>] {}
 

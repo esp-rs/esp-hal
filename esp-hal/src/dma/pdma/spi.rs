@@ -5,6 +5,8 @@ use crate::{asynch::AtomicWaker, dma::*, peripheral::Peripheral, peripherals::In
 pub(super) type SpiRegisterBlock = crate::peripherals::spi2::RegisterBlock;
 
 /// The RX half of an arbitrary SPI DMA channel.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnySpiDmaRxChannel(pub(crate) AnySpiDmaChannel);
 
 impl crate::private::Sealed for AnySpiDmaRxChannel {}
@@ -18,6 +20,8 @@ impl Peripheral for AnySpiDmaRxChannel {
 }
 
 /// The TX half of an arbitrary SPI DMA channel.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnySpiDmaTxChannel(pub(crate) AnySpiDmaChannel);
 
 impl crate::private::Sealed for AnySpiDmaTxChannel {}

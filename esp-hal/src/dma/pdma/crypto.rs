@@ -11,6 +11,8 @@ use crate::{
 pub(super) type CryptoRegisterBlock = crate::peripherals::crypto_dma::RegisterBlock;
 
 /// The RX half of a Crypto DMA channel.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CryptoDmaRxChannel(pub(crate) CryptoDmaChannel);
 
 impl crate::private::Sealed for CryptoDmaRxChannel {}
@@ -24,6 +26,8 @@ impl Peripheral for CryptoDmaRxChannel {
 }
 
 /// The TX half of a Crypto DMA channel.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CryptoDmaTxChannel(pub(crate) CryptoDmaChannel);
 
 impl crate::private::Sealed for CryptoDmaTxChannel {}
@@ -437,6 +441,8 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel {
 
 #[doc = "DMA channel suitable for CRYPTO"]
 #[non_exhaustive]
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CryptoDmaChannel {}
 
 impl crate::private::Sealed for CryptoDmaChannel {}
