@@ -86,7 +86,7 @@ const I2C_CHUNK_SIZE: usize = 254;
 const MAX_ITERATIONS: u32 = 1_000_000;
 
 /// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Error {
@@ -106,11 +106,37 @@ pub enum Error {
     InvalidZeroLength,
 }
 
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::ExceedingFifo => write!(f, "The transmission exceeded the FIFO size"),
+            Error::AckCheckFailed => write!(f, "The acknowledgment check failed"),
+            Error::TimeOut => write!(f, "A timeout occurred during transmission"),
+            Error::ArbitrationLost => write!(f, "The arbitration for the bus was lost"),
+            Error::ExecIncomplete => write!(f, "The execution of the I2C command was incomplete"),
+            Error::CommandNrExceeded => {
+                write!(f, "The number of commands issued exceeded the limit")
+            }
+            Error::InvalidZeroLength => write!(f, "Zero length read or write operation"),
+        }
+    }
+}
+
 /// I2C-specific configuration errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {}
+
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Ok(())
+    }
+}
 
 // This enum is used to keep track of the last/next operation that was/will be
 // performed in an embedded-hal(-async) I2c::transaction. It is used to
@@ -126,6 +152,7 @@ enum OpKind {
 /// I2C operation.
 ///
 /// Several operations can be combined as part of a transaction.
+#[derive(Debug, PartialEq, Eq, Hash, strum::Display)]
 pub enum Operation<'a> {
     /// Write data from the provided buffer.
     Write(&'a [u8]),
@@ -239,7 +266,7 @@ impl From<Ack> for u32 {
 }
 
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
@@ -263,6 +290,13 @@ pub struct Config {
     pub timeout: Option<u32>,
 }
 
+impl core::hash::Hash for Config {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.frequency.to_Hz().hash(state); // `HertzU32` doesn't implement `Hash`
+        self.timeout.hash(state);
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         use fugit::RateExtU32;
@@ -274,6 +308,8 @@ impl Default for Config {
 }
 
 /// I2C driver
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct I2c<'d, Dm: DriverMode, T = AnyI2c> {
     i2c: PeripheralRef<'d, T>,
     phantom: PhantomData<Dm>,
@@ -934,6 +970,7 @@ fn configure_clock(
 }
 
 /// Peripheral data describing a particular I2C instance.
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this I2C instance.
@@ -969,6 +1006,14 @@ impl Info {
         unsafe { &*self.register_block }
     }
 }
+
+impl PartialEq for Info {
+    fn eq(&self, other: &Self) -> bool {
+        self.register_block == other.register_block
+    }
+}
+
+unsafe impl Sync for Info {}
 
 #[allow(dead_code)] // Some versions don't need `state`
 struct Driver<'a> {
@@ -2105,14 +2150,6 @@ impl Driver<'_> {
         Ok(())
     }
 }
-
-impl PartialEq for Info {
-    fn eq(&self, other: &Self) -> bool {
-        self.register_block == other.register_block
-    }
-}
-
-unsafe impl Sync for Info {}
 
 /// Peripheral state for an I2C instance.
 #[non_exhaustive]

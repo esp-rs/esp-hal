@@ -7,7 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-
 ### Added
 
 - ESP32-S3: Added SDMMC signals (#2556)
@@ -35,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: DMA support for AES (#2699)
 - Added `transfer_in_place_async` and embedded-hal-async implementation to `Spi` (#2691)
 - `InterruptHandler` now implements `Hash` and `defmt::Format` (#2830)
+- `uart::ConfigError` now implements `Eq` (#2825)
+- `i2c::master::Error` now implements `Eq` and `Hash` (#2825)
+- `i2c::master::Operation` now implements `Debug`, `PartialEq`, `Eq`, `Hash`, and `Display` (#2825)
+- `i2c::master::Config` now implements `PartialEq`, `Eq`, ans `Hash` (#2825)
+- `i2c::master::I2c` now implements `Debug`, `PartialEq`, and `Eq` (#2825)
+- `i2c::master::Info` now implements `Debug` (#2825)
 
 ### Changed
 
