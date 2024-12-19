@@ -239,6 +239,7 @@ use crate::{
 /// Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Error {
     /// The desired frequency is impossible to reach
     UnreachableTargetFrequency,
