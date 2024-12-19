@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Crate prefixes and configuration keys are now separated by two underscores (`__`) (#2848)
+
 ### Removed
 
 ## 0.2.0 - 2024-11-20

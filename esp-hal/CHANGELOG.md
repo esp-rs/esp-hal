@@ -179,6 +179,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Camera` and `I8080` drivers' constructors now only accepts blocking-mode DMA channels. (#2519)
 - Many peripherals are now disabled by default and also get disabled when the driver is dropped (#2544)
 
+- Config: Crate prefixes and configuration keys are now separated by two underscores (`__`) (#2848)
+
 ### Fixed
 
 - Fix conflict between `RtcClock::get_xtal_freq` and `Rtc::disable_rom_message_printing` (#2360)

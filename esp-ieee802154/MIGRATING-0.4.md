@@ -1,4 +1,4 @@
-# Migration Guide from 0.11.x to v0.12.x
+# Migration Guide from 0.4.x to v0.5.x
 
 ## Crate configuration changes
 
@@ -10,10 +10,6 @@ configurations to match the new format.
 
 ```diff
  [env]
--ESP_WIFI_RX_QUEUE_SIZE = "16"
--ESP_WIFI_STATIC_RX_BUF_NUM = "32"
--ESP_WIFI_DYNAMIC_RX_BUF_NUM = "16"
-+ESP_WIFI__RX_QUEUE_SIZE = "16"
-+ESP_WIFI__STATIC_RX_BUF_NUM = "32"
-+ESP_WIFI__DYNAMIC_RX_BUF_NUM = "16"
+-ESP_IEEE802154_RX_QUEUE_SIZE = "50"
++ESP_IEEE802154__RX_QUEUE_SIZE = "50"
 ```
