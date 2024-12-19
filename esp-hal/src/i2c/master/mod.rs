@@ -139,7 +139,12 @@ impl core::error::Error for ConfigError {}
 
 impl core::fmt::Display for ConfigError {
     fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        Ok(())
+        match self {
+            ConfigError::InvalidFrequency => write!(
+                f,
+                "Provided bus frequency is invalid for the current configuration"
+            ),
+        }
     }
 }
 
