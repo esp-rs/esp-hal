@@ -143,6 +143,7 @@ impl AcceptedWord for i32 {}
 /// I2S Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Error {
     /// An unspecified or unknown error occurred during an I2S operation.
     Unknown,
