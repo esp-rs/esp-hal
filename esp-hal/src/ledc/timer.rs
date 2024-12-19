@@ -68,6 +68,7 @@ pub mod config {
     /// Number of bits reserved for duty cycle adjustment
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[allow(clippy::enum_variant_names)] // FIXME: resolve before stabilizing this driver
     pub enum Duty {
         /// 1-bit resolution for duty cycle adjustment.
         Duty1Bit = 1,

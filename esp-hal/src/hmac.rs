@@ -67,6 +67,7 @@ pub enum Error {
 /// user. It can also deliver to other peripherals.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum HmacPurpose {
     /// HMAC is used to re-enable JTAG after soft-disabling it.
     ToJtag     = 6,

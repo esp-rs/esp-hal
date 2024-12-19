@@ -1,0 +1,2 @@
+# FIXME: reset to `true` before the first stable release
+avoid-breaking-exported-api = false

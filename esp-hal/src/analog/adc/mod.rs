@@ -71,6 +71,7 @@ mod implementation;
 /// device being targeted. Please refer to "ADC Characteristics" section of your
 /// device's datasheet for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Attenuation {
     /// 0dB attenuation
     Attenuation0dB   = 0b00,
