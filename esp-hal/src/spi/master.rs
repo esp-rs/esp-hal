@@ -95,11 +95,11 @@ pub enum SpiInterrupt {
     ///
     /// This interrupt is triggered when an SPI transaction has finished
     /// transmitting and receiving data.
-    TransDone,
+    TransferDone,
 
     /// Triggered at the end of configurable segmented transfer.
     #[cfg(any(esp32s2, gdma))]
-    DmaSegTransDone,
+    DmaSegmentedTransferDone,
 
     /// Used and triggered by software. Only used for user defined function.
     #[cfg(gdma)]
@@ -2734,7 +2734,7 @@ impl Driver {
                 reg_block.slave().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
-                            SpiInterrupt::TransDone => w.trans_inten().bit(enable),
+                            SpiInterrupt::TransferDone => w.trans_inten().bit(enable),
                         };
                     }
                     w
@@ -2743,8 +2743,8 @@ impl Driver {
                 reg_block.slave().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
-                            SpiInterrupt::TransDone => w.int_trans_done_en().bit(enable),
-                            SpiInterrupt::DmaSegTransDone => w.int_dma_seg_trans_en().bit(enable),
+                            SpiInterrupt::TransferDone => w.int_trans_done_en().bit(enable),
+                            SpiInterrupt::DmaSegmentedTransferDone => w.int_dma_seg_trans_en().bit(enable),
                         };
                     }
                     w
@@ -2753,8 +2753,8 @@ impl Driver {
                 reg_block.dma_int_ena().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
-                            SpiInterrupt::TransDone => w.trans_done().bit(enable),
-                            SpiInterrupt::DmaSegTransDone => w.dma_seg_trans_done().bit(enable),
+                            SpiInterrupt::TransferDone => w.trans_done().bit(enable),
+                            SpiInterrupt::DmaSegmentedTransferDone => w.dma_seg_trans_done().bit(enable),
                             SpiInterrupt::App2 => w.app2().bit(enable),
                             SpiInterrupt::App1 => w.app1().bit(enable),
                         };
@@ -2773,23 +2773,23 @@ impl Driver {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 if reg_block.slave().read().trans_done().bit() {
-                    res.insert(SpiInterrupt::TransDone);
+                    res.insert(SpiInterrupt::TransferDone);
                 }
             } else if #[cfg(esp32s2)] {
                 if reg_block.slave().read().trans_done().bit() {
-                    res.insert(SpiInterrupt::TransDone);
+                    res.insert(SpiInterrupt::TransferDone);
                 }
                 if reg_block.hold().read().dma_seg_trans_done().bit() {
-                    res.insert(SpiInterrupt::DmaSegTransDone);
+                    res.insert(SpiInterrupt::DmaSegmentedTransferDone);
                 }
             } else {
                 let ints = reg_block.dma_int_raw().read();
 
                 if ints.trans_done().bit() {
-                    res.insert(SpiInterrupt::TransDone);
+                    res.insert(SpiInterrupt::TransferDone);
                 }
                 if ints.dma_seg_trans_done().bit() {
-                    res.insert(SpiInterrupt::DmaSegTransDone);
+                    res.insert(SpiInterrupt::DmaSegmentedTransferDone);
                 }
                 if ints.app2().bit() {
                     res.insert(SpiInterrupt::App2);
@@ -2810,7 +2810,7 @@ impl Driver {
             if #[cfg(esp32)] {
                 for interrupt in interrupts {
                     match interrupt {
-                        SpiInterrupt::TransDone => {
+                        SpiInterrupt::TransferDone => {
                             reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
                         }
                     }
@@ -2818,11 +2818,11 @@ impl Driver {
             } else if #[cfg(esp32s2)] {
                 for interrupt in interrupts {
                     match interrupt {
-                        SpiInterrupt::TransDone => {
+                        SpiInterrupt::TransferDone => {
                             reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
                         }
 
-                        SpiInterrupt::DmaSegTransDone => {
+                        SpiInterrupt::DmaSegmentedTransferDone => {
                             reg_block
                                 .hold()
                                 .modify(|_, w| w.dma_seg_trans_done().clear_bit());
@@ -2833,8 +2833,8 @@ impl Driver {
                 reg_block.dma_int_clr().write(|w| {
                     for interrupt in interrupts {
                         match interrupt {
-                            SpiInterrupt::TransDone => w.trans_done().clear_bit_by_one(),
-                            SpiInterrupt::DmaSegTransDone => w.dma_seg_trans_done().clear_bit_by_one(),
+                            SpiInterrupt::TransferDone => w.trans_done().clear_bit_by_one(),
+                            SpiInterrupt::DmaSegmentedTransferDone => w.dma_seg_trans_done().clear_bit_by_one(),
                             SpiInterrupt::App2 => w.app2().clear_bit_by_one(),
                             SpiInterrupt::App1 => w.app1().clear_bit_by_one(),
                         };
@@ -3123,8 +3123,8 @@ impl Driver {
 
     /// Starts the operation and waits for it to complete.
     async fn execute_operation_async(&self) {
-        self.enable_listen(SpiInterrupt::TransDone.into(), false);
-        self.clear_interrupts(SpiInterrupt::TransDone.into());
+        self.enable_listen(SpiInterrupt::TransferDone.into(), false);
+        self.clear_interrupts(SpiInterrupt::TransferDone.into());
         self.start_operation();
         SpiFuture::new(self).await;
     }
@@ -3363,9 +3363,9 @@ fn handle_async<I: Instance>(instance: I) {
     let info = instance.info();
 
     let driver = Driver { info, state };
-    if driver.interrupts().contains(SpiInterrupt::TransDone) {
+    if driver.interrupts().contains(SpiInterrupt::TransferDone) {
         state.waker.wake();
-        driver.enable_listen(SpiInterrupt::TransDone.into(), false);
+        driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
     }
 }
 
@@ -3436,14 +3436,19 @@ impl Future for SpiFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.driver.interrupts().contains(SpiInterrupt::TransDone) {
-            self.driver.clear_interrupts(SpiInterrupt::TransDone.into());
+        if self
+            .driver
+            .interrupts()
+            .contains(SpiInterrupt::TransferDone)
+        {
+            self.driver
+                .clear_interrupts(SpiInterrupt::TransferDone.into());
             return Poll::Ready(());
         }
 
         self.driver.state.waker.register(cx.waker());
         self.driver
-            .enable_listen(SpiInterrupt::TransDone.into(), true);
+            .enable_listen(SpiInterrupt::TransferDone.into(), true);
         Poll::Pending
     }
 }
@@ -3451,6 +3456,6 @@ impl Future for SpiFuture<'_> {
 impl Drop for SpiFuture<'_> {
     fn drop(&mut self) {
         self.driver
-            .enable_listen(SpiInterrupt::TransDone.into(), false);
+            .enable_listen(SpiInterrupt::TransferDone.into(), false);
     }
 }
