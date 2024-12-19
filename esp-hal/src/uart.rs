@@ -277,6 +277,7 @@ pub enum Error {
     ///
     /// This error occurs when the received data does not conform to the
     /// expected UART frame format.
+    #[allow(clippy::enum_variant_names, reason = "Frame error is a common term")]
     RxFrameError,
 
     /// A parity error was detected on the RX line.
@@ -284,6 +285,7 @@ pub enum Error {
     /// This error occurs when the parity bit in the received data does not
     /// match the expected parity configuration.
     /// with the `async` feature.
+    #[allow(clippy::enum_variant_names, reason = "Parity error is a common term")]
     RxParityError,
 }
 

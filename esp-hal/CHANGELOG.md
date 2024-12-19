@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gpio::{Level, Pull, AlternateFunction, RtcFunction}` now implement `Hash` (#2842)
 - `gpio::{GpioPin, AnyPin, Io, Output, OutputOpenDrain, Input, Flex}` now implement `Debug`, `defmt::Format` (#2842)
 
+- Test changelog entry, to be filled out (#2840)
+
 ### Changed
 
 - Bump MSRV to 1.83 (#2615)
