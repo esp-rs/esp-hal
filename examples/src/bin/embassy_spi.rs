@@ -24,11 +24,11 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    prelude::*,
     spi::{
         master::{Config, Spi},
         Mode,
     },
+    time::RateExtU32,
     timer::timg::TimerGroup,
 };
 

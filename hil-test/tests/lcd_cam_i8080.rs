@@ -18,7 +18,7 @@ use esp_hal::{
         channel::{CtrlMode, EdgeMode},
         Pcnt,
     },
-    prelude::*,
+    time::RateExtU32,
     Blocking,
 };
 use hil_test as _;

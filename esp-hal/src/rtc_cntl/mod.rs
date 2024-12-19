@@ -23,7 +23,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use core::time::Duration;
-//! # use esp_hal::{delay::Delay, prelude::*, rtc_cntl::Rtc};
+//! # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 //!
 //! let rtc = Rtc::new(peripherals.LPWR);
 //! let delay = Delay::new();
@@ -90,7 +90,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use core::time::Duration;
-//! # use esp_hal::{delay::Delay, prelude::*, rtc_cntl::Rtc};
+//! # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 //!
 //! let rtc = Rtc::new(peripherals.LPWR);
 //! let delay = Delay::new();

@@ -81,7 +81,6 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator};
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::prelude::*;
 //!
 //! // Configure frequency based on chip type
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
@@ -117,7 +116,6 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator};
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::prelude::*;
 //! # use esp_hal::gpio::{Level, Output};
 //!
 //! const WIDTH: usize = 80;

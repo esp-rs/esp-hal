@@ -11,12 +11,12 @@ use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Input, Level, Output, Pull},
-    prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
         DataMode,
         Mode,
     },
+    time::RateExtU32,
     Blocking,
 };
 use hil_test as _;
@@ -221,11 +221,7 @@ mod tests {
             #[cfg(pcnt)]
             pcnt: peripherals.PCNT,
             dma_channel,
-            gpios: [
-                pin.degrade(),
-                pin_mirror.degrade(),
-                unconnected_pin.degrade(),
-            ],
+            gpios: [pin.into(), pin_mirror.into(), unconnected_pin.into()],
         }
     }
 

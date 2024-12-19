@@ -60,8 +60,8 @@
 
 use esp_backtrace as _;
 use esp_hal::{
+    entry,
     hmac::{Hmac, HmacPurpose, KeyId},
-    prelude::*,
     rng::Rng,
 };
 use esp_println::println;

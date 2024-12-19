@@ -30,12 +30,13 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    prelude::*,
+    entry,
     spi::{
         master::{Address, Command, Config, Spi},
         DataMode,
         Mode,
     },
+    time::RateExtU32,
 };
 use esp_println::println;
 

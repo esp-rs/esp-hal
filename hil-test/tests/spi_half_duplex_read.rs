@@ -9,12 +9,12 @@ use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, Output},
-    prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
         DataMode,
         Mode,
     },
+    time::RateExtU32,
     Blocking,
 };
 use hil_test as _;

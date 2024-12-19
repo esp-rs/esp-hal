@@ -5,7 +5,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::prelude::*;
+use esp_hal::entry;
 use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
