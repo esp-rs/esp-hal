@@ -14,12 +14,12 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 
 - `C-RW-VALUE` and `C-SERDE` do not apply.
 - `C-COMMON-TRAITS`:
-  The set of traits to implement depend on the type. If nothing here applies, use your best judgement.
-  - Driver structures: `Debug/Display`, `PartialEq/Eq`
-  - Driver configuration: `Default`, `Debug/Display`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
+  The set of traits to implement depend on the type and use case. In esp-hal, we can highlight a few such use cases and provide recommendations what should be implemented. If nothing here applies, use your best judgement.
+  - Driver structures: `Debug`
+  - Driver configuration: `Default`, `Debug`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
     - `Clone/Copy` depends on the size and contents of the structure. They should generally be implemented, unless there is a good reason not to.
     - The `Default` configuration needs to make sense for a particular driver, and applying the default configuration must not fail.
-  - Error types: `Debug/Display`, `PartialEq/Eq`, `Clone/Copy`, `Hash`
+  - Error types: `Debug`, `PartialEq/Eq`, `Clone/Copy`, `Hash`, `Error`, `Display`
 
 ## Construction and Destruction of Drivers
 
@@ -63,6 +63,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - API documentation must be provided for every new driver and API.
 - Private details should not leak into the public API, and should be made private where technically possible.
   - Implementation details that _need_ to be public should be marked with `#[doc(hidden)]` and a comment as to why it needs to be public.
+    - For the time being, this includes any `Instance` traits, and `State` or `Info` structs as well.
   - Functions which technically need to be public but shouldn't be callable by the user need to be sealed.
     - see [this example in Rust's core library](https://github.com/rust-lang/rust/blob/044a28a4091f2e1a5883f7fa990223f8b200a2cd/library/core/src/error.rs#L89-L100)
 - Any public traits, that **must not** be implemented downstream need to be `Sealed`.
