@@ -49,10 +49,10 @@ pub(crate) mod constants {
     pub const RMT_RAM_START: usize = 0x3f416400;
     /// Size of the RAM allocated per RMT channel, in bytes.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 64;
-    /// Start address of the system's DRAM (low range).
-    pub const SOC_DRAM_LOW: usize = 0x3FFB_0000;
-    /// End address of the system's DRAM (high range).
-    pub const SOC_DRAM_HIGH: usize = 0x4000_0000;
+    /// The lower bound of the system's DRAM (Data RAM) address space.
+    pub const SOC_DRAM_LOW: usize = super::super::SOC_DRAM_LOW;
+    /// The upper bound of the system's DRAM (Data RAM) address space.
+    pub const SOC_DRAM_HIGH: usize = super::super::SOC_DRAM_HIGH;
     /// Reference clock tick frequency, set to 1 MHz.
     pub const REF_TICK: fugit::HertzU32 = fugit::HertzU32::MHz(1);
 }
