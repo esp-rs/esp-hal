@@ -15,6 +15,8 @@
 #![no_std]
 #![no_main]
 
+use core::net::Ipv4Addr;
+
 use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
@@ -37,7 +39,7 @@ use esp_wifi::{
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
-    wire::{IpAddress, Ipv4Address},
+    wire::IpAddress,
 };
 
 const SSID: &str = env!("SSID");
@@ -182,7 +184,7 @@ fn main() -> ! {
                 sta_socket.work();
 
                 sta_socket
-                    .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+                    .open(IpAddress::Ipv4(Ipv4Addr::new(142, 250, 185, 115)), 80)
                     .unwrap();
 
                 sta_socket

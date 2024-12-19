@@ -2680,15 +2680,42 @@ impl<Dm: Sealed> WifiRxToken<Dm> {
 
         f(buffer)
     }
+
+    /// Consumes the RX token and applies the callback function to the received
+    /// data buffer.
+    ///
+    /// TODO: https://github.com/embassy-rs/embassy/issues/3670
+    pub fn consume_token_immutable<R, F>(self, f: F) -> R
+    where
+        F: FnOnce(&[u8]) -> R,
+    {
+        let mut data = self.mode.data_queue_rx().with(|queue| {
+            unwrap!(
+                queue.pop_front(),
+                "unreachable: transmit()/receive() ensures there is a packet to process"
+            )
+        });
+
+        // We handle the received data outside of the lock because
+        // EspWifiPacketBuffer::drop must not be called in a critical section.
+        // Dropping an EspWifiPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
+        // which will try to lock an internal mutex. If the mutex is already
+        // taken, the function will try to trigger a context switch, which will
+        // fail if we are in an interrupt-free context.
+        let buffer = data.as_slice_mut();
+        dump_packet_info(buffer);
+
+        f(buffer)
+    }
 }
 
 #[cfg(feature = "smoltcp")]
 impl<Dm: Sealed> RxToken for WifiRxToken<Dm> {
     fn consume<R, F>(self, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> R,
+        F: FnOnce(&[u8]) -> R,
     {
-        self.consume_token(f)
+        self.consume_token_immutable(f)
     }
 }
 
