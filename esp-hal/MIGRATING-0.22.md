@@ -199,7 +199,6 @@ is enabled. To retrieve the address and size of the initialized external memory,
 
 The usage of `esp_alloc::psram_allocator!` remains unchanged.
 
-
 ## embedded-hal 0.2.* is not supported anymore.
 
 As per https://github.com/rust-embedded/embedded-hal/pull/640, our driver no longer implements traits from `embedded-hal 0.2.x`.
@@ -316,4 +315,17 @@ To avoid abbreviations and contractions (as per the esp-hal guidelines), some er
 + Error::Timeout
 - Error::InvalidZeroLength
 + Error::ZeroLengthInvalid
+```
+
+## UART changes
+
+The `Config` struct's setters are now prefixed with `with_`. `parity_none`, `parity_even`,
+`parity_odd` have been replaced by `with_parity` that takes a `Parity` parameter.
+
+```diff
+ let config = Config::default()
+-    .rx_fifo_full_threshold(30)
++    .with_rx_fifo_full_threshold(30)
+-    .parity_even();
++    .with_parity(Parity::Even);
 ```
