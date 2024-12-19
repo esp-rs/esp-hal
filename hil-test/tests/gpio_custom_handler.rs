@@ -6,7 +6,6 @@
 //! async API works for user handlers automatically.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: integrated-timers
 
 #![no_std]
 #![no_main]
