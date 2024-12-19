@@ -104,7 +104,7 @@ use crate::{
     system::PeripheralGuard,
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 #[derive(Debug, EnumSetType)]
@@ -253,7 +253,7 @@ impl DataFormat {
 pub struct I2s<'d, Dm, T = AnyI2s>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Handles the reception (RX) side of the I2S peripheral.
     pub i2s_rx: RxCreator<'d, Dm, T>,
@@ -311,7 +311,7 @@ where
 impl<Dm, T> I2s<'_, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Sets the interrupt handler
     ///
@@ -349,14 +349,14 @@ where
 impl<Dm, I> crate::private::Sealed for I2s<'_, Dm, I>
 where
     I: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
 }
 
 impl<Dm, I> InterruptConfigurable for I2s<'_, Dm, I>
 where
     I: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         I2s::set_interrupt_handler(self, handler);
@@ -444,7 +444,7 @@ where
 impl<'d, Dm, T> I2s<'d, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
     pub fn with_mclk<P: PeripheralOutput>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
@@ -460,7 +460,7 @@ where
 pub struct I2sTx<'d, Dm, T = AnyI2s>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     i2s: PeripheralRef<'d, T>,
     tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<T>>,
@@ -471,7 +471,7 @@ where
 impl<Dm, T> core::fmt::Debug for I2sTx<'_, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I2sTx").finish()
@@ -481,7 +481,7 @@ where
 impl<Dm, T> DmaSupport for I2sTx<'_, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         self.i2s.wait_for_tx_done();
@@ -495,7 +495,7 @@ where
 impl<'d, Dm, T> DmaSupportTx for I2sTx<'d, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type TX = ChannelTx<'d, Dm, PeripheralTxChannel<T>>;
 
@@ -511,7 +511,7 @@ where
 impl<Dm, T> I2sTx<'_, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
         self.start_tx_transfer(&data, false)?;
@@ -529,7 +529,7 @@ where
     ) -> Result<(), Error>
     where
         TXBUF: ReadBuffer,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         let (ptr, len) = unsafe { words.read_buffer() };
 
@@ -593,7 +593,7 @@ where
 pub struct I2sRx<'d, Dm, T = AnyI2s>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     i2s: PeripheralRef<'d, T>,
     rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<T>>,
@@ -604,7 +604,7 @@ where
 impl<Dm, T> core::fmt::Debug for I2sRx<'_, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I2sRx").finish()
@@ -614,7 +614,7 @@ where
 impl<Dm, T> DmaSupport for I2sRx<'_, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         self.i2s.wait_for_rx_done();
@@ -628,7 +628,7 @@ where
 impl<'d, Dm, T> DmaSupportRx for I2sRx<'d, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type RX = ChannelRx<'d, Dm, PeripheralRxChannel<T>>;
 
@@ -644,7 +644,7 @@ where
 impl<Dm, T> I2sRx<'_, Dm, T>
 where
     T: RegisterAccess,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn read_bytes(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
         self.start_rx_transfer(&mut data, false)?;
@@ -757,13 +757,13 @@ mod private {
         peripheral::{Peripheral, PeripheralRef},
         peripherals::{Interrupt, I2S0},
         private,
-        Mode,
+        DriverMode,
     };
 
     pub struct TxCreator<'d, Dm, T>
     where
         T: RegisterAccess,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         pub i2s: PeripheralRef<'d, T>,
         pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<T>>,
@@ -773,7 +773,7 @@ mod private {
 
     impl<'d, Dm, T> TxCreator<'d, Dm, T>
     where
-        Dm: Mode,
+        Dm: DriverMode,
         T: RegisterAccess,
     {
         pub fn build(self) -> I2sTx<'d, Dm, T> {
@@ -823,7 +823,7 @@ mod private {
     pub struct RxCreator<'d, Dm, T>
     where
         T: RegisterAccess,
-        Dm: Mode,
+        Dm: DriverMode,
     {
         pub i2s: PeripheralRef<'d, T>,
         pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<T>>,
@@ -833,7 +833,7 @@ mod private {
 
     impl<'d, Dm, T> RxCreator<'d, Dm, T>
     where
-        Dm: Mode,
+        Dm: DriverMode,
         T: RegisterAccess,
     {
         pub fn build(self) -> I2sRx<'d, Dm, T> {

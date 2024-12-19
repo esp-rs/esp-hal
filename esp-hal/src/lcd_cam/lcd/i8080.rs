@@ -80,7 +80,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 /// A configuration error.
@@ -92,7 +92,7 @@ pub enum ConfigError {
 }
 
 /// Represents the I8080 LCD interface.
-pub struct I8080<'d, Dm: Mode> {
+pub struct I8080<'d, Dm: DriverMode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
     _mode: PhantomData<Dm>,
@@ -100,7 +100,7 @@ pub struct I8080<'d, Dm: Mode> {
 
 impl<'d, Dm> I8080<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new<P, CH>(
@@ -396,7 +396,7 @@ where
     }
 }
 
-impl<Dm: Mode> core::fmt::Debug for I8080<'_, Dm> {
+impl<Dm: DriverMode> core::fmt::Debug for I8080<'_, Dm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
     }
@@ -404,12 +404,12 @@ impl<Dm: Mode> core::fmt::Debug for I8080<'_, Dm> {
 
 /// Represents an ongoing (or potentially finished) transfer using the I8080 LCD
 /// interface
-pub struct I8080Transfer<'d, BUF: DmaTxBuffer, Dm: Mode> {
+pub struct I8080Transfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
     i8080: ManuallyDrop<I8080<'d, Dm>>,
     buf_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, BUF: DmaTxBuffer, Dm: Mode> I8080Transfer<'d, BUF, Dm> {
+impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         self.i8080
@@ -470,7 +470,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: Mode> I8080Transfer<'d, BUF, Dm> {
     }
 }
 
-impl<BUF: DmaTxBuffer, Dm: Mode> Deref for I8080Transfer<'_, BUF, Dm> {
+impl<BUF: DmaTxBuffer, Dm: DriverMode> Deref for I8080Transfer<'_, BUF, Dm> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -478,7 +478,7 @@ impl<BUF: DmaTxBuffer, Dm: Mode> Deref for I8080Transfer<'_, BUF, Dm> {
     }
 }
 
-impl<BUF: DmaTxBuffer, Dm: Mode> DerefMut for I8080Transfer<'_, BUF, Dm> {
+impl<BUF: DmaTxBuffer, Dm: DriverMode> DerefMut for I8080Transfer<'_, BUF, Dm> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buf_view
     }
@@ -523,7 +523,7 @@ impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
     }
 }
 
-impl<BUF: DmaTxBuffer, Dm: Mode> Drop for I8080Transfer<'_, BUF, Dm> {
+impl<BUF: DmaTxBuffer, Dm: DriverMode> Drop for I8080Transfer<'_, BUF, Dm> {
     fn drop(&mut self) {
         self.stop_peripherals();
 

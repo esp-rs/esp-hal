@@ -15,8 +15,8 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
-        SpiDataMode,
-        SpiMode,
+        DataMode,
+        Mode,
     },
     Blocking,
 };
@@ -66,7 +66,7 @@ mod tests {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
-                .with_mode(SpiMode::Mode0),
+                .with_mode(Mode::Mode0),
         )
         .unwrap()
         .with_sck(sclk)
@@ -101,7 +101,7 @@ mod tests {
         dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
         let transfer = spi
             .half_duplex_write(
-                SpiDataMode::Single,
+                DataMode::Single,
                 Command::None,
                 Address::None,
                 0,
@@ -116,7 +116,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_write(
-                SpiDataMode::Single,
+                DataMode::Single,
                 Command::None,
                 Address::None,
                 0,
@@ -152,25 +152,13 @@ mod tests {
 
         let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
         // Write the buffer where each byte has 3 pos edges.
-        spi.half_duplex_write(
-            SpiDataMode::Single,
-            Command::None,
-            Address::None,
-            0,
-            &buffer,
-        )
-        .unwrap();
+        spi.half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
+            .unwrap();
 
         assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
-        spi.half_duplex_write(
-            SpiDataMode::Single,
-            Command::None,
-            Address::None,
-            0,
-            &buffer,
-        )
-        .unwrap();
+        spi.half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
+            .unwrap();
 
         assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }

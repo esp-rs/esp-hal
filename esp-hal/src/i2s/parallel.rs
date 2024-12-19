@@ -128,7 +128,7 @@ use crate::{
     system::PeripheralGuard,
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 #[doc(hidden)]
@@ -238,7 +238,7 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
 /// I2S Parallel Interface
 pub struct I2sParallel<'d, Dm, I = AnyI2s>
 where
-    Dm: Mode,
+    Dm: DriverMode,
     I: Instance,
 {
     instance: PeripheralRef<'d, I>,
@@ -326,7 +326,7 @@ where
 impl<'d, I, Dm> I2sParallel<'d, Dm, I>
 where
     I: Instance,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Write data to the I2S peripheral
     pub fn send<BUF: DmaTxBuffer>(
@@ -358,7 +358,7 @@ pub struct I2sParallelTransfer<'d, BUF, Dm, I = AnyI2s>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     i2s: ManuallyDrop<I2sParallel<'d, Dm, I>>,
     buf_view: ManuallyDrop<BUF::View>,
@@ -368,7 +368,7 @@ impl<'d, I, BUF, Dm> I2sParallelTransfer<'d, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
@@ -405,7 +405,7 @@ impl<I, BUF, Dm> Deref for I2sParallelTransfer<'_, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type Target = BUF::View;
 
@@ -418,7 +418,7 @@ impl<I, BUF, Dm> DerefMut for I2sParallelTransfer<'_, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buf_view
@@ -429,7 +429,7 @@ impl<I, BUF, Dm> Drop for I2sParallelTransfer<'_, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn drop(&mut self) {
         self.stop_peripherals();

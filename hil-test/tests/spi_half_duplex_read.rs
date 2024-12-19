@@ -12,8 +12,8 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
-        SpiDataMode,
-        SpiMode,
+        DataMode,
+        Mode,
     },
     Blocking,
 };
@@ -50,7 +50,7 @@ mod tests {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
-                .with_mode(SpiMode::Mode0),
+                .with_mode(Mode::Mode0),
         )
         .unwrap()
         .with_sck(sclk)
@@ -74,7 +74,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                SpiDataMode::Single,
+                DataMode::Single,
                 Command::None,
                 Address::None,
                 0,
@@ -92,7 +92,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                SpiDataMode::Single,
+                DataMode::Single,
                 Command::None,
                 Address::None,
                 0,
@@ -123,7 +123,7 @@ mod tests {
 
         let mut buffer = [0xAA; DMA_BUFFER_SIZE];
         spi.half_duplex_read(
-            SpiDataMode::Single,
+            DataMode::Single,
             Command::None,
             Address::None,
             0,
@@ -137,7 +137,7 @@ mod tests {
         ctx.miso_mirror.set_high();
 
         spi.half_duplex_read(
-            SpiDataMode::Single,
+            DataMode::Single,
             Command::None,
             Address::None,
             0,

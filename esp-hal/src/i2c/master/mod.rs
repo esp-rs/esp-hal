@@ -64,7 +64,7 @@ use crate::{
     Async,
     Blocking,
     Cpu,
-    Mode,
+    DriverMode,
 };
 
 cfg_if::cfg_if! {
@@ -274,7 +274,7 @@ impl Default for Config {
 }
 
 /// I2C driver
-pub struct I2c<'d, Dm: Mode, T = AnyI2c> {
+pub struct I2c<'d, Dm: DriverMode, T = AnyI2c> {
     i2c: PeripheralRef<'d, T>,
     phantom: PhantomData<Dm>,
     config: Config,
@@ -283,7 +283,7 @@ pub struct I2c<'d, Dm: Mode, T = AnyI2c> {
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T: Instance, Dm: Mode> SetConfig for I2c<'_, Dm, T> {
+impl<T: Instance, Dm: DriverMode> SetConfig for I2c<'_, Dm, T> {
     type Config = Config;
     type ConfigError = ConfigError;
 
@@ -292,11 +292,11 @@ impl<T: Instance, Dm: Mode> SetConfig for I2c<'_, Dm, T> {
     }
 }
 
-impl<T, Dm: Mode> embedded_hal::i2c::ErrorType for I2c<'_, Dm, T> {
+impl<T, Dm: DriverMode> embedded_hal::i2c::ErrorType for I2c<'_, Dm, T> {
     type Error = Error;
 }
 
-impl<T, Dm: Mode> embedded_hal::i2c::I2c for I2c<'_, Dm, T>
+impl<T, Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm, T>
 where
     T: Instance,
 {
@@ -310,7 +310,7 @@ where
     }
 }
 
-impl<'d, T, Dm: Mode> I2c<'d, Dm, T>
+impl<'d, T, Dm: DriverMode> I2c<'d, Dm, T>
 where
     T: Instance,
 {

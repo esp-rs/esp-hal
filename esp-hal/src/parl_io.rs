@@ -162,7 +162,7 @@ use crate::{
     system::{self, GenericPeripheralGuard},
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 #[allow(unused)]
@@ -846,7 +846,7 @@ impl ContainsValidSignalPin for RxSixteenBits<'_> {}
 
 impl<'d, Dm> TxCreatorFullDuplex<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Configure TX to use the given pins and settings
     pub fn with_config<P, CP>(
@@ -878,7 +878,7 @@ where
 
 impl<'d, Dm> TxCreator<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Configure TX to use the given pins and settings
     pub fn with_config<P, CP>(
@@ -911,7 +911,7 @@ where
 /// Parallel IO TX channel
 pub struct ParlIoTx<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
     tx_chain: DescriptorChain,
@@ -920,7 +920,7 @@ where
 
 impl<Dm> core::fmt::Debug for ParlIoTx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ParlIoTx").finish()
@@ -929,7 +929,7 @@ where
 
 impl<'d, Dm> RxCreatorFullDuplex<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Configure RX to use the given pins and settings
     pub fn with_config<P, CP>(
@@ -961,7 +961,7 @@ where
 
 impl<'d, Dm> RxCreator<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Configure RX to use the given pins and settings
     pub fn with_config<P, CP>(
@@ -992,7 +992,7 @@ where
 /// Parallel IO RX channel
 pub struct ParlIoRx<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
     rx_chain: DescriptorChain,
@@ -1001,7 +1001,7 @@ where
 
 impl<Dm> core::fmt::Debug for ParlIoRx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ParlIoTx").finish()
@@ -1095,7 +1095,7 @@ fn internal_clear_interrupts(interrupts: EnumSet<ParlIoInterrupt>) {
 /// Full duplex mode might limit the maximum possible bit width.
 pub struct ParlIoFullDuplex<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// The transmitter (TX) channel responsible for handling DMA transfers in
     /// the parallel I/O full-duplex operation.
@@ -1221,7 +1221,7 @@ impl<'d> ParlIoFullDuplex<'d, Async> {
 /// Parallel IO in half duplex / TX only mode
 pub struct ParlIoTxOnly<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// The transmitter (TX) channel responsible for handling DMA transfers in
     /// the parallel I/O operation.
@@ -1327,7 +1327,7 @@ impl InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
 /// Parallel IO in half duplex / RX only mode
 pub struct ParlIoRxOnly<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// The receiver (RX) channel responsible for handling DMA transfers in the
     /// parallel I/O operation.
@@ -1463,7 +1463,7 @@ fn internal_init(frequency: HertzU32) -> Result<(), Error> {
 
 impl<Dm> ParlIoTx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Perform a DMA write.
     ///
@@ -1518,7 +1518,7 @@ where
 
 impl<Dm> DmaSupport for ParlIoTx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         while !Instance::is_tx_eof() {}
@@ -1533,7 +1533,7 @@ where
 
 impl<'d, Dm> DmaSupportTx for ParlIoTx<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type TX = ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>;
 
@@ -1548,7 +1548,7 @@ where
 
 impl<'d, Dm> ParlIoRx<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Perform a DMA read.
     ///
@@ -1607,7 +1607,7 @@ where
 
 impl<Dm> DmaSupport for ParlIoRx<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         loop {
@@ -1629,7 +1629,7 @@ where
 
 impl<'d, Dm> DmaSupportRx for ParlIoRx<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type RX = ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>;
 
@@ -1645,7 +1645,7 @@ where
 /// Creates a TX channel
 pub struct TxCreator<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
@@ -1655,7 +1655,7 @@ where
 /// Creates a RX channel
 pub struct RxCreator<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
@@ -1665,7 +1665,7 @@ where
 /// Creates a TX channel
 pub struct TxCreatorFullDuplex<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],
@@ -1675,7 +1675,7 @@ where
 /// Creates a RX channel
 pub struct RxCreatorFullDuplex<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
     descriptors: &'static mut [DmaDescriptor],

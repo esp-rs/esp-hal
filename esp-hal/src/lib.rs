@@ -293,7 +293,7 @@ WARNING: use --release
 "}
 
 /// A marker trait for initializing drivers in a specific mode.
-pub trait Mode: crate::private::Sealed {}
+pub trait DriverMode: crate::private::Sealed {}
 
 /// Driver initialized in blocking mode.
 #[derive(Debug)]
@@ -303,8 +303,8 @@ pub struct Blocking;
 #[derive(Debug)]
 pub struct Async;
 
-impl crate::Mode for Blocking {}
-impl crate::Mode for Async {}
+impl crate::DriverMode for Blocking {}
+impl crate::DriverMode for Async {}
 impl crate::private::Sealed for Blocking {}
 impl crate::private::Sealed for Async {}
 

@@ -27,7 +27,7 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Config, Spi},
-        SpiMode,
+        Mode,
     },
     timer::timg::TimerGroup,
 };
@@ -61,7 +61,7 @@ async fn main(_spawner: Spawner) {
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
-            .with_mode(SpiMode::Mode0),
+            .with_mode(Mode::Mode0),
     )
     .unwrap()
     .with_sck(sclk)

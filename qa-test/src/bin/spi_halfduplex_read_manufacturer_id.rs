@@ -33,8 +33,8 @@ use esp_hal::{
     prelude::*,
     spi::{
         master::{Address, Command, Config, Spi},
-        SpiDataMode,
-        SpiMode,
+        DataMode,
+        Mode,
     },
 };
 use esp_println::println;
@@ -65,7 +65,7 @@ fn main() -> ! {
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
-            .with_mode(SpiMode::Mode0),
+            .with_mode(Mode::Mode0),
     )
     .unwrap()
     .with_sck(sclk)
@@ -81,9 +81,9 @@ fn main() -> ! {
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
         spi.half_duplex_read(
-            SpiDataMode::Single,
-            Command::Command8(0x90, SpiDataMode::Single),
-            Address::Address24(0x000000, SpiDataMode::Single),
+            DataMode::Single,
+            Command::Command8(0x90, DataMode::Single),
+            Address::Address24(0x000000, DataMode::Single),
             0,
             &mut data,
         )
@@ -94,9 +94,9 @@ fn main() -> ! {
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
         spi.half_duplex_read(
-            SpiDataMode::Dual,
-            Command::Command8(0x92, SpiDataMode::Single),
-            Address::Address32(0x000000_00, SpiDataMode::Dual),
+            DataMode::Dual,
+            Command::Command8(0x92, DataMode::Single),
+            Address::Address32(0x000000_00, DataMode::Dual),
             0,
             &mut data,
         )
@@ -107,9 +107,9 @@ fn main() -> ! {
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
         spi.half_duplex_read(
-            SpiDataMode::Quad,
-            Command::Command8(0x94, SpiDataMode::Single),
-            Address::Address32(0x000000_00, SpiDataMode::Quad),
+            DataMode::Quad,
+            Command::Command8(0x94, DataMode::Single),
+            Address::Address32(0x000000_00, DataMode::Quad),
             4,
             &mut data,
         )

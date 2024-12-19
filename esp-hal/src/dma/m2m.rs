@@ -20,7 +20,7 @@ use crate::{
     peripheral::Peripheral,
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 /// DMA Memory to Memory pseudo-Peripheral
@@ -30,7 +30,7 @@ use crate::{
 /// to memory transfers.
 pub struct Mem2Mem<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     channel: Channel<'d, Dm, AnyGdmaChannel>,
     rx_chain: DescriptorChain,
@@ -125,7 +125,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
 
 impl<Dm> Mem2Mem<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     /// Start a memory to memory transfer.
     pub fn start_transfer<'t, TXBUF, RXBUF>(
@@ -158,7 +158,7 @@ where
 
 impl<Dm> DmaSupport for Mem2Mem<'_, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         while !self.channel.rx.is_done() {}
@@ -171,7 +171,7 @@ where
 
 impl<'d, Dm> DmaSupportRx for Mem2Mem<'d, Dm>
 where
-    Dm: Mode,
+    Dm: DriverMode,
 {
     type RX = ChannelRx<'d, Dm, AnyGdmaRxChannel>;
 
