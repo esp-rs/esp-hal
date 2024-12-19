@@ -14,7 +14,7 @@ use esp_hal::{
         lcd::i8080::{Command, Config, TxEightBits, I8080},
         LcdCam,
     },
-    prelude::*,
+    time::RateExtU32,
     Async,
 };
 use hil_test as _;

@@ -26,7 +26,8 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::timer::timg::TimerGroup;
+//! use esp_hal::timer::timg::TimerGroup;
+//! use esp_hal::timer::Timer;
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let timer0 = timg0.timer0;
@@ -49,8 +50,9 @@
 //! ### Watchdog Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::timer::timg::TimerGroup;
-//! # use esp_hal::timer::timg::MwdtStage;
+//! use esp_hal::timer::timg::TimerGroup;
+//! use esp_hal::timer::timg::MwdtStage;
+//! use esp_hal::timer::Timer;
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut wdt = timg0.wdt;

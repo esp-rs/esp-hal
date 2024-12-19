@@ -16,7 +16,7 @@ use esp_hal::{
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
-    prelude::*,
+    time::RateExtU32,
     Async,
 };
 use hil_test as _;

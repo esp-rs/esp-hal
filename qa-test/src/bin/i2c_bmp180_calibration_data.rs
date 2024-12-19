@@ -13,8 +13,8 @@
 
 use esp_backtrace as _;
 use esp_hal::{
+    entry,
     i2c::master::{Config, I2c},
-    prelude::*,
 };
 use esp_println::println;
 

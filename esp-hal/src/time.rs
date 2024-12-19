@@ -2,6 +2,8 @@
 //!
 //! The `time` module offers a way to get the system now.
 
+pub use fugit::{ExtU64, RateExtU32};
+
 /// Represents a duration of time.
 ///
 /// The resolution is 1 microsecond, represented as a 64-bit unsigned integer.

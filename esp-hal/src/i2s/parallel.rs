@@ -43,7 +43,6 @@
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::i2s::parallel::{I2sParallel, TxEightBits};
-//! # use esp_hal::prelude::*;
 //!
 //! const BUFFER_SIZE: usize = 256;
 //!

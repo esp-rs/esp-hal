@@ -29,6 +29,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma_rx_stream_buffer,
+    entry,
     i2c::{
         self,
         master::{Config, I2c},
@@ -37,7 +38,7 @@ use esp_hal::{
         cam::{self, Camera, RxEightBits},
         LcdCam,
     },
-    prelude::*,
+    time::RateExtU32,
     Blocking,
 };
 use esp_println::{print, println};

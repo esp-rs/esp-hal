@@ -10,7 +10,6 @@
 mod tests {
     use esp_hal::{
         gpio::OutputPin,
-        prelude::*,
         uart::{self, UartRx, UartTx},
     };
     use hil_test as _;

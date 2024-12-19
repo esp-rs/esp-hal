@@ -23,7 +23,7 @@ use embassy_net::{tcp::TcpSocket, Ipv4Address, Stack, StackResources};
 use embassy_time::{with_timeout, Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     init,

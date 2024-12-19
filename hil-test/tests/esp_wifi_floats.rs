@@ -10,10 +10,11 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_hal::{
+    clock::CpuClock,
     delay::Delay,
     interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
+    macros::handler,
     peripherals::Peripherals,
-    prelude::*,
     rng::Rng,
     timer::timg::TimerGroup,
 };

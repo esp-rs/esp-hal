@@ -125,7 +125,6 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::uart::{AtCmdConfig, Config, Uart, UartInterrupt};
-//! # use esp_hal::prelude::*;
 //! let delay = Delay::new();
 //!
 //! // Default pins for UART/Serial communication

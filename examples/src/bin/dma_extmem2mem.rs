@@ -9,7 +9,7 @@
 use aligned::{Aligned, A64};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, dma::Mem2Mem, dma_descriptors_chunk_size, prelude::*};
+use esp_hal::{delay::Delay, dma::Mem2Mem, dma_descriptors_chunk_size, entry, time::ExtU64};
 use log::{error, info};
 extern crate alloc;
 
