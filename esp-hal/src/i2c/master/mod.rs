@@ -106,11 +106,37 @@ pub enum Error {
     InvalidZeroLength,
 }
 
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::ExceedingFifo => write!(f, "The transmission exceeded the FIFO size"),
+            Error::AckCheckFailed => write!(f, "The acknowledgment check failed"),
+            Error::TimeOut => write!(f, "A timeout occurred during transmission"),
+            Error::ArbitrationLost => write!(f, "The arbitration for the bus was lost"),
+            Error::ExecIncomplete => write!(f, "The execution of the I2C command was incomplete"),
+            Error::CommandNrExceeded => {
+                write!(f, "The number of commands issued exceeded the limit")
+            }
+            Error::InvalidZeroLength => write!(f, "Zero length read or write operation"),
+        }
+    }
+}
+
 /// I2C-specific configuration errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {}
+
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Ok(())
+    }
+}
 
 // This enum is used to keep track of the last/next operation that was/will be
 // performed in an embedded-hal(-async) I2c::transaction. It is used to

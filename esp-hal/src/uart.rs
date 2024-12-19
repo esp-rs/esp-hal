@@ -287,6 +287,20 @@ pub enum Error {
     RxParityError,
 }
 
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::InvalidArgument => write!(f, "An invalid configuration argument was provided"),
+            Error::RxFifoOvf => write!(f, "The RX FIFO overflowed"),
+            Error::RxGlitchDetected => write!(f, "A glitch was detected on the RX line"),
+            Error::RxFrameError => write!(f, "A framing error was detected on the RX line"),
+            Error::RxParityError => write!(f, "A parity error was detected on the RX line"),
+        }
+    }
+}
+
 impl embedded_hal_nb::serial::Error for Error {
     fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
         embedded_hal_nb::serial::ErrorKind::Other
@@ -621,8 +635,21 @@ pub struct UartRx<'d, Dm, T = AnyUart> {
 pub enum ConfigError {
     /// The requested timeout is not supported.
     UnsupportedTimeout,
-    /// The requested fifo threshold is not supported.
+    /// The requested FIFO threshold is not supported.
     UnsupportedFifoThreshold,
+}
+
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ConfigError::UnsupportedTimeout => write!(f, "The requested timeout is not supported"),
+            ConfigError::UnsupportedFifoThreshold => {
+                write!(f, "The requested FIFO threshold is not supported")
+            }
+        }
+    }
 }
 
 #[cfg(any(doc, feature = "unstable"))]
