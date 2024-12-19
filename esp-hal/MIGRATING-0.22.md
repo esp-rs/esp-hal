@@ -317,3 +317,22 @@ To avoid abbreviations and contractions (as per the esp-hal guidelines), some er
 - Error::InvalidZeroLength
 + Error::ZeroLengthInvalid
 ```
+
+## The crate prelude has been removed
+
+The reexports that were previously part of the prelude are available through other paths:
+
+- `nb` is no longer re-exported. Please import the `nb` crate if you need it.
+- `ExtU64` and `RateExtU32` have been moved to `esp_hal::time`
+- `Clock` and `CpuClock`: `esp_hal::clock::{Clock, CpuClock}`
+- The following traits need to be individually imported when needed:
+    - `esp_hal::analog::dac::Instance`
+    - `esp_hal::gpio::Pin`
+    - `esp_hal::ledc::channel::ChannelHW`
+    - `esp_hal::ledc::channel::ChannelIFace`
+    - `esp_hal::ledc::timer::TimerHW`
+    - `esp_hal::ledc::timer::TimerIFace`
+    - `esp_hal::timer::timg::TimerGroupInstance`
+    - `esp_hal::timer::Timer`
+    - `esp_hal::interrupt::InterruptConfigurable`
+- The `entry` macro can be imported as `esp_hal::entry`, while other macros are found under `esp_hal::macros`
