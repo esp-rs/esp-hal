@@ -440,6 +440,15 @@ pub struct Config {
     pub write_bit_order: BitOrder,
 }
 
+impl core::hash::Hash for Config {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.frequency.to_Hz().hash(state); // HertzU32 doesn't implement Hash
+        self.mode.hash(state);
+        self.read_bit_order.hash(state);
+        self.write_bit_order.hash(state);
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         use fugit::RateExtU32;
@@ -884,6 +893,7 @@ mod dma {
     /// [`SpiDmaBus`] via `with_buffers` to get access
     /// to a DMA capable SPI bus that implements the
     /// embedded-hal traits.
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct SpiDma<'d, Dm, T = AnySpi>
     where
         T: Instance,
@@ -943,7 +953,7 @@ mod dma {
 
     impl<Dm, T> core::fmt::Debug for SpiDma<'_, Dm, T>
     where
-        T: Instance,
+        T: Instance + core::fmt::Debug,
         Dm: DriverMode,
     {
         /// Formats the `SpiDma` instance for debugging purposes.
@@ -951,7 +961,7 @@ mod dma {
         /// This method returns a debug struct with the name "SpiDma" without
         /// exposing internal details.
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            f.debug_struct("SpiDma").finish()
+            f.debug_struct("SpiDma").field("spi", &self.spi).finish()
         }
     }
 
@@ -1575,6 +1585,8 @@ mod dma {
     ///
     /// This structure is responsible for managing SPI transfers using DMA
     /// buffers.
+    #[derive(Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct SpiDmaBus<'d, Dm, T = AnySpi>
     where
         T: Instance,

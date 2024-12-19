@@ -215,7 +215,7 @@ where
 
 bitfield::bitfield! {
     /// DMA descriptor flags.
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, PartialEq, Eq)]
     pub struct DmaDescriptorFlags(u32);
 
     u16;
@@ -272,7 +272,7 @@ impl defmt::Format for DmaDescriptorFlags {
 }
 
 /// A DMA transfer descriptor.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaDescriptor {
     /// Descriptor flags.
