@@ -114,7 +114,7 @@ impl CFnPtr {
 }
 
 /// Event used to trigger interrupts.
-#[derive(Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Event {
     /// Interrupts trigger on rising pin edge.
@@ -139,7 +139,7 @@ impl From<WakeEvent> for Event {
 }
 
 /// Event used to wake up from light sleep.
-#[derive(Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WakeEvent {
     /// Wake on low level
@@ -157,7 +157,7 @@ pub enum WakeEvent {
 /// input, the peripheral will read the corresponding level from that signal.
 ///
 /// When connected to a peripheral output, the level will be ignored.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Level {
     /// Low
@@ -198,7 +198,7 @@ impl From<Level> for bool {
 }
 
 /// Pull setting for an input.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Pull {
     /// No pull
@@ -210,7 +210,7 @@ pub enum Pull {
 }
 
 /// Drive strength (values are approximates)
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DriveStrength {
     /// Drive strength of approximately 5mA.
@@ -234,7 +234,7 @@ pub enum DriveStrength {
 /// The different variants correspond to different functionality depending on
 /// the chip and the specific pin. For more information, refer to your chip's
 #[doc = crate::trm_markdown_link!("iomuxgpio")]
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AlternateFunction {
     /// Alternate function 0.
@@ -268,7 +268,7 @@ impl TryFrom<usize> for AlternateFunction {
 }
 
 /// RTC function
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RtcFunction {
     /// RTC mode.
@@ -547,7 +547,8 @@ pub trait TouchPin: Pin {
 }
 
 #[doc(hidden)]
-#[derive(Clone, Copy, EnumCount)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, EnumCount)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GpioRegisterAccess {
     Bank0,
     #[cfg(gpio_bank_1)]
@@ -758,9 +759,13 @@ impl Bank1GpioRegisterAccess {
 
 /// GPIO pin
 #[non_exhaustive]
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct GpioPin<const GPIONUM: u8>;
 
 /// Type-erased GPIO pin
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyPin(pub(crate) AnyPinInner);
 
 impl<const GPIONUM: u8> GpioPin<GPIONUM>
@@ -858,6 +863,8 @@ pub(crate) fn bind_default_interrupt_handler() {
 }
 
 /// General Purpose Input/Output driver
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Io {
     _io_mux: IO_MUX,
 }
@@ -1073,6 +1080,8 @@ macro_rules! gpio {
                 }
             )+
 
+            #[derive(Debug)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             pub(crate) enum AnyPinInner {
                 $(
                     [<Gpio $gpionum >]($crate::gpio::GpioPin<$gpionum>),
@@ -1174,6 +1183,8 @@ macro_rules! gpio {
 /// This driver configures the GPIO pin to be a push-pull output driver.
 /// Push-pull means that the driver actively sets the output voltage level
 /// for both high and low logical [`Level`]s.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Output<'d, P = AnyPin> {
     pin: Flex<'d, P>,
 }
@@ -1345,6 +1356,8 @@ where
 ///
 /// This driver configures the GPIO pin to be an input. Input drivers read the
 /// voltage of their pins and convert it to a logical [`Level`].
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Input<'d, P = AnyPin> {
     pin: Flex<'d, P>,
 }
@@ -1615,6 +1628,8 @@ where
 /// for the low logical [`Level`], but leaves the high level floating, which is
 /// then determined by external hardware, or internal pull-up/pull-down
 /// resistors.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OutputOpenDrain<'d, P = AnyPin> {
     pin: Flex<'d, P>,
 }
@@ -1838,6 +1853,8 @@ where
 /// Flexible pin driver.
 ///
 /// This driver allows changing the pin mode between input and output.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Flex<'d, P = AnyPin> {
     pin: PeripheralRef<'d, P>,
 }
