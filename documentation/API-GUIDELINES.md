@@ -82,6 +82,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
   - This helps us reducing the need of introducing breaking changes if we implement additional functionalities.
 - Avoid abbreviations and contractions in the API, where possible.
   - Saving a few characters may introduce ambiguity, e.g `SpiTransDone`, is it `Transmit` or `Transfer`?
+  - Common abbreviations, that are well understood such as `Dma` are perfectly fine.
 
 ## Maintainability
 
