@@ -17,9 +17,11 @@
 #![no_std]
 #![no_main]
 
+use core::net::Ipv4Addr;
+
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
-use embassy_net::{tcp::TcpSocket, Ipv4Address, Stack, StackResources};
+use embassy_net::{tcp::TcpSocket, Runner, StackResources};
 use embassy_time::{with_timeout, Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -91,7 +93,7 @@ async fn main(spawner: Spawner) -> ! {
         ));
     }
 
-    let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
+    let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let mut rng = Rng::new(peripherals.RNG);
@@ -121,18 +123,15 @@ async fn main(spawner: Spawner) -> ! {
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     // Init network stack
-    let stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiStaDevice>>,
-        Stack::new(
-            wifi_interface,
-            config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed
-        )
+    let (stack, runner) = embassy_net::new(
+        wifi_interface,
+        config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
     );
 
     spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(&stack)).ok();
+    spawner.spawn(net_task(runner)).ok();
 
     loop {
         if stack.is_link_up() {
@@ -202,11 +201,11 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
-    stack.run().await
+async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+    runner.run().await
 }
 
-async fn test_download(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) -> usize {
+async fn test_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> usize {
     println!("Testing download...");
 
     socket.abort();
@@ -244,7 +243,7 @@ async fn test_download(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) 
     kbps
 }
 
-async fn test_upload(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) -> usize {
+async fn test_upload(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> usize {
     println!("Testing upload...");
     socket.abort();
     socket.set_timeout(Some(Duration::from_secs(10)));
@@ -281,7 +280,7 @@ async fn test_upload(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) ->
     kbps
 }
 
-async fn test_upload_download(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) -> usize {
+async fn test_upload_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> usize {
     println!("Testing upload+download...");
 
     socket.abort();
