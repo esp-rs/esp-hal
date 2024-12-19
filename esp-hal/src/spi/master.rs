@@ -459,7 +459,7 @@ impl Default for Config {
 pub enum ConfigError {}
 
 /// SPI peripheral driver
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Spi<'d, Dm, T = AnySpi> {
     spi: PeripheralRef<'d, T>,

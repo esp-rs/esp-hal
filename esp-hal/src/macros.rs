@@ -90,7 +90,7 @@ macro_rules! any_peripheral {
     }) => {
         paste::paste! {
             $(#[$meta])*
-            #[derive(Debug, PartialEq)]
+            #[derive(Debug)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             $vis struct $name([< $name Inner >]);
             impl $crate::private::Sealed for $name {}
@@ -109,7 +109,7 @@ macro_rules! any_peripheral {
             }
 
             $(#[$meta])*
-            #[derive(Debug, PartialEq)]
+            #[derive(Debug)]
             enum [< $name Inner >] {
                 $(
                     $(#[cfg($variant_meta)])*
@@ -128,36 +128,6 @@ macro_rules! any_peripheral {
                     }
                 }
             }
-
-            $(
-                // Any == Specific
-                $(#[cfg($variant_meta)])*
-                impl PartialEq<$inner> for [< $name Inner >] {
-                    fn eq(&self, _other: &$inner) -> bool {
-                        matches!(self, [< $name Inner >]::$variant(_))
-                    }
-                }
-                $(#[cfg($variant_meta)])*
-                impl PartialEq<$inner> for $name {
-                    fn eq(&self, other: &$inner) -> bool {
-                        &self.0 == other
-                    }
-                }
-
-                // Specific == Any
-                $(#[cfg($variant_meta)])*
-                impl PartialEq<[< $name Inner >]> for $inner {
-                    fn eq(&self, other: &[< $name Inner >]) -> bool {
-                        other == self
-                    }
-                }
-                $(#[cfg($variant_meta)])*
-                impl PartialEq<$name> for $inner {
-                    fn eq(&self, other: &$name) -> bool {
-                        other == self
-                    }
-                }
-            )*
 
             $(
                 $(#[cfg($variant_meta)])*
