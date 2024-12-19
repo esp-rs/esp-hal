@@ -300,3 +300,20 @@ is not compatible with the hardware.
 - spi_dma.transfer(dma_rx_buf, dma_tx_buf);
 + spi_dma.transfer(5, dma_rx_buf, 5, dma_tx_buf);
 ```
+
+## I2C Error changes
+
+To avoid abbreviations and contractions (as per the esp-hal guidelines), some error variants have changed
+
+```diff
+- Error::ExecIncomplete
++ Error::ExecutionIncomplete
+- Error::CommandNrExceeded
++ Error::CommandNumberExceeded
+- Error::ExceedingFifo
++ Error::FifoExceeded
+- Error::TimeOut
++ Error::Timeout
+- Error::InvalidZeroLength
++ Error::ZeroLengthInvalid
+```

@@ -91,19 +91,19 @@ const MAX_ITERATIONS: u32 = 1_000_000;
 #[non_exhaustive]
 pub enum Error {
     /// The transmission exceeded the FIFO size.
-    ExceedingFifo,
+    FifoExceeded,
     /// The acknowledgment check failed.
     AckCheckFailed,
     /// A timeout occurred during transmission.
-    TimeOut,
+    Timeout,
     /// The arbitration for the bus was lost.
     ArbitrationLost,
     /// The execution of the I2C command was incomplete.
-    ExecIncomplete,
+    ExecutionIncomplete,
     /// The number of commands issued exceeded the limit.
-    CommandNrExceeded,
+    CommandNumberExceeded,
     /// Zero length read or write operation.
-    InvalidZeroLength,
+    ZeroLengthInvalid,
 }
 
 impl core::error::Error for Error {}
@@ -111,15 +111,17 @@ impl core::error::Error for Error {}
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::ExceedingFifo => write!(f, "The transmission exceeded the FIFO size"),
+            Error::FifoExceeded => write!(f, "The transmission exceeded the FIFO size"),
             Error::AckCheckFailed => write!(f, "The acknowledgment check failed"),
-            Error::TimeOut => write!(f, "A timeout occurred during transmission"),
+            Error::Timeout => write!(f, "A timeout occurred during transmission"),
             Error::ArbitrationLost => write!(f, "The arbitration for the bus was lost"),
-            Error::ExecIncomplete => write!(f, "The execution of the I2C command was incomplete"),
-            Error::CommandNrExceeded => {
+            Error::ExecutionIncomplete => {
+                write!(f, "The execution of the I2C command was incomplete")
+            }
+            Error::CommandNumberExceeded => {
                 write!(f, "The number of commands issued exceeded the limit")
             }
-            Error::InvalidZeroLength => write!(f, "Zero length read or write operation"),
+            Error::ZeroLengthInvalid => write!(f, "Zero length read or write operation"),
         }
     }
 }
@@ -204,7 +206,7 @@ impl embedded_hal::i2c::Error for Error {
         use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
 
         match self {
-            Self::ExceedingFifo => ErrorKind::Overrun,
+            Self::FifoExceeded => ErrorKind::Overrun,
             Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
             Self::AckCheckFailed => ErrorKind::NoAcknowledge(NoAcknowledgeSource::Unknown),
             _ => ErrorKind::Other,
@@ -643,7 +645,7 @@ impl<'a> I2cFuture<'a> {
         }
 
         if r.time_out().bit_is_set() {
-            return Err(Error::TimeOut);
+            return Err(Error::Timeout);
         }
 
         if r.nack().bit_is_set() {
@@ -1337,7 +1339,7 @@ impl Driver<'_> {
         let max_len = if start { 254usize } else { 255usize };
         if bytes.len() > max_len {
             // we could support more by adding multiple write operations
-            return Err(Error::ExceedingFifo);
+            return Err(Error::FifoExceeded);
         }
 
         let write_len = if start { bytes.len() + 1 } else { bytes.len() };
@@ -1386,7 +1388,7 @@ impl Driver<'_> {
         I: Iterator<Item = &'a COMD>,
     {
         if buffer.is_empty() {
-            return Err(Error::InvalidZeroLength);
+            return Err(Error::ZeroLengthInvalid);
         }
         let (max_len, initial_len) = if will_continue {
             (255usize, buffer.len())
@@ -1395,7 +1397,7 @@ impl Driver<'_> {
         };
         if buffer.len() > max_len {
             // we could support more by adding multiple read operations
-            return Err(Error::ExceedingFifo);
+            return Err(Error::FifoExceeded);
         }
 
         if start {
@@ -1579,7 +1581,7 @@ impl Driver<'_> {
 
             tout -= 1;
             if tout == 0 {
-                return Err(Error::TimeOut);
+                return Err(Error::Timeout);
             }
 
             embassy_futures::yield_now().await;
@@ -1607,7 +1609,7 @@ impl Driver<'_> {
 
             tout -= 1;
             if tout == 0 {
-                return Err(Error::TimeOut);
+                return Err(Error::Timeout);
             }
         }
         self.check_all_commands_done()?;
@@ -1623,7 +1625,7 @@ impl Driver<'_> {
             let cmd = cmd_reg.read();
 
             if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
-                return Err(Error::ExecIncomplete);
+                return Err(Error::ExecutionIncomplete);
             }
         }
 
@@ -1646,7 +1648,7 @@ impl Driver<'_> {
             if #[cfg(esp32)] {
                 // Handle error cases
                 let retval = if interrupts.time_out().bit_is_set() {
-                    Err(Error::TimeOut)
+                    Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
                     Err(Error::AckCheckFailed)
                 } else if interrupts.arbitration_lost().bit_is_set() {
@@ -1657,7 +1659,7 @@ impl Driver<'_> {
             } else {
                 // Handle error cases
                 let retval = if interrupts.time_out().bit_is_set() {
-                    Err(Error::TimeOut)
+                    Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
                     Err(Error::AckCheckFailed)
                 } else if interrupts.arbitration_lost().bit_is_set() {
@@ -2181,7 +2183,7 @@ fn add_cmd<'a, I>(cmd_iterator: &mut I, command: Command) -> Result<(), Error>
 where
     I: Iterator<Item = &'a COMD>,
 {
-    let cmd = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
+    let cmd = cmd_iterator.next().ok_or(Error::CommandNumberExceeded)?;
 
     cmd.write(|w| match command {
         Command::Start => w.opcode().rstart(),
