@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gpio::{Level, Pull, AlternateFunction, RtcFunction}` now implement `Hash` (#2842)
 - `gpio::{GpioPin, AnyPin, Io, Output, OutputOpenDrain, Input, Flex}` now implement `Debug`, `defmt::Format` (#2842)
 
+- The `ExtU64` and `RateExtU32` traits have been added to `esp_hal::time` (#2845)
+
 ### Changed
 
 - Bump MSRV to 1.83 (#2615)
@@ -103,6 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
 - Removed `Camera::set_` functions (#2610)
 - `DmaTxBuf::{compute_chunk_size, compute_descriptor_count, new_with_block_size}` (#2543)
+
+- The `prelude` module has been removed (#2845)
 
 ## [0.22.0] - 2024-11-20
 

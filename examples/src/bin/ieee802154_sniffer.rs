@@ -10,7 +10,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    prelude::*,
+    entry,
     reset::software_reset,
     uart::{self, Uart},
 };

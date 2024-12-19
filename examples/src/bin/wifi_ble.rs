@@ -25,8 +25,9 @@ use bleps::{
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
+    clock::CpuClock,
+    entry,
     gpio::{Input, Pull},
-    prelude::*,
     rng::Rng,
     time,
     timer::timg::TimerGroup,

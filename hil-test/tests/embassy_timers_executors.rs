@@ -17,7 +17,7 @@ use esp_hal::{
 };
 use esp_hal::{
     peripherals::Peripherals,
-    prelude::*,
+    time::ExtU64,
     timer::{timg::TimerGroup, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]

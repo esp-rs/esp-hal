@@ -19,9 +19,9 @@ use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
+    entry,
     gpio::{Level, Output},
     interrupt::{software::SoftwareInterruptControl, Priority},
-    prelude::*,
     timer::{timg::TimerGroup, AnyTimer},
     Cpu,
 };

@@ -24,8 +24,9 @@ use embedded_graphics::{
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
+    entry,
     i2c::master::{Config, I2c},
-    prelude::*,
+    time::ExtU64,
 };
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 

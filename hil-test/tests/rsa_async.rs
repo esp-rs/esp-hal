@@ -7,7 +7,6 @@
 
 use crypto_bigint::{Uint, U1024, U512};
 use esp_hal::{
-    prelude::*,
     rsa::{
         operand_sizes::*,
         Rsa,

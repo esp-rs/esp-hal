@@ -26,12 +26,13 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
+    entry,
     peripheral::Peripheral,
-    prelude::*,
     spi::{
         master::{Config, Spi},
         Mode,
     },
+    time::RateExtU32,
 };
 extern crate alloc;
 use log::*;

@@ -11,6 +11,7 @@ use core::{arch::asm, cell::RefCell};
 
 use critical_section::Mutex;
 use esp_hal::{
+    clock::CpuClock,
     interrupt::{
         self,
         software::{SoftwareInterrupt, SoftwareInterruptControl},
@@ -18,7 +19,6 @@ use esp_hal::{
         Priority,
     },
     peripherals::Interrupt,
-    prelude::*,
 };
 use hil_test as _;
 

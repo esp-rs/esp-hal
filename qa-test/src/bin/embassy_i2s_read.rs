@@ -22,7 +22,7 @@ use esp_backtrace as _;
 use esp_hal::{
     dma_buffers,
     i2s::master::{DataFormat, I2s, Standard},
-    prelude::*,
+    time::RateExtU32,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
