@@ -6,7 +6,6 @@
 #![no_main]
 
 use esp_hal::{
-    prelude::*,
     uart::{self, UartRx, UartTx},
     Blocking,
 };

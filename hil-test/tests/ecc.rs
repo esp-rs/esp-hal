@@ -17,8 +17,8 @@ use elliptic_curve::sec1::ToEncodedPoint;
 #[cfg(feature = "esp32h2")]
 use esp_hal::ecc::WorkMode;
 use esp_hal::{
+    clock::CpuClock,
     ecc::{Ecc, EllipticCurve, Error},
-    prelude::*,
     rng::Rng,
     Blocking,
 };

@@ -55,7 +55,6 @@ pub enum WakeupLevel {
 #[doc = crate::before_snippet!()]
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
-/// # use esp_hal::prelude::*;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::Cpu;
 ///
@@ -104,7 +103,6 @@ pub enum Error {
 #[doc = crate::before_snippet!()]
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
-/// # use esp_hal::prelude::*;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::Cpu;
 /// # use esp_hal::gpio::{Input, Pull};
@@ -155,7 +153,6 @@ impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
 #[doc = crate::before_snippet!()]
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
-/// # use esp_hal::prelude::*;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::Cpu;
 /// # use esp_hal::gpio::{Input, Pull, RtcPin};
@@ -210,7 +207,6 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 #[doc = crate::before_snippet!()]
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
-/// # use esp_hal::prelude::*;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::Cpu;
 /// # use esp_hal::gpio::{Input, Pull, RtcPinWithResistors};
@@ -268,7 +264,6 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::gpio::{self, Input, Pull};
-/// # use esp_hal::prelude::*;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::Cpu;
 /// # use esp_hal::peripheral::Peripheral;

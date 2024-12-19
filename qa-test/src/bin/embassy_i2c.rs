@@ -21,7 +21,7 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     i2c::master::{Config, I2c},
-    prelude::*,
+    time::RateExtU32,
     timer::timg::TimerGroup,
 };
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};

@@ -15,8 +15,8 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    prelude::*,
     rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreatorAsync},
+    time::RateExtU32,
     timer::timg::TimerGroup,
 };
 use esp_println::println;

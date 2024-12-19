@@ -12,12 +12,12 @@ use esp_hal::{
     dma_descriptors_chunk_size,
     gpio::interconnect::InputSignal,
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
-    prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
         DataMode,
         Mode,
     },
+    time::RateExtU32,
     Blocking,
 };
 use hil_test as _;

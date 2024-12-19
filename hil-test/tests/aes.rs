@@ -7,7 +7,7 @@
 
 use esp_hal::{
     aes::{Aes, Mode},
-    prelude::*,
+    clock::CpuClock,
 };
 use hil_test as _;
 

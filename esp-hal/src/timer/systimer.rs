@@ -429,7 +429,7 @@ impl Alarm {
 
             static mut HANDLERS: [Option<extern "C" fn()>; 3] = [None, None, None];
 
-            #[crate::prelude::ram]
+            #[crate::macros::ram]
             unsafe extern "C" fn _handle_interrupt<const CH: u8>() {
                 if unsafe { &*SYSTIMER::PTR }
                     .int_raw()

@@ -7,7 +7,6 @@
 
 use embedded_hal_nb::serial::{Read, Write};
 use esp_hal::{
-    prelude::*,
     uart::{self, ClockSource, Uart},
     Blocking,
 };
