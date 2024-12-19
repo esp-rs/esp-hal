@@ -97,9 +97,7 @@ pub enum SpiInterrupt {
     /// transmitting and receiving data.
     TransDone,
 
-    /// Triggered at the end of End_SEG_TRANS transfer in GP-SPI2 slave
-    /// segmented transfer mode or at the end of configurable segmented transfer
-    /// as master.
+    /// Triggered at the end of configurable segmented transfer.
     #[cfg(any(esp32s2, gdma))]
     DmaSegTransDone,
 
