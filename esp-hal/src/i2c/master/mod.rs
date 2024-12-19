@@ -308,7 +308,7 @@ impl Default for Config {
 }
 
 /// I2C driver
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct I2c<'d, Dm: DriverMode, T = AnyI2c> {
     i2c: PeripheralRef<'d, T>,
