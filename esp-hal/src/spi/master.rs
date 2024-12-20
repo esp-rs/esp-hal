@@ -61,10 +61,7 @@ use core::marker::PhantomData;
 pub use dma::*;
 #[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
-#[cfg(gdma)]
-use enumset::EnumSet;
-#[cfg(gdma)]
-use enumset::EnumSetType;
+use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 #[cfg(place_spi_driver_in_ram)]
 use procmacros::ram;
@@ -90,7 +87,6 @@ use crate::{
 };
 
 /// Enumeration of possible SPI interrupt events.
-#[cfg(gdma)]
 #[derive(Debug, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -99,7 +95,19 @@ pub enum SpiInterrupt {
     ///
     /// This interrupt is triggered when an SPI transaction has finished
     /// transmitting and receiving data.
-    TransDone,
+    TransferDone,
+
+    /// Triggered at the end of configurable segmented transfer.
+    #[cfg(any(esp32s2, gdma))]
+    DmaSegmentedTransferDone,
+
+    /// Used and triggered by software. Only used for user defined function.
+    #[cfg(gdma)]
+    App2,
+
+    /// Used and triggered by software. Only used for user defined function.
+    #[cfg(gdma)]
+    App1,
 }
 
 /// The size of the FIFO buffer for SPI
@@ -982,7 +990,6 @@ mod dma {
         }
     }
 
-    #[cfg(gdma)]
     impl<T> SpiDma<'_, Blocking, T>
     where
         T: Instance,
@@ -1660,7 +1667,6 @@ mod dma {
         }
     }
 
-    #[cfg(gdma)]
     impl<T> SpiDmaBus<'_, Blocking, T>
     where
         T: Instance,
@@ -2720,48 +2726,123 @@ impl Driver {
     }
 
     /// Enable or disable listening for the given interrupts.
-    #[cfg(gdma)]
     fn enable_listen(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
         let reg_block = self.register_block();
 
-        reg_block.dma_int_ena().modify(|_, w| {
-            for interrupt in interrupts {
-                match interrupt {
-                    SpiInterrupt::TransDone => w.trans_done().bit(enable),
-                };
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                reg_block.slave().modify(|_, w| {
+                    for interrupt in interrupts {
+                        match interrupt {
+                            SpiInterrupt::TransferDone => w.trans_inten().bit(enable),
+                        };
+                    }
+                    w
+                });
+            } else if #[cfg(esp32s2)] {
+                reg_block.slave().modify(|_, w| {
+                    for interrupt in interrupts {
+                        match interrupt {
+                            SpiInterrupt::TransferDone => w.int_trans_done_en().bit(enable),
+                            SpiInterrupt::DmaSegmentedTransferDone => w.int_dma_seg_trans_en().bit(enable),
+                        };
+                    }
+                    w
+                });
+            } else {
+                reg_block.dma_int_ena().modify(|_, w| {
+                    for interrupt in interrupts {
+                        match interrupt {
+                            SpiInterrupt::TransferDone => w.trans_done().bit(enable),
+                            SpiInterrupt::DmaSegmentedTransferDone => w.dma_seg_trans_done().bit(enable),
+                            SpiInterrupt::App2 => w.app2().bit(enable),
+                            SpiInterrupt::App1 => w.app1().bit(enable),
+                        };
+                    }
+                    w
+                });
             }
-            w
-        });
+        }
     }
 
     /// Gets asserted interrupts
-    #[cfg(gdma)]
     fn interrupts(&self) -> EnumSet<SpiInterrupt> {
         let mut res = EnumSet::new();
         let reg_block = self.register_block();
 
-        let ints = reg_block.dma_int_st().read();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                if reg_block.slave().read().trans_done().bit() {
+                    res.insert(SpiInterrupt::TransferDone);
+                }
+            } else if #[cfg(esp32s2)] {
+                if reg_block.slave().read().trans_done().bit() {
+                    res.insert(SpiInterrupt::TransferDone);
+                }
+                if reg_block.hold().read().dma_seg_trans_done().bit() {
+                    res.insert(SpiInterrupt::DmaSegmentedTransferDone);
+                }
+            } else {
+                let ints = reg_block.dma_int_raw().read();
 
-        if ints.trans_done().bit() {
-            res.insert(SpiInterrupt::TransDone);
+                if ints.trans_done().bit() {
+                    res.insert(SpiInterrupt::TransferDone);
+                }
+                if ints.dma_seg_trans_done().bit() {
+                    res.insert(SpiInterrupt::DmaSegmentedTransferDone);
+                }
+                if ints.app2().bit() {
+                    res.insert(SpiInterrupt::App2);
+                }
+                if ints.app1().bit() {
+                    res.insert(SpiInterrupt::App1);
+                }
+            }
         }
 
         res
     }
 
     /// Resets asserted interrupts
-    #[cfg(gdma)]
     fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
         let reg_block = self.register_block();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                for interrupt in interrupts {
+                    match interrupt {
+                        SpiInterrupt::TransferDone => {
+                            reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
+                        }
+                    }
+                }
+            } else if #[cfg(esp32s2)] {
+                for interrupt in interrupts {
+                    match interrupt {
+                        SpiInterrupt::TransferDone => {
+                            reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
+                        }
 
-        reg_block.dma_int_clr().write(|w| {
-            for interrupt in interrupts {
-                match interrupt {
-                    SpiInterrupt::TransDone => w.trans_done().clear_bit_by_one(),
-                };
+                        SpiInterrupt::DmaSegmentedTransferDone => {
+                            reg_block
+                                .hold()
+                                .modify(|_, w| w.dma_seg_trans_done().clear_bit());
+                        }
+                    }
+                }
+            } else {
+                reg_block.dma_int_clr().write(|w| {
+                    for interrupt in interrupts {
+                        match interrupt {
+                            SpiInterrupt::TransferDone => w.trans_done().clear_bit_by_one(),
+                            SpiInterrupt::DmaSegmentedTransferDone => w.dma_seg_trans_done().clear_bit_by_one(),
+                            SpiInterrupt::App2 => w.app2().clear_bit_by_one(),
+                            SpiInterrupt::App1 => w.app1().clear_bit_by_one(),
+                        };
+                    }
+                    w
+                });
             }
-            w
-        });
+        }
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
@@ -3000,59 +3081,6 @@ impl Driver {
         Ok(())
     }
 
-    // FIXME EnumSet flag
-    fn clear_done_interrupt(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                self.register_block().slave().modify(|_, w| {
-                    w.trans_done().clear_bit()
-                });
-            } else {
-                self.register_block().dma_int_clr().write(|w| {
-                    w.trans_done().clear_bit_by_one()
-                });
-            }
-        }
-    }
-
-    fn is_transfer_done(&self) -> bool {
-        let reg_block = self.register_block();
-
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                reg_block.slave().read().trans_done().bit_is_set()
-            } else {
-                reg_block.dma_int_raw().read().trans_done().bit_is_set()
-            }
-        }
-    }
-
-    fn enable_listen_for_trans_done(&self, enable: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                self.register_block().slave().modify(|_, w| {
-                    w.trans_inten().bit(enable)
-                });
-            } else if #[cfg(esp32s2)] {
-                self.register_block().slave().modify(|_, w| {
-                    w.int_trans_done_en().bit(enable)
-                });
-            } else {
-                self.register_block().dma_int_ena().write(|w| {
-                    w.trans_done().bit(enable)
-                });
-            }
-        }
-    }
-
-    fn start_listening(&self) {
-        self.enable_listen_for_trans_done(true);
-    }
-
-    fn stop_listening(&self) {
-        self.enable_listen_for_trans_done(false);
-    }
-
     fn busy(&self) -> bool {
         let reg_block = self.register_block();
         reg_block.cmd().read().usr().bit_is_set()
@@ -3095,8 +3123,8 @@ impl Driver {
 
     /// Starts the operation and waits for it to complete.
     async fn execute_operation_async(&self) {
-        self.stop_listening();
-        self.clear_done_interrupt();
+        self.enable_listen(SpiInterrupt::TransferDone.into(), false);
+        self.clear_interrupts(SpiInterrupt::TransferDone.into());
         self.start_operation();
         SpiFuture::new(self).await;
     }
@@ -3335,9 +3363,9 @@ fn handle_async<I: Instance>(instance: I) {
     let info = instance.info();
 
     let driver = Driver { info, state };
-    if driver.is_transfer_done() {
+    if driver.interrupts().contains(SpiInterrupt::TransferDone) {
         state.waker.wake();
-        driver.stop_listening();
+        driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
     }
 }
 
@@ -3408,19 +3436,26 @@ impl Future for SpiFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.driver.is_transfer_done() {
-            self.driver.clear_done_interrupt();
+        if self
+            .driver
+            .interrupts()
+            .contains(SpiInterrupt::TransferDone)
+        {
+            self.driver
+                .clear_interrupts(SpiInterrupt::TransferDone.into());
             return Poll::Ready(());
         }
 
         self.driver.state.waker.register(cx.waker());
-        self.driver.start_listening();
+        self.driver
+            .enable_listen(SpiInterrupt::TransferDone.into(), true);
         Poll::Pending
     }
 }
 
 impl Drop for SpiFuture<'_> {
     fn drop(&mut self) {
-        self.driver.stop_listening();
+        self.driver
+            .enable_listen(SpiInterrupt::TransferDone.into(), false);
     }
 }

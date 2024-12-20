@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gpio::{Event, WakeEvent, GpioRegisterAccess}` now implement `Debug`, `Eq`, `PartialEq` and `Hash` (#2842)
 - `gpio::{Level, Pull, AlternateFunction, RtcFunction}` now implement `Hash` (#2842)
 - `gpio::{GpioPin, AnyPin, Io, Output, OutputOpenDrain, Input, Flex}` now implement `Debug`, `defmt::Format` (#2842)
+- More interrupts are available in `esp_hal::spi::master::SpiInterrupt`, add `enable_listen`,`interrupts` and `clear_interrupts` for ESP32/ESP32-S2 (#2833)
 
 ### Changed
 
