@@ -602,6 +602,7 @@ impl InstanceDma for crate::peripherals::SPI2 {}
 impl InstanceDma for crate::peripherals::SPI3 {}
 
 /// Peripheral data describing a particular SPI instance.
+#[doc(hidden)]
 #[non_exhaustive]
 #[doc(hidden)]
 pub struct Info {

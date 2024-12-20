@@ -2221,6 +2221,7 @@ pub mod lp_uart {
 }
 
 /// UART Peripheral Instance
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnyUart> + 'static {
     /// Returns the peripheral data and state describing this UART instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -2239,6 +2240,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnyUart> + 'static {
 }
 
 /// Peripheral data describing a particular UART instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this UART instance.
@@ -2269,6 +2271,7 @@ pub struct Info {
 }
 
 /// Peripheral state for a UART instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct State {
     /// Waker for the asynchronous RX operations.
