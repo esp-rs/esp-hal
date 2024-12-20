@@ -1360,6 +1360,7 @@ where
 }
 
 /// TWAI peripheral instance.
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnyTwai> + 'static {
     /// The identifier number for this TWAI instance.
     fn number(&self) -> usize;

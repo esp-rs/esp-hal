@@ -2362,15 +2362,18 @@ mod ehal1 {
 }
 
 /// SPI peripheral instance.
+#[doc(hidden)]
 pub trait PeripheralInstance: private::Sealed + Into<AnySpi> + DmaEligible + 'static {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;
 }
 
 /// Marker trait for QSPI-capable SPI peripherals.
+#[doc(hidden)]
 pub trait QspiInstance: PeripheralInstance {}
 
 /// Peripheral data describing a particular SPI instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this SPI instance.

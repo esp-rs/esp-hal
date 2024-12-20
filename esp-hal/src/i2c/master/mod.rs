@@ -985,6 +985,7 @@ fn configure_clock(
 }
 
 /// Peripheral data describing a particular I2C instance.
+#[doc(hidden)]
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Info {
@@ -2188,6 +2189,7 @@ impl Driver<'_> {
 }
 
 /// Peripheral state for an I2C instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct State {
     /// Waker for the asynchronous operations.
@@ -2195,6 +2197,7 @@ pub struct State {
 }
 
 /// I2C Peripheral Instance
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnyI2c> + 'static {
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);
