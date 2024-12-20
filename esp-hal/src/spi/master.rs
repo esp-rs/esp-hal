@@ -1655,7 +1655,7 @@ mod dma {
         }
 
         /// Splits [SpiDmaBus] back into [SpiDma], [DmaRxBuf] and [DmaTxBuf].
-        pub fn split(mut self) -> (SpiDma<'d, M, T>, DmaRxBuf, DmaTxBuf) {
+        pub fn split(mut self) -> (SpiDma<'d, Dm, T>, DmaRxBuf, DmaTxBuf) {
             self.wait_for_idle();
             (self.spi_dma, self.rx_buf, self.tx_buf)
         }
