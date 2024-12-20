@@ -1029,6 +1029,7 @@ macro_rules! gpio {
                 )*
 
                 impl $crate::gpio::Pin for $crate::gpio::GpioPin<$gpionum> {
+                    #[inline(always)]
                     fn number(&self) -> u8 {
                         $gpionum
                     }
@@ -2037,8 +2038,8 @@ where
     /// Toggle pin output
     #[inline]
     pub fn toggle(&mut self) {
-        let level = !self.output_level();
-        self.set_level(level);
+        let level = self.output_level();
+        self.set_level(!level);
     }
 
     /// Configure the [DriveStrength] of the pin
@@ -2124,6 +2125,7 @@ pub(crate) mod internal {
     }
 
     impl Pin for AnyPin {
+        #[inline(always)]
         fn number(&self) -> u8 {
             handle_gpio_input!(&self.0, target, { Pin::number(target) })
         }
@@ -2191,11 +2193,8 @@ pub(crate) mod internal {
             })
         }
 
-        fn set_output_high(&mut self, high: bool, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::set_output_high(target, high, private::Internal)
-            })
-        }
+        // We use the default `set_output_high` implementation to avoid matching on pin
+        // type. We check the pin type to enable output functionality anyway.
 
         fn set_drive_strength(&mut self, strength: DriveStrength, _: private::Internal) {
             handle_gpio_output!(&mut self.0, target, {
@@ -2218,12 +2217,6 @@ pub(crate) mod internal {
         fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
             handle_gpio_output!(&mut self.0, target, {
                 OutputPin::internal_pull_down_in_sleep_mode(target, on, private::Internal)
-            })
-        }
-
-        fn is_set_high(&self, _: private::Internal) -> bool {
-            handle_gpio_output!(&self.0, target, {
-                OutputPin::is_set_high(target, private::Internal)
             })
         }
     }
