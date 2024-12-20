@@ -132,7 +132,7 @@ impl core::fmt::Display for Error {
 #[non_exhaustive]
 pub enum ConfigError {
     /// Provided bus frequency is invalid for the current configuration.
-    InvalidFrequency,
+    FrequencyInvalid,
 }
 
 impl core::error::Error for ConfigError {}
@@ -140,7 +140,7 @@ impl core::error::Error for ConfigError {}
 impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            ConfigError::InvalidFrequency => write!(
+            ConfigError::FrequencyInvalid => write!(
                 f,
                 "Provided bus frequency is invalid for the current configuration"
             ),
@@ -932,7 +932,7 @@ fn configure_clock(
         #[cfg(not(esp32))]
         let scl_wait_high_period = scl_wait_high_period
             .try_into()
-            .map_err(|_| ConfigError::InvalidFrequency)?;
+            .map_err(|_| ConfigError::FrequencyInvalid)?;
 
         register_block.scl_high_period().write(|w| {
             #[cfg(not(esp32))] // ESP32 does not have a wait_high field
