@@ -27,7 +27,7 @@
 //! # extern crate alloc;
 //! # use alloc::{string::String, vec::Vec};
 //! # use esp_alloc as _;
-//! # use esp_hal::{psram, prelude::*};
+//! # use esp_hal::psram;
 //!
 //! // Initialize PSRAM and add it as a heap memory region
 //! fn init_psram_heap(start: *mut u8, size: usize) {

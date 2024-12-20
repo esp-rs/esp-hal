@@ -15,8 +15,8 @@ use esp_hal::{
     dma_buffers,
     gpio::{Level, NoPin},
     peripheral::Peripheral,
-    prelude::*,
     spi::master::{Config, Spi},
+    time::RateExtU32,
     Blocking,
 };
 #[cfg(pcnt)]

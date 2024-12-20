@@ -30,7 +30,7 @@ const IS_FIRST_SENDER: bool = true;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    prelude::*,
+    entry,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
 };
 use esp_println::println;

@@ -18,7 +18,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, macros::ram, prelude::*, rtc_cntl::Rtc};
+use esp_hal::{delay::Delay, entry, macros::ram, rtc_cntl::Rtc, time::ExtU64};
 use esp_println::println;
 
 #[ram(rtc_fast)]

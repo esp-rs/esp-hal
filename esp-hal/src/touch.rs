@@ -29,9 +29,9 @@ use core::marker::PhantomData;
 
 use crate::{
     gpio::TouchPin,
+    interrupt::InterruptConfigurable,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{RTC_CNTL, SENS, TOUCH},
-    prelude::*,
     private::{Internal, Sealed},
     rtc_cntl::Rtc,
     Async,
@@ -528,7 +528,11 @@ mod asynch {
     };
 
     use super::*;
-    use crate::{asynch::AtomicWaker, macros::ram, prelude::handler, Async};
+    use crate::{
+        asynch::AtomicWaker,
+        macros::{handler, ram},
+        Async,
+    };
 
     const NUM_TOUCH_PINS: usize = 10;
 

@@ -4,7 +4,7 @@ use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
 use crate::{
     binary::include::*,
     hal::{
-        prelude::ram,
+        macros::ram,
         system::{RadioClockController, RadioPeripherals},
     },
 };

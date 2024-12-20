@@ -6,8 +6,8 @@
 #![no_main]
 
 use esp_hal::{
-    prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
+    time::RateExtU32,
 };
 use hil_test as _;
 

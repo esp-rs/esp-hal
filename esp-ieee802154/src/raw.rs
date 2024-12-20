@@ -3,8 +3,8 @@ use core::{cell::RefCell, ptr::addr_of};
 use critical_section::Mutex;
 use esp_hal::{
     interrupt::Priority,
+    macros::handler,
     peripherals::RADIO_CLK,
-    prelude::handler,
     system::{RadioClockController, RadioPeripherals},
 };
 use esp_wifi_sys::include::{

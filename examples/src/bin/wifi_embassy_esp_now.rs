@@ -15,7 +15,7 @@ use embassy_futures::select::{select, Either};
 use embassy_time::{Duration, Ticker};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     esp_now::{PeerInfo, BROADCAST_ADDRESS},

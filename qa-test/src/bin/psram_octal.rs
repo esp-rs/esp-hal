@@ -14,7 +14,7 @@ use alloc::{string::String, vec::Vec};
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, psram};
+use esp_hal::{entry, psram};
 use esp_println::println;
 
 fn init_psram_heap(start: *mut u8, size: usize) {

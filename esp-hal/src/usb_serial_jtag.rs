@@ -73,7 +73,7 @@
 //! ### How to output text using USB Serial/JTAG.
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::{delay::Delay, prelude::*, usb_serial_jtag::UsbSerialJtag, Blocking};
+//! # use esp_hal::{delay::Delay, usb_serial_jtag::UsbSerialJtag, Blocking};
 //!
 //! let delay = Delay::new();
 //!

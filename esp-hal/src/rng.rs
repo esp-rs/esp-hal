@@ -42,7 +42,7 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::{prelude::*, rng::Rng};
+//! # use esp_hal::rng::Rng;
 //!
 //! let mut rng = Rng::new(peripherals.RNG);
 //!

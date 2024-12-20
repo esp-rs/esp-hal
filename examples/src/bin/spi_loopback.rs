@@ -19,12 +19,13 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
+    entry,
     peripheral::Peripheral,
-    prelude::*,
     spi::{
         master::{Config, Spi},
         Mode,
     },
+    time::RateExtU32,
 };
 use esp_println::println;
 

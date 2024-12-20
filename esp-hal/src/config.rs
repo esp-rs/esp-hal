@@ -22,6 +22,8 @@
 //! ### Custom initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
+//! use esp_hal::clock::CpuClock;
+//!
 //! let config =
 //! esp_hal::Config::default().with_cpu_clock(CpuClock::max()).
 //!     with_watchdog(esp_hal::config::WatchdogConfig::default().

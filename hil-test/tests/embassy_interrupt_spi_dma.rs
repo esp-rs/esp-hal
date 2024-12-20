@@ -13,11 +13,11 @@ use esp_hal::{
     dma_buffers,
     interrupt::{software::SoftwareInterruptControl, Priority},
     peripheral::Peripheral,
-    prelude::*,
     spi::{
         master::{Config, Spi},
         Mode,
     },
+    time::RateExtU32,
     timer::AnyTimer,
     Async,
 };

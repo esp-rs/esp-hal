@@ -11,6 +11,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
+    entry,
     etm::Etm,
     gpio::{
         etm::{Channels, OutputConfig},
@@ -18,7 +19,7 @@ use esp_hal::{
         Output,
         Pull,
     },
-    prelude::*,
+    time::ExtU64,
     timer::{
         systimer::{etm::Event, SystemTimer},
         PeriodicTimer,

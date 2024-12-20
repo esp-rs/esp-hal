@@ -7,7 +7,6 @@
 
 use embedded_can::Frame;
 use esp_hal::{
-    prelude::*,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
     Blocking,
 };
