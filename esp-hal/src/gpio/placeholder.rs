@@ -22,7 +22,7 @@ impl Level {
     pub(crate) fn input_signals(
         &self,
         _: private::Internal,
-    ) -> &[(AlternateFunction, InputSignal)] {
+    ) -> &'static [(AlternateFunction, InputSignal)] {
         &[]
     }
 
@@ -60,7 +60,7 @@ impl Level {
     pub(crate) fn output_signals(
         &self,
         _: private::Internal,
-    ) -> &[(AlternateFunction, OutputSignal)] {
+    ) -> &'static [(AlternateFunction, OutputSignal)] {
         &[]
     }
 

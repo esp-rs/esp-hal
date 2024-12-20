@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `ExtU64` and `RateExtU32` traits have been added to `esp_hal::time` (#2845)
 
+- Added `AnyPin::steal(pin_number)` (#2854)
+
 ### Changed
 
 - Bump MSRV to 1.83 (#2615)
