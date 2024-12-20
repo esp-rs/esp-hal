@@ -511,7 +511,8 @@ impl Default for Config {
     }
 }
 
-#[derive(procmacros::BuilderLite)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 /// Configuration for the AT-CMD detection functionality
 pub struct AtCmdConfig {
@@ -527,7 +528,7 @@ pub struct AtCmdConfig {
     /// The character that triggers the AT command detection.
     pub cmd_char: u8,
     /// Optional number of characters to detect as part of the AT command.
-    pub char_num: Option<u8>,
+    pub char_num: u8,
 }
 
 impl Default for AtCmdConfig {
@@ -537,7 +538,7 @@ impl Default for AtCmdConfig {
             post_idle_count: None,
             gap_timeout: None,
             cmd_char: CMD_CHAR_DEFAULT,
-            char_num: None,
+            char_num: 1,
         }
     }
 }
@@ -1212,7 +1213,7 @@ where
 
         register_block.at_cmd_char().write(|w| unsafe {
             w.at_cmd_char().bits(config.cmd_char);
-            w.char_num().bits(config.char_num.unwrap_or(1))
+            w.char_num().bits(config.char_num)
         });
 
         if let Some(pre_idle_count) = config.pre_idle_count {
@@ -1574,15 +1575,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        loop {
-            match self.tx.flush() {
-                Ok(_) => break,
-                Err(nb::Error::WouldBlock) => { /* Wait */ }
-                Err(nb::Error::Other(e)) => return Err(e),
-            }
-        }
-
-        Ok(())
+        embedded_io::Write::flush(&mut self.tx)
     }
 }
 
