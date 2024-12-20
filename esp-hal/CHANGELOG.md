@@ -87,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `crate::Mode` was renamed to `crate::DriverMode` (#2828)
 - Renamed some I2C error variants (#2844)
 - I2C: Replaced potential panics with errors. (#2831)
+- UART: Make `AtCmdConfig` and `ConfigError` non-exhaustive (#2851)
+- UART: Make `AtCmdConfig` use builder-lite pattern (#2851)
 
 ### Fixed
 
@@ -94,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User-bound GPIO interrupt handlers should no longer interfere with async pins. (#2625)
 - `spi::master::Spi::{into_async, into_blocking}` are now correctly available on the typed driver, to. (#2674)
 - It is no longer possible to safely conjure `GpioPin` instances (#2688)
+- UART: Public API follows `C-WORD_ORDER` Rust API standard (`VerbObject` order) (#2851)
 
 ### Removed
 
