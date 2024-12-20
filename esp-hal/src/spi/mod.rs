@@ -22,6 +22,7 @@ pub enum Error {
     /// Error occurred due to a DMA-related issue.
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    #[allow(clippy::enum_variant_names, reason = "DMA is unstable")]
     DmaError(DmaError),
     /// Error indicating that the maximum DMA transfer size was exceeded.
     MaxDmaTransferSizeExceeded,

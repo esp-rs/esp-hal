@@ -70,7 +70,9 @@ mod implementation;
 /// The effective measurement range for a given attenuation is dependent on the
 /// device being targeted. Please refer to "ADC Characteristics" section of your
 /// device's datasheet for more information.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Attenuation {
     /// 0dB attenuation
     Attenuation0dB   = 0b00,
@@ -86,7 +88,8 @@ pub enum Attenuation {
 
 /// Calibration source of the ADC.
 #[cfg(not(esp32))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AdcCalSource {
     /// Use Ground as the calibration source
     Gnd,

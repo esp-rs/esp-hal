@@ -7,7 +7,9 @@ use crate::{
 pub(super) const NUM_ATTENS: usize = 10;
 
 /// The sampling/readout resolution of the ADC.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Resolution {
     /// 9-bit resolution
     Resolution9Bit  = 0b00,

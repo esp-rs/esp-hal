@@ -176,7 +176,9 @@ unsafe fn lp_wdt<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 /// RTC SLOW_CLK frequency values
 pub(crate) enum RtcFastClock {
     /// Main XTAL, divided by 4
@@ -199,8 +201,10 @@ impl Clock for RtcFastClock {
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
-#[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 /// RTC SLOW_CLK frequency values
 pub enum RtcSlowClock {
     /// Internal slow RC oscillator
@@ -232,7 +236,9 @@ impl Clock for RtcSlowClock {
 
 #[allow(unused)]
 #[cfg(not(any(esp32c6, esp32h2)))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 /// Clock source to be calibrated using rtc_clk_cal function
 pub(crate) enum RtcCalSel {
     /// Currently selected RTC SLOW_CLK

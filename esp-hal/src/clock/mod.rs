@@ -78,6 +78,11 @@ pub trait Clock {
 /// CPU clock speed
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(
+    clippy::enum_variant_names,
+    reason = "MHz suffix indicates physical unit."
+)]
+/// FIXME: Remove Clock prefix once we can agree on a convention.
 pub enum CpuClock {
     /// 80MHz CPU clock
     #[cfg(not(esp32h2))]
