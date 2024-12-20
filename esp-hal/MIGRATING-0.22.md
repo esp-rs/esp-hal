@@ -336,3 +336,10 @@ The reexports that were previously part of the prelude are available through oth
     - `esp_hal::timer::Timer`
     - `esp_hal::interrupt::InterruptConfigurable`
 - The `entry` macro can be imported as `esp_hal::entry`, while other macros are found under `esp_hal::macros`
+
+## `AtCmdConfig` now uses builder-lite pattern
+
+```diff
+- uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
++ uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(b'#'));
+```
