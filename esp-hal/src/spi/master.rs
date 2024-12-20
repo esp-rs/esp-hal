@@ -58,6 +58,7 @@
 
 use core::marker::PhantomData;
 
+#[instability::unstable]
 pub use dma::*;
 #[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
@@ -124,6 +125,7 @@ const MAX_DMA_SIZE: usize = 32736;
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Command {
     /// No command is sent.
     None,
@@ -240,6 +242,7 @@ impl Command {
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Address {
     /// No address phase.
     None,
@@ -741,6 +744,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO2 output and input signals.
+    #[instability::unstable]
     pub fn with_sio2<SIO2: PeripheralOutput>(self, sio2: impl Peripheral<P = SIO2> + 'd) -> Self
     where
         T: QspiInstance,
@@ -759,6 +763,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO3 output and input signals.
+    #[instability::unstable]
     pub fn with_sio3<SIO3: PeripheralOutput>(self, sio3: impl Peripheral<P = SIO3> + 'd) -> Self
     where
         T: QspiInstance,
@@ -901,6 +906,7 @@ mod dma {
     /// to a DMA capable SPI bus that implements the
     /// embedded-hal traits.
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[instability::unstable]
     pub struct SpiDma<'d, Dm, T = AnySpi>
     where
         T: Instance,
@@ -927,6 +933,7 @@ mod dma {
         T: Instance,
     {
         /// Converts the SPI instance into async mode.
+        #[instability::unstable]
         pub fn into_async(self) -> SpiDma<'d, Async, T> {
             SpiDma {
                 spi: self.spi,
@@ -945,6 +952,7 @@ mod dma {
         T: Instance,
     {
         /// Converts the SPI instance into async mode.
+        #[instability::unstable]
         pub fn into_blocking(self) -> SpiDma<'d, Blocking, T> {
             SpiDma {
                 spi: self.spi,
@@ -989,6 +997,8 @@ mod dma {
         }
     }
 
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<T> SpiDma<'_, Blocking, T>
     where
         T: Instance,
@@ -1232,6 +1242,7 @@ mod dma {
         }
 
         /// Change the bus configuration.
+        #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.driver().apply_config(config)
         }
@@ -1241,6 +1252,7 @@ mod dma {
         /// This method sets up both RX and TX buffers for DMA transfers.
         /// It returns an instance of `SpiDmaBus` that can be used for SPI
         /// communication.
+        #[instability::unstable]
         pub fn with_buffers(
             self,
             dma_rx_buf: DmaRxBuf,
@@ -1269,6 +1281,7 @@ mod dma {
     ///
     /// This structure holds references to the SPI instance, DMA buffers, and
     /// transfer status.
+    #[instability::unstable]
     pub struct SpiDmaTransfer<'d, Dm, Buf, T = AnySpi>
     where
         T: Instance,
@@ -1302,6 +1315,7 @@ mod dma {
         ///
         /// This method blocks until the transfer is finished and returns the
         /// `SpiDma` instance and the associated buffer.
+        #[instability::unstable]
         pub fn wait(mut self) -> (SpiDma<'d, Dm, T>, Buf) {
             self.spi_dma.wait_for_idle();
             let retval = unsafe {
@@ -1315,6 +1329,7 @@ mod dma {
         }
 
         /// Cancels the DMA transfer.
+        #[instability::unstable]
         pub fn cancel(&mut self) {
             if !self.spi_dma.is_done() {
                 self.spi_dma.cancel_transfer();
@@ -1347,6 +1362,7 @@ mod dma {
         /// Waits for the DMA transfer to complete asynchronously.
         ///
         /// This method awaits the completion of both RX and TX operations.
+        #[instability::unstable]
         pub async fn wait_for_done(&mut self) {
             self.spi_dma.wait_for_idle_async().await;
         }
@@ -1377,6 +1393,7 @@ mod dma {
         /// bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn write<TX: DmaTxBuffer>(
             mut self,
             bytes_to_write: usize,
@@ -1410,6 +1427,7 @@ mod dma {
         /// received is 32736 bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn read<RX: DmaRxBuffer>(
             mut self,
             bytes_to_read: usize,
@@ -1444,6 +1462,7 @@ mod dma {
         /// sent/received is 32736 bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             mut self,
             bytes_to_read: usize,
@@ -1495,6 +1514,7 @@ mod dma {
         /// Perform a half-duplex read operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn half_duplex_read<RX: DmaRxBuffer>(
             mut self,
             data_mode: DataMode,
@@ -1560,6 +1580,7 @@ mod dma {
         /// Perform a half-duplex write operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn half_duplex_write<TX: DmaTxBuffer>(
             mut self,
             data_mode: DataMode,
@@ -1593,6 +1614,7 @@ mod dma {
     /// buffers.
     #[derive(Debug)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[instability::unstable]
     pub struct SpiDmaBus<'d, Dm, T = AnySpi>
     where
         T: Instance,
@@ -1615,6 +1637,7 @@ mod dma {
         T: Instance,
     {
         /// Converts the SPI instance into async mode.
+        #[instability::unstable]
         pub fn into_async(self) -> SpiDmaBus<'d, Async, T> {
             SpiDmaBus {
                 spi_dma: self.spi_dma.into_async(),
@@ -1629,6 +1652,7 @@ mod dma {
         T: Instance,
     {
         /// Converts the SPI instance into async mode.
+        #[instability::unstable]
         pub fn into_blocking(self) -> SpiDmaBus<'d, Blocking, T> {
             SpiDmaBus {
                 spi_dma: self.spi_dma.into_blocking(),
@@ -1654,6 +1678,7 @@ mod dma {
         }
 
         /// Splits [SpiDmaBus] back into [SpiDma], [DmaRxBuf] and [DmaTxBuf].
+        #[instability::unstable]
         pub fn split(mut self) -> (SpiDma<'d, Dm, T>, DmaRxBuf, DmaTxBuf) {
             self.wait_for_idle();
             (self.spi_dma, self.rx_buf, self.tx_buf)
@@ -1672,6 +1697,8 @@ mod dma {
         }
     }
 
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<T> SpiDmaBus<'_, Blocking, T>
     where
         T: Instance,
@@ -1707,11 +1734,13 @@ mod dma {
         }
 
         /// Change the bus configuration.
+        #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.spi_dma.apply_config(config)
         }
 
         /// Reads data from the SPI bus using DMA.
+        #[instability::unstable]
         pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
             self.wait_for_idle();
             for chunk in words.chunks_mut(self.rx_buf.capacity()) {
@@ -1736,6 +1765,7 @@ mod dma {
         }
 
         /// Writes data to the SPI bus using DMA.
+        #[instability::unstable]
         pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
             self.wait_for_idle();
             for chunk in words.chunks(self.tx_buf.capacity()) {
@@ -1757,6 +1787,7 @@ mod dma {
         }
 
         /// Transfers data to and from the SPI bus simultaneously using DMA.
+        #[instability::unstable]
         pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
             self.wait_for_idle();
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
@@ -1796,6 +1827,7 @@ mod dma {
         }
 
         /// Transfers data in place on the SPI bus using DMA.
+        #[instability::unstable]
         pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
             self.wait_for_idle();
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
@@ -1822,6 +1854,7 @@ mod dma {
         }
 
         /// Half-duplex read.
+        #[instability::unstable]
         pub fn half_duplex_read(
             &mut self,
             data_mode: DataMode,
@@ -1856,6 +1889,7 @@ mod dma {
         }
 
         /// Half-duplex write.
+        #[instability::unstable]
         pub fn half_duplex_write(
             &mut self,
             data_mode: DataMode,
@@ -1904,18 +1938,19 @@ mod dma {
 
     /// Async functionality
     mod asynch {
-        use core::{
-            cmp::min,
-            ops::{Deref, DerefMut},
-        };
+        #[cfg(any(doc, feature = "unstable"))]
+        use core::cmp::min;
+        use core::ops::{Deref, DerefMut};
 
         use super::*;
 
+        #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
         struct DropGuard<I, F: FnOnce(I)> {
             inner: ManuallyDrop<I>,
             on_drop: ManuallyDrop<F>,
         }
 
+        #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
         impl<I, F: FnOnce(I)> DropGuard<I, F> {
             fn new(inner: I, on_drop: F) -> Self {
                 Self {
@@ -1949,11 +1984,14 @@ mod dma {
             }
         }
 
+        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl<T> SpiDmaBus<'_, Async, T>
         where
             T: Instance,
         {
             /// Fill the given buffer with data from the bus.
+            #[instability::unstable]
             pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
                 let chunk_size = self.rx_buf.capacity();
@@ -1979,6 +2017,7 @@ mod dma {
             }
 
             /// Transmit the given buffer to the bus.
+            #[instability::unstable]
             pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
 
@@ -2001,6 +2040,7 @@ mod dma {
 
             /// Transfer by writing out a buffer and reading the response from
             /// the bus into another buffer.
+            #[instability::unstable]
             pub async fn transfer_async(
                 &mut self,
                 read: &mut [u8],
@@ -2049,6 +2089,7 @@ mod dma {
 
             /// Transfer by writing out a buffer and reading the response from
             /// the bus into the same buffer.
+            #[instability::unstable]
             pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
 
@@ -2077,6 +2118,8 @@ mod dma {
             }
         }
 
+        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl<T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, Async, T>
         where
             T: Instance,
@@ -2105,10 +2148,14 @@ mod dma {
     }
 
     mod ehal1 {
+        #[cfg(any(doc, feature = "unstable"))]
         use embedded_hal::spi::{ErrorType, SpiBus};
 
+        #[cfg(any(doc, feature = "unstable"))]
         use super::*;
 
+        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl<Dm, T> ErrorType for SpiDmaBus<'_, Dm, T>
         where
             T: Instance,
@@ -2117,6 +2164,8 @@ mod dma {
             type Error = Error;
         }
 
+        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl<Dm, T> SpiBus for SpiDmaBus<'_, Dm, T>
         where
             T: Instance,
@@ -2731,6 +2780,7 @@ impl Driver {
     }
 
     /// Enable or disable listening for the given interrupts.
+    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn enable_listen(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
         let reg_block = self.register_block();
 
@@ -2771,6 +2821,7 @@ impl Driver {
     }
 
     /// Gets asserted interrupts
+    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn interrupts(&self) -> EnumSet<SpiInterrupt> {
         let mut res = EnumSet::new();
         let reg_block = self.register_block();
@@ -2809,6 +2860,7 @@ impl Driver {
     }
 
     /// Resets asserted interrupts
+    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
         let reg_block = self.register_block();
         cfg_if::cfg_if! {
