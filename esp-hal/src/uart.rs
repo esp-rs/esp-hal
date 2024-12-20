@@ -164,7 +164,7 @@
 //! uart0.set_interrupt_handler(interrupt_handler);
 //!
 //! critical_section::with(|cs| {
-//!     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
+//!     uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(b'#'));
 //!     uart0.listen(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
 //!
 //!     SERIAL.borrow_ref_mut(cs).replace(uart0);
@@ -250,6 +250,7 @@ use crate::{
 };
 
 const UART_FIFO_SIZE: u16 = 128;
+const CMD_CHAR_DEFAULT: u8 = 0x2b;
 
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -510,6 +511,8 @@ impl Default for Config {
     }
 }
 
+#[derive(procmacros::BuilderLite)]
+#[non_exhaustive]
 /// Configuration for the AT-CMD detection functionality
 pub struct AtCmdConfig {
     /// Optional idle time before the AT command detection begins, in clock
@@ -527,25 +530,14 @@ pub struct AtCmdConfig {
     pub char_num: Option<u8>,
 }
 
-impl AtCmdConfig {
-    /// Creates a new `AtCmdConfig` with the specified configuration.
-    ///
-    /// This function sets up the AT command detection parameters, including
-    /// pre- and post-idle times, a gap timeout, the triggering command
-    /// character, and the number of characters to detect.
-    pub fn new(
-        pre_idle_count: Option<u16>,
-        post_idle_count: Option<u16>,
-        gap_timeout: Option<u16>,
-        cmd_char: u8,
-        char_num: Option<u8>,
-    ) -> AtCmdConfig {
+impl Default for AtCmdConfig {
+    fn default() -> Self {
         Self {
-            pre_idle_count,
-            post_idle_count,
-            gap_timeout,
-            cmd_char,
-            char_num,
+            pre_idle_count: None,
+            post_idle_count: None,
+            gap_timeout: None,
+            cmd_char: CMD_CHAR_DEFAULT,
+            char_num: None,
         }
     }
 }
@@ -631,6 +623,7 @@ pub struct UartRx<'d, Dm, T = AnyUart> {
 /// A configuration error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum ConfigError {
     /// The requested timeout is not supported.
     UnsupportedTimeout,
@@ -752,7 +745,7 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush_tx(&mut self) -> nb::Result<(), Error> {
+    pub fn flush(&mut self) -> nb::Result<(), Error> {
         if self.is_tx_idle() {
             Ok(())
         } else {
@@ -1254,8 +1247,8 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush_tx(&mut self) -> nb::Result<(), Error> {
-        self.tx.flush_tx()
+    pub fn flush(&mut self) -> nb::Result<(), Error> {
+        self.tx.flush()
     }
 
     /// Read a byte from the UART
@@ -1477,7 +1470,7 @@ where
     }
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx()
+        self.flush()
     }
 }
 
@@ -1491,7 +1484,7 @@ where
     }
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx()
+        self.flush()
     }
 }
 
@@ -1581,7 +1574,15 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.tx.flush()
+        loop {
+            match self.tx.flush() {
+                Ok(_) => break,
+                Err(nb::Error::WouldBlock) => { /* Wait */ }
+                Err(nb::Error::Other(e)) => return Err(e),
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -1598,7 +1599,7 @@ where
 
     fn flush(&mut self) -> Result<(), Self::Error> {
         loop {
-            match self.flush_tx() {
+            match self.flush() {
                 Ok(_) => break,
                 Err(nb::Error::WouldBlock) => { /* Wait */ }
                 Err(nb::Error::Other(e)) => return Err(e),
