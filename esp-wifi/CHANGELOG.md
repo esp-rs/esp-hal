@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `phy_enable_usb` is enabled by default (#2446)
 - Removed `get_` prefixes from functions (#2528)
 
-- Config: Crate prefixes and configuration keys are now separated by two underscores (`__`) (#2848)
+- Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 
 ### Fixed
 

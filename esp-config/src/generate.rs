@@ -264,7 +264,7 @@ pub fn generate_config(
     let mut selected_config = String::from(SELECTED_TABLE_HEADER);
 
     // Ensure that the prefix is `SCREAMING_SNAKE_CASE`:
-    let prefix = format!("{}__", screaming_snake_case(crate_name));
+    let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
 
     // Build a lookup table for any provided validators; we must prefix the
     // name of the config and transform it to SCREAMING_SNAKE_CASE so that
@@ -464,10 +464,10 @@ mod test {
     fn env_override() {
         temp_env::with_vars(
             [
-                ("ESP_TEST__NUMBER", Some("0xaa")),
-                ("ESP_TEST__NUMBER_SIGNED", Some("-999")),
-                ("ESP_TEST__STRING", Some("Hello world!")),
-                ("ESP_TEST__BOOL", Some("true")),
+                ("ESP_TEST_CONFIG_NUMBER", Some("0xaa")),
+                ("ESP_TEST_CONFIG_NUMBER_SIGNED", Some("-999")),
+                ("ESP_TEST_CONFIG_STRING", Some("Hello world!")),
+                ("ESP_TEST_CONFIG_BOOL", Some("true")),
             ],
             || {
                 let configs = generate_config(
@@ -491,28 +491,28 @@ mod test {
 
                 // some values have changed
                 assert_eq!(
-                    match configs.get("ESP_TEST__NUMBER").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_NUMBER").unwrap() {
                         Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     0xaa
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST__NUMBER_SIGNED").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_NUMBER_SIGNED").unwrap() {
                         Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     -999
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST__STRING").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_STRING").unwrap() {
                         Value::String(val) => val,
                         _ => unreachable!(),
                     },
                     "Hello world!"
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST__BOOL").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_BOOL").unwrap() {
                         Value::Bool(val) => *val,
                         _ => unreachable!(),
                     },
@@ -521,21 +521,21 @@ mod test {
 
                 // the rest are the defaults
                 assert_eq!(
-                    match configs.get("ESP_TEST__NUMBER_DEFAULT").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_NUMBER_DEFAULT").unwrap() {
                         Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     999
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST__STRING_DEFAULT").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_STRING_DEFAULT").unwrap() {
                         Value::String(val) => val,
                         _ => unreachable!(),
                     },
                     "Demo"
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST__BOOL_DEFAULT").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_BOOL_DEFAULT").unwrap() {
                         Value::Bool(val) => *val,
                         _ => unreachable!(),
                     },
@@ -549,10 +549,10 @@ mod test {
     fn builtin_validation_passes() {
         temp_env::with_vars(
             [
-                ("ESP_TEST__POSITIVE_NUMBER", Some("7")),
-                ("ESP_TEST__NEGATIVE_NUMBER", Some("-1")),
-                ("ESP_TEST__NON_NEGATIVE_NUMBER", Some("0")),
-                ("ESP_TEST__RANGE", Some("9")),
+                ("ESP_TEST_CONFIG_POSITIVE_NUMBER", Some("7")),
+                ("ESP_TEST_CONFIG_NEGATIVE_NUMBER", Some("-1")),
+                ("ESP_TEST_CONFIG_NON_NEGATIVE_NUMBER", Some("0")),
+                ("ESP_TEST_CONFIG_RANGE", Some("9")),
             ],
             || {
                 generate_config(
@@ -591,7 +591,7 @@ mod test {
 
     #[test]
     fn custom_validation_passes() {
-        temp_env::with_vars([("ESP_TEST__NUMBER", Some("13"))], || {
+        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("13"))], || {
             generate_config(
                 "esp-test",
                 &[(
@@ -615,7 +615,7 @@ mod test {
     #[test]
     #[should_panic]
     fn builtin_validation_bails() {
-        temp_env::with_vars([("ESP_TEST__POSITIVE_NUMBER", Some("-99"))], || {
+        temp_env::with_vars([("ESP_TEST_CONFIG_POSITIVE_NUMBER", Some("-99"))], || {
             generate_config(
                 "esp-test",
                 &[(
@@ -632,7 +632,7 @@ mod test {
     #[test]
     #[should_panic]
     fn custom_validation_bails() {
-        temp_env::with_vars([("ESP_TEST__NUMBER", Some("37"))], || {
+        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("37"))], || {
             generate_config(
                 "esp-test",
                 &[(
@@ -658,8 +658,8 @@ mod test {
     fn env_unknown_bails() {
         temp_env::with_vars(
             [
-                ("ESP_TEST__NUMBER", Some("0xaa")),
-                ("ESP_TEST__RANDOM_VARIABLE", Some("")),
+                ("ESP_TEST_CONFIG_NUMBER", Some("0xaa")),
+                ("ESP_TEST_CONFIG_RANDOM_VARIABLE", Some("")),
             ],
             || {
                 generate_config(
@@ -674,7 +674,7 @@ mod test {
     #[test]
     #[should_panic]
     fn env_invalid_values_bails() {
-        temp_env::with_vars([("ESP_TEST__NUMBER", Some("Hello world"))], || {
+        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("Hello world"))], || {
             generate_config(
                 "esp-test",
                 &[("number", "NA", Value::Integer(999), None)],
@@ -685,12 +685,15 @@ mod test {
 
     #[test]
     fn env_unknown_prefix_is_ignored() {
-        temp_env::with_vars([("ESP_TEST_OTHER__NUMBER", Some("Hello world"))], || {
-            generate_config(
-                "esp-test",
-                &[("number", "NA", Value::Integer(999), None)],
-                false,
-            );
-        });
+        temp_env::with_vars(
+            [("ESP_TEST_OTHER_CONFIG_NUMBER", Some("Hello world"))],
+            || {
+                generate_config(
+                    "esp-test",
+                    &[("number", "NA", Value::Integer(999), None)],
+                    false,
+                );
+            },
+        );
     }
 }

@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump MSRV to 1.83 (#2615)
 
-- Config: Crate prefixes and configuration keys are now separated by two underscores (`__`) (#2848)
+- Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 
 ### Fixed
 
