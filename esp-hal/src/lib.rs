@@ -196,7 +196,7 @@ pub mod time;
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
-macro_rules! unstable {
+macro_rules! unstable_module {
     ($(
         $(#[$meta:meta])*
         pub mod $module:ident;
@@ -216,7 +216,9 @@ macro_rules! unstable {
     };
 }
 
-unstable! {
+pub(crate) use unstable_module;
+
+unstable_module! {
     #[cfg(aes)]
     pub mod aes;
     #[cfg(any(adc, dac))]

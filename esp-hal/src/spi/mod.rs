@@ -12,7 +12,10 @@
 use crate::dma::{DmaEligible, DmaError};
 
 pub mod master;
-pub mod slave;
+
+crate::unstable_module! {
+    pub mod slave;
+}
 
 /// SPI errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
