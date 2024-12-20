@@ -1653,6 +1653,12 @@ mod dma {
                 tx_buf,
             }
         }
+
+        /// Splits [SpiDmaBus] back into [SpiDma], [DmaRxBuf] and [DmaTxBuf].
+        pub fn split(mut self) -> (SpiDma<'d, Dm, T>, DmaRxBuf, DmaTxBuf) {
+            self.wait_for_idle();
+            (self.spi_dma, self.rx_buf, self.tx_buf)
+        }
     }
 
     impl<T> InterruptConfigurable for SpiDmaBus<'_, Blocking, T>
