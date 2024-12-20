@@ -125,6 +125,7 @@ const MAX_DMA_SIZE: usize = 32736;
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Command {
     /// No command is sent.
     None,
@@ -241,6 +242,7 @@ impl Command {
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Address {
     /// No address phase.
     None,
