@@ -468,20 +468,6 @@ impl Config {
         self
     }
 
-    /// Sets duration between transfers in bits. The duration of time would
-    /// be based on your configured baud rate. If you are expecting bytes
-    /// written to be sent immediately, set this to 0. Default value is 256,
-    /// maximum value is 1023.
-    pub fn tx_idle_num(mut self, tx_idle_num: u16) -> Self {
-        // Bits 10:19 => 10-bit register has max value of 1023.
-        assert!(
-            tx_idle_num <= 0x3FF,
-            "Invalid tx_idle_num, 10-bit register has max value of 1023."
-        );
-        self.tx_idle_num = tx_idle_num;
-        self
-    }
-
     /// Calculates the total symbol length in bits based on the configured
     /// data bits, parity, and stop bits.
     pub fn symbol_length(&self) -> u8 {
