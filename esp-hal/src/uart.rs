@@ -418,6 +418,11 @@ pub struct Config {
     pub rx_fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
     pub rx_timeout: Option<u8>,
+    /// Duration between transfers in bits. The duration of time would
+    /// be based on your configured baud rate. If you are expecting bytes
+    /// written to be sent immediately, set this to 0. Default value is 256,
+    /// maximum value is 1023.
+    pub tx_idle_num: u16,
 }
 
 impl Config {
@@ -460,6 +465,20 @@ impl Config {
     /// Sets the clock source for the UART configuration.
     pub fn clock_source(mut self, source: ClockSource) -> Self {
         self.clock_source = source;
+        self
+    }
+
+    /// Sets duration between transfers in bits. The duration of time would
+    /// be based on your configured baud rate. If you are expecting bytes
+    /// written to be sent immediately, set this to 0. Default value is 256,
+    /// maximum value is 1023.
+    pub fn tx_idle_num(mut self, tx_idle_num: u16) -> Self {
+        // Bits 10:19 => 10-bit register has max value of 1023.
+        assert!(
+            tx_idle_num <= 0x3FF,
+            "Invalid tx_idle_num, 10-bit register has max value of 1023."
+        );
+        self.tx_idle_num = tx_idle_num;
         self
     }
 
@@ -507,6 +526,7 @@ impl Default for Config {
             clock_source: Default::default(),
             rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
             rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
+            tx_idle_num: 256,
         }
     }
 }
@@ -2361,6 +2381,7 @@ impl Info {
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
+        self.change_tx_idle(config.tx_idle_num);
 
         // Reset Tx/Rx FIFOs
         self.rxfifo_reset();
@@ -2626,6 +2647,17 @@ impl Info {
         self.register_block()
             .conf0()
             .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+    }
+
+    fn change_tx_idle(&self, idle_num: u16) {
+        // Bits 10:19 => 10-bit register has max value of 1023.
+        assert!(
+            idle_num <= 0x3FF,
+            "Invalid idle_num, 10-bit register has max value of 1023."
+        );
+        self.register_block()
+            .idle_conf()
+            .modify(|_, w| unsafe { w.tx_idle_num().bits(idle_num) });
     }
 
     fn rxfifo_reset(&self) {
