@@ -973,10 +973,16 @@ where
     }
 
     /// Busy waits for a break condition to be detected on the RX line.
-    /// Condition is met when the receiver detects a NULL character (i.e. logic 0 for one NULL
-    /// character transmission) after stop bits.
+    /// Condition is met when the receiver detects a NULL character (i.e. logic
+    /// 0 for one NULL character transmission) after stop bits.
     pub fn wait_for_break(&mut self) {
-        while !self.register_block().int_raw().read().brk_det().bit_is_set() {
+        while !self
+            .register_block()
+            .int_raw()
+            .read()
+            .brk_det()
+            .bit_is_set()
+        {
             // Just busy waiting
         }
     }
@@ -1167,8 +1173,8 @@ pub enum UartInterrupt {
     TxDone,
 
     /// Break condition has been detected.
-    /// Triggered when the receiver detects a NULL character (i.e. logic 0 for one NULL
-    /// character transmission) after stop bits.
+    /// Triggered when the receiver detects a NULL character (i.e. logic 0 for
+    /// one NULL character transmission) after stop bits.
     RxBreakDetected,
 
     /// The receiver has received more data than what
@@ -1937,7 +1943,10 @@ where
                     RxEvent::GlitchDetected => return Err(Error::RxGlitchDetected),
                     RxEvent::FrameError => return Err(Error::RxFrameError),
                     RxEvent::ParityError => return Err(Error::RxParityError),
-                    RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::BreakDetected | RxEvent::FifoTout => continue,
+                    RxEvent::FifoFull
+                    | RxEvent::CmdCharDetected
+                    | RxEvent::BreakDetected
+                    | RxEvent::FifoTout => continue,
                 }
             }
             // Unfortunately, the uart's rx-timeout counter counts up whenever there is
@@ -1955,8 +1964,8 @@ where
     }
 
     /// Interrupt-driven wait for a break condition on the RX line.
-    /// Condition is met when the receiver detects a NULL character (i.e. logic 0 for one NULL
-    /// character transmission) after stop bits.
+    /// Condition is met when the receiver detects a NULL character (i.e. logic
+    /// 0 for one NULL character transmission) after stop bits.
     pub async fn wait_for_break_async(&mut self) -> Result<(), Error> {
         UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
         Ok(())
