@@ -1966,9 +1966,8 @@ where
     /// Interrupt-driven wait for a break condition on the RX line.
     /// Condition is met when the receiver detects a NULL character (i.e. logic
     /// 0 for one NULL character transmission) after stop bits.
-    pub async fn wait_for_break_async(&mut self) -> Result<(), Error> {
+    pub async fn wait_for_break_async(&mut self) {
         UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
-        Ok(())
     }
 }
 
