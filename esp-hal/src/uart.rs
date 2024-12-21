@@ -2644,10 +2644,6 @@ impl Info {
 
     fn change_tx_idle(&self, idle_num: u16) -> Result<(), ConfigError> {
         // Bits 10:19 => 10-bit register has max value of 1023.
-        // assert!(
-        //     idle_num <= 0x3FF,
-        //     "Invalid idle_num, 10-bit register has max value of 1023."
-        // );
         if idle_num > 0x3FF {
             return Err(ConfigError::UnsupportedIdleNum);
         }
