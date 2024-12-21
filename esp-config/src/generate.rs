@@ -377,9 +377,11 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
         panic!("Invalid configuration options detected: {:?}", failed);
     }
 
-    if !unknown.is_empty() {
-        panic!("Unknown configuration options detected: {:?}", unknown);
-    }
+    // FIXME: disabled for testing purposes, esp-hal rejects esp-hal-embassy
+    // configs because of this
+    // if !unknown.is_empty() {
+    //    panic!("Unknown configuration options detected: {:?}", unknown);
+    // }
 }
 
 fn emit_configuration(
