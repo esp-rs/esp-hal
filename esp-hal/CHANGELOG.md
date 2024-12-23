@@ -92,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART: Make `AtCmdConfig` and `ConfigError` non-exhaustive (#2851)
 - UART: Make `AtCmdConfig` use builder-lite pattern (#2851)
 - UART: Fix naming violations for `DataBits`, `Parity`, and `StopBits` enum variants (#2893)
+- Renamed / changed some I2C error variants (#2844, #2862)
 
 ### Fixed
 

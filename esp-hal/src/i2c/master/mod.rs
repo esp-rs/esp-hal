@@ -1730,7 +1730,7 @@ impl Driver<'_> {
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AcknowledgeCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(AcknowledgeCheckFailedReason::Unknown))
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)
                 } else {
