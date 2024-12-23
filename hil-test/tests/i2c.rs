@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    i2c::master::{Config, Error, I2c, Operation},
+    i2c::master::{AcknowledgeCheckFailedReason, Config, Error, I2c, Operation},
     Async,
     Blocking,
 };
@@ -50,9 +50,12 @@ mod tests {
 
     #[test]
     fn empty_write_returns_ack_error_for_unknown_address(mut ctx: Context) {
+        // we don't specify the exact reason yet
         assert_eq!(
             ctx.i2c.write(NON_EXISTENT_ADDRESS, &[]),
-            Err(Error::AckCheckFailed)
+            Err(Error::AcknowledgeCheckFailed(
+                AcknowledgeCheckFailedReason::Unknown
+            ))
         );
         assert_eq!(ctx.i2c.write(DUT_ADDRESS, &[]), Ok(()));
     }
