@@ -42,6 +42,7 @@ pub struct LowPowerOutput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     /// Create a new output pin for use by the low-power core
+    #[instability::unstable] 
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: OutputPin + RtcPin,
@@ -77,6 +78,7 @@ pub struct LowPowerInput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     /// Create a new input pin for use by the low-power core
+    #[instability::unstable] 
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: InputPin + RtcPin,
@@ -121,6 +123,7 @@ pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     /// Create a new output pin for use by the low-power core
+    #[instability::unstable] 
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: InputPin + OutputPin + RtcPin,
