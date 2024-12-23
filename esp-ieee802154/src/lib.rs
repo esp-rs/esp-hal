@@ -67,7 +67,7 @@ struct QueueConfig {
 }
 
 pub(crate) const CONFIG: QueueConfig = QueueConfig {
-    rx_queue_size: esp_config_int!(usize, "ESP_IEEE802154_RX_QUEUE_SIZE"),
+    rx_queue_size: esp_config_int!(usize, "ESP_IEEE802154_CONFIG_RX_QUEUE_SIZE"),
 };
 
 /// IEEE 802.15.4 driver configuration
