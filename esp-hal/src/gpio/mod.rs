@@ -85,12 +85,18 @@ mod placeholder;
 
 pub use placeholder::NoPin;
 
+#[cfg(soc_etm)]
 crate::unstable_module! {
-    #[cfg(soc_etm)]
     pub mod etm;
-    #[cfg(lp_io)]
+}
+
+#[cfg(lp_io)]
+crate::unstable_module! {
     pub mod lp_io;
-    #[cfg(all(rtc_io, not(esp32)))]
+}
+
+#[cfg(all(rtc_io, not(esp32)))]
+crate::unstable_module! {
     pub mod rtc_io;
 }
 

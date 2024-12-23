@@ -191,7 +191,6 @@ pub(crate) fn init_low_power_pin(pin: u8) {
 }
 
 #[doc(hidden)]
-#[macro_export]
 macro_rules! lp_gpio {
     (
         $($gpionum:literal)+
@@ -262,3 +261,5 @@ macro_rules! lp_gpio {
         )+
     }
 }
+
+pub(crate) use lp_gpio;
