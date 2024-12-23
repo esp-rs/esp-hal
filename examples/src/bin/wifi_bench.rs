@@ -14,6 +14,8 @@
 #![no_std]
 #![no_main]
 
+use core::net::Ipv4Addr;
+
 use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
@@ -40,7 +42,7 @@ use esp_wifi::{
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
-    wire::{DhcpOption, IpAddress, Ipv4Address},
+    wire::{DhcpOption, IpAddress},
 };
 
 const SSID: &str = env!("SSID");
@@ -63,7 +65,7 @@ fn main() -> ! {
 
     esp_alloc::heap_allocator!(72 * 1024);
 
-    let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
+    let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
@@ -155,7 +157,7 @@ fn main() -> ! {
 }
 
 fn test_download<'a, D: smoltcp::phy::Device>(
-    server_address: Ipv4Address,
+    server_address: Ipv4Addr,
     socket: &mut blocking_network_stack::Socket<'a, 'a, D>,
 ) {
     println!("Testing download...");
@@ -189,7 +191,7 @@ fn test_download<'a, D: smoltcp::phy::Device>(
 }
 
 fn test_upload<'a, D: smoltcp::phy::Device>(
-    server_address: Ipv4Address,
+    server_address: Ipv4Addr,
     socket: &mut blocking_network_stack::Socket<'a, 'a, D>,
 ) {
     println!("Testing upload...");
@@ -223,7 +225,7 @@ fn test_upload<'a, D: smoltcp::phy::Device>(
 }
 
 fn test_upload_download<'a, D: smoltcp::phy::Device>(
-    server_address: Ipv4Address,
+    server_address: Ipv4Addr,
     socket: &mut blocking_network_stack::Socket<'a, 'a, D>,
 ) {
     println!("Testing upload+download...");

@@ -2686,9 +2686,9 @@ impl<Dm: Sealed> WifiRxToken<Dm> {
 impl<Dm: Sealed> RxToken for WifiRxToken<Dm> {
     fn consume<R, F>(self, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> R,
+        F: FnOnce(&[u8]) -> R,
     {
-        self.consume_token(f)
+        self.consume_token(|t| f(t))
     }
 }
 
