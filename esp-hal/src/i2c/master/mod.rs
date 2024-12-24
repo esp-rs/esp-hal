@@ -85,6 +85,50 @@ const I2C_CHUNK_SIZE: usize = 254;
 // on ESP32 there is a chance to get trapped in `wait_for_completion` forever
 const MAX_ITERATIONS: u32 = 1_000_000;
 
+/// Address mode.
+///
+/// Note: This trait is sealed and should not be implemented outside of this
+/// crate.
+pub trait AddressMode: _private::AddressModeInternal + Copy + 'static {}
+
+mod _private {
+    pub trait AddressModeInternal {
+        fn is_seven_bit(&self) -> bool;
+
+        fn as_u8(&self) -> u8;
+
+        fn as_u16(&self) -> u16;
+    }
+}
+
+/// 7-bit address mode type.
+///
+/// Note that 7-bit addresses defined by drivers should be specified in
+/// **right-aligned** form, e.g. in the range `0x00..=0x7F`.
+///
+/// For example, a device that has the seven bit address of `0b011_0010`, and
+/// therefore is addressed on the wire using:
+///
+/// * `0b0110010_0` or `0x64` for *writes*
+/// * `0b0110010_1` or `0x65` for *reads*
+pub type SevenBitAddress = u8;
+
+impl AddressMode for SevenBitAddress {}
+
+impl _private::AddressModeInternal for SevenBitAddress {
+    fn is_seven_bit(&self) -> bool {
+        true
+    }
+
+    fn as_u8(&self) -> u8 {
+        *self as u8
+    }
+
+    fn as_u16(&self) -> u16 {
+        unreachable!()
+    }
+}
+
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -377,9 +421,9 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
         Ok(())
     }
 
-    fn transaction_impl<'a>(
+    fn transaction_impl<'a, A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
@@ -500,14 +544,14 @@ impl<'d> I2c<'d, Blocking> {
     }
 
     /// Writes bytes to slave with address `address`
-    pub fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+    pub fn write<A: AddressMode>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
             .write_blocking(address, buffer, true, true)
             .inspect_err(|_| self.internal_recover())
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
-    pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    pub fn read<A: AddressMode>(&mut self, address: A, buffer: &mut [u8]) -> Result<(), Error> {
         self.driver()
             .read_blocking(address, buffer, true, true, false)
             .inspect_err(|_| self.internal_recover())
@@ -515,9 +559,9 @@ impl<'d> I2c<'d, Blocking> {
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
-    pub fn write_read(
+    pub fn write_read<A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
@@ -550,9 +594,9 @@ impl<'d> I2c<'d, Blocking> {
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    pub fn transaction<'a>(
+    pub fn transaction<'a, A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
         self.transaction_impl(address, operations.into_iter().map(Operation::from))
@@ -688,7 +732,7 @@ impl<'d> I2c<'d, Async> {
     }
 
     /// Writes bytes to slave with address `address`
-    pub async fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+    pub async fn write<A: AddressMode>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
             .write(address, buffer, true, true)
             .await
@@ -696,7 +740,11 @@ impl<'d> I2c<'d, Async> {
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
-    pub async fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    pub async fn read<A: AddressMode>(
+        &mut self,
+        address: A,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
         self.driver()
             .read(address, buffer, true, true, false)
             .await
@@ -705,9 +753,9 @@ impl<'d> I2c<'d, Async> {
 
     /// Writes bytes to slave with address `address` and then reads enough
     /// bytes to fill `buffer` *in a single transaction*
-    pub async fn write_read(
+    pub async fn write_read<A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
@@ -743,9 +791,9 @@ impl<'d> I2c<'d, Async> {
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    pub async fn transaction<'a>(
+    pub async fn transaction<'a, A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
         self.transaction_impl_async(address, operations.into_iter().map(Operation::from))
@@ -753,9 +801,9 @@ impl<'d> I2c<'d, Async> {
             .inspect_err(|_| self.internal_recover())
     }
 
-    async fn transaction_impl_async<'a>(
+    async fn transaction_impl_async<'a, A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
@@ -1329,9 +1377,9 @@ impl Driver<'_> {
     /// - `start` indicates whether the operation should start by a START
     ///   condition and sending the address.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn setup_write<'a, I>(
+    fn setup_write<'a, I, A: AddressMode>(
         &self,
-        addr: u8,
+        addr: A,
         bytes: &[u8],
         start: bool,
         cmd_iterator: &mut I,
@@ -1367,7 +1415,7 @@ impl Driver<'_> {
             // Load address and R/W bit into FIFO
             write_fifo(
                 self.register_block(),
-                addr << 1 | OperationType::Write as u8,
+                addr.as_u8() << 1 | OperationType::Write as u8,
             );
         }
         Ok(())
@@ -1381,9 +1429,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn setup_read<'a, I>(
+    fn setup_read<'a, I, A: AddressMode>(
         &self,
-        addr: u8,
+        addr: A,
         buffer: &mut [u8],
         start: bool,
         will_continue: bool,
@@ -1444,7 +1492,10 @@ impl Driver<'_> {
 
         if start {
             // Load address and R/W bit into FIFO
-            write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
+            write_fifo(
+                self.register_block(),
+                addr.as_u8() << 1 | OperationType::Read as u8,
+            );
         }
         Ok(())
     }
@@ -1877,9 +1928,9 @@ impl Driver<'_> {
             .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
-    fn start_write_operation(
+    fn start_write_operation<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -1914,9 +1965,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn start_read_operation(
+    fn start_read_operation<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -1949,9 +2000,9 @@ impl Driver<'_> {
     /// - `stop` indicates whether the operation should end with a STOP
     ///   condition.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn write_operation_blocking(
+    fn write_operation_blocking<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -1981,9 +2032,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn read_operation_blocking(
+    fn read_operation_blocking<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2011,9 +2062,9 @@ impl Driver<'_> {
     /// - `stop` indicates whether the operation should end with a STOP
     ///   condition.
     /// - `cmd_iterator` is an iterator over the command registers.
-    async fn write_operation(
+    async fn write_operation<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -2043,9 +2094,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    async fn read_operation(
+    async fn read_operation<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2065,9 +2116,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    fn read_blocking(
+    fn read_blocking<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2087,9 +2138,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    fn write_blocking(
+    fn write_blocking<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &[u8],
         start: bool,
         stop: bool,
@@ -2110,9 +2161,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    async fn read(
+    async fn read<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2133,9 +2184,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    async fn write(
+    async fn write<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &[u8],
         start: bool,
         stop: bool,
