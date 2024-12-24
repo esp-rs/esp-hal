@@ -121,11 +121,59 @@ impl _private::AddressModeInternal for SevenBitAddress {
     }
 
     fn as_u8(&self) -> u8 {
-        *self as u8
+        *self
     }
 
     fn as_u16(&self) -> u16 {
         unreachable!()
+    }
+}
+
+/// I2C SCL timeout period.
+///
+/// When the level of SCL remains unchanged for more than `timeout` bus
+/// clock cycles, the bus goes to idle state.
+///
+/// Default value is `BusCycles(10)`.
+#[doc = ""]
+#[cfg_attr(
+    not(esp32),
+    doc = "Note that the effective timeout may be longer than the value configured here."
+)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+// TODO: when supporting interrupts, document that SCL = high also triggers an
+// interrupt.
+pub enum Timeout {
+    /// Use the maximum timeout value.
+    #[cfg(any(esp32, esp32s2))]
+    Maximum,
+
+    /// Disable timeout control.
+    #[cfg(not(any(esp32, esp32s2)))]
+    Disabled,
+
+    /// Timeout in bus clock cycles.
+    BusCycles(u32),
+}
+
+impl Timeout {
+    fn cycles(&self) -> u32 {
+        match self {
+            #[cfg(any(esp32, esp32s2))]
+            Timeout::Maximum => u32::MAX,
+
+            #[cfg(not(any(esp32, esp32s2)))]
+            Timeout::Disabled => 1,
+
+            Timeout::BusCycles(cycles) => *cycles,
+        }
+    }
+
+    #[cfg(not(esp32))]
+    fn is_set(&self) -> bool {
+        matches!(self, Timeout::BusCycles(_))
     }
 }
 
@@ -328,20 +376,7 @@ pub struct Config {
     pub frequency: HertzU32,
 
     /// I2C SCL timeout period.
-    ///
-    /// When the level of SCL remains unchanged for more than `timeout` bus
-    /// clock cycles, the bus goes to idle state.
-    ///
-    /// The default value is about 10 bus clock cycles.
-    #[doc = ""]
-    #[cfg_attr(
-        not(esp32),
-        doc = "Note that the effective timeout may be longer than the value configured here."
-    )]
-    #[cfg_attr(not(esp32), doc = "Configuring `None` disables timeout control.")]
-    #[cfg_attr(esp32, doc = "Configuring `None` equals to the maximum timeout value.")]
-    // TODO: when supporting interrupts, document that SCL = high also triggers an interrupt.
-    pub timeout: Option<u32>,
+    pub timeout: Timeout,
 }
 
 impl core::hash::Hash for Config {
@@ -356,7 +391,7 @@ impl Default for Config {
         use fugit::RateExtU32;
         Config {
             frequency: 100.kHz(),
-            timeout: Some(10),
+            timeout: Timeout::BusCycles(10),
         }
     }
 }
@@ -932,7 +967,7 @@ fn configure_clock(
     scl_stop_setup_time: u32,
     scl_start_hold_time: u32,
     scl_stop_hold_time: u32,
-    timeout: Option<u32>,
+    timeout: Timeout,
 ) -> Result<(), ConfigError> {
     unsafe {
         // divider
@@ -988,13 +1023,13 @@ fn configure_clock(
             if #[cfg(esp32)] {
                 register_block
                     .to()
-                    .write(|w| w.time_out().bits(unwrap!(timeout)));
+                    .write(|w| w.time_out().bits(timeout.cycles()));
             } else {
                 register_block
                     .to()
-                    .write(|w| w.time_out_en().bit(timeout.is_some())
+                    .write(|w| w.time_out_en().bit(timeout.is_set())
                     .time_out_value()
-                    .bits(timeout.unwrap_or(1) as _)
+                    .bits(timeout.cycles() as _)
                 );
             }
         }
@@ -1144,7 +1179,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: Option<u32>,
+        timeout: Timeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1156,9 +1191,7 @@ impl Driver<'_> {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let timeout = timeout.map_or(Some(0xF_FFFF), |to_bus| {
-            Some((to_bus * 2 * half_cycle).min(0xF_FFFF))
-        });
+        let timeout = Timeout::BusCycles((timeout.cycles() * 2 * half_cycle).min(0xF_FFFF));
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -1225,7 +1258,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: Option<u32>,
+        timeout: Timeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1268,7 +1301,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            timeout.map(|to_bus| (to_bus * 2 * half_cycle).min(0xFF_FFFF)),
+            Timeout::BusCycles((timeout.cycles() * 2 * half_cycle).min(0xFF_FFFF)),
         )?;
 
         Ok(())
@@ -1282,7 +1315,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: Option<u32>,
+        timeout: Timeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1339,13 +1372,13 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            timeout.map(|to_bus| {
-                let to_peri = (to_bus * 2 * half_cycle).max(1);
+            {
+                let to_peri = (timeout.cycles() * 2 * half_cycle).max(1);
                 let log2 = to_peri.ilog2();
                 // Round up so that we don't shorten timeouts.
                 let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                raw.min(0x1F)
-            }),
+                Timeout::BusCycles(raw.min(0x1F))
+            },
         )?;
 
         Ok(())
