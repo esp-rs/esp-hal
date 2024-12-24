@@ -644,7 +644,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         &[
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
-                            &format!("--features={chip},executors,defmt,integrated-timers,esp-hal/unstable"),
+                            &format!("--features={chip},executors,defmt,esp-hal/unstable"),
                         ],
                         args.fix,
                     )?;
