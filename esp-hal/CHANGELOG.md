@@ -103,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ClockSource` enums are now `#[non_exhaustive]` (#2912)
 
 - `gpio::{Input, Flex}::wakeup_enable` now returns an error instead of panicking. (#2916)
+- I2C: Have a dedicated enum to specify the timeout (#2864)
 
 ### Fixed
 
