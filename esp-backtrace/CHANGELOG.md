@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Features `coredump` and `coredump-all` (#2672)
+
 ### Changed
+
+- Bumped MSRV to 1.79 (#2672)
 
 ### Fixed
 

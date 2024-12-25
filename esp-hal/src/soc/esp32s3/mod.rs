@@ -57,9 +57,9 @@ pub(crate) mod constants {
     pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(80);
 
     /// The lower bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_LOW: usize = 0x3FC8_8000;
+    pub const SOC_DRAM_LOW: usize = super::super::SOC_DRAM_LOW;
     /// The upper bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_HIGH: usize = 0x3FD0_0000;
+    pub const SOC_DRAM_HIGH: usize = super::super::SOC_DRAM_HIGH;
 
     /// A reference clock tick of 1 MHz.
     pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
