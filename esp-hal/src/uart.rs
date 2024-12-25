@@ -418,6 +418,11 @@ pub struct Config {
     pub rx_fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
     pub rx_timeout: Option<u8>,
+    /// Duration between transfers in the unit of bit time, i.e. the time it
+    /// takes to transfer one bit. If you are expecting bytes written to
+    /// be sent immediately, set this to 0. Default value is 256,
+    /// maximum value is 1023.
+    pub tx_idle_num: u16,
 }
 
 impl Config {
@@ -507,6 +512,7 @@ impl Default for Config {
             clock_source: Default::default(),
             rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
             rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
+            tx_idle_num: 256,
         }
     }
 }
@@ -630,6 +636,10 @@ pub enum ConfigError {
     UnsupportedTimeout,
     /// The requested FIFO threshold is not supported.
     UnsupportedFifoThreshold,
+    /// The requested idle number is not supported.
+    /// Valid range is 0..=1023 in the unit of bit time,
+    /// i.e. the time it takes to transfer one bit.
+    UnsupportedIdleNum,
 }
 
 impl core::error::Error for ConfigError {}
@@ -640,6 +650,9 @@ impl core::fmt::Display for ConfigError {
             ConfigError::UnsupportedTimeout => write!(f, "The requested timeout is not supported"),
             ConfigError::UnsupportedFifoThreshold => {
                 write!(f, "The requested FIFO threshold is not supported")
+            }
+            ConfigError::UnsupportedIdleNum => {
+                write!(f, "The requested tx_idle_num is not supported.")
             }
         }
     }
@@ -2364,6 +2377,7 @@ impl Info {
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
+        self.change_tx_idle(config.tx_idle_num)?;
 
         // Reset Tx/Rx FIFOs
         self.rxfifo_reset();
@@ -2629,6 +2643,18 @@ impl Info {
         self.register_block()
             .conf0()
             .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+    }
+
+    fn change_tx_idle(&self, idle_num: u16) -> Result<(), ConfigError> {
+        // Bits 10:19 => 10-bit register has max value of 1023.
+        if idle_num > 0x3FF {
+            return Err(ConfigError::UnsupportedIdleNum);
+        }
+        self.register_block()
+            .idle_conf()
+            .modify(|_, w| unsafe { w.tx_idle_num().bits(idle_num) });
+
+        Ok(())
     }
 
     fn rxfifo_reset(&self) {
