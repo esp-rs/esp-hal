@@ -2077,10 +2077,7 @@ pub mod lp_uart {
                 w.bit_num().bits(0x3);
                 w.stop_bit_num().bits(0x1)
             });
-            // Set tx idle
-            me.uart
-                .idle_conf()
-                .modify(|_, w| unsafe { w.tx_idle_num().bits(0) });
+
             // Disable hw-flow control
             me.uart
                 .hwfc_conf()
