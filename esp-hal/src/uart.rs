@@ -972,26 +972,20 @@ where
         count
     }
 
-    /// Busy waits for a break condition to be detected on the RX 
-    /// line. Condition is met when the receiver detects a NULL character 
+    /// Busy waits for a break condition to be detected on the RX
+    /// line. Condition is met when the receiver detects a NULL character
     /// (i.e. logic 0 for one NULL character transmission) after stop bits.
     ///
     /// Clears the break detection interrupt before returning.
     pub fn wait_for_break(&mut self) {
-        while !self
-            .register_block()
-            .int_raw()
-            .read()
-            .brk_det()
-            .bit_is_set()
-        {
+        while !self.register_block().int_raw().read().brk_det().bit() {
             // Just busy waiting
         }
 
         // Clear the break detection interrupt
         self.register_block()
             .int_clr()
-            .write(|w| w.brk_det().clear_bit_by_one());
+            .write(|w| w.brk_det().bit(true));
     }
 
     #[allow(clippy::useless_conversion)]
@@ -1842,9 +1836,9 @@ where
         self.tx.flush_async().await
     }
 
-    /// Asynchronously waits for a break condition to be detected on the RX line.
-    /// Condition is met when the receiver detects a NULL character (i.e. logic
-    /// 0 for one NULL character transmission) after stop bits.
+    /// Asynchronously waits for a break condition to be detected on the RX
+    /// line. Condition is met when the receiver detects a NULL character
+    /// (i.e. logic 0 for one NULL character transmission) after stop bits.
     pub async fn wait_for_break_async(&mut self) {
         self.rx.wait_for_break_async().await;
     }

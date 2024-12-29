@@ -31,7 +31,7 @@ fn main() -> ! {
         .data_bits(DataBits::DataBits8)
         .parity_none()
         .stop_bits(StopBits::Stop1)
-        .rx_fifo_full_threshold(1);
+        .rx_fifo_full_threshold(1); // when more data than this, an interrupt will be triggered
     let mut uart = Uart::new(
         peripherals.UART1,
         uart_config,
@@ -43,6 +43,7 @@ fn main() -> ! {
     uart.set_interrupt_handler(handler);
 
     critical_section::with(|cs| {
+        uart.clear_interrupts(UartInterrupt::RxFifoFull | UartInterrupt::RxBreakDetected);
         uart.listen(UartInterrupt::RxFifoFull | UartInterrupt::RxBreakDetected);
         SERIAL.borrow_ref_mut(cs).replace(uart);
     });
@@ -56,15 +57,15 @@ fn handler() {
     critical_section::with(|cs| {
         let mut serial = SERIAL.borrow_ref_mut(cs);
         let serial = serial.as_mut().unwrap();
-        
+
         if serial.interrupts().contains(UartInterrupt::RxFifoFull) {
-            esp_println::println!("Byte received: {:?}", serial.read_byte().unwrap());
+            esp_println::println!("Byte received: {:?}", serial.read_byte());
         } else if serial.interrupts().contains(UartInterrupt::RxBreakDetected) {
             esp_println::println!("Break detected");
         } else {
             esp_println::println!("Unknown source of interrupt");
         }
-    
+
         serial.clear_interrupts(UartInterrupt::RxFifoFull | UartInterrupt::RxBreakDetected);
     });
 }

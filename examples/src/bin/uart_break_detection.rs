@@ -10,12 +10,14 @@
 #![no_std]
 #![no_main]
 
-use embassy_executor::Spawner;
 use esp_backtrace as _;
-use esp_hal::uart::{Config as UartConfig, DataBits, StopBits, Uart, UartInterrupt};
+use esp_hal::{
+    entry,
+    uart::{Config as UartConfig, DataBits, StopBits, Uart},
+};
 
-#[esp_hal_embassy::main]
-async fn main(spawner: Spawner) {
+#[entry]
+fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let uart_config = UartConfig::default()
         .baudrate(19200)
