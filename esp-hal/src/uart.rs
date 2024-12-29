@@ -972,9 +972,9 @@ where
         count
     }
 
-    /// Busy waits for a break condition to be detected on the RX line.
-    /// Condition is met when the receiver detects a NULL character (i.e. logic
-    /// 0 for one NULL character transmission) after stop bits.
+    /// Busy waits for a break condition to be detected on the RX 
+    /// line. Condition is met when the receiver detects a NULL character 
+    /// (i.e. logic 0 for one NULL character transmission) after stop bits.
     ///
     /// Clears the break detection interrupt before returning.
     pub fn wait_for_break(&mut self) {
