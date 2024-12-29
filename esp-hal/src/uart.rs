@@ -978,6 +978,11 @@ where
     ///
     /// Clears the break detection interrupt before returning.
     pub fn wait_for_break(&mut self) {
+        // Enable the break detection interrupt
+        self.register_block()
+            .int_ena()
+            .write(|w| w.brk_det().bit(true));
+
         while !self.register_block().int_raw().read().brk_det().bit() {
             // Just busy waiting
         }
