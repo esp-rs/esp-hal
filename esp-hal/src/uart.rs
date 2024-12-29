@@ -975,7 +975,7 @@ where
     /// Busy waits for a break condition to be detected on the RX line.
     /// Condition is met when the receiver detects a NULL character (i.e. logic
     /// 0 for one NULL character transmission) after stop bits.
-    /// 
+    ///
     /// Clears the break detection interrupt before returning.
     pub fn wait_for_break(&mut self) {
         while !self
@@ -989,7 +989,9 @@ where
         }
 
         // Clear the break detection interrupt
-        self.register_block().int_clr().write(|w| w.brk_det().clear_bit_by_one());
+        self.register_block()
+            .int_clr()
+            .write(|w| w.brk_det().clear_bit_by_one());
     }
 
     #[allow(clippy::useless_conversion)]
