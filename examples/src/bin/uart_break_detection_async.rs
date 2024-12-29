@@ -12,7 +12,10 @@
 
 use embassy_executor::Spawner;
 use esp_backtrace as _;
-use esp_hal::uart::{Config as UartConfig, DataBits, StopBits, Uart};
+use esp_hal::{
+    gpio::{Level, Output},
+    uart::{Config as UartConfig, DataBits, StopBits, Uart},
+};
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
@@ -26,8 +29,8 @@ async fn main(_spawner: Spawner) {
     let mut uart = Uart::new(
         peripherals.UART1,
         uart_config,
-        peripherals.GPIO17, // TX
         peripherals.GPIO16, // RX
+        peripherals.GPIO17, // TX
     )
     .expect("Failed to initialize UART")
     .into_async();

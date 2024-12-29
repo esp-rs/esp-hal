@@ -13,6 +13,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     entry,
+    gpio::{Level, Output},
     uart::{Config as UartConfig, DataBits, StopBits, Uart},
 };
 
@@ -28,8 +29,8 @@ fn main() -> ! {
     let mut uart = Uart::new(
         peripherals.UART1,
         uart_config,
-        peripherals.GPIO17, // TX
         peripherals.GPIO16, // RX
+        peripherals.GPIO17, // TX
     )
     .expect("Failed to initialize UART");
 

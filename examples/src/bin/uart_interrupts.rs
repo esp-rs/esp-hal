@@ -35,16 +35,16 @@ fn main() -> ! {
     let mut uart = Uart::new(
         peripherals.UART1,
         uart_config,
-        peripherals.GPIO17, // TX
         peripherals.GPIO16, // RX
+        peripherals.GPIO17, // TX
     )
     .expect("Failed to initialize UART");
 
     uart.set_interrupt_handler(handler);
 
     critical_section::with(|cs| {
-        uart.clear_interrupts(UartInterrupt::RxFifoFull | UartInterrupt::RxBreakDetected);
-        uart.listen(UartInterrupt::RxFifoFull | UartInterrupt::RxBreakDetected);
+        uart.clear_interrupts(UartInterrupt::RxBreakDetected | UartInterrupt::RxFifoFull);
+        uart.listen(UartInterrupt::RxBreakDetected | UartInterrupt::RxFifoFull);
         SERIAL.borrow_ref_mut(cs).replace(uart);
     });
 
@@ -58,14 +58,16 @@ fn handler() {
         let mut serial = SERIAL.borrow_ref_mut(cs);
         let serial = serial.as_mut().unwrap();
 
-        if serial.interrupts().contains(UartInterrupt::RxFifoFull) {
-            esp_println::println!("Byte received: {:?}", serial.read_byte());
-        } else if serial.interrupts().contains(UartInterrupt::RxBreakDetected) {
+        if serial.interrupts().contains(UartInterrupt::RxBreakDetected) {
             esp_println::println!("Break detected");
-        } else {
-            esp_println::println!("Unknown source of interrupt");
+
+            // Clear the RX FIFO
+            while serial.read_byte().is_ok() {}
+        }
+        if serial.interrupts().contains(UartInterrupt::RxFifoFull) {
+            // esp_println::println!("Byte received: {:?}", serial.read_byte());
         }
 
-        serial.clear_interrupts(UartInterrupt::RxFifoFull | UartInterrupt::RxBreakDetected);
+        serial.clear_interrupts(UartInterrupt::RxBreakDetected | UartInterrupt::RxFifoFull);
     });
 }
