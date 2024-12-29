@@ -59,13 +59,10 @@ fn handler() {
         let serial = serial.as_mut().unwrap();
 
         if serial.interrupts().contains(UartInterrupt::RxBreakDetected) {
-            esp_println::println!("Break detected");
-
-            // Clear the RX FIFO
-            while serial.read_byte().is_ok() {}
+            esp_println::print!("\nBREAK");
         }
         if serial.interrupts().contains(UartInterrupt::RxFifoFull) {
-            // esp_println::println!("Byte received: {:?}", serial.read_byte());
+            esp_println::print!(" {:02X}", serial.read_byte().expect("Failed to read byte"));
         }
 
         serial.clear_interrupts(UartInterrupt::RxBreakDetected | UartInterrupt::RxFifoFull);
