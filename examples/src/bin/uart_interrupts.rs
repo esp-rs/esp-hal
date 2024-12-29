@@ -14,7 +14,6 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    delay::Delay,
     entry,
     interrupt::InterruptConfigurable,
     macros::{handler, ram},

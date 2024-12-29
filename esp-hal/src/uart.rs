@@ -975,6 +975,8 @@ where
     /// Busy waits for a break condition to be detected on the RX line.
     /// Condition is met when the receiver detects a NULL character (i.e. logic
     /// 0 for one NULL character transmission) after stop bits.
+    /// 
+    /// Clears the break detection interrupt before returning.
     pub fn wait_for_break(&mut self) {
         while !self
             .register_block()
@@ -985,6 +987,9 @@ where
         {
             // Just busy waiting
         }
+
+        // Clear the break detection interrupt
+        self.register_block().int_clr().write(|w| w.brk_det().clear_bit_by_one());
     }
 
     #[allow(clippy::useless_conversion)]
@@ -1275,6 +1280,11 @@ where
     /// Read a byte from the UART
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         self.rx.read_byte()
+    }
+
+    /// Busy waits for a break condition to be detected on the RX line.
+    pub fn wait_for_break(&mut self) {
+        self.rx.wait_for_break();
     }
 
     /// Change the configuration.
@@ -1828,6 +1838,13 @@ where
     /// Asynchronously flushes the UART transmit buffer.
     pub async fn flush_async(&mut self) -> Result<(), Error> {
         self.tx.flush_async().await
+    }
+
+    /// Asynchronously waits for a break condition to be detected on the RX line.
+    /// Condition is met when the receiver detects a NULL character (i.e. logic
+    /// 0 for one NULL character transmission) after stop bits.
+    pub async fn wait_for_break_async(&mut self) {
+        self.rx.wait_for_break_async().await;
     }
 }
 
