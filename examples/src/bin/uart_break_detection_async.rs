@@ -38,7 +38,7 @@ async fn main(_spawner: Spawner) {
     loop {
         uart.wait_for_break_async().await;
         esp_println::print!("\nBREAK");
-        
+
         let mut buf = [0u8; 1024];
         while let Ok(size) = uart.read_async(&mut buf).await {
             for i in 0..size {
