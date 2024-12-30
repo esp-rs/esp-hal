@@ -59,14 +59,24 @@ pub struct Metadata {
     example_path: PathBuf,
     chip: Chip,
     feature_set: Vec<String>,
+    tag: Option<String>,
+    description: Option<String>,
 }
 
 impl Metadata {
-    pub fn new(example_path: &Path, chip: Chip, feature_set: Vec<String>) -> Self {
+    pub fn new(
+        example_path: &Path,
+        chip: Chip,
+        feature_set: Vec<String>,
+        tag: Option<String>,
+        description: Option<String>,
+    ) -> Self {
         Self {
             example_path: example_path.to_path_buf(),
             chip,
             feature_set,
+            tag,
+            description,
         }
     }
 
@@ -92,6 +102,16 @@ impl Metadata {
     /// If the specified chip is in the list of chips, then it is supported.
     pub fn supports_chip(&self, chip: Chip) -> bool {
         self.chip == chip
+    }
+
+    /// Optional tag of the example.
+    pub fn tag(&self) -> Option<String> {
+        self.tag.clone()
+    }
+
+    /// Optional description of the example.
+    pub fn description(&self) -> Option<String> {
+        self.description.clone()
     }
 }
 
@@ -202,6 +222,17 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
         let mut chips = Chip::iter().collect::<Vec<_>>();
         let mut feature_sets = Vec::new();
         let mut chip_features = HashMap::new();
+        let mut tag = None;
+        let mut description = None;
+
+        // collect `//!` as description
+        for line in text.lines().filter(|line| line.starts_with("//!")) {
+            let line = line.trim_start_matches("//!");
+            let mut descr: String = description.unwrap_or_default();
+            descr.push_str(line);
+            descr.push('\n');
+            description = Some(descr);
+        }
 
         // We will indicate metadata lines using the `//%` prefix:
         for line in text.lines().filter(|line| line.starts_with("//%")) {
@@ -249,6 +280,8 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
                 for chip in chips {
                     chip_features.insert(chip, values.clone());
                 }
+            } else if key.starts_with("TAG") {
+                tag = Some(value.to_string());
             } else {
                 log::warn!("Unrecognized metadata key '{key}', ignoring");
             }
@@ -273,7 +306,13 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
                     feature_set.sort();
                 }
 
-                examples.push(Metadata::new(&path, *chip, feature_set.clone()));
+                examples.push(Metadata::new(
+                    &path,
+                    *chip,
+                    feature_set.clone(),
+                    tag.clone(),
+                    description.clone(),
+                ));
             }
         }
     }
