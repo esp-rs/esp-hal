@@ -15,7 +15,6 @@ use embassy_executor::Spawner;
 use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::{
-    delay::Delay,
     gpio::{Level, Output},
     timer::timg::TimerGroup,
     uart::{Config as UartConfig, DataBits, StopBits, Uart},
@@ -41,8 +40,6 @@ async fn main(_spawner: Spawner) {
     )
     .expect("Failed to initialize UART")
     .into_async();
-
-    let delay = Delay::new();
 
     // Used to toggle an output pin for comparing its timing with
     // the TX line on an oscilloscope. It's also the LED pin.
