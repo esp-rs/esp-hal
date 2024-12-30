@@ -24,7 +24,7 @@ fn main() -> ! {
         .data_bits(DataBits::DataBits8)
         .parity_none()
         .stop_bits(StopBits::Stop1)
-        .rx_fifo_full_threshold(1);
+        .rx_fifo_full_threshold(1); // interrupt every time a byte is received
     let mut uart = Uart::new(
         peripherals.UART1,
         uart_config,
