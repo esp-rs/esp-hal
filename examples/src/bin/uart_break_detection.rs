@@ -36,6 +36,10 @@ fn main() -> ! {
 
     loop {
         uart.wait_for_break();
-        esp_println::println!("Break detected!");
+        esp_println::print!("\nBREAK");
+        
+        while let Ok(byte) = uart.read_byte() {
+            esp_println::print!(" {:02X}", byte);
+        }
     }
 }
