@@ -62,12 +62,7 @@ fn handler() {
             esp_println::print!("\nBREAK");
         }
         if serial.interrupts().contains(UartInterrupt::RxFifoFull) {
-            esp_println::print!(
-                " {:02X}",
-                serial
-                    .read_byte()
-                    .expect("Failed to read byte but FIFO is full")
-            );
+            esp_println::print!(" {:02X}", serial.read_byte().expect("Read byte failed"));
         }
 
         serial.clear_interrupts(UartInterrupt::RxBreakDetected | UartInterrupt::RxFifoFull);
