@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `send_break` and `send_break_async` for sending software breaks with the UART driver (#2872)
 - ESP32-S3: Added SDMMC signals (#2556)
 - Added `set_priority` to the `DmaChannel` trait on GDMA devices (#2403, #2526)
 - Added `into_async` and `into_blocking` functions for `ParlIoTxOnly`, `ParlIoRxOnly` (#2526)
