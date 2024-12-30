@@ -5,7 +5,6 @@
 //! - RX => GPIO16
 
 //% CHIPS: esp32
-//% FEATURES: embassy embassy-generic-timers esp-hal/unstable
 
 #![no_std]
 #![no_main]
