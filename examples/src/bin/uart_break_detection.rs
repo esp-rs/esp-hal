@@ -13,7 +13,6 @@
 use esp_backtrace as _;
 use esp_hal::{
     entry,
-    gpio::{Level, Output},
     uart::{Config as UartConfig, DataBits, StopBits, Uart},
 };
 

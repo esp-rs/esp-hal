@@ -12,10 +12,7 @@
 
 use embassy_executor::Spawner;
 use esp_backtrace as _;
-use esp_hal::{
-    gpio::{Level, Output},
-    uart::{Config as UartConfig, DataBits, StopBits, Uart},
-};
+use esp_hal::uart::{Config as UartConfig, DataBits, StopBits, Uart};
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
@@ -39,11 +36,10 @@ async fn main(_spawner: Spawner) {
         uart.wait_for_break_async().await;
         esp_println::print!("\nBREAK");
 
-        let mut buf = [0u8; 1024];
-        while let Ok(size) = uart.read_async(&mut buf).await {
-            for i in 0..size {
-                esp_println::print!(" {:02X}", buf[i]);
-            }
+        let mut buf = [0u8; 11];
+        let len = uart.read_async(&mut buf).await.unwrap();
+        for byte in buf.iter().take(len) {
+            esp_println::print!(" {:02X}", byte);
         }
     }
 }
