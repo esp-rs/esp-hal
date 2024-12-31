@@ -194,6 +194,9 @@ pub mod debugger;
 pub mod sync;
 pub mod time;
 
+#[cfg(tsens)]
+pub mod tsens;
+
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
 macro_rules! unstable_module {
