@@ -1,154 +1,94 @@
-use alloc::boxed::Box;
-
 use esp_hal::sync::Locked;
+use esp_wifi_sys::c_types::c_void;
+use timer_queue::TimerQueue;
 
-use crate::binary::{
-    c_types,
-    include::{esp_timer_create_args_t, ets_timer},
+use crate::{
+    binary::{c_types, include::ets_timer},
+    timer::systimer_count,
 };
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct TimerCallback {
-    f: unsafe extern "C" fn(*mut c_types::c_void),
-    args: *mut c_types::c_void,
-}
+// Usage of ets_timer
+// next => callback params
+// expire => 1 = armed, 0 = disarmed
+// period => repeat period in us or 0
+// func => callback function
+// priv_ => Timer handle in TimerQueue
+#[repr(transparent)]
+struct EtsTimer(*mut ets_timer);
 
-impl TimerCallback {
-    fn new(f: unsafe extern "C" fn(*mut c_types::c_void), args: *mut c_types::c_void) -> Self {
-        Self { f, args }
+impl EtsTimer {
+    fn timer_handle(&self) -> timer_queue::Timer {
+        unsafe { core::mem::transmute((*(self.0)).priv_) }
     }
 
-    pub(crate) fn call(self) {
-        unsafe { (self.f)(self.args) };
-    }
-}
-
-impl From<&esp_timer_create_args_t> for TimerCallback {
-    fn from(args: &esp_timer_create_args_t) -> Self {
-        Self::new(unwrap!(args.callback), args.arg)
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub(crate) struct Timer {
-    pub ets_timer: *mut ets_timer,
-    pub started: u64,
-    pub timeout: u64,
-    pub active: bool,
-    pub periodic: bool,
-    pub callback: TimerCallback,
-
-    next: Option<Box<Timer>>,
-}
-
-impl Timer {
-    pub(crate) fn id(&self) -> usize {
-        self.ets_timer as usize
-    }
-}
-
-pub(crate) struct TimerQueue {
-    head: Option<Box<Timer>>,
-}
-
-impl TimerQueue {
-    const fn new() -> Self {
-        Self { head: None }
-    }
-
-    fn find(&mut self, ets_timer: *mut ets_timer) -> Option<&mut Box<Timer>> {
-        let mut current = self.head.as_mut();
-        while let Some(timer) = current {
-            if timer.ets_timer == ets_timer {
-                return Some(timer);
-            }
-            current = timer.next.as_mut();
+    fn set_timer_handle(&mut self, timer: timer_queue::Timer) {
+        unsafe {
+            (*(self.0)).priv_ = core::mem::transmute(timer);
         }
-
-        None
     }
 
-    pub(crate) unsafe fn find_next_due(
+    fn callback(&self) -> (Option<unsafe extern "C" fn(*mut c_void)>, *mut c_void) {
+        unsafe {
+            let f = (*(self.0)).func;
+            let p = (*(self.0)).next.cast();
+            (f, p)
+        }
+    }
+
+    fn set_callback(
         &mut self,
-        current_timestamp: u64,
-    ) -> Option<&mut Box<Timer>> {
-        let mut current = self.head.as_mut();
-        while let Some(timer) = current {
-            if timer.active
-                && crate::timer::time_diff(timer.started, current_timestamp) >= timer.timeout
-            {
-                return Some(timer);
-            }
-            current = timer.next.as_mut();
-        }
-
-        None
-    }
-
-    fn remove(&mut self, ets_timer: *mut ets_timer) {
-        if let Some(head) = self.head.as_mut() {
-            if head.ets_timer == ets_timer {
-                self.head = head.next.take();
-                return;
-            }
-        }
-
-        let timer = self.find(ets_timer);
-        if let Some(to_remove) = timer {
-            let tail = to_remove.next.take();
-
-            let mut current = self.head.as_mut();
-            let before = {
-                let mut found = None;
-                while let Some(before) = current {
-                    if before.next.as_mut().unwrap().ets_timer == ets_timer {
-                        found = Some(before);
-                        break;
-                    }
-                    current = before.next.as_mut();
-                }
-                found
-            };
-
-            if let Some(before) = before {
-                let to_remove = before.next.take().unwrap();
-                let to_remove = Box::into_raw(to_remove);
-                unsafe {
-                    crate::compat::malloc::free(to_remove as *mut _);
-                }
-                before.next = tail;
-            }
+        func: Option<unsafe extern "C" fn(*mut c_void)>,
+        param: *mut c_void,
+    ) {
+        unsafe {
+            (*(self.0)).func = func;
+            (*(self.0)).next = param.cast();
         }
     }
 
-    fn push(&mut self, to_add: Box<Timer>) -> Result<(), ()> {
-        if self.head.is_none() {
-            self.head = Some(to_add);
-            return Ok(());
-        }
+    fn armed(&self) -> bool {
+        unsafe { (*(self.0)).expire != 0 }
+    }
 
-        let mut current = self.head.as_mut();
-        while let Some(timer) = current {
-            if timer.next.is_none() {
-                timer.next = Some(to_add);
-                break;
-            }
-            current = timer.next.as_mut();
+    fn set_armed(&mut self, armed: bool) {
+        unsafe {
+            (*(self.0)).expire = armed.into();
         }
-        Ok(())
+    }
+
+    fn period(&self) -> u32 {
+        unsafe { (*(self.0)).period }
+    }
+
+    fn set_period(&mut self, us: u32) {
+        unsafe {
+            (*(self.0)).period = us;
+        }
+    }
+
+    fn is_repeating(&self) -> bool {
+        self.period() != 0
     }
 }
 
-unsafe impl Send for TimerQueue {}
+struct ScheduledTimer {
+    timeout: u64,
+    ets_timer: EtsTimer,
+}
 
-pub(crate) static TIMERS: Locked<TimerQueue> = Locked::new(TimerQueue::new());
+static TIMERS: Locked<TimerQueue<ScheduledTimer>> = Locked::new(TimerQueue::new());
 
 pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {
     compat_timer_arm_us(ets_timer, tmout * 1000, repeat);
 }
 
 pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
+    compat_timer_arm_us_with_drift(ets_timer, us, repeat, 0);
+}
+
+fn compat_timer_arm_us_with_drift(ets_timer: *mut ets_timer, us: u32, repeat: bool, drift: u64) {
+    compat_timer_disarm(ets_timer);
+
     let systick = crate::timer::systimer_count();
     let ticks = crate::timer::micros_to_ticks(us as u64);
 
@@ -160,47 +100,41 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
         repeat
     );
 
+    let timeout = systick + ticks - drift;
+
     TIMERS.with(|timers| {
-        if let Some(timer) = timers.find(ets_timer) {
-            timer.started = systick;
-            timer.timeout = ticks;
-            timer.active = true;
-            timer.periodic = repeat;
-        } else {
-            trace!("timer_arm_us {:x} not found", ets_timer as usize);
-        }
+        let timer = timers.insert(
+            timeout,
+            ScheduledTimer {
+                timeout,
+                ets_timer: EtsTimer(ets_timer),
+            },
+        );
+
+        let mut ets_timer = EtsTimer(ets_timer);
+        ets_timer.set_timer_handle(timer);
+        ets_timer.set_period(if repeat { us } else { 0 });
+        ets_timer.set_armed(true);
     })
 }
 
 pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
-    trace!("timer disarm");
+    trace!("timer disarm {:p}", ets_timer);
     TIMERS.with(|timers| {
-        if let Some(timer) = timers.find(ets_timer) {
-            trace!("timer_disarm {:x}", timer.id());
-            timer.active = false;
-        } else {
-            trace!("timer_disarm {:x} not found", ets_timer as usize);
+        let mut timer = EtsTimer(ets_timer);
+        if timer.armed() {
+            timers.remove(timer.timer_handle());
         }
+        timer.set_armed(false);
     })
 }
 
 pub fn compat_timer_done(ets_timer: *mut ets_timer) {
     trace!("timer done");
-    TIMERS.with(|timers| {
-        if let Some(timer) = timers.find(ets_timer) {
-            trace!("timer_done {:x}", timer.id());
-            timer.active = false;
 
-            unsafe {
-                (*ets_timer).priv_ = core::ptr::null_mut();
-                (*ets_timer).expire = 0;
-            }
-
-            timers.remove(ets_timer);
-        } else {
-            trace!("timer_done {:x} not found", ets_timer as usize);
-        }
-    })
+    let mut timer = EtsTimer(ets_timer);
+    timer.set_callback(None, core::ptr::null_mut());
+    compat_timer_disarm(ets_timer);
 }
 
 pub(crate) fn compat_timer_setfn(
@@ -214,35 +148,44 @@ pub(crate) fn compat_timer_setfn(
         pfunction,
         parg
     );
-    let set = TIMERS.with(|timers| unsafe {
-        if let Some(timer) = timers.find(ets_timer) {
-            timer.callback = TimerCallback::new(pfunction, parg);
-            timer.active = false;
 
-            (*ets_timer).expire = 0;
+    let mut timer = EtsTimer(ets_timer);
+    unsafe {
+        timer.set_callback(core::mem::transmute(pfunction), core::mem::transmute(parg));
+    }
+    timer.set_armed(false);
+}
 
-            true
+pub(crate) fn get_next_due_timer(
+) -> Option<(Option<unsafe extern "C" fn(*mut c_void)>, *mut c_void)> {
+    let current_timestamp = systimer_count();
+    let next_due = TIMERS.with(|timers| {
+        let next_due = timers.poll(current_timestamp);
+
+        if let Some(mut next_due) = next_due {
+            let (f, p) = next_due.ets_timer.callback();
+
+            if next_due.ets_timer.armed() {
+                next_due.ets_timer.set_armed(false);
+                Some((next_due, f, p))
+            } else {
+                None
+            }
         } else {
-            (*ets_timer).next = core::ptr::null_mut();
-            (*ets_timer).period = 0;
-            (*ets_timer).func = None;
-            (*ets_timer).priv_ = core::ptr::null_mut();
-
-            let timer =
-                crate::compat::malloc::calloc(1, core::mem::size_of::<Timer>()) as *mut Timer;
-            (*timer).next = None;
-            (*timer).ets_timer = ets_timer;
-            (*timer).started = 0;
-            (*timer).timeout = 0;
-            (*timer).active = false;
-            (*timer).periodic = false;
-            (*timer).callback = TimerCallback::new(pfunction, parg);
-
-            timers.push(Box::from_raw(timer)).is_ok()
+            None
         }
     });
 
-    if !set {
-        warn!("Failed to set timer function {:x}", ets_timer as usize);
+    if let Some((scheduled_timer, func, param)) = next_due {
+        let ets_timer = scheduled_timer.ets_timer;
+        if ets_timer.is_repeating() {
+            // reschedule repeating alarm - take the drift into account
+            let drift = systimer_count() - scheduled_timer.timeout;
+            compat_timer_arm_us_with_drift(ets_timer.0, ets_timer.period(), true, drift);
+        }
+
+        Some((func, param))
+    } else {
+        None
     }
 }

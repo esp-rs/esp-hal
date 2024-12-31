@@ -1,7 +1,7 @@
 use crate::{
-    compat::timer_compat::TIMERS,
+    compat::timer_compat::get_next_due_timer,
     preempt::arch_specific::task_create,
-    timer::{systimer_count, yield_task},
+    timer::yield_task,
 };
 
 /// Initializes the `main` and `timer` tasks for the Wi-Fi driver.
@@ -17,24 +17,15 @@ pub(crate) fn init_tasks() {
 /// events.
 pub(crate) extern "C" fn timer_task(_param: *mut esp_wifi_sys::c_types::c_void) {
     loop {
-        let current_timestamp = systimer_count();
-        let to_run = TIMERS.with(|timers| {
-            let to_run = unsafe { timers.find_next_due(current_timestamp) }?;
-
-            to_run.active = to_run.periodic;
-
-            if to_run.periodic {
-                to_run.started = current_timestamp;
-            }
-
-            Some(to_run.callback)
-        });
-
         // run the due timer callback NOT in an interrupt free context
-        if let Some(to_run) = to_run {
-            trace!("trigger timer....");
-            to_run.call();
-            trace!("timer callback called");
+        if let Some((func, param)) = get_next_due_timer() {
+            if let Some(func) = func {
+                trace!("trigger timer callback {:p} {:p}", func, param);
+                unsafe {
+                    func(param as *mut _);
+                }
+                trace!("timer callback done");
+            }
         } else {
             yield_task();
         }
