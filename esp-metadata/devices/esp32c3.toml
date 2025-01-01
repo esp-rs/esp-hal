@@ -52,6 +52,7 @@ symbols = [
     "phy",
     "bt",
     "wifi",
+    "tsens",
 
     # ROM capabilities
     "rom_crc_le",

@@ -1,7 +1,7 @@
 //! This example uses the internal temperature sensor to measure the chip's temperature
 //!
 
-//% CHIPS: esp32c6
+//% CHIPS: esp32c6 esp32c3
 
 #![no_std]
 #![no_main]
@@ -12,6 +12,7 @@ use esp_println::println;
 
 #[entry]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let temperature_sensor = TemperatureSensor::new(peripherals.TSENS);

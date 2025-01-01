@@ -401,6 +401,10 @@ impl PeripheralClockControl {
             Peripheral::Systimer => {
                 perip_clk_en0.modify(|_, w| w.systimer_clk_en().bit(enable));
             }
+            #[cfg(tsens)]
+            Peripheral::Tsens => {
+                perip_clk_en1.modify(|_, w| w.tsens_clk_en().bit(enable));
+            }
         }
     }
 
@@ -613,10 +617,15 @@ impl PeripheralClockControl {
                 perip_rst_en0.modify(|_, w| w.systimer_rst().set_bit());
                 perip_rst_en0.modify(|_, w| w.systimer_rst().clear_bit());
             }
-            #[cfg(tsens)]
+            #[cfg(all(tsens, esp32c6))]
             Peripheral::Tsens => {
                 perip_rst_en0.modify(|_, w| w.tsens_rst().set_bit());
                 perip_rst_en0.modify(|_, w| w.tsens_rst().clear_bit());
+            }
+            #[cfg(all(tsens, esp32c3))]
+            Peripheral::Tsens => {
+                perip_rst_en1.modify(|_, w| w.tsens_rst().set_bit());
+                perip_rst_en1.modify(|_, w| w.tsens_rst().clear_bit());
             }
         });
     }
