@@ -71,6 +71,10 @@ impl<'d> TemperatureSensor<'d> {
         // Power Up
         apb_saradc.tsens_ctrl().write(|w| w.pu().set_bit());
 
+        // Default to XTAL_CLK source, as it works out of the box on both esp32c6 and
+        // esp32c3
+        apb_saradc.tsens_ctrl2().write(|w| w.clk_sel().set_bit());
+
         Self {
             _guard: guard,
             _peripheral: peripheral,
