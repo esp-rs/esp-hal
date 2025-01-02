@@ -311,13 +311,13 @@ where
     }
 
     /// "Wait" until the count down finishes without blocking.
-    pub fn wait(&mut self) -> nb::Result<(), void::Void> {
+    pub fn wait(&mut self) -> Option<()> {
         if self.inner.is_interrupt_set() {
             self.inner.clear_interrupt();
 
-            Ok(())
+            Some(())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
