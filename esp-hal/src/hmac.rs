@@ -133,7 +133,7 @@ impl<'d> Hmac<'d> {
     }
 
     /// Step 2. Configure HMAC keys and key purposes.
-    pub fn configure(&mut self, m: HmacPurpose, key_id: KeyId) -> nb::Result<(), Error> {
+    pub fn configure(&mut self, m: HmacPurpose, key_id: KeyId) -> Result<(), Error> {
         self.hmac
             .set_para_purpose()
             .write(|w| unsafe { w.purpose_set().bits(m as u8) });
@@ -145,7 +145,7 @@ impl<'d> Hmac<'d> {
             .write(|w| w.set_para_end().set_bit());
 
         if self.hmac.query_error().read().query_check().bit_is_set() {
-            return Err(nb::Error::Other(Error::KeyPurposeMismatch));
+            return Err(Error::KeyPurposeMismatch);
         }
 
         Ok(())
@@ -154,22 +154,22 @@ impl<'d> Hmac<'d> {
     /// Process the msg block after block
     ///
     /// Call this function as many times as necessary (msg.len() > 0)
-    pub fn update<'a>(&mut self, msg: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
+    pub fn update<'a>(&mut self, msg: &'a [u8]) -> Option<&'a [u8]> {
         if self.is_busy() {
-            return Err(nb::Error::WouldBlock);
+            return None;
         }
 
         self.next_command();
 
         let remaining = self.write_data(msg).unwrap();
 
-        Ok(remaining)
+        Some(remaining)
     }
 
     /// Finalizes the HMAC computation and retrieves the resulting hash output.
-    pub fn finalize(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
+    pub fn finalize(&mut self, output: &mut [u8]) -> Option<()> {
         if self.is_busy() {
-            return Err(nb::Error::WouldBlock);
+            return None;
         }
 
         self.next_command();
@@ -204,7 +204,7 @@ impl<'d> Hmac<'d> {
             .write(|w| w.set_result_end().set_bit());
         self.byte_written = 64;
         self.next_command = NextCommand::None;
-        Ok(())
+        Some(())
     }
 
     fn is_busy(&mut self) -> bool {
@@ -228,7 +228,7 @@ impl<'d> Hmac<'d> {
         self.next_command = NextCommand::None;
     }
 
-    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
+    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> Option<&'a [u8]> {
         let mod_length = self.byte_written % 64;
 
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
@@ -257,12 +257,12 @@ impl<'d> Hmac<'d> {
             }
         }
 
-        Ok(remaining)
+        Some(remaining)
     }
 
-    fn flush_data(&mut self) -> nb::Result<(), Infallible> {
+    fn flush_data(&mut self) -> Option<()> {
         if self.is_busy() {
-            return Err(nb::Error::WouldBlock);
+            return None;
         }
 
         let flushed = self.alignment_helper.flush_to(
@@ -282,7 +282,7 @@ impl<'d> Hmac<'d> {
             self.next_command = NextCommand::MessagePad;
         }
 
-        Ok(())
+        Some(())
     }
 
     fn padding(&mut self, msg_len: u64) {
