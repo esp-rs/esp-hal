@@ -433,10 +433,7 @@ where
     /// This method takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
-    pub fn read_oneshot<PIN, CS>(
-        &mut self,
-        pin: &mut super::AdcPin<PIN, ADCI, CS>,
-    ) -> nb::Result<u16, ()>
+    pub fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCI, CS>) -> Option<u16>
     where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCI>,
@@ -450,7 +447,7 @@ where
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
             if active_channel != PIN::CHANNEL {
-                return Err(nb::Error::WouldBlock);
+                return None;
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
@@ -476,7 +473,7 @@ where
         // Wait for ADC to finish conversion
         let conversion_finished = ADCI::is_done();
         if !conversion_finished {
-            return Err(nb::Error::WouldBlock);
+            return None;
         }
 
         // Get converted value
@@ -499,7 +496,7 @@ where
         // Mark that no conversions are currently in progress
         self.active_channel = None;
 
-        Ok(converted_value)
+        Some(converted_value)
     }
 }
 
