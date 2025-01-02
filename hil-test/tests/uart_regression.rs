@@ -10,7 +10,6 @@
 mod tests {
     use esp_hal::{
         gpio::OutputPin,
-        prelude::*,
         uart::{self, UartRx, UartTx},
     };
     use hil_test as _;
@@ -32,7 +31,7 @@ mod tests {
         // set up TX and send a byte
         let mut tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx).unwrap();
 
-        tx.flush_tx().unwrap();
+        tx.flush().unwrap();
         tx.write_bytes(&[0x42]).unwrap();
         let read = block!(rx.read_byte());
 

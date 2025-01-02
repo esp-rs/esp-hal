@@ -86,11 +86,19 @@ mod placeholder;
 pub use placeholder::NoPin;
 
 #[cfg(soc_etm)]
-pub mod etm;
+crate::unstable_module! {
+    pub mod etm;
+}
+
 #[cfg(lp_io)]
-pub mod lp_io;
+crate::unstable_module! {
+    pub mod lp_io;
+}
+
 #[cfg(all(rtc_io, not(esp32)))]
-pub mod rtc_io;
+crate::unstable_module! {
+    pub mod rtc_io;
+}
 
 /// Convenience constant for `Option::None` pin
 static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
@@ -139,6 +147,7 @@ impl From<WakeEvent> for Event {
 }
 
 /// Event used to wake up from light sleep.
+#[instability::unstable]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WakeEvent {
@@ -233,6 +242,7 @@ pub enum DriveStrength {
 ///
 /// The different variants correspond to different functionality depending on
 /// the chip and the specific pin. For more information, refer to your chip's
+#[doc(hidden)]
 #[doc = crate::trm_markdown_link!("iomuxgpio")]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -268,6 +278,7 @@ impl TryFrom<usize> for AlternateFunction {
 }
 
 /// RTC function
+#[instability::unstable]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RtcFunction {
@@ -278,6 +289,7 @@ pub enum RtcFunction {
 }
 
 /// Trait implemented by RTC pins
+#[instability::unstable]
 pub trait RtcPin: Pin {
     /// RTC number of the pin
     #[cfg(xtensa)]
@@ -300,6 +312,7 @@ pub trait RtcPin: Pin {
 
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
+#[instability::unstable]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     fn rtcio_pullup(&mut self, enable: bool);
@@ -376,8 +389,7 @@ pub trait Pin: Sealed {
     /// Enable or disable the GPIO pin output buffer.
     #[doc(hidden)]
     fn enable_output(&self, enable: bool, _: private::Internal) {
-        self.gpio_bank(private::Internal)
-            .write_out_en(self.mask(), enable);
+        GpioRegisterAccess::from(self.number() as usize).write_out_en(self.mask(), enable);
     }
 
     /// Enable input for the pin
@@ -391,9 +403,6 @@ pub trait Pin: Sealed {
 
     #[doc(hidden)]
     fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)];
-
-    #[doc(hidden)]
-    fn gpio_bank(&self, _: private::Internal) -> GpioRegisterAccess;
 
     #[doc(hidden)]
     fn pull_direction(&self, pull: Pull, _: private::Internal) {
@@ -430,7 +439,7 @@ pub trait InputPin: Pin + Into<AnyPin> + 'static {
     /// The current state of the input
     #[doc(hidden)]
     fn is_input_high(&self, _: private::Internal) -> bool {
-        self.gpio_bank(private::Internal).read_input() & self.mask() != 0
+        GpioRegisterAccess::from(self.number() as usize).read_input() & self.mask() != 0
     }
 }
 
@@ -483,8 +492,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     /// Set the pin's level to high or low
     #[doc(hidden)]
     fn set_output_high(&mut self, high: bool, _: private::Internal) {
-        self.gpio_bank(private::Internal)
-            .write_output(self.mask(), high);
+        GpioRegisterAccess::from(self.number() as usize).write_output(self.mask(), high);
     }
 
     /// Configure the [DriveStrength] of the pin
@@ -516,11 +524,12 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
     /// Is the output set to high
     #[doc(hidden)]
     fn is_set_high(&self, _: private::Internal) -> bool {
-        self.gpio_bank(private::Internal).read_output() & self.mask() != 0
+        GpioRegisterAccess::from(self.number() as usize).read_output() & self.mask() != 0
     }
 }
 
 /// Trait implemented by pins which can be used as analog pins
+#[instability::unstable]
 pub trait AnalogPin: Pin {
     /// Configure the pin for analog operation
     #[doc(hidden)]
@@ -528,6 +537,8 @@ pub trait AnalogPin: Pin {
 }
 
 /// Trait implemented by pins which can be used as Touchpad pins
+#[cfg(touch)]
+#[instability::unstable]
 pub trait TouchPin: Pin {
     /// Configure the pin for analog operation
     #[doc(hidden)]
@@ -1040,10 +1051,6 @@ macro_rules! gpio {
 
                     fn degrade_pin(&self, _: $crate::private::Internal) -> $crate::gpio::AnyPin {
                         $crate::gpio::AnyPin(AnyPinInner::[< Gpio $gpionum >](unsafe { Self::steal() }))
-                    }
-
-                    fn gpio_bank(&self, _: $crate::private::Internal) -> $crate::gpio::GpioRegisterAccess {
-                        $crate::gpio::GpioRegisterAccess::from($gpionum)
                     }
 
                     fn output_signals(&self, _: $crate::private::Internal) -> &[($crate::gpio::AlternateFunction, $crate::gpio::OutputSignal)] {
@@ -1592,6 +1599,7 @@ where
     /// Enable as a wake-up source.
     ///
     /// This will unlisten for interrupts
+    #[instability::unstable]
     #[inline]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.pin.wakeup_enable(enable, event);
@@ -1976,17 +1984,14 @@ where
     /// Clear the interrupt status bit for this Pin
     #[inline]
     pub fn clear_interrupt(&mut self) {
-        self.pin
-            .gpio_bank(private::Internal)
+        GpioRegisterAccess::from(self.pin.number() as usize)
             .write_interrupt_status_clear(1 << (self.pin.number() % 32));
     }
 
     /// Checks if the interrupt status bit for this Pin is set
     #[inline]
     pub fn is_interrupt_set(&self) -> bool {
-        self.pin
-            .gpio_bank(private::Internal)
-            .read_interrupt_status()
+        GpioRegisterAccess::from(self.pin.number() as usize).read_interrupt_status()
             & 1 << (self.pin.number() % 32)
             != 0
     }
@@ -1994,6 +1999,7 @@ where
     /// Enable as a wake-up source.
     ///
     /// This will unlisten for interrupts
+    #[instability::unstable]
     #[inline]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.listen_with_options(event.into(), false, false, enable);
@@ -2094,7 +2100,6 @@ impl<P: Pin> Pin for Flex<'_, P> {
             fn degrade_pin(&self, _internal: private::Internal) -> AnyPin;
             fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, OutputSignal)];
             fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, InputSignal)];
-            fn gpio_bank(&self, _internal: private::Internal) -> GpioRegisterAccess;
         }
     }
 }
@@ -2166,12 +2171,6 @@ pub(crate) mod internal {
         fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)] {
             handle_gpio_input!(&self.0, target, {
                 Pin::input_signals(target, private::Internal)
-            })
-        }
-
-        fn gpio_bank(&self, _: private::Internal) -> GpioRegisterAccess {
-            handle_gpio_input!(&self.0, target, {
-                Pin::gpio_bank(target, private::Internal)
             })
         }
     }
@@ -2373,9 +2372,7 @@ mod asynch {
             // do our setup.
 
             // Mark pin as async.
-            future
-                .pin
-                .gpio_bank(private::Internal)
+            GpioRegisterAccess::from(future.pin.number() as usize)
                 .async_operations()
                 .fetch_or(future.pin_mask(), Ordering::Relaxed);
 
@@ -2481,15 +2478,14 @@ mod asynch {
 
     impl<P: InputPin> PinFuture<'_, P> {
         fn pin_mask(&self) -> u32 {
-            let bank = self.pin.gpio_bank(private::Internal);
+            let bank = GpioRegisterAccess::from(self.pin.number() as usize);
             1 << (self.pin.number() - bank.offset())
         }
 
         fn is_done(&self) -> bool {
             // Only the interrupt handler should clear the async bit, and only if the
             // specific pin is handling an interrupt.
-            self.pin
-                .gpio_bank(private::Internal)
+            GpioRegisterAccess::from(self.pin.number() as usize)
                 .async_operations()
                 .load(Ordering::Acquire)
                 & self.pin_mask()
@@ -2529,8 +2525,7 @@ mod asynch {
                 while self.pin.is_interrupt_set() {}
 
                 // Unmark pin as async
-                self.pin
-                    .gpio_bank(private::Internal)
+                GpioRegisterAccess::from(self.pin.number() as usize)
                     .async_operations()
                     .fetch_and(!self.pin_mask(), Ordering::Relaxed);
             }

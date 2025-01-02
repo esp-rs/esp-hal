@@ -35,6 +35,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma_loop_buffer,
+    entry,
     gpio::{Level, Output},
     i2c::{self, master::I2c},
     lcd_cam::{
@@ -47,7 +48,7 @@ use esp_hal::{
         LcdCam,
     },
     peripherals::Peripherals,
-    prelude::*,
+    time::RateExtU32,
     Blocking,
 };
 use esp_println::println;

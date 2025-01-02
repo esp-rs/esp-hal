@@ -287,7 +287,7 @@ pub enum OutputSignal {
     GPIO                  = 128,
 }
 
-crate::lp_gpio! {
+crate::gpio::lp_io::lp_gpio! {
     0
     1
     2

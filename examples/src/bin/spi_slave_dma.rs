@@ -34,8 +34,8 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma_buffers,
+    entry,
     gpio::{Input, Level, Output, Pull},
-    prelude::*,
     spi::{slave::Spi, Mode},
 };
 use esp_println::println;

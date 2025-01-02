@@ -37,6 +37,8 @@
 //! ### Initialize With Different Clock Frequencies
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
+//! use esp_hal::clock::CpuClock;
+//!
 //! // Initialize with the highest possible frequency for this chip
 //! let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //! let peripherals = esp_hal::init(config);

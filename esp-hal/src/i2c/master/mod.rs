@@ -130,13 +130,21 @@ impl core::fmt::Display for Error {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum ConfigError {}
+pub enum ConfigError {
+    /// Provided bus frequency is invalid for the current configuration.
+    FrequencyInvalid,
+}
 
 impl core::error::Error for ConfigError {}
 
 impl core::fmt::Display for ConfigError {
-    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        Ok(())
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ConfigError::FrequencyInvalid => write!(
+                f,
+                "Provided bus frequency is invalid for the current configuration"
+            ),
+        }
     }
 }
 
@@ -907,7 +915,7 @@ fn configure_clock(
     scl_start_hold_time: u32,
     scl_stop_hold_time: u32,
     timeout: Option<u32>,
-) {
+) -> Result<(), ConfigError> {
     unsafe {
         // divider
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
@@ -921,10 +929,14 @@ fn configure_clock(
             .scl_low_period()
             .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
+        #[cfg(not(esp32))]
+        let scl_wait_high_period = scl_wait_high_period
+            .try_into()
+            .map_err(|_| ConfigError::FrequencyInvalid)?;
+
         register_block.scl_high_period().write(|w| {
             #[cfg(not(esp32))] // ESP32 does not have a wait_high field
-            w.scl_wait_high_period()
-                .bits(scl_wait_high_period.try_into().unwrap());
+            w.scl_wait_high_period().bits(scl_wait_high_period);
             w.scl_high_period().bits(scl_high_period as u16)
         });
 
@@ -969,9 +981,11 @@ fn configure_clock(
             }
         }
     }
+    Ok(())
 }
 
 /// Peripheral data describing a particular I2C instance.
+#[doc(hidden)]
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Info {
@@ -1064,7 +1078,7 @@ impl Driver<'_> {
                 let clock = clocks.xtal_clock.convert();
             }
         }
-        self.set_frequency(clock, config.frequency, config.timeout);
+        self.set_frequency(clock, config.frequency, config.timeout)?;
 
         self.update_config();
 
@@ -1108,7 +1122,12 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
+    fn set_frequency(
+        &self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+        timeout: Option<u32>,
+    ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1175,14 +1194,21 @@ impl Driver<'_> {
             scl_start_hold_time,
             scl_stop_hold_time,
             timeout,
-        );
+        )?;
+
+        Ok(())
     }
 
     #[cfg(esp32s2)]
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
+    fn set_frequency(
+        &self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+        timeout: Option<u32>,
+    ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1225,14 +1251,21 @@ impl Driver<'_> {
             scl_start_hold_time,
             scl_stop_hold_time,
             timeout.map(|to_bus| (to_bus * 2 * half_cycle).min(0xFF_FFFF)),
-        );
+        )?;
+
+        Ok(())
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
+    fn set_frequency(
+        &self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+        timeout: Option<u32>,
+    ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1295,13 +1328,15 @@ impl Driver<'_> {
                 let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
                 raw.min(0x1F)
             }),
-        );
+        )?;
+
+        Ok(())
     }
 
     #[cfg(any(esp32, esp32s2))]
     async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
         if buffer.len() > 32 {
-            panic!("On ESP32 and ESP32-S2 the max I2C read is limited to 32 bytes");
+            return Err(Error::FifoExceeded);
         }
 
         self.wait_for_completion(false).await?;
@@ -1474,7 +1509,7 @@ impl Driver<'_> {
         // see https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
         if buffer.len() > 32 {
-            panic!("On ESP32 and ESP32-S2 the max I2C read is limited to 32 bytes");
+            return Err(Error::FifoExceeded);
         }
 
         // wait for completion - then we can just read the data from FIFO
@@ -1707,7 +1742,7 @@ impl Driver<'_> {
 
     #[cfg(not(any(esp32, esp32s2)))]
     /// Fills the TX FIFO with data from the provided slice.
-    fn fill_tx_fifo(&self, bytes: &[u8]) -> usize {
+    fn fill_tx_fifo(&self, bytes: &[u8]) -> Result<usize, Error> {
         let mut index = 0;
         while index < bytes.len()
             && !self
@@ -1732,7 +1767,7 @@ impl Driver<'_> {
                 .int_clr()
                 .write(|w| w.txfifo_ovf().clear_bit_by_one());
         }
-        index
+        Ok(index)
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
@@ -1782,20 +1817,20 @@ impl Driver<'_> {
 
     #[cfg(any(esp32, esp32s2))]
     /// Fills the TX FIFO with data from the provided slice.
-    fn fill_tx_fifo(&self, bytes: &[u8]) -> usize {
+    fn fill_tx_fifo(&self, bytes: &[u8]) -> Result<usize, Error> {
         // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
         // FIFO apparently it would be possible by using non-fifo mode
         // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
         if bytes.len() > 31 {
-            panic!("On ESP32 and ESP32-S2 the max I2C transfer is limited to 31 bytes");
+            return Err(Error::FifoExceeded);
         }
 
         for b in bytes {
             write_fifo(self.register_block(), *b);
         }
 
-        bytes.len()
+        Ok(bytes.len())
     }
 
     #[cfg(any(esp32, esp32s2))]
@@ -1893,7 +1928,7 @@ impl Driver<'_> {
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
-        let index = self.fill_tx_fifo(bytes);
+        let index = self.fill_tx_fifo(bytes)?;
         self.start_transmission();
 
         Ok(index)
@@ -2154,6 +2189,7 @@ impl Driver<'_> {
 }
 
 /// Peripheral state for an I2C instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct State {
     /// Waker for the asynchronous operations.
@@ -2161,6 +2197,7 @@ pub struct State {
 }
 
 /// I2C Peripheral Instance
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnyI2c> + 'static {
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);

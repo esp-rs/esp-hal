@@ -12,7 +12,10 @@
 use crate::dma::{DmaEligible, DmaError};
 
 pub mod master;
-pub mod slave;
+
+crate::unstable_module! {
+    pub mod slave;
+}
 
 /// SPI errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -92,6 +95,7 @@ pub enum BitOrder {
 /// SPI data mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum DataMode {
     /// `Single` Data Mode - 1 bit, 2 wires.
     Single,

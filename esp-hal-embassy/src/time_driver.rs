@@ -3,9 +3,8 @@ use core::cell::Cell;
 use embassy_time_driver::{AlarmHandle, Driver};
 use esp_hal::{
     interrupt::{InterruptHandler, Priority},
-    prelude::*,
     sync::Locked,
-    time::now,
+    time::{now, ExtU64},
     timer::{AnyTimer, OneShotTimer},
     Blocking,
 };

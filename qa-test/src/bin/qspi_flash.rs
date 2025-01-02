@@ -32,12 +32,13 @@ use esp_hal::{
     delay::Delay,
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    prelude::*,
+    entry,
     spi::{
         master::{Address, Command, Config, Spi},
         DataMode,
         Mode,
     },
+    time::RateExtU32,
 };
 use esp_println::{print, println};
 

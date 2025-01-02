@@ -12,7 +12,8 @@ use critical_section::Mutex;
 use embedded_hal::delay::DelayNs;
 use esp_hal::{
     delay::Delay,
-    prelude::*,
+    macros::handler,
+    time::ExtU64,
     timer::{
         systimer::{Alarm, SystemTimer},
         OneShotTimer,

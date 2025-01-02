@@ -68,9 +68,10 @@
 //! #     loop {}
 //! # }
 //! use esp_hal::{
+//!     clock::CpuClock,
 //!     delay::Delay,
+//!     entry,
 //!     gpio::{Io, Level, Output},
-//!     prelude::*,
 //! };
 //!
 //! #[entry]
@@ -178,7 +179,6 @@ pub mod i2c;
 #[cfg(any(dport, interrupt_core0, interrupt_core1))]
 pub mod interrupt;
 pub mod peripheral;
-pub mod prelude;
 #[cfg(any(hmac, sha))]
 mod reg_access;
 #[cfg(any(spi0, spi1, spi2, spi3))]
@@ -196,7 +196,7 @@ pub mod time;
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
-macro_rules! unstable {
+macro_rules! unstable_module {
     ($(
         $(#[$meta:meta])*
         pub mod $module:ident;
@@ -216,7 +216,9 @@ macro_rules! unstable {
     };
 }
 
-unstable! {
+pub(crate) use unstable_module;
+
+unstable_module! {
     #[cfg(aes)]
     pub mod aes;
     #[cfg(any(adc, dac))]

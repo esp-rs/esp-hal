@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Peripheral singletons now implement `Debug` and `defmt::Format` (#2682, #2834)
 - `BurstConfig`, a device-specific configuration for configuring DMA transfers in burst mode (#2543)
 - `{DmaRxBuf, DmaTxBuf, DmaRxTxBuf}::set_burst_config` (#2543)
+- Added `SpiDmaBus::split` for moving between manual & automatic DMA buffers (#2824)
 - ESP32-S2: DMA support for AES (#2699)
 - Added `transfer_in_place_async` and embedded-hal-async implementation to `Spi` (#2691)
 - `InterruptHandler` now implements `Hash` and `defmt::Format` (#2830)
@@ -48,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gpio::{Event, WakeEvent, GpioRegisterAccess}` now implement `Debug`, `Eq`, `PartialEq` and `Hash` (#2842)
 - `gpio::{Level, Pull, AlternateFunction, RtcFunction}` now implement `Hash` (#2842)
 - `gpio::{GpioPin, AnyPin, Io, Output, OutputOpenDrain, Input, Flex}` now implement `Debug`, `defmt::Format` (#2842)
+- More interrupts are available in `esp_hal::spi::master::SpiInterrupt`, add `enable_listen`,`interrupts` and `clear_interrupts` for ESP32/ESP32-S2 (#2833)
+
+- The `ExtU64` and `RateExtU32` traits have been added to `esp_hal::time` (#2845)
 
 ### Changed
 
@@ -82,6 +86,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpiBitOrder`, `SpiDataMode`, `SpiMode` were renamed to `BitOder`, `DataMode` and `Mode` (#2828)
 - `crate::Mode` was renamed to `crate::DriverMode` (#2828)
 - Renamed some I2C error variants (#2844)
+- I2C: Replaced potential panics with errors. (#2831)
+- UART: Make `AtCmdConfig` and `ConfigError` non-exhaustive (#2851)
+- UART: Make `AtCmdConfig` use builder-lite pattern (#2851)
 
 ### Fixed
 
@@ -89,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User-bound GPIO interrupt handlers should no longer interfere with async pins. (#2625)
 - `spi::master::Spi::{into_async, into_blocking}` are now correctly available on the typed driver, to. (#2674)
 - It is no longer possible to safely conjure `GpioPin` instances (#2688)
+- UART: Public API follows `C-WORD_ORDER` Rust API standard (`VerbObject` order) (#2851)
 
 ### Removed
 
@@ -103,6 +111,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
 - Removed `Camera::set_` functions (#2610)
 - `DmaTxBuf::{compute_chunk_size, compute_descriptor_count, new_with_block_size}` (#2543)
+
+- The `prelude` module has been removed (#2845)
 
 ## [0.22.0] - 2024-11-20
 

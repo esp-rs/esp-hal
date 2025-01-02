@@ -26,7 +26,7 @@ use esp_hal::{
         Pcnt,
     },
     peripherals::PARL_IO,
-    prelude::*,
+    time::RateExtU32,
 };
 use hil_test as _;
 

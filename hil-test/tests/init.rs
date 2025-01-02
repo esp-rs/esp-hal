@@ -6,10 +6,11 @@
 #![no_main]
 
 use esp_hal::{
+    clock::CpuClock,
     config::WatchdogStatus,
     delay::Delay,
-    prelude::*,
     rtc_cntl::Rtc,
+    time::ExtU64,
     timer::timg::TimerGroup,
     Config,
 };
