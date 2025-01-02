@@ -505,12 +505,12 @@ where
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    pub fn read_byte(&mut self) -> Option<u8> {
         self.driver().read_byte()
     }
 
     /// Write a byte to SPI.
-    pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+    pub fn write_byte(&mut self, word: u8) -> Option<()> {
         self.driver().write_byte(word)
     }
 
@@ -2212,11 +2212,13 @@ mod ehal1 {
         Dm: DriverMode,
     {
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
-            self.driver().read_byte()
+            self.driver().read_byte().ok_or(nb::Error::WouldBlock)
         }
 
         fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-            self.driver().write_byte(word)
+            self.driver()
+                .write_byte(word)
+                .map_or_else(|| Err(nb::Error::WouldBlock), |_| Ok(()))
         }
     }
 
@@ -2989,18 +2991,18 @@ impl Driver {
         });
     }
 
-    fn read_byte(&self) -> nb::Result<u8, Error> {
+    fn read_byte(&self) -> Option<u8> {
         if self.busy() {
-            return Err(nb::Error::WouldBlock);
+            return None;
         }
 
         let reg_block = self.register_block();
-        Ok(u32::try_into(reg_block.w(0).read().bits()).unwrap_or_default())
+        Some(u32::try_into(reg_block.w(0).read().bits()).unwrap_or_default())
     }
 
-    fn write_byte(&self, word: u8) -> nb::Result<(), Error> {
+    fn write_byte(&self, word: u8) -> Option<()> {
         if self.busy() {
-            return Err(nb::Error::WouldBlock);
+            return None;
         }
 
         self.configure_datalen(0, 1);
@@ -3010,7 +3012,7 @@ impl Driver {
 
         self.start_operation();
 
-        Ok(())
+        Some(())
     }
 
     #[cfg_attr(place_spi_driver_in_ram, ram)]
