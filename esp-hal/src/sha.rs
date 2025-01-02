@@ -208,7 +208,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     }
 
     /// Updates the SHA digest with the provided data buffer.
-    pub fn update<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
+    pub fn update<'a>(&mut self, incoming: &'a [u8]) -> Option<&'a [u8]> {
         self.finished = false;
 
         self.write_data(incoming)
@@ -221,10 +221,13 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     /// Typically, output is expected to be the size of
     /// [ShaAlgorithm::DIGEST_LENGTH], but smaller inputs can be given to
     /// get a "short hash"
-    pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
+    pub fn finish(&mut self, output: &mut [u8]) -> Option<()> {
         // Store message length for padding
         let length = (self.cursor as u64 * 8).to_be_bytes();
-        nb::block!(self.update(&[0x80]))?; // Append "1" bit
+        // Append "1" bit
+        if self.update(&[0x80]).is_none() {
+            return None;
+        }
 
         // Flush partial data, ensures aligned cursor
         {
@@ -308,14 +311,14 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         self.cursor = 0;
         self.alignment_helper.reset();
 
-        Ok(())
+        Some(())
     }
 
     /// Save the current state of the digest for later continuation.
     #[cfg(not(esp32))]
-    pub fn save(&mut self, context: &mut Context<A>) -> nb::Result<(), Infallible> {
+    pub fn save(&mut self, context: &mut Context<A>) -> Option<()> {
         if self.is_busy() {
-            return Err(nb::Error::WouldBlock);
+            return None;
         }
 
         context.alignment_helper = self.alignment_helper.clone();
@@ -340,7 +343,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
             );
         }
 
-        Ok(())
+        Some(())
     }
 
     /// Discard the current digest and return the peripheral.
@@ -380,12 +383,12 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         }
     }
 
-    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
+    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> Option<&'a [u8]> {
         if self.message_buffer_is_full {
             if self.is_busy() {
                 // The message buffer is full and the hardware is still processing the previous
                 // message. There's nothing to be done besides wait for the hardware.
-                return Err(nb::Error::WouldBlock);
+                return None;
             } else {
                 // Submit the full buffer.
                 self.process_buffer();
@@ -419,7 +422,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
             }
         }
 
-        Ok(remaining)
+        Some(remaining)
     }
 }
 
