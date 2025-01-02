@@ -9,11 +9,12 @@
 //! frequency or I/O load. Generally, the chip’s internal temperature is higher
 //! than the operating ambient temperature.
 //!
+//! It is recommended to wait a few hundred microseconds after turning it on
+//! before measuring, in order to allow the sensor to stabilize.
+//!
 //! ## Configuration
 //!
-//! Currently, it does not support any configuration, but some future
-//! configuration options are listed below in the Implementation State list of
-//! pending items
+//! The temperature sensor can be configured with different clock sources.
 //!
 //! ## Examples
 //!
@@ -22,14 +23,17 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::tsens::TemperatureSensor;
+//! # use esp_hal::tsens::{TemperatureSensor, Config};
 //! # use esp_hal::delay::Delay;
 //!
-//! let tsens = TemperatureSensor::new(peripherals.TSENS);
+//! let temperature_sensor = TemperatureSensor::new(
+//!         peripherals.TSENS,
+//!         Config::default()
+//!     ).unwrap();
 //! let delay = Delay::new();
 //!
 //! loop {
-//!   let temp = tsens.get_celsius();
+//!   let temp = temperature_sensor.get_celsius();
 //!   println!("Temperature: {:.2}°C", temp);
 //!   delay.delay_millis(1_000);
 //! }
@@ -38,7 +42,6 @@
 //! 
 //! ## Implementation State
 //!
-//! - Source clock selection is not supported
 //! - Temperature calibration range is not supported
 //! - Interrupts are not supported
 
@@ -48,45 +51,71 @@ use crate::{
     system::{GenericPeripheralGuard, PeripheralClockControl},
 };
 
+/// Clock source for the temperature sensor
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ClockSource {
+    /// Use RC_FAST clock source
+    RcFast,
+    /// Use XTAL clock source
+    #[default]
+    Xtal,
+}
+
+/// Temperature sensor configuration
+#[derive(Debug, Clone, Default, PartialEq, Eq, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    clock_source: ClockSource,
+}
+
+/// Temperature sensor configuration error
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigError {}
+
 /// Temperature sensor driver
-// #[derive(Clone, Copy)]
 pub struct TemperatureSensor<'d> {
     _peripheral: PeripheralRef<'d, TSENS>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Tsens as u8 }>,
 }
 
 impl<'d> TemperatureSensor<'d> {
-    /// Create a new temperature sensor instance
-    pub fn new(peripheral: impl Peripheral<P = TSENS> + 'd) -> Self {
+    /// Create a new temperature sensor instance with configuration
+    pub fn new(
+        peripheral: impl Peripheral<P = TSENS> + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
         crate::into_ref!(peripheral);
-
         let guard = GenericPeripheralGuard::new();
 
         // We need to enable ApbSarAdc clock before trying to write on the tsens_ctrl
         // register
         PeripheralClockControl::enable(crate::system::Peripheral::ApbSarAdc);
-
         let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::PTR };
 
         // Power Up
         apb_saradc.tsens_ctrl().write(|w| w.pu().set_bit());
 
-        // Default to XTAL_CLK source, as it works out of the box on both esp32c6 and
-        // esp32c3
-        apb_saradc.tsens_ctrl2().write(|w| w.clk_sel().set_bit());
-
-        Self {
+        let mut tsens = Self {
             _guard: guard,
             _peripheral: peripheral,
-        }
+        };
+        tsens.apply_config(&config)?;
+
+        Ok(tsens)
     }
 
-    /// Disable the temperature sensor
-    pub fn disable(&self) {
-        let abp_saradc = unsafe { &*crate::peripherals::APB_SARADC::PTR };
-        abp_saradc.tsens_ctrl().write(|w| w.pu().clear_bit());
+    /// Change the temperature sensor configuration
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::PTR };
 
-        PeripheralClockControl::disable(crate::system::Peripheral::Tsens);
+        // Set clock source
+        apb_saradc.tsens_ctrl2().write(|w| {
+            w.clk_sel()
+                .bit(matches!(config.clock_source, ClockSource::Xtal))
+        });
+
+        Ok(())
     }
 
     /// Get the temperature in Celsius
