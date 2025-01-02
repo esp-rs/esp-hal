@@ -14,11 +14,11 @@ impl<Dm: crate::DriverMode> Rsa<'_, Dm> {
     /// After the RSA Accelerator is released from reset, the memory blocks
     /// needs to be initialized, only after that peripheral should be used.
     /// This function would return without an error if the memory is initialized
-    pub fn ready(&mut self) -> nb::Result<(), Infallible> {
+    pub fn ready(&mut self) -> Option<()> {
         if self.rsa.query_clean().read().query_clean().bit_is_clear() {
-            return Err(nb::Error::WouldBlock);
+            return None;
         }
-        Ok(())
+        Some(())
     }
 
     /// Enables/disables rsa interrupt.
