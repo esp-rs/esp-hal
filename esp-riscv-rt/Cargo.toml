@@ -4,10 +4,10 @@ version      = "0.9.1"
 edition      = "2021"
 rust-version = "1.65"
 description  = "Minimal runtime / startup for RISC-V CPUs from Espressif"
+keywords     = ["esp32", "espressif", "riscv", "runtime", "startup"]
+categories   = ["embedded", "hardware-support", "no-std"]
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
-keywords     = ["esp32", "riscv", "runtime", "startup"]
-categories   = ["embedded", "no-std"]
 
 [dependencies]
 document-features = "0.2.10"
