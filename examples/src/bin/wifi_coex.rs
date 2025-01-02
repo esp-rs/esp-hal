@@ -15,6 +15,8 @@
 #![no_std]
 #![no_main]
 
+use core::net::Ipv4Addr;
+
 use bleps::{
     ad_structure::{
         create_advertising_data,
@@ -45,7 +47,7 @@ use esp_wifi::{
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
-    wire::{DhcpOption, IpAddress, Ipv4Address},
+    wire::{DhcpOption, IpAddress},
 };
 
 const SSID: &str = env!("SSID");
@@ -172,7 +174,7 @@ fn main() -> ! {
         socket.work();
 
         socket
-            .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+            .open(IpAddress::Ipv4(Ipv4Addr::new(142, 250, 185, 115)), 80)
             .unwrap();
 
         socket
