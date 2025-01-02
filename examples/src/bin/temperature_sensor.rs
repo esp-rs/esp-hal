@@ -7,7 +7,11 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, entry, tsens::TemperatureSensor};
+use esp_hal::{
+    delay::Delay,
+    entry,
+    tsens::{Config, TemperatureSensor},
+};
 use esp_println::println;
 
 #[entry]
@@ -15,8 +19,12 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let temperature_sensor = TemperatureSensor::new(peripherals.TSENS);
+    let temperature_sensor = TemperatureSensor::new(peripherals.TSENS, Config::default()).unwrap();
     let delay = Delay::new();
+
+    // Wait for the sensor to stabilize
+    delay.delay_micros(200);
+
     loop {
         let temp = temperature_sensor.get_celsius();
         println!("Temperature: {:.2}°C", temp);
