@@ -922,6 +922,27 @@ where
         count
     }
 
+    /// Busy waits for a break condition to be detected on the RX
+    /// line. Condition is met when the receiver detects a NULL character
+    /// (i.e. logic 0 for one NULL character transmission) after stop bits.
+    ///
+    /// Clears the break detection interrupt before returning.
+    pub fn wait_for_break(&mut self) {
+        // Enable the break detection interrupt
+        self.register_block()
+            .int_ena()
+            .write(|w| w.brk_det().bit(true));
+
+        while !self.register_block().int_raw().read().brk_det().bit() {
+            // Just busy waiting
+        }
+
+        // Clear the break detection interrupt
+        self.register_block()
+            .int_clr()
+            .write(|w| w.brk_det().bit(true));
+    }
+
     #[allow(clippy::useless_conversion)]
     fn rx_fifo_count(&self) -> u16 {
         let fifo_cnt: u16 = self
@@ -1107,6 +1128,11 @@ pub enum UartInterrupt {
     /// The transmitter has finished sending out all data from the FIFO.
     TxDone,
 
+    /// Break condition has been detected.
+    /// Triggered when the receiver detects a NULL character (i.e. logic 0 for
+    /// one NULL character transmission) after stop bits.
+    RxBreakDetected,
+
     /// The receiver has received more data than what
     /// [`Config::rx_fifo_full_threshold`] specifies.
     RxFifoFull,
@@ -1205,6 +1231,11 @@ where
     /// Read a byte from the UART
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         self.rx.read_byte()
+    }
+
+    /// Busy waits for a break condition to be detected on the RX line.
+    pub fn wait_for_break(&mut self) {
+        self.rx.wait_for_break();
     }
 
     /// Change the configuration.
@@ -1563,6 +1594,7 @@ pub(crate) enum TxEvent {
 pub(crate) enum RxEvent {
     FifoFull,
     CmdCharDetected,
+    BreakDetected,
     FifoOvf,
     FifoTout,
     GlitchDetected,
@@ -1601,6 +1633,7 @@ impl UartRxFuture {
             let event_triggered = match event {
                 RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
                 RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_clear(),
+                RxEvent::BreakDetected => interrupts_enabled.brk_det().bit_is_clear(),
 
                 RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
                 RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
@@ -1621,6 +1654,7 @@ impl UartRxFuture {
                 match event {
                     RxEvent::FifoFull => w.rxfifo_full().bit(enable),
                     RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
+                    RxEvent::BreakDetected => w.brk_det().bit(enable),
                     RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
                     RxEvent::FifoTout => w.rxfifo_tout().bit(enable),
                     RxEvent::GlitchDetected => w.glitch_det().bit(enable),
@@ -1756,6 +1790,13 @@ where
     pub async fn flush_async(&mut self) -> Result<(), Error> {
         self.tx.flush_async().await
     }
+
+    /// Asynchronously waits for a break condition to be detected on the RX
+    /// line. Condition is met when the receiver detects a NULL character
+    /// (i.e. logic 0 for one NULL character transmission) after stop bits.
+    pub async fn wait_for_break_async(&mut self) {
+        self.rx.wait_for_break_async().await;
+    }
 }
 
 impl<T> UartTx<'_, Async, T>
@@ -1870,7 +1911,10 @@ where
                     RxEvent::GlitchDetected => return Err(Error::RxGlitchDetected),
                     RxEvent::FrameError => return Err(Error::RxFrameError),
                     RxEvent::ParityError => return Err(Error::RxParityError),
-                    RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
+                    RxEvent::FifoFull
+                    | RxEvent::CmdCharDetected
+                    | RxEvent::BreakDetected
+                    | RxEvent::FifoTout => continue,
                 }
             }
             // Unfortunately, the uart's rx-timeout counter counts up whenever there is
@@ -1885,6 +1929,13 @@ where
                 return Ok(read_bytes);
             }
         }
+    }
+
+    /// Interrupt-driven wait for a break condition on the RX line.
+    /// Condition is met when the receiver detects a NULL character (i.e. logic
+    /// 0 for one NULL character transmission) after stop bits.
+    pub async fn wait_for_break_async(&mut self) {
+        UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
     }
 }
 
@@ -1959,7 +2010,8 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
         || interrupts.at_cmd_char_det().bit_is_set()
         || interrupts.glitch_det().bit_is_set()
         || interrupts.frm_err().bit_is_set()
-        || interrupts.parity_err().bit_is_set();
+        || interrupts.parity_err().bit_is_set()
+        || interrupts.brk_det().bit_is_set();
     let tx_wake = interrupts.tx_done().bit_is_set() || interrupts.txfifo_empty().bit_is_set();
     uart.register_block()
         .int_clr()
@@ -2253,6 +2305,7 @@ impl Info {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().bit(enable),
                     UartInterrupt::TxDone => w.tx_done().bit(enable),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().bit(enable),
+                    UartInterrupt::RxBreakDetected => w.brk_det().bit(enable),
                 };
             }
             w
@@ -2274,6 +2327,9 @@ impl Info {
         if ints.rxfifo_full().bit_is_set() {
             res.insert(UartInterrupt::RxFifoFull);
         }
+        if ints.brk_det().bit_is_set() {
+            res.insert(UartInterrupt::RxBreakDetected);
+        }
 
         res
     }
@@ -2287,6 +2343,7 @@ impl Info {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().clear_bit_by_one(),
                     UartInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().clear_bit_by_one(),
+                    UartInterrupt::RxBreakDetected => w.brk_det().clear_bit_by_one(),
                 };
             }
             w
