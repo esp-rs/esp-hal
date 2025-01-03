@@ -1,4 +1,4 @@
-# Migration Guide from 0.5.x to v0.6.x
+# Migration Guide from 0.4.x to v0.5.x
 
 ## Crate configuration changes
 
@@ -10,6 +10,6 @@ configurations to match the new format.
 
 ```diff
  [env]
--ESP_HAL_EMBASSY_LOW_POWER_WAIT="false"
-+ESP_HAL_EMBASSY_CONFIG_LOW_POWER_WAIT="false"
+-ESP_IEEE802154_RX_QUEUE_SIZE = "50"
++ESP_IEEE802154_CONFIG_RX_QUEUE_SIZE = "50"
 ```

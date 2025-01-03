@@ -343,6 +343,21 @@ The reexports that were previously part of the prelude are available through oth
 + uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(b'#'));
 ```
 
+
+## Crate configuration changes
+
+To prevent ambiguity between configurations, we had to change the naming format of configuration
+keys. Before, we used `{prefix}_{key}`, which meant that esp-hal and esp-hal-* configuration keys
+were impossible to tell apart. To fix this issue, we are changing the separator from one underscore
+character to `_CONFIG_`. This also means that users will have to change their `config.toml`
+configurations to match the new format.
+
+```diff
+ [env]
+-ESP_HAL_PLACE_SPI_DRIVER_IN_RAM="true"
++ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM="true"
+```
+
 ## UART changes
 
 The `Config` struct's setters are now prefixed with `with_`. `parity_none`, `parity_even`,
@@ -354,3 +369,4 @@ The `Config` struct's setters are now prefixed with `with_`. `parity_none`, `par
 +    .with_rx_fifo_full_threshold(30)
 -    .parity_even();
 +    .with_parity(Parity::Even);
+```
