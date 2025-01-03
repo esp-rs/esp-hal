@@ -35,7 +35,7 @@
 //!
 //! periodic.start(1.secs());
 //! loop {
-//!     nb::block!(periodic.wait());
+//!    while periodic.wait().is_none() {}
 //! }
 //! # }
 //! ```
@@ -351,13 +351,13 @@ where
     }
 
     /// "Wait" until the count down finishes without blocking.
-    pub fn wait(&mut self) -> nb::Result<(), void::Void> {
+    pub fn wait(&mut self) -> Option<()> {
         if self.inner.is_interrupt_set() {
             self.inner.clear_interrupt();
 
-            Ok(())
+            Some(())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 

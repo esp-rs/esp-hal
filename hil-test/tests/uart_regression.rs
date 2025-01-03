@@ -13,7 +13,6 @@ mod tests {
         uart::{self, UartRx, UartTx},
     };
     use hil_test as _;
-    use nb::block;
 
     #[test]
     fn test_that_creating_tx_does_not_cause_a_pulse() {
@@ -33,8 +32,12 @@ mod tests {
 
         tx.flush().unwrap();
         tx.write_bytes(&[0x42]).unwrap();
-        let read = block!(rx.read_byte());
+        let read = loop {
+            if let Some(byte) = rx.read_byte() {
+                break byte;
+            }
+        };
 
-        assert_eq!(read, Ok(0x42));
+        assert_eq!(read, 0x42);
     }
 }

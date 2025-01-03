@@ -112,7 +112,7 @@
 //!
 //!         writeln!(usb_serial, "USB serial interrupt").unwrap();
 //!
-//!         while let nb::Result::Ok(c) = usb_serial.read_byte() {
+//!         while let Some(c) = usb_serial.read_byte() {
 //!             writeln!(usb_serial, "Read byte: {:02x}", c).unwrap();
 //!         }
 //!
@@ -200,7 +200,7 @@ where
 
     /// Write data to the serial output in a non-blocking manner
     /// Requires manual flushing (automatically flushed every 64 bytes)
-    pub fn write_byte_nb(&mut self, word: u8) -> nb::Result<(), Error> {
+    pub fn write_byte_nb(&mut self, word: u8) -> Option<()> {
         let reg_block = USB_DEVICE::register_block();
 
         if reg_block
@@ -214,9 +214,9 @@ where
                 reg_block.ep1().write(|w| w.rdwr_byte().bits(word));
             }
 
-            Ok(())
+            Some(())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
@@ -233,14 +233,14 @@ where
     }
 
     /// Flush the output FIFO but don't block if it isn't ready immediately
-    pub fn flush_tx_nb(&mut self) -> nb::Result<(), Error> {
+    pub fn flush_tx_nb(&mut self) -> Option<()> {
         let reg_block = USB_DEVICE::register_block();
         reg_block.ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
         if reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
-            Err(nb::Error::WouldBlock)
+            None
         } else {
-            Ok(())
+            Some(())
         }
     }
 }
@@ -258,7 +258,7 @@ where
     }
 
     /// Read a byte from the UART in a non-blocking manner
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    pub fn read_byte(&mut self) -> Option<u8> {
         let reg_block = USB_DEVICE::register_block();
 
         // Check if there are any bytes to read
@@ -270,9 +270,9 @@ where
         {
             let value = reg_block.ep1().read().rdwr_byte().bits();
 
-            Ok(value)
+            Some(value)
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
@@ -281,7 +281,7 @@ where
     /// number of bytes in the FIFO is larger than `buf`.
     pub fn drain_rx_fifo(&mut self, buf: &mut [u8]) -> usize {
         let mut count = 0;
-        while let Ok(value) = self.read_byte() {
+        while let Some(value) = self.read_byte() {
             buf[count] = value;
             count += 1;
             if count == buf.len() {
@@ -409,7 +409,7 @@ where
 
     /// Write data to the serial output in a non-blocking manner
     /// Requires manual flushing (automatically flushed every 64 bytes)
-    pub fn write_byte_nb(&mut self, word: u8) -> nb::Result<(), Error> {
+    pub fn write_byte_nb(&mut self, word: u8) -> Option<()> {
         self.tx.write_byte_nb(word)
     }
 
@@ -419,12 +419,12 @@ where
     }
 
     /// Flush the output FIFO but don't block if it isn't ready immediately
-    pub fn flush_tx_nb(&mut self) -> nb::Result<(), Error> {
+    pub fn flush_tx_nb(&mut self) -> Option<()> {
         self.tx.flush_tx_nb()
     }
 
     /// Read a single byte but don't block if it isn't ready immediately
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    pub fn read_byte(&mut self) -> Option<u8> {
         self.rx.read_byte()
     }
 
@@ -568,7 +568,7 @@ impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtag<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
         embedded_hal_nb::serial::Read::read(&mut self.rx)
     }
 }
@@ -577,8 +577,9 @@ impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
         self.read_byte()
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -586,11 +587,11 @@ impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtag<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         embedded_hal_nb::serial::Write::write(&mut self.tx, word)
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
+    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         embedded_hal_nb::serial::Write::flush(&mut self.tx)
     }
 }
@@ -599,12 +600,14 @@ impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         self.write_byte_nb(word)
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
+    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         self.flush_tx_nb()
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 

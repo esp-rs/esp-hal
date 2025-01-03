@@ -10,7 +10,6 @@ use esp_hal::{
     Blocking,
 };
 use hil_test as _;
-use nb::block;
 
 struct Context {
     rx: UartRx<'static, Blocking>,
@@ -40,9 +39,13 @@ mod tests {
 
         ctx.tx.flush().unwrap();
         ctx.tx.write_bytes(&byte).unwrap();
-        let read = block!(ctx.rx.read_byte());
+        let read = loop {
+            if let Some(byte) = ctx.rx.read_byte() {
+                break byte;
+            }
+        };
 
-        assert_eq!(read, Ok(0x42));
+        assert_eq!(read, 0x42);
     }
 
     #[test]
