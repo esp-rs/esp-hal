@@ -1,5 +1,5 @@
-//! This example uses the internal temperature sensor to measure the chip's temperature
-//!
+//! This example uses the internal temperature sensor to measure the chip's
+//! temperature
 
 //% CHIPS: esp32c6 esp32c3
 
@@ -26,8 +26,8 @@ fn main() -> ! {
     delay.delay_micros(200);
 
     loop {
-        let temp = temperature_sensor.get_celsius();
-        println!("Temperature: {:.2}°C", temp);
+        let temp = temperature_sensor.get_temperature();
+        println!("Temperature: {:.2}°C", temp.to_celsius());
         delay.delay_millis(1_000);
     }
 }
