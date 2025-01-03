@@ -21,6 +21,7 @@ use crate::{
 
 /// Input/Output Stream descriptor for each channel
 #[derive(Copy, Clone)]
+#[allow(clippy::upper_case_acronyms, reason = "peripheral is unstable")]
 pub enum PWMStream {
     /// PWM Stream A
     PWMA,
