@@ -3286,7 +3286,7 @@ impl Driver {
                     // wait
                 }
             } else if #[cfg(esp32)] {
-                xtensa_lx::timer::delay(1);
+                xtensa_lx::timer::delay(2); // ☠️
             } else {
                 // Doesn't seem to be needed for ESP32-S2
             }

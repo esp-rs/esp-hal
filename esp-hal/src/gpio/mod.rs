@@ -72,7 +72,7 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{
-        gpio::{handle_gpio_input, handle_gpio_output, AnyPinInner},
+        gpio::{handle_gpio_input, handle_gpio_output},
         Interrupt,
         GPIO,
         IO_MUX,
@@ -399,10 +399,10 @@ pub trait Pin: Sealed {
     }
 
     #[doc(hidden)]
-    fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)];
+    fn output_signals(&self, _: private::Internal) -> &'static [(AlternateFunction, OutputSignal)];
 
     #[doc(hidden)]
-    fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)];
+    fn input_signals(&self, _: private::Internal) -> &'static [(AlternateFunction, InputSignal)];
 
     #[doc(hidden)]
     fn pull_direction(&self, pull: Pull, _: private::Internal) {
@@ -777,7 +777,7 @@ pub struct GpioPin<const GPIONUM: u8>;
 /// Type-erased GPIO pin
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyPin(pub(crate) AnyPinInner);
+pub struct AnyPin(pub(crate) u8);
 
 impl<const GPIONUM: u8> GpioPin<GPIONUM>
 where
@@ -1045,15 +1045,16 @@ macro_rules! gpio {
                 )*
 
                 impl $crate::gpio::Pin for $crate::gpio::GpioPin<$gpionum> {
+                    #[inline(always)]
                     fn number(&self) -> u8 {
                         $gpionum
                     }
 
                     fn degrade_pin(&self, _: $crate::private::Internal) -> $crate::gpio::AnyPin {
-                        $crate::gpio::AnyPin(AnyPinInner::[< Gpio $gpionum >](unsafe { Self::steal() }))
+                        $crate::gpio::AnyPin($gpionum)
                     }
 
-                    fn output_signals(&self, _: $crate::private::Internal) -> &[($crate::gpio::AlternateFunction, $crate::gpio::OutputSignal)] {
+                    fn output_signals(&self, _: $crate::private::Internal) -> &'static [($crate::gpio::AlternateFunction, $crate::gpio::OutputSignal)] {
                         &[
                             $(
                                 $(
@@ -1066,7 +1067,7 @@ macro_rules! gpio {
                         ]
                     }
 
-                    fn input_signals(&self, _: $crate::private::Internal) -> &[($crate::gpio::AlternateFunction, $crate::gpio::InputSignal)] {
+                    fn input_signals(&self, _: $crate::private::Internal) -> &'static [($crate::gpio::AlternateFunction, $crate::gpio::InputSignal)] {
                         &[
                             $(
                                 $(
@@ -1087,22 +1088,27 @@ macro_rules! gpio {
                 }
             )+
 
-            #[derive(Debug)]
-            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-            pub(crate) enum AnyPinInner {
-                $(
-                    [<Gpio $gpionum >]($crate::gpio::GpioPin<$gpionum>),
-                )+
-            }
-
             impl $crate::peripheral::Peripheral for $crate::gpio::AnyPin {
                 type P = $crate::gpio::AnyPin;
                 unsafe fn clone_unchecked(&self) ->  Self {
-                    match self.0 {
-                        $(AnyPinInner::[<Gpio $gpionum >](_) => {
-                            Self(AnyPinInner::[< Gpio $gpionum >](unsafe { $crate::gpio::GpioPin::steal() }))
-                        })+
-                    }
+                    Self(self.0)
+                }
+            }
+
+            impl $crate::gpio::AnyPin {
+                /// Conjure a new, type-erased GPIO pin out of thin air.
+                ///
+                /// # Safety
+                ///
+                /// The caller must ensure that only one instance of a pin is in use at one time.
+                ///
+                /// # Panics
+                ///
+                /// Panics if the pin with the given number does not exist.
+                pub unsafe fn steal(pin: u8) ->  Self {
+                    const PINS: &[u8] = &[$($gpionum),*];
+                    assert!(PINS.contains(&pin), "Pin {} does not exist", pin);
+                    Self(pin)
                 }
             }
 
@@ -1111,15 +1117,17 @@ macro_rules! gpio {
             #[doc(hidden)]
             macro_rules! handle_gpio_output {
                 ($this:expr, $inner:ident, $code:tt) => {
-                    match $this {
+                    match $this.number() {
                         $(
-                            AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_output_pin!($($type),* {
+                            $gpionum => $crate::if_output_pin!($($type),* {{
+                                #[allow(unused_mut)]
+                                let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
                                 $code
-                            } else {{
-                                let _ = $inner;
+                            }} else {{
                                 panic!("Unsupported")
                             }}),
                         )+
+                        _ => unreachable!(),
                     }
                 }
             }
@@ -1127,10 +1135,15 @@ macro_rules! gpio {
             #[doc(hidden)]
             macro_rules! handle_gpio_input {
                 ($this:expr, $inner:ident, $code:tt) => {
-                    match $this {
+                    match $this.number() {
                         $(
-                            AnyPinInner::[<Gpio $gpionum >]($inner) => $code
+                            $gpionum => {{
+                                #[allow(unused_mut)]
+                                let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
+                                $code
+                            }},
                         )+
+                        _ => unreachable!(),
                     }
                 }
             }
@@ -1143,15 +1156,17 @@ macro_rules! gpio {
                     #[doc(hidden)]
                     macro_rules! handle_rtcio {
                         ($this:expr, $inner:ident, $code:tt) => {
-                            match $this {
+                            match $this.number() {
                                 $(
-                                    AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
+                                    $gpionum => $crate::if_rtcio_pin!($($type),* {{
+                                        #[allow(unused_mut)]
+                                        let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
                                         $code
-                                    } else {{
-                                        let _ = $inner;
+                                    }} else {{
                                         panic!("Unsupported")
                                     }}),
                                 )+
+                                _ => unreachable!(),
                             }
                         }
                     }
@@ -1159,20 +1174,21 @@ macro_rules! gpio {
                     #[doc(hidden)]
                     macro_rules! handle_rtcio_with_resistors {
                         ($this:expr, $inner:ident, $code:tt) => {
-                            match $this {
+                            match $this.number() {
                                 $(
-                                    AnyPinInner::[<Gpio $gpionum >]($inner) => $crate::if_rtcio_pin!($($type),* {
-                                        $crate::if_output_pin!($($type),* {
+                                    $gpionum => $crate::if_rtcio_pin!($($type),* {
+                                        $crate::if_output_pin!($($type),* {{
+                                            #[allow(unused_mut)]
+                                            let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
                                             $code
-                                        } else {{
-                                            let _ = $inner;
+                                        }} else {{
                                             panic!("Unsupported")
                                         }})
                                     } else {{
-                                        let _ = $inner;
                                         panic!("Unsupported")
                                     }}),
                                 )+
+                                _ => unreachable!(),
                             }
                         }
                     }
@@ -2012,6 +2028,7 @@ where
 {
     /// Set the GPIO to output mode.
     #[instability::unstable]
+    #[inline]
     pub fn set_as_output(&mut self) {
         self.pin.set_to_push_pull_output(private::Internal);
     }
@@ -2055,8 +2072,8 @@ where
     /// Toggle pin output
     #[inline]
     pub fn toggle(&mut self) {
-        let level = !self.output_level();
-        self.set_level(level);
+        let level = self.output_level();
+        self.set_level(!level);
     }
 
     /// Configure the [DriveStrength] of the pin
@@ -2098,8 +2115,8 @@ impl<P: Pin> Pin for Flex<'_, P> {
         to self.pin {
             fn number(&self) -> u8;
             fn degrade_pin(&self, _internal: private::Internal) -> AnyPin;
-            fn output_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, OutputSignal)];
-            fn input_signals(&self, _internal: private::Internal) -> &[(AlternateFunction, InputSignal)];
+            fn output_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, OutputSignal)];
+            fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, InputSignal)];
         }
     }
 }
@@ -2136,14 +2153,16 @@ pub(crate) mod internal {
         /// Peripheral signals allow connecting peripherals together without
         /// using external hardware.
         #[inline]
+        #[allow(unused_braces, reason = "False positive")]
         pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
-            handle_gpio_input!(self.0, target, { target.split() })
+            handle_gpio_input!(self, target, { target.split() })
         }
     }
 
     impl Pin for AnyPin {
+        #[inline(always)]
         fn number(&self) -> u8 {
-            handle_gpio_input!(&self.0, target, { Pin::number(target) })
+            self.0
         }
 
         fn degrade_pin(&self, _: private::Internal) -> AnyPin {
@@ -2151,26 +2170,32 @@ pub(crate) mod internal {
         }
 
         fn sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_input!(&mut self.0, target, {
-                Pin::sleep_mode(target, on, private::Internal)
+            handle_gpio_input!(self, target, {
+                Pin::sleep_mode(&mut target, on, private::Internal)
             })
         }
 
         fn set_alternate_function(&mut self, alternate: AlternateFunction, _: private::Internal) {
-            handle_gpio_input!(&mut self.0, target, {
-                Pin::set_alternate_function(target, alternate, private::Internal)
+            handle_gpio_input!(self, target, {
+                Pin::set_alternate_function(&mut target, alternate, private::Internal)
             })
         }
 
-        fn output_signals(&self, _: private::Internal) -> &[(AlternateFunction, OutputSignal)] {
-            handle_gpio_output!(&self.0, target, {
-                Pin::output_signals(target, private::Internal)
+        fn output_signals(
+            &self,
+            _: private::Internal,
+        ) -> &'static [(AlternateFunction, OutputSignal)] {
+            handle_gpio_output!(self, target, {
+                Pin::output_signals(&target, private::Internal)
             })
         }
 
-        fn input_signals(&self, _: private::Internal) -> &[(AlternateFunction, InputSignal)] {
-            handle_gpio_input!(&self.0, target, {
-                Pin::input_signals(target, private::Internal)
+        fn input_signals(
+            &self,
+            _: private::Internal,
+        ) -> &'static [(AlternateFunction, InputSignal)] {
+            handle_gpio_input!(self, target, {
+                Pin::input_signals(&target, private::Internal)
             })
         }
     }
@@ -2186,9 +2211,9 @@ pub(crate) mod internal {
             input_enable: Option<bool>,
             _: private::Internal,
         ) {
-            handle_gpio_output!(&mut self.0, target, {
+            handle_gpio_output!(self, target, {
                 OutputPin::init_output(
-                    target,
+                    &mut target,
                     alternate,
                     open_drain,
                     input_enable,
@@ -2198,50 +2223,41 @@ pub(crate) mod internal {
         }
 
         fn set_to_open_drain_output(&mut self, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::set_to_open_drain_output(target, private::Internal)
+            handle_gpio_output!(self, target, {
+                OutputPin::set_to_open_drain_output(&mut target, private::Internal)
             })
         }
 
         fn set_to_push_pull_output(&mut self, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::set_to_push_pull_output(target, private::Internal)
+            handle_gpio_output!(self, target, {
+                OutputPin::set_to_push_pull_output(&mut target, private::Internal)
             })
         }
 
-        fn set_output_high(&mut self, high: bool, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::set_output_high(target, high, private::Internal)
-            })
-        }
+        // We use the default `set_output_high` implementation to avoid matching on pin
+        // type. We check the pin type to enable output functionality anyway.
 
         fn set_drive_strength(&mut self, strength: DriveStrength, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::set_drive_strength(target, strength, private::Internal)
+            handle_gpio_output!(self, target, {
+                OutputPin::set_drive_strength(&mut target, strength, private::Internal)
             })
         }
 
         fn enable_open_drain(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::enable_open_drain(target, on, private::Internal)
+            handle_gpio_output!(self, target, {
+                OutputPin::enable_open_drain(&mut target, on, private::Internal)
             })
         }
 
         fn internal_pull_up_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::internal_pull_up_in_sleep_mode(target, on, private::Internal)
+            handle_gpio_output!(self, target, {
+                OutputPin::internal_pull_up_in_sleep_mode(&mut target, on, private::Internal)
             })
         }
 
         fn internal_pull_down_in_sleep_mode(&mut self, on: bool, _: private::Internal) {
-            handle_gpio_output!(&mut self.0, target, {
-                OutputPin::internal_pull_down_in_sleep_mode(target, on, private::Internal)
-            })
-        }
-
-        fn is_set_high(&self, _: private::Internal) -> bool {
-            handle_gpio_output!(&self.0, target, {
-                OutputPin::is_set_high(target, private::Internal)
+            handle_gpio_output!(self, target, {
+                OutputPin::internal_pull_down_in_sleep_mode(&mut target, on, private::Internal)
             })
         }
     }
@@ -2251,26 +2267,26 @@ pub(crate) mod internal {
         #[cfg(xtensa)]
         #[allow(unused_braces)] // False positive :/
         fn rtc_number(&self) -> u8 {
-            handle_rtcio!(&self.0, target, { RtcPin::rtc_number(target) })
+            handle_rtcio!(self, target, { RtcPin::rtc_number(&target) })
         }
 
         #[cfg(any(xtensa, esp32c6))]
         fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction) {
-            handle_rtcio!(&mut self.0, target, {
-                RtcPin::rtc_set_config(target, input_enable, mux, func)
+            handle_rtcio!(self, target, {
+                RtcPin::rtc_set_config(&mut target, input_enable, mux, func)
             })
         }
 
         fn rtcio_pad_hold(&mut self, enable: bool) {
-            handle_rtcio!(&mut self.0, target, {
-                RtcPin::rtcio_pad_hold(target, enable)
+            handle_rtcio!(self, target, {
+                RtcPin::rtcio_pad_hold(&mut target, enable)
             })
         }
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
         unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
-            handle_rtcio!(&mut self.0, target, {
-                RtcPin::apply_wakeup(target, wakeup, level)
+            handle_rtcio!(self, target, {
+                RtcPin::apply_wakeup(&mut target, wakeup, level)
             })
         }
     }
@@ -2278,14 +2294,14 @@ pub(crate) mod internal {
     #[cfg(any(esp32c2, esp32c3, esp32c6, xtensa))]
     impl RtcPinWithResistors for AnyPin {
         fn rtcio_pullup(&mut self, enable: bool) {
-            handle_rtcio_with_resistors!(&mut self.0, target, {
-                RtcPinWithResistors::rtcio_pullup(target, enable)
+            handle_rtcio_with_resistors!(self, target, {
+                RtcPinWithResistors::rtcio_pullup(&mut target, enable)
             })
         }
 
         fn rtcio_pulldown(&mut self, enable: bool) {
-            handle_rtcio_with_resistors!(&mut self.0, target, {
-                RtcPinWithResistors::rtcio_pulldown(target, enable)
+            handle_rtcio_with_resistors!(self, target, {
+                RtcPinWithResistors::rtcio_pulldown(&mut target, enable)
             })
         }
     }
