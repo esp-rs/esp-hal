@@ -86,11 +86,19 @@ mod placeholder;
 pub use placeholder::NoPin;
 
 #[cfg(soc_etm)]
-pub mod etm;
+crate::unstable_module! {
+    pub mod etm;
+}
+
 #[cfg(lp_io)]
-pub mod lp_io;
+crate::unstable_module! {
+    pub mod lp_io;
+}
+
 #[cfg(all(rtc_io, not(esp32)))]
-pub mod rtc_io;
+crate::unstable_module! {
+    pub mod rtc_io;
+}
 
 /// Convenience constant for `Option::None` pin
 static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
@@ -139,6 +147,7 @@ impl From<WakeEvent> for Event {
 }
 
 /// Event used to wake up from light sleep.
+#[instability::unstable]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WakeEvent {
@@ -233,6 +242,7 @@ pub enum DriveStrength {
 ///
 /// The different variants correspond to different functionality depending on
 /// the chip and the specific pin. For more information, refer to your chip's
+#[doc(hidden)]
 #[doc = crate::trm_markdown_link!("iomuxgpio")]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -268,6 +278,7 @@ impl TryFrom<usize> for AlternateFunction {
 }
 
 /// RTC function
+#[instability::unstable]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RtcFunction {
@@ -278,6 +289,7 @@ pub enum RtcFunction {
 }
 
 /// Trait implemented by RTC pins
+#[instability::unstable]
 pub trait RtcPin: Pin {
     /// RTC number of the pin
     #[cfg(xtensa)]
@@ -300,6 +312,7 @@ pub trait RtcPin: Pin {
 
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
+#[instability::unstable]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     fn rtcio_pullup(&mut self, enable: bool);
@@ -516,6 +529,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
 }
 
 /// Trait implemented by pins which can be used as analog pins
+#[instability::unstable]
 pub trait AnalogPin: Pin {
     /// Configure the pin for analog operation
     #[doc(hidden)]
@@ -523,6 +537,8 @@ pub trait AnalogPin: Pin {
 }
 
 /// Trait implemented by pins which can be used as Touchpad pins
+#[cfg(touch)]
+#[instability::unstable]
 pub trait TouchPin: Pin {
     /// Configure the pin for analog operation
     #[doc(hidden)]
@@ -1599,6 +1615,7 @@ where
     /// Enable as a wake-up source.
     ///
     /// This will unlisten for interrupts
+    #[instability::unstable]
     #[inline]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.pin.wakeup_enable(enable, event);
@@ -1998,6 +2015,7 @@ where
     /// Enable as a wake-up source.
     ///
     /// This will unlisten for interrupts
+    #[instability::unstable]
     #[inline]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.listen_with_options(event.into(), false, false, enable);

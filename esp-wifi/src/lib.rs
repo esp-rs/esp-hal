@@ -45,10 +45,21 @@
 //! a feature flag of the `log` crate. See [documentation](https://docs.rs/log/0.4.19/log/#compile-time-filters).
 //! You should set it to `release_max_level_off`.
 //!
-//! ### Xtensa considerations
+//! ### WiFi performance considerations
 //!
-//! Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in
-//! your application you are not using this CPU timer.
+//! The default configuration is quite conservative to reduce power and memory consumption.
+//!
+//! There are a number of settings which influence the general performance. Optimal settings are chip and applications specific.
+//! You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
+//!
+//! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
+//!
+//! By default the power-saving mode is [PowerSaveMode::Minimum](crate::config::PowerSaveMode::Minimum) and `ESP_WIFI_PHY_ENABLE_USB` is enabled by default.
+//!
+//! In addition pay attention to these configuration keys:
+//! - `ESP_WIFI_RX_QUEUE_SIZE`
+//! - `ESP_WIFI_TX_QUEUE_SIZE`
+//! - `ESP_WIFI_MAX_BURST_SIZE`
 //!
 //! # Features flags
 //!

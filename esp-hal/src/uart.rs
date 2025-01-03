@@ -152,7 +152,7 @@
     any(esp32s2, esp32s3),
     doc = "let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);"
 )]
-//! let config = Config::default().rx_fifo_full_threshold(30);
+//! let config = Config::default().with_rx_fifo_full_threshold(30);
 //!
 //! let mut uart0 = Uart::new(
 //!     peripherals.UART0,
@@ -164,7 +164,7 @@
 //! uart0.set_interrupt_handler(interrupt_handler);
 //!
 //! critical_section::with(|cs| {
-//!     uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
+//!     uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(b'#'));
 //!     uart0.listen(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
 //!
 //!     SERIAL.borrow_ref_mut(cs).replace(uart0);
@@ -250,6 +250,7 @@ use crate::{
 };
 
 const UART_FIFO_SIZE: u16 = 128;
+const CMD_CHAR_DEFAULT: u8 = 0x2b;
 
 /// UART Error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -276,6 +277,7 @@ pub enum Error {
     ///
     /// This error occurs when the received data does not conform to the
     /// expected UART frame format.
+    #[allow(clippy::enum_variant_names, reason = "Frame error is a common term")]
     RxFrameError,
 
     /// A parity error was detected on the RX line.
@@ -283,6 +285,7 @@ pub enum Error {
     /// This error occurs when the parity bit in the received data does not
     /// match the expected parity configuration.
     /// with the `async` feature.
+    #[allow(clippy::enum_variant_names, reason = "Parity error is a common term")]
     RxParityError,
 }
 
@@ -368,6 +371,7 @@ pub enum DataBits {
 /// either even or odd.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 pub enum Parity {
     /// No parity bit is used (most common).
     #[default]
@@ -387,6 +391,7 @@ pub enum Parity {
 /// bits.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 pub enum StopBits {
     /// 1 stop bit.
     #[default]
@@ -420,51 +425,9 @@ pub struct Config {
 }
 
 impl Config {
-    /// Sets the baud rate for the UART configuration.
-    pub fn baudrate(mut self, baudrate: u32) -> Self {
-        self.baudrate = baudrate;
-        self
-    }
-
-    /// Configures the UART to use no parity check.
-    pub fn parity_none(mut self) -> Self {
-        self.parity = Parity::ParityNone;
-        self
-    }
-
-    /// Configures the UART to use even parity check.
-    pub fn parity_even(mut self) -> Self {
-        self.parity = Parity::ParityEven;
-        self
-    }
-
-    /// Configures the UART to use odd parity check.
-    pub fn parity_odd(mut self) -> Self {
-        self.parity = Parity::ParityOdd;
-        self
-    }
-
-    /// Sets the number of data bits for the UART configuration.
-    pub fn data_bits(mut self, data_bits: DataBits) -> Self {
-        self.data_bits = data_bits;
-        self
-    }
-
-    /// Sets the number of stop bits for the UART configuration.
-    pub fn stop_bits(mut self, stop_bits: StopBits) -> Self {
-        self.stop_bits = stop_bits;
-        self
-    }
-
-    /// Sets the clock source for the UART configuration.
-    pub fn clock_source(mut self, source: ClockSource) -> Self {
-        self.clock_source = source;
-        self
-    }
-
     /// Calculates the total symbol length in bits based on the configured
     /// data bits, parity, and stop bits.
-    pub fn symbol_length(&self) -> u8 {
+    fn symbol_length(&self) -> u8 {
         let mut length: u8 = 1; // start bit
         length += match self.data_bits {
             DataBits::DataBits5 => 5,
@@ -482,18 +445,6 @@ impl Config {
         };
         length
     }
-
-    /// Sets the RX FIFO full threshold for the UART configuration.
-    pub fn rx_fifo_full_threshold(mut self, threshold: u16) -> Self {
-        self.rx_fifo_full_threshold = threshold;
-        self
-    }
-
-    /// Sets the RX timeout for the UART configuration.
-    pub fn rx_timeout(mut self, timeout: Option<u8>) -> Self {
-        self.rx_timeout = timeout;
-        self
-    }
 }
 
 impl Default for Config {
@@ -510,6 +461,9 @@ impl Default for Config {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 /// Configuration for the AT-CMD detection functionality
 pub struct AtCmdConfig {
     /// Optional idle time before the AT command detection begins, in clock
@@ -524,28 +478,17 @@ pub struct AtCmdConfig {
     /// The character that triggers the AT command detection.
     pub cmd_char: u8,
     /// Optional number of characters to detect as part of the AT command.
-    pub char_num: Option<u8>,
+    pub char_num: u8,
 }
 
-impl AtCmdConfig {
-    /// Creates a new `AtCmdConfig` with the specified configuration.
-    ///
-    /// This function sets up the AT command detection parameters, including
-    /// pre- and post-idle times, a gap timeout, the triggering command
-    /// character, and the number of characters to detect.
-    pub fn new(
-        pre_idle_count: Option<u16>,
-        post_idle_count: Option<u16>,
-        gap_timeout: Option<u16>,
-        cmd_char: u8,
-        char_num: Option<u8>,
-    ) -> AtCmdConfig {
+impl Default for AtCmdConfig {
+    fn default() -> Self {
         Self {
-            pre_idle_count,
-            post_idle_count,
-            gap_timeout,
-            cmd_char,
-            char_num,
+            pre_idle_count: None,
+            post_idle_count: None,
+            gap_timeout: None,
+            cmd_char: CMD_CHAR_DEFAULT,
+            char_num: 1,
         }
     }
 }
@@ -631,6 +574,7 @@ pub struct UartRx<'d, Dm, T = AnyUart> {
 /// A configuration error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum ConfigError {
     /// The requested timeout is not supported.
     UnsupportedTimeout,
@@ -752,7 +696,7 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush_tx(&mut self) -> nb::Result<(), Error> {
+    pub fn flush(&mut self) -> nb::Result<(), Error> {
         if self.is_tx_idle() {
             Ok(())
         } else {
@@ -1219,7 +1163,7 @@ where
 
         register_block.at_cmd_char().write(|w| unsafe {
             w.at_cmd_char().bits(config.cmd_char);
-            w.char_num().bits(config.char_num.unwrap_or(1))
+            w.char_num().bits(config.char_num)
         });
 
         if let Some(pre_idle_count) = config.pre_idle_count {
@@ -1254,8 +1198,8 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush_tx(&mut self) -> nb::Result<(), Error> {
-        self.tx.flush_tx()
+    pub fn flush(&mut self) -> nb::Result<(), Error> {
+        self.tx.flush()
     }
 
     /// Read a byte from the UART
@@ -1477,7 +1421,7 @@ where
     }
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx()
+        self.flush()
     }
 }
 
@@ -1491,7 +1435,7 @@ where
     }
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx()
+        self.flush()
     }
 }
 
@@ -1581,7 +1525,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.tx.flush()
+        embedded_io::Write::flush(&mut self.tx)
     }
 }
 
@@ -1598,7 +1542,7 @@ where
 
     fn flush(&mut self) -> Result<(), Self::Error> {
         loop {
-            match self.flush_tx() {
+            match self.flush() {
                 Ok(_) => break,
                 Err(nb::Error::WouldBlock) => { /* Wait */ }
                 Err(nb::Error::Other(e)) => return Err(e),
@@ -2227,6 +2171,7 @@ pub mod lp_uart {
 }
 
 /// UART Peripheral Instance
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnyUart> + 'static {
     /// Returns the peripheral data and state describing this UART instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -2245,6 +2190,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnyUart> + 'static {
 }
 
 /// Peripheral data describing a particular UART instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this UART instance.
@@ -2275,6 +2221,7 @@ pub struct Info {
 }
 
 /// Peripheral state for a UART instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct State {
     /// Waker for the asynchronous RX operations.

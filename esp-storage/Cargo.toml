@@ -3,24 +3,12 @@ name = "esp-storage"
 version = "0.4.0"
 edition = "2021"
 rust-version = "1.76.0"
-authors = [
-    "The ESP-RS team",
-    "Björn Quentin <bjoern.quentin@mobile-j.de>",
-]
 description  = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
+keywords     = ["embedded-storage", "esp32", "espressif", "no-std"]
+categories   = ["embedded", "hardware-support", "no-std"]
 repository   = "https://github.com/esp-rs/esp-storage"
 license      = "MIT OR Apache-2.0"
 
-keywords = [
-    "embedded-storage",
-    "esp",
-    "no-std",
-]
-categories = [
-    "embedded",
-    "hardware-support",
-    "no-std",
-]
 
 [dependencies]
 embedded-storage = "0.3.1"

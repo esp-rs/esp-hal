@@ -185,6 +185,7 @@ pub enum ParlIoInterrupt {
 /// Parallel IO errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Error {
     /// General DMA error
     DmaError(DmaError),

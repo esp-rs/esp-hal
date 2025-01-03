@@ -54,6 +54,8 @@
 //! 
 //! ## Implementation State
 //!
+//! This driver is currently **unstable**.
+//!
 //! There are several options for working with the SPI peripheral in slave mode,
 //! but the code currently only supports:
 //! - Single transfers (not segmented transfers)
@@ -91,6 +93,7 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 /// SPI peripheral driver.
 ///
 /// See the [module-level documentation][self] for more details.
+#[instability::unstable]
 pub struct Spi<'d, Dm, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
     #[allow(dead_code)]
@@ -98,9 +101,9 @@ pub struct Spi<'d, Dm, T = AnySpi> {
     _mode: PhantomData<Dm>,
     _guard: PeripheralGuard,
 }
-
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
+    #[instability::unstable]
     pub fn new(spi: impl Peripheral<P = impl Instance> + 'd, mode: Mode) -> Spi<'d, Blocking> {
         Self::new_typed(spi.map_into(), mode)
     }
@@ -111,6 +114,7 @@ where
     T: Instance,
 {
     /// Constructs an SPI instance in 8bit dataframe mode.
+    #[instability::unstable]
     pub fn new_typed(spi: impl Peripheral<P = T> + 'd, mode: Mode) -> Spi<'d, Dm, T> {
         crate::into_ref!(spi);
 
@@ -133,6 +137,7 @@ where
     }
 
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    #[instability::unstable]
     pub fn with_sck(self, sclk: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(sclk);
         sclk.enable_input(true, private::Internal);
@@ -141,6 +146,7 @@ where
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
+    #[instability::unstable]
     pub fn with_mosi(self, mosi: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
         mosi.enable_input(true, private::Internal);
@@ -149,6 +155,7 @@ where
     }
 
     /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
+    #[instability::unstable]
     pub fn with_miso(self, miso: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
         miso.set_to_push_pull_output(private::Internal);
@@ -157,6 +164,7 @@ where
     }
 
     /// Assign the CS (Chip Select) pin for the SPI instance.
+    #[instability::unstable]
     pub fn with_cs(self, cs: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
         cs.enable_input(true, private::Internal);
@@ -166,6 +174,7 @@ where
 }
 
 /// DMA (Direct Memory Access) functionality (Slave).
+#[instability::unstable]
 pub mod dma {
     use super::*;
     use crate::{
@@ -198,6 +207,7 @@ pub mod dma {
         /// Configures the SPI peripheral with the provided DMA channel and
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
+        #[instability::unstable]
         pub fn with_dma<CH>(
             self,
             channel: impl Peripheral<P = CH> + 'd,
@@ -218,6 +228,7 @@ pub mod dma {
     }
 
     /// A DMA capable SPI instance.
+    #[instability::unstable]
     pub struct SpiDma<'d, Dm, T = AnySpi>
     where
         T: InstanceDma,
@@ -333,6 +344,7 @@ pub mod dma {
         /// sent is 32736 bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
+        #[instability::unstable]
         pub fn write<'t, TXBUF>(
             &'t mut self,
             words: &'t TXBUF,
@@ -368,6 +380,7 @@ pub mod dma {
         /// received is 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
+        #[instability::unstable]
         pub fn read<'t, RXBUF>(
             &'t mut self,
             words: &'t mut RXBUF,
@@ -404,6 +417,7 @@ pub mod dma {
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.
+        #[instability::unstable]
         pub fn transfer<'t, RXBUF, TXBUF>(
             &'t mut self,
             read_buffer: &'t mut RXBUF,
@@ -573,12 +587,14 @@ pub mod dma {
 }
 
 /// SPI peripheral instance.
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + 'static {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;
 }
 
 /// A marker for DMA-capable SPI peripheral instances.
+#[doc(hidden)]
 pub trait InstanceDma: Instance + DmaEligible {}
 
 impl InstanceDma for crate::peripherals::SPI2 {}
@@ -586,7 +602,9 @@ impl InstanceDma for crate::peripherals::SPI2 {}
 impl InstanceDma for crate::peripherals::SPI3 {}
 
 /// Peripheral data describing a particular SPI instance.
+#[doc(hidden)]
 #[non_exhaustive]
+#[doc(hidden)]
 pub struct Info {
     /// Pointer to the register block for this SPI instance.
     ///
@@ -611,6 +629,7 @@ pub struct Info {
 
 impl Info {
     /// Returns the register block for this SPI instance.
+    #[instability::unstable]
     pub fn register_block(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
     }

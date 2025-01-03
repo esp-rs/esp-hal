@@ -158,6 +158,7 @@ use crate::binary::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
+#[allow(clippy::upper_case_acronyms)] // FIXME
 pub enum AuthMethod {
     /// No authentication (open network).
     None,
@@ -1089,6 +1090,7 @@ pub enum WifiEvent {
 #[repr(i32)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME remove prefix
 pub enum InternalWifiError {
     /// Out of memory
     EspErrNoMem          = 0x101,
@@ -2686,9 +2688,9 @@ impl<Dm: Sealed> WifiRxToken<Dm> {
 impl<Dm: Sealed> RxToken for WifiRxToken<Dm> {
     fn consume<R, F>(self, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> R,
+        F: FnOnce(&[u8]) -> R,
     {
-        self.consume_token(f)
+        self.consume_token(|t| f(t))
     }
 }
 
