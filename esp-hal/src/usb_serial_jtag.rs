@@ -281,7 +281,7 @@ where
     /// number of bytes in the FIFO is larger than `buf`.
     pub fn drain_rx_fifo(&mut self, buf: &mut [u8]) -> usize {
         let mut count = 0;
-        while let Ok(value) = self.read_byte() {
+        while let Some(value) = self.read_byte() {
             buf[count] = value;
             count += 1;
             if count == buf.len() {
@@ -568,7 +568,7 @@ impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtag<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
         embedded_hal_nb::serial::Read::read(&mut self.rx)
     }
 }
@@ -577,8 +577,9 @@ impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte().ok_or(nb::Error::WouldBlock)
+    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
+        self.read_byte()
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -586,11 +587,11 @@ impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtag<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         embedded_hal_nb::serial::Write::write(&mut self.tx, word)
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
+    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         embedded_hal_nb::serial::Write::flush(&mut self.tx)
     }
 }
@@ -599,12 +600,14 @@ impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte_nb(word).ok_or(nb::Error::WouldBlock)
+    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
+        self.write_byte_nb(word)
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx_nb().ok_or(nb::Error::WouldBlock)
+    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
+        self.flush_tx_nb()
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 

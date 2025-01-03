@@ -42,7 +42,11 @@ fn main() -> ! {
     let mut cnt = 0;
     let mut read = [0u8; 2];
     loop {
-        let c = nb::block!(uart0.read_byte()).unwrap();
+        let c = loop {
+            if let Some(c) = uart0.read_byte() {
+                break c;
+            }
+        };
         if c == b'r' {
             continue;
         }
@@ -77,7 +81,7 @@ fn main() -> ! {
             println!("@RAW {:02x?}", &frame.data);
         }
 
-        if let nb::Result::Ok(c) = uart0.read_byte() {
+        if let Some(c) = uart0.read_byte() {
             if c == b'r' {
                 software_reset();
             }

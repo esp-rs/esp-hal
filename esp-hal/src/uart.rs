@@ -198,7 +198,7 @@
 //!         let serial = serial.as_mut().unwrap();
 //!
 //!         let mut cnt = 0;
-//!         while let nb::Result::Ok(_c) = serial.read_byte() {
+//!         while let Some(_c) = serial.read_byte() {
 //!             cnt += 1;
 //!         }
 //!         writeln!(serial, "Read {} bytes", cnt).ok();
@@ -285,6 +285,9 @@ pub enum Error {
     /// match the expected parity configuration.
     /// with the `async` feature.
     RxParityError,
+
+    /// This operation requires blocking behavior to complete
+    WouldBlock,
 }
 
 impl core::error::Error for Error {}
@@ -297,6 +300,7 @@ impl core::fmt::Display for Error {
             Error::RxGlitchDetected => write!(f, "A glitch was detected on the RX line"),
             Error::RxFrameError => write!(f, "A framing error was detected on the RX line"),
             Error::RxParityError => write!(f, "A parity error was detected on the RX line"),
+            Error::WouldBlock => write!(f, "Would block"),
         }
     }
 }
@@ -661,21 +665,24 @@ where
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         let count = data.len();
 
-        data.iter()
-            .try_for_each(|c| nb::block!(self.write_byte(*c)))?;
+        for &byte in data {
+            if self.write_byte(byte).is_none() {
+                return Err(Error::WouldBlock);
+            }
+        }
 
         Ok(count)
     }
 
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+    fn write_byte(&mut self, word: u8) -> Option<()> {
         if self.tx_fifo_count() < UART_FIFO_SIZE {
             self.register_block()
                 .fifo()
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
 
-            Ok(())
+            Some(())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
@@ -692,11 +699,11 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> nb::Result<(), Error> {
+    pub fn flush(&mut self) -> Option<()> {
         if self.is_tx_idle() {
-            Ok(())
+            Some(())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
@@ -883,7 +890,7 @@ where
     }
 
     /// Read a byte from the UART
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    pub fn read_byte(&mut self) -> Option<u8> {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
                 // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
@@ -897,9 +904,9 @@ where
         }
 
         if self.rx_fifo_count() > 0 {
-            Ok(fifo.read().rxfifo_rd_byte().bits())
+            Some(fifo.read().rxfifo_rd_byte().bits())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
@@ -908,7 +915,7 @@ where
     pub fn drain_fifo(&mut self, buf: &mut [u8]) -> usize {
         let mut count = 0;
         while count < buf.len() {
-            if let Ok(byte) = self.read_byte() {
+            if let Some(byte) = self.read_byte() {
                 buf[count] = byte;
                 count += 1;
             } else {
@@ -1189,17 +1196,17 @@ where
     }
 
     /// Write a byte out over the UART
-    pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+    pub fn write_byte(&mut self, word: u8) -> Option<()> {
         self.tx.write_byte(word)
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> nb::Result<(), Error> {
+    pub fn flush(&mut self) -> Option<()> {
         self.tx.flush()
     }
 
     /// Read a byte from the UART
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    pub fn read_byte(&mut self) -> Option<u8> {
         self.rx.read_byte()
     }
 
@@ -1392,8 +1399,9 @@ where
     T: Instance,
     Dm: DriverMode,
 {
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
         self.read_byte()
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -1402,8 +1410,9 @@ where
     T: Instance,
     Dm: DriverMode,
 {
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
         self.read_byte()
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -1412,12 +1421,13 @@ where
     T: Instance,
     Dm: DriverMode,
 {
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         self.write_byte(word)
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush()
+    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
+        self.flush().ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -1426,12 +1436,13 @@ where
     T: Instance,
     Dm: DriverMode,
 {
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         self.write_byte(word)
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush()
+    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
+        self.flush().ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -1539,9 +1550,8 @@ where
     fn flush(&mut self) -> Result<(), Self::Error> {
         loop {
             match self.flush() {
-                Ok(_) => break,
-                Err(nb::Error::WouldBlock) => { /* Wait */ }
-                Err(nb::Error::Other(e)) => return Err(e),
+                Some(_) => break,
+                None => { /* Wait */ }
             }
         }
 

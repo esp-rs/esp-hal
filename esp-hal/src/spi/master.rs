@@ -2211,14 +2211,16 @@ mod ehal1 {
         T: Instance,
         Dm: DriverMode,
     {
-        fn read(&mut self) -> nb::Result<u8, Self::Error> {
-            self.driver().read_byte().ok_or(nb::Error::WouldBlock)
+        fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
+            self.driver()
+                .read_byte()
+                .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
         }
 
-        fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+        fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
             self.driver()
                 .write_byte(word)
-                .map_or_else(|| Err(nb::Error::WouldBlock), |_| Ok(()))
+                .map_or_else(|| Err(embedded_hal_nb::nb::Error::WouldBlock), |_| Ok(()))
         }
     }
 
