@@ -224,6 +224,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parl_io::{no_clk_pin(), NoClkPin}` (#2531)
 - Removed `get_core` function in favour of `Cpu::current` (#2533)
 
+- Removed `uart::Config` setters and `symbol_length`. (#2847)
+
 ## [0.21.1]
 
 ### Fixed

@@ -152,7 +152,7 @@
     any(esp32s2, esp32s3),
     doc = "let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);"
 )]
-//! let config = Config::default().rx_fifo_full_threshold(30);
+//! let config = Config::default().with_rx_fifo_full_threshold(30);
 //!
 //! let mut uart0 = Uart::new(
 //!     peripherals.UART0,
@@ -421,51 +421,9 @@ pub struct Config {
 }
 
 impl Config {
-    /// Sets the baud rate for the UART configuration.
-    pub fn baudrate(mut self, baudrate: u32) -> Self {
-        self.baudrate = baudrate;
-        self
-    }
-
-    /// Configures the UART to use no parity check.
-    pub fn parity_none(mut self) -> Self {
-        self.parity = Parity::ParityNone;
-        self
-    }
-
-    /// Configures the UART to use even parity check.
-    pub fn parity_even(mut self) -> Self {
-        self.parity = Parity::ParityEven;
-        self
-    }
-
-    /// Configures the UART to use odd parity check.
-    pub fn parity_odd(mut self) -> Self {
-        self.parity = Parity::ParityOdd;
-        self
-    }
-
-    /// Sets the number of data bits for the UART configuration.
-    pub fn data_bits(mut self, data_bits: DataBits) -> Self {
-        self.data_bits = data_bits;
-        self
-    }
-
-    /// Sets the number of stop bits for the UART configuration.
-    pub fn stop_bits(mut self, stop_bits: StopBits) -> Self {
-        self.stop_bits = stop_bits;
-        self
-    }
-
-    /// Sets the clock source for the UART configuration.
-    pub fn clock_source(mut self, source: ClockSource) -> Self {
-        self.clock_source = source;
-        self
-    }
-
     /// Calculates the total symbol length in bits based on the configured
     /// data bits, parity, and stop bits.
-    pub fn symbol_length(&self) -> u8 {
+    fn symbol_length(&self) -> u8 {
         let mut length: u8 = 1; // start bit
         length += match self.data_bits {
             DataBits::DataBits5 => 5,
@@ -482,18 +440,6 @@ impl Config {
             _ => 2, // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
         };
         length
-    }
-
-    /// Sets the RX FIFO full threshold for the UART configuration.
-    pub fn rx_fifo_full_threshold(mut self, threshold: u16) -> Self {
-        self.rx_fifo_full_threshold = threshold;
-        self
-    }
-
-    /// Sets the RX timeout for the UART configuration.
-    pub fn rx_timeout(mut self, timeout: Option<u8>) -> Self {
-        self.rx_timeout = timeout;
-        self
     }
 }
 
@@ -2221,6 +2167,7 @@ pub mod lp_uart {
 }
 
 /// UART Peripheral Instance
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnyUart> + 'static {
     /// Returns the peripheral data and state describing this UART instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -2239,6 +2186,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnyUart> + 'static {
 }
 
 /// Peripheral data describing a particular UART instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this UART instance.
@@ -2269,6 +2217,7 @@ pub struct Info {
 }
 
 /// Peripheral state for a UART instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct State {
     /// Waker for the asynchronous RX operations.

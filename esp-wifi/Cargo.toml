@@ -3,14 +3,13 @@ name = "esp-wifi"
 version = "0.11.0"
 edition = "2021"
 rust-version  = "1.83.0"
-authors = ["The ESP-RS team"]
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
 documentation = "https://docs.esp-rs.org/esp-hal/"
+keywords = ["wifi", "bluetooth", "esp-now", "esp32", "no-std"]
+categories = ["embedded", "hardware-support", "no-std"]
 repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
-keywords = ["wifi", "bluetooth", "esp", "no-std"]
-categories = ["embedded", "hardware-support", "no-std"]
 
 [dependencies]
 defmt = { version = "0.3.8", optional = true }
@@ -18,7 +17,7 @@ log = { version = "0.4.22", optional = true }
 document-features  = "0.2.10"
 esp-alloc = { version = "0.5.0", path = "../esp-alloc", optional = true }
 esp-hal = { version = "0.22.0", path = "../esp-hal", default-features = false }
-smoltcp = { version = "0.11.0", default-features = false, features = [
+smoltcp = { version = "0.12.0", default-features = false, features = [
   "medium-ethernet",
   "socket-raw",
 ], optional = true }

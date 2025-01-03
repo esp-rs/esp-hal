@@ -4,21 +4,10 @@ version      = "0.1.0"
 edition      = "2021"
 rust-version = "1.76.0"
 description  = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
+keywords     = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
+categories   = ["embedded", "hardware-support", "no-std"]
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
-
-keywords = [
-    "embedded",
-    "embedded-hal",
-    "esp",
-    "esp32",
-    "no-std",
-]
-categories = [
-    "embedded",
-    "hardware-support",
-    "no-std",
-]
 
 [lib]
 bench = false
