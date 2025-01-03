@@ -34,8 +34,6 @@
 //!
 //! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/hmac.rs
 
-use core::convert::Infallible;
-
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::HMAC,
@@ -176,8 +174,8 @@ impl<'d> Hmac<'d> {
 
         let msg_len = self.byte_written as u64;
 
-        nb::block!(self.write_data(&[0x80])).unwrap();
-        nb::block!(self.flush_data()).unwrap();
+        self.write_data(&[0x80])?;
+        self.flush_data()?;
         self.next_command();
         debug_assert!(self.byte_written % 4 == 0);
 

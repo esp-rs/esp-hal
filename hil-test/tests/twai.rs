@@ -12,7 +12,6 @@ use esp_hal::{
     Blocking,
 };
 use hil_test as _;
-use nb::block;
 
 struct Context {
     twai: twai::Twai<'static, Blocking>,
@@ -53,9 +52,13 @@ mod tests {
     #[test]
     fn test_send_receive(mut ctx: Context) {
         let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3]).unwrap();
-        block!(ctx.twai.transmit(&frame)).unwrap();
+        while ctx.twai.transmit(&frame).is_err() {}
 
-        let frame = block!(ctx.twai.receive()).unwrap();
+        let frame = loop {
+            if let Ok(frame) = ctx.twai.receive() {
+                break frame;
+            }
+        };
 
         assert_eq!(frame.data(), &[1, 2, 3])
     }

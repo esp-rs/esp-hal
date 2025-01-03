@@ -46,8 +46,13 @@ pub unsafe fn conjure() -> LpUart {
 }
 
 /// UART Error
-#[derive(Debug)]
-pub enum Error {}
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum Error {
+    /// This operation requires blocking behavior to complete
+    WouldBlock,
+}
 
 #[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Error for Error {
@@ -169,24 +174,23 @@ pub struct LpUart {
 
 impl LpUart {
     /// Read a single byte from the UART in a non-blocking manner.
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    pub fn read_byte(&mut self) -> Option<u8> {
         if self.rx_fifo_count() > 0 {
-            let byte = self.uart.fifo().read().rxfifo_rd_byte().bits();
-            Ok(byte)
+            Some(self.uart.fifo().read().rxfifo_rd_byte().bits())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
     /// Write a single byte to the UART in a non-blocking manner.
-    pub fn write_byte(&mut self, byte: u8) -> nb::Result<(), Error> {
+    pub fn write_byte(&mut self, byte: u8) -> Option<()> {
         if self.tx_fifo_count() < UART_FIFO_SIZE {
             self.uart
                 .fifo()
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(byte) });
-            Ok(())
+            Some(())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
@@ -195,18 +199,21 @@ impl LpUart {
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         let count = data.len();
 
-        data.iter()
-            .try_for_each(|c| nb::block!(self.write_byte(*c)))?;
+        for &byte in data {
+            if self.write_byte(byte).is_none() {
+                return Err(Error::WouldBlock);
+            }
+        }
 
         Ok(count)
     }
 
-    /// Flush the UART's transmit buffer in a non-blocking manner.
-    pub fn flush_tx(&mut self) -> nb::Result<(), Error> {
+    /// Flush the transmit buffer of the UART
+    pub fn flush(&mut self) -> Option<()> {
         if self.is_tx_idle() {
-            Ok(())
+            Some(())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
@@ -238,19 +245,21 @@ impl embedded_hal_nb::serial::ErrorType for LpUart {
 
 #[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Read for LpUart {
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
         self.read_byte()
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
 #[cfg(feature = "embedded-hal")]
 impl embedded_hal_nb::serial::Write for LpUart {
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         self.write_byte(word)
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx()
+    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
+        self.flush().ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -295,11 +304,9 @@ impl embedded_io::Write for LpUart {
 
     fn flush(&mut self) -> Result<(), Self::Error> {
         loop {
-            match self.flush_tx() {
-                Ok(_) => break,
-                Err(nb::Error::WouldBlock) => { /* Wait */ }
-                #[allow(unreachable_patterns)]
-                Err(nb::Error::Other(e)) => return Err(e),
+            match self.flush() {
+                Some(_) => break,
+                None => { /* Wait */ }
             }
         }
 

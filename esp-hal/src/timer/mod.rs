@@ -35,7 +35,7 @@
 //!
 //! periodic.start(1.secs());
 //! loop {
-//!     nb::block!(periodic.wait());
+//!    while periodic.wait().is_none() {}
 //! }
 //! # }
 //! ```

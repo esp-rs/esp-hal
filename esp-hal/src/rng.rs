@@ -81,10 +81,13 @@
 ///     Attenuation::_11dB
 /// );
 /// let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
-/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+/// let pin_value: u16 = loop {
+///    if let Some(value) = adc1.read_oneshot(&mut adc1_pin) {
+///       break value;
+///    }
+/// };
 /// rng.read(&mut buf);
 /// true_rand = rng.random();
-/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
 /// # }
 /// ```
 use core::marker::PhantomData;

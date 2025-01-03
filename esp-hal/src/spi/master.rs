@@ -52,7 +52,7 @@
 //! .with_miso(miso);
 //! # }
 //! ```
-//!
+//! 
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: https://docs.embassy.dev/embassy-embedded-hal/git/default/shared_bus/index.html
 
