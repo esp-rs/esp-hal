@@ -46,16 +46,14 @@ fn main() -> ! {
         function_in_ram as *const ()
     );
     unsafe {
-        println!("SOME_INITED_DATA {:x?}", SOME_INITED_DATA);
-        println!("SOME_PERSISTENT_DATA {:x?}", SOME_PERSISTENT_DATA);
-        println!("SOME_ZEROED_DATA {:x?}", SOME_ZEROED_DATA);
+        assert_eq!(&[0xaa, 0xbb], &SOME_INITED_DATA);
+        assert_eq!(&[0; 8], &SOME_ZEROED_DATA);
 
         SOME_INITED_DATA[0] = 0xff;
         SOME_ZEROED_DATA[0] = 0xff;
 
-        println!("SOME_INITED_DATA {:x?}", SOME_INITED_DATA);
-        println!("SOME_PERSISTENT_DATA {:x?}", SOME_PERSISTENT_DATA);
-        println!("SOME_ZEROED_DATA {:x?}", SOME_ZEROED_DATA);
+        assert_eq!(&[0xff, 0xbb], &SOME_INITED_DATA);
+        assert_eq!(&[0xff, 0, 0, 0, 0, 0, 0, 0], &SOME_ZEROED_DATA);
 
         if SOME_PERSISTENT_DATA[1] == 0xff {
             SOME_PERSISTENT_DATA[1] = 0;
@@ -69,17 +67,22 @@ fn main() -> ! {
         "RTC_FAST function located at {:p}",
         function_in_rtc_ram as *const ()
     );
-    println!("Result {}", function_in_rtc_ram());
 
+    assert_eq!(42, function_in_rtc_ram());
+
+    println!("Restarting in ~ 10 seconds.");
+    let mut i = 10;
     loop {
-        function_in_ram();
+        assert_eq!(42, function_in_rtc_ram());
+        function_in_ram(i);
+        i = i.saturating_sub(1);
         delay.delay(1.secs());
     }
 }
 
 #[ram]
-fn function_in_ram() {
-    println!("Hello world!");
+fn function_in_ram(count: u32) {
+    println!("{}", count);
 }
 
 #[ram(rtc_fast)]

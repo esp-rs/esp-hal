@@ -244,7 +244,8 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     // Execute the specified action:
     match action {
         CargoAction::Build => build_examples(args, examples, &package_path),
-        CargoAction::Run => run_example(args, examples, &package_path),
+        CargoAction::Run if args.example.is_some() => run_example(args, examples, &package_path),
+        CargoAction::Run => run_examples(args, examples, &package_path),
     }
 }
 
@@ -314,6 +315,79 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
         "Example not found or unsupported for {}",
         args.chip
     );
+
+    Ok(())
+}
+
+fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(args.package, &args.chip)?;
+
+    // Filter the examples down to only the binaries we're interested in
+    let mut examples: Vec<Metadata> = examples
+        .iter()
+        .filter(|ex| ex.supports_chip(args.chip))
+        .cloned()
+        .collect();
+    examples.sort_by_key(|ex| ex.tag());
+
+    let console = console::Term::stdout();
+
+    for example in examples {
+        let mut skip = false;
+
+        log::info!("Running example '{}'", example.name());
+        if let Some(description) = example.description() {
+            log::info!(
+                "\n\n{}\n\nPress ENTER to run example, `s` to skip",
+                description.trim()
+            );
+        } else {
+            log::info!("\n\nPress ENTER to run example, `s` to skip");
+        }
+
+        loop {
+            let key = console.read_key();
+
+            match key {
+                Ok(console::Key::Enter) => break,
+                Ok(console::Key::Char('s')) => {
+                    skip = true;
+                    break;
+                }
+                _ => (),
+            }
+        }
+
+        if !skip {
+            while !skip
+                && xtask::execute_app(
+                    package_path,
+                    args.chip,
+                    target,
+                    &example,
+                    CargoAction::Run,
+                    1,
+                    args.debug,
+                )
+                .is_err()
+            {
+                log::info!("Failed to run example. Retry or skip? (r/s)");
+                loop {
+                    let key = console.read_key();
+
+                    match key {
+                        Ok(console::Key::Char('r')) => break,
+                        Ok(console::Key::Char('s')) => {
+                            skip = true;
+                            break;
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+    }
 
     Ok(())
 }
