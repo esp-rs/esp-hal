@@ -83,6 +83,7 @@ symbols = [
     "wifi6",
     "ieee802154",
     "lp_core",
+    "tsens",
 
     # ROM capabilities
     "rom_crc_le",

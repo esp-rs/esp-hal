@@ -52,6 +52,7 @@ crate::peripherals! {
         SW_INTERRUPT <= virtual,
         TIMG0 <= TIMG0,
         TIMG1 <= TIMG1,
+        TSENS <= virtual,
         TWAI0 <= TWAI0,
         UART0 <= UART0,
         UART1 <= UART1,
