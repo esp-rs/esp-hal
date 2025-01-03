@@ -85,6 +85,98 @@ const I2C_CHUNK_SIZE: usize = 254;
 // on ESP32 there is a chance to get trapped in `wait_for_completion` forever
 const MAX_ITERATIONS: u32 = 1_000_000;
 
+/// Address mode.
+///
+/// Note: This trait is sealed and should not be implemented outside of this
+/// crate.
+pub trait AddressMode: _private::AddressModeInternal + Copy + 'static {}
+
+mod _private {
+    pub trait AddressModeInternal {
+        fn is_seven_bit(&self) -> bool;
+
+        fn as_u8(&self) -> u8;
+
+        fn as_u16(&self) -> u16;
+    }
+}
+
+/// 7-bit address mode type.
+///
+/// Note that 7-bit addresses defined by drivers should be specified in
+/// **right-aligned** form, e.g. in the range `0x00..=0x7F`.
+///
+/// For example, a device that has the seven bit address of `0b011_0010`, and
+/// therefore is addressed on the wire using:
+///
+/// * `0b0110010_0` or `0x64` for *writes*
+/// * `0b0110010_1` or `0x65` for *reads*
+pub type SevenBitAddress = u8;
+
+impl AddressMode for SevenBitAddress {}
+
+impl _private::AddressModeInternal for SevenBitAddress {
+    fn is_seven_bit(&self) -> bool {
+        true
+    }
+
+    fn as_u8(&self) -> u8 {
+        *self
+    }
+
+    fn as_u16(&self) -> u16 {
+        unreachable!()
+    }
+}
+
+/// I2C SCL timeout period.
+///
+/// When the level of SCL remains unchanged for more than `timeout` bus
+/// clock cycles, the bus goes to idle state.
+///
+/// Default value is `BusCycles(10)`.
+#[doc = ""]
+#[cfg_attr(
+    not(esp32),
+    doc = "Note that the effective timeout may be longer than the value configured here."
+)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+// TODO: when supporting interrupts, document that SCL = high also triggers an
+// interrupt.
+pub enum Timeout {
+    /// Use the maximum timeout value.
+    #[cfg(any(esp32, esp32s2))]
+    Maximum,
+
+    /// Disable timeout control.
+    #[cfg(not(any(esp32, esp32s2)))]
+    Disabled,
+
+    /// Timeout in bus clock cycles.
+    BusCycles(u32),
+}
+
+impl Timeout {
+    fn cycles(&self) -> u32 {
+        match self {
+            #[cfg(any(esp32, esp32s2))]
+            Timeout::Maximum => u32::MAX,
+
+            #[cfg(not(any(esp32, esp32s2)))]
+            Timeout::Disabled => 1,
+
+            Timeout::BusCycles(cycles) => *cycles,
+        }
+    }
+
+    #[cfg(not(esp32))]
+    fn is_set(&self) -> bool {
+        matches!(self, Timeout::BusCycles(_))
+    }
+}
+
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -284,20 +376,7 @@ pub struct Config {
     pub frequency: HertzU32,
 
     /// I2C SCL timeout period.
-    ///
-    /// When the level of SCL remains unchanged for more than `timeout` bus
-    /// clock cycles, the bus goes to idle state.
-    ///
-    /// The default value is about 10 bus clock cycles.
-    #[doc = ""]
-    #[cfg_attr(
-        not(esp32),
-        doc = "Note that the effective timeout may be longer than the value configured here."
-    )]
-    #[cfg_attr(not(esp32), doc = "Configuring `None` disables timeout control.")]
-    #[cfg_attr(esp32, doc = "Configuring `None` equals to the maximum timeout value.")]
-    // TODO: when supporting interrupts, document that SCL = high also triggers an interrupt.
-    pub timeout: Option<u32>,
+    pub timeout: Timeout,
 }
 
 impl core::hash::Hash for Config {
@@ -312,7 +391,7 @@ impl Default for Config {
         use fugit::RateExtU32;
         Config {
             frequency: 100.kHz(),
-            timeout: Some(10),
+            timeout: Timeout::BusCycles(10),
         }
     }
 }
@@ -342,7 +421,7 @@ impl<T, Dm: DriverMode> embedded_hal::i2c::ErrorType for I2c<'_, Dm, T> {
     type Error = Error;
 }
 
-impl<T, Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm, T>
+impl<T, Dm: DriverMode> embedded_hal::i2c::I2c<u8> for I2c<'_, Dm, T>
 where
     T: Instance,
 {
@@ -383,9 +462,9 @@ where
         Ok(())
     }
 
-    fn transaction_impl<'a>(
+    fn transaction_impl<'a, A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
@@ -521,14 +600,14 @@ where
     }
 
     /// Writes bytes to slave with address `address`
-    pub fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+    pub fn write<A: AddressMode>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
             .write_blocking(address, buffer, true, true)
             .inspect_err(|_| self.internal_recover())
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
-    pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    pub fn read<A: AddressMode>(&mut self, address: A, buffer: &mut [u8]) -> Result<(), Error> {
         self.driver()
             .read_blocking(address, buffer, true, true, false)
             .inspect_err(|_| self.internal_recover())
@@ -536,9 +615,9 @@ where
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
-    pub fn write_read(
+    pub fn write_read<A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
@@ -571,9 +650,9 @@ where
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    pub fn transaction<'a>(
+    pub fn transaction<'a, A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
         self.transaction_impl(address, operations.into_iter().map(Operation::from))
@@ -715,7 +794,7 @@ where
     }
 
     /// Writes bytes to slave with address `address`
-    pub async fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+    pub async fn write<A: AddressMode>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
             .write(address, buffer, true, true)
             .await
@@ -723,7 +802,11 @@ where
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
-    pub async fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    pub async fn read<A: AddressMode>(
+        &mut self,
+        address: A,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
         self.driver()
             .read(address, buffer, true, true, false)
             .await
@@ -732,9 +815,9 @@ where
 
     /// Writes bytes to slave with address `address` and then reads enough
     /// bytes to fill `buffer` *in a single transaction*
-    pub async fn write_read(
+    pub async fn write_read<A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
@@ -770,9 +853,9 @@ where
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    pub async fn transaction<'a>(
+    pub async fn transaction<'a, A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
         self.transaction_impl_async(address, operations.into_iter().map(Operation::from))
@@ -780,9 +863,9 @@ where
             .inspect_err(|_| self.internal_recover())
     }
 
-    async fn transaction_impl_async<'a>(
+    async fn transaction_impl_async<'a, A: AddressMode>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
@@ -832,7 +915,7 @@ where
     }
 }
 
-impl<T> embedded_hal_async::i2c::I2c for I2c<'_, Async, T>
+impl<T> embedded_hal_async::i2c::I2c<u8> for I2c<'_, Async, T>
 where
     T: Instance,
 {
@@ -914,7 +997,7 @@ fn configure_clock(
     scl_stop_setup_time: u32,
     scl_start_hold_time: u32,
     scl_stop_hold_time: u32,
-    timeout: Option<u32>,
+    timeout: Timeout,
 ) -> Result<(), ConfigError> {
     unsafe {
         // divider
@@ -970,13 +1053,13 @@ fn configure_clock(
             if #[cfg(esp32)] {
                 register_block
                     .to()
-                    .write(|w| w.time_out().bits(unwrap!(timeout)));
+                    .write(|w| w.time_out().bits(timeout.cycles()));
             } else {
                 register_block
                     .to()
-                    .write(|w| w.time_out_en().bit(timeout.is_some())
+                    .write(|w| w.time_out_en().bit(timeout.is_set())
                     .time_out_value()
-                    .bits(timeout.unwrap_or(1) as _)
+                    .bits(timeout.cycles() as _)
                 );
             }
         }
@@ -1126,7 +1209,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: Option<u32>,
+        timeout: Timeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1138,9 +1221,7 @@ impl Driver<'_> {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let timeout = timeout.map_or(Some(0xF_FFFF), |to_bus| {
-            Some((to_bus * 2 * half_cycle).min(0xF_FFFF))
-        });
+        let timeout = Timeout::BusCycles((timeout.cycles() * 2 * half_cycle).min(0xF_FFFF));
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -1207,7 +1288,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: Option<u32>,
+        timeout: Timeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1250,7 +1331,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            timeout.map(|to_bus| (to_bus * 2 * half_cycle).min(0xFF_FFFF)),
+            Timeout::BusCycles((timeout.cycles() * 2 * half_cycle).min(0xFF_FFFF)),
         )?;
 
         Ok(())
@@ -1264,7 +1345,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: Option<u32>,
+        timeout: Timeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1321,13 +1402,13 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            timeout.map(|to_bus| {
-                let to_peri = (to_bus * 2 * half_cycle).max(1);
+            {
+                let to_peri = (timeout.cycles() * 2 * half_cycle).max(1);
                 let log2 = to_peri.ilog2();
                 // Round up so that we don't shorten timeouts.
                 let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                raw.min(0x1F)
-            }),
+                Timeout::BusCycles(raw.min(0x1F))
+            },
         )?;
 
         Ok(())
@@ -1359,9 +1440,9 @@ impl Driver<'_> {
     /// - `start` indicates whether the operation should start by a START
     ///   condition and sending the address.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn setup_write<'a, I>(
+    fn setup_write<'a, I, A: AddressMode>(
         &self,
-        addr: u8,
+        addr: A,
         bytes: &[u8],
         start: bool,
         cmd_iterator: &mut I,
@@ -1397,7 +1478,7 @@ impl Driver<'_> {
             // Load address and R/W bit into FIFO
             write_fifo(
                 self.register_block(),
-                addr << 1 | OperationType::Write as u8,
+                addr.as_u8() << 1 | OperationType::Write as u8,
             );
         }
         Ok(())
@@ -1411,9 +1492,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn setup_read<'a, I>(
+    fn setup_read<'a, I, A: AddressMode>(
         &self,
-        addr: u8,
+        addr: A,
         buffer: &mut [u8],
         start: bool,
         will_continue: bool,
@@ -1474,7 +1555,10 @@ impl Driver<'_> {
 
         if start {
             // Load address and R/W bit into FIFO
-            write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
+            write_fifo(
+                self.register_block(),
+                addr.as_u8() << 1 | OperationType::Read as u8,
+            );
         }
         Ok(())
     }
@@ -1907,9 +1991,9 @@ impl Driver<'_> {
             .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
-    fn start_write_operation(
+    fn start_write_operation<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -1944,9 +2028,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn start_read_operation(
+    fn start_read_operation<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -1979,9 +2063,9 @@ impl Driver<'_> {
     /// - `stop` indicates whether the operation should end with a STOP
     ///   condition.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn write_operation_blocking(
+    fn write_operation_blocking<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -2011,9 +2095,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn read_operation_blocking(
+    fn read_operation_blocking<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2041,9 +2125,9 @@ impl Driver<'_> {
     /// - `stop` indicates whether the operation should end with a STOP
     ///   condition.
     /// - `cmd_iterator` is an iterator over the command registers.
-    async fn write_operation(
+    async fn write_operation<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -2073,9 +2157,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    async fn read_operation(
+    async fn read_operation<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2095,9 +2179,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    fn read_blocking(
+    fn read_blocking<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2117,9 +2201,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    fn write_blocking(
+    fn write_blocking<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &[u8],
         start: bool,
         stop: bool,
@@ -2140,9 +2224,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    async fn read(
+    async fn read<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2163,9 +2247,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    async fn write(
+    async fn write<A: AddressMode>(
         &self,
-        address: u8,
+        address: A,
         buffer: &[u8],
         start: bool,
         stop: bool,
