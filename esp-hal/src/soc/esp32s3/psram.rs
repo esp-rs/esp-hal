@@ -174,11 +174,11 @@ pub(crate) fn init_psram(config: PsramConfig) {
         let mut mapped_pages = 0;
         for i in (0..FLASH_MMU_TABLE_SIZE).rev() {
             if mmu_table_ptr.add(i).read_volatile() != MMU_INVALID {
-                mapped_pages = i;
+                mapped_pages = (i + 1) as u32;
                 break;
             }
         }
-        let start = EXTMEM_ORIGIN + MMU_PAGE_SIZE * (mapped_pages + 1) as u32;
+        let start = EXTMEM_ORIGIN + (MMU_PAGE_SIZE * mapped_pages);
         debug!("PSRAM start address = {:x}", start);
 
         // Configure the mode of instruction cache : cache size, cache line size.
@@ -188,7 +188,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
             CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE,
         );
 
-        // If we need use SPIRAM, we should use data cache.Connfigure the mode of data :
+        // If we need use SPIRAM, we should use data cache.Configure the mode of data :
         // cache size, cache line size.
         Cache_Suspend_DCache();
 
