@@ -1,5 +1,3 @@
-use core::convert::Infallible;
-
 use crate::rsa::{
     implement_op,
     Multi,

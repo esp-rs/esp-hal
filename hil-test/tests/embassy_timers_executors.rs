@@ -68,7 +68,8 @@ mod test_cases {
         let t1 = esp_hal::time::now();
         periodic.start(100.millis()).unwrap();
 
-        nb::block!(periodic.wait()).unwrap();
+        while periodic.wait().is_none() {}
+
         let t2 = esp_hal::time::now();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);

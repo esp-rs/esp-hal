@@ -12,7 +12,6 @@ use esp_hal::{
     Blocking,
 };
 use hil_test as _;
-use nb::block;
 
 struct Context {
     uart: Uart<'static, Blocking>,
@@ -40,8 +39,13 @@ mod tests {
     #[test]
     fn test_send_receive(mut ctx: Context) {
         ctx.uart.write(0x42).ok();
-        let read = block!(ctx.uart.read());
-        assert_eq!(read, Ok(0x42));
+        let read = loop {
+            if let Ok(byte) = ctx.uart.read() {
+                break byte;
+            }
+        };
+
+        assert_eq!(read, 0x42);
     }
 
     #[test]
@@ -61,8 +65,8 @@ mod tests {
                     buffer[i] = byte;
                     i += 1;
                 }
-                Err(nb::Error::WouldBlock) => continue,
-                Err(nb::Error::Other(_)) => panic!(),
+                Err(embedded_hal_nb::nb::Error::WouldBlock) => continue,
+                Err(embedded_hal_nb::nb::Error::Other(_)) => panic!(),
             }
         }
 
@@ -95,8 +99,12 @@ mod tests {
                 )
                 .unwrap();
             ctx.uart.write(byte_to_write).ok();
-            let read = block!(ctx.uart.read());
-            assert_eq!(read, Ok(byte_to_write));
+            let read = loop {
+                if let Ok(byte) = ctx.uart.read() {
+                    break byte;
+                }
+            };
+            assert_eq!(read, byte_to_write);
             byte_to_write = !byte_to_write;
         }
     }

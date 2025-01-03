@@ -34,7 +34,6 @@ use esp_hal::{
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
 };
 use esp_println::println;
-use nb::block;
 
 #[main]
 fn main() -> ! {
@@ -82,21 +81,26 @@ fn main() -> ! {
         // Send a frame to the other ESP
         // Use `new_self_reception` if you want to use self-testing.
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
-        block!(twai.transmit(&frame)).unwrap();
+        while twai.transmit(&frame).is_err() {}
+
         println!("Sent a frame");
     }
 
     let delay = Delay::new();
     loop {
         // Wait for a frame to be received.
-        let frame = block!(twai.receive()).unwrap();
+        let frame = loop {
+            if let Ok(frame) = twai.receive() {
+                break frame;
+            }
+        };
 
         println!("Received a frame: {frame:?}");
         delay.delay_millis(250);
 
         let frame = EspTwaiFrame::new(StandardId::ZERO, &[1, 2, 3]).unwrap();
         // Transmit a new frame back to the other ESP
-        block!(twai.transmit(&frame)).unwrap();
+        while twai.transmit(&frame).is_err() {}
         println!("Sent a frame");
     }
 }

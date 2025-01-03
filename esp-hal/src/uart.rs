@@ -645,21 +645,24 @@ where
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         let count = data.len();
 
-        data.iter()
-            .try_for_each(|c| nb::block!(self.write_byte(*c)))?;
+        for &byte in data {
+            if self.write_byte(byte).is_none() {
+                return Err(Error::WouldBlock);
+            }
+        }
 
         Ok(count)
     }
 
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+    fn write_byte(&mut self, word: u8) -> Option<()> {
         if self.tx_fifo_count() < UART_FIFO_SIZE {
             self.register_block()
                 .fifo()
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
 
-            Ok(())
+            Some(())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
@@ -676,11 +679,11 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> nb::Result<(), Error> {
+    pub fn flush(&mut self) -> Option<()> {
         if self.is_tx_idle() {
-            Ok(())
+            Some(())
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
     }
 
@@ -1202,13 +1205,13 @@ where
         sync_regs(register_block);
     }
 
-    // Write a byte out over the UART
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+    /// Write a byte out over the UART
+    fn write_byte(&mut self, word: u8) -> Option<()> {
         self.tx.write_byte(word)
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> nb::Result<(), Error> {
+    pub fn flush(&mut self) -> Option<()> {
         self.tx.flush()
     }
 
@@ -1399,8 +1402,9 @@ impl<Dm> embedded_hal_nb::serial::Read for Uart<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
         self.read_byte()
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -1420,12 +1424,13 @@ impl<Dm> embedded_hal_nb::serial::Write for Uart<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         self.write_byte(word)
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush()
+    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
+        self.flush().ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -1433,12 +1438,13 @@ impl<Dm> embedded_hal_nb::serial::Write for UartTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
         self.write_byte(word)
+            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush()
+    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
+        self.flush().ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
@@ -1540,9 +1546,8 @@ where
     fn flush(&mut self) -> Result<(), Self::Error> {
         loop {
             match self.flush() {
-                Ok(_) => break,
-                Err(nb::Error::WouldBlock) => { /* Wait */ }
-                Err(nb::Error::Other(e)) => return Err(e),
+                Some(_) => break,
+                None => { /* Wait */ }
             }
         }
 

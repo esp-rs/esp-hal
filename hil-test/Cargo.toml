@@ -224,7 +224,6 @@ embassy-executor    = { version = "0.7.0", default-features = false }
 embedded-test       = { version = "0.6.0", default-features = false, features = ["embassy", "external-executor"] }
 fugit               = "0.3.7"
 hex-literal         = "0.4.1"
-nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 sha1                = { version = "0.10.6", default-features = false }

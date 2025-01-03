@@ -33,7 +33,6 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::sha::Sha;
 //! # use esp_hal::sha::Sha256;
-//! # use nb::block;
 //! let mut source_data = "HELLO, ESPRESSIF!".as_bytes();
 //! let mut sha = Sha::new(peripherals.SHA);
 //! let mut hasher = sha.start::<Sha256>();
@@ -41,22 +40,21 @@
 //! // desired length
 //! let mut output = [0u8; 32];
 //!
-//! while !source_data.is_empty() {
-//!     // All the HW Sha functions are infallible so unwrap is fine to use if
-//!     // you use block!
-//!     source_data = block!(hasher.update(source_data)).unwrap();
-//! }
+//! let source_data = loop {
+//!    if let Some(data) = hasher.finish(&mut output) {
+//!       break data;
+//!   }
+//! };
 //!
 //! // Finish can be called as many times as desired to get multiple copies of
 //! // the output.
-//! block!(hasher.finish(output.as_mut_slice())).unwrap();
-//!
+//! while hasher.finish(output.as_mut_slice()).is_none() {}
 //! # }
 //! ```
 //! ## Implementation State
 //! - DMA-SHA Mode is not supported.
 
-use core::{borrow::BorrowMut, convert::Infallible, marker::PhantomData, mem::size_of};
+use core::{borrow::BorrowMut, marker::PhantomData, mem::size_of};
 
 /// Re-export digest for convenience
 #[cfg(feature = "digest")]
@@ -225,9 +223,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         // Store message length for padding
         let length = (self.cursor as u64 * 8).to_be_bytes();
         // Append "1" bit
-        if self.update(&[0x80]).is_none() {
-            return None;
-        }
+        self.update(&[0x80])?;
 
         // Flush partial data, ensures aligned cursor
         {
@@ -540,8 +536,8 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::OutputSizeUser for ShaD
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::Update for ShaDigest<'d, A, S> {
     fn update(&mut self, data: &[u8]) {
         let mut remaining = data.as_ref();
-        while !remaining.is_empty() {
-            remaining = nb::block!(Self::update(self, remaining)).unwrap();
+        while let Some(rem) = Self::update(self, remaining) {
+            remaining = rem;
         }
     }
 }
@@ -549,7 +545,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::Update for ShaDigest<'d
 #[cfg(feature = "digest")]
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::FixedOutput for ShaDigest<'d, A, S> {
     fn finalize_into(mut self, out: &mut digest::Output<Self>) {
-        nb::block!(self.finish(out)).unwrap();
+        while self.finish(out).is_none() {}
     }
 }
 
