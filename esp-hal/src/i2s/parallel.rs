@@ -736,8 +736,9 @@ impl Instance for I2S1 {
             bits
         );
 
-        // signals for 8bit and 16bit both start at an offset of 8 for I2S1
-        // https://github.com/espressif/esp-idf/blob/9106c43accd9f5e75379f62f12597677213f5023/components/esp_lcd/i80/esp_lcd_panel_io_i2s.c#L701
+        // signals for 8bit  start at an offset of  0 and 16bit start at an offset of 8 for I2S1
+        let pin_offset = if bits == 8 { 0 } else { 8 };
+
         match i + 8 {
             0 => OutputSignal::I2S1O_DATA_0,
             1 => OutputSignal::I2S1O_DATA_1,
