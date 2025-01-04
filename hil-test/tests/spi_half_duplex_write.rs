@@ -6,16 +6,16 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::interconnect::InputSignal,
     pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
-    prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
-        SpiDataMode,
-        SpiMode,
+        DataMode,
+        Mode,
     },
+    time::RateExtU32,
     Blocking,
 };
 use hil_test as _;
@@ -27,7 +27,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -39,29 +39,27 @@ mod tests {
         let (mosi, _) = hil_test::common_test_pins!(peripherals);
 
         let pcnt = Pcnt::new(peripherals.PCNT);
-        let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-                let dma_channel = dma.spi2channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 
         let (mosi_loopback, mosi) = mosi.split();
 
-        let spi = Spi::new_with_config(
+        let spi = Spi::new(
             peripherals.SPI2,
-            Config {
-                frequency: 100.kHz(),
-                mode: SpiMode::Mode0,
-                ..Config::default()
-            },
+            Config::default()
+                .with_frequency(100.kHz())
+                .with_mode(Mode::Mode0),
         )
+        .unwrap()
         .with_sck(sclk)
         .with_mosi(mosi)
-        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+        .with_dma(dma_channel);
 
         Context {
             spi,
@@ -71,7 +69,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
@@ -90,10 +87,11 @@ mod tests {
 
         let transfer = spi
             .half_duplex_write(
-                SpiDataMode::Single,
+                DataMode::Single,
                 Command::None,
                 Address::None,
                 0,
+                dma_tx_buf.len(),
                 dma_tx_buf,
             )
             .map_err(|e| e.0)
@@ -104,21 +102,22 @@ mod tests {
 
         let transfer = spi
             .half_duplex_write(
-                SpiDataMode::Single,
+                DataMode::Single,
                 Command::None,
                 Address::None,
                 0,
+                dma_tx_buf.len(),
                 dma_tx_buf,
             )
             .map_err(|e| e.0)
             .unwrap();
-        transfer.wait();
+        // dropping SPI would make us see an additional edge - so let's keep SPI alive
+        let (_spi, _) = transfer.wait();
 
         assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
@@ -135,25 +134,13 @@ mod tests {
 
         let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
         // Write the buffer where each byte has 3 pos edges.
-        spi.half_duplex_write(
-            SpiDataMode::Single,
-            Command::None,
-            Address::None,
-            0,
-            &buffer,
-        )
-        .unwrap();
+        spi.half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
+            .unwrap();
 
         assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
-        spi.half_duplex_write(
-            SpiDataMode::Single,
-            Command::None,
-            Address::None,
-            0,
-            &buffer,
-        )
-        .unwrap();
+        spi.half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
+            .unwrap();
 
         assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }

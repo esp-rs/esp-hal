@@ -1,6 +1,7 @@
 //! Interrupt handling
 
 use xtensa_lx::interrupt;
+pub(crate) use xtensa_lx::interrupt::free;
 use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
@@ -334,13 +335,45 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::interrupt_c
     crate::peripherals::INTERRUPT_CORE1::PTR
 }
 
+/// Get the current run level (the level below which interrupts are masked).
+pub(crate) fn current_runlevel() -> Priority {
+    let ps: u32;
+    unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
+
+    let prev_interrupt_priority = ps as u8 & 0x0F;
+
+    unwrap!(Priority::try_from(prev_interrupt_priority))
+}
+
+/// Changes the current run level (the level below which interrupts are
+/// masked), and returns the previous run level.
+///
+/// # Safety
+///
+/// This function must only be used to raise the runlevel and to restore it
+/// to a previous value. It must not be used to arbitrarily lower the
+/// runlevel.
+pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
+    let token: u32;
+    match level {
+        Priority::None => core::arch::asm!("rsil {0}, 0", out(reg) token),
+        Priority::Priority1 => core::arch::asm!("rsil {0}, 1", out(reg) token),
+        Priority::Priority2 => core::arch::asm!("rsil {0}, 2", out(reg) token),
+        Priority::Priority3 => core::arch::asm!("rsil {0}, 3", out(reg) token),
+    };
+
+    let prev_interrupt_priority = token as u8 & 0x0F;
+
+    unwrap!(Priority::try_from(prev_interrupt_priority))
+}
+
 mod vectored {
     use procmacros::ram;
 
     use super::*;
 
     /// Interrupt priority levels.
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[repr(u8)]
     pub enum Priority {
@@ -363,6 +396,20 @@ mod vectored {
         /// Minimum interrupt priority
         pub const fn min() -> Priority {
             Priority::Priority1
+        }
+    }
+
+    impl TryFrom<u8> for Priority {
+        type Error = Error;
+
+        fn try_from(value: u8) -> Result<Self, Self::Error> {
+            match value {
+                0 => Ok(Priority::None),
+                1 => Ok(Priority::Priority1),
+                2 => Ok(Priority::Priority2),
+                3 => Ok(Priority::Priority3),
+                _ => Err(Error::InvalidInterrupt),
+            }
         }
     }
 

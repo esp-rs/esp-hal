@@ -16,21 +16,42 @@
 //!    * Low-Power Management
 //!    * Handling Watchdog Timers
 //!
-//! ## Example
+//! ## Examples
+//!
+//! ### Get time in ms from the RTC Timer
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use core::cell::RefCell;
+//! # use core::time::Duration;
+//! # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 //!
+//! let rtc = Rtc::new(peripherals.LPWR);
+//! let delay = Delay::new();
+//!
+//! loop {
+//!     // Print the current RTC time in milliseconds
+//!     let time_ms = rtc.current_time().and_utc().timestamp_millis();
+//!     delay.delay_millis(1000);
+//!
+//!     // Set the time to half a second in the past
+//!     let new_time = rtc.current_time() - Duration::from_millis(500);
+//!     rtc.set_current_time(new_time);
+//! }
+//! # }
+//! ```
+//! 
+//! ### RWDT usage
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use core::cell::RefCell;
 //! # use critical_section::Mutex;
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::rtc_cntl::Rtc;
 //! # use esp_hal::rtc_cntl::Rwdt;
 //! # use esp_hal::rtc_cntl::RwdtStage;
-//! # use crate::esp_hal::InterruptConfigurable;
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
-//! let mut delay = Delay::new();
 //!
+//! let mut delay = Delay::new();
 //! let mut rtc = Rtc::new(peripherals.LPWR);
 //!
 //! rtc.set_interrupt_handler(interrupt_handler);
@@ -42,29 +63,48 @@
 //!
 //! // Where the `LP_WDT` interrupt handler is defined as:
 //! # use core::cell::RefCell;
-//!
 //! # use critical_section::Mutex;
 //! # use esp_hal::rtc_cntl::Rwdt;
 //! # use esp_hal::rtc_cntl::RwdtStage;
-//!
 //! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 //!
 //! // Handle the corresponding interrupt
 //! #[handler]
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
-//!         // esp_println::println!("RWDT Interrupt");
+//!         println!("RWDT Interrupt");
 //!
 //!         let mut rwdt = RWDT.borrow_ref_mut(cs);
 //!         let rwdt = rwdt.as_mut().unwrap();
 //!         rwdt.clear_interrupt();
 //!
-//!         // esp_println::println!("Restarting in 5 seconds...");
+//!         println!("Restarting in 5 seconds...");
 //!
 //!         rwdt.set_timeout(RwdtStage::Stage0, 5000u64.millis());
 //!         rwdt.unlisten();
 //!     });
 //! }
+//! ```
+//! 
+//! ### Get time in ms from the RTC Timer
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use core::time::Duration;
+//! # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
+//!
+//! let rtc = Rtc::new(peripherals.LPWR);
+//! let delay = Delay::new();
+//!
+//! loop {
+//!     // Get the current RTC time in milliseconds
+//!     let time_ms = rtc.current_time().and_utc().timestamp_millis();
+//!     delay.delay_millis(1000);
+//!
+//!     // Set the time to half a second in the past
+//!     let new_time = rtc.current_time() - Duration::from_millis(500);
+//!     rtc.set_current_time(new_time);
+//! }
+//! # }
 //! ```
 
 use chrono::{DateTime, NaiveDateTime};
@@ -85,12 +125,11 @@ use crate::peripherals::{LP_AON, LP_TIMER, LP_WDT};
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
-    interrupt::{self, InterruptHandler},
+    interrupt::{self, InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     reset::{SleepSource, WakeupReason},
     Cpu,
-    InterruptConfigurable,
 };
 // only include sleep where it's been implemented
 #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
@@ -137,7 +176,9 @@ unsafe fn lp_wdt<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 /// RTC SLOW_CLK frequency values
 pub(crate) enum RtcFastClock {
     /// Main XTAL, divided by 4
@@ -160,8 +201,10 @@ impl Clock for RtcFastClock {
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
-#[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 /// RTC SLOW_CLK frequency values
 pub enum RtcSlowClock {
     /// Internal slow RC oscillator
@@ -193,7 +236,9 @@ impl Clock for RtcSlowClock {
 
 #[allow(unused)]
 #[cfg(not(any(esp32c6, esp32h2)))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 /// Clock source to be calibrated using rtc_clk_cal function
 pub(crate) enum RtcCalSel {
     /// Currently selected RTC SLOW_CLK
@@ -1054,29 +1099,6 @@ impl Rwdt {
     }
 }
 
-impl embedded_hal_02::watchdog::WatchdogDisable for Rwdt {
-    fn disable(&mut self) {
-        self.disable();
-    }
-}
-
-impl embedded_hal_02::watchdog::WatchdogEnable for Rwdt {
-    type Time = MicrosDurationU64;
-
-    fn start<T>(&mut self, period: T)
-    where
-        T: Into<Self::Time>,
-    {
-        self.set_timeout(RwdtStage::Stage0, period.into());
-    }
-}
-
-impl embedded_hal_02::watchdog::Watchdog for Rwdt {
-    fn feed(&mut self) {
-        self.feed();
-    }
-}
-
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 /// Super Watchdog
 pub struct Swd;
@@ -1128,13 +1150,6 @@ impl Swd {
 impl Default for Swd {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-impl embedded_hal_02::watchdog::WatchdogDisable for Swd {
-    fn disable(&mut self) {
-        self.disable();
     }
 }
 

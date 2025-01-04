@@ -6,15 +6,15 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, Output},
-    prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
-        SpiDataMode,
-        SpiMode,
+        DataMode,
+        Mode,
     },
+    time::RateExtU32,
     Blocking,
 };
 use hil_test as _;
@@ -25,7 +25,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -38,33 +38,29 @@ mod tests {
 
         let miso_mirror = Output::new(miso_mirror, Level::High);
 
-        let dma = Dma::new(peripherals.DMA);
-
         cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-                let dma_channel = dma.spi2channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 
-        let spi = Spi::new_with_config(
+        let spi = Spi::new(
             peripherals.SPI2,
-            Config {
-                frequency: 100.kHz(),
-                mode: SpiMode::Mode0,
-                ..Config::default()
-            },
+            Config::default()
+                .with_frequency(100.kHz())
+                .with_mode(Mode::Mode0),
         )
+        .unwrap()
         .with_sck(sclk)
         .with_miso(miso)
-        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+        .with_dma(dma_channel);
 
         Context { spi, miso_mirror }
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin(mut ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
@@ -78,10 +74,11 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                SpiDataMode::Single,
+                DataMode::Single,
                 Command::None,
                 Address::None,
                 0,
+                dma_rx_buf.len(),
                 dma_rx_buf,
             )
             .map_err(|e| e.0)
@@ -95,10 +92,11 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                SpiDataMode::Single,
+                DataMode::Single,
                 Command::None,
                 Address::None,
                 0,
+                dma_rx_buf.len(),
                 dma_rx_buf,
             )
             .map_err(|e| e.0)
@@ -110,7 +108,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spidmabus_reads_correctly_from_gpio_pin(mut ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
@@ -126,7 +123,7 @@ mod tests {
 
         let mut buffer = [0xAA; DMA_BUFFER_SIZE];
         spi.half_duplex_read(
-            SpiDataMode::Single,
+            DataMode::Single,
             Command::None,
             Address::None,
             0,
@@ -140,7 +137,7 @@ mod tests {
         ctx.miso_mirror.set_high();
 
         spi.half_duplex_read(
-            SpiDataMode::Single,
+            DataMode::Single,
             Command::None,
             Address::None,
             0,

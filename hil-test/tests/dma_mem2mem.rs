@@ -6,11 +6,10 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{AnyGdmaChannel, Channel, Dma, DmaError, DmaPriority, Mem2Mem},
+    dma::{AnyGdmaChannel, DmaChannelConvert, DmaError, Mem2Mem},
     dma_buffers,
     dma_buffers_chunk_size,
     dma_descriptors,
-    Blocking,
 };
 use hil_test as _;
 
@@ -25,12 +24,12 @@ cfg_if::cfg_if! {
 }
 
 struct Context {
-    channel: Channel<'static, Blocking, AnyGdmaChannel>,
+    channel: AnyGdmaChannel,
     dma_peripheral: DmaPeripheralType,
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -38,8 +37,7 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        let dma_channel = peripherals.DMA_CH0;
 
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c6, esp32h2))] {
@@ -50,9 +48,7 @@ mod tests {
         }
 
         Context {
-            channel: dma_channel
-                .configure(false, DmaPriority::Priority0)
-                .degrade(),
+            channel: dma_channel.degrade(),
             dma_peripheral,
         }
     }

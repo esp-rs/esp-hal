@@ -4,7 +4,7 @@
 //! - offers one service with three characteristics (one is read/write, one is write only, one is read/write/notify)
 //! - pressing the boot-button on a dev-board will send a notification if it is subscribed
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/ble
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/ble esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
@@ -28,8 +28,8 @@ use embassy_executor::Spawner;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
+    clock::CpuClock,
     gpio::{Input, Pull},
-    prelude::*,
     rng::Rng,
     time,
     timer::timg::TimerGroup,
@@ -50,11 +50,8 @@ macro_rules! mk_static {
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 
@@ -83,8 +80,8 @@ async fn main(_spawner: Spawner) -> ! {
             let timg1 = TimerGroup::new(peripherals.TIMG1);
             esp_hal_embassy::init(timg1.timer0);
         } else {
-            use esp_hal::timer::systimer::{SystemTimer, Target};
-            let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+            use esp_hal::timer::systimer::SystemTimer;
+            let systimer = SystemTimer::new(peripherals.SYSTIMER);
             esp_hal_embassy::init(systimer.alarm0);
         }
     }

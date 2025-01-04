@@ -22,7 +22,7 @@ impl Level {
     pub(crate) fn input_signals(
         &self,
         _: private::Internal,
-    ) -> &[(AlternateFunction, InputSignal)] {
+    ) -> &'static [(AlternateFunction, InputSignal)] {
         &[]
     }
 
@@ -60,7 +60,7 @@ impl Level {
     pub(crate) fn output_signals(
         &self,
         _: private::Internal,
-    ) -> &[(AlternateFunction, OutputSignal)] {
+    ) -> &'static [(AlternateFunction, OutputSignal)] {
         &[]
     }
 
@@ -84,25 +84,6 @@ impl crate::peripheral::Peripheral for NoPin {
 }
 
 impl private::Sealed for NoPin {}
-
-impl embedded_hal_02::digital::v2::OutputPin for NoPin {
-    type Error = core::convert::Infallible;
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-impl embedded_hal_02::digital::v2::StatefulOutputPin for NoPin {
-    fn is_set_high(&self) -> Result<bool, Self::Error> {
-        Ok(false)
-    }
-    fn is_set_low(&self) -> Result<bool, Self::Error> {
-        Ok(false)
-    }
-}
 
 impl embedded_hal::digital::ErrorType for NoPin {
     type Error = core::convert::Infallible;

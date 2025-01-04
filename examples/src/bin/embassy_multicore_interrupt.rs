@@ -7,7 +7,7 @@
 //! - LED => GPIO0
 
 //% CHIPS: esp32 esp32s3
-//% FEATURES: embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -19,9 +19,9 @@ use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
+    entry,
     gpio::{Level, Output},
     interrupt::{software::SoftwareInterruptControl, Priority},
-    prelude::*,
     timer::{timg::TimerGroup, AnyTimer},
     Cpu,
 };

@@ -3,7 +3,7 @@
 //! Sniffs for beacon frames.
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/sniffer
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/sniffer esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -19,7 +19,7 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, entry, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{init, wifi};
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
@@ -29,11 +29,8 @@ static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(B
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 

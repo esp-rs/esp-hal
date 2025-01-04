@@ -4,6 +4,9 @@
 //! systems. This package provides support for building applications using
 //! Embassy with [esp-hal].
 //!
+//! Note that this crate currently requires you to enable the `unstable` feature
+//! on `esp-hal`.
+//!
 //! [esp-hal]: https://github.com/esp-rs/esp-hal
 //! [embassy]: https://github.com/embassy-rs/embassy
 //!
@@ -75,20 +78,10 @@ trait IntoAnyTimer: Into<AnyTimer> {}
 
 impl IntoAnyTimer for AnyTimer {}
 
-impl<T, DM> IntoAnyTimer for TimgTimer<T, DM>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for TimgTimer where Self: Into<AnyTimer> {}
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> IntoAnyTimer for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for Alarm where Self: Into<AnyTimer> {}
 
 impl<T> TimerCollection for T
 where
@@ -156,7 +149,7 @@ impl_array!(4);
 ///
 /// ```rust, no_run
 #[doc = esp_hal::before_snippet!()]
-/// use esp_hal::timg::TimerGroup;
+/// use esp_hal::timer::timg::TimerGroup;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// esp_hal_embassy::init(timg0.timer0);

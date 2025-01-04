@@ -62,6 +62,7 @@ symbols = [
     "timg_timer1",
     "touch",
     "large_intr_status",
+    "gpio_bank_1",
 
     # ROM capabilities
     "rom_crc_le",

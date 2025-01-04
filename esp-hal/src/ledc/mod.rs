@@ -20,15 +20,17 @@
 //! ### Low Speed Channel
 //!
 //! The following example will configure the Low Speed Channel0 to 24kHz output
-//! with 10% duty using the ABPClock.
+//! with 10% duty using the ABPClock and turn on LED with the option to change
+//! LED intensity depending on `duty` value. Possible values (`u32`) are in
+//! range 0..100.
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::ledc::Ledc;
 //! # use esp_hal::ledc::LSGlobalClkSource;
-//! # use esp_hal::ledc::timer;
+//! # use esp_hal::ledc::timer::{self, TimerIFace};
 //! # use esp_hal::ledc::LowSpeed;
-//! # use esp_hal::ledc::channel;
+//! # use esp_hal::ledc::channel::{self, ChannelIFace};
 //! # let led = peripherals.GPIO0;
 //!
 //! let mut ledc = Ledc::new(peripherals.LEDC);
@@ -51,6 +53,15 @@
 //!         pin_config: channel::config::PinConfig::PushPull,
 //!     })
 //!     .unwrap();
+//!
+//! loop {
+//!     // Set up a breathing LED: fade from off to on over a second, then
+//!     // from on back off over the next second.  Then loop.
+//!     channel0.start_duty_fade(0, 100, 1000).unwrap();
+//!     while channel0.is_duty_fade_running() {}
+//!     channel0.start_duty_fade(100, 0, 1000).unwrap();
+//!     while channel0.is_duty_fade_running() {}
+//! }
 //! # }
 //! ```
 //! 
@@ -111,8 +122,9 @@ impl<'d> Ledc<'d> {
     pub fn new(_instance: impl Peripheral<P = crate::peripherals::LEDC> + 'd) -> Self {
         crate::into_ref!(_instance);
 
-        PeripheralClockControl::reset(PeripheralEnable::Ledc);
-        PeripheralClockControl::enable(PeripheralEnable::Ledc);
+        if PeripheralClockControl::enable(PeripheralEnable::Ledc) {
+            PeripheralClockControl::reset(PeripheralEnable::Ledc);
+        }
 
         let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
         Ledc { _instance, ledc }

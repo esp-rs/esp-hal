@@ -24,14 +24,13 @@
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, RSA},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
     Async,
     Blocking,
     Cpu,
-    InterruptConfigurable,
 };
 
 #[cfg_attr(esp32s2, path = "esp32sX.rs")]
@@ -45,9 +44,10 @@ mod rsa_spec_impl;
 pub use rsa_spec_impl::operand_sizes;
 
 /// RSA peripheral container
-pub struct Rsa<'d, DM: crate::Mode> {
+pub struct Rsa<'d, Dm: crate::DriverMode> {
     rsa: PeripheralRef<'d, RSA>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
+    _guard: GenericPeripheralGuard<{ PeripheralEnable::Rsa as u8 }>,
 }
 
 impl<'d> Rsa<'d, Blocking> {
@@ -64,6 +64,7 @@ impl<'d> Rsa<'d, Blocking> {
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 }
@@ -87,20 +88,21 @@ impl<'d> Rsa<'d, Async> {
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
+            _guard: self._guard,
         }
     }
 }
 
-impl<'d, DM: crate::Mode> Rsa<'d, DM> {
+impl<'d, Dm: crate::DriverMode> Rsa<'d, Dm> {
     fn new_internal(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
         crate::into_ref!(rsa);
 
-        PeripheralClockControl::reset(PeripheralEnable::Rsa);
-        PeripheralClockControl::enable(PeripheralEnable::Rsa);
+        let guard = GenericPeripheralGuard::new();
 
         Self {
             rsa,
             phantom: PhantomData,
+            _guard: guard,
         }
     }
 
@@ -213,12 +215,13 @@ use implement_op;
 /// used to find the `(base ^ exponent) mod modulus`.
 ///
 /// Each operand is a little endian byte array of the same size
-pub struct RsaModularExponentiation<'a, 'd, T: RsaMode, DM: crate::Mode> {
-    rsa: &'a mut Rsa<'d, DM>,
+pub struct RsaModularExponentiation<'a, 'd, T: RsaMode, Dm: crate::DriverMode> {
+    rsa: &'a mut Rsa<'d, Dm>,
     phantom: PhantomData<T>,
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'a, 'd, T, DM>
+impl<'a, 'd, T: RsaMode, Dm: crate::DriverMode, const N: usize>
+    RsaModularExponentiation<'a, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -229,7 +232,7 @@ where
     ///
     /// For more information refer to 24.3.2 of <https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf>.
     pub fn new(
-        rsa: &'a mut Rsa<'d, DM>,
+        rsa: &'a mut Rsa<'d, Dm>,
         exponent: &T::InputType,
         modulus: &T::InputType,
         m_prime: u32,
@@ -279,12 +282,13 @@ where
 /// used to find the `(operand a * operand b) mod modulus`.
 ///
 /// Each operand is a little endian byte array of the same size
-pub struct RsaModularMultiplication<'a, 'd, T: RsaMode, DM: crate::Mode> {
-    rsa: &'a mut Rsa<'d, DM>,
+pub struct RsaModularMultiplication<'a, 'd, T: RsaMode, Dm: crate::DriverMode> {
+    rsa: &'a mut Rsa<'d, Dm>,
     phantom: PhantomData<T>,
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'a, 'd, T, DM>
+impl<'a, 'd, T: RsaMode, Dm: crate::DriverMode, const N: usize>
+    RsaModularMultiplication<'a, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -296,7 +300,7 @@ where
     ///
     /// For more information refer to 20.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf>.
     pub fn new(
-        rsa: &'a mut Rsa<'d, DM>,
+        rsa: &'a mut Rsa<'d, Dm>,
         operand_a: &T::InputType,
         modulus: &T::InputType,
         r: &T::InputType,
@@ -334,17 +338,18 @@ where
 /// be used to find the `operand a * operand b`.
 ///
 /// Each operand is a little endian byte array of the same size
-pub struct RsaMultiplication<'a, 'd, T: RsaMode + Multi, DM: crate::Mode> {
-    rsa: &'a mut Rsa<'d, DM>,
+pub struct RsaMultiplication<'a, 'd, T: RsaMode + Multi, Dm: crate::DriverMode> {
+    rsa: &'a mut Rsa<'d, Dm>,
     phantom: PhantomData<T>,
 }
 
-impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'a, 'd, T, DM>
+impl<'a, 'd, T: RsaMode + Multi, Dm: crate::DriverMode, const N: usize>
+    RsaMultiplication<'a, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Creates an instance of `RsaMultiplication`.
-    pub fn new(rsa: &'a mut Rsa<'d, DM>, operand_a: &T::InputType) -> Self {
+    pub fn new(rsa: &'a mut Rsa<'d, Dm>, operand_a: &T::InputType) -> Self {
         Self::write_mode(rsa);
         rsa.write_operand_a(operand_a);
 
@@ -376,11 +381,11 @@ where
 pub(crate) mod asynch {
     use core::task::Poll;
 
-    use embassy_sync::waitqueue::AtomicWaker;
     use portable_atomic::{AtomicBool, Ordering};
     use procmacros::handler;
 
     use crate::{
+        asynch::AtomicWaker,
         rsa::{
             Multi,
             Rsa,

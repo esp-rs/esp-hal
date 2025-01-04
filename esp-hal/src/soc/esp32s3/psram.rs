@@ -12,6 +12,49 @@
 //!
 //! The mapped start address for PSRAM depends on the amount of mapped flash
 //! memory.
+//!
+//! ## Examples
+//!
+//! ### Octal/Quad PSRAM
+//! This example shows how to use PSRAM as heap-memory via esp-alloc.
+//! You need an ESP32-S3 with at least 2 MB of PSRAM memory.
+//! Either `Octal` or `Quad` PSRAM will be used, depending on whether
+//! `octal-psram` or `quad-psram` feature is enabled.
+//! Notice that PSRAM example **must** be built in release mode!
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # extern crate alloc;
+//! # use alloc::{string::String, vec::Vec};
+//! # use esp_alloc as _;
+//! # use esp_hal::psram;
+//!
+//! // Initialize PSRAM and add it as a heap memory region
+//! fn init_psram_heap(start: *mut u8, size: usize) {
+//!     unsafe {
+//!         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+//!             start,
+//!             size,
+//!             esp_alloc::MemoryCapability::External.into(),
+//!         ));
+//!     }
+//! }
+//!
+//! // Initialize PSRAM and add it to the heap
+//! let (start, size) = psram::init_psram(peripherals.PSRAM,
+//!     psram::PsramConfig::default());
+//!
+//! init_psram_heap(start, size);
+//!
+//! let mut large_vec: Vec<u32> = Vec::with_capacity(500 * 1024 / 4);
+//!
+//! for i in 0..(500 * 1024 / 4) {
+//!     large_vec.push((i & 0xff) as u32);
+//! }
+//!
+//! let string = String::from("A string allocated in PSRAM");
+//! # }
+//! ```
 
 pub use crate::soc::psram_common::*;
 
@@ -70,7 +113,7 @@ pub struct PsramConfig {
 ///
 /// Returns the start of the mapped memory and the size
 #[procmacros::ram]
-pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -> (*mut u8, usize) {
+pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
     utils::psram_init(&mut config);
 
@@ -179,11 +222,9 @@ pub fn init_psram(_peripheral: crate::peripherals::PSRAM, config: PsramConfig) -
         start
     };
 
-    crate::soc::MAPPED_PSRAM.with(|mapped_psram| {
-        mapped_psram.memory_range = start as usize..start as usize + config.size.get();
-    });
-
-    (start as *mut u8, config.size.get())
+    unsafe {
+        crate::soc::MAPPED_PSRAM.memory_range = start as usize..start as usize + config.size.get();
+    }
 }
 
 #[cfg(feature = "quad-psram")]
@@ -685,7 +726,7 @@ pub(crate) mod utils {
     #[ram]
     fn psram_set_cs_timing() {
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
+            let spi = crate::peripherals::SPI0::steal();
             // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time registers
             // for PSRAM, so we only need to set SPI0 related registers here
             spi.spi_smem_ac()
@@ -705,8 +746,7 @@ pub(crate) mod utils {
         let cs1_io: u8 = PSRAM_CS_IO;
         if cs1_io == SPI_CS1_GPIO_NUM {
             unsafe {
-                let iomux = &*esp32s3::IO_MUX::PTR;
-                iomux
+                esp32s3::IO_MUX::steal()
                     .gpio(cs1_io as usize)
                     .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
             }
@@ -714,8 +754,7 @@ pub(crate) mod utils {
             unsafe {
                 esp_rom_gpio_connect_out_signal(cs1_io, SPICS1_OUT_IDX, false, false);
 
-                let iomux = &*esp32s3::IO_MUX::PTR;
-                iomux
+                esp32s3::IO_MUX::steal()
                     .gpio(cs1_io as usize)
                     .modify(|_, w| w.mcu_sel().bits(PIN_FUNC_GPIO));
             }
@@ -1105,7 +1144,7 @@ pub(crate) mod utils {
     // requirement
     fn config_psram_spi_phases() {
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
+            let spi = crate::peripherals::SPI0::steal();
             // Config Write CMD phase for SPI0 to access PSRAM
             spi.cache_sctrl()
                 .modify(|_, w| w.cache_sram_usr_wcmd().set_bit());
@@ -1163,7 +1202,7 @@ pub(crate) mod utils {
     #[ram]
     fn spi_flash_set_rom_required_regs() {
         // Disable the variable dummy mode when doing timing tuning
-        let spi = unsafe { &*crate::peripherals::SPI1::PTR };
+        let spi = unsafe { crate::peripherals::SPI1::steal() };
         spi.ddr().modify(|_, w| w.spi_fmem_var_dummy().clear_bit());
         // STR /DTR mode setting is done every time when
         // `esp_rom_opiflash_exec_cmd` is called
@@ -1174,9 +1213,7 @@ pub(crate) mod utils {
 
     #[ram]
     fn mspi_pin_init() {
-        unsafe {
-            esp_rom_opiflash_pin_config();
-        }
+        unsafe { esp_rom_opiflash_pin_config() };
         spi_timing_set_pin_drive_strength();
         // Set F4R4 board pin drive strength. TODO: IDF-3663
     }
@@ -1186,7 +1223,7 @@ pub(crate) mod utils {
         // For now, set them all to 3. Need to check after QVL test results are out.
         // TODO: IDF-3663 Set default clk
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
+            let spi = crate::peripherals::SPI0::steal();
 
             spi.date()
                 .modify(|_, w| w.spi_spiclk_pad_drv_ctl_en().set_bit());
@@ -1196,10 +1233,11 @@ pub(crate) mod utils {
                 .modify(|_, w| w.spi_fmem_spiclk_fun_drv().bits(3));
 
             // Set default mspi d0 ~ d7, dqs pin drive strength
-            let pins = &[27usize, 28, 31, 32, 33, 34, 35, 36, 37];
+            let pins = [27usize, 28, 31, 32, 33, 34, 35, 36, 37];
             for pin in pins {
-                let iomux = &*esp32s3::IO_MUX::PTR;
-                iomux.gpio(*pin).modify(|_, w| w.fun_drv().bits(3));
+                esp32s3::IO_MUX::steal()
+                    .gpio(pin)
+                    .modify(|_, w| w.fun_drv().bits(3));
             }
         }
     }
@@ -1284,16 +1322,14 @@ pub(crate) mod utils {
     fn init_psram_pins() {
         // Set cs1 pin function
         unsafe {
-            let iomux = &*esp32s3::IO_MUX::PTR;
-            iomux
+            esp32s3::IO_MUX::steal()
                 .gpio(OCT_PSRAM_CS1_IO as usize)
                 .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
         }
 
         // Set mspi cs1 drive strength
         unsafe {
-            let iomux = &*esp32s3::IO_MUX::PTR;
-            iomux
+            esp32s3::IO_MUX::steal()
                 .gpio(OCT_PSRAM_CS1_IO as usize)
                 .modify(|_, w| w.fun_drv().bits(3));
         }

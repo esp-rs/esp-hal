@@ -2,7 +2,7 @@
 //!
 //! Broadcasts, receives and sends messages via esp-now
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -11,7 +11,8 @@
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    prelude::*,
+    clock::CpuClock,
+    entry,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -25,11 +26,8 @@ use esp_wifi::{
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 

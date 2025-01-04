@@ -8,15 +8,15 @@
 #[cfg(pcnt)]
 use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
-    dma::{Channel, Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Input, Level, Output, Pull},
-    prelude::*,
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
-        SpiDataMode,
-        SpiMode,
+        DataMode,
+        Mode,
     },
+    time::RateExtU32,
     Blocking,
 };
 use hil_test as _;
@@ -31,9 +31,9 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        const COMMAND_DATA_MODES: [SpiDataMode; 1] = [SpiDataMode::Single];
+        const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::Single];
     } else {
-        const COMMAND_DATA_MODES: [SpiDataMode; 2] = [SpiDataMode::Single, SpiDataMode::Quad];
+        const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::Single, DataMode::Quad];
     }
 }
 
@@ -43,7 +43,7 @@ struct Context {
     spi: Spi<'static, Blocking>,
     #[cfg(pcnt)]
     pcnt: esp_hal::peripherals::PCNT,
-    dma_channel: Channel<'static, Blocking, DmaChannel0>,
+    dma_channel: DmaChannel0,
     gpios: [AnyPin; 3],
 }
 
@@ -53,7 +53,14 @@ fn transfer_read(
     command: Command,
 ) -> (SpiUnderTest, DmaRxBuf) {
     let transfer = spi
-        .half_duplex_read(SpiDataMode::Quad, command, Address::None, 0, dma_rx_buf)
+        .half_duplex_read(
+            DataMode::Quad,
+            command,
+            Address::None,
+            0,
+            dma_rx_buf.len(),
+            dma_rx_buf,
+        )
         .map_err(|e| e.0)
         .unwrap();
     transfer.wait()
@@ -63,17 +70,18 @@ fn transfer_write(
     spi: SpiUnderTest,
     dma_tx_buf: DmaTxBuf,
     write: u8,
-    command_data_mode: SpiDataMode,
+    command_data_mode: DataMode,
 ) -> (SpiUnderTest, DmaTxBuf) {
     let transfer = spi
         .half_duplex_write(
-            SpiDataMode::Quad,
+            DataMode::Quad,
             Command::Command8(write as u16, command_data_mode),
             Address::Address24(
                 write as u32 | (write as u32) << 8 | (write as u32) << 16,
-                SpiDataMode::Quad,
+                DataMode::Quad,
             ),
             0,
+            dma_tx_buf.len(),
             dma_tx_buf,
         )
         .map_err(|e| e.0)
@@ -146,7 +154,7 @@ fn execute_write(
         assert_eq!(unit0.value() + unit1.value(), 8);
 
         if data_on_multiple_pins {
-            if command_data_mode == SpiDataMode::Single {
+            if command_data_mode == DataMode::Single {
                 assert_eq!(unit0.value(), 1);
                 assert_eq!(unit1.value(), 7);
             } else {
@@ -164,7 +172,7 @@ fn execute_write(
         assert_eq!(unit0.value() + unit1.value(), 4);
 
         if data_on_multiple_pins {
-            if command_data_mode == SpiDataMode::Single {
+            if command_data_mode == DataMode::Single {
                 assert_eq!(unit0.value(), 1);
                 assert_eq!(unit1.value(), 3);
             } else {
@@ -176,7 +184,7 @@ fn execute_write(
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -192,41 +200,32 @@ mod tests {
         let _ = Input::new(&mut pin_mirror, Pull::Down);
         let _ = Input::new(&mut unconnected_pin, Pull::Down);
 
-        let dma = Dma::new(peripherals.DMA);
-
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let dma_channel = dma.spi2channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 
-        let dma_channel = dma_channel.configure(false, DmaPriority::Priority0);
-        let spi = Spi::new_with_config(
+        let spi = Spi::new(
             peripherals.SPI2,
-            Config {
-                frequency: 100.kHz(),
-                mode: SpiMode::Mode0,
-                ..Config::default()
-            },
-        );
+            Config::default()
+                .with_frequency(100.kHz())
+                .with_mode(Mode::Mode0),
+        )
+        .unwrap();
 
         Context {
             spi,
             #[cfg(pcnt)]
             pcnt: peripherals.PCNT,
             dma_channel,
-            gpios: [
-                pin.degrade(),
-                pin_mirror.degrade(),
-                unconnected_pin.degrade(),
-            ],
+            gpios: [pin.into(), pin_mirror.into(), unconnected_pin.into()],
         }
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_0(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -237,7 +236,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_1(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -248,7 +246,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_2(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -259,7 +256,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_reads_correctly_from_gpio_pin_3(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -270,7 +266,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_and_reads_correctly_pin_0(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -281,7 +276,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_and_reads_correctly_pin_1(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -292,7 +286,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_and_reads_correctly_pin_2(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -303,7 +296,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_spi_writes_and_reads_correctly_pin_3(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
@@ -314,7 +306,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_0(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
@@ -338,7 +329,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_1(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
@@ -372,7 +362,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_2(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
@@ -406,7 +395,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     #[cfg(pcnt)]
     fn test_spi_writes_correctly_to_pin_3(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled

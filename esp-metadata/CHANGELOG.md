@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Introduced the `wifi6` symbol (#2612)
+- Introduced the `gpio_bank_1` symbol (#2625)
 
 ### Fixed
 

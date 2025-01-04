@@ -14,7 +14,7 @@
 //! the peripherals in LP system during chip Deep-sleep, and wake up the
 //! chip from Deep-sleep.
 //!
-//! # Example
+//! ## Examples
 //!
 //! ## Configure a LP Pin as Output
 //!
@@ -42,6 +42,7 @@ pub struct LowPowerOutput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     /// Create a new output pin for use by the low-power core
+    #[instability::unstable] 
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: OutputPin + RtcPin,
@@ -77,6 +78,7 @@ pub struct LowPowerInput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     /// Create a new input pin for use by the low-power core
+    #[instability::unstable] 
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: InputPin + RtcPin,
@@ -121,6 +123,7 @@ pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     /// Create a new output pin for use by the low-power core
+    #[instability::unstable] 
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: InputPin + OutputPin + RtcPin,
@@ -191,7 +194,6 @@ pub(crate) fn init_low_power_pin(pin: u8) {
 }
 
 #[doc(hidden)]
-#[macro_export]
 macro_rules! lp_gpio {
     (
         $($gpionum:literal)+
@@ -262,3 +264,5 @@ macro_rules! lp_gpio {
         )+
     }
 }
+
+pub(crate) use lp_gpio;

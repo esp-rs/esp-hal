@@ -49,6 +49,7 @@ pub enum Package {
     EspWifi,
     Examples,
     HilTest,
+    QaTest,
     XtensaLx,
     XtensaLxRt,
 }
@@ -58,14 +59,24 @@ pub struct Metadata {
     example_path: PathBuf,
     chip: Chip,
     feature_set: Vec<String>,
+    tag: Option<String>,
+    description: Option<String>,
 }
 
 impl Metadata {
-    pub fn new(example_path: &Path, chip: Chip, feature_set: Vec<String>) -> Self {
+    pub fn new(
+        example_path: &Path,
+        chip: Chip,
+        feature_set: Vec<String>,
+        tag: Option<String>,
+        description: Option<String>,
+    ) -> Self {
         Self {
             example_path: example_path.to_path_buf(),
             chip,
             feature_set,
+            tag,
+            description,
         }
     }
 
@@ -91,6 +102,16 @@ impl Metadata {
     /// If the specified chip is in the list of chips, then it is supported.
     pub fn supports_chip(&self, chip: Chip) -> bool {
         self.chip == chip
+    }
+
+    /// Optional tag of the example.
+    pub fn tag(&self) -> Option<String> {
+        self.tag.clone()
+    }
+
+    /// Optional description of the example.
+    pub fn description(&self) -> Option<String> {
+        self.description.clone()
     }
 }
 
@@ -136,7 +157,11 @@ pub fn build_documentation(workspace: &Path, package: Package, chip: Chip) -> Re
     log::debug!("{args:#?}");
 
     // Execute `cargo doc` from the package root:
-    cargo::run(&args, &package_path)?;
+    cargo::run_with_env(
+        &args,
+        &package_path,
+        [("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs")],
+    )?;
 
     let docs_path = windows_safe_path(
         &workspace
@@ -152,13 +177,19 @@ pub fn build_documentation(workspace: &Path, package: Package, chip: Chip) -> Re
 fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
     let chip_name = &config.name();
 
-    match (package, chip_name.as_str()) {
-        (Package::EspHal, "esp32") => vec!["quad-psram".to_owned(), "ci".to_owned()],
-        (Package::EspHal, "esp32s2") => vec!["quad-psram".to_owned(), "ci".to_owned()],
-        (Package::EspHal, "esp32s3") => vec!["quad-psram".to_owned(), "ci".to_owned()],
-        (Package::EspHal, _) => vec!["ci".to_owned()],
-        (Package::EspWifi, _) => {
-            let mut features = vec![];
+    let mut features = vec![];
+    match package {
+        Package::EspHal => {
+            features.push("unstable".to_owned());
+            features.push("ci".to_owned());
+            match chip_name.as_str() {
+                "esp32" => features.push("quad-psram".to_owned()),
+                "esp32s2" => features.push("quad-psram".to_owned()),
+                "esp32s3" => features.push("quad-psram".to_owned()),
+                _ => {}
+            };
+        }
+        Package::EspWifi => {
             if config.contains("wifi") {
                 features.push("wifi".to_owned());
                 features.push("esp-now".to_owned());
@@ -166,6 +197,7 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
                 features.push("utils".to_owned());
                 features.push("smoltcp/proto-ipv4".to_owned());
                 features.push("smoltcp/proto-ipv6".to_owned());
+                features.push("esp-hal/unstable".to_owned());
             }
             if config.contains("ble") {
                 features.push("ble".to_owned());
@@ -173,10 +205,10 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             if config.contains("wifi") && config.contains("ble") {
                 features.push("coex".to_owned());
             }
-            features
         }
-        _ => vec![],
+        _ => {}
     }
+    features
 }
 
 /// Load all examples at the given path, and parse their metadata.
@@ -191,6 +223,17 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
         let mut chips = Chip::iter().collect::<Vec<_>>();
         let mut feature_sets = Vec::new();
         let mut chip_features = HashMap::new();
+        let mut tag = None;
+        let mut description = None;
+
+        // collect `//!` as description
+        for line in text.lines().filter(|line| line.starts_with("//!")) {
+            let line = line.trim_start_matches("//!");
+            let mut descr: String = description.unwrap_or_default();
+            descr.push_str(line);
+            descr.push('\n');
+            description = Some(descr);
+        }
 
         // We will indicate metadata lines using the `//%` prefix:
         for line in text.lines().filter(|line| line.starts_with("//%")) {
@@ -238,6 +281,8 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
                 for chip in chips {
                     chip_features.insert(chip, values.clone());
                 }
+            } else if key.starts_with("TAG") {
+                tag = Some(value.to_string());
             } else {
                 log::warn!("Unrecognized metadata key '{key}', ignoring");
             }
@@ -262,7 +307,13 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
                     feature_set.sort();
                 }
 
-                examples.push(Metadata::new(&path, *chip, feature_set.clone()));
+                examples.push(Metadata::new(
+                    &path,
+                    *chip,
+                    feature_set.clone(),
+                    tag.clone(),
+                    description.clone(),
+                ));
             }
         }
     }

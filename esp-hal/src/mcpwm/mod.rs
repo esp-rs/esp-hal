@@ -94,7 +94,7 @@ use crate::{
     clock::Clocks,
     gpio::OutputSignal,
     peripheral::{Peripheral, PeripheralRef},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{self, PeripheralGuard},
 };
 
 /// MCPWM operators
@@ -115,11 +115,12 @@ pub struct McPwm<'d, PWM> {
     /// Timer2
     pub timer2: Timer<2, PWM>,
     /// Operator0
-    pub operator0: Operator<0, PWM>,
+    pub operator0: Operator<'d, 0, PWM>,
     /// Operator1
-    pub operator1: Operator<1, PWM>,
+    pub operator1: Operator<'d, 1, PWM>,
     /// Operator2
-    pub operator2: Operator<2, PWM>,
+    pub operator2: Operator<'d, 2, PWM>,
+    _guard: PeripheralGuard,
 }
 
 impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
@@ -131,8 +132,7 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
     ) -> Self {
         crate::into_ref!(peripheral);
 
-        PWM::reset();
-        PWM::enable();
+        let guard = PeripheralGuard::new(PWM::peripheral());
 
         #[cfg(not(esp32c6))]
         {
@@ -181,6 +181,7 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
             operator0: Operator::new(),
             operator1: Operator::new(),
             operator2: Operator::new(),
+            _guard: guard,
         }
     }
 }
@@ -313,26 +314,16 @@ pub struct FrequencyError;
 
 /// A MCPWM peripheral
 pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed {
-    /// Enable peripheral
-    fn enable();
-    /// Reset peripheral
-    fn reset();
     /// Get a pointer to the peripheral RegisterBlock
     fn block() -> *const RegisterBlock;
     /// Get operator GPIO mux output signal
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
+    /// Peripheral
+    fn peripheral() -> system::Peripheral;
 }
 
 #[cfg(mcpwm0)]
 impl PwmPeripheral for crate::peripherals::MCPWM0 {
-    fn enable() {
-        PeripheralClockControl::enable(PeripheralEnable::Mcpwm0)
-    }
-
-    fn reset() {
-        PeripheralClockControl::reset(PeripheralEnable::Mcpwm0)
-    }
-
     fn block() -> *const RegisterBlock {
         Self::PTR
     }
@@ -348,18 +339,14 @@ impl PwmPeripheral for crate::peripherals::MCPWM0 {
             _ => unreachable!(),
         }
     }
+
+    fn peripheral() -> system::Peripheral {
+        system::Peripheral::Mcpwm0
+    }
 }
 
 #[cfg(mcpwm1)]
 impl PwmPeripheral for crate::peripherals::MCPWM1 {
-    fn enable() {
-        PeripheralClockControl::enable(PeripheralEnable::Mcpwm1)
-    }
-
-    fn reset() {
-        PeripheralClockControl::reset(PeripheralEnable::Mcpwm1)
-    }
-
     fn block() -> *const RegisterBlock {
         Self::PTR
     }
@@ -374,5 +361,9 @@ impl PwmPeripheral for crate::peripherals::MCPWM1 {
             (2, false) => OutputSignal::PWM1_2B,
             _ => unreachable!(),
         }
+    }
+
+    fn peripheral() -> system::Peripheral {
+        system::Peripheral::Mcpwm1
     }
 }

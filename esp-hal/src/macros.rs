@@ -13,9 +13,14 @@ macro_rules! before_snippet {
     () => {
         r#"
 # #![no_std]
-# use esp_hal::prelude::*;
 # use procmacros::handler;
-# use esp_hal::interrupt;
+# use esp_hal::{interrupt::{self, InterruptConfigurable}, time::{RateExtU32 as _, ExtU64 as _}};
+# macro_rules! println {
+#     ($($tt:tt)*) => { };
+# }
+# macro_rules! print {
+#     ($($tt:tt)*) => { };
+# }
 # #[panic_handler]
 # fn panic(_ : &core::panic::PanicInfo) -> ! {
 #     loop {}
@@ -84,6 +89,8 @@ macro_rules! any_peripheral {
     }) => {
         paste::paste! {
             $(#[$meta])*
+            #[derive(Debug)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             $vis struct $name([< $name Inner >]);
             impl $crate::private::Sealed for $name {}
 
@@ -100,11 +107,25 @@ macro_rules! any_peripheral {
                 }
             }
 
+            $(#[$meta])*
+            #[derive(Debug)]
             enum [< $name Inner >] {
                 $(
                     $(#[cfg($variant_meta)])*
                     $variant($inner),
                 )*
+            }
+
+            #[cfg(feature = "defmt")]
+            impl defmt::Format for [< $name Inner >] {
+                fn format(&self, fmt: defmt::Formatter<'_>) {
+                    match self {
+                        $(
+                            $(#[cfg($variant_meta)])*
+                            [< $name Inner >]::$variant(inner) => inner.format(fmt),
+                        )*
+                    }
+                }
             }
 
             $(
@@ -130,4 +151,14 @@ macro_rules! if_set {
     ($set:expr, $not_set:expr) => {
         $set
     };
+}
+
+/// Macro to ignore tokens.
+///
+/// This is useful when we need existence of a metavariable (to expand a
+/// repetition), but we don't need to use it.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! ignore {
+    ($($item:tt)*) => {};
 }

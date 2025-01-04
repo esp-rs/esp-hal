@@ -1,9 +1,8 @@
-#[cfg(esp32s3)]
-use crate::dma::DmaExtMemBKSize;
 use crate::{
     dma::{
         dma_private::{DmaSupport, DmaSupportRx},
         AnyGdmaChannel,
+        AnyGdmaRxChannel,
         Channel,
         ChannelRx,
         DescriptorChain,
@@ -18,9 +17,10 @@ use crate::{
         Tx,
         WriteBuffer,
     },
+    peripheral::Peripheral,
     Async,
     Blocking,
-    Mode,
+    DriverMode,
 };
 
 /// DMA Memory to Memory pseudo-Peripheral
@@ -28,11 +28,11 @@ use crate::{
 /// This is a pseudo-peripheral that allows for memory to memory transfers.
 /// It is not a real peripheral, but a way to use the DMA engine for memory
 /// to memory transfers.
-pub struct Mem2Mem<'d, M>
+pub struct Mem2Mem<'d, Dm>
 where
-    M: Mode,
+    Dm: DriverMode,
 {
-    channel: Channel<'d, M, AnyGdmaChannel>,
+    channel: Channel<'d, Dm, AnyGdmaChannel>,
     rx_chain: DescriptorChain,
     tx_chain: DescriptorChain,
     peripheral: DmaPeripheral,
@@ -40,16 +40,14 @@ where
 
 impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new Mem2Mem instance.
-    pub fn new<CH, DM>(
-        channel: Channel<'d, DM, CH>,
+    pub fn new<CH>(
+        channel: impl Peripheral<P = CH> + 'd,
         peripheral: impl DmaEligible,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Result<Self, DmaError>
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
-        DM: Mode,
-        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
         unsafe {
             Self::new_unsafe(
@@ -63,8 +61,8 @@ impl<'d> Mem2Mem<'d, Blocking> {
     }
 
     /// Create a new Mem2Mem instance with specific chunk size.
-    pub fn new_with_chunk_size<CH, DM>(
-        channel: Channel<'d, DM, CH>,
+    pub fn new_with_chunk_size<CH>(
+        channel: impl Peripheral<P = CH> + 'd,
         peripheral: impl DmaEligible,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -72,8 +70,6 @@ impl<'d> Mem2Mem<'d, Blocking> {
     ) -> Result<Self, DmaError>
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
-        DM: Mode,
-        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
         unsafe {
             Self::new_unsafe(
@@ -92,8 +88,8 @@ impl<'d> Mem2Mem<'d, Blocking> {
     ///
     /// You must ensure that your not using DMA for the same peripheral and
     /// that your the only one using the DmaPeripheral.
-    pub unsafe fn new_unsafe<CH, DM>(
-        channel: Channel<'d, DM, CH>,
+    pub unsafe fn new_unsafe<CH>(
+        channel: impl Peripheral<P = CH> + 'd,
         peripheral: DmaPeripheral,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -101,8 +97,6 @@ impl<'d> Mem2Mem<'d, Blocking> {
     ) -> Result<Self, DmaError>
     where
         CH: DmaChannelConvert<AnyGdmaChannel>,
-        DM: Mode,
-        Channel<'d, Blocking, CH>: From<Channel<'d, DM, CH>>,
     {
         if !(1..=4092).contains(&chunk_size) {
             return Err(DmaError::InvalidChunkSize);
@@ -111,7 +105,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
             return Err(DmaError::OutOfDescriptors);
         }
         Ok(Mem2Mem {
-            channel: Channel::<Blocking, _>::from(channel).degrade(),
+            channel: Channel::new(channel.map(|ch| ch.degrade())),
             peripheral,
             rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
             tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
@@ -129,9 +123,9 @@ impl<'d> Mem2Mem<'d, Blocking> {
     }
 }
 
-impl<M> Mem2Mem<'_, M>
+impl<Dm> Mem2Mem<'_, Dm>
 where
-    M: Mode,
+    Dm: DriverMode,
 {
     /// Start a memory to memory transfer.
     pub fn start_transfer<'t, TXBUF, RXBUF>(
@@ -156,30 +150,15 @@ where
                 .prepare_transfer_without_start(self.peripheral, &self.rx_chain)?;
             self.channel.rx.set_mem2mem_mode(true);
         }
-        #[cfg(esp32s3)]
-        {
-            let align = match unsafe { crate::soc::cache_get_dcache_line_size() } {
-                16 => DmaExtMemBKSize::Size16,
-                32 => DmaExtMemBKSize::Size32,
-                64 => DmaExtMemBKSize::Size64,
-                _ => panic!("unsupported cache line size"),
-            };
-            if crate::soc::is_valid_psram_address(tx_ptr as usize) {
-                self.channel.tx.set_ext_mem_block_size(align);
-            }
-            if crate::soc::is_valid_psram_address(rx_ptr as usize) {
-                self.channel.rx.set_ext_mem_block_size(align);
-            }
-        }
         self.channel.tx.start_transfer()?;
         self.channel.rx.start_transfer()?;
         Ok(DmaTransferRx::new(self))
     }
 }
 
-impl<MODE> DmaSupport for Mem2Mem<'_, MODE>
+impl<Dm> DmaSupport for Mem2Mem<'_, Dm>
 where
-    MODE: Mode,
+    Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         while !self.channel.rx.is_done() {}
@@ -190,11 +169,11 @@ where
     }
 }
 
-impl<'d, M> DmaSupportRx for Mem2Mem<'d, M>
+impl<'d, Dm> DmaSupportRx for Mem2Mem<'d, Dm>
 where
-    M: Mode,
+    Dm: DriverMode,
 {
-    type RX = ChannelRx<'d, M, AnyGdmaChannel>;
+    type RX = ChannelRx<'d, Dm, AnyGdmaRxChannel>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.channel.rx

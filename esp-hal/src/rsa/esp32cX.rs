@@ -10,7 +10,7 @@ use crate::rsa::{
     RsaMultiplication,
 };
 
-impl<DM: crate::Mode> Rsa<'_, DM> {
+impl<Dm: crate::DriverMode> Rsa<'_, Dm> {
     /// After the RSA Accelerator is released from reset, the memory blocks
     /// needs to be initialized, only after that peripheral should be used.
     /// This function would return without an error if the memory is initialized
@@ -229,7 +229,7 @@ pub mod operand_sizes {
     );
 }
 
-impl<'d, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'_, 'd, T, DM>
+impl<'d, T: RsaMode, Dm: crate::DriverMode, const N: usize> RsaModularExponentiation<'_, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -244,16 +244,16 @@ where
     }
 
     /// Sets the modular exponentiation mode for the RSA hardware.
-    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, Dm>) {
         rsa.write_mode((N - 1) as u32)
     }
 }
 
-impl<'d, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'_, 'd, T, DM>
+impl<'d, T: RsaMode, Dm: crate::DriverMode, const N: usize> RsaModularMultiplication<'_, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, Dm>) {
         rsa.write_mode((N - 1) as u32)
     }
 
@@ -262,7 +262,7 @@ where
     }
 }
 
-impl<'d, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'_, 'd, T, DM>
+impl<'d, T: RsaMode + Multi, Dm: crate::DriverMode, const N: usize> RsaMultiplication<'_, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -271,7 +271,7 @@ where
     }
 
     /// Sets the multiplication mode for the RSA hardware.
-    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, Dm>) {
         rsa.write_mode((N * 2 - 1) as u32)
     }
 }

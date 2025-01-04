@@ -11,16 +11,14 @@ use esp_build::assert_unique_used_features;
 use esp_config::{generate_config, Value};
 use esp_metadata::{Chip, Config};
 
-#[cfg(debug_assertions)]
-esp_build::warning! {"
-WARNING: use --release
-  We *strongly* recommend using release profile when building esp-hal.
-  The dev profile can potentially be one or more orders of magnitude
-  slower than release, and may cause issues with timing-senstive
-  peripherals and/or devices.
-"}
-
 fn main() -> Result<(), Box<dyn Error>> {
+    println!("cargo:rustc-check-cfg=cfg(is_debug_build)");
+    if let Ok(level) = std::env::var("OPT_LEVEL") {
+        if level == "0" || level == "1" {
+            println!("cargo:rustc-cfg=is_debug_build");
+        }
+    }
+
     // NOTE: update when adding new device support!
     // Ensure that exactly one chip has been specified:
     assert_unique_used_features!(

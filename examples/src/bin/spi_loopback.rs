@@ -11,6 +11,7 @@
 //! This example transfers data via SPI.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -18,12 +19,13 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
+    entry,
     peripheral::Peripheral,
-    prelude::*,
     spi::{
         master::{Config, Spi},
-        SpiMode,
+        Mode,
     },
+    time::RateExtU32,
 };
 use esp_println::println;
 
@@ -37,17 +39,16 @@ fn main() -> ! {
 
     let miso = unsafe { miso_mosi.clone_unchecked() };
 
-    let mut spi = Spi::new_with_config(
+    let mut spi = Spi::new(
         peripherals.SPI2,
-        Config {
-            frequency: 100.kHz(),
-            mode: SpiMode::Mode0,
-            ..Config::default()
-        },
+        Config::default()
+            .with_frequency(100.kHz())
+            .with_mode(Mode::Mode0),
     )
+    .unwrap()
     .with_sck(sclk)
-    .with_mosi(miso_mosi)
-    .with_miso(miso)
+    .with_miso(miso) // order matters
+    .with_mosi(miso_mosi) // order matters
     .with_cs(cs);
 
     let delay = Delay::new();

@@ -7,6 +7,7 @@
 //! - DM => GPIO19
 
 //% CHIPS: esp32s2 esp32s3
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -15,8 +16,8 @@ use core::ptr::addr_of_mut;
 
 use esp_backtrace as _;
 use esp_hal::{
+    entry,
     otg_fs::{Usb, UsbBus},
-    prelude::*,
 };
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 use usbd_serial::{SerialPort, USB_CLASS_CDC};

@@ -25,7 +25,6 @@ crate::peripherals! {
         AES <= AES,
         ASSIST_DEBUG <= ASSIST_DEBUG,
         BT <= virtual,
-        DMA <= DMA (DMA_IN_CH0,DMA_IN_CH1,DMA_IN_CH2,DMA_OUT_CH0,DMA_OUT_CH1,DMA_OUT_CH2),
         DS <= DS,
         ECC <= ECC,
         EFUSE <= EFUSE,
@@ -117,5 +116,10 @@ crate::peripherals! {
         (25, [Input, Output] () (2 => FSPICS3))
         (26, [Input, Output] () (2 => FSPICS4))
         (27, [Input, Output] () (2 => FSPICS5))
+    ],
+    dma_channels: [
+        DMA_CH0: DmaChannel0,
+        DMA_CH1: DmaChannel1,
+        DMA_CH2: DmaChannel2,
     ]
 }

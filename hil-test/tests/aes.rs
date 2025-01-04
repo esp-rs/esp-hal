@@ -7,7 +7,7 @@
 
 use esp_hal::{
     aes::{Aes, Mode},
-    prelude::*,
+    clock::CpuClock,
 };
 use hil_test as _;
 
@@ -16,17 +16,14 @@ struct Context<'a> {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
     #[init]
     fn init() -> Context<'static> {
-        let peripherals = esp_hal::init({
-            let mut config = esp_hal::Config::default();
-            config.cpu_clock = CpuClock::max();
-            config
-        });
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let peripherals = esp_hal::init(config);
         let aes = Aes::new(peripherals.AES);
 
         Context { aes }

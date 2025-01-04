@@ -3,6 +3,7 @@
 //! Uncomment the functionality you want to test
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -11,7 +12,12 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{assist_debug::DebugAssist, prelude::*};
+use esp_hal::{
+    assist_debug::DebugAssist,
+    entry,
+    interrupt::InterruptConfigurable,
+    macros::handler,
+};
 use esp_println::println;
 
 static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));

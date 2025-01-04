@@ -12,21 +12,20 @@
 
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
-    prelude::*,
+    time::RateExtU32,
     Async,
 };
 use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel0Creator = esp_hal::dma::I2s0DmaChannelCreator;
+        type DmaChannel0 = esp_hal::dma::I2s0DmaChannel;
     } else {
-        type DmaChannel0Creator = esp_hal::dma::ChannelCreator<0>;
+        type DmaChannel0 = esp_hal::dma::DmaChannel0;
     }
 }
 
@@ -98,13 +97,13 @@ fn enable_loopback() {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
     struct Context {
         dout: AnyPin,
-        dma_channel: DmaChannel0Creator,
+        dma_channel: DmaChannel0,
         i2s: I2S0,
     }
 
@@ -112,13 +111,11 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let dma = Dma::new(peripherals.DMA);
-
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let dma_channel = dma.i2s0channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_I2S0;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 
@@ -143,7 +140,7 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
         )
@@ -196,7 +193,7 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
         );
@@ -305,7 +302,7 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
         );
@@ -335,7 +332,7 @@ mod tests {
             Standard::Philips,
             DataFormat::Data16Channel16,
             16000.Hz(),
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
+            ctx.dma_channel,
             rx_descriptors,
             tx_descriptors,
         );

@@ -8,7 +8,7 @@ use crate::efuse::Efuse;
 use crate::{
     peripheral::PeripheralRef,
     peripherals::APB_SARADC,
-    system::{Peripheral, PeripheralClockControl},
+    system::{GenericPeripheralGuard, Peripheral},
 };
 
 mod calibration;
@@ -101,7 +101,9 @@ cfg_if::cfg_if! {
 }
 
 /// The sampling/readout resolution of the ADC.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Resolution {
     /// 12-bit resolution
     #[default]
@@ -396,6 +398,7 @@ pub struct Adc<'d, ADCI> {
     _adc: PeripheralRef<'d, ADCI>,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
+    _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI>
@@ -408,8 +411,7 @@ where
         adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
         config: AdcConfig<ADCI>,
     ) -> Self {
-        PeripheralClockControl::reset(Peripheral::ApbSarAdc);
-        PeripheralClockControl::enable(Peripheral::ApbSarAdc);
+        let guard = GenericPeripheralGuard::new();
 
         unsafe { &*APB_SARADC::PTR }.ctrl().modify(|_, w| unsafe {
             w.start_force().set_bit();
@@ -422,6 +424,7 @@ where
             _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
+            _guard: guard,
         }
     }
 
@@ -527,20 +530,6 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_cal_code(2, atten)
-    }
-}
-
-impl<ADCI, PIN, CS> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI, CS>>
-    for Adc<'_, ADCI>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8> + super::AdcChannel,
-    ADCI: RegisterAccess,
-    CS: super::AdcCalScheme<ADCI>,
-{
-    type Error = ();
-
-    fn read(&mut self, pin: &mut super::AdcPin<PIN, ADCI, CS>) -> nb::Result<u16, Self::Error> {
-        self.read_oneshot(pin)
     }
 }
 

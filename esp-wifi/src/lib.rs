@@ -1,6 +1,6 @@
 #![cfg_attr(
-    docsrs,
-    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.esp-rs.org/esp-wifi/'>browse the <code>esp-wifi</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C3, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs might change depending on the chip.</p></div>\n\n<br/>\n\n"
+    all(docsrs, not(not_really_docsrs)),
+    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.esp-rs.org/esp-hal/'>browse the <code>esp-wifi</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C3, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs might change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
 //! This documentation is built for the
 #![cfg_attr(esp32, doc = "**ESP32**")]
@@ -17,21 +17,23 @@
 //!
 //! ### Importing
 //!
+//! Note that this crate currently requires you to enable the `unstable` feature
+//! on `esp-hal`.
+//!
 //! Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
 //!
 //! ```toml
 //! [dependencies.esp-wifi]
 //! # A supported chip needs to be specified, as well as specific use-case features
-//! features = ["esp32s3", "wifi", "esp-now"]
+#![doc = concat!(r#"features = [""#, esp_hal::chip!(), r#"", "wifi", "esp-now"]"#)]
 //! ```
-//!
+//! 
 //! ### Optimization Level
 //!
 //! It is necessary to build with optimization level 2 or 3 since otherwise, it
 //! might not even be able to connect or advertise.
 //!
 //! To make it work also for your debug builds add this to your `Cargo.toml`
-//!
 //! ```toml
 //! [profile.dev.package.esp-wifi]
 //! opt-level = 3
@@ -43,10 +45,21 @@
 //! a feature flag of the `log` crate. See [documentation](https://docs.rs/log/0.4.19/log/#compile-time-filters).
 //! You should set it to `release_max_level_off`.
 //!
-//! ### Xtensa considerations
+//! ### WiFi performance considerations
 //!
-//! Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in
-//! your application you are not using this CPU timer.
+//! The default configuration is quite conservative to reduce power and memory consumption.
+//!
+//! There are a number of settings which influence the general performance. Optimal settings are chip and applications specific.
+//! You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
+//!
+//! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
+//!
+//! By default the power-saving mode is [PowerSaveMode::Minimum](crate::config::PowerSaveMode::Minimum) and `ESP_WIFI_PHY_ENABLE_USB` is enabled by default.
+//!
+//! In addition pay attention to these configuration keys:
+//! - `ESP_WIFI_RX_QUEUE_SIZE`
+//! - `ESP_WIFI_TX_QUEUE_SIZE`
+//! - `ESP_WIFI_MAX_BURST_SIZE`
 //!
 //! # Features flags
 //!
@@ -100,6 +113,7 @@ use hal::{
     rng::{Rng, Trng},
     system::RadioClockController,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
+    Blocking,
 };
 use portable_atomic::Ordering;
 
@@ -182,27 +196,30 @@ struct Config {
 }
 
 pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
-    rx_queue_size: esp_config_int!(usize, "ESP_WIFI_RX_QUEUE_SIZE"),
-    tx_queue_size: esp_config_int!(usize, "ESP_WIFI_TX_QUEUE_SIZE"),
-    static_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_RX_BUF_NUM"),
-    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_RX_BUF_NUM"),
-    static_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_TX_BUF_NUM"),
-    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_TX_BUF_NUM"),
-    csi_enable: esp_config_bool!("ESP_WIFI_CSI_ENABLE"),
-    ampdu_rx_enable: esp_config_bool!("ESP_WIFI_AMPDU_RX_ENABLE"),
-    ampdu_tx_enable: esp_config_bool!("ESP_WIFI_AMPDU_TX_ENABLE"),
-    amsdu_tx_enable: esp_config_bool!("ESP_WIFI_AMSDU_TX_ENABLE"),
-    rx_ba_win: esp_config_int!(usize, "ESP_WIFI_RX_BA_WIN"),
-    max_burst_size: esp_config_int!(usize, "ESP_WIFI_MAX_BURST_SIZE"),
-    country_code: esp_config_str!("ESP_WIFI_COUNTRY_CODE"),
-    country_code_operating_class: esp_config_int!(u8, "ESP_WIFI_COUNTRY_CODE_OPERATING_CLASS"),
-    mtu: esp_config_int!(usize, "ESP_WIFI_MTU"),
-    tick_rate_hz: esp_config_int!(u32, "ESP_WIFI_TICK_RATE_HZ"),
-    listen_interval: esp_config_int!(u16, "ESP_WIFI_LISTEN_INTERVAL"),
-    beacon_timeout: esp_config_int!(u16, "ESP_WIFI_BEACON_TIMEOUT"),
-    ap_beacon_timeout: esp_config_int!(u16, "ESP_WIFI_AP_BEACON_TIMEOUT"),
-    failure_retry_cnt: esp_config_int!(u8, "ESP_WIFI_FAILURE_RETRY_CNT"),
-    scan_method: esp_config_int!(u32, "ESP_WIFI_SCAN_METHOD"),
+    rx_queue_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_RX_QUEUE_SIZE"),
+    tx_queue_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_TX_QUEUE_SIZE"),
+    static_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_STATIC_RX_BUF_NUM"),
+    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_DYNAMIC_RX_BUF_NUM"),
+    static_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_STATIC_TX_BUF_NUM"),
+    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_DYNAMIC_TX_BUF_NUM"),
+    csi_enable: esp_config_bool!("ESP_WIFI_CONFIG_CSI_ENABLE"),
+    ampdu_rx_enable: esp_config_bool!("ESP_WIFI_CONFIG_AMPDU_RX_ENABLE"),
+    ampdu_tx_enable: esp_config_bool!("ESP_WIFI_CONFIG_AMPDU_TX_ENABLE"),
+    amsdu_tx_enable: esp_config_bool!("ESP_WIFI_CONFIG_AMSDU_TX_ENABLE"),
+    rx_ba_win: esp_config_int!(usize, "ESP_WIFI_CONFIG_RX_BA_WIN"),
+    max_burst_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_MAX_BURST_SIZE"),
+    country_code: esp_config_str!("ESP_WIFI_CONFIG_COUNTRY_CODE"),
+    country_code_operating_class: esp_config_int!(
+        u8,
+        "ESP_WIFI_CONFIG_COUNTRY_CODE_OPERATING_CLASS"
+    ),
+    mtu: esp_config_int!(usize, "ESP_WIFI_CONFIG_MTU"),
+    tick_rate_hz: esp_config_int!(u32, "ESP_WIFI_CONFIG_TICK_RATE_HZ"),
+    listen_interval: esp_config_int!(u16, "ESP_WIFI_CONFIG_LISTEN_INTERVAL"),
+    beacon_timeout: esp_config_int!(u16, "ESP_WIFI_CONFIG_BEACON_TIMEOUT"),
+    ap_beacon_timeout: esp_config_int!(u16, "ESP_WIFI_CONFIG_AP_BEACON_TIMEOUT"),
+    failure_retry_cnt: esp_config_int!(u8, "ESP_WIFI_CONFIG_FAILURE_RETRY_CNT"),
+    scan_method: esp_config_int!(u32, "ESP_WIFI_CONFIG_SCAN_METHOD"),
 };
 
 // Validate the configuration at compile time
@@ -217,7 +234,7 @@ const _: () = {
     core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
 };
 
-type TimeBase = PeriodicTimer<'static, AnyTimer>;
+type TimeBase = PeriodicTimer<'static, Blocking, AnyTimer>;
 
 pub(crate) mod flags {
     use portable_atomic::{AtomicBool, AtomicUsize};
@@ -285,21 +302,12 @@ pub trait EspWifiTimerSource: private::Sealed {
 /// conflicting implementations.
 trait IntoAnyTimer: Into<AnyTimer> {}
 
-impl<T, DM> IntoAnyTimer for TimgTimer<T, DM>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for TimgTimer where Self: Into<AnyTimer> {}
 
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> IntoAnyTimer for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl IntoAnyTimer for Alarm where Self: Into<AnyTimer> {}
 
+impl private::Sealed for AnyTimer {}
 impl IntoAnyTimer for AnyTimer {}
 
 impl<T> EspWifiTimerSource for T
@@ -318,19 +326,9 @@ impl EspWifiTimerSource for TimeBase {
 }
 
 impl private::Sealed for TimeBase {}
-impl<T, DM> private::Sealed for TimgTimer<T, DM>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl private::Sealed for TimgTimer where Self: Into<AnyTimer> {}
 #[cfg(not(feature = "esp32"))]
-impl<T, DM, COMP, UNIT> private::Sealed for Alarm<'_, T, DM, COMP, UNIT>
-where
-    DM: esp_hal::Mode,
-    Self: Into<AnyTimer>,
-{
-}
+impl private::Sealed for Alarm where Self: Into<AnyTimer> {}
 
 /// A marker trait for suitable Rng sources for esp-wifi
 pub trait EspWifiRngSource: rand_core::RngCore + private::Sealed {}
@@ -356,7 +354,7 @@ impl private::Sealed for Trng<'_> {}
 ///
 /// ```rust, no_run
 #[doc = esp_hal::before_snippet!()]
-/// use esp_hal::{rng::Rng, timg::TimerGroup};
+/// use esp_hal::{rng::Rng, timer::timg::TimerGroup};
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
 /// let init = esp_wifi::init(
@@ -408,7 +406,7 @@ pub fn init<'d, T: EspWifiTimerSource>(
 /// # Safety
 ///
 /// The user must ensure that any use of the radio via the WIFI/BLE/ESP-NOW
-/// drivers are complete, else undefined behavour may occur within those
+/// drivers are complete, else undefined behaviour may occur within those
 /// drivers.
 pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     // Disable coexistence
@@ -438,7 +436,7 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     shutdown_timer_isr();
     crate::preempt::delete_all_tasks();
 
-    critical_section::with(|cs| crate::timer::TIMER.borrow_ref_mut(cs).take());
+    crate::timer::TIMER.with(|timer| timer.take());
 
     crate::flags::ESP_WIFI_INITIALIZED.store(false, Ordering::Release);
 

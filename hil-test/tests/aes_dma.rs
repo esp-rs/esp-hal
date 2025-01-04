@@ -1,13 +1,12 @@
 //! AES DMA Test
 
-//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
 
 use esp_hal::{
     aes::{dma::CipherMode, Aes, Mode},
-    dma::{Dma, DmaPriority},
     dma_buffers,
     peripherals::Peripherals,
 };
@@ -16,7 +15,7 @@ use hil_test as _;
 const DMA_BUFFER_SIZE: usize = 16;
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -27,16 +26,18 @@ mod tests {
 
     #[test]
     fn test_aes_128_dma_encryption(peripherals: Peripherals) {
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                let dma_channel = peripherals.DMA_CRYPTO;
+            } else {
+                let dma_channel = peripherals.DMA_CH0;
+            }
+        }
 
         let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
-        let mut aes = Aes::new(peripherals.AES).with_dma(
-            dma_channel.configure(false, DmaPriority::Priority0),
-            rx_descriptors,
-            tx_descriptors,
-        );
+        let mut aes =
+            Aes::new(peripherals.AES).with_dma(dma_channel, rx_descriptors, tx_descriptors);
 
         let keytext = b"SUp4SeCp@sSw0rd";
         let mut keybuf = [0_u8; 16];
@@ -69,16 +70,18 @@ mod tests {
 
     #[test]
     fn test_aes_128_dma_decryption(peripherals: Peripherals) {
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                let dma_channel = peripherals.DMA_CRYPTO;
+            } else {
+                let dma_channel = peripherals.DMA_CH0;
+            }
+        }
 
         let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
-        let mut aes = Aes::new(peripherals.AES).with_dma(
-            dma_channel.configure(false, DmaPriority::Priority0),
-            rx_descriptors,
-            tx_descriptors,
-        );
+        let mut aes =
+            Aes::new(peripherals.AES).with_dma(dma_channel, rx_descriptors, tx_descriptors);
 
         let keytext = b"SUp4SeCp@sSw0rd";
         let mut keybuf = [0_u8; 16];
@@ -110,16 +113,18 @@ mod tests {
 
     #[test]
     fn test_aes_256_dma_encryption(peripherals: Peripherals) {
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                let dma_channel = peripherals.DMA_CRYPTO;
+            } else {
+                let dma_channel = peripherals.DMA_CH0;
+            }
+        }
 
         let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
-        let mut aes = Aes::new(peripherals.AES).with_dma(
-            dma_channel.configure(false, DmaPriority::Priority0),
-            rx_descriptors,
-            tx_descriptors,
-        );
+        let mut aes =
+            Aes::new(peripherals.AES).with_dma(dma_channel, rx_descriptors, tx_descriptors);
 
         let keytext = b"SUp4SeCp@sSw0rd";
         let mut keybuf = [0_u8; 16];
@@ -152,16 +157,18 @@ mod tests {
 
     #[test]
     fn test_aes_256_dma_decryption(peripherals: Peripherals) {
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                let dma_channel = peripherals.DMA_CRYPTO;
+            } else {
+                let dma_channel = peripherals.DMA_CH0;
+            }
+        }
 
         let (mut output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
 
-        let mut aes = Aes::new(peripherals.AES).with_dma(
-            dma_channel.configure(false, DmaPriority::Priority0),
-            rx_descriptors,
-            tx_descriptors,
-        );
+        let mut aes =
+            Aes::new(peripherals.AES).with_dma(dma_channel, rx_descriptors, tx_descriptors);
 
         let keytext = b"SUp4SeCp@sSw0rd";
         let mut keybuf = [0_u8; 16];

@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_hal::{
-    uart::{UartRx, UartTx},
+    uart::{self, UartRx, UartTx},
     Async,
 };
 use hil_test as _;
@@ -18,7 +18,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -28,14 +28,17 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx = UartTx::new(peripherals.UART0, tx).unwrap().into_async();
-        let rx = UartRx::new(peripherals.UART1, rx).unwrap().into_async();
+        let tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx)
+            .unwrap()
+            .into_async();
+        let rx = UartRx::new(peripherals.UART1, uart::Config::default(), rx)
+            .unwrap()
+            .into_async();
 
         Context { rx, tx }
     }
 
     #[test]
-    #[timeout(3)]
     async fn test_send_receive(mut ctx: Context) {
         let byte = [0x42];
         let mut read = [0u8; 1];

@@ -17,6 +17,11 @@ The following error enum variants have been removed from `InitializationError`:
 - `TimerUnavailable`
 - `RadioClockUnavailable`
 
+```diff
+- let init: EspWifiInitialization = esp_wifi::init(EspWifiInitFor::Wifi, timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
++ let init: EspWifiController = esp_wifi::init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+```
+
 ## No need to include `rom_functions.x` manually
 
 Don't include `rom_functions.x` from esp-wifi
@@ -82,3 +87,12 @@ The related features are removed from `esp-wifi`: wifi-default, ipv6, ipv4, tcp,
 In order to better comply with the Rust API Guidelines [getter names convention], we have removed the `get_` prefixes from all functions which previously had it. Due to the number of changes it's not practical to list all changes here, however if a function previous began with `get_`, you can simply remove this prefix.
 
 [getter names convention]: https://rust-lang.github.io/api-guidelines/naming.html#c-getter
+
+## Removal of features
+
+Along with the features removed regarding the blocking network stack, the following features have been removed:
+
+- `async` - Enabled by default
+- `phy-enable-usb` - Turned into a configuration option
+- `dump-packets` - Turned into a configuration option
+- `ps-min-modem` & `ps-max-modem` - Turned into a runtime configuration, see `set_power_saving`

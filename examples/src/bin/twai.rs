@@ -20,6 +20,7 @@
 //! * change the `tx_pin` and `rx_pin` to the appropriate pins for your boards.
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -29,7 +30,7 @@ const IS_FIRST_SENDER: bool = true;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    prelude::*,
+    entry,
     twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
 };
 use esp_println::println;

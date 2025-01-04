@@ -728,23 +728,23 @@ impl SleepTimeConfig {
             );
 
         #[rustfmt::skip] // ASCII art
-        /* When the SOC wakeup (lp timer or GPIO wakeup) and Modem wakeup (Beacon wakeup) complete,
-        * the soc wakeup will be delayed until the RF is turned on in Modem state.
-        *
-        *              modem wakeup                      TBTT, RF on by HW
-        *                   |                                    |
-        *                  \|/                                  \|/
-        * PMU_HP_ACTIVE                                                                         /------
-        * PMU_HP_MODEM                                           /------------//////////////////
-        * PMU_HP_SLEEP   ----------------------//////////////////
-        *                  /|\                /|\ /|\          /|\           /|\              /|\
-        *                   |<- some hw wait ->|   |            |             |<- M2A switch ->|
-        *                   |  slow cycles &   | soc wakeup     |                              |
-        *                   |   FOSC cycles    |<- S2M switch ->|                              |
-        *                   |                                                                  |
-        *                   |<--      PMU guard time, also the maximum time for the SOC     -->|
-        *                   |                           wake-up delay                          |
-        */
+        //  When the SOC wakeup (lp timer or GPIO wakeup) and Modem wakeup (Beacon wakeup) complete,
+        // the soc wakeup will be delayed until the RF is turned on in Modem state.
+        // 
+        //              modem wakeup                      TBTT, RF on by HW
+        //                   |                                    |
+        //                  \|/                                  \|/
+        // PMU_HP_ACTIVE                                                                         /------
+        // PMU_HP_MODEM                                           /------------//////////////////
+        // PMU_HP_SLEEP   ----------------------//////////////////
+        //                  /|\                /|\ /|\          /|\           /|\              /|\
+        //                   |<- some hw wait ->|   |            |             |<- M2A switch ->|
+        //                   |  slow cycles &   | soc wakeup     |                              |
+        //                   |   FOSC cycles    |<- S2M switch ->|                              |
+        //                   |                                                                  |
+        //                   |<--      PMU guard time, also the maximum time for the SOC     -->|
+        //                   |                           wake-up delay                          |
+        // 
         const CONFIG_ESP_WIFI_ENHANCED_LIGHT_SLEEP: bool = true;
 
         let (rf_on_protect_time_us, sync_time_us) = if CONFIG_ESP_WIFI_ENHANCED_LIGHT_SLEEP {

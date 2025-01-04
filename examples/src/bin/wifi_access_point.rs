@@ -8,7 +8,7 @@
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -19,7 +19,8 @@ use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    prelude::*,
+    clock::CpuClock,
+    entry,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -40,11 +41,8 @@ use smoltcp::iface::{SocketSet, SocketStorage};
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 
@@ -52,15 +50,15 @@ fn main() -> ! {
 
     // Set event handlers for wifi before init to avoid missing any.
     let mut connections = 0u32;
-    _ = event::ApStart::replace_handler(|_, _| esp_println::println!("ap start event"));
-    event::ApStaconnected::update_handler(move |_, event| {
+    _ = event::ApStart::replace_handler(|_| esp_println::println!("ap start event"));
+    event::ApStaconnected::update_handler(move |event| {
         connections += 1;
         esp_println::println!("connected {}, mac: {:?}", connections, event.0.mac);
     });
-    event::ApStaconnected::update_handler(|_, event| {
+    event::ApStaconnected::update_handler(|event| {
         esp_println::println!("connected aid: {}", event.0.aid);
     });
-    event::ApStadisconnected::update_handler(|_, event| {
+    event::ApStadisconnected::update_handler(|event| {
         esp_println::println!(
             "disconnected mac: {:?}, reason: {:?}",
             event.0.mac,

@@ -9,15 +9,17 @@
 //! - LED => GPIO1
 
 //% CHIPS: esp32c6
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
 use esp_hal::{
+    entry,
     gpio::lp_io::LowPowerOutput,
     lp_core::{LpCore, LpCoreWakeupSource},
-    prelude::*,
+    macros::load_lp_code,
 };
 use esp_println::{print, println};
 

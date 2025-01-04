@@ -40,7 +40,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::HMAC,
     reg_access::{AlignmentHelper, SocDependentEndianess},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
 };
 
 /// Provides an interface for interacting with the HMAC hardware peripheral.
@@ -51,6 +51,7 @@ pub struct Hmac<'d> {
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     byte_written: usize,
     next_command: NextCommand,
+    _guard: GenericPeripheralGuard<{ PeripheralEnable::Hmac as u8 }>,
 }
 
 /// HMAC interface error
@@ -66,6 +67,7 @@ pub enum Error {
 /// user. It can also deliver to other peripherals.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum HmacPurpose {
     /// HMAC is used to re-enable JTAG after soft-disabling it.
     ToJtag     = 6,
@@ -107,14 +109,14 @@ impl<'d> Hmac<'d> {
     pub fn new(hmac: impl Peripheral<P = HMAC> + 'd) -> Self {
         crate::into_ref!(hmac);
 
-        PeripheralClockControl::reset(PeripheralEnable::Hmac);
-        PeripheralClockControl::enable(PeripheralEnable::Hmac);
+        let guard = GenericPeripheralGuard::new();
 
         Self {
             hmac,
             alignment_helper: AlignmentHelper::default(),
             byte_written: 64,
             next_command: NextCommand::None,
+            _guard: guard,
         }
     }
 

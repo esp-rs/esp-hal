@@ -13,7 +13,7 @@
 //! CS   => GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -22,13 +22,13 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    dma::*,
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    prelude::*,
     spi::{
         master::{Config, Spi},
-        SpiMode,
+        Mode,
     },
+    time::RateExtU32,
     timer::timg::TimerGroup,
 };
 
@@ -45,13 +45,11 @@ async fn main(_spawner: Spawner) {
     let mosi = peripherals.GPIO4;
     let cs = peripherals.GPIO5;
 
-    let dma = Dma::new(peripherals.DMA);
-
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let dma_channel = dma.spi2channel;
+            let dma_channel = peripherals.DMA_SPI2;
         } else {
-            let dma_channel = dma.channel0;
+            let dma_channel = peripherals.DMA_CH0;
         }
     }
 
@@ -59,19 +57,18 @@ async fn main(_spawner: Spawner) {
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let mut spi = Spi::new_with_config(
+    let mut spi = Spi::new(
         peripherals.SPI2,
-        Config {
-            frequency: 100.kHz(),
-            mode: SpiMode::Mode0,
-            ..Config::default()
-        },
+        Config::default()
+            .with_frequency(100.kHz())
+            .with_mode(Mode::Mode0),
     )
+    .unwrap()
     .with_sck(sclk)
     .with_mosi(mosi)
     .with_miso(miso)
     .with_cs(cs)
-    .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+    .with_dma(dma_channel)
     .with_buffers(dma_rx_buf, dma_tx_buf)
     .into_async();
 

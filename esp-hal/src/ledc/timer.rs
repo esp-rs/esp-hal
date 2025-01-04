@@ -68,6 +68,7 @@ pub mod config {
     /// Number of bits reserved for duty cycle adjustment
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[allow(clippy::enum_variant_names)] // FIXME: resolve before stabilizing this driver
     pub enum Duty {
         /// 1-bit resolution for duty cycle adjustment.
         Duty1Bit = 1,
@@ -369,7 +370,7 @@ impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
 
 #[cfg(esp32)]
 /// Timer HW implementation for HighSpeed timers
-impl<'a> TimerHW<HighSpeed> for Timer<'a, HighSpeed> {
+impl TimerHW<HighSpeed> for Timer<'_, HighSpeed> {
     /// Get the current source timer frequency from the HW
     fn freq_hw(&self) -> Option<HertzU32> {
         self.clock_source.map(|source| match source {

@@ -8,12 +8,14 @@
 //! Note: On ESP32-C2 and ESP32-C3 you need a wifi-heap size of 70000, on ESP32-C6 you need 80000 and a tx_queue_size of 10
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/ble esp-wifi/coex
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/ble esp-wifi/coex esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![allow(static_mut_refs)]
 #![no_std]
 #![no_main]
+
+use core::net::Ipv4Addr;
 
 use bleps::{
     ad_structure::{
@@ -31,7 +33,8 @@ use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    prelude::*,
+    clock::CpuClock,
+    entry,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -44,7 +47,7 @@ use esp_wifi::{
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
-    wire::{DhcpOption, IpAddress, Ipv4Address},
+    wire::{DhcpOption, IpAddress},
 };
 
 const SSID: &str = env!("SSID");
@@ -53,11 +56,8 @@ const PASSWORD: &str = env!("PASSWORD");
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     static mut HEAP: core::mem::MaybeUninit<[u8; 72 * 1024]> = core::mem::MaybeUninit::uninit();
 
@@ -174,7 +174,7 @@ fn main() -> ! {
         socket.work();
 
         socket
-            .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+            .open(IpAddress::Ipv4(Ipv4Addr::new(142, 250, 185, 115)), 80)
             .unwrap();
 
         socket

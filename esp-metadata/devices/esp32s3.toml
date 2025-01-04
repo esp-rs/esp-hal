@@ -68,10 +68,13 @@ symbols = [
     "bt",
     "wifi",
     "psram",
+    "psram_dma",
     "octal_psram",
     "ulp_riscv_core",
     "timg_timer1",
     "very_large_intr_status",
+    "gpio_bank_1",
+    "spi_octal",
 
     # ROM capabilities
     "rom_crc_le",
@@ -87,4 +90,7 @@ symbols = [
     "uart_support_wakeup_int",
     "ulp_supported",
     "riscv_coproc_supported",
+
+    # Other capabilities
+    "psram_dma",
 ]

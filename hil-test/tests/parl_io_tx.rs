@@ -7,7 +7,7 @@
 #[cfg(esp32c6)]
 use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
-    dma::{ChannelCreator, Dma, DmaPriority},
+    dma::DmaChannel0,
     gpio::{
         interconnect::{InputSignal, OutputSignal},
         NoPin,
@@ -26,13 +26,13 @@ use esp_hal::{
         Pcnt,
     },
     peripherals::PARL_IO,
-    prelude::*,
+    time::RateExtU32,
 };
 use hil_test as _;
 
 struct Context {
     parl_io: PARL_IO,
-    dma_channel: ChannelCreator<0>,
+    dma_channel: DmaChannel0,
     clock: OutputSignal,
     valid: OutputSignal,
     clock_loopback: InputSignal,
@@ -41,7 +41,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use defmt::info;
 
@@ -57,8 +57,7 @@ mod tests {
         let (valid_loopback, valid) = valid.split();
         let pcnt = Pcnt::new(peripherals.PCNT);
         let pcnt_unit = pcnt.unit0;
-        let dma = Dma::new(peripherals.DMA);
-        let dma_channel = dma.channel0;
+        let dma_channel = peripherals.DMA_CH0;
 
         let parl_io = peripherals.PARL_IO;
 
@@ -75,7 +74,6 @@ mod tests {
 
     #[cfg(esp32c6)]
     #[test]
-    #[timeout(3)]
     fn test_parl_io_tx_16bit_valid_clock_count(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
         let tx_buffer = [0u16; BUFFER_SIZE];
@@ -88,13 +86,8 @@ mod tests {
         let mut pins = TxPinConfigIncludingValidPin::new(pins);
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(
-            ctx.parl_io,
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
-            tx_descriptors,
-            10.MHz(),
-        )
-        .unwrap();
+        let pio =
+            ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz()).unwrap();
 
         let mut pio = pio
             .tx
@@ -128,7 +121,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_parl_io_tx_8bit_valid_clock_count(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
         let tx_buffer = [0u8; BUFFER_SIZE];
@@ -155,13 +147,8 @@ mod tests {
 
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(
-            ctx.parl_io,
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
-            tx_descriptors,
-            10.MHz(),
-        )
-        .unwrap();
+        let pio =
+            ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, tx_descriptors, 10.MHz()).unwrap();
 
         let mut pio = pio
             .tx

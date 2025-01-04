@@ -1,10 +1,11 @@
 //% CHIPS: esp32c6 esp32h2
+//% FEATURES: esp-ieee802154 esp-hal/unstable
 
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::prelude::*;
+use esp_hal::entry;
 use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 

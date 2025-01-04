@@ -61,6 +61,7 @@ macro_rules! check_error {
 #[repr(u32)]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME avoid Error suffix, could use better names
 pub enum Error {
     /// ESP-NOW is not initialized.
     NotInitialized  = 12389,
@@ -884,7 +885,7 @@ pub use asynch::SendFuture;
 mod asynch {
     use core::task::{Context, Poll};
 
-    use embassy_sync::waitqueue::AtomicWaker;
+    use esp_hal::asynch::AtomicWaker;
 
     use super::*;
 

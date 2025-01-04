@@ -3,8 +3,6 @@ use core::ops::Range;
 use portable_atomic::{AtomicU8, Ordering};
 
 pub use self::implementation::*;
-#[cfg(psram)]
-use crate::sync::Locked;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2/mod.rs")]
@@ -20,13 +18,20 @@ mod efuse_field;
 #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 mod psram_common;
 
-#[cfg(psram)]
-static MAPPED_PSRAM: Locked<MappedPsram> = Locked::new(MappedPsram { memory_range: 0..0 });
+// Using static mut should be fine since we are only writing to it once during
+// initialization. As other tasks and interrupts are not running yet, the worst
+// that can happen is, that the user creates a DMA buffer before initializing
+// the HAL. This will access the PSRAM range, returning an empty range - which
+// is, at that point, true. The user has no (safe) means to allocate in PSRAM
+// before initializing the HAL.
+#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+static mut MAPPED_PSRAM: MappedPsram = MappedPsram { memory_range: 0..0 };
 
-fn psram_range() -> Range<usize> {
+pub(crate) fn psram_range() -> Range<usize> {
     cfg_if::cfg_if! {
-        if #[cfg(psram)] {
-            MAPPED_PSRAM.with(|mapped_psram| mapped_psram.memory_range.clone())
+        if #[cfg(any(feature = "quad-psram", feature = "octal-psram"))] {
+            #[allow(static_mut_refs)]
+            unsafe { MAPPED_PSRAM.memory_range.clone() }
         } else {
             0..0
         }
@@ -35,9 +40,9 @@ fn psram_range() -> Range<usize> {
 
 const DRAM: Range<usize> = self::constants::SOC_DRAM_LOW..self::constants::SOC_DRAM_HIGH;
 
-#[cfg(psram)]
+#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 pub struct MappedPsram {
-    memory_range: core::ops::Range<usize>,
+    memory_range: Range<usize>,
 }
 
 // Indicates the state of setting the mac address
@@ -131,6 +136,6 @@ fn slice_in_range<T>(slice: &[T], range: Range<usize>) -> bool {
     addr_in_range(start, range.clone()) && end <= range.end
 }
 
-fn addr_in_range(addr: usize, range: Range<usize>) -> bool {
+pub(crate) fn addr_in_range(addr: usize, range: Range<usize>) -> bool {
     range.contains(&addr)
 }

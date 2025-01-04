@@ -7,14 +7,14 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaTxBuf},
+    dma::{DmaChannel0, DmaTxBuf},
     dma_buffers,
     gpio::NoPin,
     lcd_cam::{
         lcd::i8080::{Command, Config, TxEightBits, I8080},
         LcdCam,
     },
-    prelude::*,
+    time::RateExtU32,
     Async,
 };
 use hil_test as _;
@@ -23,12 +23,12 @@ const DATA_SIZE: usize = 1024 * 10;
 
 struct Context<'d> {
     lcd_cam: LcdCam<'d, Async>,
-    dma: Dma<'d>,
+    dma: DmaChannel0,
     dma_buf: DmaTxBuf,
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -36,30 +36,27 @@ mod tests {
     async fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM).into_async();
         let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, DATA_SIZE);
         let dma_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         Context {
             lcd_cam,
-            dma,
+            dma: peripherals.DMA_CH0,
             dma_buf,
         }
     }
 
     #[test]
     async fn test_i8080_8bit(ctx: Context<'static>) {
-        let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
-        let i8080 = I8080::new(
-            ctx.lcd_cam.lcd,
-            channel.tx,
-            pins,
-            20.MHz(),
-            Config::default(),
-        );
+        let i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
+            let mut config = Config::default();
+            config.frequency = 20.MHz();
+            config
+        })
+        .unwrap();
 
         let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
 

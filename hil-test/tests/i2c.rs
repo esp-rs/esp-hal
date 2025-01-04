@@ -28,7 +28,7 @@ const DUT_ADDRESS: u8 = 0x77;
 const NON_EXISTENT_ADDRESS: u8 = 0x6b;
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -41,6 +41,7 @@ mod tests {
         // Create a new peripheral object with the described wiring and standard
         // I2C clock speed:
         let i2c = I2c::new(peripherals.I2C0, Config::default())
+            .unwrap()
             .with_sda(sda)
             .with_scl(scl);
 
@@ -48,7 +49,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn empty_write_returns_ack_error_for_unknown_address(mut ctx: Context) {
         assert_eq!(
             ctx.i2c.write(NON_EXISTENT_ADDRESS, &[]),
@@ -58,7 +58,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_read_cali(mut ctx: Context) {
         let mut read_data = [0u8; 22];
 
@@ -77,7 +76,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_read_cali_with_transactions(mut ctx: Context) {
         let mut read_data = [0u8; 22];
 

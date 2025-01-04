@@ -95,4 +95,6 @@ symbols = [
     # Additional peripherals defined by us (the developers):
     "clic",
     "very_large_intr_status",
+    "gpio_bank_1",
+    "spi_octal",
 ]

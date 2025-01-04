@@ -221,7 +221,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     let package_path = xtask::windows_safe_path(&workspace.join(args.package.to_string()));
 
     let example_path = match args.package {
-        Package::Examples => package_path.join("src").join("bin"),
+        Package::Examples | Package::QaTest => package_path.join("src").join("bin"),
         Package::HilTest => package_path.join("tests"),
         _ => package_path.join("examples"),
     };
@@ -244,7 +244,8 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     // Execute the specified action:
     match action {
         CargoAction::Build => build_examples(args, examples, &package_path),
-        CargoAction::Run => run_example(args, examples, &package_path),
+        CargoAction::Run if args.example.is_some() => run_example(args, examples, &package_path),
+        CargoAction::Run => run_examples(args, examples, &package_path),
     }
 }
 
@@ -314,6 +315,79 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
         "Example not found or unsupported for {}",
         args.chip
     );
+
+    Ok(())
+}
+
+fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(args.package, &args.chip)?;
+
+    // Filter the examples down to only the binaries we're interested in
+    let mut examples: Vec<Metadata> = examples
+        .iter()
+        .filter(|ex| ex.supports_chip(args.chip))
+        .cloned()
+        .collect();
+    examples.sort_by_key(|ex| ex.tag());
+
+    let console = console::Term::stdout();
+
+    for example in examples {
+        let mut skip = false;
+
+        log::info!("Running example '{}'", example.name());
+        if let Some(description) = example.description() {
+            log::info!(
+                "\n\n{}\n\nPress ENTER to run example, `s` to skip",
+                description.trim()
+            );
+        } else {
+            log::info!("\n\nPress ENTER to run example, `s` to skip");
+        }
+
+        loop {
+            let key = console.read_key();
+
+            match key {
+                Ok(console::Key::Enter) => break,
+                Ok(console::Key::Char('s')) => {
+                    skip = true;
+                    break;
+                }
+                _ => (),
+            }
+        }
+
+        if !skip {
+            while !skip
+                && xtask::execute_app(
+                    package_path,
+                    args.chip,
+                    target,
+                    &example,
+                    CargoAction::Run,
+                    1,
+                    args.debug,
+                )
+                .is_err()
+            {
+                log::info!("Failed to run example. Retry or skip? (r/s)");
+                loop {
+                    let key = console.read_key();
+
+                    match key {
+                        Ok(console::Key::Char('r')) => break,
+                        Ok(console::Key::Char('s')) => {
+                            skip = true;
+                            break;
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+    }
 
     Ok(())
 }
@@ -595,6 +669,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
             match package {
                 Package::EspBacktrace => {
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
@@ -607,7 +682,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspHal => {
-                    let mut features = format!("--features={chip},ci");
+                    let mut features = format!("--features={chip},ci,unstable");
 
                     // Cover all esp-hal features where a device is supported
                     if device.contains("usb0") {
@@ -625,6 +700,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
 
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
@@ -637,11 +713,12 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspHalEmbassy => {
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
-                            &format!("--features={chip},executors,defmt,integrated-timers"),
+                            &format!("--features={chip},executors,defmt,integrated-timers,esp-hal/unstable"),
                         ],
                         args.fix,
                     )?;
@@ -649,8 +726,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
-                        let features = format!("--features={chip},sys-logs");
+                        let features = format!("--features={chip},sys-logs,esp-hal/unstable");
                         lint_package(
+                            chip,
                             &path,
                             &[
                                 "-Zbuild-std=core",
@@ -664,6 +742,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::EspLpHal => {
                     if device.contains("lp_core") {
                         lint_package(
+                            chip,
                             &path,
                             &[
                                 "-Zbuild-std=core",
@@ -677,6 +756,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspPrintln => {
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
@@ -690,6 +770,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::EspRiscvRt => {
                     if matches!(device.arch(), Arch::RiscV) {
                         lint_package(
+                            chip,
                             &path,
                             &["-Zbuild-std=core", &format!("--target={}", chip.target())],
                             args.fix,
@@ -699,6 +780,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspStorage => {
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core",
@@ -710,7 +792,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!("--features={chip},defmt,sys-logs");
+                    let mut features = format!("--features={chip},defmt,sys-logs,esp-hal/unstable");
 
                     if device.contains("wifi") {
                         features.push_str(",esp-now,sniffer")
@@ -722,6 +804,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         features.push_str(",coex")
                     }
                     lint_package(
+                        chip,
                         &path,
                         &[
                             "-Zbuild-std=core,alloc",
@@ -736,6 +819,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::XtensaLxRt => {
                     if matches!(device.arch(), Arch::Xtensa) {
                         lint_package(
+                            chip,
                             &path,
                             &[
                                 "-Zbuild-std=core",
@@ -749,10 +833,10 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 // We will *not* check the following packages with `clippy`; this
                 // may or may not change in the future:
-                Package::Examples | Package::HilTest => {}
+                Package::Examples | Package::HilTest | Package::QaTest => {}
 
                 // By default, no `clippy` arguments are required:
-                _ => lint_package(&path, &[], args.fix)?,
+                _ => lint_package(chip, &path, &[], args.fix)?,
             }
         }
     }
@@ -760,10 +844,18 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     Ok(())
 }
 
-fn lint_package(path: &Path, args: &[&str], fix: bool) -> Result<()> {
+fn lint_package(chip: &Chip, path: &Path, args: &[&str], fix: bool) -> Result<()> {
     log::info!("Linting package: {}", path.display());
 
-    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
+    let builder = CargoArgsBuilder::default().subcommand("clippy");
+
+    let mut builder = if chip.is_xtensa() {
+        // We only overwrite Xtensas so that externally set nightly/stable toolchains
+        // are not overwritten.
+        builder.toolchain("esp")
+    } else {
+        builder
+    };
 
     for arg in args {
         builder = builder.arg(arg.to_string());
@@ -772,7 +864,7 @@ fn lint_package(path: &Path, args: &[&str], fix: bool) -> Result<()> {
     // build in release to reuse example artifacts
     let cargo_args = builder.arg("--release");
     let cargo_args = if fix {
-        cargo_args.arg("--fix").arg("--lib")
+        cargo_args.arg("--fix").arg("--lib").arg("--allow-dirty")
     } else {
         cargo_args.arg("--").arg("-D").arg("warnings")
     };
@@ -788,7 +880,7 @@ fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
 
     use Package::*;
     let mut publish_args = match args.package {
-        Examples | HilTest => {
+        Examples | HilTest | QaTest => {
             bail!(
                 "Invalid package '{}' specified, this package should not be published!",
                 args.package
@@ -796,7 +888,7 @@ fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
         }
 
         EspBacktrace | EspHal | EspHalEmbassy | EspIeee802154 | EspLpHal | EspPrintln
-        | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
+        | EspRiscvRt | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
 
         _ => vec![],
     };
@@ -870,7 +962,7 @@ fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
     let target = target_triple(args.package, &chip)?;
-    let features = vec![chip.to_string()];
+    let features = vec![chip.to_string(), "unstable".to_string()];
 
     // We need `nightly` for building the doc tests, unfortunately:
     let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };

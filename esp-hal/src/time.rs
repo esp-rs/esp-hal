@@ -2,6 +2,8 @@
 //!
 //! The `time` module offers a way to get the system now.
 
+pub use fugit::{ExtU64, RateExtU32};
+
 /// Represents a duration of time.
 ///
 /// The resolution is 1 microsecond, represented as a 64-bit unsigned integer.
@@ -47,12 +49,10 @@ pub fn now() -> Instant {
 
     #[cfg(not(esp32))]
     let (ticks, div) = {
+        use crate::timer::systimer::{SystemTimer, Unit};
         // otherwise use SYSTIMER
-        let ticks = crate::timer::systimer::SystemTimer::now();
-        (
-            ticks,
-            (crate::timer::systimer::SystemTimer::ticks_per_second() / 1_000_000),
-        )
+        let ticks = SystemTimer::unit_value(Unit::Unit0);
+        (ticks, (SystemTimer::ticks_per_second() / 1_000_000))
     };
 
     Instant::from_ticks(ticks / div)

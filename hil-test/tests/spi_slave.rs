@@ -9,26 +9,25 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority},
     dma_buffers,
     gpio::{Input, Level, Output, Pull},
     peripheral::Peripheral,
-    spi::{slave::Spi, SpiMode},
+    spi::{slave::Spi, Mode},
     Blocking,
 };
 use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannelCreator = esp_hal::dma::Spi2DmaChannelCreator;
+        type DmaChannel = esp_hal::dma::Spi2DmaChannel;
     } else {
-        type DmaChannelCreator = esp_hal::dma::ChannelCreator<0>;
+        type DmaChannel = esp_hal::dma::DmaChannel0;
     }
 }
 
 struct Context {
     spi: Spi<'static, Blocking>,
-    dma_channel: DmaChannelCreator,
+    dma_channel: DmaChannel,
     bitbang_spi: BitbangSpi,
 }
 
@@ -95,7 +94,7 @@ impl BitbangSpi {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 10, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -107,13 +106,11 @@ mod tests {
         let (sclk_pin, _) = hil_test::common_test_pins!(peripherals);
         let cs_pin = hil_test::unconnected_pin!(peripherals);
 
-        let dma = Dma::new(peripherals.DMA);
-
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let dma_channel = dma.spi2channel;
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 
@@ -128,7 +125,7 @@ mod tests {
         let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
 
         Context {
-            spi: Spi::new(peripherals.SPI2, SpiMode::Mode1)
+            spi: Spi::new(peripherals.SPI2, Mode::Mode1)
                 .with_sck(sclk)
                 .with_mosi(mosi)
                 .with_miso(miso)
@@ -139,15 +136,12 @@ mod tests {
     }
 
     #[test]
-    #[timeout(10)]
     fn test_basic(mut ctx: Context) {
         const DMA_SIZE: usize = 32;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_SIZE);
-        let mut spi = ctx.spi.with_dma(
-            ctx.dma_channel.configure(false, DmaPriority::Priority0),
-            rx_descriptors,
-            tx_descriptors,
-        );
+        let mut spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel, rx_descriptors, tx_descriptors);
         let slave_send = tx_buffer;
         let slave_receive = rx_buffer;
 

@@ -2,11 +2,13 @@
 
 [![Crates.io](https://img.shields.io/crates/v/esp-wifi?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-wifi)
 [![docs.rs](https://img.shields.io/docsrs/esp-wifi?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.esp-rs.org/esp-hal)
-![MSRV](https://img.shields.io/badge/MSRV-1.76-blue?labelColor=1C2C2E&style=flat-square)
+![MSRV](https://img.shields.io/badge/MSRV-1.83-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-wifi?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 A WiFi, BLE and ESP-NOW driver for Espressif microcontrollers.
+
+Note that this crate currently requires you to enable the `unstable` feature on `esp-hal`.
 
 ## Current support
 
@@ -22,7 +24,10 @@ If a cell contains an em dash (&mdash;) this means that the particular feature i
 | ESP32-S2 |                          ✓                           |                       &mdash;                       |                       &mdash;                        |    ✓    |
 | ESP32-S3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
 
-Minimum supported Rust compiler version: 1.79.0
+## Minimum Supported Rust Version (MSRV)
+
+This crate is guaranteed to compile on stable Rust 1.83 and up. It _might_
+compile with older versions but that may change in any new patch release.
 
 ## Missing / To be done
 

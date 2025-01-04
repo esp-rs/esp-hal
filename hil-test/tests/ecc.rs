@@ -17,8 +17,8 @@ use elliptic_curve::sec1::ToEncodedPoint;
 #[cfg(feature = "esp32h2")]
 use esp_hal::ecc::WorkMode;
 use esp_hal::{
+    clock::CpuClock,
     ecc::{Ecc, EllipticCurve, Error},
-    prelude::*,
     rng::Rng,
     Blocking,
 };
@@ -48,17 +48,14 @@ struct Context<'a> {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 10)]
 mod tests {
     use super::*;
 
     #[init]
     fn init() -> Context<'static> {
-        let peripherals = esp_hal::init({
-            let mut config = esp_hal::Config::default();
-            config.cpu_clock = CpuClock::max();
-            config
-        });
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let peripherals = esp_hal::init(config);
 
         let ecc = Ecc::new(peripherals.ECC);
         let rng = Rng::new(peripherals.RNG);
@@ -67,6 +64,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(5)]
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             match prime_field.len() {

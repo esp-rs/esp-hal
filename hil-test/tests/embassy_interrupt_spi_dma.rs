@@ -9,15 +9,15 @@
 
 use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     interrupt::{software::SoftwareInterruptControl, Priority},
     peripheral::Peripheral,
-    prelude::*,
     spi::{
         master::{Config, Spi},
-        SpiMode,
+        Mode,
     },
+    time::RateExtU32,
     timer::AnyTimer,
     Async,
 };
@@ -75,20 +75,18 @@ async fn interrupt_driven_task(mut i2s_tx: esp_hal::i2s::master::I2sTx<'static, 
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod test {
     use super::*;
 
     #[test]
-    #[timeout(3)]
     async fn dma_does_not_lock_up_when_used_in_different_executors() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
             if #[cfg(systimer)] {
-                use esp_hal::timer::systimer::{SystemTimer, Target};
-                let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+                use esp_hal::timer::systimer::SystemTimer;
+                let systimer = SystemTimer::new(peripherals.SYSTIMER);
                 esp_hal_embassy::init([
                     AnyTimer::from(systimer.alarm0),
                     AnyTimer::from(systimer.alarm1),
@@ -104,12 +102,12 @@ mod test {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
-                let dma_channel1 = dma.spi2channel;
-                let dma_channel2 = dma.spi3channel;
+            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+                let dma_channel1 = peripherals.DMA_SPI2;
+                let dma_channel2 = peripherals.DMA_SPI3;
             } else {
-                let dma_channel1 = dma.channel0;
-                let dma_channel2 = dma.channel1;
+                let dma_channel1 = peripherals.DMA_CH0;
+                let dma_channel2 = peripherals.DMA_CH1;
             }
         }
 
@@ -119,30 +117,28 @@ mod test {
 
         let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
-        let mut spi = Spi::new_with_config(
+        let mut spi = Spi::new(
             peripherals.SPI2,
-            Config {
-                frequency: 100.kHz(),
-                mode: SpiMode::Mode0,
-                ..Config::default()
-            },
+            Config::default()
+                .with_frequency(10000.kHz())
+                .with_mode(Mode::Mode0),
         )
+        .unwrap()
         .with_miso(unsafe { mosi.clone_unchecked() })
         .with_mosi(mosi)
-        .with_dma(dma_channel1.configure(false, DmaPriority::Priority0))
+        .with_dma(dma_channel1)
         .with_buffers(dma_rx_buf, dma_tx_buf)
         .into_async();
 
         #[cfg(any(esp32, esp32s2, esp32s3))]
-        let other_peripheral = Spi::new_with_config(
+        let other_peripheral = Spi::new(
             peripherals.SPI3,
-            Config {
-                frequency: 100.kHz(),
-                mode: SpiMode::Mode0,
-                ..Config::default()
-            },
+            Config::default()
+                .with_frequency(10000.kHz())
+                .with_mode(Mode::Mode0),
         )
-        .with_dma(dma_channel2.configure(false, DmaPriority::Priority0))
+        .unwrap()
+        .with_dma(dma_channel2)
         .into_async();
 
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
@@ -154,7 +150,7 @@ mod test {
                 esp_hal::i2s::master::Standard::Philips,
                 esp_hal::i2s::master::DataFormat::Data8Channel8,
                 8u32.kHz(),
-                dma_channel2.configure(false, DmaPriority::Priority0),
+                dma_channel2,
                 rx_descriptors,
                 tx_descriptors,
             )
@@ -202,7 +198,6 @@ mod test {
     // Reproducer of https://github.com/esp-rs/esp-hal/issues/2369
     #[cfg(multi_core)]
     #[test]
-    #[timeout(3)]
     async fn dma_does_not_lock_up_on_core_1() {
         use embassy_time::Timer;
         use esp_hal::peripherals::SPI2;
@@ -210,9 +205,9 @@ mod test {
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
-                use esp_hal::dma::Spi2DmaChannelCreator as DmaChannelCreator;
+                use esp_hal::dma::Spi2DmaChannel as DmaChannel;
             } else {
-                type DmaChannelCreator = esp_hal::dma::ChannelCreator<0>;
+                type DmaChannel = esp_hal::dma::DmaChannel0;
             }
         }
 
@@ -221,7 +216,7 @@ mod test {
 
         pub struct SpiPeripherals {
             pub spi: SPI2,
-            pub dma_channel: DmaChannelCreator,
+            pub dma_channel: DmaChannel,
         }
 
         #[embassy_executor::task]
@@ -230,19 +225,14 @@ mod test {
             let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
             let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-            let mut spi = Spi::new_with_config(
+            let mut spi = Spi::new(
                 peripherals.spi,
-                Config {
-                    frequency: 100.kHz(),
-                    mode: SpiMode::Mode0,
-                    ..Config::default()
-                },
+                Config::default()
+                    .with_frequency(100.kHz())
+                    .with_mode(Mode::Mode0),
             )
-            .with_dma(
-                peripherals
-                    .dma_channel
-                    .configure(false, DmaPriority::Priority0),
-            )
+            .unwrap()
+            .with_dma(peripherals.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();
 
@@ -257,12 +247,11 @@ mod test {
         }
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let dma = Dma::new(peripherals.DMA);
 
         cfg_if::cfg_if! {
             if #[cfg(systimer)] {
-                use esp_hal::timer::systimer::{SystemTimer, Target};
-                let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+                use esp_hal::timer::systimer::SystemTimer;
+                let systimer = SystemTimer::new(peripherals.SYSTIMER);
                 esp_hal_embassy::init([
                     AnyTimer::from(systimer.alarm0),
                     AnyTimer::from(systimer.alarm1),
@@ -279,9 +268,9 @@ mod test {
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
-                let dma_channel = dma.spi2channel;
+                let dma_channel = peripherals.DMA_SPI2;
             } else {
-                let dma_channel = dma.channel0;
+                let dma_channel = peripherals.DMA_CH0;
             }
         }
 

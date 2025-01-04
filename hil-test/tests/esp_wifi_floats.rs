@@ -10,10 +10,11 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_hal::{
+    clock::CpuClock,
     delay::Delay,
     interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
+    macros::handler,
     peripherals::Peripherals,
-    prelude::*,
     rng::Rng,
     timer::timg::TimerGroup,
 };
@@ -50,7 +51,7 @@ cfg_if::cfg_if! {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -58,11 +59,8 @@ mod tests {
     fn test_init() -> Peripherals {
         esp_alloc::heap_allocator!(72 * 1024);
 
-        esp_hal::init({
-            let mut config = esp_hal::Config::default();
-            config.cpu_clock = CpuClock::max();
-            config
-        })
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        esp_hal::init(config)
     }
 
     #[test]
@@ -73,7 +71,6 @@ mod tests {
 
     #[cfg(multi_core)]
     #[test]
-    #[timeout(3)]
     fn fpu_is_enabled_on_core1(peripherals: Peripherals) {
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
@@ -97,7 +94,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn fpu_stays_enabled_with_wifi(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         let _init = esp_wifi::init(
@@ -127,7 +123,6 @@ mod tests {
 
     #[cfg(multi_core)]
     #[test]
-    #[timeout(3)]
     fn fpu_stays_enabled_with_wifi_on_core1(peripherals: Peripherals) {
         let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
@@ -172,4 +167,16 @@ mod tests {
         let result = super::run_float_calc(2.0);
         assert_eq!(result, 4.0);
     }
+}
+
+// Here is a random test that doesn't fit anywhere else - and since it's alone,
+// creating a new test suite is not necessary as we don't want to flash/run
+// anything.
+#[allow(unused)] // compile test
+fn esp_wifi_can_be_initialized_with_any_timer(
+    timer: esp_hal::timer::AnyTimer,
+    rng: esp_hal::rng::Rng,
+    radio_clocks: esp_hal::peripherals::RADIO_CLK,
+) {
+    esp_wifi::init(timer, rng, radio_clocks);
 }

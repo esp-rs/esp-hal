@@ -12,34 +12,26 @@ use critical_section::Mutex;
 use embedded_hal::delay::DelayNs;
 use esp_hal::{
     delay::Delay,
-    prelude::*,
-    timer::systimer::{
-        Alarm,
-        FrozenUnit,
-        Periodic,
-        SpecificComparator,
-        SpecificUnit,
-        SystemTimer,
-        Target,
+    macros::handler,
+    time::ExtU64,
+    timer::{
+        systimer::{Alarm, SystemTimer},
+        OneShotTimer,
+        PeriodicTimer,
     },
     Blocking,
 };
-use fugit::ExtU32;
 use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};
-use static_cell::StaticCell;
 
-type TestAlarm<M, const C: u8> =
-    Alarm<'static, M, Blocking, SpecificComparator<'static, C>, SpecificUnit<'static, 0>>;
-
-static ALARM_TARGET: Mutex<RefCell<Option<TestAlarm<Target, 0>>>> = Mutex::new(RefCell::new(None));
-static ALARM_PERIODIC: Mutex<RefCell<Option<TestAlarm<Periodic, 1>>>> =
+static ALARM_TARGET: Mutex<RefCell<Option<OneShotTimer<'static, Blocking>>>> =
+    Mutex::new(RefCell::new(None));
+static ALARM_PERIODIC: Mutex<RefCell<Option<PeriodicTimer<'static, Blocking>>>> =
     Mutex::new(RefCell::new(None));
 
 struct Context {
-    unit: FrozenUnit<'static, SpecificUnit<'static, 0>>,
-    comparator0: SpecificComparator<'static, 0>,
-    comparator1: SpecificComparator<'static, 1>,
+    alarm0: Alarm,
+    alarm1: Alarm,
 }
 
 #[handler(priority = esp_hal::interrupt::Priority::min())]
@@ -96,36 +88,29 @@ fn target_fail_test_if_called_twice() {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
-        static UNIT0: StaticCell<SpecificUnit<'static, 0>> = StaticCell::new();
-
-        let unit0 = UNIT0.init(systimer.unit0);
-        let frozen_unit = FrozenUnit::new(unit0);
 
         Context {
-            unit: frozen_unit,
-            comparator0: systimer.comparator0,
-            comparator1: systimer.comparator1,
+            alarm0: systimer.alarm0,
+            alarm1: systimer.alarm1,
         }
     }
 
     #[test]
-    #[timeout(3)]
     fn target_interrupt_is_handled(ctx: Context) {
-        let alarm0 = Alarm::new(ctx.comparator0, &ctx.unit);
+        let mut alarm0 = OneShotTimer::new(ctx.alarm0);
 
         critical_section::with(|cs| {
             alarm0.set_interrupt_handler(pass_test_if_called);
-            alarm0.set_target(SystemTimer::now() + SystemTimer::ticks_per_second() / 10);
             alarm0.enable_interrupt(true);
+            alarm0.schedule(10_u64.millis()).unwrap();
 
             ALARM_TARGET.borrow_ref_mut(cs).replace(alarm0);
         });
@@ -135,22 +120,20 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn target_interrupt_is_handled_once(ctx: Context) {
-        let alarm0 = Alarm::new(ctx.comparator0, &ctx.unit);
-        let alarm1 = Alarm::new(ctx.comparator1, &ctx.unit);
+        let mut alarm0 = OneShotTimer::new(ctx.alarm0);
+        let mut alarm1 = PeriodicTimer::new(ctx.alarm1);
 
         COUNTER.store(0, Ordering::Relaxed);
 
         critical_section::with(|cs| {
             alarm0.set_interrupt_handler(target_fail_test_if_called_twice);
-            alarm0.set_target(SystemTimer::now() + SystemTimer::ticks_per_second() / 10);
             alarm0.enable_interrupt(true);
+            alarm0.schedule(10_u64.millis()).unwrap();
 
-            let alarm1 = alarm1.into_periodic();
             alarm1.set_interrupt_handler(handle_periodic_interrupt);
-            alarm1.set_period(100u32.millis());
             alarm1.enable_interrupt(true);
+            alarm1.start(100u64.millis()).unwrap();
 
             ALARM_TARGET.borrow_ref_mut(cs).replace(alarm0);
             ALARM_PERIODIC.borrow_ref_mut(cs).replace(alarm1);
@@ -161,17 +144,15 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn periodic_interrupt_is_handled(ctx: Context) {
-        let alarm1 = Alarm::new(ctx.comparator1, &ctx.unit);
+        let mut alarm1 = PeriodicTimer::new(ctx.alarm1);
 
         COUNTER.store(0, Ordering::Relaxed);
 
         critical_section::with(|cs| {
-            let alarm1 = alarm1.into_periodic();
             alarm1.set_interrupt_handler(pass_test_if_called_twice);
-            alarm1.set_period(100u32.millis());
             alarm1.enable_interrupt(true);
+            alarm1.start(100u64.millis()).unwrap();
 
             ALARM_PERIODIC.borrow_ref_mut(cs).replace(alarm1);
         });

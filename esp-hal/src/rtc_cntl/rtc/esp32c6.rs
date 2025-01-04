@@ -1361,7 +1361,7 @@ pub(crate) enum RtcFastClock {
 impl Clock for RtcFastClock {
     fn frequency(&self) -> HertzU32 {
         match self {
-            RtcFastClock::RtcFastClockXtalD2 => HertzU32::Hz(40_000_000 / 2), /* TODO: Is the value correct? */
+            RtcFastClock::RtcFastClockXtalD2 => HertzU32::Hz(40_000_000 / 2), // TODO: Is the value correct?
             RtcFastClock::RtcFastClockRcFast => HertzU32::Hz(17_500_000),
         }
     }

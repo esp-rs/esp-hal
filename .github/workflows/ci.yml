@@ -23,7 +23,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MSRV: "1.79.0"
+  MSRV: "1.83.0"
   RUSTDOCFLAGS: -Dwarnings
   DEFMT_LOG: trace
 
@@ -70,6 +70,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           ldproxy: false
+          version: 1.83.0.1
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
@@ -137,10 +138,10 @@ jobs:
 
       - name: msrv RISCV (esp-wifi)
         run: |
-          cargo xtask build-package --features=esp32c2,wifi,ble --target=riscv32imc-unknown-none-elf   esp-wifi
-          cargo xtask build-package --features=esp32c3,wifi,ble --target=riscv32imc-unknown-none-elf   esp-wifi
-          cargo xtask build-package --features=esp32c6,wifi,ble --target=riscv32imac-unknown-none-elf  esp-wifi
-          cargo xtask build-package --features=esp32h2,ble --target=riscv32imac-unknown-none-elf  esp-wifi
+          cargo xtask build-package --features=esp32c2,wifi,ble,esp-hal/unstable --target=riscv32imc-unknown-none-elf   esp-wifi
+          cargo xtask build-package --features=esp32c3,wifi,ble,esp-hal/unstable --target=riscv32imc-unknown-none-elf   esp-wifi
+          cargo xtask build-package --features=esp32c6,wifi,ble,esp-hal/unstable --target=riscv32imac-unknown-none-elf  esp-wifi
+          cargo xtask build-package --features=esp32h2,ble,esp-hal/unstable --target=riscv32imac-unknown-none-elf  esp-wifi
 
         # Verify the MSRV for all Xtensa chips:
       - name: msrv Xtensa (esp-hal)
@@ -151,9 +152,9 @@ jobs:
 
       - name: msrv Xtensa (esp-wifi)
         run: |
-          cargo xtask build-package --toolchain=esp --features=esp32,wifi,ble   --target=xtensa-esp32-none-elf   esp-wifi
-          cargo xtask build-package --toolchain=esp --features=esp32s2,wifi --target=xtensa-esp32s2-none-elf esp-wifi
-          cargo xtask build-package --toolchain=esp --features=esp32s3,wifi,ble --target=xtensa-esp32s3-none-elf esp-wifi
+          cargo xtask build-package --toolchain=esp --features=esp32,wifi,ble,esp-hal/unstable   --target=xtensa-esp32-none-elf   esp-wifi
+          cargo xtask build-package --toolchain=esp --features=esp32s2,wifi,esp-hal/unstable     --target=xtensa-esp32s2-none-elf esp-wifi
+          cargo xtask build-package --toolchain=esp --features=esp32s3,wifi,ble,esp-hal/unstable --target=xtensa-esp32s3-none-elf esp-wifi
 
       - name: msrv (esp-lp-hal)
         run: |

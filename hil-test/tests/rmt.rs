@@ -6,13 +6,13 @@
 #![no_main]
 
 use esp_hal::{
-    prelude::*,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
+    time::RateExtU32,
 };
 use hil_test as _;
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 1)]
 mod tests {
     use esp_hal::rmt::Error;
 
@@ -22,7 +22,6 @@ mod tests {
     fn init() {}
 
     #[test]
-    #[timeout(1)]
     fn rmt_loopback() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
@@ -97,7 +96,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1)]
     fn rmt_single_shot_fails_without_end_marker() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 

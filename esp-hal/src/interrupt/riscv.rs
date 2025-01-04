@@ -12,6 +12,7 @@
 //! interrupt15() => Priority::Priority15
 //! ```
 
+pub(crate) use esp_riscv_rt::riscv::interrupt::free;
 pub use esp_riscv_rt::TrapFrame;
 use riscv::register::{mcause, mtvec};
 
@@ -117,7 +118,7 @@ pub enum CpuInterrupt {
 }
 
 /// Interrupt priority levels.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 pub enum Priority {
@@ -167,9 +168,35 @@ impl Priority {
     }
 }
 
+impl TryFrom<u8> for Priority {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Priority::None),
+            1 => Ok(Priority::Priority1),
+            2 => Ok(Priority::Priority2),
+            3 => Ok(Priority::Priority3),
+            4 => Ok(Priority::Priority4),
+            5 => Ok(Priority::Priority5),
+            6 => Ok(Priority::Priority6),
+            7 => Ok(Priority::Priority7),
+            8 => Ok(Priority::Priority8),
+            9 => Ok(Priority::Priority9),
+            10 => Ok(Priority::Priority10),
+            11 => Ok(Priority::Priority11),
+            12 => Ok(Priority::Priority12),
+            13 => Ok(Priority::Priority13),
+            14 => Ok(Priority::Priority14),
+            15 => Ok(Priority::Priority15),
+            _ => Err(Error::InvalidInterruptPriority),
+        }
+    }
+}
+
 /// The interrupts reserved by the HAL
 #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
-pub static RESERVED_INTERRUPTS: &[usize] = INTERRUPT_TO_PRIORITY;
+pub static RESERVED_INTERRUPTS: &[usize] = PRIORITY_TO_INTERRUPT;
 
 /// # Safety
 ///
@@ -681,6 +708,34 @@ mod classic {
         let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
         intr.cpu_int_thresh().write(|w| w.bits(stored_prio));
     }
+
+    /// Get the current run level (the level below which interrupts are masked).
+    pub(crate) fn current_runlevel() -> Priority {
+        let intr = unsafe { crate::peripherals::INTERRUPT_CORE0::steal() };
+        let prev_interrupt_priority = intr.cpu_int_thresh().read().bits().saturating_sub(1) as u8;
+
+        unwrap!(Priority::try_from(prev_interrupt_priority))
+    }
+
+    /// Changes the current run level (the level below which interrupts are
+    /// masked), and returns the previous run level.
+    ///
+    /// # Safety
+    ///
+    /// This function must only be used to raise the runlevel and to restore it
+    /// to a previous value. It must not be used to arbitrarily lower the
+    /// runlevel.
+    pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
+        let prev_interrupt_priority = current_runlevel();
+
+        // The CPU responds to interrupts `>= level`, but we want to also disable
+        // interrupts at `level` so we set the threshold to `level + 1`.
+        crate::peripherals::INTERRUPT_CORE0::steal()
+            .cpu_int_thresh()
+            .write(|w| w.bits(level as u32 + 1));
+
+        prev_interrupt_priority
+    }
 }
 
 #[cfg(plic)]
@@ -816,5 +871,37 @@ mod plic {
         let plic = &*crate::peripherals::PLIC_MX::PTR;
         plic.mxint_thresh()
             .write(|w| w.cpu_mxint_thresh().bits(stored_prio as u8));
+    }
+
+    /// Get the current run level (the level below which interrupts are masked).
+    pub(crate) fn current_runlevel() -> Priority {
+        let prev_interrupt_priority = unsafe { crate::peripherals::PLIC_MX::steal() }
+            .mxint_thresh()
+            .read()
+            .cpu_mxint_thresh()
+            .bits()
+            .saturating_sub(1);
+
+        unwrap!(Priority::try_from(prev_interrupt_priority))
+    }
+
+    /// Changes the current run level (the level below which interrupts are
+    /// masked), and returns the previous run level.
+    ///
+    /// # Safety
+    ///
+    /// This function must only be used to raise the runlevel and to restore it
+    /// to a previous value. It must not be used to arbitrarily lower the
+    /// runlevel.
+    pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
+        let prev_interrupt_priority = current_runlevel();
+
+        // The CPU responds to interrupts `>= level`, but we want to also disable
+        // interrupts at `level` so we set the threshold to `level + 1`.
+        crate::peripherals::PLIC_MX::steal()
+            .mxint_thresh()
+            .write(|w| w.cpu_mxint_thresh().bits(level as u8 + 1));
+
+        prev_interrupt_priority
     }
 }

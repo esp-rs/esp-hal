@@ -10,7 +10,7 @@ use crate::rsa::{
     RsaMultiplication,
 };
 
-impl<'d, DM: crate::Mode> Rsa<'d, DM> {
+impl<Dm: crate::DriverMode> Rsa<'_, Dm> {
     /// After the RSA accelerator is released from reset, the memory blocks
     /// needs to be initialized, only after that peripheral should be used.
     /// This function would return without an error if the memory is
@@ -44,16 +44,9 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     ///
     /// For more information refer to 20.3.4 of <https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf>.
     pub fn enable_disable_search_acceleration(&mut self, enable: bool) {
-        match enable {
-            true => self
-                .rsa
-                .search_enable()
-                .write(|w| w.search_enable().set_bit()),
-            false => self
-                .rsa
-                .search_enable()
-                .write(|w| w.search_enable().clear_bit()),
-        };
+        self.rsa
+            .search_enable()
+            .write(|w| w.search_enable().bit(enable));
     }
 
     /// Checks if the search functionality is enabled in the RSA hardware.
@@ -79,16 +72,9 @@ impl<'d, DM: crate::Mode> Rsa<'d, DM> {
     ///
     /// For more information refer to 20.3.4 of <https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf>.
     pub fn enable_disable_constant_time_acceleration(&mut self, enable: bool) {
-        match enable {
-            true => self
-                .rsa
-                .constant_time()
-                .write(|w| w.constant_time().clear_bit()),
-            false => self
-                .rsa
-                .constant_time()
-                .write(|w| w.constant_time().set_bit()),
-        };
+        self.rsa
+            .constant_time()
+            .write(|w| w.constant_time().bit(!enable));
     }
 
     /// Starts the modular exponentiation operation.
@@ -262,7 +248,7 @@ pub mod operand_sizes {
     );
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularExponentiation<'a, 'd, T, DM>
+impl<'d, T: RsaMode, Dm: crate::DriverMode, const N: usize> RsaModularExponentiation<'_, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
@@ -277,16 +263,16 @@ where
     }
 
     /// Sets the modular exponentiation mode for the RSA hardware.
-    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, Dm>) {
         rsa.write_mode((N - 1) as u32)
     }
 }
 
-impl<'a, 'd, T: RsaMode, DM: crate::Mode, const N: usize> RsaModularMultiplication<'a, 'd, T, DM>
+impl<'d, T: RsaMode, Dm: crate::DriverMode, const N: usize> RsaModularMultiplication<'_, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
-    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, Dm>) {
         rsa.write_mode((N - 1) as u32)
     }
 
@@ -295,12 +281,12 @@ where
     }
 }
 
-impl<'a, 'd, T: RsaMode + Multi, DM: crate::Mode, const N: usize> RsaMultiplication<'a, 'd, T, DM>
+impl<'d, T: RsaMode + Multi, Dm: crate::DriverMode, const N: usize> RsaMultiplication<'_, 'd, T, Dm>
 where
     T: RsaMode<InputType = [u32; N]>,
 {
     /// Sets the multiplication mode for the RSA hardware.
-    pub(super) fn write_mode(rsa: &mut Rsa<'d, DM>) {
+    pub(super) fn write_mode(rsa: &mut Rsa<'d, Dm>) {
         rsa.write_mode((N * 2 - 1) as u32)
     }
 

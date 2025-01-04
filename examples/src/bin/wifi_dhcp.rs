@@ -6,20 +6,22 @@
 //! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
 
 extern crate alloc;
+use core::net::Ipv4Addr;
 
 use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    prelude::*,
+    clock::CpuClock,
+    entry,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -38,7 +40,7 @@ use esp_wifi::{
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
-    wire::{DhcpOption, IpAddress, Ipv4Address},
+    wire::{DhcpOption, IpAddress},
 };
 
 const SSID: &str = env!("SSID");
@@ -47,11 +49,8 @@ const PASSWORD: &str = env!("PASSWORD");
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 
@@ -136,7 +135,7 @@ fn main() -> ! {
         socket.work();
 
         socket
-            .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+            .open(IpAddress::Ipv4(Ipv4Addr::new(142, 250, 185, 115)), 80)
             .unwrap();
 
         socket

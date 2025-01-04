@@ -9,6 +9,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ESP32-S3: Added SDMMC signals (#2556)
+- Added `set_priority` to the `DmaChannel` trait on GDMA devices (#2403, #2526)
+- Added `into_async` and `into_blocking` functions for `ParlIoTxOnly`, `ParlIoRxOnly` (#2526)
+- ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526, #2532)
+- DMA: `PeripheralDmaChannel` type aliasses and `DmaChannelFor` traits to improve usability. (#2532)
+- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
+- `esp_hal::asynch::AtomicWaker` that does not hold a global critical section (#2555)
+- `esp_hal::sync::RawMutex` for embassy-sync. (#2555)
+- ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526)
+- Added PSRAM configuration to `esp_hal::Config` if `quad-psram` or `octal-psram` is enabled (#2546)
+- Added `esp_hal::psram::psram_raw_parts` (#2546)
+- The timer drivers `OneShotTimer` & `PeriodicTimer` have `into_async` and `new_typed` methods (#2586)
+- `timer::Timer` trait has three new methods, `wait`, `async_interrupt_handler` and `peripheral_interrupt` (#2586)
+- Configuration structs in the I2C, SPI, and UART drivers now implement the Builder Lite pattern (#2614)
+- Added `I8080::apply_config`, `DPI::apply_config` and `Camera::apply_config` (#2610)
+- Introduced the `unstable` feature which will be used to restrict stable APIs to a subset of esp-hal. (#2628)
+- HAL configuration structs now implement the Builder Lite pattern (#2645)
+- Added `OutputOpenDrain::unlisten` (#2625)
+- Added `{Input, Flex}::wait_for` (#2625)
+- Peripheral singletons now implement `Debug` and `defmt::Format` (#2682, #2834)
+- `BurstConfig`, a device-specific configuration for configuring DMA transfers in burst mode (#2543)
+- `{DmaRxBuf, DmaTxBuf, DmaRxTxBuf}::set_burst_config` (#2543)
+- Added `SpiDmaBus::split` for moving between manual & automatic DMA buffers (#2824)
+- ESP32-S2: DMA support for AES (#2699)
+- Added `transfer_in_place_async` and embedded-hal-async implementation to `Spi` (#2691)
+- `InterruptHandler` now implements `Hash` and `defmt::Format` (#2830)
+- `uart::ConfigError` now implements `Eq` (#2825)
+- `i2c::master::Error` now implements `Eq` and `Hash` (#2825)
+- `i2c::master::Operation` now implements `Debug`, `PartialEq`, `Eq`, `Hash`, and `Display` (#2825)
+- `i2c::master::Config` now implements `PartialEq`, `Eq`, ans `Hash` (#2825)
+- `i2c::master::I2c` now implements `Debug`, `PartialEq`, and `Eq` (#2825)
+- `i2c::master::Info` now implements `Debug` (#2825)
+- `spi::master::Config` now implements `Hash` (#2823)
+- `spi::master` drivers now implement `Debug` and `defmt::Format` (#2823)
+- `DmaRxBuf`, `DmaTxBuf` and `DmaRxTxBuf` now implement `Debug` and `defmt::Format` (#2823)
+- DMA channels (`AnyGdmaChannel`, `SpiDmaChannel`, `I2sDmaChannel`, `CryptoDmaChannel`) and their RX/TX halves now implement `Debug` and `defmt::Format` (#2823)
+- `DmaDescriptor` and `DmaDescriptorFlags` now implement `PartialEq` and `Eq` (#2823)
+- `gpio::{Event, WakeEvent, GpioRegisterAccess}` now implement `Debug`, `Eq`, `PartialEq` and `Hash` (#2842)
+- `gpio::{Level, Pull, AlternateFunction, RtcFunction}` now implement `Hash` (#2842)
+- `gpio::{GpioPin, AnyPin, Io, Output, OutputOpenDrain, Input, Flex}` now implement `Debug`, `defmt::Format` (#2842)
+- More interrupts are available in `esp_hal::spi::master::SpiInterrupt`, add `enable_listen`,`interrupts` and `clear_interrupts` for ESP32/ESP32-S2 (#2833)
+- The `ExtU64` and `RateExtU32` traits have been added to `esp_hal::time` (#2845)
+- Added `AnyPin::steal(pin_number)` (#2854)
+- `adc::{AdcCalSource, Attenuation, Resolution}` now implement `Hash` and `defmt::Format` (#2840)
+- `rtc_cntl::{RtcFastClock, RtcSlowClock, RtcCalSel}` now implement `PartialEq`, `Eq`, `Hash` and `defmt::Format` (#2840)
+
+### Changed
+
+- Bump MSRV to 1.83 (#2615)
+- In addition to taking by value, peripheral drivers can now mutably borrow DMA channel objects. (#2526)
+- DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
+- The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
+- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
+- `SystemTimer::set_unit_value` & `SystemTimer::configure_unit` (#2576)
+- `SystemTimer` no longer uses peripheral ref (#2576)
+- `TIMGX` no longer uses peripheral ref (#2581)
+- `SystemTimer::now` has been renamed `SystemTimer::unit_value(Unit)` (#2576)
+- `SpiDma` transfers now explicitly take a length along with the DMA buffer object (#2587)
+- `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
+- `SystemTimer`s `Alarm`s are now type erased (#2576)
+- `TimerGroup` `Timer`s are now type erased (#2581)
+- PSRAM is now initialized automatically if `quad-psram` or `octal-psram` is enabled (#2546)
+- DMA channels are now available via the `Peripherals` struct, and have been renamed accordingly. (#2545)
+- Moved interrupt related items from lib.rs, moved to the `interrupt` module (#2613)
+- The timer drivers `OneShotTimer` & `PeriodicTimer` now have a `Mode` parameter and type erase the underlying driver by default (#2586)
+- `timer::Timer` has new trait requirements of `Into<AnyTimer>`, `'static` and `InterruptConfigurable` (#2586)
+- `systimer::etm::Event` no longer borrows the alarm indefinitely (#2586)
+- A number of public enums and structs in the I2C, SPI, and UART drivers have been marked with `#[non_exhaustive]` (#2614)
+- Interrupt handling related functions are only provided for Blocking UART. (#2610)
+- Changed how `Spi`, (split or unsplit) `Uart`, `LpUart`, `I8080`, `Camera`, `DPI` and `I2C` drivers are constructed (#2610)
+- I8080, camera, DPI: The various standalone configuration options have been merged into `Config` (#2610)
+- Dropped GPIO futures stop listening for interrupts (#2625)
+- UART driver's `StopBits` enum variants now correctly use UpperCamelCase (#2669)
+- The `PeripheralInput` and `PeripheralOutput` traits are now sealed (#2690)
+- `esp_hal::sync::Lock` has been renamed to RawMutex (#2684)
+- Updated `esp-pacs` with support for Wi-Fi on the ESP32 and made the peripheral non virtual
+- `SpiBitOrder`, `SpiDataMode`, `SpiMode` were renamed to `BitOder`, `DataMode` and `Mode` (#2828)
+- `crate::Mode` was renamed to `crate::DriverMode` (#2828)
+- Renamed some I2C error variants (#2844)
+- I2C: Replaced potential panics with errors. (#2831)
+- UART: Make `AtCmdConfig` and `ConfigError` non-exhaustive (#2851)
+- UART: Make `AtCmdConfig` use builder-lite pattern (#2851)
+
+### Fixed
+
+- Xtensa devices now correctly enable the `esp-hal-procmacros/rtc-slow` feature (#2594)
+- User-bound GPIO interrupt handlers should no longer interfere with async pins. (#2625)
+- `spi::master::Spi::{into_async, into_blocking}` are now correctly available on the typed driver, to. (#2674)
+- It is no longer possible to safely conjure `GpioPin` instances (#2688)
+- UART: Public API follows `C-WORD_ORDER` Rust API standard (`VerbObject` order) (#2851)
+
+### Removed
+
+- Remove more examples. Update doctests. (#2547)
+- The `configure` and `configure_for_async` DMA channel functions has been removed (#2403)
+- The DMA channel objects no longer have `tx` and `rx` fields. (#2526)
+- `SysTimerAlarms` has been removed, alarms are now part of the `SystemTimer` struct (#2576)
+- `FrozenUnit`, `AnyUnit`, `SpecificUnit`, `SpecificComparator`, `AnyComparator` have been removed from `systimer` (#2576)
+- Remove Dma[Rx|Tx]Buffer::length (#2587)
+- `esp_hal::psram::psram_range` (#2546)
+- The `Dma` structure has been removed. (#2545)
+- Removed `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
+- Removed `Camera::set_` functions (#2610)
+- `DmaTxBuf::{compute_chunk_size, compute_descriptor_count, new_with_block_size}` (#2543)
+
+- The `prelude` module has been removed (#2845)
+
+## [0.22.0] - 2024-11-20
+
+### Added
+
 - A new config option `PLACE_SWITCH_TABLES_IN_RAM` to improve performance (especially for interrupts) at the cost of slightly more RAM usage (#2331)
 - A new config option `PLACE_ANON_IN_RAM` to improve performance (especially for interrupts) at the cost of RAM usage (#2331)
 - Add burst transfer support to DMA buffers (#2336)
@@ -20,6 +131,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pins::steal()` to unsafely obtain GPIO. (#2335)
 - `I2c::with_timeout` (#2361)
 - `Spi::half_duplex_read` and `Spi::half_duplex_write` (#2373)
+- Add RGB/DPI driver (#2415)
+- Add `DmaLoopBuf` (#2415)
 - `Cpu::COUNT` and `Cpu::current()` (#2411)
 - `UartInterrupt` and related functions (#2406)
 - I2S Parallel output driver for ESP32. (#2348, #2436, #2472)
@@ -66,6 +179,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Trying to send a single-shot RMT transmission will result in an error now, `RMT` deals with `u32` now, `PulseCode` is a convenience trait now (#2463)
 - Removed `get_` prefixes from functions (#2528)
 - The `Camera` and `I8080` drivers' constructors now only accepts blocking-mode DMA channels. (#2519)
+- Many peripherals are now disabled by default and also get disabled when the driver is dropped (#2544)
+
+- Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 
 ### Fixed
 
@@ -110,6 +226,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parl_io::{no_clk_pin(), NoClkPin}` (#2531)
 - Removed `get_core` function in favour of `Cpu::current` (#2533)
 
+- Removed `uart::Config` setters and `symbol_length`. (#2847)
+
 ## [0.21.1]
 
 ### Fixed
@@ -118,8 +236,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2c::transaction is now able to transmit data of arbitrary length (#2481)
 
 ## [0.21.0]
-
-- Bump MSRV to 1.79.0 (#1971)
 
 ### Added
 
@@ -918,7 +1034,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/esp-rs/esp-hal/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1

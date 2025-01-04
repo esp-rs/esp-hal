@@ -26,7 +26,6 @@ crate::peripherals! {
         AES <= AES,
         DAC1 <= virtual,
         DAC2 <= virtual,
-        DMA <= virtual,
         DEDICATED_GPIO <= DEDICATED_GPIO,
         DS <= DS,
         EFUSE <= EFUSE,
@@ -115,5 +114,11 @@ crate::peripherals! {
         (44, [Input, Output])
         (45, [Input, Output])
         (46, [Input, Output])
+    ],
+    dma_channels: [
+        DMA_SPI2: Spi2DmaChannel,
+        DMA_SPI3: Spi3DmaChannel,
+        DMA_I2S0: I2s0DmaChannel,
+        DMA_CRYPTO: CryptoDmaChannel,
     ]
 }

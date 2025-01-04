@@ -22,8 +22,8 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::trace::Trace;
-//! let mut trace = Trace::new(peripherals.TRACE0);
 //! let mut buffer = [0_u8; 1024];
+//! let mut trace = Trace::new(peripherals.TRACE0);
 //! trace.start_trace(&mut buffer);
 //! // traced code
 //!
@@ -36,7 +36,7 @@
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::trace::RegisterBlock,
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
 };
 
 /// Errors returned from [Trace::stop_trace]
@@ -56,9 +56,13 @@ pub struct TraceResult {
 }
 
 /// TRACE Encoder Instance
-pub struct Trace<'d, T> {
+pub struct Trace<'d, T>
+where
+    T: Instance,
+{
     peripheral: PeripheralRef<'d, T>,
     buffer: Option<&'d mut [u8]>,
+    _guard: PeripheralGuard,
 }
 
 impl<'d, T> Trace<'d, T>
@@ -68,13 +72,12 @@ where
     /// Construct a new instance
     pub fn new(peripheral: impl Peripheral<P = T> + 'd) -> Self {
         crate::into_ref!(peripheral);
-
-        PeripheralClockControl::reset(crate::system::Peripheral::Trace0);
-        PeripheralClockControl::enable(crate::system::Peripheral::Trace0);
+        let guard = PeripheralGuard::new(peripheral.peripheral());
 
         Self {
             peripheral,
             buffer: None,
+            _guard: guard,
         }
     }
 
@@ -204,13 +207,21 @@ where
 }
 
 /// Trace peripheral instance
+#[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
     /// Get a reference to the peripheral's underlying register block
     fn register_block(&self) -> &RegisterBlock;
+
+    /// Peripheral
+    fn peripheral(&self) -> crate::system::Peripheral;
 }
 
 impl Instance for crate::peripherals::TRACE0 {
     fn register_block(&self) -> &RegisterBlock {
         self
+    }
+
+    fn peripheral(&self) -> crate::system::Peripheral {
+        crate::system::Peripheral::Trace0
     }
 }

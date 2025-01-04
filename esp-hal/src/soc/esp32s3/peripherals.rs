@@ -28,7 +28,6 @@ crate::peripherals! {
         ASSIST_DEBUG <= ASSIST_DEBUG,
         BT <= virtual,
         CPU_CTRL <= virtual,
-        DMA <= DMA (DMA_IN_CH0,DMA_IN_CH1,DMA_IN_CH2,DMA_IN_CH3,DMA_IN_CH4,DMA_OUT_CH0,DMA_OUT_CH1,DMA_OUT_CH2,DMA_OUT_CH3,DMA_OUT_CH4),
         DS <= DS,
         EFUSE <= EFUSE,
         EXTMEM <= EXTMEM,
@@ -126,5 +125,12 @@ crate::peripherals! {
         (46, [Input, Output])
         (47, [Input, Output])
         (48, [Input, Output])
+    ],
+    dma_channels: [
+        DMA_CH0: DmaChannel0,
+        DMA_CH1: DmaChannel1,
+        DMA_CH2: DmaChannel2,
+        DMA_CH3: DmaChannel3,
+        DMA_CH4: DmaChannel4,
     ]
 }

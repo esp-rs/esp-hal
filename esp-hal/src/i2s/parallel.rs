@@ -34,6 +34,69 @@
 //!   - `GPIO`
 //!   - `DMA`
 //!   - `system` (to configure and enable the I2S peripheral)
+//!
+//! ## Examples
+//!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::dma::DmaTxBuf;
+//! # use esp_hal::dma_buffers;
+//! # use esp_hal::delay::Delay;
+//! # use esp_hal::i2s::parallel::{I2sParallel, TxEightBits};
+//!
+//! const BUFFER_SIZE: usize = 256;
+//!
+//! let delay = Delay::new();
+//! let dma_channel = peripherals.DMA_I2S1;
+//! let i2s = peripherals.I2S1;
+//! let clock = peripherals.GPIO25;
+//!
+//! let pins = TxEightBits::new(
+//!     peripherals.GPIO16,
+//!     peripherals.GPIO4,
+//!     peripherals.GPIO17,
+//!     peripherals.GPIO18,
+//!     peripherals.GPIO5,
+//!     peripherals.GPIO19,
+//!     peripherals.GPIO12,
+//!     peripherals.GPIO14,
+//! );
+//!
+//! let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);
+//! let mut parallel = I2sParallel::new(
+//!     i2s,
+//!     dma_channel,
+//!     1.MHz(),
+//!     pins,
+//!     clock,
+//! ).into_async();
+//!
+//! for (i, data) in tx_buffer.chunks_mut(4).enumerate() {
+//!     let offset = i * 4;
+//!     // i2s parallel driver expects the buffer to be interleaved
+//!     data[0] = (offset + 2) as u8;
+//!     data[1] = (offset + 3) as u8;
+//!     data[2] = offset as u8;
+//!     data[3] = (offset + 1) as u8;
+//! }
+//!
+//! let mut tx_buf: DmaTxBuf =
+//!     DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed");
+//!
+//! // Sending 256 bytes.
+//! loop {
+//!     let xfer = match parallel.send(tx_buf) {
+//!         Ok(xfer) => xfer,
+//!         Err(_) => {
+//!             panic!("Failed to send buffer");
+//!         }
+//!     };
+//!     (parallel, tx_buf) = xfer.wait();
+//!     delay.delay_millis(10);
+//! }
+//! # }
+//! ```
+//!
 use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -46,11 +109,12 @@ use crate::{
         asynch::DmaTxFuture,
         Channel,
         ChannelTx,
-        DmaChannelConvert,
+        DmaChannelFor,
         DmaEligible,
         DmaError,
         DmaPeripheral,
         DmaTxBuffer,
+        PeripheralTxChannel,
         Tx,
     },
     gpio::{
@@ -60,9 +124,10 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
     private::Internal,
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
     Async,
-    Mode,
+    Blocking,
+    DriverMode,
 };
 
 #[doc(hidden)]
@@ -170,58 +235,55 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
 }
 
 /// I2S Parallel Interface
-pub struct I2sParallel<'d, DM, I = AnyI2s>
+pub struct I2sParallel<'d, Dm, I = AnyI2s>
 where
-    DM: Mode,
+    Dm: DriverMode,
     I: Instance,
 {
     instance: PeripheralRef<'d, I>,
-    tx_channel: ChannelTx<'d, DM, I::Dma>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<I>>,
+    _guard: PeripheralGuard,
 }
 
-impl<'d, DM> I2sParallel<'d, DM>
-where
-    DM: Mode,
-{
+impl<'d> I2sParallel<'d, Blocking> {
     /// Create a new I2S Parallel Interface
     pub fn new<CH>(
         i2s: impl Peripheral<P = impl Instance> + 'd,
-        channel: Channel<'d, DM, CH>,
+        channel: impl Peripheral<P = CH> + 'd,
         frequency: impl Into<fugit::HertzU32>,
         pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
-        CH: DmaChannelConvert<<AnyI2s as DmaEligible>::Dma>,
+        CH: DmaChannelFor<AnyI2s>,
     {
         Self::new_typed(i2s.map_into(), channel, frequency, pins, clock_pin)
     }
 }
 
-impl<'d, I, DM> I2sParallel<'d, DM, I>
+impl<'d, I> I2sParallel<'d, Blocking, I>
 where
     I: Instance,
-    DM: Mode,
 {
     /// Create a new I2S Parallel Interface
     pub fn new_typed<CH>(
         i2s: impl Peripheral<P = I> + 'd,
-        channel: Channel<'d, DM, CH>,
+        channel: impl Peripheral<P = CH> + 'd,
         frequency: impl Into<fugit::HertzU32>,
         mut pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
-        CH: DmaChannelConvert<I::Dma>,
+        CH: DmaChannelFor<I>,
     {
         crate::into_ref!(i2s);
         crate::into_mapped_ref!(clock_pin);
 
+        let channel = Channel::new(channel.map(|ch| ch.degrade()));
         channel.runtime_ensure_compatible(&i2s);
-        let channel = channel.degrade();
 
-        PeripheralClockControl::reset(i2s.peripheral());
-        PeripheralClockControl::enable(i2s.peripheral());
+        let guard = PeripheralGuard::new(i2s.peripheral());
+
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
@@ -232,14 +294,44 @@ where
         Self {
             instance: i2s,
             tx_channel: channel.tx,
+            _guard: guard,
         }
     }
 
+    /// Converts the I2S instance into async mode.
+    pub fn into_async(self) -> I2sParallel<'d, Async, I> {
+        I2sParallel {
+            instance: self.instance,
+            tx_channel: self.tx_channel.into_async(),
+            _guard: self._guard,
+        }
+    }
+}
+
+impl<'d, I> I2sParallel<'d, Async, I>
+where
+    I: Instance,
+{
+    /// Converts the I2S instance into async mode.
+    pub fn into_blocking(self) -> I2sParallel<'d, Blocking, I> {
+        I2sParallel {
+            instance: self.instance,
+            tx_channel: self.tx_channel.into_blocking(),
+            _guard: self._guard,
+        }
+    }
+}
+
+impl<'d, I, Dm> I2sParallel<'d, Dm, I>
+where
+    I: Instance,
+    Dm: DriverMode,
+{
     /// Write data to the I2S peripheral
     pub fn send<BUF: DmaTxBuffer>(
         mut self,
         mut data: BUF,
-    ) -> Result<I2sParallelTransfer<'d, BUF, DM, I>, (DmaError, Self, BUF)> {
+    ) -> Result<I2sParallelTransfer<'d, BUF, Dm, I>, (DmaError, Self, BUF)> {
         self.instance.tx_reset();
         self.instance.tx_fifo_reset();
         let result = unsafe {
@@ -261,21 +353,21 @@ where
 
 /// Represents an ongoing (or potentially finished) transfer using the i2s
 /// parallel interface
-pub struct I2sParallelTransfer<'d, BUF, DM, I = AnyI2s>
+pub struct I2sParallelTransfer<'d, BUF, Dm, I = AnyI2s>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: DriverMode,
 {
-    i2s: ManuallyDrop<I2sParallel<'d, DM, I>>,
+    i2s: ManuallyDrop<I2sParallel<'d, Dm, I>>,
     buf_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, I, BUF, DM> I2sParallelTransfer<'d, BUF, DM, I>
+impl<'d, I, BUF, Dm> I2sParallelTransfer<'d, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: DriverMode,
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
@@ -283,7 +375,7 @@ where
     }
 
     /// Wait for the transfer to finish
-    pub fn wait(mut self) -> (I2sParallel<'d, DM, I>, BUF) {
+    pub fn wait(mut self) -> (I2sParallel<'d, Dm, I>, BUF) {
         self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
         let view = unsafe { ManuallyDrop::take(&mut self.buf_view) };
@@ -308,11 +400,11 @@ where
     }
 }
 
-impl<'d, I, BUF, DM> Deref for I2sParallelTransfer<'d, BUF, DM, I>
+impl<I, BUF, Dm> Deref for I2sParallelTransfer<'_, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: DriverMode,
 {
     type Target = BUF::View;
 
@@ -321,22 +413,22 @@ where
     }
 }
 
-impl<'d, I, BUF, DM> DerefMut for I2sParallelTransfer<'d, BUF, DM, I>
+impl<I, BUF, Dm> DerefMut for I2sParallelTransfer<'_, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: DriverMode,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buf_view
     }
 }
 
-impl<'d, I, BUF, DM> Drop for I2sParallelTransfer<'d, BUF, DM, I>
+impl<I, BUF, Dm> Drop for I2sParallelTransfer<'_, BUF, Dm, I>
 where
     I: Instance,
     BUF: DmaTxBuffer,
-    DM: Mode,
+    Dm: DriverMode,
 {
     fn drop(&mut self) {
         self.stop_peripherals();

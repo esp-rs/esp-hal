@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+### Added
+
+### Changed
+
+- Bump MSRV to 1.83 (#2615)
+- Bump smoltcp to 0.12.0 (#2849)
+
+### Fixed
+
+- Fixed triggering a debug-assertion during scan (#2612)
+
+### Removed
+
+## 0.11.0 - 2024-11-20
+
 ### Added
 
 - Added `serde` support through the `serde` feature (#2346)
@@ -23,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `phy_enable_usb` is enabled by default (#2446)
 - Removed `get_` prefixes from functions (#2528)
 
+- Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
+
 ### Fixed
 
 - Fixed a possible crash when parsing results from a radius server (#2380)
@@ -34,7 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Features `async`, `embassy-net` have been removed (#2446)
 - Features `phy-enable-usb` & `dump-packets` have been turned into configuration options `phy_enable_usb` & `dump_packets` (#2446)
 - Features `ps-min-modem` & `ps-max-modem` have been removed in favour of a runtime config (#2446)
-
 - The blocking networking stack is removed (#2488)
 
 ## 0.10.1 - 2024-10-10
@@ -190,4 +207,4 @@ Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2
 
 Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2024-10-10
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2024-11-20

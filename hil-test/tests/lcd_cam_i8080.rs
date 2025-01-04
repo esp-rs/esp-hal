@@ -6,7 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{Dma, DmaPriority, DmaTxBuf},
+    dma::{DmaChannel0, DmaTxBuf},
     dma_buffers,
     gpio::{GpioPin, NoPin},
     lcd_cam::{
@@ -18,7 +18,7 @@ use esp_hal::{
         channel::{CtrlMode, EdgeMode},
         Pcnt,
     },
-    prelude::*,
+    time::RateExtU32,
     Blocking,
 };
 use hil_test as _;
@@ -38,19 +38,18 @@ struct Context<'d> {
     lcd_cam: LcdCam<'d, Blocking>,
     pcnt: Pcnt<'d>,
     pins: Pins,
-    dma: Dma<'d>,
+    dma: DmaChannel0,
     dma_buf: DmaTxBuf,
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-        let dma = Dma::new(peripherals.DMA);
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
         let pcnt = Pcnt::new(peripherals.PCNT);
 
@@ -59,7 +58,7 @@ mod tests {
 
         Context {
             lcd_cam,
-            dma,
+            dma: peripherals.DMA_CH0,
             pcnt,
             pins: Pins {
                 GPIO8: peripherals.GPIO8,
@@ -74,17 +73,14 @@ mod tests {
 
     #[test]
     fn test_i8080_8bit(ctx: Context<'static>) {
-        let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
-
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
-        let i8080 = I8080::new(
-            ctx.lcd_cam.lcd,
-            channel.tx,
-            pins,
-            20.MHz(),
-            Config::default(),
-        );
+        let i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
+            let mut config = Config::default();
+            config.frequency = 20.MHz();
+            config
+        })
+        .unwrap();
 
         let xfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
         xfer.wait().0.unwrap();
@@ -130,7 +126,6 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
         let pins = TxEightBits::new(
             unit0_signal,
             unit1_signal,
@@ -142,13 +137,12 @@ mod tests {
             NoPin,
         );
 
-        let mut i8080 = I8080::new(
-            ctx.lcd_cam.lcd,
-            channel.tx,
-            pins,
-            20.MHz(),
-            Config::default(),
-        )
+        let mut i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
+            let mut config = Config::default();
+            config.frequency = 20.MHz();
+            config
+        })
+        .unwrap()
         .with_cs(cs_signal)
         .with_ctrl_pins(NoPin, NoPin);
 
@@ -241,7 +235,6 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let channel = ctx.dma.channel0.configure(false, DmaPriority::Priority0);
         let pins = TxSixteenBits::new(
             NoPin,
             NoPin,
@@ -261,13 +254,12 @@ mod tests {
             unit3_signal,
         );
 
-        let mut i8080 = I8080::new(
-            ctx.lcd_cam.lcd,
-            channel.tx,
-            pins,
-            20.MHz(),
-            Config::default(),
-        )
+        let mut i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
+            let mut config = Config::default();
+            config.frequency = 20.MHz();
+            config
+        })
+        .unwrap()
         .with_cs(cs_signal)
         .with_ctrl_pins(NoPin, NoPin);
 

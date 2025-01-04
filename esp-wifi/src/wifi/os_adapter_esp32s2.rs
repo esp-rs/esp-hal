@@ -1,7 +1,3 @@
-#![allow(unused_variables)]
-#![allow(dead_code)]
-#![allow(non_snake_case)]
-
 use crate::hal::{interrupt, peripherals};
 
 pub(crate) fn chip_ints_on(mask: u32) {
@@ -10,21 +6,6 @@ pub(crate) fn chip_ints_on(mask: u32) {
 
 pub(crate) fn chip_ints_off(mask: u32) {
     crate::hal::xtensa_lx::interrupt::disable_mask(mask);
-}
-
-pub(crate) unsafe extern "C" fn wifi_int_disable(
-    wifi_int_mux: *mut crate::binary::c_types::c_void,
-) -> u32 {
-    core::mem::transmute(critical_section::acquire())
-}
-
-pub(crate) unsafe extern "C" fn wifi_int_restore(
-    wifi_int_mux: *mut crate::binary::c_types::c_void,
-    tmp: u32,
-) {
-    critical_section::release(core::mem::transmute::<u32, critical_section::RestoreState>(
-        tmp,
-    ))
 }
 
 pub(crate) unsafe extern "C" fn set_intr(

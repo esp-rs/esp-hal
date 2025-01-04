@@ -4,7 +4,7 @@
 //! - Connect GPIO4 and GPIO5
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy embassy-generic-timers
+//% FEATURES: embassy embassy-generic-timers esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -14,8 +14,8 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output},
-    prelude::*,
     rmt::{PulseCode, Rmt, RxChannelAsync, RxChannelConfig, RxChannelCreatorAsync},
+    time::RateExtU32,
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};

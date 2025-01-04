@@ -7,7 +7,7 @@
 //! - responds with some HTML content when connecting to port 8080
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -18,7 +18,8 @@ use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    prelude::*,
+    clock::CpuClock,
+    entry,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -45,11 +46,8 @@ const GATEWAY_IP: &str = env!("GATEWAY_IP");
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 

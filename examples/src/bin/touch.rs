@@ -7,6 +7,7 @@
 //! pad on a PCB).
 
 //% CHIPS: esp32
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -17,9 +18,10 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
+    entry,
     gpio::GpioPin,
-    macros::ram,
-    prelude::*,
+    interrupt::InterruptConfigurable,
+    macros::{handler, ram},
     rtc_cntl::Rtc,
     touch::{Continuous, Touch, TouchConfig, TouchPad},
     Blocking,

@@ -237,6 +237,9 @@ impl Config {
 ///
 /// This is required to avoid triggering the unexpected-cfgs lint.
 fn define_all_possible_symbols() {
+    // Used by our documentation builds to prevent the huge red warning banner.
+    println!("cargo:rustc-check-cfg=cfg(not_really_docsrs)");
+
     for chip in Chip::iter() {
         let config = Config::for_chip(&chip);
         for symbol in config.all() {

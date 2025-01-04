@@ -6,8 +6,7 @@
 #![no_main]
 
 use esp_hal::{
-    prelude::*,
-    uart::{UartRx, UartTx},
+    uart::{self, UartRx, UartTx},
     Blocking,
 };
 use hil_test as _;
@@ -19,7 +18,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -29,18 +28,17 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx = UartTx::new(peripherals.UART0, tx).unwrap();
-        let rx = UartRx::new(peripherals.UART1, rx).unwrap();
+        let tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx).unwrap();
+        let rx = UartRx::new(peripherals.UART1, uart::Config::default(), rx).unwrap();
 
         Context { rx, tx }
     }
 
     #[test]
-    #[timeout(3)]
     fn test_send_receive(mut ctx: Context) {
         let byte = [0x42];
 
-        ctx.tx.flush_tx().unwrap();
+        ctx.tx.flush().unwrap();
         ctx.tx.write_bytes(&byte).unwrap();
         let read = block!(ctx.rx.read_byte());
 
@@ -48,12 +46,11 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_send_receive_bytes(mut ctx: Context) {
         let bytes = [0x42, 0x43, 0x44];
         let mut buf = [0u8; 3];
 
-        ctx.tx.flush_tx().unwrap();
+        ctx.tx.flush().unwrap();
         ctx.tx.write_bytes(&bytes).unwrap();
 
         ctx.rx.read_bytes(&mut buf).unwrap();

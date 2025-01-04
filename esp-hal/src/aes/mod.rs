@@ -59,6 +59,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,
     reg_access::{AlignmentHelper, NativeEndianess},
+    system::GenericPeripheralGuard,
 };
 
 #[cfg_attr(esp32, path = "esp32.rs")]
@@ -136,6 +137,7 @@ pub enum Mode {
 pub struct Aes<'d> {
     aes: PeripheralRef<'d, AES>,
     alignment_helper: AlignmentHelper<NativeEndianess>,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Aes as u8 }>,
 }
 
 impl<'d> Aes<'d> {
@@ -143,12 +145,12 @@ impl<'d> Aes<'d> {
     pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
         crate::into_ref!(aes);
 
-        crate::system::PeripheralClockControl::reset(crate::system::Peripheral::Aes);
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::Aes);
+        let guard = GenericPeripheralGuard::new();
 
         let mut ret = Self {
             aes,
             alignment_helper: AlignmentHelper::native_endianess(),
+            _guard: guard,
         };
         ret.init();
 
@@ -162,15 +164,11 @@ impl<'d> Aes<'d> {
     {
         // Convert from into Key enum
         self.write_key(key.into().as_slice());
-        self.set_mode(mode as u8);
+        self.write_mode(mode);
         self.set_block(block);
         self.start();
         while !(self.is_idle()) {}
         self.block(block);
-    }
-
-    fn set_mode(&mut self, mode: u8) {
-        self.write_mode(mode as u32);
     }
 
     fn is_idle(&mut self) -> bool {
@@ -229,7 +227,7 @@ pub enum Endianness {
 /// transfer, which can significantly speed up operations when dealing with
 /// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
 /// CTR, CFB8, and CFB128.
-#[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
+#[cfg(any(esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
 pub mod dma {
     use crate::{
         aes::{Key, Mode},
@@ -239,16 +237,19 @@ pub mod dma {
             ChannelRx,
             ChannelTx,
             DescriptorChain,
-            DmaChannelConvert,
+            DmaChannelFor,
             DmaDescriptor,
-            DmaEligible,
             DmaPeripheral,
             DmaTransferRxTx,
+            PeripheralDmaChannel,
+            PeripheralRxChannel,
+            PeripheralTxChannel,
             ReadBuffer,
             Rx,
             Tx,
             WriteBuffer,
         },
+        peripheral::Peripheral,
         peripherals::AES,
         Blocking,
     };
@@ -256,6 +257,7 @@ pub mod dma {
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
     /// Specifies the block cipher modes available for AES operations.
+    #[derive(Clone, Copy, PartialEq, Eq)]
     pub enum CipherMode {
         /// Electronic Codebook Mode
         Ecb = 0,
@@ -276,7 +278,7 @@ pub mod dma {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
-        channel: Channel<'d, Blocking, <AES as DmaEligible>::Dma>,
+        channel: Channel<'d, Blocking, PeripheralDmaChannel<AES>>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
     }
@@ -285,16 +287,18 @@ pub mod dma {
         /// Enable DMA for the current instance of the AES driver
         pub fn with_dma<CH>(
             self,
-            channel: Channel<'d, Blocking, CH>,
+            channel: impl Peripheral<P = CH> + 'd,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> AesDma<'d>
         where
-            CH: DmaChannelConvert<<AES as DmaEligible>::Dma>,
+            CH: DmaChannelFor<AES>,
         {
+            let channel = Channel::new(channel.map(|ch| ch.degrade()));
+            channel.runtime_ensure_compatible(&self.aes);
             AesDma {
                 aes: self,
-                channel: channel.degrade(),
+                channel,
                 rx_chain: DescriptorChain::new(rx_descriptors),
                 tx_chain: DescriptorChain::new(tx_descriptors),
             }
@@ -324,7 +328,7 @@ pub mod dma {
     }
 
     impl<'d> DmaSupportTx for AesDma<'d> {
-        type TX = ChannelTx<'d, Blocking, <AES as DmaEligible>::Dma>;
+        type TX = ChannelTx<'d, Blocking, PeripheralTxChannel<AES>>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -336,7 +340,7 @@ pub mod dma {
     }
 
     impl<'d> DmaSupportRx for AesDma<'d> {
-        type RX = ChannelRx<'d, Blocking, <AES as DmaEligible>::Dma>;
+        type RX = ChannelRx<'d, Blocking, PeripheralRxChannel<AES>>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -417,9 +421,6 @@ pub mod dma {
             // AES has to be restarted after each calculation
             self.reset_aes();
 
-            self.channel.tx.is_done();
-            self.channel.rx.is_done();
-
             unsafe {
                 self.tx_chain
                     .fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
@@ -437,19 +438,18 @@ pub mod dma {
             }
             self.enable_dma(true);
             self.enable_interrupt();
-            self.set_mode(mode);
+            self.aes.write_mode(mode);
             self.set_cipher_mode(cipher_mode);
             self.write_key(key.into());
 
-            // TODO: verify 16?
-            self.set_num_block(16);
+            self.set_num_block((write_buffer_len as u32).div_ceil(16));
 
             self.start_transform();
 
             Ok(())
         }
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(any(esp32c3, esp32s2, esp32s3))]
         fn reset_aes(&self) {
             unsafe {
                 let s = crate::peripherals::SYSTEM::steal();
@@ -488,9 +488,9 @@ pub mod dma {
             self.aes
                 .aes
                 .block_mode()
-                .modify(|_, w| unsafe { w.bits(mode as u32) });
+                .modify(|_, w| unsafe { w.block_mode().bits(mode as u8) });
 
-            if self.aes.aes.block_mode().read().block_mode().bits() == CipherMode::Ctr as u8 {
+            if mode == CipherMode::Ctr {
                 self.aes
                     .aes
                     .inc_sel()
@@ -498,15 +498,8 @@ pub mod dma {
             }
         }
 
-        fn set_mode(&self, mode: Mode) {
-            self.aes
-                .aes
-                .mode()
-                .modify(|_, w| unsafe { w.mode().bits(mode as u8) });
-        }
-
         fn start_transform(&self) {
-            self.aes.aes.trigger().write(|w| w.trigger().set_bit());
+            self.aes.write_start();
         }
 
         fn finish_transform(&self) {

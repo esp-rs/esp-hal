@@ -13,7 +13,7 @@ use esp_hal::sha::{Sha384, Sha512};
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha512_224, Sha512_256};
 use esp_hal::{
-    prelude::*,
+    clock::CpuClock,
     rng::Rng,
     sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaDigest},
 };
@@ -158,7 +158,7 @@ pub struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 6)]
 mod tests {
     use super::*;
 
@@ -169,8 +169,7 @@ mod tests {
                 // FIXME: max speed fails...?
                 let config = esp_hal::Config::default();
             } else {
-                let mut config = esp_hal::Config::default();
-                config.cpu_clock = CpuClock::max();
+                let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
             }
         }
 
@@ -217,6 +216,7 @@ mod tests {
     /// A test that runs a hashing on a digest of every size between 1 and 200
     /// inclusively.
     #[test]
+    #[timeout(15)]
     fn test_digest_of_size_1_to_200(mut ctx: Context) {
         for i in 1..=200 {
             assert_sha::<Sha1, 20>(&mut ctx.sha, &SOURCE_DATA[..i]);

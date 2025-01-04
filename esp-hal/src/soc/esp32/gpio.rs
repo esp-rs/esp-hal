@@ -119,7 +119,7 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
 }
 
 /// Peripheral input signals for the GPIO mux
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Debug, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
@@ -311,7 +311,7 @@ pub enum InputSignal {
 }
 
 /// Peripheral output signals for the GPIO mux
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Debug, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)]
@@ -531,8 +531,6 @@ pub enum OutputSignal {
 }
 
 macro_rules! rtcio_analog {
-    ( @ignore $rue:literal ) => {};
-
     (
         $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
     ) => {
@@ -564,7 +562,7 @@ macro_rules! rtcio_analog {
 
         $(
             // FIXME: replace with $(ignore($rue)) once stable
-            rtcio_analog!(@ignore $rue);
+            $crate::ignore!($rue);
             impl $crate::gpio::RtcPinWithResistors for $crate::gpio::GpioPin<$pin_num> {
                 fn rtcio_pullup(&mut self, enable: bool) {
                     paste::paste! {
@@ -610,7 +608,7 @@ macro_rules! rtcio_analog {
                         // Disable pull-up and pull-down resistors on the pin, if it has them
                         $(
                             // FIXME: replace with $(ignore($rue)) once stable
-                            rtcio_analog!( @ignore $rue );
+                            $crate::ignore!($rue);
                             w.[<$prefix rue>]().bit(false);
                             w.[<$prefix rde>]().bit(false);
                         )?
@@ -789,14 +787,8 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => match Cpu::current() {
-                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
-                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int().read().bits(),
-            },
-            Self::Bank1 => match Cpu::current() {
-                Cpu::ProCpu => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
-                Cpu::AppCpu => unsafe { GPIO::steal() }.acpu_int1().read().bits(),
-            },
+            Self::Bank0 => unsafe { GPIO::steal() }.status().read().bits(),
+            Self::Bank1 => unsafe { GPIO::steal() }.status1().read().bits(),
         }
     }
 }

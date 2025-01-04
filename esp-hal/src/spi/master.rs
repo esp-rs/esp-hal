@@ -14,8 +14,6 @@
 //! If all you want to do is to communicate to a single device, and you initiate
 //! transactions yourself, there are a number of ways to achieve this:
 //!
-//! - Use the [`FullDuplex`](embedded_hal_02::spi::FullDuplex) trait to
-//!   read/write single bytes at a time,
 //! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated
 //!   functions to initiate transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
@@ -30,33 +28,28 @@
 //!
 //! ## Usage
 //!
-//! The module implements several third-party traits from embedded-hal@0.2.x,
-//! embedded-hal@1.x.x and embassy-embedded-hal
+//! The module implements several third-party traits from embedded-hal@1.x.x
+//! and embassy-embedded-hal.
 //!
-//! ## Example
+//! ## Examples
 //!
 //! ### SPI Initialization
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::spi::SpiMode;
+//! # use esp_hal::spi::Mode;
 //! # use esp_hal::spi::master::{Config, Spi};
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO2;
 //! let mosi = peripherals.GPIO1;
-//! let cs = peripherals.GPIO5;
 //!
-//! let mut spi = Spi::new_with_config(
+//! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config {
-//!         frequency: 100.kHz(),
-//!         mode: SpiMode::Mode0,
-//!         ..Config::default()
-//!     },
+//!     Config::default().with_frequency(100.kHz()).with_mode(Mode::Mode0)
 //! )
+//! .unwrap()
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
-//! .with_miso(miso)
-//! .with_cs(cs);
+//! .with_miso(miso);
 //! # }
 //! ```
 //! 
@@ -65,54 +58,65 @@
 
 use core::marker::PhantomData;
 
+#[instability::unstable]
 pub use dma::*;
+#[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
-#[cfg(gdma)]
-use enumset::EnumSet;
-#[cfg(gdma)]
-use enumset::EnumSetType;
+use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 #[cfg(place_spi_driver_in_ram)]
 use procmacros::ram;
 
-use super::{DmaError, Error, SpiBitOrder, SpiDataMode, SpiMode};
+use super::{BitOrder, DataMode, DmaError, Error, Mode};
 use crate::{
+    asynch::AtomicWaker,
     clock::Clocks,
-    dma::{Channel, DmaChannelConvert, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
+    dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         NoPin,
         OutputSignal,
     },
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
     private,
+    private::Sealed,
     spi::AnySpi,
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
     Async,
     Blocking,
-    Mode,
+    Cpu,
+    DriverMode,
 };
 
 /// Enumeration of possible SPI interrupt events.
-#[cfg(gdma)]
-#[derive(Debug, EnumSetType)]
+#[derive(Debug, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum SpiInterrupt {
     /// Indicates that the SPI transaction has completed successfully.
     ///
     /// This interrupt is triggered when an SPI transaction has finished
     /// transmitting and receiving data.
-    TransDone,
+    TransferDone,
+
+    /// Triggered at the end of configurable segmented transfer.
+    #[cfg(any(esp32s2, gdma))]
+    DmaSegmentedTransferDone,
+
+    /// Used and triggered by software. Only used for user defined function.
+    #[cfg(gdma)]
+    App2,
+
+    /// Used and triggered by software. Only used for user defined function.
+    #[cfg(gdma)]
+    App1,
 }
 
 /// The size of the FIFO buffer for SPI
-#[cfg(not(esp32s2))]
-const FIFO_SIZE: usize = 64;
-#[cfg(esp32s2)]
-const FIFO_SIZE: usize = 72;
+const FIFO_SIZE: usize = if cfg!(esp32s2) { 72 } else { 64 };
 
 /// Padding byte for empty write transfers
 const EMPTY_WRITE_PAD: u8 = 0x00;
@@ -123,43 +127,45 @@ const MAX_DMA_SIZE: usize = 32736;
 ///
 /// Used to define specific commands sent over the SPI bus.
 /// Can be [Command::None] if command phase should be suppressed.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Command {
     /// No command is sent.
     None,
-    /// Command1.
-    Command1(u16, SpiDataMode),
-    /// Command2.
-    Command2(u16, SpiDataMode),
-    /// Command3.
-    Command3(u16, SpiDataMode),
-    /// Command4.
-    Command4(u16, SpiDataMode),
-    /// Command5.
-    Command5(u16, SpiDataMode),
-    /// Command6.
-    Command6(u16, SpiDataMode),
-    /// Command7.
-    Command7(u16, SpiDataMode),
-    /// Command8.
-    Command8(u16, SpiDataMode),
-    /// Command9.
-    Command9(u16, SpiDataMode),
-    /// Command10.
-    Command10(u16, SpiDataMode),
-    /// Command11.
-    Command11(u16, SpiDataMode),
-    /// Command12.
-    Command12(u16, SpiDataMode),
-    /// Command13.
-    Command13(u16, SpiDataMode),
-    /// Command14.
-    Command14(u16, SpiDataMode),
-    /// Command15.
-    Command15(u16, SpiDataMode),
-    /// Command16.
-    Command16(u16, SpiDataMode),
+    /// A 1-bit command.
+    Command1(u16, DataMode),
+    /// A 2-bit command.
+    Command2(u16, DataMode),
+    /// A 3-bit command.
+    Command3(u16, DataMode),
+    /// A 4-bit command.
+    Command4(u16, DataMode),
+    /// A 5-bit command.
+    Command5(u16, DataMode),
+    /// A 6-bit command.
+    Command6(u16, DataMode),
+    /// A 7-bit command.
+    Command7(u16, DataMode),
+    /// A 8-bit command.
+    Command8(u16, DataMode),
+    /// A 9-bit command.
+    Command9(u16, DataMode),
+    /// A 10-bit command.
+    Command10(u16, DataMode),
+    /// A 11-bit command.
+    Command11(u16, DataMode),
+    /// A 12-bit command.
+    Command12(u16, DataMode),
+    /// A 13-bit command.
+    Command13(u16, DataMode),
+    /// A 14-bit command.
+    Command14(u16, DataMode),
+    /// A 15-bit command.
+    Command15(u16, DataMode),
+    /// A 16-bit command.
+    Command16(u16, DataMode),
 }
 
 impl Command {
@@ -207,9 +213,9 @@ impl Command {
         }
     }
 
-    fn mode(&self) -> SpiDataMode {
+    fn mode(&self) -> DataMode {
         match self {
-            Command::None => SpiDataMode::Single,
+            Command::None => DataMode::Single,
             Command::Command1(_, mode)
             | Command::Command2(_, mode)
             | Command::Command3(_, mode)
@@ -238,75 +244,77 @@ impl Command {
 ///
 /// This can be used to specify the address phase of SPI transactions.
 /// Can be [Address::None] if address phase should be suppressed.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Address {
     /// No address phase.
     None,
-    /// Address with 1-bit.
-    Address1(u32, SpiDataMode),
-    /// Address with 2-bit.
-    Address2(u32, SpiDataMode),
-    /// Address with 3-bit.
-    Address3(u32, SpiDataMode),
-    /// Address with 4-bit.
-    Address4(u32, SpiDataMode),
-    /// Address with 5-bit.
-    Address5(u32, SpiDataMode),
-    /// Address with 6-bit.
-    Address6(u32, SpiDataMode),
-    /// Address with 7-bit.
-    Address7(u32, SpiDataMode),
-    /// Address with 8-bit.
-    Address8(u32, SpiDataMode),
-    /// Address with 9-bit.
-    Address9(u32, SpiDataMode),
-    /// Address with 10-bit.
-    Address10(u32, SpiDataMode),
-    /// Address with 11-bit.
-    Address11(u32, SpiDataMode),
-    /// Address with 12-bit.
-    Address12(u32, SpiDataMode),
-    /// Address with 13-bit.
-    Address13(u32, SpiDataMode),
-    /// Address with 14-bit.
-    Address14(u32, SpiDataMode),
-    /// Address with 15-bit.
-    Address15(u32, SpiDataMode),
-    /// Address with 16-bit.
-    Address16(u32, SpiDataMode),
-    /// Address with 17-bit.
-    Address17(u32, SpiDataMode),
-    /// Address with 18-bit.
-    Address18(u32, SpiDataMode),
-    /// Address with 19-bit.
-    Address19(u32, SpiDataMode),
-    /// Address with 20-bit.
-    Address20(u32, SpiDataMode),
-    /// Address with 21-bit.
-    Address21(u32, SpiDataMode),
-    /// Address with 22-bit.
-    Address22(u32, SpiDataMode),
-    /// Address with 23-bit.
-    Address23(u32, SpiDataMode),
-    /// Address with 24-bit.
-    Address24(u32, SpiDataMode),
-    /// Address with 25-bit.
-    Address25(u32, SpiDataMode),
-    /// Address with 26-bit.
-    Address26(u32, SpiDataMode),
-    /// Address with 27-bit.
-    Address27(u32, SpiDataMode),
-    /// Address with 28-bit.
-    Address28(u32, SpiDataMode),
-    /// Address with 29-bit.
-    Address29(u32, SpiDataMode),
-    /// Address with 30-bit.
-    Address30(u32, SpiDataMode),
-    /// Address with 31-bit.
-    Address31(u32, SpiDataMode),
-    /// Address with 32-bit.
-    Address32(u32, SpiDataMode),
+    /// A 1-bit address.
+    Address1(u32, DataMode),
+    /// A 2-bit address.
+    Address2(u32, DataMode),
+    /// A 3-bit address.
+    Address3(u32, DataMode),
+    /// A 4-bit address.
+    Address4(u32, DataMode),
+    /// A 5-bit address.
+    Address5(u32, DataMode),
+    /// A 6-bit address.
+    Address6(u32, DataMode),
+    /// A 7-bit address.
+    Address7(u32, DataMode),
+    /// A 8-bit address.
+    Address8(u32, DataMode),
+    /// A 9-bit address.
+    Address9(u32, DataMode),
+    /// A 10-bit address.
+    Address10(u32, DataMode),
+    /// A 11-bit address.
+    Address11(u32, DataMode),
+    /// A 12-bit address.
+    Address12(u32, DataMode),
+    /// A 13-bit address.
+    Address13(u32, DataMode),
+    /// A 14-bit address.
+    Address14(u32, DataMode),
+    /// A 15-bit address.
+    Address15(u32, DataMode),
+    /// A 16-bit address.
+    Address16(u32, DataMode),
+    /// A 17-bit address.
+    Address17(u32, DataMode),
+    /// A 18-bit address.
+    Address18(u32, DataMode),
+    /// A 19-bit address.
+    Address19(u32, DataMode),
+    /// A 20-bit address.
+    Address20(u32, DataMode),
+    /// A 21-bit address.
+    Address21(u32, DataMode),
+    /// A 22-bit address.
+    Address22(u32, DataMode),
+    /// A 23-bit address.
+    Address23(u32, DataMode),
+    /// A 24-bit address.
+    Address24(u32, DataMode),
+    /// A 25-bit address.
+    Address25(u32, DataMode),
+    /// A 26-bit address.
+    Address26(u32, DataMode),
+    /// A 27-bit address.
+    Address27(u32, DataMode),
+    /// A 28-bit address.
+    Address28(u32, DataMode),
+    /// A 29-bit address.
+    Address29(u32, DataMode),
+    /// A 30-bit address.
+    Address30(u32, DataMode),
+    /// A 31-bit address.
+    Address31(u32, DataMode),
+    /// A 32-bit address.
+    Address32(u32, DataMode),
 }
 
 impl Address {
@@ -390,9 +398,9 @@ impl Address {
         matches!(self, Address::None)
     }
 
-    fn mode(&self) -> SpiDataMode {
+    fn mode(&self) -> DataMode {
         match self {
-            Address::None => SpiDataMode::Single,
+            Address::None => DataMode::Single,
             Address::Address1(_, mode)
             | Address::Address2(_, mode)
             | Address::Address3(_, mode)
@@ -430,20 +438,30 @@ impl Address {
 }
 
 /// SPI peripheral configuration
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct Config {
-    /// SPI clock frequency
+    /// SPI bus clock frequency.
     pub frequency: HertzU32,
 
-    /// SPI mode
-    pub mode: SpiMode,
+    /// SPI sample/shift mode.
+    pub mode: Mode,
 
     /// Bit order of the read data.
-    pub read_bit_order: SpiBitOrder,
+    pub read_bit_order: BitOrder,
 
     /// Bit order of the written data.
-    pub write_bit_order: SpiBitOrder,
+    pub write_bit_order: BitOrder,
+}
+
+impl core::hash::Hash for Config {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.frequency.to_Hz().hash(state); // HertzU32 doesn't implement Hash
+        self.mode.hash(state);
+        self.read_bit_order.hash(state);
+        self.write_bit_order.hash(state);
+    }
 }
 
 impl Default for Config {
@@ -451,50 +469,40 @@ impl Default for Config {
         use fugit::RateExtU32;
         Config {
             frequency: 1_u32.MHz(),
-            mode: SpiMode::Mode0,
-            read_bit_order: SpiBitOrder::MSBFirst,
-            write_bit_order: SpiBitOrder::MSBFirst,
+            mode: Mode::Mode0,
+            read_bit_order: BitOrder::MsbFirst,
+            write_bit_order: BitOrder::MsbFirst,
         }
     }
 }
 
 /// Configuration errors.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConfigError {}
 
 /// SPI peripheral driver
-pub struct Spi<'d, M, T = AnySpi> {
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Spi<'d, Dm, T = AnySpi> {
     spi: PeripheralRef<'d, T>,
-    _mode: PhantomData<M>,
+    _mode: PhantomData<Dm>,
+    guard: PeripheralGuard,
 }
 
-impl<'d, M, T> Spi<'d, M, T>
-where
-    M: Mode,
-    T: Instance,
-{
-    /// Configures the SPI instance to use DMA with the specified channel.
-    ///
-    /// This method prepares the SPI instance for DMA transfers using SPI
-    /// and returns an instance of `SpiDma` that supports DMA
-    /// operations.
-    pub fn with_dma<CH, DM>(self, channel: Channel<'d, DM, CH>) -> SpiDma<'d, M, T>
-    where
-        CH: DmaChannelConvert<T::Dma>,
-        DM: Mode,
-        Channel<'d, M, CH>: From<Channel<'d, DM, CH>>,
-    {
-        SpiDma::new(self.spi, channel.into())
-    }
-}
+impl<Dm: DriverMode, T: Instance> Sealed for Spi<'_, Dm, T> {}
 
-impl<M, T> Spi<'_, M, T>
+impl<Dm, T> Spi<'_, Dm, T>
 where
     T: Instance,
+    Dm: DriverMode,
 {
-    fn driver(&self) -> &'static Info {
-        self.spi.info()
+    fn driver(&self) -> Driver {
+        Driver {
+            info: self.spi.info(),
+            state: self.spi.state(),
+        }
     }
 
     /// Read a byte from SPI.
@@ -512,10 +520,6 @@ where
     }
 
     /// Write bytes to SPI.
-    ///
-    /// Copies the content of `words` in chunks of 64 bytes into the SPI
-    /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         self.driver().write_bytes(words)?;
         self.driver().flush()?;
@@ -531,63 +535,117 @@ where
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new(spi: impl Peripheral<P = impl Instance> + 'd) -> Spi<'d, Blocking> {
-        Self::new_with_config(spi, Config::default())
-    }
-
-    /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_with_config(
-        spi: impl Peripheral<P = impl Instance> + 'd,
+    pub fn new(
+        spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
         config: Config,
-    ) -> Spi<'d, Blocking> {
-        Self::new_typed_with_config(spi.map_into(), config)
-    }
-
-    /// Converts the SPI instance into async mode.
-    pub fn into_async(self) -> Spi<'d, Async> {
-        Spi {
-            spi: self.spi,
-            _mode: PhantomData,
-        }
+    ) -> Result<Self, ConfigError> {
+        Self::new_typed(spi.map_into(), config)
     }
 }
 
-impl<'d> Spi<'d, Async> {
-    /// Converts the SPI instance into blocking mode.
-    pub fn into_blocking(self) -> Spi<'d, Blocking> {
-        Spi {
-            spi: self.spi,
-            _mode: PhantomData,
-        }
-    }
-}
-
-impl<'d, M, T> Spi<'d, M, T>
+impl<'d, T> Spi<'d, Blocking, T>
 where
     T: Instance,
 {
-    /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_typed(spi: impl Peripheral<P = T> + 'd) -> Spi<'d, M, T> {
-        Self::new_typed_with_config(spi, Config::default())
+    /// Converts the SPI instance into async mode.
+    pub fn into_async(mut self) -> Spi<'d, Async, T> {
+        self.set_interrupt_handler(self.spi.handler());
+        Spi {
+            spi: self.spi,
+            _mode: PhantomData,
+            guard: self.guard,
+        }
     }
 
+    /// Configures the SPI instance to use DMA with the specified channel.
+    ///
+    /// This method prepares the SPI instance for DMA transfers using SPI
+    /// and returns an instance of `SpiDma` that supports DMA
+    /// operations.
+    #[instability::unstable]
+    pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking, T>
+    where
+        CH: DmaChannelFor<T>,
+    {
+        SpiDma::new(self.spi, channel.map(|ch| ch.degrade()).into_ref())
+    }
+}
+
+impl<T> InterruptConfigurable for Spi<'_, Blocking, T>
+where
+    T: Instance,
+{
+    /// Sets the interrupt handler
+    ///
+    /// Interrupts are not enabled at the peripheral level here.
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        let interrupt = self.driver().info.interrupt;
+        for core in Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
+        }
+        unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+    }
+}
+
+impl<'d, T> Spi<'d, Async, T>
+where
+    T: Instance,
+{
+    /// Converts the SPI instance into blocking mode.
+    pub fn into_blocking(self) -> Spi<'d, Blocking, T> {
+        crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
+        Spi {
+            spi: self.spi,
+            _mode: PhantomData,
+            guard: self.guard,
+        }
+    }
+
+    /// Waits for the completion of previous operations.
+    pub async fn flush_async(&mut self) -> Result<(), Error> {
+        let driver = self.driver();
+
+        if !driver.busy() {
+            return Ok(());
+        }
+
+        SpiFuture::new(&driver).await;
+
+        Ok(())
+    }
+
+    /// Sends `words` to the slave. Returns the `words` received from the slave
+    pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        // We need to flush because the blocking transfer functions may return while a
+        // transfer is still in progress.
+        self.flush_async().await?;
+        self.driver().transfer_in_place_async(words).await
+    }
+}
+
+impl<'d, Dm, T> Spi<'d, Dm, T>
+where
+    T: Instance,
+    Dm: DriverMode,
+{
     /// Constructs an SPI instance in 8bit dataframe mode.
-    pub fn new_typed_with_config(
+    pub fn new_typed(
         spi: impl Peripheral<P = T> + 'd,
         config: Config,
-    ) -> Spi<'d, M, T> {
+    ) -> Result<Self, ConfigError> {
         crate::into_ref!(spi);
+
+        let guard = PeripheralGuard::new(spi.info().peripheral);
 
         let mut this = Spi {
             spi,
             _mode: PhantomData,
+            guard,
         };
 
-        PeripheralClockControl::enable(this.driver().peripheral);
-        PeripheralClockControl::reset(this.driver().peripheral);
-
         this.driver().init();
-        unwrap!(this.apply_config(&config)); // FIXME: update based on the resolution of https://github.com/esp-rs/esp-hal/issues/2416
+        this.apply_config(&config)?;
 
         let this = this
             .with_mosi(NoPin)
@@ -595,15 +653,15 @@ where
             .with_sck(NoPin)
             .with_cs(NoPin);
 
-        let is_qspi = this.driver().sio2_input.is_some();
+        let is_qspi = this.driver().info.sio2_input.is_some();
         if is_qspi {
-            unwrap!(this.driver().sio2_input).connect_to(NoPin);
-            unwrap!(this.driver().sio2_output).connect_to(NoPin);
-            unwrap!(this.driver().sio3_input).connect_to(NoPin);
-            unwrap!(this.driver().sio3_output).connect_to(NoPin);
+            unwrap!(this.driver().info.sio2_input).connect_to(NoPin);
+            unwrap!(this.driver().info.sio2_output).connect_to(NoPin);
+            unwrap!(this.driver().info.sio3_input).connect_to(NoPin);
+            unwrap!(this.driver().info.sio3_output).connect_to(NoPin);
         }
 
-        this
+        Ok(this)
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
@@ -615,8 +673,8 @@ where
         mosi.enable_output(true, private::Internal);
         mosi.enable_input(true, private::Internal);
 
-        self.driver().mosi.connect_to(&mut mosi);
-        self.driver().sio0_input.connect_to(&mut mosi);
+        self.driver().info.mosi.connect_to(&mut mosi);
+        self.driver().info.sio0_input.connect_to(&mut mosi);
 
         self
     }
@@ -645,8 +703,8 @@ where
         miso.enable_input(true, private::Internal);
         miso.enable_output(true, private::Internal);
 
-        self.driver().miso.connect_to(&mut miso);
-        self.driver().sio1_output.connect_to(&mut miso);
+        self.driver().info.miso.connect_to(&mut miso);
+        self.driver().info.sio1_output.connect_to(&mut miso);
 
         self
     }
@@ -658,7 +716,7 @@ where
     pub fn with_sck<SCK: PeripheralOutput>(self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_mapped_ref!(sclk);
         sclk.set_to_push_pull_output(private::Internal);
-        self.driver().sclk.connect_to(sclk);
+        self.driver().info.sclk.connect_to(sclk);
 
         self
     }
@@ -667,10 +725,11 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI CS
     /// signal.
+    #[instability::unstable]
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
         cs.set_to_push_pull_output(private::Internal);
-        self.driver().cs.connect_to(cs);
+        self.driver().info.cs.connect_to(cs);
 
         self
     }
@@ -681,10 +740,12 @@ where
     }
 }
 
-impl<M, T> SetConfig for Spi<'_, M, T>
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+impl<Dm, T> SetConfig for Spi<'_, Dm, T>
 where
     T: Instance,
-    M: Mode,
+    Dm: DriverMode,
 {
     type Config = Config;
     type ConfigError = ConfigError;
@@ -694,14 +755,16 @@ where
     }
 }
 
-impl<'d, M, T> Spi<'d, M, T>
+impl<'d, Dm, T> Spi<'d, Dm, T>
 where
-    T: QspiInstance,
+    T: Instance + QspiInstance,
+    Dm: DriverMode,
 {
     /// Assign the SIO2 pin for the SPI instance.
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO2 output and input signals.
+    #[instability::unstable]
     pub fn with_sio2<SIO2: PeripheralOutput>(self, sio2: impl Peripheral<P = SIO2> + 'd) -> Self
     where
         T: QspiInstance,
@@ -710,8 +773,8 @@ where
         sio2.enable_input(true, private::Internal);
         sio2.enable_output(true, private::Internal);
 
-        unwrap!(self.driver().sio2_input).connect_to(&mut sio2);
-        unwrap!(self.driver().sio2_output).connect_to(&mut sio2);
+        unwrap!(self.driver().info.sio2_input).connect_to(&mut sio2);
+        unwrap!(self.driver().info.sio2_output).connect_to(&mut sio2);
 
         self
     }
@@ -720,6 +783,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO3 output and input signals.
+    #[instability::unstable]
     pub fn with_sio3<SIO3: PeripheralOutput>(self, sio3: impl Peripheral<P = SIO3> + 'd) -> Self
     where
         T: QspiInstance,
@@ -728,21 +792,23 @@ where
         sio3.enable_input(true, private::Internal);
         sio3.enable_output(true, private::Internal);
 
-        unwrap!(self.driver().sio3_input).connect_to(&mut sio3);
-        unwrap!(self.driver().sio3_output).connect_to(&mut sio3);
+        unwrap!(self.driver().info.sio3_input).connect_to(&mut sio3);
+        unwrap!(self.driver().info.sio3_output).connect_to(&mut sio3);
 
         self
     }
 }
 
-impl<M, T> Spi<'_, M, T>
+impl<Dm, T> Spi<'_, Dm, T>
 where
     T: Instance,
+    Dm: DriverMode,
 {
     /// Half-duplex read.
+    #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
-        data_mode: SpiDataMode,
+        data_mode: DataMode,
         cmd: Command,
         address: Address,
         dummy: u8,
@@ -764,7 +830,7 @@ where
             dummy,
             buffer.is_empty(),
             data_mode,
-        );
+        )?;
 
         self.driver().configure_datalen(buffer.len(), 0);
         self.driver().start_operation();
@@ -773,9 +839,10 @@ where
     }
 
     /// Half-duplex write.
+    #[instability::unstable]
     pub fn half_duplex_write(
         &mut self,
-        data_mode: SpiDataMode,
+        data_mode: DataMode,
         cmd: Command,
         address: Address,
         dummy: u8,
@@ -802,6 +869,11 @@ where
                     data_mode = address.mode();
                     address = Address::None;
                 }
+
+                if dummy > 0 {
+                    // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                    return Err(Error::Unsupported);
+                }
             }
         }
 
@@ -813,7 +885,7 @@ where
             dummy,
             buffer.is_empty(),
             data_mode,
-        );
+        )?;
 
         if !buffer.is_empty() {
             // re-using the full-duplex write here
@@ -822,44 +894,6 @@ where
             self.driver().start_operation();
         }
 
-        self.driver().flush()
-    }
-}
-
-impl<M, T> embedded_hal_02::spi::FullDuplex<u8> for Spi<'_, M, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-
-    fn send(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-}
-
-impl<M, T> embedded_hal_02::blocking::spi::Transfer<u8> for Spi<'_, M, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-        self.transfer(words)
-    }
-}
-
-impl<M, T> embedded_hal_02::blocking::spi::Write<u8> for Spi<'_, M, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.write_bytes(words)?;
         self.driver().flush()
     }
 }
@@ -877,14 +911,11 @@ mod dma {
             asynch::{DmaRxFuture, DmaTxFuture},
             Channel,
             DmaRxBuf,
-            DmaRxBuffer,
             DmaTxBuf,
-            DmaTxBuffer,
             EmptyBuf,
-            Rx,
-            Tx,
+            PeripheralDmaChannel,
         },
-        InterruptConfigurable,
+        interrupt::InterruptConfigurable,
     };
 
     /// A DMA capable SPI instance.
@@ -894,23 +925,26 @@ mod dma {
     /// [`SpiDmaBus`] via `with_buffers` to get access
     /// to a DMA capable SPI bus that implements the
     /// embedded-hal traits.
-    pub struct SpiDma<'d, M, T = AnySpi>
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[instability::unstable]
+    pub struct SpiDma<'d, Dm, T = AnySpi>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
         pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, M, T::Dma>,
+        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<T>>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
         address_buffer: DmaTxBuf,
+        guard: PeripheralGuard,
     }
 
-    impl<M, T> crate::private::Sealed for SpiDma<'_, M, T>
+    impl<Dm, T> crate::private::Sealed for SpiDma<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
     }
 
@@ -919,6 +953,7 @@ mod dma {
         T: Instance,
     {
         /// Converts the SPI instance into async mode.
+        #[instability::unstable]
         pub fn into_async(self) -> SpiDma<'d, Async, T> {
             SpiDma {
                 spi: self.spi,
@@ -927,6 +962,7 @@ mod dma {
                 rx_transfer_in_progress: self.rx_transfer_in_progress,
                 #[cfg(all(esp32, spi_address_workaround))]
                 address_buffer: self.address_buffer,
+                guard: self.guard,
             }
         }
     }
@@ -936,6 +972,7 @@ mod dma {
         T: Instance,
     {
         /// Converts the SPI instance into async mode.
+        #[instability::unstable]
         pub fn into_blocking(self) -> SpiDma<'d, Blocking, T> {
             SpiDma {
                 spi: self.spi,
@@ -944,21 +981,22 @@ mod dma {
                 rx_transfer_in_progress: self.rx_transfer_in_progress,
                 #[cfg(all(esp32, spi_address_workaround))]
                 address_buffer: self.address_buffer,
+                guard: self.guard,
             }
         }
     }
 
-    impl<M, T> core::fmt::Debug for SpiDma<'_, M, T>
+    impl<Dm, T> core::fmt::Debug for SpiDma<'_, Dm, T>
     where
-        T: Instance,
-        M: Mode,
+        T: Instance + core::fmt::Debug,
+        Dm: DriverMode,
     {
         /// Formats the `SpiDma` instance for debugging purposes.
         ///
         /// This method returns a debug struct with the name "SpiDma" without
         /// exposing internal details.
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            f.debug_struct("SpiDma").finish()
+            f.debug_struct("SpiDma").field("spi", &self.spi).finish()
         }
     }
 
@@ -970,7 +1008,7 @@ mod dma {
         ///
         /// Interrupts are not enabled at the peripheral level here.
         fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-            let interrupt = self.driver().interrupt;
+            let interrupt = self.driver().info.interrupt;
             for core in crate::Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
@@ -979,7 +1017,8 @@ mod dma {
         }
     }
 
-    #[cfg(gdma)]
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<T> SpiDma<'_, Blocking, T>
     where
         T: Instance,
@@ -1005,15 +1044,15 @@ mod dma {
         }
     }
 
-    impl<'d, M, T> SpiDma<'d, M, T>
+    impl<'d, T> SpiDma<'d, Blocking, T>
     where
         T: Instance,
-        M: Mode,
     {
-        pub(super) fn new<CH>(spi: PeripheralRef<'d, T>, channel: Channel<'d, M, CH>) -> Self
-        where
-            CH: DmaChannelConvert<T::Dma>,
-        {
+        pub(super) fn new(
+            spi: PeripheralRef<'d, T>,
+            channel: PeripheralRef<'d, PeripheralDmaChannel<T>>,
+        ) -> Self {
+            let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
             #[cfg(all(esp32, spi_address_workaround))]
             let address_buffer = {
@@ -1031,27 +1070,39 @@ mod dma {
 
                 unwrap!(DmaTxBuf::new(
                     unsafe { &mut DESCRIPTORS[id] },
-                    crate::as_mut_byte_array!(BUFFERS[id], 4)
+                    crate::dma::as_mut_byte_array!(BUFFERS[id], 4)
                 ))
             };
 
+            let guard = PeripheralGuard::new(spi.info().peripheral);
+
             Self {
                 spi,
-                channel: channel.degrade(),
+                channel,
                 #[cfg(all(esp32, spi_address_workaround))]
                 address_buffer,
                 tx_transfer_in_progress: false,
                 rx_transfer_in_progress: false,
+                guard,
             }
         }
+    }
 
-        fn driver(&self) -> &'static Info {
-            self.spi.info()
+    impl<'d, Dm, T> SpiDma<'d, Dm, T>
+    where
+        T: Instance,
+        Dm: DriverMode,
+    {
+        fn driver(&self) -> Driver {
+            Driver {
+                info: self.spi.info(),
+                state: self.spi.state(),
+            }
         }
 
         fn dma_driver(&self) -> DmaDriver {
             DmaDriver {
-                info: self.driver(),
+                driver: self.driver(),
                 dma_peripheral: self.spi.dma_peripheral(),
             }
         }
@@ -1119,12 +1170,11 @@ mod dma {
         unsafe fn start_transfer_dma<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             &mut self,
             full_duplex: bool,
+            bytes_to_read: usize,
+            bytes_to_write: usize,
             rx_buffer: &mut RX,
             tx_buffer: &mut TX,
         ) -> Result<(), Error> {
-            let bytes_to_read = rx_buffer.length();
-            let bytes_to_write = tx_buffer.length();
-
             if bytes_to_read > MAX_DMA_SIZE || bytes_to_write > MAX_DMA_SIZE {
                 return Err(Error::MaxDmaTransferSizeExceeded);
             }
@@ -1134,6 +1184,8 @@ mod dma {
             unsafe {
                 self.dma_driver().start_transfer_dma(
                     full_duplex,
+                    bytes_to_read,
+                    bytes_to_write,
                     rx_buffer,
                     tx_buffer,
                     &mut self.channel.rx,
@@ -1149,6 +1201,11 @@ mod dma {
             address: Address,
             dummy: u8,
         ) -> Result<(), Error> {
+            if dummy > 0 {
+                // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                return Err(Error::Unsupported);
+            }
+
             let bytes_to_write = address.width().div_ceil(8);
             // The address register is read in big-endian order,
             // we have to prepare the emulated write in the same way.
@@ -1164,7 +1221,7 @@ mod dma {
                 dummy,
                 bytes_to_write == 0,
                 address.mode(),
-            );
+            )?;
 
             // FIXME: we could use self.start_transfer_dma if the address buffer was part of
             // the (yet-to-be-created) State struct.
@@ -1172,6 +1229,8 @@ mod dma {
             unsafe {
                 self.dma_driver().start_transfer_dma(
                     false,
+                    0,
+                    bytes_to_write,
                     &mut EmptyBuf,
                     &mut self.address_buffer,
                     &mut self.channel.rx,
@@ -1203,6 +1262,7 @@ mod dma {
         }
 
         /// Change the bus configuration.
+        #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.driver().apply_config(config)
         }
@@ -1212,19 +1272,22 @@ mod dma {
         /// This method sets up both RX and TX buffers for DMA transfers.
         /// It returns an instance of `SpiDmaBus` that can be used for SPI
         /// communication.
+        #[instability::unstable]
         pub fn with_buffers(
             self,
             dma_rx_buf: DmaRxBuf,
             dma_tx_buf: DmaTxBuf,
-        ) -> SpiDmaBus<'d, M, T> {
+        ) -> SpiDmaBus<'d, Dm, T> {
             SpiDmaBus::new(self, dma_rx_buf, dma_tx_buf)
         }
     }
 
-    impl<M, T> SetConfig for SpiDma<'_, M, T>
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    impl<Dm, T> SetConfig for SpiDma<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
         type Config = Config;
         type ConfigError = ConfigError;
@@ -1238,21 +1301,22 @@ mod dma {
     ///
     /// This structure holds references to the SPI instance, DMA buffers, and
     /// transfer status.
-    pub struct SpiDmaTransfer<'d, M, Buf, T = AnySpi>
+    #[instability::unstable]
+    pub struct SpiDmaTransfer<'d, Dm, Buf, T = AnySpi>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
-        spi_dma: ManuallyDrop<SpiDma<'d, M, T>>,
+        spi_dma: ManuallyDrop<SpiDma<'d, Dm, T>>,
         dma_buf: ManuallyDrop<Buf>,
     }
 
-    impl<'d, M, T, Buf> SpiDmaTransfer<'d, M, Buf, T>
+    impl<'d, Dm, T, Buf> SpiDmaTransfer<'d, Dm, Buf, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
-        fn new(spi_dma: SpiDma<'d, M, T>, dma_buf: Buf) -> Self {
+        fn new(spi_dma: SpiDma<'d, Dm, T>, dma_buf: Buf) -> Self {
             Self {
                 spi_dma: ManuallyDrop::new(spi_dma),
                 dma_buf: ManuallyDrop::new(dma_buf),
@@ -1271,7 +1335,8 @@ mod dma {
         ///
         /// This method blocks until the transfer is finished and returns the
         /// `SpiDma` instance and the associated buffer.
-        pub fn wait(mut self) -> (SpiDma<'d, M, T>, Buf) {
+        #[instability::unstable]
+        pub fn wait(mut self) -> (SpiDma<'d, Dm, T>, Buf) {
             self.spi_dma.wait_for_idle();
             let retval = unsafe {
                 (
@@ -1284,6 +1349,7 @@ mod dma {
         }
 
         /// Cancels the DMA transfer.
+        #[instability::unstable]
         pub fn cancel(&mut self) {
             if !self.spi_dma.is_done() {
                 self.spi_dma.cancel_transfer();
@@ -1291,10 +1357,10 @@ mod dma {
         }
     }
 
-    impl<M, T, Buf> Drop for SpiDmaTransfer<'_, M, Buf, T>
+    impl<Dm, T, Buf> Drop for SpiDmaTransfer<'_, Dm, Buf, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
         fn drop(&mut self) {
             if !self.is_done() {
@@ -1316,23 +1382,28 @@ mod dma {
         /// Waits for the DMA transfer to complete asynchronously.
         ///
         /// This method awaits the completion of both RX and TX operations.
+        #[instability::unstable]
         pub async fn wait_for_done(&mut self) {
             self.spi_dma.wait_for_idle_async().await;
         }
     }
 
-    impl<'d, M, T> SpiDma<'d, M, T>
+    impl<'d, Dm, T> SpiDma<'d, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
         /// # Safety:
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
         #[cfg_attr(place_spi_driver_in_ram, ram)]
-        unsafe fn start_dma_write(&mut self, buffer: &mut impl DmaTxBuffer) -> Result<(), Error> {
-            self.start_dma_transfer(&mut EmptyBuf, buffer)
+        unsafe fn start_dma_write(
+            &mut self,
+            bytes_to_write: usize,
+            buffer: &mut impl DmaTxBuffer,
+        ) -> Result<(), Error> {
+            self.start_dma_transfer(0, bytes_to_write, &mut EmptyBuf, buffer)
         }
 
         /// Perform a DMA write.
@@ -1342,13 +1413,15 @@ mod dma {
         /// bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn write<TX: DmaTxBuffer>(
             mut self,
+            bytes_to_write: usize,
             mut buffer: TX,
-        ) -> Result<SpiDmaTransfer<'d, M, TX, T>, (Error, Self, TX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, TX, T>, (Error, Self, TX)> {
             self.wait_for_idle();
 
-            match unsafe { self.start_dma_write(&mut buffer) } {
+            match unsafe { self.start_dma_write(bytes_to_write, &mut buffer) } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
             }
@@ -1359,8 +1432,12 @@ mod dma {
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
         #[cfg_attr(place_spi_driver_in_ram, ram)]
-        unsafe fn start_dma_read(&mut self, buffer: &mut impl DmaRxBuffer) -> Result<(), Error> {
-            self.start_dma_transfer(buffer, &mut EmptyBuf)
+        unsafe fn start_dma_read(
+            &mut self,
+            bytes_to_read: usize,
+            buffer: &mut impl DmaRxBuffer,
+        ) -> Result<(), Error> {
+            self.start_dma_transfer(bytes_to_read, 0, buffer, &mut EmptyBuf)
         }
 
         /// Perform a DMA read.
@@ -1370,12 +1447,14 @@ mod dma {
         /// received is 32736 bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn read<RX: DmaRxBuffer>(
             mut self,
+            bytes_to_read: usize,
             mut buffer: RX,
-        ) -> Result<SpiDmaTransfer<'d, M, RX, T>, (Error, Self, RX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, RX, T>, (Error, Self, RX)> {
             self.wait_for_idle();
-            match unsafe { self.start_dma_read(&mut buffer) } {
+            match unsafe { self.start_dma_read(bytes_to_read, &mut buffer) } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
             }
@@ -1388,10 +1467,12 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         unsafe fn start_dma_transfer(
             &mut self,
+            bytes_to_read: usize,
+            bytes_to_write: usize,
             rx_buffer: &mut impl DmaRxBuffer,
             tx_buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
-            self.start_transfer_dma(true, rx_buffer, tx_buffer)
+            self.start_transfer_dma(true, bytes_to_read, bytes_to_write, rx_buffer, tx_buffer)
         }
 
         /// Perform a DMA transfer
@@ -1401,13 +1482,23 @@ mod dma {
         /// sent/received is 32736 bytes.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             mut self,
+            bytes_to_read: usize,
             mut rx_buffer: RX,
+            bytes_to_write: usize,
             mut tx_buffer: TX,
-        ) -> Result<SpiDmaTransfer<'d, M, (RX, TX), T>, (Error, Self, RX, TX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, (RX, TX), T>, (Error, Self, RX, TX)> {
             self.wait_for_idle();
-            match unsafe { self.start_dma_transfer(&mut rx_buffer, &mut tx_buffer) } {
+            match unsafe {
+                self.start_dma_transfer(
+                    bytes_to_read,
+                    bytes_to_write,
+                    &mut rx_buffer,
+                    &mut tx_buffer,
+                )
+            } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, (rx_buffer, tx_buffer))),
                 Err(e) => Err((e, self, rx_buffer, tx_buffer)),
             }
@@ -1420,14 +1511,13 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         unsafe fn start_half_duplex_read(
             &mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
+            bytes_to_read: usize,
             buffer: &mut impl DmaRxBuffer,
         ) -> Result<(), Error> {
-            let bytes_to_read = buffer.length();
-
             self.driver().setup_half_duplex(
                 false,
                 cmd,
@@ -1436,26 +1526,35 @@ mod dma {
                 dummy,
                 bytes_to_read == 0,
                 data_mode,
-            );
+            )?;
 
-            self.start_transfer_dma(false, buffer, &mut EmptyBuf)
+            self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
         }
 
         /// Perform a half-duplex read operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn half_duplex_read<RX: DmaRxBuffer>(
             mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
+            bytes_to_read: usize,
             mut buffer: RX,
-        ) -> Result<SpiDmaTransfer<'d, M, RX, T>, (Error, Self, RX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, RX, T>, (Error, Self, RX)> {
             self.wait_for_idle();
 
             match unsafe {
-                self.start_half_duplex_read(data_mode, cmd, address, dummy, &mut buffer)
+                self.start_half_duplex_read(
+                    data_mode,
+                    cmd,
+                    address,
+                    dummy,
+                    bytes_to_read,
+                    &mut buffer,
+                )
             } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
@@ -1469,19 +1568,18 @@ mod dma {
         #[cfg_attr(place_spi_driver_in_ram, ram)]
         unsafe fn start_half_duplex_write(
             &mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
+            bytes_to_write: usize,
             buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
-            let bytes_to_write = buffer.length();
-
             #[cfg(all(esp32, spi_address_workaround))]
             {
                 // On the ESP32, if we don't have data, the address is always sent
                 // on a single line, regardless of its data mode.
-                if bytes_to_write == 0 && address.mode() != SpiDataMode::Single {
+                if bytes_to_write == 0 && address.mode() != DataMode::Single {
                     return self.set_up_address_workaround(cmd, address, dummy);
                 }
             }
@@ -1494,26 +1592,35 @@ mod dma {
                 dummy,
                 bytes_to_write == 0,
                 data_mode,
-            );
+            )?;
 
-            self.start_transfer_dma(false, &mut EmptyBuf, buffer)
+            self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
         }
 
         /// Perform a half-duplex write operation using DMA.
         #[allow(clippy::type_complexity)]
         #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[instability::unstable]
         pub fn half_duplex_write<TX: DmaTxBuffer>(
             mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
+            bytes_to_write: usize,
             mut buffer: TX,
-        ) -> Result<SpiDmaTransfer<'d, M, TX, T>, (Error, Self, TX)> {
+        ) -> Result<SpiDmaTransfer<'d, Dm, TX, T>, (Error, Self, TX)> {
             self.wait_for_idle();
 
             match unsafe {
-                self.start_half_duplex_write(data_mode, cmd, address, dummy, &mut buffer)
+                self.start_half_duplex_write(
+                    data_mode,
+                    cmd,
+                    address,
+                    dummy,
+                    bytes_to_write,
+                    &mut buffer,
+                )
             } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
@@ -1525,21 +1632,23 @@ mod dma {
     ///
     /// This structure is responsible for managing SPI transfers using DMA
     /// buffers.
-    pub struct SpiDmaBus<'d, M, T = AnySpi>
+    #[derive(Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[instability::unstable]
+    pub struct SpiDmaBus<'d, Dm, T = AnySpi>
     where
         T: Instance,
-
-        M: Mode,
+        Dm: DriverMode,
     {
-        spi_dma: SpiDma<'d, M, T>,
+        spi_dma: SpiDma<'d, Dm, T>,
         rx_buf: DmaRxBuf,
         tx_buf: DmaTxBuf,
     }
 
-    impl<M, T> crate::private::Sealed for SpiDmaBus<'_, M, T>
+    impl<Dm, T> crate::private::Sealed for SpiDmaBus<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
     }
 
@@ -1548,6 +1657,7 @@ mod dma {
         T: Instance,
     {
         /// Converts the SPI instance into async mode.
+        #[instability::unstable]
         pub fn into_async(self) -> SpiDmaBus<'d, Async, T> {
             SpiDmaBus {
                 spi_dma: self.spi_dma.into_async(),
@@ -1562,6 +1672,7 @@ mod dma {
         T: Instance,
     {
         /// Converts the SPI instance into async mode.
+        #[instability::unstable]
         pub fn into_blocking(self) -> SpiDmaBus<'d, Blocking, T> {
             SpiDmaBus {
                 spi_dma: self.spi_dma.into_blocking(),
@@ -1571,19 +1682,26 @@ mod dma {
         }
     }
 
-    impl<'d, M, T> SpiDmaBus<'d, M, T>
+    impl<'d, Dm, T> SpiDmaBus<'d, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
         /// Creates a new `SpiDmaBus` with the specified SPI instance and DMA
         /// buffers.
-        pub fn new(spi_dma: SpiDma<'d, M, T>, rx_buf: DmaRxBuf, tx_buf: DmaTxBuf) -> Self {
+        pub fn new(spi_dma: SpiDma<'d, Dm, T>, rx_buf: DmaRxBuf, tx_buf: DmaTxBuf) -> Self {
             Self {
                 spi_dma,
                 rx_buf,
                 tx_buf,
             }
+        }
+
+        /// Splits [SpiDmaBus] back into [SpiDma], [DmaRxBuf] and [DmaTxBuf].
+        #[instability::unstable]
+        pub fn split(mut self) -> (SpiDma<'d, Dm, T>, DmaRxBuf, DmaTxBuf) {
+            self.wait_for_idle();
+            (self.spi_dma, self.rx_buf, self.tx_buf)
         }
     }
 
@@ -1599,7 +1717,8 @@ mod dma {
         }
     }
 
-    #[cfg(gdma)]
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl<T> SpiDmaBus<'_, Blocking, T>
     where
         T: Instance,
@@ -1625,29 +1744,35 @@ mod dma {
         }
     }
 
-    impl<M, T> SpiDmaBus<'_, M, T>
+    impl<Dm, T> SpiDmaBus<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
         fn wait_for_idle(&mut self) {
             self.spi_dma.wait_for_idle();
         }
 
         /// Change the bus configuration.
+        #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.spi_dma.apply_config(config)
         }
 
         /// Reads data from the SPI bus using DMA.
+        #[instability::unstable]
         pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
             self.wait_for_idle();
             for chunk in words.chunks_mut(self.rx_buf.capacity()) {
                 self.rx_buf.set_length(chunk.len());
 
                 unsafe {
-                    self.spi_dma
-                        .start_dma_transfer(&mut self.rx_buf, &mut EmptyBuf)?;
+                    self.spi_dma.start_dma_transfer(
+                        chunk.len(),
+                        0,
+                        &mut self.rx_buf,
+                        &mut EmptyBuf,
+                    )?;
                 }
 
                 self.wait_for_idle();
@@ -1660,14 +1785,19 @@ mod dma {
         }
 
         /// Writes data to the SPI bus using DMA.
+        #[instability::unstable]
         pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
             self.wait_for_idle();
             for chunk in words.chunks(self.tx_buf.capacity()) {
                 self.tx_buf.fill(chunk);
 
                 unsafe {
-                    self.spi_dma
-                        .start_dma_transfer(&mut EmptyBuf, &mut self.tx_buf)?;
+                    self.spi_dma.start_dma_transfer(
+                        0,
+                        chunk.len(),
+                        &mut EmptyBuf,
+                        &mut self.tx_buf,
+                    )?;
                 }
 
                 self.wait_for_idle();
@@ -1677,6 +1807,7 @@ mod dma {
         }
 
         /// Transfers data to and from the SPI bus simultaneously using DMA.
+        #[instability::unstable]
         pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
             self.wait_for_idle();
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
@@ -1693,8 +1824,12 @@ mod dma {
                 self.rx_buf.set_length(read_chunk.len());
 
                 unsafe {
-                    self.spi_dma
-                        .start_dma_transfer(&mut self.rx_buf, &mut self.tx_buf)?;
+                    self.spi_dma.start_dma_transfer(
+                        read_chunk.len(),
+                        write_chunk.len(),
+                        &mut self.rx_buf,
+                        &mut self.tx_buf,
+                    )?;
                 }
                 self.wait_for_idle();
 
@@ -1712,6 +1847,7 @@ mod dma {
         }
 
         /// Transfers data in place on the SPI bus using DMA.
+        #[instability::unstable]
         pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
             self.wait_for_idle();
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
@@ -1721,8 +1857,12 @@ mod dma {
                 self.rx_buf.set_length(chunk.len());
 
                 unsafe {
-                    self.spi_dma
-                        .start_dma_transfer(&mut self.rx_buf, &mut self.tx_buf)?;
+                    self.spi_dma.start_dma_transfer(
+                        chunk.len(),
+                        chunk.len(),
+                        &mut self.rx_buf,
+                        &mut self.tx_buf,
+                    )?;
                 }
                 self.wait_for_idle();
 
@@ -1734,16 +1874,17 @@ mod dma {
         }
 
         /// Half-duplex read.
+        #[instability::unstable]
         pub fn half_duplex_read(
             &mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
             buffer: &mut [u8],
         ) -> Result<(), Error> {
             if buffer.len() > self.rx_buf.capacity() {
-                return Err(Error::DmaError(DmaError::Overflow));
+                return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
             self.rx_buf.set_length(buffer.len());
@@ -1754,6 +1895,7 @@ mod dma {
                     cmd,
                     address,
                     dummy,
+                    buffer.len(),
                     &mut self.rx_buf,
                 )?;
             }
@@ -1767,16 +1909,17 @@ mod dma {
         }
 
         /// Half-duplex write.
+        #[instability::unstable]
         pub fn half_duplex_write(
             &mut self,
-            data_mode: SpiDataMode,
+            data_mode: DataMode,
             cmd: Command,
             address: Address,
             dummy: u8,
             buffer: &[u8],
         ) -> Result<(), Error> {
             if buffer.len() > self.tx_buf.capacity() {
-                return Err(Error::DmaError(DmaError::Overflow));
+                return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
             self.tx_buf.fill(buffer);
@@ -1787,6 +1930,7 @@ mod dma {
                     cmd,
                     address,
                     dummy,
+                    buffer.len(),
                     &mut self.tx_buf,
                 )?;
             }
@@ -1797,10 +1941,12 @@ mod dma {
         }
     }
 
-    impl<M, T> SetConfig for SpiDmaBus<'_, M, T>
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    impl<Dm, T> SetConfig for SpiDmaBus<'_, Dm, T>
     where
         T: Instance,
-        M: Mode,
+        Dm: DriverMode,
     {
         type Config = Config;
         type ConfigError = ConfigError;
@@ -1810,45 +1956,21 @@ mod dma {
         }
     }
 
-    impl<T> embedded_hal_02::blocking::spi::Transfer<u8> for SpiDmaBus<'_, Blocking, T>
-    where
-        T: Instance,
-    {
-        type Error = Error;
-
-        fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Self::Error> {
-            self.transfer_in_place(words)?;
-            Ok(words)
-        }
-    }
-
-    impl<T> embedded_hal_02::blocking::spi::Write<u8> for SpiDmaBus<'_, Blocking, T>
-    where
-        T: Instance,
-    {
-        type Error = Error;
-
-        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.write(words)?;
-            Ok(())
-        }
-    }
-
     /// Async functionality
     mod asynch {
-        use core::{
-            cmp::min,
-            ops::{Deref, DerefMut},
-        };
+        #[cfg(any(doc, feature = "unstable"))]
+        use core::cmp::min;
+        use core::ops::{Deref, DerefMut};
 
         use super::*;
-        use crate::Async;
 
+        #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
         struct DropGuard<I, F: FnOnce(I)> {
             inner: ManuallyDrop<I>,
             on_drop: ManuallyDrop<F>,
         }
 
+        #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
         impl<I, F: FnOnce(I)> DropGuard<I, F> {
             fn new(inner: I, on_drop: F) -> Self {
                 Self {
@@ -1882,11 +2004,14 @@ mod dma {
             }
         }
 
+        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl<T> SpiDmaBus<'_, Async, T>
         where
             T: Instance,
         {
             /// Fill the given buffer with data from the bus.
+            #[instability::unstable]
             pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
                 let chunk_size = self.rx_buf.capacity();
@@ -1896,7 +2021,9 @@ mod dma {
 
                     let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
 
-                    unsafe { spi.start_dma_transfer(&mut self.rx_buf, &mut EmptyBuf)? };
+                    unsafe {
+                        spi.start_dma_transfer(chunk.len(), 0, &mut self.rx_buf, &mut EmptyBuf)?
+                    };
 
                     spi.wait_for_idle_async().await;
 
@@ -1910,6 +2037,7 @@ mod dma {
             }
 
             /// Transmit the given buffer to the bus.
+            #[instability::unstable]
             pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
 
@@ -1919,7 +2047,9 @@ mod dma {
                 for chunk in words.chunks(chunk_size) {
                     self.tx_buf.fill(chunk);
 
-                    unsafe { spi.start_dma_transfer(&mut EmptyBuf, &mut self.tx_buf)? };
+                    unsafe {
+                        spi.start_dma_transfer(0, chunk.len(), &mut EmptyBuf, &mut self.tx_buf)?
+                    };
 
                     spi.wait_for_idle_async().await;
                 }
@@ -1930,6 +2060,7 @@ mod dma {
 
             /// Transfer by writing out a buffer and reading the response from
             /// the bus into another buffer.
+            #[instability::unstable]
             pub async fn transfer_async(
                 &mut self,
                 read: &mut [u8],
@@ -1952,12 +2083,17 @@ mod dma {
                     self.rx_buf.set_length(read_chunk.len());
 
                     unsafe {
-                        spi.start_dma_transfer(&mut self.rx_buf, &mut self.tx_buf)?;
+                        spi.start_dma_transfer(
+                            read_chunk.len(),
+                            write_chunk.len(),
+                            &mut self.rx_buf,
+                            &mut self.tx_buf,
+                        )?;
                     }
                     spi.wait_for_idle_async().await;
 
                     let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                    assert_eq!(bytes_read, read_chunk.len());
+                    debug_assert_eq!(bytes_read, read_chunk.len());
                 }
 
                 spi.defuse();
@@ -1973,6 +2109,7 @@ mod dma {
 
             /// Transfer by writing out a buffer and reading the response from
             /// the bus into the same buffer.
+            #[instability::unstable]
             pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
 
@@ -1982,12 +2119,17 @@ mod dma {
                     self.rx_buf.set_length(chunk.len());
 
                     unsafe {
-                        spi.start_dma_transfer(&mut self.rx_buf, &mut self.tx_buf)?;
+                        spi.start_dma_transfer(
+                            chunk.len(),
+                            chunk.len(),
+                            &mut self.rx_buf,
+                            &mut self.tx_buf,
+                        )?;
                     }
                     spi.wait_for_idle_async().await;
 
                     let bytes_read = self.rx_buf.read_received_data(chunk);
-                    assert_eq!(bytes_read, chunk.len());
+                    debug_assert_eq!(bytes_read, chunk.len());
                 }
 
                 spi.defuse();
@@ -1996,6 +2138,8 @@ mod dma {
             }
         }
 
+        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl<T> embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, Async, T>
         where
             T: Instance,
@@ -2024,22 +2168,28 @@ mod dma {
     }
 
     mod ehal1 {
+        #[cfg(any(doc, feature = "unstable"))]
         use embedded_hal::spi::{ErrorType, SpiBus};
 
+        #[cfg(any(doc, feature = "unstable"))]
         use super::*;
 
-        impl<M, T> ErrorType for SpiDmaBus<'_, M, T>
+        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        impl<Dm, T> ErrorType for SpiDmaBus<'_, Dm, T>
         where
             T: Instance,
-            M: Mode,
+            Dm: DriverMode,
         {
             type Error = Error;
         }
 
-        impl<M, T> SpiBus for SpiDmaBus<'_, M, T>
+        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        impl<Dm, T> SpiBus for SpiDmaBus<'_, Dm, T>
         where
             T: Instance,
-            M: Mode,
+            Dm: DriverMode,
         {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.read(words)
@@ -2067,17 +2217,19 @@ mod dma {
 
 mod ehal1 {
     use embedded_hal::spi::SpiBus;
+    use embedded_hal_async::spi::SpiBus as SpiBusAsync;
     use embedded_hal_nb::spi::FullDuplex;
 
     use super::*;
 
-    impl<M, T> embedded_hal::spi::ErrorType for Spi<'_, M, T> {
+    impl<Dm, T> embedded_hal::spi::ErrorType for Spi<'_, Dm, T> {
         type Error = Error;
     }
 
-    impl<M, T> FullDuplex for Spi<'_, M, T>
+    impl<Dm, T> FullDuplex for Spi<'_, Dm, T>
     where
         T: Instance,
+        Dm: DriverMode,
     {
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
             self.driver().read_byte()
@@ -2088,9 +2240,10 @@ mod ehal1 {
         }
     }
 
-    impl<M, T> SpiBus for Spi<'_, M, T>
+    impl<Dm, T> SpiBus for Spi<'_, Dm, T>
     where
         T: Instance,
+        Dm: DriverMode,
     {
         fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
             self.driver().read_bytes(words)
@@ -2147,31 +2300,100 @@ mod ehal1 {
         }
 
         fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            // Since we have the traits so neatly implemented above, use them!
-            for chunk in words.chunks_mut(FIFO_SIZE) {
-                SpiBus::write(self, chunk)?;
-                SpiBus::flush(self)?;
-                self.driver().read_bytes_from_fifo(chunk)?;
-            }
-            Ok(())
+            self.driver().transfer(words).map(|_| ())
         }
 
         fn flush(&mut self) -> Result<(), Self::Error> {
             self.driver().flush()
         }
     }
+
+    impl<T> SpiBusAsync for Spi<'_, Async, T>
+    where
+        T: Instance,
+    {
+        async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+            // We need to flush because the blocking transfer functions may return while a
+            // transfer is still in progress.
+            self.flush_async().await?;
+            self.driver().read_bytes_async(words).await
+        }
+
+        async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+            // We need to flush because the blocking transfer functions may return while a
+            // transfer is still in progress.
+            self.flush_async().await?;
+            self.driver().write_bytes_async(words).await
+        }
+
+        async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+            // Optimizations
+            if read.is_empty() {
+                return SpiBusAsync::write(self, write).await;
+            } else if write.is_empty() {
+                return SpiBusAsync::read(self, read).await;
+            }
+
+            let mut write_from = 0;
+            let mut read_from = 0;
+
+            loop {
+                // How many bytes we write in this chunk
+                let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
+                let write_to = write_from + write_inc;
+                // How many bytes we read in this chunk
+                let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
+                let read_to = read_from + read_inc;
+
+                if (write_inc == 0) && (read_inc == 0) {
+                    break;
+                }
+
+                // No need to flush here, `SpiBusAsync::write` will do it for us
+
+                if write_to < read_to {
+                    // Read more than we write, must pad writing part with zeros
+                    let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
+                    empty[0..write_inc].copy_from_slice(&write[write_from..write_to]);
+                    SpiBusAsync::write(self, &empty).await?;
+                } else {
+                    SpiBusAsync::write(self, &write[write_from..write_to]).await?;
+                }
+
+                if read_inc > 0 {
+                    self.driver()
+                        .read_bytes_from_fifo(&mut read[read_from..read_to])?;
+                }
+
+                write_from = write_to;
+                read_from = read_to;
+            }
+            Ok(())
+        }
+
+        async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+            self.transfer_in_place_async(words).await
+        }
+
+        async fn flush(&mut self) -> Result<(), Self::Error> {
+            self.flush_async().await
+        }
+    }
 }
 
 /// SPI peripheral instance.
-pub trait Instance: private::Sealed + Into<AnySpi> + DmaEligible + 'static {
+#[doc(hidden)]
+pub trait PeripheralInstance: private::Sealed + Into<AnySpi> + DmaEligible + 'static {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;
 }
 
 /// Marker trait for QSPI-capable SPI peripherals.
-pub trait QspiInstance: Instance {}
+#[doc(hidden)]
+pub trait QspiInstance: PeripheralInstance {}
 
 /// Peripheral data describing a particular SPI instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this SPI instance.
@@ -2217,26 +2439,29 @@ pub struct Info {
 }
 
 struct DmaDriver {
-    info: &'static Info,
+    driver: Driver,
     dma_peripheral: crate::dma::DmaPeripheral,
 }
 
 impl DmaDriver {
     fn abort_transfer(&self) {
-        self.info.configure_datalen(1, 1);
-        self.info.update();
+        self.driver.configure_datalen(1, 1);
+        self.driver.update();
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
         &self,
         _full_duplex: bool,
+        rx_len: usize,
+        tx_len: usize,
         rx_buffer: &mut impl DmaRxBuffer,
         tx_buffer: &mut impl DmaTxBuffer,
         rx: &mut RX,
         tx: &mut TX,
     ) -> Result<(), Error> {
-        let reg_block = self.info.register_block();
+        let reg_block = self.driver.register_block();
 
         #[cfg(esp32s2)]
         {
@@ -2245,9 +2470,7 @@ impl DmaDriver {
             reg_block.dma_in_link().write(|w| w.bits(0));
         }
 
-        let rx_len = rx_buffer.length();
-        let tx_len = tx_buffer.length();
-        self.info.configure_datalen(rx_len, tx_len);
+        self.driver.configure_datalen(rx_len, tx_len);
 
         // enable the MISO and MOSI if needed
         reg_block
@@ -2282,7 +2505,7 @@ impl DmaDriver {
         #[cfg(gdma)]
         self.reset_dma();
 
-        self.info.start_operation();
+        self.driver.start_operation();
 
         Ok(())
     }
@@ -2291,7 +2514,7 @@ impl DmaDriver {
         #[cfg(gdma)]
         {
             // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
-            let reg_block = self.info.register_block();
+            let reg_block = self.driver.register_block();
             reg_block.dma_conf().modify(|_, w| {
                 w.dma_tx_ena().set_bit();
                 w.dma_rx_ena().set_bit()
@@ -2317,7 +2540,7 @@ impl DmaDriver {
                 w.dma_afifo_rst().bit(bit)
             });
         }
-        let reg_block = self.info.register_block();
+        let reg_block = self.driver.register_block();
         set_reset_bit(reg_block, true);
         set_reset_bit(reg_block, false);
         self.clear_dma_interrupts();
@@ -2325,7 +2548,7 @@ impl DmaDriver {
 
     #[cfg(gdma)]
     fn clear_dma_interrupts(&self) {
-        let reg_block = self.info.register_block();
+        let reg_block = self.driver.register_block();
         reg_block.dma_int_clr().write(|w| {
             w.dma_infifo_full_err().clear_bit_by_one();
             w.dma_outfifo_empty_err().clear_bit_by_one();
@@ -2337,7 +2560,7 @@ impl DmaDriver {
 
     #[cfg(pdma)]
     fn clear_dma_interrupts(&self) {
-        let reg_block = self.info.register_block();
+        let reg_block = self.driver.register_block();
         reg_block.dma_int_clr().write(|w| {
             w.inlink_dscr_empty().clear_bit_by_one();
             w.outlink_dscr_error().clear_bit_by_one();
@@ -2352,12 +2575,17 @@ impl DmaDriver {
     }
 }
 
+struct Driver {
+    info: &'static Info,
+    state: &'static State,
+}
+
 // private implementation bits
 // FIXME: split this up into peripheral versions
-impl Info {
+impl Driver {
     /// Returns the register block for this SPI instance.
     pub fn register_block(&self) -> &RegisterBlock {
-        unsafe { &*self.register_block }
+        unsafe { &*self.info.register_block }
     }
 
     /// Initialize for full-duplex 1 bit mode
@@ -2417,72 +2645,77 @@ impl Info {
     #[cfg(not(esp32))]
     fn init_spi_data_mode(
         &self,
-        cmd_mode: SpiDataMode,
-        address_mode: SpiDataMode,
-        data_mode: SpiDataMode,
-    ) {
+        cmd_mode: DataMode,
+        address_mode: DataMode,
+        data_mode: DataMode,
+    ) -> Result<(), Error> {
         let reg_block = self.register_block();
         reg_block.ctrl().modify(|_, w| {
-            w.fcmd_dual().bit(cmd_mode == SpiDataMode::Dual);
-            w.fcmd_quad().bit(cmd_mode == SpiDataMode::Quad);
-            w.faddr_dual().bit(address_mode == SpiDataMode::Dual);
-            w.faddr_quad().bit(address_mode == SpiDataMode::Quad);
-            w.fread_dual().bit(data_mode == SpiDataMode::Dual);
-            w.fread_quad().bit(data_mode == SpiDataMode::Quad)
+            w.fcmd_dual().bit(cmd_mode == DataMode::Dual);
+            w.fcmd_quad().bit(cmd_mode == DataMode::Quad);
+            w.faddr_dual().bit(address_mode == DataMode::Dual);
+            w.faddr_quad().bit(address_mode == DataMode::Quad);
+            w.fread_dual().bit(data_mode == DataMode::Dual);
+            w.fread_quad().bit(data_mode == DataMode::Quad)
         });
         reg_block.user().modify(|_, w| {
-            w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
-            w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
+            w.fwrite_dual().bit(data_mode == DataMode::Dual);
+            w.fwrite_quad().bit(data_mode == DataMode::Quad)
         });
+        Ok(())
     }
 
     #[cfg(esp32)]
     fn init_spi_data_mode(
         &self,
-        cmd_mode: SpiDataMode,
-        address_mode: SpiDataMode,
-        data_mode: SpiDataMode,
-    ) {
+        cmd_mode: DataMode,
+        address_mode: DataMode,
+        data_mode: DataMode,
+    ) -> Result<(), Error> {
         let reg_block = self.register_block();
         match cmd_mode {
-            SpiDataMode::Single => (),
-            _ => panic!("Only 1-bit command supported"),
+            DataMode::Single => (),
+            // FIXME: more detailed error - Only 1-bit commands are supported.
+            _ => return Err(Error::Unsupported),
         }
 
         match address_mode {
-            SpiDataMode::Single => {
+            DataMode::Single => {
                 reg_block.ctrl().modify(|_, w| {
                     w.fread_dio().clear_bit();
                     w.fread_qio().clear_bit();
-                    w.fread_dual().bit(data_mode == SpiDataMode::Dual);
-                    w.fread_quad().bit(data_mode == SpiDataMode::Quad)
+                    w.fread_dual().bit(data_mode == DataMode::Dual);
+                    w.fread_quad().bit(data_mode == DataMode::Quad)
                 });
 
                 reg_block.user().modify(|_, w| {
                     w.fwrite_dio().clear_bit();
                     w.fwrite_qio().clear_bit();
-                    w.fwrite_dual().bit(data_mode == SpiDataMode::Dual);
-                    w.fwrite_quad().bit(data_mode == SpiDataMode::Quad)
+                    w.fwrite_dual().bit(data_mode == DataMode::Dual);
+                    w.fwrite_quad().bit(data_mode == DataMode::Quad)
                 });
             }
             address_mode if address_mode == data_mode => {
                 reg_block.ctrl().modify(|_, w| {
                     w.fastrd_mode().set_bit();
-                    w.fread_dio().bit(address_mode == SpiDataMode::Dual);
-                    w.fread_qio().bit(address_mode == SpiDataMode::Quad);
+                    w.fread_dio().bit(address_mode == DataMode::Dual);
+                    w.fread_qio().bit(address_mode == DataMode::Quad);
                     w.fread_dual().clear_bit();
                     w.fread_quad().clear_bit()
                 });
 
                 reg_block.user().modify(|_, w| {
-                    w.fwrite_dio().bit(address_mode == SpiDataMode::Dual);
-                    w.fwrite_qio().bit(address_mode == SpiDataMode::Quad);
+                    w.fwrite_dio().bit(address_mode == DataMode::Dual);
+                    w.fwrite_qio().bit(address_mode == DataMode::Quad);
                     w.fwrite_dual().clear_bit();
                     w.fwrite_quad().clear_bit()
                 });
             }
-            _ => panic!("Unsupported combination of data-modes"),
+            // FIXME: more detailed error - Unsupported combination of data-modes,
+            _ => return Err(Error::Unsupported),
         }
+
+        Ok(())
     }
 
     // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
@@ -2507,13 +2740,12 @@ impl Info {
             // Using APB frequency directly will give us the best result here.
             reg_val = 1 << 31;
         } else {
-            /* For best duty cycle resolution, we want n to be as close to 32 as
-             * possible, but we also need a pre/n combo that gets us as close as
-             * possible to the intended frequency. To do this, we bruteforce n and
-             * calculate the best pre to go along with that. If there's a choice
-             * between pre/n combos that give the same result, use the one with the
-             * higher n.
-             */
+            // For best duty cycle resolution, we want n to be as close to 32 as
+            // possible, but we also need a pre/n combo that gets us as close as
+            // possible to the intended frequency. To do this, we bruteforce n and
+            // calculate the best pre to go along with that. If there's a choice
+            // between pre/n combos that give the same result, use the one with the
+            // higher n.
 
             let mut pre: i32;
             let mut bestn: i32 = -1;
@@ -2521,14 +2753,12 @@ impl Info {
             let mut besterr: i32 = 0;
             let mut errval: i32;
 
-            /* Start at n = 2. We need to be able to set h/l so we have at least
-             * one high and one low pulse.
-             */
+            // Start at n = 2. We need to be able to set h/l so we have at least
+            // one high and one low pulse.
 
             for n in 2..64 {
-                /* Effectively, this does:
-                 *   pre = round((APB_CLK_FREQ / n) / frequency)
-                 */
+                // Effectively, this does:
+                // pre = round((APB_CLK_FREQ / n) / frequency)
 
                 pre = ((apb_clk_freq.raw() as i32 / n) + (frequency.raw() as i32 / 2))
                     / frequency.raw() as i32;
@@ -2553,9 +2783,8 @@ impl Info {
             pre = bestpre;
             let l: i32 = n;
 
-            /* Effectively, this does:
-             *   h = round((duty_cycle * n) / 256)
-             */
+            // Effectively, this does:
+            // h = round((duty_cycle * n) / 256)
 
             let mut h: i32 = (duty_cycle * n + 127) / 256;
             if h <= 0 {
@@ -2574,48 +2803,126 @@ impl Info {
     }
 
     /// Enable or disable listening for the given interrupts.
-    #[cfg(gdma)]
+    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn enable_listen(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
         let reg_block = self.register_block();
 
-        reg_block.dma_int_ena().modify(|_, w| {
-            for interrupt in interrupts {
-                match interrupt {
-                    SpiInterrupt::TransDone => w.trans_done().bit(enable),
-                };
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                reg_block.slave().modify(|_, w| {
+                    for interrupt in interrupts {
+                        match interrupt {
+                            SpiInterrupt::TransferDone => w.trans_inten().bit(enable),
+                        };
+                    }
+                    w
+                });
+            } else if #[cfg(esp32s2)] {
+                reg_block.slave().modify(|_, w| {
+                    for interrupt in interrupts {
+                        match interrupt {
+                            SpiInterrupt::TransferDone => w.int_trans_done_en().bit(enable),
+                            SpiInterrupt::DmaSegmentedTransferDone => w.int_dma_seg_trans_en().bit(enable),
+                        };
+                    }
+                    w
+                });
+            } else {
+                reg_block.dma_int_ena().modify(|_, w| {
+                    for interrupt in interrupts {
+                        match interrupt {
+                            SpiInterrupt::TransferDone => w.trans_done().bit(enable),
+                            SpiInterrupt::DmaSegmentedTransferDone => w.dma_seg_trans_done().bit(enable),
+                            SpiInterrupt::App2 => w.app2().bit(enable),
+                            SpiInterrupt::App1 => w.app1().bit(enable),
+                        };
+                    }
+                    w
+                });
             }
-            w
-        });
+        }
     }
 
     /// Gets asserted interrupts
-    #[cfg(gdma)]
+    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn interrupts(&self) -> EnumSet<SpiInterrupt> {
         let mut res = EnumSet::new();
         let reg_block = self.register_block();
 
-        let ints = reg_block.dma_int_st().read();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                if reg_block.slave().read().trans_done().bit() {
+                    res.insert(SpiInterrupt::TransferDone);
+                }
+            } else if #[cfg(esp32s2)] {
+                if reg_block.slave().read().trans_done().bit() {
+                    res.insert(SpiInterrupt::TransferDone);
+                }
+                if reg_block.hold().read().dma_seg_trans_done().bit() {
+                    res.insert(SpiInterrupt::DmaSegmentedTransferDone);
+                }
+            } else {
+                let ints = reg_block.dma_int_raw().read();
 
-        if ints.trans_done().bit() {
-            res.insert(SpiInterrupt::TransDone);
+                if ints.trans_done().bit() {
+                    res.insert(SpiInterrupt::TransferDone);
+                }
+                if ints.dma_seg_trans_done().bit() {
+                    res.insert(SpiInterrupt::DmaSegmentedTransferDone);
+                }
+                if ints.app2().bit() {
+                    res.insert(SpiInterrupt::App2);
+                }
+                if ints.app1().bit() {
+                    res.insert(SpiInterrupt::App1);
+                }
+            }
         }
 
         res
     }
 
     /// Resets asserted interrupts
-    #[cfg(gdma)]
+    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
         let reg_block = self.register_block();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                for interrupt in interrupts {
+                    match interrupt {
+                        SpiInterrupt::TransferDone => {
+                            reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
+                        }
+                    }
+                }
+            } else if #[cfg(esp32s2)] {
+                for interrupt in interrupts {
+                    match interrupt {
+                        SpiInterrupt::TransferDone => {
+                            reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
+                        }
 
-        reg_block.dma_int_clr().write(|w| {
-            for interrupt in interrupts {
-                match interrupt {
-                    SpiInterrupt::TransDone => w.trans_done().clear_bit_by_one(),
-                };
+                        SpiInterrupt::DmaSegmentedTransferDone => {
+                            reg_block
+                                .hold()
+                                .modify(|_, w| w.dma_seg_trans_done().clear_bit());
+                        }
+                    }
+                }
+            } else {
+                reg_block.dma_int_clr().write(|w| {
+                    for interrupt in interrupts {
+                        match interrupt {
+                            SpiInterrupt::TransferDone => w.trans_done().clear_bit_by_one(),
+                            SpiInterrupt::DmaSegmentedTransferDone => w.dma_seg_trans_done().clear_bit_by_one(),
+                            SpiInterrupt::App2 => w.app2().clear_bit_by_one(),
+                            SpiInterrupt::App1 => w.app1().clear_bit_by_one(),
+                        };
+                    }
+                    w
+                });
             }
-            w
-        });
+        }
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
@@ -2625,7 +2932,7 @@ impl Info {
         Ok(())
     }
 
-    fn set_data_mode(&self, data_mode: SpiMode) {
+    fn set_data_mode(&self, data_mode: Mode) {
         let reg_block = self.register_block();
 
         cfg_if::cfg_if! {
@@ -2638,11 +2945,11 @@ impl Info {
 
         pin_reg.modify(|_, w| {
             w.ck_idle_edge()
-                .bit(matches!(data_mode, SpiMode::Mode2 | SpiMode::Mode3))
+                .bit(matches!(data_mode, Mode::Mode2 | Mode::Mode3))
         });
         reg_block.user().modify(|_, w| {
             w.ck_out_edge()
-                .bit(matches!(data_mode, SpiMode::Mode1 | SpiMode::Mode2))
+                .bit(matches!(data_mode, Mode::Mode1 | Mode::Mode2))
         });
     }
 
@@ -2665,16 +2972,16 @@ impl Info {
     }
 
     #[cfg(not(any(esp32, esp32c3, esp32s2)))]
-    fn set_bit_order(&self, read_order: SpiBitOrder, write_order: SpiBitOrder) {
+    fn set_bit_order(&self, read_order: BitOrder, write_order: BitOrder) {
         let reg_block = self.register_block();
 
         let read_value = match read_order {
-            SpiBitOrder::MSBFirst => 0,
-            SpiBitOrder::LSBFirst => 1,
+            BitOrder::MsbFirst => 0,
+            BitOrder::LsbFirst => 1,
         };
         let write_value = match write_order {
-            SpiBitOrder::MSBFirst => 0,
-            SpiBitOrder::LSBFirst => 1,
+            BitOrder::MsbFirst => 0,
+            BitOrder::LsbFirst => 1,
         };
         reg_block.ctrl().modify(|_, w| unsafe {
             w.rd_bit_order().bits(read_value);
@@ -2684,16 +2991,16 @@ impl Info {
     }
 
     #[cfg(any(esp32, esp32c3, esp32s2))]
-    fn set_bit_order(&self, read_order: SpiBitOrder, write_order: SpiBitOrder) {
+    fn set_bit_order(&self, read_order: BitOrder, write_order: BitOrder) {
         let reg_block = self.register_block();
 
         let read_value = match read_order {
-            SpiBitOrder::MSBFirst => false,
-            SpiBitOrder::LSBFirst => true,
+            BitOrder::MsbFirst => false,
+            BitOrder::LsbFirst => true,
         };
         let write_value = match write_order {
-            SpiBitOrder::MSBFirst => false,
-            SpiBitOrder::LSBFirst => true,
+            BitOrder::MsbFirst => false,
+            BitOrder::LsbFirst => true,
         };
         reg_block.ctrl().modify(|_, w| {
             w.rd_bit_order().bit(read_value);
@@ -2726,14 +3033,37 @@ impl Info {
         Ok(())
     }
 
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    fn fill_fifo(&self, chunk: &[u8]) {
+        // TODO: replace with `array_chunks` and `from_le_bytes`
+        let mut c_iter = chunk.chunks_exact(4);
+        let mut w_iter = self.register_block().w_iter();
+        for c in c_iter.by_ref() {
+            if let Some(w_reg) = w_iter.next() {
+                let word =
+                    (c[0] as u32) | (c[1] as u32) << 8 | (c[2] as u32) << 16 | (c[3] as u32) << 24;
+                w_reg.write(|w| w.buf().set(word));
+            }
+        }
+        let rem = c_iter.remainder();
+        if !rem.is_empty() {
+            if let Some(w_reg) = w_iter.next() {
+                let word = match rem.len() {
+                    3 => (rem[0] as u32) | (rem[1] as u32) << 8 | (rem[2] as u32) << 16,
+                    2 => (rem[0] as u32) | (rem[1] as u32) << 8,
+                    1 => rem[0] as u32,
+                    _ => unreachable!(),
+                };
+                w_reg.write(|w| w.buf().set(word));
+            }
+        }
+    }
+
     /// Write bytes to SPI.
     ///
-    /// Copies the content of `words` in chunks of 64 bytes into the SPI
-    /// transmission FIFO. If `words` is longer than 64 bytes, multiple
-    /// sequential transfers are performed. This function will return before
-    /// all bytes of the last chunk to transmit have been sent to the wire. If
-    /// you must ensure that the whole messages was written correctly, use
-    /// [`Self::flush`].
+    /// This function will return before all bytes of the last chunk to transmit
+    /// have been sent to the wire. If you must ensure that the whole
+    /// messages was written correctly, use [`Self::flush`].
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn write_bytes(&self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
@@ -2746,42 +3076,29 @@ impl Info {
         // transmitted
         for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
             self.configure_datalen(0, chunk.len());
-
-            {
-                // TODO: replace with `array_chunks` and `from_le_bytes`
-                let mut c_iter = chunk.chunks_exact(4);
-                let mut w_iter = self.register_block().w_iter();
-                for c in c_iter.by_ref() {
-                    if let Some(w_reg) = w_iter.next() {
-                        let word = (c[0] as u32)
-                            | (c[1] as u32) << 8
-                            | (c[2] as u32) << 16
-                            | (c[3] as u32) << 24;
-                        w_reg.write(|w| w.buf().set(word));
-                    }
-                }
-                let rem = c_iter.remainder();
-                if !rem.is_empty() {
-                    if let Some(w_reg) = w_iter.next() {
-                        let word = match rem.len() {
-                            3 => (rem[0] as u32) | (rem[1] as u32) << 8 | (rem[2] as u32) << 16,
-                            2 => (rem[0] as u32) | (rem[1] as u32) << 8,
-                            1 => rem[0] as u32,
-                            _ => unreachable!(),
-                        };
-                        w_reg.write(|w| w.buf().set(word));
-                    }
-                }
-            }
+            self.fill_fifo(chunk);
 
             self.start_operation();
 
             // Wait for all chunks to complete except the last one.
             // The function is allowed to return before the bus is idle.
-            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0-alpha.8/embedded_hal/spi/blocking/index.html#flushing)
+            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0/embedded_hal/spi/index.html#flushing)
             if i < num_chunks {
                 self.flush()?;
             }
+        }
+        Ok(())
+    }
+
+    /// Write bytes to SPI.
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    async fn write_bytes_async(&self, words: &[u8]) -> Result<(), Error> {
+        // The fifo has a limited fixed size, so the data must be chunked and then
+        // transmitted
+        for chunk in words.chunks(FIFO_SIZE) {
+            self.configure_datalen(0, chunk.len());
+            self.fill_fifo(chunk);
+            self.execute_operation_async().await;
         }
         Ok(())
     }
@@ -2798,6 +3115,22 @@ impl Info {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write_bytes(&empty_array[0..chunk.len()])?;
             self.flush()?;
+            self.read_bytes_from_fifo(chunk)?;
+        }
+        Ok(())
+    }
+
+    /// Read bytes from SPI.
+    ///
+    /// Sends out a stuffing byte for every byte to read. This function doesn't
+    /// perform flushing. If you want to read the response to something you
+    /// have written before, consider using [`Self::transfer`] instead.
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    async fn read_bytes_async(&self, words: &mut [u8]) -> Result<(), Error> {
+        let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
+
+        for chunk in words.chunks_mut(FIFO_SIZE) {
+            self.write_bytes_async(&empty_array[0..chunk.len()]).await?;
             self.read_bytes_from_fifo(chunk)?;
         }
         Ok(())
@@ -2852,10 +3185,28 @@ impl Info {
         Ok(words)
     }
 
+    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    async fn transfer_in_place_async(&self, words: &mut [u8]) -> Result<(), Error> {
+        for chunk in words.chunks_mut(FIFO_SIZE) {
+            self.write_bytes_async(chunk).await?;
+            self.read_bytes_from_fifo(chunk)?;
+        }
+
+        Ok(())
+    }
+
     fn start_operation(&self) {
         let reg_block = self.register_block();
         self.update();
         reg_block.cmd().modify(|_, w| w.usr().set_bit());
+    }
+
+    /// Starts the operation and waits for it to complete.
+    async fn execute_operation_async(&self) {
+        self.enable_listen(SpiInterrupt::TransferDone.into(), false);
+        self.clear_interrupts(SpiInterrupt::TransferDone.into());
+        self.start_operation();
+        SpiFuture::new(self).await;
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2867,9 +3218,9 @@ impl Info {
         dummy_idle: bool,
         dummy: u8,
         no_mosi_miso: bool,
-        data_mode: SpiDataMode,
-    ) {
-        self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode);
+        data_mode: DataMode,
+    ) -> Result<(), Error> {
+        self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
 
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
@@ -2910,6 +3261,8 @@ impl Info {
 
         // set cmd, address, dummy cycles
         self.set_up_common_phases(cmd, address, dummy);
+
+        Ok(())
     }
 
     fn set_up_common_phases(&self, cmd: Command, address: Address, dummy: u8) {
@@ -2953,7 +3306,7 @@ impl Info {
                     // wait
                 }
             } else if #[cfg(esp32)] {
-                xtensa_lx::timer::delay(1);
+                xtensa_lx::timer::delay(2); // ☠️
             } else {
                 // Doesn't seem to be needed for ESP32-S2
             }
@@ -3005,12 +3358,13 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
+// TODO: this macro needs to move to one level up, and it needs to describe the
+// hardware fully. The master module should extend it with the master specific
+// details.
 macro_rules! spi_instance {
-    (@ignore $sio2:ident) => {};
-
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident $(, $sio2:ident, $sio3:ident)?) => {
         paste::paste! {
-            impl Instance for crate::peripherals::[<SPI $num>] {
+            impl PeripheralInstance for crate::peripherals::[<SPI $num>] {
                 #[inline(always)]
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
@@ -3035,7 +3389,7 @@ macro_rules! spi_instance {
 
             $(
                 // If the extra pins are set, implement QspiInstance
-                spi_instance!(@ignore $sio2);
+                $crate::ignore!($sio2);
                 impl QspiInstance for crate::peripherals::[<SPI $num>] {}
             )?
         }
@@ -3064,7 +3418,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl Instance for super::AnySpi {
+impl PeripheralInstance for super::AnySpi {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,
@@ -3077,3 +3431,111 @@ impl Instance for super::AnySpi {
 }
 
 impl QspiInstance for super::AnySpi {}
+
+#[doc(hidden)]
+pub struct State {
+    waker: AtomicWaker,
+}
+
+#[cfg_attr(place_spi_driver_in_ram, ram)]
+fn handle_async<I: Instance>(instance: I) {
+    let state = instance.state();
+    let info = instance.info();
+
+    let driver = Driver { info, state };
+    if driver.interrupts().contains(SpiInterrupt::TransferDone) {
+        state.waker.wake();
+        driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
+    }
+}
+
+#[doc(hidden)]
+pub trait Instance: PeripheralInstance {
+    fn state(&self) -> &'static State;
+    fn handler(&self) -> InterruptHandler;
+}
+
+macro_rules! master_instance {
+    ($peri:ident) => {
+        impl Instance for $crate::peripherals::$peri {
+            fn state(&self) -> &'static State {
+                static STATE: State = State {
+                    waker: AtomicWaker::new(),
+                };
+
+                &STATE
+            }
+
+            fn handler(&self) -> InterruptHandler {
+                #[$crate::macros::handler]
+                #[cfg_attr(place_spi_driver_in_ram, ram)]
+                fn handle() {
+                    handle_async(unsafe { $crate::peripherals::$peri::steal() })
+                }
+
+                handle
+            }
+        }
+    };
+}
+
+master_instance!(SPI2);
+#[cfg(spi3)]
+master_instance!(SPI3);
+
+impl Instance for super::AnySpi {
+    delegate::delegate! {
+        to match &self.0 {
+            super::AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi3)]
+            super::AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn state(&self) -> &'static State;
+            fn handler(&self) -> InterruptHandler;
+        }
+    }
+}
+
+struct SpiFuture<'a> {
+    driver: &'a Driver,
+}
+
+impl<'a> SpiFuture<'a> {
+    pub fn new(driver: &'a Driver) -> Self {
+        Self { driver }
+    }
+}
+
+use core::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+impl Future for SpiFuture<'_> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self
+            .driver
+            .interrupts()
+            .contains(SpiInterrupt::TransferDone)
+        {
+            self.driver
+                .clear_interrupts(SpiInterrupt::TransferDone.into());
+            return Poll::Ready(());
+        }
+
+        self.driver.state.waker.register(cx.waker());
+        self.driver
+            .enable_listen(SpiInterrupt::TransferDone.into(), true);
+        Poll::Pending
+    }
+}
+
+impl Drop for SpiFuture<'_> {
+    fn drop(&mut self) {
+        self.driver
+            .enable_listen(SpiInterrupt::TransferDone.into(), false);
+    }
+}

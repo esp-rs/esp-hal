@@ -3,12 +3,17 @@
 //! Besides the runtime changeable channel and the output format it's almost identical to ieee802154_receive_all_frames
 
 //% CHIPS: esp32c6 esp32h2
+//% FEATURES: esp-ieee802154 esp-hal/unstable
 
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{prelude::*, reset::software_reset, uart::Uart};
+use esp_hal::{
+    entry,
+    reset::software_reset,
+    uart::{self, Uart},
+};
 use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
@@ -25,7 +30,13 @@ fn main() -> ! {
         }
     }
 
-    let mut uart0 = Uart::new(peripherals.UART0, &mut rx_pin, &mut tx_pin).unwrap();
+    let mut uart0 = Uart::new(
+        peripherals.UART0,
+        uart::Config::default(),
+        &mut rx_pin,
+        &mut tx_pin,
+    )
+    .unwrap();
 
     // read two characters which get parsed as the channel
     let mut cnt = 0;

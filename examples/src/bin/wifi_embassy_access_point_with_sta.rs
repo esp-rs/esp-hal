@@ -12,26 +12,27 @@
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 //!
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi esp-wifi/utils
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
 
+use core::net::Ipv4Addr;
+
 use embassy_executor::Spawner;
 use embassy_net::{
     tcp::TcpSocket,
     IpListenEndpoint,
-    Ipv4Address,
     Ipv4Cidr,
-    Stack,
+    Runner,
     StackResources,
     StaticConfigV4,
 };
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
     init,
@@ -65,24 +66,17 @@ macro_rules! mk_static {
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let mut rng = Rng::new(peripherals.RNG);
 
     let init = &*mk_static!(
         EspWifiController<'static>,
-        init(
-            timg0.timer0,
-            Rng::new(peripherals.RNG),
-            peripherals.RADIO_CLK,
-        )
-        .unwrap()
+        init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap()
     );
 
     let wifi = peripherals.WIFI;
@@ -94,39 +88,33 @@ async fn main(spawner: Spawner) -> ! {
             let timg1 = TimerGroup::new(peripherals.TIMG1);
             esp_hal_embassy::init(timg1.timer0);
         } else {
-            use esp_hal::timer::systimer::{SystemTimer, Target};
-            let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+            use esp_hal::timer::systimer::SystemTimer;
+            let systimer = SystemTimer::new(peripherals.SYSTIMER);
             esp_hal_embassy::init(systimer.alarm0);
         }
     }
 
     let ap_config = embassy_net::Config::ipv4_static(StaticConfigV4 {
-        address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
-        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+        address: Ipv4Cidr::new(Ipv4Addr::new(192, 168, 2, 1), 24),
+        gateway: Some(Ipv4Addr::new(192, 168, 2, 1)),
         dns_servers: Default::default(),
     });
     let sta_config = embassy_net::Config::dhcpv4(Default::default());
 
-    let seed = 1234; // very random, very secure seed
+    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     // Init network stacks
-    let ap_stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiApDevice>>,
-        Stack::new(
-            wifi_ap_interface,
-            ap_config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed
-        )
+    let (ap_stack, ap_runner) = embassy_net::new(
+        wifi_ap_interface,
+        ap_config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
     );
-    let sta_stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiStaDevice>>,
-        Stack::new(
-            wifi_sta_interface,
-            sta_config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed
-        )
+    let (sta_stack, sta_runner) = embassy_net::new(
+        wifi_sta_interface,
+        sta_config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
     );
 
     let client_config = Configuration::Mixed(
@@ -143,8 +131,8 @@ async fn main(spawner: Spawner) -> ! {
     controller.set_configuration(&client_config).unwrap();
 
     spawner.spawn(connection(controller)).ok();
-    spawner.spawn(ap_task(&ap_stack)).ok();
-    spawner.spawn(sta_task(&sta_stack)).ok();
+    spawner.spawn(ap_task(ap_runner)).ok();
+    spawner.spawn(sta_task(sta_runner)).ok();
 
     loop {
         if sta_stack.is_link_up() {
@@ -165,13 +153,13 @@ async fn main(spawner: Spawner) -> ! {
     let mut ap_rx_buffer = [0; 1536];
     let mut ap_tx_buffer = [0; 1536];
 
-    let mut ap_socket = TcpSocket::new(&ap_stack, &mut ap_rx_buffer, &mut ap_tx_buffer);
+    let mut ap_socket = TcpSocket::new(ap_stack, &mut ap_rx_buffer, &mut ap_tx_buffer);
     ap_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
     let mut sta_rx_buffer = [0; 1536];
     let mut sta_tx_buffer = [0; 1536];
 
-    let mut sta_socket = TcpSocket::new(&sta_stack, &mut sta_rx_buffer, &mut sta_tx_buffer);
+    let mut sta_socket = TcpSocket::new(sta_stack, &mut sta_rx_buffer, &mut sta_tx_buffer);
     sta_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
     loop {
@@ -219,7 +207,7 @@ async fn main(spawner: Spawner) -> ! {
         }
 
         if sta_stack.is_link_up() {
-            let remote_endpoint = (Ipv4Address::new(142, 250, 185, 115), 80);
+            let remote_endpoint = (Ipv4Addr::new(142, 250, 185, 115), 80);
             println!("connecting...");
             let r = sta_socket.connect(remote_endpoint).await;
             if let Err(e) = r {
@@ -341,11 +329,11 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn ap_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
-    stack.run().await
+async fn ap_task(mut runner: Runner<'static, WifiDevice<'static, WifiApDevice>>) {
+    runner.run().await
 }
 
 #[embassy_executor::task]
-async fn sta_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
-    stack.run().await
+async fn sta_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+    runner.run().await
 }

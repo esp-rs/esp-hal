@@ -4,7 +4,7 @@
 //! - offers one service with three characteristics (one is read/write, one is write only, one is read/write/notify)
 //! - pressing the boot-button on a dev-board will send a notification if it is subscribed
 
-//% FEATURES: esp-wifi esp-wifi/ble
+//% FEATURES: esp-wifi esp-wifi/ble esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
@@ -25,8 +25,9 @@ use bleps::{
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
+    clock::CpuClock,
+    entry,
     gpio::{Input, Pull},
-    prelude::*,
     rng::Rng,
     time,
     timer::timg::TimerGroup,
@@ -37,11 +38,8 @@ use esp_wifi::{ble::controller::BleConnector, init};
 #[entry]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 

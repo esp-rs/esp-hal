@@ -18,9 +18,10 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
+    entry,
     gpio::{Event, Input, Io, Level, Output, Pull},
-    macros::ram,
-    prelude::*,
+    interrupt::InterruptConfigurable,
+    macros::{handler, ram},
 };
 
 static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));

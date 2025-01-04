@@ -10,20 +10,22 @@
 //! Because of the huge task-arena size configured this won't work on ESP32-S2 and ESP32-C2
 //!
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi esp-wifi/utils
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6
 
 #![allow(static_mut_refs)]
 #![no_std]
 #![no_main]
 
+use core::net::Ipv4Addr;
+
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
-use embassy_net::{tcp::TcpSocket, Ipv4Address, Stack, StackResources};
+use embassy_net::{tcp::TcpSocket, Runner, StackResources};
 use embassy_time::{with_timeout, Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     init,
@@ -68,11 +70,8 @@ static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     static mut HEAP: core::mem::MaybeUninit<[u8; 32 * 1024]> = core::mem::MaybeUninit::uninit();
 
@@ -94,18 +93,14 @@ async fn main(spawner: Spawner) -> ! {
         ));
     }
 
-    let server_address: Ipv4Address = HOST_IP.parse().expect("Invalid HOST_IP address");
+    let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let mut rng = Rng::new(peripherals.RNG);
 
     let init = &*mk_static!(
         EspWifiController<'static>,
-        init(
-            timg0.timer0,
-            Rng::new(peripherals.RNG),
-            peripherals.RADIO_CLK,
-        )
-        .unwrap()
+        init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap()
     );
 
     let wifi = peripherals.WIFI;
@@ -117,29 +112,26 @@ async fn main(spawner: Spawner) -> ! {
             let timg1 = TimerGroup::new(peripherals.TIMG1);
             esp_hal_embassy::init(timg1.timer0);
         } else {
-            use esp_hal::timer::systimer::{SystemTimer, Target};
-            let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+            use esp_hal::timer::systimer::SystemTimer;
+            let systimer = SystemTimer::new(peripherals.SYSTIMER);
             esp_hal_embassy::init(systimer.alarm0);
         }
     }
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
-    let seed = 1234; // very random, very secure seed
+    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     // Init network stack
-    let stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiStaDevice>>,
-        Stack::new(
-            wifi_interface,
-            config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed
-        )
+    let (stack, runner) = embassy_net::new(
+        wifi_interface,
+        config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
     );
 
     spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(&stack)).ok();
+    spawner.spawn(net_task(runner)).ok();
 
     loop {
         if stack.is_link_up() {
@@ -209,11 +201,11 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
-    stack.run().await
+async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+    runner.run().await
 }
 
-async fn test_download(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) -> usize {
+async fn test_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> usize {
     println!("Testing download...");
 
     socket.abort();
@@ -251,7 +243,7 @@ async fn test_download(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) 
     kbps
 }
 
-async fn test_upload(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) -> usize {
+async fn test_upload(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> usize {
     println!("Testing upload...");
     socket.abort();
     socket.set_timeout(Some(Duration::from_secs(10)));
@@ -288,7 +280,7 @@ async fn test_upload(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) ->
     kbps
 }
 
-async fn test_upload_download(server_address: Ipv4Address, socket: &mut TcpSocket<'_>) -> usize {
+async fn test_upload_download(server_address: Ipv4Addr, socket: &mut TcpSocket<'_>) -> usize {
     println!("Testing upload+download...");
 
     socket.abort();

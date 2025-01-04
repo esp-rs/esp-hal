@@ -8,18 +8,17 @@ publish = false
 [dependencies]
 aligned             = { version = "0.4.2", optional = true }
 bleps               = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8ae679e021b78f53fd33afb8bb35d0b62e", features = [ "macros", "async"] }
-blocking-network-stack = { git = "https://github.com/bjoernQ/blocking-network-stack.git", rev = "1c581661d78e0cf0f17b936297179b993fb149d7" }
+blocking-network-stack = { git = "https://github.com/bjoernQ/blocking-network-stack.git", rev = "b3ecefc222d8806edd221f266999ca339c52d34e" }
 bt-hci              = "0.1.1"
 cfg-if              = "1.0.0"
 critical-section    = "1.1.3"
-embassy-executor    = { version = "0.6.0", features = ["task-arena-size-12288"] }
+embassy-executor    = { version = "0.6.0", features = ["task-arena-size-20480"] }
 embassy-futures     = "0.1.1"
-embassy-net = { version = "0.4.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
+embassy-net = { version = "0.5.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
 embassy-sync        = "0.6.0"
 embassy-time        = "0.3.2"
 embassy-usb         = { version = "0.2.0", default-features = false }
 embedded-can        = "0.4.1"
-embedded-graphics   = "0.8.1"
 embedded-hal-async  = "1.0.0"
 embedded-io         = { version = "0.6.1", default-features = false }
 embedded-io-async   = "0.6.1"
@@ -37,26 +36,27 @@ heapless            = "0.8.0"
 hmac                = { version = "0.12.1", default-features = false }
 ieee80211           = { version = "0.4.0", default-features = false }
 ieee802154          = "0.6.1"
-lis3dh-async        = "0.9.3"
 log                 = "0.4.22"
 nb                  = "1.1.0"
 portable-atomic     = { version = "1.9.0",  default-features = false }
 sha2                = { version = "0.10.8", default-features = false }
-smoltcp             = { version = "0.11.0", default-features = false, features = [ "medium-ethernet", "socket-raw"] }
-smoltcp-nal         = "0.5.1"
+smoltcp             = { version = "0.12.0", default-features = false, features = [ "medium-ethernet", "socket-raw"] }
 embedded-time       = "=0.12.1"
-ssd1306             = "0.8.4"
 static_cell         = { version = "2.1.0", features = ["nightly"] }
 trouble-host        = { git = "https://github.com/embassy-rs/trouble", package = "trouble-host", rev = "4f1114ce58e96fe54f5ed7e726f66e1ad8d9ce54", features = [ "log", "gatt" ] }
 usb-device          = "0.3.2"
 usbd-serial         = "0.2.2"
+edge-dhcp = "0.3.0"
+edge-raw = "0.3.0"
+edge-nal = "0.3.0"
+edge-nal-embassy = "0.3.0"
 
 [features]
 esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-wifi?/esp32"]
 esp32c2 = ["esp-hal/esp32c2", "esp-backtrace/esp32c2", "esp-hal-embassy?/esp32c2", "esp-println/esp32c2", "esp-storage?/esp32c2", "esp-wifi?/esp32c2", ]
 esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3", "esp-hal-embassy?/esp32c3", "esp-println/esp32c3", "esp-storage?/esp32c3", "esp-wifi?/esp32c3"]
-esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-hal-embassy?/esp32c6", "esp-println/esp32c6", "esp-storage?/esp32c6", "esp-wifi?/esp32c6", "esp-ieee802154/esp32c6"]
-esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-hal-embassy?/esp32h2", "esp-println/esp32h2", "esp-storage?/esp32h2", "esp-wifi?/esp32h2", "esp-ieee802154/esp32h2"]
+esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-hal-embassy?/esp32c6", "esp-println/esp32c6", "esp-storage?/esp32c6", "esp-wifi?/esp32c6", "esp-ieee802154?/esp32c6"]
+esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-hal-embassy?/esp32h2", "esp-println/esp32h2", "esp-storage?/esp32h2", "esp-wifi?/esp32h2", "esp-ieee802154?/esp32h2"]
 esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2", "esp-hal-embassy?/esp32s2", "esp-println/esp32s2", "esp-storage?/esp32s2", "esp-wifi?/esp32s2"]
 esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-hal-embassy?/esp32s3", "esp-println/esp32s3", "esp-storage?/esp32s3", "esp-wifi?/esp32s3"]
 
@@ -68,8 +68,13 @@ embassy-generic-timers = ["embassy-time/generic-queue-8"]
 [profile.release]
 codegen-units    = 1
 debug            = 2
-debug-assertions = false
+debug-assertions = true
 incremental      = false
 opt-level        = 3
 lto = 'fat'
 overflow-checks  = false
+
+[patch.crates-io]
+# Patch until https://github.com/ivmarkov/edge-net/pull/50 is merged
+edge-nal = { git = "https://github.com/ivmarkov/edge-net", rev = "5a85bcc8b8726e8b7044e9526f01cdba1fd684da"}
+edge-nal-embassy = { git = "https://github.com/ivmarkov/edge-net", rev = "5a85bcc8b8726e8b7044e9526f01cdba1fd684da"}

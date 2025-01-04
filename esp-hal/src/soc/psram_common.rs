@@ -23,3 +23,10 @@ impl PsramSize {
         matches!(self, PsramSize::AutoDetect)
     }
 }
+
+/// Returns the address and size of the available in external memory.
+#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+pub fn psram_raw_parts(_psram: &crate::peripherals::PSRAM) -> (*mut u8, usize) {
+    let range = crate::soc::psram_range();
+    (range.start as *mut u8, range.end - range.start)
+}

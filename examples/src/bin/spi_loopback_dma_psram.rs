@@ -16,7 +16,7 @@
 //! If your module is quad PSRAM then you need to change the `psram` feature in the
 //! in the features line below to `quad-psram`.
 
-//% FEATURES: esp-hal/log esp-hal/octal-psram
+//% FEATURES: esp-hal/log esp-hal/octal-psram esp-hal/unstable
 //% CHIPS: esp32s3
 
 #![no_std]
@@ -25,13 +25,14 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaBufBlkSize, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
+    entry,
     peripheral::Peripheral,
-    prelude::*,
     spi::{
         master::{Config, Spi},
-        SpiMode,
+        Mode,
     },
+    time::RateExtU32,
 };
 extern crate alloc;
 use log::*;
@@ -51,7 +52,7 @@ macro_rules! dma_alloc_buffer {
 }
 
 const DMA_BUFFER_SIZE: usize = 8192;
-const DMA_ALIGNMENT: DmaBufBlkSize = DmaBufBlkSize::Size64;
+const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
 const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
 #[entry]
@@ -67,9 +68,6 @@ fn main() -> ! {
     let miso = unsafe { mosi.clone_unchecked() };
     let cs = peripherals.GPIO38;
 
-    let dma = Dma::new(peripherals.DMA);
-    let dma_channel = dma.channel0;
-
     let (_, tx_descriptors) =
         esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
     let tx_buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
@@ -80,7 +78,7 @@ fn main() -> ! {
         tx_descriptors.len()
     );
     let mut dma_tx_buf =
-        DmaTxBuf::new_with_block_size(tx_descriptors, tx_buffer, Some(DMA_ALIGNMENT)).unwrap();
+        DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, DMA_ALIGNMENT).unwrap();
     let (rx_buffer, rx_descriptors, _, _) = esp_hal::dma_buffers!(DMA_BUFFER_SIZE, 0);
     info!(
         "RX: {:p} len {} ({} descripters)",
@@ -91,19 +89,18 @@ fn main() -> ! {
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     // Need to set miso first so that mosi can overwrite the
     // output connection (because we are using the same pin to loop back)
-    let mut spi = Spi::new_with_config(
+    let mut spi = Spi::new(
         peripherals.SPI2,
-        Config {
-            frequency: 100.kHz(),
-            mode: SpiMode::Mode0,
-            ..Config::default()
-        },
+        Config::default()
+            .with_frequency(100.kHz())
+            .with_mode(Mode::Mode0),
     )
+    .unwrap()
     .with_sck(sclk)
     .with_miso(miso)
     .with_mosi(mosi)
     .with_cs(cs)
-    .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
+    .with_dma(peripherals.DMA_CH0);
 
     delay.delay_millis(100); // delay to let the above messages display
 
@@ -119,7 +116,7 @@ fn main() -> ! {
         i = i.wrapping_add(1);
 
         let transfer = spi
-            .transfer(dma_rx_buf, dma_tx_buf)
+            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 

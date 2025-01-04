@@ -1,19 +1,14 @@
-use crate::{
-    aes::{Aes, Aes128, Aes256, AesFlavour, ALIGN_SIZE},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
-};
+use crate::aes::{Aes, Aes128, Aes256, AesFlavour, Mode, ALIGN_SIZE};
 
-impl<'d> Aes<'d> {
+impl Aes<'_> {
     pub(super) fn init(&mut self) {
-        PeripheralClockControl::enable(PeripheralEnable::Aes);
         self.write_dma(false);
     }
 
     fn write_dma(&mut self, enable_dma: bool) {
-        match enable_dma {
-            true => self.aes.dma_enable().write(|w| w.dma_enable().set_bit()),
-            false => self.aes.dma_enable().write(|w| w.dma_enable().clear_bit()),
-        };
+        self.aes
+            .dma_enable()
+            .write(|w| w.dma_enable().bit(enable_dma));
     }
 
     pub(super) fn write_key(&mut self, key: &[u8]) {
@@ -34,11 +29,11 @@ impl<'d> Aes<'d> {
         );
     }
 
-    pub(super) fn write_mode(&mut self, mode: u32) {
-        self.aes.mode().write(|w| unsafe { w.bits(mode) });
+    pub(super) fn write_mode(&self, mode: Mode) {
+        self.aes.mode().write(|w| unsafe { w.bits(mode as _) });
     }
 
-    pub(super) fn write_start(&mut self) {
+    pub(super) fn write_start(&self) {
         self.aes.trigger().write(|w| w.trigger().set_bit());
     }
 

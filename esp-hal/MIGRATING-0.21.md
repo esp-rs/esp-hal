@@ -99,8 +99,8 @@ The constructors no longer take pins. Use `with_sda` and `with_scl` instead.
 ```diff
 -use esp_hal::i2c::I2c;
 +use esp_hal::i2c::{Config, I2c};
--let i2c = I2c::new_with_timeout(peripherals.I2C0, io.pins.gpio4, io.pins.gpio5, 100.kHz(), timeout);
-+I2c::new_with_config(
+-let i2c = I2c::new_with_timeout(peripherals.I2C0, sda, scl, 100.kHz(), timeout);
++let i2c = I2c::new(
 +    peripherals.I2C0,
 +    {
 +        let mut config = Config::default();
@@ -109,8 +109,8 @@ The constructors no longer take pins. Use `with_sda` and `with_scl` instead.
 +        config
 +    },
 +)
-+.with_sda(io.pins.gpio4)
-+.with_scl(io.pins.gpio5);
++.with_sda(sda)
++.with_scl(scl);
 ```
 
 ### The calculation of I2C timeout has changed
@@ -137,7 +137,7 @@ drivers. It is now possible to execute half-duplex and full-duplex operations on
 ```diff
 - let mut spi = Spi::new_half_duplex(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
 -     .with_pins(sck, mosi, miso, sio2, sio3, cs);
-+ let mut spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0)
++ let mut spi = Spi::new(peripherals.SPI2) // or new_with_config
 +     .with_sck(sck)
 +     .with_cs(cs)
 +     .with_mosi(mosi)

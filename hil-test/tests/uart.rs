@@ -5,9 +5,8 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_02::serial::{Read, Write};
+use embedded_hal_nb::serial::{Read, Write};
 use esp_hal::{
-    prelude::*,
     uart::{self, ClockSource, Uart},
     Blocking,
 };
@@ -19,7 +18,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use super::*;
 
@@ -31,13 +30,12 @@ mod tests {
 
         let (rx, tx) = pin.split();
 
-        let uart = Uart::new(peripherals.UART1, rx, tx).unwrap();
+        let uart = Uart::new(peripherals.UART1, uart::Config::default(), rx, tx).unwrap();
 
         Context { uart }
     }
 
     #[test]
-    #[timeout(3)]
     fn test_send_receive(mut ctx: Context) {
         ctx.uart.write(0x42).ok();
         let read = block!(ctx.uart.read());
@@ -45,7 +43,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_send_receive_buffer(mut ctx: Context) {
         const BUF_SIZE: usize = 128; // UART_FIFO_SIZE
 
@@ -71,7 +68,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(3)]
     fn test_send_receive_different_baud_rates_and_clock_sources(mut ctx: Context) {
         // The default baud rate for the UART is 115,200, so we will try to
         // send/receive with some other common baud rates to ensure this is
@@ -90,11 +86,11 @@ mod tests {
         let mut byte_to_write = 0xA5;
         for (baudrate, clock_source) in configs {
             ctx.uart
-                .apply_config(&uart::Config {
-                    baudrate,
-                    clock_source,
-                    ..Default::default()
-                })
+                .apply_config(
+                    &uart::Config::default()
+                        .with_baudrate(baudrate)
+                        .with_clock_source(clock_source),
+                )
                 .unwrap();
             ctx.uart.write(byte_to_write).ok();
             let read = block!(ctx.uart.read());

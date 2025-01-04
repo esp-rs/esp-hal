@@ -9,8 +9,7 @@
 //!
 //! The I2C driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
-//! from the community. This includes the [`embedded-hal`] for both 0.2.x and
-//! 1.0.x versions.
+//! from the community, including the [`embedded-hal`].
 //!
 //! ## Examples
 //!
@@ -26,6 +25,7 @@
 //!     peripherals.I2C0,
 //!     Config::default(),
 //! )
+//! .unwrap()
 //! .with_sda(peripherals.GPIO1)
 //! .with_scl(peripherals.GPIO2);
 //!
@@ -35,7 +35,7 @@
 //! }
 //! # }
 //! ```
-//! [`embedded-hal`]: https://crates.io/crates/embedded-hal
+//! [`embedded-hal`]: https://docs.rs/embedded-hal/latest/embedded_hal/index.html
 
 use core::marker::PhantomData;
 #[cfg(not(esp32))]
@@ -44,27 +44,27 @@ use core::{
     task::{Context, Poll},
 };
 
+#[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
-use embassy_sync::waitqueue::AtomicWaker;
 use embedded_hal::i2c::Operation as EhalOperation;
 use fugit::HertzU32;
 
 use crate::{
+    asynch::AtomicWaker,
     clock::Clocks,
     gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{
         i2c0::{RegisterBlock, COMD},
         Interrupt,
     },
     private,
-    system::PeripheralClockControl,
+    system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
     Cpu,
-    InterruptConfigurable,
-    Mode,
+    DriverMode,
 };
 
 cfg_if::cfg_if! {
@@ -86,36 +86,74 @@ const I2C_CHUNK_SIZE: usize = 254;
 const MAX_ITERATIONS: u32 = 1_000_000;
 
 /// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Error {
     /// The transmission exceeded the FIFO size.
-    ExceedingFifo,
+    FifoExceeded,
     /// The acknowledgment check failed.
     AckCheckFailed,
     /// A timeout occurred during transmission.
-    TimeOut,
+    Timeout,
     /// The arbitration for the bus was lost.
     ArbitrationLost,
     /// The execution of the I2C command was incomplete.
-    ExecIncomplete,
+    ExecutionIncomplete,
     /// The number of commands issued exceeded the limit.
-    CommandNrExceeded,
+    CommandNumberExceeded,
     /// Zero length read or write operation.
-    InvalidZeroLength,
+    ZeroLengthInvalid,
+}
+
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::FifoExceeded => write!(f, "The transmission exceeded the FIFO size"),
+            Error::AckCheckFailed => write!(f, "The acknowledgment check failed"),
+            Error::Timeout => write!(f, "A timeout occurred during transmission"),
+            Error::ArbitrationLost => write!(f, "The arbitration for the bus was lost"),
+            Error::ExecutionIncomplete => {
+                write!(f, "The execution of the I2C command was incomplete")
+            }
+            Error::CommandNumberExceeded => {
+                write!(f, "The number of commands issued exceeded the limit")
+            }
+            Error::ZeroLengthInvalid => write!(f, "Zero length read or write operation"),
+        }
+    }
 }
 
 /// I2C-specific configuration errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum ConfigError {}
+#[non_exhaustive]
+pub enum ConfigError {
+    /// Provided bus frequency is invalid for the current configuration.
+    FrequencyInvalid,
+}
 
-#[derive(PartialEq)]
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ConfigError::FrequencyInvalid => write!(
+                f,
+                "Provided bus frequency is invalid for the current configuration"
+            ),
+        }
+    }
+}
+
 // This enum is used to keep track of the last/next operation that was/will be
 // performed in an embedded-hal(-async) I2c::transaction. It is used to
 // determine whether a START condition should be issued at the start of the
 // current operation and whether a read needs an ack or a nack for the final
 // byte.
+#[derive(PartialEq)]
 enum OpKind {
     Write,
     Read,
@@ -124,6 +162,7 @@ enum OpKind {
 /// I2C operation.
 ///
 /// Several operations can be combined as part of a transaction.
+#[derive(Debug, PartialEq, Eq, Hash, strum::Display)]
 pub enum Operation<'a> {
     /// Write data from the provided buffer.
     Write(&'a [u8]),
@@ -175,7 +214,7 @@ impl embedded_hal::i2c::Error for Error {
         use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
 
         match self {
-            Self::ExceedingFifo => ErrorKind::Overrun,
+            Self::FifoExceeded => ErrorKind::Overrun,
             Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
             Self::AckCheckFailed => ErrorKind::NoAcknowledge(NoAcknowledgeSource::Unknown),
             _ => ErrorKind::Other,
@@ -219,6 +258,7 @@ enum Ack {
     Ack  = 0,
     Nack = 1,
 }
+
 impl From<u32> for Ack {
     fn from(ack: u32) -> Self {
         match ack {
@@ -228,6 +268,7 @@ impl From<u32> for Ack {
         }
     }
 }
+
 impl From<Ack> for u32 {
     fn from(ack: Ack) -> u32 {
         ack as u32
@@ -235,8 +276,9 @@ impl From<Ack> for u32 {
 }
 
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
     pub frequency: HertzU32,
@@ -258,6 +300,13 @@ pub struct Config {
     pub timeout: Option<u32>,
 }
 
+impl core::hash::Hash for Config {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.frequency.to_Hz().hash(state); // `HertzU32` doesn't implement `Hash`
+        self.timeout.hash(state);
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         use fugit::RateExtU32;
@@ -269,13 +318,18 @@ impl Default for Config {
 }
 
 /// I2C driver
-pub struct I2c<'d, DM: Mode, T = AnyI2c> {
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct I2c<'d, Dm: DriverMode, T = AnyI2c> {
     i2c: PeripheralRef<'d, T>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
     config: Config,
+    guard: PeripheralGuard,
 }
 
-impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+impl<T: Instance, Dm: DriverMode> SetConfig for I2c<'_, Dm, T> {
     type Config = Config;
     type ConfigError = ConfigError;
 
@@ -284,49 +338,11 @@ impl<T: Instance, DM: Mode> SetConfig for I2c<'_, DM, T> {
     }
 }
 
-impl<T> embedded_hal_02::blocking::i2c::Read for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        self.read(address, buffer)
-    }
-}
-
-impl<T> embedded_hal_02::blocking::i2c::Write for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.write(addr, bytes)
-    }
-}
-
-impl<T> embedded_hal_02::blocking::i2c::WriteRead for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
-    type Error = Error;
-
-    fn write_read(
-        &mut self,
-        address: u8,
-        bytes: &[u8],
-        buffer: &mut [u8],
-    ) -> Result<(), Self::Error> {
-        self.write_read(address, bytes, buffer)
-    }
-}
-
-impl<T, DM: Mode> embedded_hal::i2c::ErrorType for I2c<'_, DM, T> {
+impl<T, Dm: DriverMode> embedded_hal::i2c::ErrorType for I2c<'_, Dm, T> {
     type Error = Error;
 }
 
-impl<T, DM: Mode> embedded_hal::i2c::I2c for I2c<'_, DM, T>
+impl<T, Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm, T>
 where
     T: Instance,
 {
@@ -340,7 +356,7 @@ where
     }
 }
 
-impl<'d, T, DM: Mode> I2c<'d, DM, T>
+impl<'d, T, Dm: DriverMode> I2c<'d, Dm, T>
 where
     T: Instance,
 {
@@ -352,8 +368,9 @@ where
     }
 
     fn internal_recover(&self) {
-        PeripheralClockControl::reset(self.driver().info.peripheral);
+        PeripheralClockControl::disable(self.driver().info.peripheral);
         PeripheralClockControl::enable(self.driver().info.peripheral);
+        PeripheralClockControl::reset(self.driver().info.peripheral);
 
         // We know the configuration is valid, we can ignore the result.
         _ = self.driver().setup(&self.config);
@@ -454,7 +471,10 @@ impl<'d> I2c<'d, Blocking> {
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new(i2c: impl Peripheral<P = impl Instance> + 'd, config: Config) -> Self {
+    pub fn new(
+        i2c: impl Peripheral<P = impl Instance> + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
         Self::new_typed(i2c.map_into(), config)
     }
 }
@@ -466,20 +486,24 @@ where
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
-    pub fn new_typed(i2c: impl Peripheral<P = T> + 'd, config: Config) -> Self {
+    pub fn new_typed(
+        i2c: impl Peripheral<P = T> + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
         crate::into_ref!(i2c);
+
+        let guard = PeripheralGuard::new(i2c.info().peripheral);
 
         let i2c = I2c {
             i2c,
             phantom: PhantomData,
             config,
+            guard,
         };
 
-        PeripheralClockControl::reset(i2c.driver().info.peripheral);
-        PeripheralClockControl::enable(i2c.driver().info.peripheral);
+        i2c.driver().setup(&i2c.config)?;
 
-        unwrap!(i2c.driver().setup(&i2c.config));
-        i2c
+        Ok(i2c)
     }
 
     // TODO: missing interrupt APIs
@@ -492,6 +516,7 @@ where
             i2c: self.i2c,
             phantom: PhantomData,
             config: self.config,
+            guard: self.guard,
         }
     }
 
@@ -601,10 +626,6 @@ impl<'a> I2cFuture<'a> {
 
             w.arbitration_lost().set_bit();
             w.time_out().set_bit();
-
-            #[cfg(esp32)]
-            w.ack_err().set_bit();
-            #[cfg(not(esp32))]
             w.nack().set_bit();
 
             w
@@ -632,16 +653,10 @@ impl<'a> I2cFuture<'a> {
         }
 
         if r.time_out().bit_is_set() {
-            return Err(Error::TimeOut);
+            return Err(Error::Timeout);
         }
 
-        #[cfg(not(esp32))]
         if r.nack().bit_is_set() {
-            return Err(Error::AckCheckFailed);
-        }
-
-        #[cfg(esp32)]
-        if r.ack_err().bit_is_set() {
             return Err(Error::AckCheckFailed);
         }
 
@@ -695,6 +710,7 @@ where
             i2c: self.i2c,
             phantom: PhantomData,
             config: self.config,
+            guard: self.guard,
         }
     }
 
@@ -899,7 +915,7 @@ fn configure_clock(
     scl_start_hold_time: u32,
     scl_stop_hold_time: u32,
     timeout: Option<u32>,
-) {
+) -> Result<(), ConfigError> {
     unsafe {
         // divider
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
@@ -913,10 +929,14 @@ fn configure_clock(
             .scl_low_period()
             .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
+        #[cfg(not(esp32))]
+        let scl_wait_high_period = scl_wait_high_period
+            .try_into()
+            .map_err(|_| ConfigError::FrequencyInvalid)?;
+
         register_block.scl_high_period().write(|w| {
             #[cfg(not(esp32))] // ESP32 does not have a wait_high field
-            w.scl_wait_high_period()
-                .bits(scl_wait_high_period.try_into().unwrap());
+            w.scl_wait_high_period().bits(scl_wait_high_period);
             w.scl_high_period().bits(scl_high_period as u16)
         });
 
@@ -961,9 +981,12 @@ fn configure_clock(
             }
         }
     }
+    Ok(())
 }
 
 /// Peripheral data describing a particular I2C instance.
+#[doc(hidden)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct Info {
     /// Pointer to the register block for this I2C instance.
@@ -999,6 +1022,14 @@ impl Info {
         unsafe { &*self.register_block }
     }
 }
+
+impl PartialEq for Info {
+    fn eq(&self, other: &Self) -> bool {
+        self.register_block == other.register_block
+    }
+}
+
+unsafe impl Sync for Info {}
 
 #[allow(dead_code)] // Some versions don't need `state`
 struct Driver<'a> {
@@ -1047,7 +1078,7 @@ impl Driver<'_> {
                 let clock = clocks.xtal_clock.convert();
             }
         }
-        self.set_frequency(clock, config.frequency, config.timeout);
+        self.set_frequency(clock, config.frequency, config.timeout)?;
 
         self.update_config();
 
@@ -1091,7 +1122,12 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
+    fn set_frequency(
+        &self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+        timeout: Option<u32>,
+    ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1158,14 +1194,21 @@ impl Driver<'_> {
             scl_start_hold_time,
             scl_stop_hold_time,
             timeout,
-        );
+        )?;
+
+        Ok(())
     }
 
     #[cfg(esp32s2)]
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
+    fn set_frequency(
+        &self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+        timeout: Option<u32>,
+    ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1208,14 +1251,21 @@ impl Driver<'_> {
             scl_start_hold_time,
             scl_stop_hold_time,
             timeout.map(|to_bus| (to_bus * 2 * half_cycle).min(0xFF_FFFF)),
-        );
+        )?;
+
+        Ok(())
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, source_clk: HertzU32, bus_freq: HertzU32, timeout: Option<u32>) {
+    fn set_frequency(
+        &self,
+        source_clk: HertzU32,
+        bus_freq: HertzU32,
+        timeout: Option<u32>,
+    ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
 
@@ -1278,13 +1328,15 @@ impl Driver<'_> {
                 let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
                 raw.min(0x1F)
             }),
-        );
+        )?;
+
+        Ok(())
     }
 
     #[cfg(any(esp32, esp32s2))]
     async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
         if buffer.len() > 32 {
-            panic!("On ESP32 and ESP32-S2 the max I2C read is limited to 32 bytes");
+            return Err(Error::FifoExceeded);
         }
 
         self.wait_for_completion(false).await?;
@@ -1322,7 +1374,7 @@ impl Driver<'_> {
         let max_len = if start { 254usize } else { 255usize };
         if bytes.len() > max_len {
             // we could support more by adding multiple write operations
-            return Err(Error::ExceedingFifo);
+            return Err(Error::FifoExceeded);
         }
 
         let write_len = if start { bytes.len() + 1 } else { bytes.len() };
@@ -1371,7 +1423,7 @@ impl Driver<'_> {
         I: Iterator<Item = &'a COMD>,
     {
         if buffer.is_empty() {
-            return Err(Error::InvalidZeroLength);
+            return Err(Error::ZeroLengthInvalid);
         }
         let (max_len, initial_len) = if will_continue {
             (255usize, buffer.len())
@@ -1380,7 +1432,7 @@ impl Driver<'_> {
         };
         if buffer.len() > max_len {
             // we could support more by adding multiple read operations
-            return Err(Error::ExceedingFifo);
+            return Err(Error::FifoExceeded);
         }
 
         if start {
@@ -1457,7 +1509,7 @@ impl Driver<'_> {
         // see https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
         if buffer.len() > 32 {
-            panic!("On ESP32 and ESP32-S2 the max I2C read is limited to 32 bytes");
+            return Err(Error::FifoExceeded);
         }
 
         // wait for completion - then we can just read the data from FIFO
@@ -1564,7 +1616,7 @@ impl Driver<'_> {
 
             tout -= 1;
             if tout == 0 {
-                return Err(Error::TimeOut);
+                return Err(Error::Timeout);
             }
 
             embassy_futures::yield_now().await;
@@ -1592,7 +1644,7 @@ impl Driver<'_> {
 
             tout -= 1;
             if tout == 0 {
-                return Err(Error::TimeOut);
+                return Err(Error::Timeout);
             }
         }
         self.check_all_commands_done()?;
@@ -1608,7 +1660,7 @@ impl Driver<'_> {
             let cmd = cmd_reg.read();
 
             if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
-                return Err(Error::ExecIncomplete);
+                return Err(Error::ExecutionIncomplete);
             }
         }
 
@@ -1631,7 +1683,7 @@ impl Driver<'_> {
             if #[cfg(esp32)] {
                 // Handle error cases
                 let retval = if interrupts.time_out().bit_is_set() {
-                    Err(Error::TimeOut)
+                    Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
                     Err(Error::AckCheckFailed)
                 } else if interrupts.arbitration_lost().bit_is_set() {
@@ -1642,7 +1694,7 @@ impl Driver<'_> {
             } else {
                 // Handle error cases
                 let retval = if interrupts.time_out().bit_is_set() {
-                    Err(Error::TimeOut)
+                    Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
                     Err(Error::AckCheckFailed)
                 } else if interrupts.arbitration_lost().bit_is_set() {
@@ -1690,7 +1742,7 @@ impl Driver<'_> {
 
     #[cfg(not(any(esp32, esp32s2)))]
     /// Fills the TX FIFO with data from the provided slice.
-    fn fill_tx_fifo(&self, bytes: &[u8]) -> usize {
+    fn fill_tx_fifo(&self, bytes: &[u8]) -> Result<usize, Error> {
         let mut index = 0;
         while index < bytes.len()
             && !self
@@ -1715,7 +1767,7 @@ impl Driver<'_> {
                 .int_clr()
                 .write(|w| w.txfifo_ovf().clear_bit_by_one());
         }
-        index
+        Ok(index)
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
@@ -1765,20 +1817,20 @@ impl Driver<'_> {
 
     #[cfg(any(esp32, esp32s2))]
     /// Fills the TX FIFO with data from the provided slice.
-    fn fill_tx_fifo(&self, bytes: &[u8]) -> usize {
+    fn fill_tx_fifo(&self, bytes: &[u8]) -> Result<usize, Error> {
         // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
         // FIFO apparently it would be possible by using non-fifo mode
         // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
         if bytes.len() > 31 {
-            panic!("On ESP32 and ESP32-S2 the max I2C transfer is limited to 31 bytes");
+            return Err(Error::FifoExceeded);
         }
 
         for b in bytes {
             write_fifo(self.register_block(), *b);
         }
 
-        bytes.len()
+        Ok(bytes.len())
     }
 
     #[cfg(any(esp32, esp32s2))]
@@ -1876,7 +1928,7 @@ impl Driver<'_> {
             cmd_iterator,
             if stop { Command::Stop } else { Command::End },
         )?;
-        let index = self.fill_tx_fifo(bytes);
+        let index = self.fill_tx_fifo(bytes)?;
         self.start_transmission();
 
         Ok(index)
@@ -2136,15 +2188,8 @@ impl Driver<'_> {
     }
 }
 
-impl PartialEq for Info {
-    fn eq(&self, other: &Self) -> bool {
-        self.register_block == other.register_block
-    }
-}
-
-unsafe impl Sync for Info {}
-
 /// Peripheral state for an I2C instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct State {
     /// Waker for the asynchronous operations.
@@ -2152,6 +2197,7 @@ pub struct State {
 }
 
 /// I2C Peripheral Instance
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnyI2c> + 'static {
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);
@@ -2174,7 +2220,7 @@ fn add_cmd<'a, I>(cmd_iterator: &mut I, command: Command) -> Result<(), Error>
 where
     I: Iterator<Item = &'a COMD>,
 {
-    let cmd = cmd_iterator.next().ok_or(Error::CommandNrExceeded)?;
+    let cmd = cmd_iterator.next().ok_or(Error::CommandNumberExceeded)?;
 
     cmd.write(|w| match command {
         Command::Start => w.opcode().rstart(),

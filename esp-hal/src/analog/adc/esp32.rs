@@ -7,7 +7,9 @@ use crate::{
 pub(super) const NUM_ATTENS: usize = 10;
 
 /// The sampling/readout resolution of the ADC.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Resolution {
     /// 9-bit resolution
     Resolution9Bit  = 0b00,
@@ -327,7 +329,7 @@ where
     }
 }
 
-impl<'d, ADC1> Adc<'d, ADC1> {
+impl<ADC1> Adc<'_, ADC1> {
     /// Enable the Hall sensor
     pub fn enable_hall_sensor() {
         unsafe { &*RTC_IO::ptr() }
@@ -340,19 +342,6 @@ impl<'d, ADC1> Adc<'d, ADC1> {
         unsafe { &*RTC_IO::ptr() }
             .hall_sens()
             .modify(|_, w| w.xpd_hall().clear_bit());
-    }
-}
-
-impl<'d, ADCI, PIN> embedded_hal_02::adc::OneShot<ADCI, u16, super::AdcPin<PIN, ADCI>>
-    for Adc<'d, ADCI>
-where
-    PIN: embedded_hal_02::adc::Channel<ADCI, ID = u8> + super::AdcChannel,
-    ADCI: RegisterAccess,
-{
-    type Error = ();
-
-    fn read(&mut self, pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, Self::Error> {
-        self.read_oneshot(pin)
     }
 }
 

@@ -25,49 +25,47 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use embedded_can::Id;
 //! # use esp_hal::twai;
 //! # use esp_hal::twai::filter;
 //! # use esp_hal::twai::filter::SingleStandardFilter;
 //! # use esp_hal::twai::TwaiConfiguration;
 //! # use esp_hal::twai::BaudRate;
 //! # use esp_hal::twai::TwaiMode;
-//! # use embedded_can::Frame;
 //! # use nb::block;
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
-//! let can_rx_pin = peripherals.GPIO3;
-//! let can_tx_pin = peripherals.GPIO2;
+//! let twai_rx_pin = peripherals.GPIO3;
+//! let twai_tx_pin = peripherals.GPIO2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
 //!
 //! // Begin configuring the TWAI peripheral. The peripheral is in a reset like
 //! // state that prevents transmission but allows configuration.
-//! let mut can_config = twai::TwaiConfiguration::new(
+//! let mut twai_config = twai::TwaiConfiguration::new(
 //!     peripherals.TWAI0,
-//!     can_rx_pin,
-//!     can_tx_pin,
+//!     twai_rx_pin,
+//!     twai_tx_pin,
 //!     TWAI_BAUDRATE,
 //!     TwaiMode::Normal
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
 //! // undesired messages
-//! can_config.set_filter(const { SingleStandardFilter::new(b"xxxxxxxxxx0",
+//! twai_config.set_filter(const { SingleStandardFilter::new(b"xxxxxxxxxx0",
 //! b"x", [b"xxxxxxxx", b"xxxxxxxx"]) });
 //!
 //! // Start the peripheral. This locks the configuration settings of the
 //! // peripheral and puts it into operation mode, allowing packets to be sent
 //! // and received.
-//! let mut can = can_config.start();
+//! let mut twai = twai_config.start();
 //!
 //! loop {
 //!     // Wait for a frame to be received.
-//!     let frame = block!(can.receive()).unwrap();
+//!     let frame = block!(twai.receive()).unwrap();
 //!
 //!     // Transmit the frame back.
-//!     let _result = block!(can.transmit(&frame)).unwrap();
+//!     let _result = block!(twai.transmit(&frame)).unwrap();
 //! }
 //! # }
 //! ```
@@ -75,7 +73,6 @@
 //! ### Self-testing (self reception of transmitted messages)
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use embedded_can::Id;
 //! # use esp_hal::twai;
 //! # use esp_hal::twai::filter;
 //! # use esp_hal::twai::filter::SingleStandardFilter;
@@ -84,7 +81,6 @@
 //! # use esp_hal::twai::EspTwaiFrame;
 //! # use esp_hal::twai::StandardId;
 //! # use esp_hal::twai::TwaiMode;
-//! # use embedded_can::Frame;
 //! # use nb::block;
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
@@ -131,14 +127,13 @@ use crate::{
         OutputSignal,
         Pull,
     },
-    interrupt::InterruptHandler,
+    interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::twai0::RegisterBlock,
-    system::PeripheralClockControl,
+    system::PeripheralGuard,
     twai::filter::SingleStandardFilter,
     Async,
     Blocking,
-    InterruptConfigurable,
 };
 
 pub mod filter;
@@ -206,26 +201,8 @@ impl_display! {
     Other => "A different error occurred. The original error may contain more information",
 }
 
-impl From<ErrorKind> for embedded_hal_02::can::ErrorKind {
-    fn from(value: ErrorKind) -> Self {
-        match value {
-            ErrorKind::Overrun => embedded_hal_02::can::ErrorKind::Overrun,
-            ErrorKind::Bit => embedded_hal_02::can::ErrorKind::Bit,
-            ErrorKind::Stuff => embedded_hal_02::can::ErrorKind::Stuff,
-            ErrorKind::Crc => embedded_hal_02::can::ErrorKind::Crc,
-            ErrorKind::Form => embedded_hal_02::can::ErrorKind::Form,
-            ErrorKind::Acknowledge => embedded_hal_02::can::ErrorKind::Acknowledge,
-            ErrorKind::Other => embedded_hal_02::can::ErrorKind::Other,
-        }
-    }
-}
-
-impl embedded_hal_02::can::Error for ErrorKind {
-    fn kind(&self) -> embedded_hal_02::can::ErrorKind {
-        (*self).into()
-    }
-}
-
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl From<ErrorKind> for embedded_can::ErrorKind {
     fn from(value: ErrorKind) -> Self {
         match value {
@@ -240,6 +217,8 @@ impl From<ErrorKind> for embedded_can::ErrorKind {
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl embedded_can::Error for ErrorKind {
     fn kind(&self) -> embedded_can::ErrorKind {
         (*self).into()
@@ -301,24 +280,16 @@ impl StandardId {
     }
 }
 
-impl From<StandardId> for embedded_hal_02::can::StandardId {
-    fn from(value: StandardId) -> Self {
-        embedded_hal_02::can::StandardId::new(value.as_raw()).unwrap()
-    }
-}
-
-impl From<embedded_hal_02::can::StandardId> for StandardId {
-    fn from(value: embedded_hal_02::can::StandardId) -> Self {
-        StandardId::new(value.as_raw()).unwrap()
-    }
-}
-
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl From<StandardId> for embedded_can::StandardId {
     fn from(value: StandardId) -> Self {
         embedded_can::StandardId::new(value.as_raw()).unwrap()
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl From<embedded_can::StandardId> for StandardId {
     fn from(value: embedded_can::StandardId) -> Self {
         StandardId::new(value.as_raw()).unwrap()
@@ -373,24 +344,16 @@ impl ExtendedId {
     }
 }
 
-impl From<ExtendedId> for embedded_hal_02::can::ExtendedId {
-    fn from(value: ExtendedId) -> Self {
-        embedded_hal_02::can::ExtendedId::new(value.0).unwrap()
-    }
-}
-
-impl From<embedded_hal_02::can::ExtendedId> for ExtendedId {
-    fn from(value: embedded_hal_02::can::ExtendedId) -> Self {
-        ExtendedId::new(value.as_raw()).unwrap()
-    }
-}
-
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl From<ExtendedId> for embedded_can::ExtendedId {
     fn from(value: ExtendedId) -> Self {
         embedded_can::ExtendedId::new(value.0).unwrap()
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl From<embedded_can::ExtendedId> for ExtendedId {
     fn from(value: embedded_can::ExtendedId) -> Self {
         ExtendedId::new(value.as_raw()).unwrap()
@@ -421,24 +384,8 @@ impl From<ExtendedId> for Id {
     }
 }
 
-impl From<Id> for embedded_hal_02::can::Id {
-    fn from(value: Id) -> Self {
-        match value {
-            Id::Standard(id) => embedded_hal_02::can::Id::Standard(id.into()),
-            Id::Extended(id) => embedded_hal_02::can::Id::Extended(id.into()),
-        }
-    }
-}
-
-impl From<embedded_hal_02::can::Id> for Id {
-    fn from(value: embedded_hal_02::can::Id) -> Self {
-        match value {
-            embedded_hal_02::can::Id::Standard(id) => Id::Standard(id.into()),
-            embedded_hal_02::can::Id::Extended(id) => Id::Extended(id.into()),
-        }
-    }
-}
-
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl From<Id> for embedded_can::Id {
     fn from(value: Id) -> Self {
         match value {
@@ -448,6 +395,8 @@ impl From<Id> for embedded_can::Id {
     }
 }
 
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl From<embedded_can::Id> for Id {
     fn from(value: embedded_can::Id) -> Self {
         match value {
@@ -457,7 +406,7 @@ impl From<embedded_can::Id> for Id {
     }
 }
 
-/// Structure backing the embedded_hal_02::can::Frame/embedded_can::Frame trait.
+/// A TWAI Frame.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct EspTwaiFrame {
@@ -549,41 +498,8 @@ impl EspTwaiFrame {
     }
 }
 
-impl embedded_hal_02::can::Frame for EspTwaiFrame {
-    fn new(id: impl Into<embedded_hal_02::can::Id>, data: &[u8]) -> Option<Self> {
-        Self::new(id.into(), data)
-    }
-
-    fn new_remote(id: impl Into<embedded_hal_02::can::Id>, dlc: usize) -> Option<Self> {
-        Self::new_remote(id.into(), dlc)
-    }
-
-    fn is_extended(&self) -> bool {
-        matches!(self.id, Id::Extended(_))
-    }
-
-    fn is_remote_frame(&self) -> bool {
-        self.is_remote
-    }
-
-    fn id(&self) -> embedded_hal_02::can::Id {
-        self.id.into()
-    }
-
-    fn dlc(&self) -> usize {
-        self.dlc
-    }
-
-    fn data(&self) -> &[u8] {
-        // Remote frames do not contain data, yet have a value for the dlc so return
-        // an empty slice for remote frames.
-        match self.is_remote {
-            true => &[],
-            false => &self.data[0..self.dlc],
-        }
-    }
-}
-
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl embedded_can::Frame for EspTwaiFrame {
     fn new(id: impl Into<embedded_can::Id>, data: &[u8]) -> Option<Self> {
         Self::new(id.into(), data)
@@ -746,17 +662,18 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TwaiConfiguration<'d, DM: crate::Mode, T = AnyTwai> {
+pub struct TwaiConfiguration<'d, Dm: crate::DriverMode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
     filter: Option<(FilterType, [u8; 8])>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
     mode: TwaiMode,
+    _guard: PeripheralGuard,
 }
 
-impl<'d, DM, T> TwaiConfiguration<'d, DM, T>
+impl<'d, Dm, T> TwaiConfiguration<'d, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
+    Dm: crate::DriverMode,
 {
     fn new_internal<TX: PeripheralOutput, RX: PeripheralInput>(
         twai: impl Peripheral<P = T> + 'd,
@@ -769,15 +686,14 @@ where
         crate::into_ref!(twai);
         crate::into_mapped_ref!(tx_pin, rx_pin);
 
-        // Enable the peripheral clock for the TWAI peripheral.
-        PeripheralClockControl::enable(twai.peripheral());
-        PeripheralClockControl::reset(twai.peripheral());
+        let guard = PeripheralGuard::new(twai.peripheral());
 
         let mut this = TwaiConfiguration {
             twai,
             filter: None, // We'll immediately call `set_filter`
             phantom: PhantomData,
             mode,
+            _guard: guard,
         };
 
         // Accept all messages by default.
@@ -990,7 +906,7 @@ where
 
     /// Put the peripheral into Operation Mode, allowing the transmission and
     /// reception of packets using the new object.
-    pub fn start(self) -> Twai<'d, DM, T> {
+    pub fn start(self) -> Twai<'d, Dm, T> {
         self.apply_filter();
         self.set_mode(self.mode);
 
@@ -1035,10 +951,12 @@ where
             rx: TwaiRx {
                 twai: unsafe { self.twai.clone_unchecked() },
                 phantom: PhantomData,
+                _guard: PeripheralGuard::new(self.twai.peripheral()),
             },
             tx: TwaiTx {
                 twai: unsafe { self.twai.clone_unchecked() },
                 phantom: PhantomData,
+                _guard: PeripheralGuard::new(self.twai.peripheral()),
             },
             twai: unsafe { self.twai.clone_unchecked() },
             phantom: PhantomData,
@@ -1116,6 +1034,7 @@ where
             filter: self.filter,
             phantom: PhantomData,
             mode: self.mode,
+            _guard: self._guard,
         }
     }
 }
@@ -1136,6 +1055,7 @@ where
             filter: self.filter,
             phantom: PhantomData,
             mode: self.mode,
+            _guard: self._guard,
         }
     }
 }
@@ -1155,17 +1075,17 @@ where
 ///
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
-pub struct Twai<'d, DM: crate::Mode, T = AnyTwai> {
+pub struct Twai<'d, Dm: crate::DriverMode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
-    tx: TwaiTx<'d, DM, T>,
-    rx: TwaiRx<'d, DM, T>,
-    phantom: PhantomData<DM>,
+    tx: TwaiTx<'d, Dm, T>,
+    rx: TwaiRx<'d, Dm, T>,
+    phantom: PhantomData<Dm>,
 }
 
-impl<'d, T, DM> Twai<'d, DM, T>
+impl<'d, T, Dm> Twai<'d, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
+    Dm: crate::DriverMode,
 {
     fn mode(&self) -> TwaiMode {
         let mode = self.twai.register_block().mode().read();
@@ -1181,7 +1101,7 @@ where
 
     /// Stop the peripheral, putting it into reset mode and enabling
     /// reconfiguration.
-    pub fn stop(self) -> TwaiConfiguration<'d, DM, T> {
+    pub fn stop(self) -> TwaiConfiguration<'d, Dm, T> {
         // Put the peripheral into reset/configuration mode by setting the reset mode
         // bit.
         self.twai
@@ -1191,11 +1111,13 @@ where
 
         let mode = self.mode();
 
+        let guard = PeripheralGuard::new(self.twai.peripheral());
         TwaiConfiguration {
             twai: self.twai,
             filter: None, // filter already applied, no need to restore it
             phantom: PhantomData,
             mode,
+            _guard: guard,
         }
     }
 
@@ -1268,21 +1190,22 @@ where
 
     /// Consumes this `Twai` instance and splits it into transmitting and
     /// receiving halves.
-    pub fn split(self) -> (TwaiRx<'d, DM, T>, TwaiTx<'d, DM, T>) {
+    pub fn split(self) -> (TwaiRx<'d, Dm, T>, TwaiTx<'d, Dm, T>) {
         (self.rx, self.tx)
     }
 }
 
 /// Interface to the TWAI transmitter part.
-pub struct TwaiTx<'d, DM: crate::Mode, T = AnyTwai> {
+pub struct TwaiTx<'d, Dm: crate::DriverMode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
+    _guard: PeripheralGuard,
 }
 
-impl<DM, T> TwaiTx<'_, DM, T>
+impl<Dm, T> TwaiTx<'_, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
+    Dm: crate::DriverMode,
 {
     /// Transmit a frame.
     ///
@@ -1316,15 +1239,16 @@ where
 }
 
 /// Interface to the TWAI receiver part.
-pub struct TwaiRx<'d, DM: crate::Mode, T = AnyTwai> {
+pub struct TwaiRx<'d, Dm: crate::DriverMode, T = AnyTwai> {
     twai: PeripheralRef<'d, T>,
-    phantom: PhantomData<DM>,
+    phantom: PhantomData<Dm>,
+    _guard: PeripheralGuard,
 }
 
-impl<DM, T> TwaiRx<'_, DM, T>
+impl<Dm, T> TwaiRx<'_, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
+    Dm: crate::DriverMode,
 {
     /// Receive a frame
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
@@ -1366,16 +1290,8 @@ pub enum EspTwaiError {
     EmbeddedHAL(ErrorKind),
 }
 
-impl embedded_hal_02::can::Error for EspTwaiError {
-    fn kind(&self) -> embedded_hal_02::can::ErrorKind {
-        if let Self::EmbeddedHAL(kind) = self {
-            (*kind).into()
-        } else {
-            embedded_hal_02::can::ErrorKind::Other
-        }
-    }
-}
-
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl embedded_can::Error for EspTwaiError {
     fn kind(&self) -> embedded_can::ErrorKind {
         if let Self::EmbeddedHAL(kind) = self {
@@ -1418,34 +1334,11 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-impl<DM, T> embedded_hal_02::can::Can for Twai<'_, DM, T>
+#[cfg(any(doc, feature = "unstable"))]
+impl<Dm, T> embedded_can::nb::Can for Twai<'_, Dm, T>
 where
     T: Instance,
-    DM: crate::Mode,
-{
-    type Frame = EspTwaiFrame;
-    type Error = EspTwaiError;
-
-    /// Transmit a frame.
-    fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
-        self.tx.transmit(frame)?;
-
-        // Success in readying packet for transmit. No packets can be replaced in the
-        // transmit buffer so return None in accordance with the
-        // embedded-can/embedded-hal trait.
-        nb::Result::Ok(None)
-    }
-
-    /// Return a received frame if there are any available.
-    fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
-        self.rx.receive()
-    }
-}
-
-impl<DM, T> embedded_can::nb::Can for Twai<'_, DM, T>
-where
-    T: Instance,
-    DM: crate::Mode,
+    Dm: crate::DriverMode,
 {
     type Frame = EspTwaiFrame;
     type Error = EspTwaiError;
@@ -1467,6 +1360,7 @@ where
 }
 
 /// TWAI peripheral instance.
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnyTwai> + 'static {
     /// The identifier number for this TWAI instance.
     fn number(&self) -> usize;

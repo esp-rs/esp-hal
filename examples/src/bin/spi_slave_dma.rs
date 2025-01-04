@@ -25,6 +25,7 @@
 //! so no immediate neighbor is available.
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -32,11 +33,10 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{Dma, DmaPriority},
     dma_buffers,
+    entry,
     gpio::{Input, Level, Output, Pull},
-    prelude::*,
-    spi::{slave::Spi, SpiMode},
+    spi::{slave::Spi, Mode},
 };
 use esp_println::println;
 
@@ -54,27 +54,22 @@ fn main() -> ! {
     let slave_mosi = peripherals.GPIO2;
     let slave_cs = peripherals.GPIO3;
 
-    let dma = Dma::new(peripherals.DMA);
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32s2")] {
-            let dma_channel = dma.spi2channel;
+            let dma_channel = peripherals.DMA_SPI2;
         } else {
-            let dma_channel = dma.channel0;
+            let dma_channel = peripherals.DMA_CH0;
         }
     }
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
-    let mut spi = Spi::new(peripherals.SPI2, SpiMode::Mode0)
+    let mut spi = Spi::new(peripherals.SPI2, Mode::Mode0)
         .with_sck(slave_sclk)
         .with_mosi(slave_mosi)
         .with_miso(slave_miso)
         .with_cs(slave_cs)
-        .with_dma(
-            dma_channel.configure(false, DmaPriority::Priority0),
-            rx_descriptors,
-            tx_descriptors,
-        );
+        .with_dma(dma_channel, rx_descriptors, tx_descriptors);
 
     let delay = Delay::new();
 

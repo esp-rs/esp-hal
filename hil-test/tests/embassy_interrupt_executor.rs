@@ -48,7 +48,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod test {
     use super::*;
 
@@ -73,8 +73,8 @@ mod test {
                     AnyTimer::from(timg1.timer0),
                 ]);
             } else if #[cfg(systimer)] {
-                use esp_hal::timer::systimer::{SystemTimer, Target};
-                let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+                use esp_hal::timer::systimer::SystemTimer;
+                let systimer = SystemTimer::new(peripherals.SYSTIMER);
                 esp_hal_embassy::init([
                     AnyTimer::from(systimer.alarm0),
                     AnyTimer::from(systimer.alarm1),
@@ -91,7 +91,6 @@ mod test {
     }
 
     #[test]
-    #[timeout(3)]
     async fn run_interrupt_executor_test(ctx: Context) {
         let interrupt_executor =
             mk_static!(InterruptExecutor<1>, InterruptExecutor::new(ctx.interrupt));
@@ -112,7 +111,6 @@ mod test {
 
     #[test]
     #[cfg(multi_core)]
-    #[timeout(3)]
     async fn run_interrupt_executor_test_on_core_1(mut ctx: Context) {
         let app_core_stack = mk_static!(Stack<8192>, Stack::new());
         let response = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());

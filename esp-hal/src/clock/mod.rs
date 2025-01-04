@@ -37,27 +37,11 @@
 //! ### Initialize With Different Clock Frequencies
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! // Initialize with the highest possible frequency for this chip
-//! let peripherals = esp_hal::init({
-//!     let mut config = esp_hal::Config::default();
-//!     config.cpu_clock = CpuClock::max();
-//!     config
-//! });
+//! use esp_hal::clock::CpuClock;
 //!
-//! // Initialize with custom clock frequency
-//! // let peripherals = esp_hal::init({
-//! //    let mut config = esp_hal::Config::default();
-#![cfg_attr(
-    not(any(esp32c2, esp32h2)),
-    doc = "//    config.cpu_clock = CpuClock::Clock160MHz;"
-)]
-#![cfg_attr(esp32c2, doc = "//    config.cpu_clock = CpuClock::Clock120MHz;")]
-#![cfg_attr(esp32h2, doc = "//    config.cpu_clock = CpuClock::Clock96MHz;")]
-//! //    config
-//! // });
-//! //
-//! // Initialize with default clock frequency for this chip
-//! // let peripherals = esp_hal::init(esp_hal::Config::default());
+//! // Initialize with the highest possible frequency for this chip
+//! let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+//! let peripherals = esp_hal::init(config);
 //! # }
 //! ```
 
@@ -94,6 +78,11 @@ pub trait Clock {
 /// CPU clock speed
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(
+    clippy::enum_variant_names,
+    reason = "MHz suffix indicates physical unit."
+)]
+/// FIXME: Remove Clock prefix once we can agree on a convention.
 pub enum CpuClock {
     /// 80MHz CPU clock
     #[cfg(not(esp32h2))]

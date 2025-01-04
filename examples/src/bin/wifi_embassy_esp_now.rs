@@ -4,7 +4,7 @@
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now
+//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -15,7 +15,7 @@ use embassy_futures::select::{select, Either};
 use embassy_time::{Duration, Ticker};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     esp_now::{PeerInfo, BROADCAST_ADDRESS},
@@ -36,11 +36,8 @@ macro_rules! mk_static {
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 
@@ -65,8 +62,8 @@ async fn main(_spawner: Spawner) -> ! {
             let timg1 = TimerGroup::new(peripherals.TIMG1);
             esp_hal_embassy::init(timg1.timer0);
         } else {
-            use esp_hal::timer::systimer::{SystemTimer, Target};
-            let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+            use esp_hal::timer::systimer::SystemTimer;
+            let systimer = SystemTimer::new(peripherals.SYSTIMER);
             esp_hal_embassy::init(systimer.alarm0);
         }
     }
