@@ -736,10 +736,10 @@ impl Instance for I2S1 {
             bits
         );
 
-        // signals for 8bit  start at an offset of  0 and 16bit start at an offset of 8 for I2S1
-        let pin_offset = if bits == 8 { 0 } else { 8 };
+        // signals for 8bit  start at an offset of  8 for 16bit on I2S1
+        let pin_offset = if bits == 16 { 8 } else { 0 };
 
-        match i + 8 {
+        match i + pin_offset {
             0 => OutputSignal::I2S1O_DATA_0,
             1 => OutputSignal::I2S1O_DATA_1,
             2 => OutputSignal::I2S1O_DATA_2,
