@@ -14,10 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump MSRV to 1.83 (#2615)
 - Bump smoltcp to 0.12.0 (#2849)
+- Enabled `unstable` feature gate on esp-hal dependancy (#2628)
+- Bump embassy-sync to 0.6.1 (#2628)
 
 ### Fixed
 
 - Fixed triggering a debug-assertion during scan (#2612)
+
 
 ### Removed
 
