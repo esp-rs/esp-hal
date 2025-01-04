@@ -262,7 +262,7 @@ is not compatible with the hardware.
 +.unwrap();
 ```
 
-### LCD_CAM configuration changes
+## LCD_CAM configuration changes
 
 - `cam` now has a `Config` strurct that contains frequency, bit/byte order, VSync filter options.
 - DPI, I8080: `frequency` has been moved into `Config`.
