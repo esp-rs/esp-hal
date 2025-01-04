@@ -91,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2C: Replaced potential panics with errors. (#2831)
 - UART: Make `AtCmdConfig` and `ConfigError` non-exhaustive (#2851)
 - UART: Make `AtCmdConfig` use builder-lite pattern (#2851)
+- UART: Make `is_tx_idle` and `tx_fifo_count` public (#2887)
 
 ### Fixed
 
