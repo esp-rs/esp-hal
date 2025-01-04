@@ -87,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `esp-pacs` with support for Wi-Fi on the ESP32 and made the peripheral non virtual
 - `SpiBitOrder`, `SpiDataMode`, `SpiMode` were renamed to `BitOder`, `DataMode` and `Mode` (#2828)
 - `crate::Mode` was renamed to `crate::DriverMode` (#2828)
+- `Spi::with_miso` has been overloaded into `Spi::with_miso` and `Spi::with_sio1` (#2557)
 - Renamed some I2C error variants (#2844)
 - I2C: Replaced potential panics with errors. (#2831)
 - UART: Make `AtCmdConfig` and `ConfigError` non-exhaustive (#2851)
