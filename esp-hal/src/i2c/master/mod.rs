@@ -147,7 +147,6 @@ impl _private::AddressModeInternal for SevenBitAddress {
 // interrupt.
 pub enum Timeout {
     /// Use the maximum timeout value.
-    #[cfg(any(esp32, esp32s2))]
     Maximum,
 
     /// Disable timeout control.
@@ -161,8 +160,14 @@ pub enum Timeout {
 impl Timeout {
     fn cycles(&self) -> u32 {
         match self {
-            #[cfg(any(esp32, esp32s2))]
-            Timeout::Maximum => u32::MAX,
+            #[cfg(esp32)]
+            Timeout::Maximum => 0xF_FFFF,
+
+            #[cfg(esp32s2)]
+            Timeout::Maximum => 0xFF_FFFF,
+
+            #[cfg(not(any(esp32, esp32s2)))]
+            Timeout::Maximum => 0x1F,
 
             #[cfg(not(any(esp32, esp32s2)))]
             Timeout::Disabled => 1,
@@ -173,7 +178,7 @@ impl Timeout {
 
     #[cfg(not(esp32))]
     fn is_set(&self) -> bool {
-        matches!(self, Timeout::BusCycles(_))
+        matches!(self, Timeout::BusCycles(_)) || matches!(self, Timeout::Maximum)
     }
 }
 
@@ -1373,11 +1378,17 @@ impl Driver<'_> {
             scl_start_hold_time,
             scl_stop_hold_time,
             {
-                let to_peri = (timeout.cycles() * 2 * half_cycle).max(1);
-                let log2 = to_peri.ilog2();
-                // Round up so that we don't shorten timeouts.
-                let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                Timeout::BusCycles(raw.min(0x1F))
+                match timeout {
+                    Timeout::Maximum => Timeout::BusCycles(0x1F),
+                    Timeout::Disabled => Timeout::Disabled,
+                    _ => {
+                        let to_peri = (timeout.cycles() * 2 * half_cycle).max(1);
+                        let log2 = to_peri.ilog2();
+                        // Round up so that we don't shorten timeouts.
+                        let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
+                        Timeout::BusCycles(raw.min(0x1F))
+                    }
+                }
             },
         )?;
 
