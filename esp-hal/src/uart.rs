@@ -322,15 +322,13 @@ impl embedded_io::Error for Error {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockSource {
-    /// APB_CLK clock source (default for UART on all the chips except of
-    /// esp32c6 and esp32h2)
+    /// APB_CLK clock source
     #[cfg_attr(not(any(esp32c6, esp32h2, lp_uart)), default)]
     Apb,
     /// RC_FAST_CLK clock source (17.5 MHz)
     #[cfg(not(any(esp32, esp32s2)))]
     RcFast,
-    /// XTAL_CLK clock source (default for UART on esp32c6 and esp32h2 and
-    /// LP_UART)
+    /// XTAL_CLK clock source
     #[cfg(not(any(esp32, esp32s2)))]
     #[cfg_attr(any(esp32c6, esp32h2, lp_uart), default)]
     Xtal,
@@ -372,7 +370,7 @@ pub enum DataBits {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Parity {
-    /// No parity bit is used (most common).
+    /// No parity bit is used.
     #[default]
     None,
     /// Even parity: the parity bit is set to make the total number of
@@ -460,10 +458,10 @@ impl Default for Config {
     }
 }
 
+/// Configuration for the AT-CMD detection functionality
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-/// Configuration for the AT-CMD detection functionality
 pub struct AtCmdConfig {
     /// Optional idle time before the AT command detection begins, in clock
     /// cycles.
