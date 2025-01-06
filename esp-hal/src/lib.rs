@@ -194,9 +194,6 @@ pub mod debugger;
 pub mod sync;
 pub mod time;
 
-#[cfg(tsens)]
-pub mod tsens;
-
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
 macro_rules! unstable_module {
@@ -270,6 +267,8 @@ unstable_module! {
     pub mod touch;
     #[cfg(trace0)]
     pub mod trace;
+    #[cfg(tsens)]
+    pub mod tsens;
     #[cfg(any(twai0, twai1))]
     pub mod twai;
     #[cfg(usb_device)]
