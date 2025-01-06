@@ -168,8 +168,10 @@ pub(crate) fn init_psram(config: PsramConfig) {
         const MMU_INVALID: u32 = 1 << 14;
         const DR_REG_MMU_TABLE: u32 = 0x600C5000;
 
-        // calculate the PSRAM start address to map - honor the fact there might be
-        // unmapped pages in between
+        // calculate the PSRAM start address to map
+        // the linker scripts can produce a gap between mapped IROM and DROM segments
+        // bigger than a flash page - i.e. we will see an unmapped memory slot
+        // start from the end and find the last mapped flash page
         let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
         let mut mapped_pages = 0;
         for i in (0..FLASH_MMU_TABLE_SIZE).rev() {
