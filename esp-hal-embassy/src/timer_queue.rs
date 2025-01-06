@@ -189,6 +189,6 @@ mod queue_impl {
 #[cfg(generic_timers)]
 mod queue_impl {
     pub(super) type RawQueue = embassy_time_queue_driver::queue_generic::ConstGenericQueue<
-        { esp_config::esp_config_int!(usize, "ESP_HAL_EMBASSY_GENERIC_QUEUE_SIZE") },
+        { esp_config::esp_config_int!(usize, "ESP_HAL_EMBASSY_CONFIG_GENERIC_QUEUE_SIZE") },
     >;
 }

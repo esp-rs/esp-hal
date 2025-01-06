@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     println!("cargo:rustc-check-cfg=cfg(single_queue)");
     println!("cargo:rustc-check-cfg=cfg(generic_timers)");
 
-    match &crate_config["ESP_HAL_EMBASSY_TIMER_QUEUE"] {
+    match &crate_config["ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE"] {
         Value::String(s) if s.as_str() == "single-integrated" => {
             println!("cargo:rustc-cfg=integrated_timers");
             println!("cargo:rustc-cfg=single_queue");
