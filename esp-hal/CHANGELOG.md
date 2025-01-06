@@ -203,6 +203,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `get_` prefixes from functions (#2528)
 - The `Camera` and `I8080` drivers' constructors now only accepts blocking-mode DMA channels. (#2519)
 - Many peripherals are now disabled by default and also get disabled when the driver is dropped (#2544)
+- Updated embassy-time to v0.4 (#2701)
 
 - Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 - UART: `read_byte` and `write_byte` made private. (#2915)

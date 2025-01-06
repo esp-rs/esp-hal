@@ -200,7 +200,7 @@ defmt-rtt          = { version = "0.4.1", optional = true }
 embassy-executor   = "0.6.0"
 embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.0"
-embassy-time       = "0.3.2"
+embassy-time       = "0.4.0"
 embedded-hal       = "1.0.0"
 embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
@@ -310,9 +310,3 @@ incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = false
-
-[patch.crates-io]
-embassy-executor    = { git = "https://github.com/embassy-rs/embassy", rev = "0c245892c6812538f4f51b784ed8afa1ce47f25d" }
-embassy-time        = { git = "https://github.com/embassy-rs/embassy", rev = "0c245892c6812538f4f51b784ed8afa1ce47f25d" }
-embassy-time-driver = { git = "https://github.com/embassy-rs/embassy", rev = "0c245892c6812538f4f51b784ed8afa1ce47f25d" }
-embassy-time-queue-driver = { git = "https://github.com/embassy-rs/embassy", rev = "0c245892c6812538f4f51b784ed8afa1ce47f25d" }
