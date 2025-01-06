@@ -382,3 +382,7 @@ e.g.)
 - StopBits::Stop1
 + StopBits::_1
 ```
+
+The previous blocking implementation of `read_bytes` has been removed, and the non-blocking `drain_fifo` has instead been renamed to `read_bytes` in its place.
+
+Any code which was previously using `read_bytes` to fill a buffer in a blocking manner will now need to implement the necessary logic to block until the buffer is filled in their application instead.
