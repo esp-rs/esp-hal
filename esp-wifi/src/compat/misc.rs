@@ -23,16 +23,17 @@ unsafe extern "C" fn fclose(stream: *const ()) -> i32 {
 
 // We cannot just use the ROM function since it needs to allocate memory
 #[no_mangle]
-unsafe extern "C" fn strdup(str: *const i8) -> *const u8 {
+unsafe extern "C" fn strdup(str: *const core::ffi::c_char) -> *const core::ffi::c_char {
     trace!("strdup {:?}", str);
 
     unsafe {
         let s = core::ffi::CStr::from_ptr(str);
-        let s = s.to_str().unwrap();
-
-        let p = malloc(s.len() + 1);
-        core::ptr::copy_nonoverlapping(str, p as *mut i8, s.len() + 1);
-        p as *const u8
+        let len = s.count_bytes() + 1;
+        let p = malloc(len);
+        if !p.is_null() {
+            core::ptr::copy_nonoverlapping(str, p as *mut i8, len);
+        }
+        p.cast()
     }
 }
 
