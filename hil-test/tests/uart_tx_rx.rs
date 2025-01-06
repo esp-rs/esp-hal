@@ -53,7 +53,13 @@ mod tests {
         ctx.tx.flush().unwrap();
         ctx.tx.write_bytes(&bytes).unwrap();
 
-        let bytes_read = ctx.rx.read_bytes(&mut buf);
+        let mut bytes_read = 0;
+        loop {
+            bytes_read += ctx.rx.read_bytes(&mut buf[bytes_read..]);
+            if bytes_read == 3 {
+                break;
+            }
+        }
 
         assert_eq!(bytes_read, 3);
         assert_eq!(buf, bytes);
