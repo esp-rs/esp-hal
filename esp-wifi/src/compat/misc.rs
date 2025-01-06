@@ -1,5 +1,6 @@
-// these are not called but needed for linking
+use crate::compat::malloc::malloc;
 
+// these are not called but needed for linking
 #[no_mangle]
 unsafe extern "C" fn fwrite(ptr: *const (), size: usize, count: usize, stream: *const ()) -> usize {
     todo!("fwrite {:?} {} {} {:?}", ptr, size, count, stream)
@@ -20,8 +21,26 @@ unsafe extern "C" fn fclose(stream: *const ()) -> i32 {
     todo!("fclose {:?}", stream);
 }
 
-// not available in ROM on ESP32-S2
-#[cfg(feature = "esp32s2")]
+// We cannot just use the ROM function since it needs to allocate memory
+#[no_mangle]
+unsafe extern "C" fn strdup(str: *const i8) -> *const u8 {
+    trace!("strdup {:?}", str);
+
+    unsafe {
+        let s = core::ffi::CStr::from_ptr(str);
+        let s = s.to_str().unwrap();
+
+        let p = malloc(s.len() + 1);
+        core::ptr::copy_nonoverlapping(str, p as *mut i8, s.len() + 1);
+        p as *const u8
+    }
+}
+
+// We cannot just use the ROM function since it calls `__getreent`
+//
+// From docs: The __getreent() function returns a per-task pointer to struct
+// _reent in newlib libc. This structure is allocated on the TCB of each task.
+// i.e. it assumes a FreeRTOS task calling it.
 #[no_mangle]
 unsafe extern "C" fn atoi(str: *const i8) -> i32 {
     trace!("atoi {:?}", str);
