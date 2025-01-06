@@ -371,17 +371,16 @@ pub enum DataBits {
 /// either even or odd.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 pub enum Parity {
     /// No parity bit is used (most common).
     #[default]
-    ParityNone,
+    None,
     /// Even parity: the parity bit is set to make the total number of
     /// 1-bits even.
-    ParityEven,
+    Even,
     /// Odd parity: the parity bit is set to make the total number of 1-bits
     /// odd.
-    ParityOdd,
+    Odd,
 }
 
 /// Number of stop bits
@@ -436,7 +435,7 @@ impl Config {
             DataBits::DataBits8 => 8,
         };
         length += match self.parity {
-            Parity::ParityNone => 0,
+            Parity::None => 0,
             _ => 1,
         };
         length += match self.stop_bits {
@@ -2125,16 +2124,16 @@ pub mod lp_uart {
         }
 
         fn change_parity(&mut self, parity: Parity) -> &mut Self {
-            if parity != Parity::ParityNone {
+            if parity != Parity::None {
                 self.uart
                     .conf0()
                     .modify(|_, w| w.parity().bit((parity as u8 & 0x1) != 0));
             }
 
             self.uart.conf0().modify(|_, w| match parity {
-                Parity::ParityNone => w.parity_en().clear_bit(),
-                Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
-                Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
+                Parity::None => w.parity_en().clear_bit(),
+                Parity::Even => w.parity_en().set_bit().parity().clear_bit(),
+                Parity::Odd => w.parity_en().set_bit().parity().set_bit(),
             });
 
             self
@@ -2550,9 +2549,9 @@ impl Info {
 
     fn change_parity(&self, parity: Parity) {
         self.register_block().conf0().modify(|_, w| match parity {
-            Parity::ParityNone => w.parity_en().clear_bit(),
-            Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
-            Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
+            Parity::None => w.parity_en().clear_bit(),
+            Parity::Even => w.parity_en().set_bit().parity().clear_bit(),
+            Parity::Odd => w.parity_en().set_bit().parity().set_bit(),
         });
     }
 
