@@ -111,11 +111,6 @@ pub enum Error {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum AcknowledgeCheckFailedReason {
-    /// The device did not acknowledge its address. The device may be missing.
-    Address,
-    /// The device did not acknowledge the data. It may not be ready to process
-    /// requests at the moment.
-    Data,
     /// Either the device did not acknowledge its address or the data, but it is
     /// unknown which.
     Unknown,
@@ -124,8 +119,6 @@ pub enum AcknowledgeCheckFailedReason {
 impl core::fmt::Display for AcknowledgeCheckFailedReason {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            AcknowledgeCheckFailedReason::Address => write!(f, "Address"),
-            AcknowledgeCheckFailedReason::Data => write!(f, "Data"),
             AcknowledgeCheckFailedReason::Unknown => write!(f, "Unknown"),
         }
     }
@@ -134,10 +127,6 @@ impl core::fmt::Display for AcknowledgeCheckFailedReason {
 impl From<&AcknowledgeCheckFailedReason> for embedded_hal::i2c::NoAcknowledgeSource {
     fn from(value: &AcknowledgeCheckFailedReason) -> Self {
         match value {
-            AcknowledgeCheckFailedReason::Address => {
-                embedded_hal::i2c::NoAcknowledgeSource::Address
-            }
-            AcknowledgeCheckFailedReason::Data => embedded_hal::i2c::NoAcknowledgeSource::Data,
             AcknowledgeCheckFailedReason::Unknown => {
                 embedded_hal::i2c::NoAcknowledgeSource::Unknown
             }
