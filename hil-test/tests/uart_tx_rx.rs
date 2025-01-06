@@ -53,8 +53,9 @@ mod tests {
         ctx.tx.flush().unwrap();
         ctx.tx.write_bytes(&bytes).unwrap();
 
-        ctx.rx.read_bytes(&mut buf).unwrap();
+        let bytes_read = ctx.rx.read_bytes(&mut buf);
 
+        assert_eq!(bytes_read, 3);
         assert_eq!(buf, bytes);
     }
 }

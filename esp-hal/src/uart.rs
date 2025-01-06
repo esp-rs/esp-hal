@@ -848,40 +848,6 @@ where
         self.uart.info().apply_config(config)
     }
 
-    /// Fill a buffer with received bytes
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
-                let fifo = unsafe {
-                    &*((self.register_block().fifo().as_ptr() as *mut u8).add(0x20C00000)
-                        as *mut crate::peripherals::uart0::FIFO)
-                };
-            } else {
-                let fifo = self.register_block().fifo();
-            }
-        }
-
-        for byte in buf.iter_mut() {
-            while self.rx_fifo_count() == 0 {
-                // Block until we received at least one byte
-            }
-
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
-                    crate::interrupt::free(|| {
-                        *byte = fifo.read().rxfifo_rd_byte().bits();
-                    });
-                } else {
-                    *byte = fifo.read().rxfifo_rd_byte().bits();
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Read a byte from the UART
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         cfg_if::cfg_if! {
@@ -904,8 +870,8 @@ where
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
-    /// returns the number of read bytes. Never blocks
-    pub fn drain_fifo(&mut self, buf: &mut [u8]) -> usize {
+    /// returns the number of read bytes without blocking.
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> usize {
         let mut count = 0;
         while count < buf.len() {
             if let Ok(byte) = self.read_byte() {
@@ -1143,8 +1109,9 @@ where
         self.tx.write_bytes(data)
     }
 
-    /// Fill a buffer with received bytes
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+    /// Read all available bytes from the RX FIFO into the provided buffer and
+    /// returns the number of read bytes without blocking.
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> usize {
         self.rx.read_bytes(buf)
     }
 
@@ -1481,7 +1448,7 @@ where
             // Block until we received at least one byte
         }
 
-        Ok(self.drain_fifo(buf))
+        Ok(self.read_bytes(buf))
     }
 }
 
@@ -1858,7 +1825,7 @@ where
 
             let events_happened = UartRxFuture::new(self.uart.reborrow(), events).await;
             // always drain the fifo, if an error has occurred the data is lost
-            let read_bytes = self.drain_fifo(buf);
+            let read_bytes = self.read_bytes(buf);
             // check error events
             for event_happened in events_happened {
                 match event_happened {
