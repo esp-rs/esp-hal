@@ -322,15 +322,13 @@ impl embedded_io::Error for Error {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockSource {
-    /// APB_CLK clock source (default for UART on all the chips except of
-    /// esp32c6 and esp32h2)
+    /// APB_CLK clock source
     #[cfg_attr(not(any(esp32c6, esp32h2, lp_uart)), default)]
     Apb,
     /// RC_FAST_CLK clock source (17.5 MHz)
     #[cfg(not(any(esp32, esp32s2)))]
     RcFast,
-    /// XTAL_CLK clock source (default for UART on esp32c6 and esp32h2 and
-    /// LP_UART)
+    /// XTAL_CLK clock source
     #[cfg(not(any(esp32, esp32s2)))]
     #[cfg_attr(any(esp32c6, esp32h2, lp_uart), default)]
     Xtal,
@@ -353,14 +351,14 @@ const UART_TOUT_THRESH_DEFAULT: u8 = 10;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DataBits {
     /// 5 data bits per frame.
-    DataBits5 = 0,
+    _5 = 0,
     /// 6 data bits per frame.
-    DataBits6 = 1,
+    _6 = 1,
     /// 7 data bits per frame.
-    DataBits7 = 2,
-    /// 8 data bits per frame (most common).
+    _7 = 2,
+    /// 8 data bits per frame.
     #[default]
-    DataBits8 = 3,
+    _8 = 3,
 }
 
 /// Parity check
@@ -371,17 +369,16 @@ pub enum DataBits {
 /// either even or odd.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 pub enum Parity {
-    /// No parity bit is used (most common).
+    /// No parity bit is used.
     #[default]
-    ParityNone,
+    None,
     /// Even parity: the parity bit is set to make the total number of
     /// 1-bits even.
-    ParityEven,
+    Even,
     /// Odd parity: the parity bit is set to make the total number of 1-bits
     /// odd.
-    ParityOdd,
+    Odd,
 }
 
 /// Number of stop bits
@@ -391,15 +388,14 @@ pub enum Parity {
 /// bits.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names)] // FIXME: resolve this
 pub enum StopBits {
     /// 1 stop bit.
     #[default]
-    Stop1   = 1,
+    _1   = 1,
     /// 1.5 stop bits.
-    Stop1P5 = 2,
+    _1p5 = 2,
     /// 2 stop bits.
-    Stop2   = 3,
+    _2   = 3,
 }
 
 /// UART Configuration
@@ -430,17 +426,17 @@ impl Config {
     fn symbol_length(&self) -> u8 {
         let mut length: u8 = 1; // start bit
         length += match self.data_bits {
-            DataBits::DataBits5 => 5,
-            DataBits::DataBits6 => 6,
-            DataBits::DataBits7 => 7,
-            DataBits::DataBits8 => 8,
+            DataBits::_5 => 5,
+            DataBits::_6 => 6,
+            DataBits::_7 => 7,
+            DataBits::_8 => 8,
         };
         length += match self.parity {
-            Parity::ParityNone => 0,
+            Parity::None => 0,
             _ => 1,
         };
         length += match self.stop_bits {
-            StopBits::Stop1 => 1,
+            StopBits::_1 => 1,
             _ => 2, // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
         };
         length
@@ -461,10 +457,10 @@ impl Default for Config {
     }
 }
 
+/// Configuration for the AT-CMD detection functionality
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-/// Configuration for the AT-CMD detection functionality
 pub struct AtCmdConfig {
     /// Optional idle time before the AT command detection begins, in clock
     /// cycles.
@@ -2125,16 +2121,16 @@ pub mod lp_uart {
         }
 
         fn change_parity(&mut self, parity: Parity) -> &mut Self {
-            if parity != Parity::ParityNone {
+            if parity != Parity::None {
                 self.uart
                     .conf0()
                     .modify(|_, w| w.parity().bit((parity as u8 & 0x1) != 0));
             }
 
             self.uart.conf0().modify(|_, w| match parity {
-                Parity::ParityNone => w.parity_en().clear_bit(),
-                Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
-                Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
+                Parity::None => w.parity_en().clear_bit(),
+                Parity::Even => w.parity_en().set_bit().parity().clear_bit(),
+                Parity::Odd => w.parity_en().set_bit().parity().set_bit(),
             });
 
             self
@@ -2550,9 +2546,9 @@ impl Info {
 
     fn change_parity(&self, parity: Parity) {
         self.register_block().conf0().modify(|_, w| match parity {
-            Parity::ParityNone => w.parity_en().clear_bit(),
-            Parity::ParityEven => w.parity_en().set_bit().parity().clear_bit(),
-            Parity::ParityOdd => w.parity_en().set_bit().parity().set_bit(),
+            Parity::None => w.parity_en().clear_bit(),
+            Parity::Even => w.parity_en().set_bit().parity().clear_bit(),
+            Parity::Odd => w.parity_en().set_bit().parity().set_bit(),
         });
     }
 
@@ -2560,18 +2556,14 @@ impl Info {
         #[cfg(esp32)]
         {
             // workaround for hardware issue, when UART stop bit set as 2-bit mode.
-            if stop_bits == StopBits::Stop2 {
+            if stop_bits == StopBits::_2 {
                 self.register_block()
                     .rs485_conf()
-                    .modify(|_, w| w.dl1_en().bit(stop_bits == StopBits::Stop2));
+                    .modify(|_, w| w.dl1_en().bit(stop_bits == StopBits::_2));
 
-                self.register_block().conf0().modify(|_, w| {
-                    if stop_bits == StopBits::Stop2 {
-                        unsafe { w.stop_bit_num().bits(1) }
-                    } else {
-                        unsafe { w.stop_bit_num().bits(stop_bits as u8) }
-                    }
-                });
+                self.register_block()
+                    .conf0()
+                    .modify(|_, w| unsafe { w.stop_bit_num().bits(1) });
             }
         }
 
