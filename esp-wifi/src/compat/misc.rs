@@ -31,7 +31,7 @@ unsafe extern "C" fn strdup(str: *const core::ffi::c_char) -> *const core::ffi::
         let len = s.count_bytes() + 1;
         let p = malloc(len);
         if !p.is_null() {
-            core::ptr::copy_nonoverlapping(str, p as *mut i8, len);
+            core::ptr::copy_nonoverlapping(str, p.cast(), len);
         }
         p.cast()
     }
