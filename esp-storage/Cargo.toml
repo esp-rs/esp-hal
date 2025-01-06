@@ -9,6 +9,9 @@ categories   = ["embedded", "hardware-support", "no-std"]
 repository   = "https://github.com/esp-rs/esp-storage"
 license      = "MIT OR Apache-2.0"
 
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6"]
 
 [dependencies]
 embedded-storage = "0.3.1"
