@@ -172,6 +172,9 @@ pub(crate) fn init_psram(config: PsramConfig) {
         // the linker scripts can produce a gap between mapped IROM and DROM segments
         // bigger than a flash page - i.e. we will see an unmapped memory slot
         // start from the end and find the last mapped flash page
+        //
+        // More general information about the MMU can be found here:
+        // https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction
         let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
         let mut mapped_pages = 0;
         for i in (0..FLASH_MMU_TABLE_SIZE).rev() {
