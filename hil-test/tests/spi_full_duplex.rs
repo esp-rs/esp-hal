@@ -103,7 +103,7 @@ mod tests {
 
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
-        let spi = Spi::new(peripherals.SPI2, Config::default().with_frequency(10.MHz()))
+        let spi = Spi::new(peripherals.SPI2, Config::default().with_clock(10.MHz()))
             .unwrap()
             .with_sck(peripherals.GPIO0)
             .with_miso(miso)
@@ -233,7 +233,7 @@ mod tests {
         let mut spi = ctx.spi.into_async();
 
         // Slow down SCLK so that transferring the buffer takes a while.
-        spi.apply_config(&Config::default().with_frequency(80.kHz()))
+        spi.apply_config(&Config::default().with_clock(80.kHz()))
             .expect("Apply config failed");
 
         SpiBus::write(&mut spi, &write[..]).expect("Sync write failed");
@@ -705,7 +705,7 @@ mod tests {
         // This means that without working cancellation, the test case should
         // fail.
         ctx.spi
-            .apply_config(&Config::default().with_frequency(80.kHz()))
+            .apply_config(&Config::default().with_clock(80.kHz()))
             .unwrap();
 
         // Set up a large buffer that would trigger a timeout
@@ -728,7 +728,7 @@ mod tests {
     fn can_transmit_after_cancel(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         ctx.spi
-            .apply_config(&Config::default().with_frequency(80.kHz()))
+            .apply_config(&Config::default().with_clock(80.kHz()))
             .unwrap();
 
         // Set up a large buffer that would trigger a timeout
@@ -745,7 +745,7 @@ mod tests {
         transfer.cancel();
         (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
 
-        spi.apply_config(&Config::default().with_frequency(10.MHz()))
+        spi.apply_config(&Config::default().with_clock(10.MHz()))
             .unwrap();
 
         let transfer = spi
