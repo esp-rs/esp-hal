@@ -183,7 +183,7 @@ impl Timeout {
 
     #[cfg(not(esp32))]
     fn is_set(&self) -> bool {
-        matches!(self, Timeout::BusCycles(_)) || matches!(self, Timeout::Maximum)
+        matches!(self, Timeout::BusCycles(_) | Timeout::Maximum)
     }
 }
 
@@ -1231,7 +1231,7 @@ impl Driver<'_> {
         let hold = half_cycle;
         let timeout = Timeout::BusCycles(match timeout {
             Timeout::Maximum => 0xF_FFFF,
-            Timeout::BusCycles(cycles) => (cycles * 2 * half_cycle).check_timeout(0xF_FFFF)?,
+            Timeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xF_FFFF)?,
         });
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
@@ -1332,7 +1332,7 @@ impl Driver<'_> {
 
         let timeout = Timeout::BusCycles(match timeout {
             Timeout::Maximum => 0xFF_FFFF,
-            Timeout::BusCycles(cycles) => (cycles * 2 * half_cycle).check_timeout(0xFF_FFFF)?,
+            Timeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xFF_FFFF)?,
         });
 
         configure_clock(
@@ -1414,7 +1414,7 @@ impl Driver<'_> {
                 let log2 = to_peri.ilog2();
                 // Round up so that we don't shorten timeouts.
                 let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                Timeout::BusCycles(raw.check_timeout(0x1F)?)
+                Timeout::BusCycles(check_timeout(raw, 0x1F)?)
             }
         };
 
@@ -2294,17 +2294,11 @@ impl Driver<'_> {
     }
 }
 
-trait CheckTimeout {
-    fn check_timeout(&self, max: u32) -> Result<u32, ConfigError>;
-}
-
-impl CheckTimeout for u32 {
-    fn check_timeout(&self, max: u32) -> Result<u32, ConfigError> {
-        if *self <= max {
-            Ok(*self)
-        } else {
-            Err(ConfigError::TimeoutInvalid)
-        }
+fn check_timeout(v: u32, max: u32) -> Result<u32, ConfigError> {
+    if v <= max {
+        Ok(v)
+    } else {
+        Err(ConfigError::TimeoutInvalid)
     }
 }
 
