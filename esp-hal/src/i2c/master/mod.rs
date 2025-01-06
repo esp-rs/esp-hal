@@ -44,6 +44,7 @@ use core::{
     task::{Context, Poll},
 };
 
+use _private::{AddressModeInternal, I2cAddress};
 #[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
 use embedded_hal::i2c::Operation as EhalOperation;
@@ -93,11 +94,23 @@ pub trait AddressMode: _private::AddressModeInternal + Copy + 'static {}
 
 mod _private {
     pub trait AddressModeInternal {
-        fn is_seven_bit(&self) -> bool;
+        fn as_i2c_address(&self) -> super::I2cAddress;
+    }
 
-        fn as_u8(&self) -> u8;
+    /// Internally used representation of an I2C address.
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub enum I2cAddress {
+        /// Seven bit address
+        SevenBit(super::SevenBitAddress),
+    }
 
-        fn as_u16(&self) -> u16;
+    impl I2cAddress {
+        pub fn as_u8(&self) -> u8 {
+            match self {
+                I2cAddress::SevenBit(addr) => *addr,
+            }
+        }
     }
 }
 
@@ -116,16 +129,8 @@ pub type SevenBitAddress = u8;
 impl AddressMode for SevenBitAddress {}
 
 impl _private::AddressModeInternal for SevenBitAddress {
-    fn is_seven_bit(&self) -> bool {
-        true
-    }
-
-    fn as_u8(&self) -> u8 {
-        *self
-    }
-
-    fn as_u16(&self) -> u16 {
-        unreachable!()
+    fn as_i2c_address(&self) -> I2cAddress {
+        I2cAddress::SevenBit(*self)
     }
 }
 
@@ -432,8 +437,11 @@ impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction_impl(address, operations.iter_mut().map(Operation::from))
-            .inspect_err(|_| self.internal_recover())
+        self.transaction_impl(
+            address.as_i2c_address(),
+            operations.iter_mut().map(Operation::from),
+        )
+        .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -461,9 +469,9 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
         Ok(())
     }
 
-    fn transaction_impl<'a, A: AddressMode>(
+    fn transaction_impl<'a>(
         &mut self,
-        address: A,
+        address: I2cAddress,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
@@ -586,14 +594,14 @@ impl<'d> I2c<'d, Blocking> {
     /// Writes bytes to slave with address `address`
     pub fn write<A: AddressMode>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
-            .write_blocking(address, buffer, true, true)
+            .write_blocking(address.as_i2c_address(), buffer, true, true)
             .inspect_err(|_| self.internal_recover())
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
     pub fn read<A: AddressMode>(&mut self, address: A, buffer: &mut [u8]) -> Result<(), Error> {
         self.driver()
-            .read_blocking(address, buffer, true, true, false)
+            .read_blocking(address.as_i2c_address(), buffer, true, true, false)
             .inspect_err(|_| self.internal_recover())
     }
 
@@ -606,11 +614,16 @@ impl<'d> I2c<'d, Blocking> {
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
         self.driver()
-            .write_blocking(address, write_buffer, true, read_buffer.is_empty())
+            .write_blocking(
+                address.as_i2c_address(),
+                write_buffer,
+                true,
+                read_buffer.is_empty(),
+            )
             .inspect_err(|_| self.internal_recover())?;
 
         self.driver()
-            .read_blocking(address, read_buffer, true, true, false)
+            .read_blocking(address.as_i2c_address(), read_buffer, true, true, false)
             .inspect_err(|_| self.internal_recover())?;
 
         Ok(())
@@ -639,8 +652,11 @@ impl<'d> I2c<'d, Blocking> {
         address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
-        self.transaction_impl(address, operations.into_iter().map(Operation::from))
-            .inspect_err(|_| self.internal_recover())
+        self.transaction_impl(
+            address.as_i2c_address(),
+            operations.into_iter().map(Operation::from),
+        )
+        .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -774,7 +790,7 @@ impl<'d> I2c<'d, Async> {
     /// Writes bytes to slave with address `address`
     pub async fn write<A: AddressMode>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
-            .write(address, buffer, true, true)
+            .write(address.as_i2c_address(), buffer, true, true)
             .await
             .inspect_err(|_| self.internal_recover())
     }
@@ -786,7 +802,7 @@ impl<'d> I2c<'d, Async> {
         buffer: &mut [u8],
     ) -> Result<(), Error> {
         self.driver()
-            .read(address, buffer, true, true, false)
+            .read(address.as_i2c_address(), buffer, true, true, false)
             .await
             .inspect_err(|_| self.internal_recover())
     }
@@ -800,12 +816,17 @@ impl<'d> I2c<'d, Async> {
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
         self.driver()
-            .write(address, write_buffer, true, read_buffer.is_empty())
+            .write(
+                address.as_i2c_address(),
+                write_buffer,
+                true,
+                read_buffer.is_empty(),
+            )
             .await
             .inspect_err(|_| self.internal_recover())?;
 
         self.driver()
-            .read(address, read_buffer, true, true, false)
+            .read(address.as_i2c_address(), read_buffer, true, true, false)
             .await
             .inspect_err(|_| self.internal_recover())?;
 
@@ -836,14 +857,17 @@ impl<'d> I2c<'d, Async> {
         address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
-        self.transaction_impl_async(address, operations.into_iter().map(Operation::from))
-            .await
-            .inspect_err(|_| self.internal_recover())
+        self.transaction_impl_async(
+            address.as_i2c_address(),
+            operations.into_iter().map(Operation::from),
+        )
+        .await
+        .inspect_err(|_| self.internal_recover())
     }
 
-    async fn transaction_impl_async<'a, A: AddressMode>(
+    async fn transaction_impl_async<'a>(
         &mut self,
-        address: A,
+        address: I2cAddress,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
@@ -899,9 +923,12 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
         address: u8,
         operations: &mut [EhalOperation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction_impl_async(address, operations.iter_mut().map(Operation::from))
-            .await
-            .inspect_err(|_| self.internal_recover())
+        self.transaction_impl_async(
+            address.as_i2c_address(),
+            operations.iter_mut().map(Operation::from),
+        )
+        .await
+        .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -1421,9 +1448,9 @@ impl Driver<'_> {
     /// - `start` indicates whether the operation should start by a START
     ///   condition and sending the address.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn setup_write<'a, I, A: AddressMode>(
+    fn setup_write<'a, I>(
         &self,
-        addr: A,
+        addr: I2cAddress,
         bytes: &[u8],
         start: bool,
         cmd_iterator: &mut I,
@@ -1473,9 +1500,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn setup_read<'a, I, A: AddressMode>(
+    fn setup_read<'a, I>(
         &self,
-        addr: A,
+        addr: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         will_continue: bool,
@@ -1972,9 +1999,9 @@ impl Driver<'_> {
             .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
-    fn start_write_operation<A: AddressMode>(
+    fn start_write_operation(
         &self,
-        address: A,
+        address: I2cAddress,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -2009,9 +2036,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn start_read_operation<A: AddressMode>(
+    fn start_read_operation(
         &self,
-        address: A,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2044,9 +2071,9 @@ impl Driver<'_> {
     /// - `stop` indicates whether the operation should end with a STOP
     ///   condition.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn write_operation_blocking<A: AddressMode>(
+    fn write_operation_blocking(
         &self,
-        address: A,
+        address: I2cAddress,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -2076,9 +2103,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    fn read_operation_blocking<A: AddressMode>(
+    fn read_operation_blocking(
         &self,
-        address: A,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2106,9 +2133,9 @@ impl Driver<'_> {
     /// - `stop` indicates whether the operation should end with a STOP
     ///   condition.
     /// - `cmd_iterator` is an iterator over the command registers.
-    async fn write_operation<A: AddressMode>(
+    async fn write_operation(
         &self,
-        address: A,
+        address: I2cAddress,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -2138,9 +2165,9 @@ impl Driver<'_> {
     /// - `will_continue` indicates whether there is another read operation
     ///   following this one and we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
-    async fn read_operation<A: AddressMode>(
+    async fn read_operation(
         &self,
-        address: A,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2160,9 +2187,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    fn read_blocking<A: AddressMode>(
+    fn read_blocking(
         &self,
-        address: A,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2182,9 +2209,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    fn write_blocking<A: AddressMode>(
+    fn write_blocking(
         &self,
-        address: A,
+        address: I2cAddress,
         buffer: &[u8],
         start: bool,
         stop: bool,
@@ -2205,9 +2232,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    async fn read<A: AddressMode>(
+    async fn read(
         &self,
-        address: A,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2228,9 +2255,9 @@ impl Driver<'_> {
         Ok(())
     }
 
-    async fn write<A: AddressMode>(
+    async fn write(
         &self,
-        address: A,
+        address: I2cAddress,
         buffer: &[u8],
         start: bool,
         stop: bool,
