@@ -863,7 +863,8 @@ where
         }
 
         if self.rx_fifo_count() > 0 {
-            Ok(fifo.read().rxfifo_rd_byte().bits())
+            let byte = crate::interrupt::free(|| fifo.read().rxfifo_rd_byte().bits());
+            Ok(byte)
         } else {
             Err(nb::Error::WouldBlock)
         }
