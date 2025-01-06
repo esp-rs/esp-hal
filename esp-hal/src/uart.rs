@@ -686,7 +686,7 @@ where
     #[allow(clippy::useless_conversion)]
     /// Returns the number of bytes currently in the TX FIFO for this UART
     /// instance.
-    fn tx_fifo_count(&self) -> u16 {
+    pub fn tx_fifo_count(&self) -> u16 {
         self.register_block()
             .status()
             .read()
@@ -708,7 +708,7 @@ where
     ///
     /// Returns `true` if the transmit line is idle, meaning no data is
     /// currently being transmitted.
-    fn is_tx_idle(&self) -> bool {
+    pub fn is_tx_idle(&self) -> bool {
         #[cfg(esp32)]
         let status = self.register_block().status();
         #[cfg(not(esp32))]
