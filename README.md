@@ -20,7 +20,7 @@ If you have any questions, comments, or concerns, please [open an issue], [start
 
 > [!NOTE]
 >
-> This project is still in the relatively early stages of development, and as such there should be no expectation of API stability. A significant number of peripherals currently have drivers implemented but have varying levels of functionality. For most tasks, this should be usable already, however some more advanced or uncommon features may not yet be implemented.
+> This project is still in the relatively early stages of development. A significant number of peripherals currently have drivers implemented but have varying levels of functionality. For most tasks, this should be usable already, however some more advanced or uncommon features may not yet be implemented.
 
 [esp-lp-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp-lp-hal
 [esp-idf-svc]: https://github.com/esp-rs/esp-idf-svc

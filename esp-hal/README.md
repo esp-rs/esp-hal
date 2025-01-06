@@ -46,6 +46,12 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [s2-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf
 [s3-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
 
+## `unstable` feature
+
+We aim to avoid enabling experimental features automatically. Allowing automatic access could result in users unintentionally utilizing APIs that are still under development.
+
+This feature is **NOT** enabled by default. 
+
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is guaranteed to compile on stable Rust 1.83 and up. It _might_
