@@ -235,6 +235,8 @@ impl core::fmt::Display for Error {
 pub enum ConfigError {
     /// Provided bus frequency is invalid for the current configuration.
     FrequencyInvalid,
+    /// Provided timeout is invalid for the current configuration.
+    TimeoutInvalid,
 }
 
 impl core::error::Error for ConfigError {}
@@ -245,6 +247,10 @@ impl core::fmt::Display for ConfigError {
             ConfigError::FrequencyInvalid => write!(
                 f,
                 "Provided bus frequency is invalid for the current configuration"
+            ),
+            ConfigError::TimeoutInvalid => write!(
+                f,
+                "Provided timeout is invalid for the current configuration"
             ),
         }
     }
@@ -1223,7 +1229,10 @@ impl Driver<'_> {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let timeout = Timeout::BusCycles((timeout.cycles() * 2 * half_cycle).min(0xF_FFFF));
+        let timeout = Timeout::BusCycles(match timeout {
+            Timeout::Maximum => 0xF_FFFF,
+            Timeout::BusCycles(cycles) => (cycles * 2 * half_cycle).check_timeout(0xF_FFFF)?,
+        });
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -1321,6 +1330,11 @@ impl Driver<'_> {
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold;
 
+        let timeout = Timeout::BusCycles(match timeout {
+            Timeout::Maximum => 0xFF_FFFF,
+            Timeout::BusCycles(cycles) => (cycles * 2 * half_cycle).check_timeout(0xFF_FFFF)?,
+        });
+
         configure_clock(
             self.register_block(),
             0,
@@ -1333,7 +1347,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            Timeout::BusCycles((timeout.cycles() * 2 * half_cycle).min(0xFF_FFFF)),
+            timeout,
         )?;
 
         Ok(())
@@ -1392,6 +1406,18 @@ impl Driver<'_> {
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold - 1;
 
+        let timeout = match timeout {
+            Timeout::Maximum => Timeout::BusCycles(0x1F),
+            Timeout::Disabled => Timeout::Disabled,
+            Timeout::BusCycles(cycles) => {
+                let to_peri = (cycles * 2 * half_cycle).max(1);
+                let log2 = to_peri.ilog2();
+                // Round up so that we don't shorten timeouts.
+                let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
+                Timeout::BusCycles(raw.check_timeout(0x1F)?)
+            }
+        };
+
         configure_clock(
             self.register_block(),
             clkm_div,
@@ -1404,19 +1430,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            {
-                match timeout {
-                    Timeout::Maximum => Timeout::BusCycles(0x1F),
-                    Timeout::Disabled => Timeout::Disabled,
-                    _ => {
-                        let to_peri = (timeout.cycles() * 2 * half_cycle).max(1);
-                        let log2 = to_peri.ilog2();
-                        // Round up so that we don't shorten timeouts.
-                        let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                        Timeout::BusCycles(raw.min(0x1F))
-                    }
-                }
-            },
+            timeout,
         )?;
 
         Ok(())
@@ -2277,6 +2291,20 @@ impl Driver<'_> {
         }
 
         Ok(())
+    }
+}
+
+trait CheckTimeout {
+    fn check_timeout(&self, max: u32) -> Result<u32, ConfigError>;
+}
+
+impl CheckTimeout for u32 {
+    fn check_timeout(&self, max: u32) -> Result<u32, ConfigError> {
+        if *self <= max {
+            Ok(*self)
+        } else {
+            Err(ConfigError::TimeoutInvalid)
+        }
     }
 }
 
