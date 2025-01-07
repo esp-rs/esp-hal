@@ -8,6 +8,8 @@
 
 use digest::{Digest, Update};
 #[cfg(not(feature = "esp32"))]
+use esp_hal::clock::CpuClock;
+#[cfg(not(feature = "esp32"))]
 use esp_hal::sha::Sha224;
 #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha384, Sha512};

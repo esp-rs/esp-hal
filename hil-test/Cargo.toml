@@ -292,9 +292,11 @@ embassy = [
     "dep:esp-hal-embassy",
 ]
 generic-queue = [
+    "embassy",
     "embassy-time/generic-queue-64"
 ]
 integrated-timers = [
+    "embassy",
     "esp-hal-embassy/integrated-timers",
 ]
 octal-psram = ["esp-hal/octal-psram", "esp-alloc"]
