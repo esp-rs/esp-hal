@@ -1,5 +1,5 @@
 use esp_wifi_sys::include::timeval;
-use hal::macros::ram;
+use hal::ram;
 
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},

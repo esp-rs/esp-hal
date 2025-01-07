@@ -530,7 +530,8 @@ mod asynch {
     use super::*;
     use crate::{
         asynch::AtomicWaker,
-        macros::{handler, ram},
+        handler,
+        ram,
         Async,
     };
 

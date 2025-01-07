@@ -3370,7 +3370,7 @@ macro_rules! master_instance {
             }
 
             fn handler(&self) -> InterruptHandler {
-                #[$crate::macros::handler]
+                #[$crate::handler]
                 #[cfg_attr(place_spi_driver_in_ram, ram)]
                 fn handle() {
                     handle_async(unsafe { $crate::peripherals::$peri::steal() })

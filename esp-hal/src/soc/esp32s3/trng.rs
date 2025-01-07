@@ -15,7 +15,7 @@ const ADC_SARADC_DTEST_RTC_ADDR: u32 = 0x7;
 const ADC_SARADC_DTEST_RTC_ADDR_MSB: u32 = 1;
 const ADC_SARADC_DTEST_RTC_ADDR_LSB: u32 = 0;
 
-use crate::regi2c_write_mask;
+use crate::rom::regi2c_write_mask;
 
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.

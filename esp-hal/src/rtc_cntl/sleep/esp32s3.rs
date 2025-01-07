@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     gpio::{RtcFunction, RtcPin},
-    regi2c_write_mask,
+    rom::regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
 };
 

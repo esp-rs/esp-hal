@@ -167,17 +167,10 @@ pub use self::soc::ulp_core;
 
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
-
-pub mod config;
-
-#[cfg(any(xtensa, all(riscv, systimer)))]
-pub mod delay;
 #[cfg(gpio)]
 pub mod gpio;
 #[cfg(any(i2c0, i2c1))]
 pub mod i2c;
-#[cfg(any(dport, interrupt_core0, interrupt_core1))]
-pub mod interrupt;
 pub mod peripheral;
 #[cfg(any(hmac, sha))]
 mod reg_access;
@@ -186,13 +179,13 @@ pub mod spi;
 #[cfg(any(uart0, uart1, uart2))]
 pub mod uart;
 
-pub mod macros;
-pub mod rom;
+mod macros;
 
-pub mod debugger;
-#[doc(hidden)]
-pub mod sync;
-pub mod time;
+#[cfg(any(lp_core, ulp_riscv_core))]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use procmacros::load_lp_code;
+pub use procmacros::{handler, ram};
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
@@ -225,6 +218,10 @@ unstable_module! {
     pub mod analog;
     #[cfg(assist_debug)]
     pub mod assist_debug;
+    pub mod config;
+    pub mod debugger;
+    #[cfg(any(xtensa, all(riscv, systimer)))]
+    pub mod delay;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
     #[cfg(ecc)]
@@ -235,6 +232,8 @@ unstable_module! {
     pub mod hmac;
     #[cfg(any(i2s0, i2s1))]
     pub mod i2s;
+    #[cfg(any(dport, interrupt_core0, interrupt_core1))]
+    pub mod interrupt;
     #[cfg(lcd_cam)]
     pub mod lcd_cam;
     #[cfg(ledc)]
@@ -253,14 +252,18 @@ unstable_module! {
     pub mod rmt;
     #[cfg(rng)]
     pub mod rng;
+    pub mod rom;
     #[cfg(rsa)]
     pub mod rsa;
     #[cfg(any(lp_clkrst, rtc_cntl))]
     pub mod rtc_cntl;
     #[cfg(sha)]
     pub mod sha;
+    #[doc(hidden)]
+    pub mod sync;
     #[cfg(any(dport, hp_sys, pcr, system))]
     pub mod system;
+    pub mod time;
     #[cfg(any(systimer, timg0, timg1))]
     pub mod timer;
     #[cfg(touch)]
@@ -493,9 +496,10 @@ unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
 }
 
+#[cfg(feature = "unstable")]
+use crate::config::{WatchdogConfig, WatchdogStatus};
 use crate::{
     clock::{Clocks, CpuClock},
-    config::{WatchdogConfig, WatchdogStatus},
     peripherals::Peripherals,
 };
 
@@ -514,9 +518,13 @@ pub struct Config {
     pub cpu_clock: CpuClock,
 
     /// Enable watchdog timer(s).
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
     pub psram: psram::PsramConfig,
 }
@@ -533,43 +541,61 @@ pub fn init(config: Config) -> Peripherals {
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
 
-    #[cfg(not(any(esp32, esp32s2)))]
-    if config.watchdog.swd {
-        rtc.swd.enable();
-    } else {
-        rtc.swd.disable();
-    }
+    // Handle watchdog configuration with defaults
+    cfg_if::cfg_if! {
+        if #[cfg(any(doc, feature = "unstable"))]
+        {
+            #[cfg(not(any(esp32, esp32s2)))]
+            if config.watchdog.swd {
+                rtc.swd.enable();
+            } else {
+                rtc.swd.disable();
+            }
 
-    match config.watchdog.rwdt {
-        WatchdogStatus::Enabled(duration) => {
-            rtc.rwdt.enable();
-            rtc.rwdt
-                .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
+            match config.watchdog.rwdt {
+                WatchdogStatus::Enabled(duration) => {
+                    rtc.rwdt.enable();
+                    rtc.rwdt
+                        .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
+                }
+                WatchdogStatus::Disabled => {
+                    rtc.rwdt.disable();
+                }
+            }
+
+            match config.watchdog.timg0 {
+                WatchdogStatus::Enabled(duration) => {
+                    let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
+                    timg0_wd.enable();
+                    timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
+                }
+                WatchdogStatus::Disabled => {
+                    crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
+                }
+            }
+
+            #[cfg(timg1)]
+            match config.watchdog.timg1 {
+                WatchdogStatus::Enabled(duration) => {
+                    let mut timg1_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
+                    timg1_wd.enable();
+                    timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
+                }
+                WatchdogStatus::Disabled => {
+                    crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();
+                }
+            }
         }
-        WatchdogStatus::Disabled => {
+        else
+        {
+            #[cfg(not(any(esp32, esp32s2)))]
+            rtc.swd.disable();
+
             rtc.rwdt.disable();
-        }
-    }
 
-    match config.watchdog.timg0 {
-        WatchdogStatus::Enabled(duration) => {
-            let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
-            timg0_wd.enable();
-            timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
-        }
-        WatchdogStatus::Disabled => {
             crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
-        }
-    }
 
-    #[cfg(timg1)]
-    match config.watchdog.timg1 {
-        WatchdogStatus::Enabled(duration) => {
-            let mut timg1_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
-            timg1_wd.enable();
-            timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
-        }
-        WatchdogStatus::Disabled => {
+            #[cfg(timg1)]
             crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();
         }
     }

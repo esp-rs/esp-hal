@@ -62,6 +62,8 @@ macro_rules! regi2c_write {
     };
 }
 
+pub use regi2c_write; // TODO: can be removed as soon as ROM is stabilized
+
 #[doc(hidden)]
 #[macro_export]
 macro_rules! regi2c_write_mask {
@@ -81,6 +83,8 @@ macro_rules! regi2c_write_mask {
         }
     };
 }
+
+pub use regi2c_write_mask; // TODO: can be removed as soon as ROM is stabilized
 
 #[inline(always)]
 pub(crate) fn ets_delay_us(us: u32) {

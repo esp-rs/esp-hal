@@ -12,8 +12,8 @@ use critical_section::Mutex;
 use esp_hal::{
     clock::CpuClock,
     delay::Delay,
+    handler,
     interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
-    macros::handler,
     peripherals::Peripherals,
     rng::Rng,
     timer::timg::TimerGroup,

@@ -12,12 +12,7 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{
-    assist_debug::DebugAssist,
-    entry,
-    interrupt::InterruptConfigurable,
-    macros::handler,
-};
+use esp_hal::{assist_debug::DebugAssist, entry, handler, interrupt::InterruptConfigurable};
 use esp_println::println;
 
 static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));

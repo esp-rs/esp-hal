@@ -2510,7 +2510,7 @@ macro_rules! impl_instance {
     ($inst:ident, $peri:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst {
             fn parts(&self) -> (&'static Info, &'static State) {
-                #[crate::macros::handler]
+                #[crate::handler]
                 pub(super) fn irq_handler() {
                     intr_handler(&PERIPHERAL, &STATE);
                 }

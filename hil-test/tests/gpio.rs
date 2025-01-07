@@ -15,7 +15,7 @@ use embassy_time::{Duration, Timer};
 use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, Input, Level, Output, OutputOpenDrain, Pin, Pull},
-    macros::handler,
+    handler,
 };
 #[cfg(feature = "unstable")]
 use esp_hal::{
