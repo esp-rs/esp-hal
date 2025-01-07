@@ -1194,10 +1194,7 @@ where
             return Err(EspTwaiError::BusOff);
         }
         // Check that the peripheral is not already transmitting a packet.
-        if !status.tx_buf_st().bit_is_set() {
-            return Err(EspTwaiError::WouldBlock); // TODO: Is this the right
-                                                  // error?
-        }
+        while !status.tx_buf_st().bit_is_set() {}
 
         write_frame(register_block, frame);
 
@@ -1227,9 +1224,7 @@ where
         }
 
         // Check that we actually have packets to receive.
-        if !status.rx_buf_st().bit_is_set() {
-            return Err(EspTwaiError::WouldBlock);
-        }
+        while !status.rx_buf_st().bit_is_set() {}
 
         // Check if the packet in the receive buffer is valid or overrun.
         if status.miss_st().bit_is_set() {
@@ -1252,8 +1247,6 @@ pub enum EspTwaiError {
     NonCompliantDlc(u8),
     /// Encapsulates errors defined by the embedded-hal crate.
     EmbeddedHAL(ErrorKind),
-    /// This operation requires blocking behavior to complete
-    WouldBlock,
 }
 
 #[cfg(any(doc, feature = "unstable"))]
