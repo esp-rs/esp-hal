@@ -70,7 +70,7 @@ pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
 
         // Configure 480M PLL
         match xtal_freq {
-            XtalClock::RtcXtalFreq40M => {
+            XtalClock::_40M => {
                 div_ref = 0;
                 div7_0 = 8;
                 dr1 = 0;
@@ -80,7 +80,7 @@ pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
                 dbias = 2;
             }
 
-            XtalClock::RtcXtalFreq32M => {
+            XtalClock::_32M => {
                 div_ref = 1;
                 div7_0 = 26;
                 dr1 = 1;
@@ -90,7 +90,7 @@ pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
                 dbias = 2;
             }
 
-            XtalClock::RtcXtalFreqOther(_) => {
+            XtalClock::Other(_) => {
                 div_ref = 0;
                 div7_0 = 8;
                 dr1 = 0;
@@ -110,7 +110,7 @@ pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
 
         // Configure 320M PLL
         match xtal_freq {
-            XtalClock::RtcXtalFreq40M => {
+            XtalClock::_40M => {
                 div_ref = 0;
                 div7_0 = 4;
                 dr1 = 0;
@@ -120,7 +120,7 @@ pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
                 dbias = 2;
             }
 
-            XtalClock::RtcXtalFreq32M => {
+            XtalClock::_32M => {
                 div_ref = 1;
                 div7_0 = 6;
                 dr1 = 0;
@@ -130,7 +130,7 @@ pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
                 dbias = 2;
             }
 
-            XtalClock::RtcXtalFreqOther(_) => {
+            XtalClock::Other(_) => {
                 div_ref = 0;
                 div7_0 = 4;
                 dr1 = 0;
@@ -211,8 +211,8 @@ pub(crate) fn esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
             .modify(|_, w| w.pre_div_cnt().bits(0).soc_clk_sel().bits(1));
         system_control.cpu_per_conf().modify(|_, w| {
             w.cpuperiod_sel().bits(match cpu_clock_speed {
-                CpuClock::Clock80MHz => 0,
-                CpuClock::Clock160MHz => 1,
+                CpuClock::_80MHz => 0,
+                CpuClock::_160MHz => 1,
             })
         });
     }

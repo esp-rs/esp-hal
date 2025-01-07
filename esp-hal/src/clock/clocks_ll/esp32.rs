@@ -64,7 +64,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 
         // Configure 320M PLL
         match xtal_freq {
-            XtalClock::RtcXtalFreq40M => {
+            XtalClock::_40M => {
                 div_ref = 0;
                 div7_0 = 32;
                 div10_8 = 0;
@@ -73,7 +73,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 bw = 3;
             }
 
-            XtalClock::RtcXtalFreq26M => {
+            XtalClock::_26M => {
                 div_ref = 12;
                 div7_0 = 224;
                 div10_8 = 4;
@@ -82,7 +82,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 bw = 1;
             }
 
-            XtalClock::RtcXtalFreqOther(_) => {
+            XtalClock::Other(_) => {
                 div_ref = 12;
                 div7_0 = 224;
                 div10_8 = 4;
@@ -102,7 +102,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 
         // Configure 480M PLL
         match xtal_freq {
-            XtalClock::RtcXtalFreq40M => {
+            XtalClock::_40M => {
                 div_ref = 0;
                 div7_0 = 28;
                 div10_8 = 0;
@@ -111,7 +111,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 bw = 3;
             }
 
-            XtalClock::RtcXtalFreq26M => {
+            XtalClock::_26M => {
                 div_ref = 12;
                 div7_0 = 144;
                 div10_8 = 4;
@@ -120,7 +120,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 bw = 1;
             }
 
-            XtalClock::RtcXtalFreqOther(_) => {
+            XtalClock::Other(_) => {
                 div_ref = 12;
                 div7_0 = 224;
                 div10_8 = 4;
@@ -220,14 +220,14 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
         let per_conf;
 
         match cpu_freq_mhz {
-            crate::clock::CpuClock::Clock160MHz => {
+            crate::clock::CpuClock::_160MHz => {
                 per_conf = CPU_160M;
             }
-            crate::clock::CpuClock::Clock240MHz => {
+            crate::clock::CpuClock::_240MHz => {
                 dbias = dig_dbias_240_m;
                 per_conf = CPU_240M;
             }
-            crate::clock::CpuClock::Clock80MHz => {
+            crate::clock::CpuClock::_80MHz => {
                 per_conf = CPU_80M;
             }
         }

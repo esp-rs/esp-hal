@@ -563,12 +563,12 @@ impl RtcClock {
     #[cfg(not(any(esp32c6, esp32h2)))]
     pub fn xtal_freq() -> XtalClock {
         match Self::read_xtal_freq_mhz() {
-            None | Some(40) => XtalClock::RtcXtalFreq40M,
+            None | Some(40) => XtalClock::_40M,
             #[cfg(any(esp32c3, esp32s3))]
-            Some(32) => XtalClock::RtcXtalFreq32M,
+            Some(32) => XtalClock::_32M,
             #[cfg(any(esp32, esp32c2))]
-            Some(26) => XtalClock::RtcXtalFreq26M,
-            Some(other) => XtalClock::RtcXtalFreqOther(other),
+            Some(26) => XtalClock::_26M,
+            Some(other) => XtalClock::Other(other),
         }
     }
 

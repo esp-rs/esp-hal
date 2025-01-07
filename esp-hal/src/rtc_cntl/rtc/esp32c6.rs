@@ -1200,7 +1200,7 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(RtcClock::xtal_freq(), XtalClock::RtcXtalFreq40M));
+    assert!(matches!(RtcClock::xtal_freq(), XtalClock::_40M));
 
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
 
@@ -1429,8 +1429,8 @@ impl RtcClock {
     /// bootloader, as passed to rtc_clk_init function.
     pub fn xtal_freq() -> XtalClock {
         match Self::xtal_freq_mhz() {
-            40 => XtalClock::RtcXtalFreq40M,
-            other => XtalClock::RtcXtalFreqOther(other),
+            40 => XtalClock::_40M,
+            other => XtalClock::Other(other),
         }
     }
 
