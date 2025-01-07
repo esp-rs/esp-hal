@@ -13,7 +13,6 @@ use esp_hal::sha::{Sha384, Sha512};
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha512_224, Sha512_256};
 use esp_hal::{
-    clock::CpuClock,
     rng::Rng,
     sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaDigest},
 };
