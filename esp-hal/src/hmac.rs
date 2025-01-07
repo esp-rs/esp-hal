@@ -150,32 +150,26 @@ impl<'d> Hmac<'d> {
     }
 
     /// Process the msg block after block
-    ///
-    /// Call this function as many times as necessary (msg.len() > 0)
-    pub fn update<'a>(&mut self, msg: &'a [u8]) -> Option<&'a [u8]> {
-        if self.is_busy() {
-            return None;
-        }
+    pub fn update<'a>(&mut self, msg: &'a [u8]) -> &'a [u8] {
+        while (&mut *self).is_busy() {}
 
         self.next_command();
 
-        let remaining = self.write_data(msg).unwrap();
+        let remaining = self.write_data(msg);
 
-        Some(remaining)
+        remaining
     }
 
     /// Finalizes the HMAC computation and retrieves the resulting hash output.
-    pub fn finalize(&mut self, output: &mut [u8]) -> Option<()> {
-        if self.is_busy() {
-            return None;
-        }
+    pub fn finalize(&mut self, output: &mut [u8]) {
+        while (&mut *self).is_busy() {}
 
         self.next_command();
 
         let msg_len = self.byte_written as u64;
 
-        self.write_data(&[0x80])?;
-        self.flush_data()?;
+        self.write_data(&[0x80]);
+        self.flush_data();
         self.next_command();
         debug_assert!(self.byte_written % 4 == 0);
 
@@ -202,7 +196,6 @@ impl<'d> Hmac<'d> {
             .write(|w| w.set_result_end().set_bit());
         self.byte_written = 64;
         self.next_command = NextCommand::None;
-        Some(())
     }
 
     fn is_busy(&mut self) -> bool {
@@ -226,7 +219,7 @@ impl<'d> Hmac<'d> {
         self.next_command = NextCommand::None;
     }
 
-    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> Option<&'a [u8]> {
+    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> &'a [u8] {
         let mod_length = self.byte_written % 64;
 
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
@@ -255,13 +248,11 @@ impl<'d> Hmac<'d> {
             }
         }
 
-        Some(remaining)
+        remaining
     }
 
-    fn flush_data(&mut self) -> Option<()> {
-        if self.is_busy() {
-            return None;
-        }
+    fn flush_data(&mut self) {
+        while self.is_busy() {}
 
         let flushed = self.alignment_helper.flush_to(
             #[cfg(esp32s2)]
@@ -279,8 +270,6 @@ impl<'d> Hmac<'d> {
             while self.is_busy() {}
             self.next_command = NextCommand::MessagePad;
         }
-
-        Some(())
     }
 
     fn padding(&mut self, msg_len: u64) {

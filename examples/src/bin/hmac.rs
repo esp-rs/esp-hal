@@ -96,10 +96,10 @@ fn main() -> ! {
             .configure(HmacPurpose::ToUser, KeyId::Key0)
             .expect("Key purpose mismatch");
         let pre_hw_hmac = esp_hal::time::now();
-        while let Some(rem) = hw_hmac.update(remaining) {
-            remaining = rem;
+        while remaining.len() > 0 {
+            remaining = hw_hmac.update(remaining);
         }
-        while hw_hmac.finalize(output.as_mut_slice()).is_none() {}
+        hw_hmac.finalize(output.as_mut_slice());
         let post_hw_hmac = esp_hal::time::now();
         let hw_time = post_hw_hmac - pre_hw_hmac;
         let mut sw_hmac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
