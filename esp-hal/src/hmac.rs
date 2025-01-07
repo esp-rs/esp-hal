@@ -151,7 +151,7 @@ impl<'d> Hmac<'d> {
 
     /// Process the msg block after block
     pub fn update<'a>(&mut self, msg: &'a [u8]) -> &'a [u8] {
-        while (&mut *self).is_busy() {}
+        while (*self).is_busy() {}
 
         self.next_command();
 
@@ -162,7 +162,7 @@ impl<'d> Hmac<'d> {
 
     /// Finalizes the HMAC computation and retrieves the resulting hash output.
     pub fn finalize(&mut self, output: &mut [u8]) {
-        while (&mut *self).is_busy() {}
+        while (*self).is_busy() {}
 
         self.next_command();
 
