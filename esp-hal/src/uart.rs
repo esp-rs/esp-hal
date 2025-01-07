@@ -863,7 +863,15 @@ where
         }
 
         if self.rx_fifo_count() > 0 {
-            let byte = crate::interrupt::free(|| fifo.read().rxfifo_rd_byte().bits());
+            // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    let byte = crate::interrupt::free(|| fifo.read().rxfifo_rd_byte().bits());
+                } else {
+                    let byte = fifo.read().rxfifo_rd_byte().bits();
+                }
+            }
+
             Ok(byte)
         } else {
             Err(nb::Error::WouldBlock)
