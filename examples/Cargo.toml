@@ -43,13 +43,12 @@ sha2                = { version = "0.10.8", default-features = false }
 smoltcp             = { version = "0.12.0", default-features = false, features = [ "medium-ethernet", "socket-raw"] }
 embedded-time       = "=0.12.1"
 static_cell         = { version = "2.1.0", features = ["nightly"] }
-trouble-host        = { git = "https://github.com/embassy-rs/trouble", package = "trouble-host", rev = "4f1114ce58e96fe54f5ed7e726f66e1ad8d9ce54", features = [ "log", "gatt" ] }
 usb-device          = "0.3.2"
 usbd-serial         = "0.2.2"
-edge-dhcp = "0.3.0"
-edge-raw = "0.3.0"
-edge-nal = "0.3.0"
-edge-nal-embassy = "0.3.0"
+edge-dhcp = { version = "0.5.0", git = "https://github.com/bugadani/edge-net", rev = "b72678e15bb7c6e72809df235778bb7b48ac146d" }
+edge-raw = { version = "0.5.0", git = "https://github.com/bugadani/edge-net", rev = "b72678e15bb7c6e72809df235778bb7b48ac146d" }
+edge-nal = { version = "0.5.0", git = "https://github.com/bugadani/edge-net", rev = "b72678e15bb7c6e72809df235778bb7b48ac146d" }
+edge-nal-embassy = { version = "0.5.0", git = "https://github.com/bugadani/edge-net", rev = "b72678e15bb7c6e72809df235778bb7b48ac146d" }
 
 [features]
 esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-wifi?/esp32"]
@@ -72,8 +71,3 @@ incremental      = false
 opt-level        = 3
 lto = 'fat'
 overflow-checks  = false
-
-[patch.crates-io]
-# Patch until https://github.com/ivmarkov/edge-net/pull/50 is merged
-edge-nal = { git = "https://github.com/ivmarkov/edge-net", rev = "5a85bcc8b8726e8b7044e9526f01cdba1fd684da"}
-edge-nal-embassy = { git = "https://github.com/ivmarkov/edge-net", rev = "5a85bcc8b8726e8b7044e9526f01cdba1fd684da"}
