@@ -40,15 +40,13 @@
 //! // desired length
 //! let mut output = [0u8; 32];
 //!
-//! let source_data = loop {
-//!    if let Some(data) = hasher.finish(&mut output) {
-//!       break data;
-//!   }
+//! while !source_data.is_empty() {
+//!     source_data = hasher.update(source_data);
 //! };
 //!
 //! // Finish can be called as many times as desired to get multiple copies of
 //! // the output.
-//! while hasher.finish(output.as_mut_slice()).is_none() {}
+//! hasher.finish(output.as_mut_slice());
 //! # }
 //! ```
 //! ## Implementation State
@@ -206,7 +204,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     }
 
     /// Updates the SHA digest with the provided data buffer.
-    pub fn update<'a>(&mut self, incoming: &'a [u8]) -> Option<&'a [u8]> {
+    pub fn update<'a>(&mut self, incoming: &'a [u8]) -> &'a [u8] {
         self.finished = false;
 
         self.write_data(incoming)
@@ -219,11 +217,11 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     /// Typically, output is expected to be the size of
     /// [ShaAlgorithm::DIGEST_LENGTH], but smaller inputs can be given to
     /// get a "short hash"
-    pub fn finish(&mut self, output: &mut [u8]) -> Option<()> {
+    pub fn finish(&mut self, output: &mut [u8]) {
         // Store message length for padding
         let length = (self.cursor as u64 * 8).to_be_bytes();
         // Append "1" bit
-        self.update(&[0x80])?;
+        self.update(&[0x80]);
 
         // Flush partial data, ensures aligned cursor
         {
@@ -306,16 +304,12 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         self.first_run = true;
         self.cursor = 0;
         self.alignment_helper.reset();
-
-        Some(())
     }
 
     /// Save the current state of the digest for later continuation.
     #[cfg(not(esp32))]
-    pub fn save(&mut self, context: &mut Context<A>) -> Option<()> {
-        if self.is_busy() {
-            return None;
-        }
+    pub fn save(&mut self, context: &mut Context<A>) {
+        while self.is_busy() {}
 
         context.alignment_helper = self.alignment_helper.clone();
         context.cursor = self.cursor;
@@ -338,8 +332,6 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
                 32,
             );
         }
-
-        Some(())
     }
 
     /// Discard the current digest and return the peripheral.
@@ -379,18 +371,18 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         }
     }
 
-    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> Option<&'a [u8]> {
+    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> &'a [u8] {
         if self.message_buffer_is_full {
-            if self.is_busy() {
-                // The message buffer is full and the hardware is still processing the previous
-                // message. There's nothing to be done besides wait for the hardware.
-                return None;
-            } else {
-                // Submit the full buffer.
-                self.process_buffer();
-                // The buffer is now free for filling.
-                self.message_buffer_is_full = false;
+            while (&*&*&*self).is_busy() {
+                // The message buffer is full and the hardware is still
+                // processing the previous message. There's
+                // nothing to be done besides wait for the hardware.
             }
+
+            // Submit the full buffer.
+            self.process_buffer();
+            // The buffer is now free for filling.
+            self.message_buffer_is_full = false;
         }
 
         let mod_cursor = self.cursor % A::CHUNK_LENGTH;
@@ -418,7 +410,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
             }
         }
 
-        Some(remaining)
+        remaining
     }
 }
 
@@ -536,8 +528,8 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::OutputSizeUser for ShaD
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::Update for ShaDigest<'d, A, S> {
     fn update(&mut self, data: &[u8]) {
         let mut remaining = data.as_ref();
-        while let Some(rem) = Self::update(self, remaining) {
-            remaining = rem;
+        while !remaining.is_empty() {
+            remaining = self.update(remaining);
         }
     }
 }
@@ -545,7 +537,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::Update for ShaDigest<'d
 #[cfg(feature = "digest")]
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::FixedOutput for ShaDigest<'d, A, S> {
     fn finalize_into(mut self, out: &mut digest::Output<Self>) {
-        while self.finish(out).is_none() {}
+        self.finish(out);
     }
 }
 
