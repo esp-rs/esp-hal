@@ -35,7 +35,7 @@
 //!
 //! periodic.start(1.secs());
 //! loop {
-//!    while periodic.wait().is_none() {}
+//!    periodic.wait();
 //! }
 //! # }
 //! ```
@@ -311,14 +311,9 @@ where
     }
 
     /// "Wait" until the count down finishes without blocking.
-    pub fn wait(&mut self) -> Option<()> {
-        if self.inner.is_interrupt_set() {
-            self.inner.clear_interrupt();
-
-            Some(())
-        } else {
-            None
-        }
+    pub fn wait(&mut self) {
+        while !self.inner.is_interrupt_set() {}
+        self.inner.clear_interrupt();
     }
 
     /// Tries to cancel the active count down.
