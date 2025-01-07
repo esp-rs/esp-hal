@@ -199,7 +199,7 @@ is enabled. To retrieve the address and size of the initialized external memory,
 
 The usage of `esp_alloc::psram_allocator!` remains unchanged.
 
-## embedded-hal 0.2.* is not supported anymore.
+## embedded-hal 0.2.\* is not supported anymore.
 
 As per https://github.com/rust-embedded/embedded-hal/pull/640, our driver no longer implements traits from `embedded-hal 0.2.x`.
 Analogs of all traits from the above mentioned version are available in `embedded-hal 1.x.x`
@@ -262,7 +262,7 @@ is not compatible with the hardware.
 +.unwrap();
 ```
 
-### LCD_CAM configuration changes
+## LCD_CAM configuration changes
 
 - `cam` now has a `Config` strurct that contains frequency, bit/byte order, VSync filter options.
 - DPI, I8080: `frequency` has been moved into `Config`.
@@ -325,15 +325,15 @@ The reexports that were previously part of the prelude are available through oth
 - `ExtU64` and `RateExtU32` have been moved to `esp_hal::time`
 - `Clock` and `CpuClock`: `esp_hal::clock::{Clock, CpuClock}`
 - The following traits need to be individually imported when needed:
-    - `esp_hal::analog::dac::Instance`
-    - `esp_hal::gpio::Pin`
-    - `esp_hal::ledc::channel::ChannelHW`
-    - `esp_hal::ledc::channel::ChannelIFace`
-    - `esp_hal::ledc::timer::TimerHW`
-    - `esp_hal::ledc::timer::TimerIFace`
-    - `esp_hal::timer::timg::TimerGroupInstance`
-    - `esp_hal::timer::Timer`
-    - `esp_hal::interrupt::InterruptConfigurable`
+  - `esp_hal::analog::dac::Instance`
+  - `esp_hal::gpio::Pin`
+  - `esp_hal::ledc::channel::ChannelHW`
+  - `esp_hal::ledc::channel::ChannelIFace`
+  - `esp_hal::ledc::timer::TimerHW`
+  - `esp_hal::ledc::timer::TimerIFace`
+  - `esp_hal::timer::timg::TimerGroupInstance`
+  - `esp_hal::timer::Timer`
+  - `esp_hal::interrupt::InterruptConfigurable`
 - The `entry` macro can be imported as `esp_hal::entry`, while other macros are found under `esp_hal::macros`
 
 ## `AtCmdConfig` now uses builder-lite pattern
@@ -343,11 +343,10 @@ The reexports that were previously part of the prelude are available through oth
 + uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(b'#'));
 ```
 
-
 ## Crate configuration changes
 
 To prevent ambiguity between configurations, we had to change the naming format of configuration
-keys. Before, we used `{prefix}_{key}`, which meant that esp-hal and esp-hal-* configuration keys
+keys. Before, we used `{prefix}_{key}`, which meant that esp-hal and esp-hal-\* configuration keys
 were impossible to tell apart. To fix this issue, we are changing the separator from one underscore
 character to `_CONFIG_`. This also means that users will have to change their `config.toml`
 configurations to match the new format.
@@ -370,6 +369,23 @@ The `Config` struct's setters are now prefixed with `with_`. `parity_none`, `par
 -    .parity_even();
 +    .with_parity(Parity::Even);
 ```
+
+The `DataBits`, `Parity`, and `StopBits` enum variants are no longer prefixed with the name of the enum.
+
+e.g.)
+
+```diff
+- DataBits::DataBits8
++ DataBits::_8
+- Parity::ParityNone
++ Parity::None
+- StopBits::Stop1
++ StopBits::_1
+```
+
+The previous blocking implementation of `read_bytes` has been removed, and the non-blocking `drain_fifo` has instead been renamed to `read_bytes` in its place.
+
+Any code which was previously using `read_bytes` to fill a buffer in a blocking manner will now need to implement the necessary logic to block until the buffer is filled in their application instead.
 
 ## Spi `with_miso` has been split
 

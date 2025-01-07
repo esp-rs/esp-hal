@@ -92,6 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2C: Replaced potential panics with errors. (#2831)
 - UART: Make `AtCmdConfig` and `ConfigError` non-exhaustive (#2851)
 - UART: Make `AtCmdConfig` use builder-lite pattern (#2851)
+- UART: Fix naming violations for `DataBits`, `Parity`, and `StopBits` enum variants (#2893)
+- UART: Remove blocking version of `read_bytes` and rename `drain_fifo` to `read_bytes` instead (#2895)
 
 ### Fixed
 
@@ -100,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `spi::master::Spi::{into_async, into_blocking}` are now correctly available on the typed driver, to. (#2674)
 - It is no longer possible to safely conjure `GpioPin` instances (#2688)
 - UART: Public API follows `C-WORD_ORDER` Rust API standard (`VerbObject` order) (#2851)
+- `DmaRxStreamBuf` now correctly resets the descriptors the next time it's used (#2890)
 
 ### Removed
 
