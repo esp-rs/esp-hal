@@ -58,7 +58,8 @@ use crate::rtc_cntl::RtcClock;
 pub(crate) mod clocks_ll;
 
 /// Clock properties
-pub(crate) trait Clock {
+#[doc(hidden)]
+pub trait Clock {
     /// Frequency of the clock in [Hertz](fugit::HertzU32), using [fugit] types.
     fn frequency(&self) -> HertzU32;
 
@@ -157,7 +158,6 @@ pub enum XtalClock {
     Other(u32),
 }
 
-#[cfg(feature = "unstable")]
 impl Clock for XtalClock {
     fn frequency(&self) -> HertzU32 {
         match self {
@@ -254,7 +254,8 @@ impl Clock for ApbClock {
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub(crate) struct Clocks {
+#[doc(hidden)]
+pub struct Clocks {
     /// CPU clock frequency
     pub cpu_clock: HertzU32,
 
