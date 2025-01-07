@@ -206,7 +206,7 @@ embedded-hal-async = "1.0.0"
 embedded-hal-nb    = "1.0.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["exception-handler", "defmt", "semihosting"] }
-esp-hal            = { path = "../esp-hal", features = ["digest", "unstable"], optional = true }
+esp-hal            = { path = "../esp-hal", features = ["digest"], optional = true }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
 esp-wifi           = { path = "../esp-wifi", optional = true, features = ["wifi"] }
 portable-atomic    = "1.9.0"
@@ -235,6 +235,7 @@ esp-metadata = { path = "../esp-metadata" }
 
 [features]
 default = ["embassy"]
+unstable = ["esp-hal/unstable"]
 
 defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt"]
 

@@ -1,7 +1,7 @@
 //! SPI Full Duplex test suite.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: generic-queue
+//% FEATURES: unstable generic-queue
 
 // FIXME: add async test cases that don't rely on PCNT
 

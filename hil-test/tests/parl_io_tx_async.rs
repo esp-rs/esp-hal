@@ -1,7 +1,7 @@
 //! PARL_IO TX async test
 
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: generic-queue
+//% FEATURES: unstable generic-queue
 
 #![no_std]
 #![no_main]

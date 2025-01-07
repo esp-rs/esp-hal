@@ -1,7 +1,7 @@
 //! GPIO Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: generic-queue
+//% FEATURES: unstable generic-queue
 
 #![no_std]
 #![no_main]
@@ -58,8 +58,11 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init(timg0.timer0);
+        #[cfg(feature = "unstable")]
+        {
+            let timg0 = TimerGroup::new(peripherals.TIMG0);
+            esp_hal_embassy::init(timg0.timer0);
+        }
 
         Context {
             test_gpio1: gpio1.degrade(),
@@ -148,53 +151,6 @@ mod tests {
     }
 
     #[test]
-    fn gpio_output_embedded_hal_0_2(ctx: Context) {
-        let test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
-        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
-
-        fn set<T>(pin: &mut T, state: bool)
-        where
-            T: embedded_hal::digital::OutputPin,
-        {
-            if state {
-                pin.set_high().ok();
-            } else {
-                pin.set_low().ok();
-            }
-        }
-
-        fn toggle<T>(pin: &mut T)
-        where
-            T: embedded_hal::digital::StatefulOutputPin,
-        {
-            pin.toggle().ok();
-        }
-
-        // `StatefulOutputPin`:
-        assert_eq!(test_gpio2.is_set_low(), true);
-        assert_eq!(test_gpio2.is_set_high(), false);
-        assert_eq!(test_gpio1.is_low(), true);
-        assert_eq!(test_gpio1.is_high(), false);
-        set(&mut test_gpio2, true);
-        assert_eq!(test_gpio2.is_set_low(), false);
-        assert_eq!(test_gpio2.is_set_high(), true);
-        assert_eq!(test_gpio1.is_low(), false);
-        assert_eq!(test_gpio1.is_high(), true);
-
-        // `ToggleableOutputPin`:
-        toggle(&mut test_gpio2);
-        assert_eq!(test_gpio2.is_set_low(), true);
-        assert_eq!(test_gpio2.is_set_high(), false);
-        assert_eq!(test_gpio1.is_low(), true);
-        assert_eq!(test_gpio1.is_high(), false);
-        toggle(&mut test_gpio2);
-        assert_eq!(test_gpio2.is_set_low(), false);
-        assert_eq!(test_gpio2.is_set_high(), true);
-        assert_eq!(test_gpio1.is_low(), false);
-        assert_eq!(test_gpio1.is_high(), true);
-    }
-
-    #[test]
     fn gpio_output_embedded_hal_1_0(ctx: Context) {
         let test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
@@ -242,6 +198,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn gpio_interrupt(ctx: Context) {
         let mut test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);
@@ -325,6 +282,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn gpio_flex(ctx: Context) {
         let mut test_gpio1 = Flex::new(ctx.test_gpio1);
         let mut test_gpio2 = Flex::new(ctx.test_gpio2);
@@ -401,6 +359,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn interrupt_executor_is_not_frozen(ctx: Context) {
         use esp_hal::interrupt::{software::SoftwareInterrupt, Priority};
         use esp_hal_embassy::InterruptExecutor;

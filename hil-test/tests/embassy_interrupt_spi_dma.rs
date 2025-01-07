@@ -1,8 +1,8 @@
 //! Reproduction and regression test for a sneaky issue.
 
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6 esp32h2
-//% FEATURES: integrated-timers
-//% FEATURES: generic-queue
+//% FEATURES: unstable integrated-timers
+//% FEATURES: unstable generic-queue
 
 #![no_std]
 #![no_main]

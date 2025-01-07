@@ -4,7 +4,7 @@
 //! with loopback mode enabled).
 
 //% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: generic-queue
+//% FEATURES: unstable generic-queue
 // FIXME: re-enable on ESP32 when it no longer fails spuriously
 
 #![no_std]
