@@ -373,7 +373,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
 
     fn write_data<'a>(&mut self, incoming: &'a [u8]) -> &'a [u8] {
         if self.message_buffer_is_full {
-            while (&*&*&*self).is_busy() {
+            while (*self).is_busy() {
                 // The message buffer is full and the hardware is still
                 // processing the previous message. There's
                 // nothing to be done besides wait for the hardware.
