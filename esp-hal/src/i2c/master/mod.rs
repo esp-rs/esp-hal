@@ -2342,11 +2342,10 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
         } else {
             // this is based on observations rather than documented behavior
             if _register_block.fifo_st().read().txfifo_raddr().bits() <= 1 {
-                return AcknowledgeCheckFailedReason::Address;
+                AcknowledgeCheckFailedReason::Address
             } else {
-                return AcknowledgeCheckFailedReason::Data;
+                AcknowledgeCheckFailedReason::Data
             }
-
         }
     }
 }
