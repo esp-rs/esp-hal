@@ -394,3 +394,14 @@ Full duplex does not require this, and it also creates an artificial restriction
 
 If you were using half duplex SPI with `with_miso`,
 you should now use `with_sio1` instead to get the previous behavior.
+
+## CPU Clocks
+
+The specific CPU clock variants are renamed from e.g. `Clock80MHz` to `_80MHz`.
+
+```diff
+- CpuClock::Clock80MHz
++ CpuClock::_80MHz
+```
+
+Additionally the enum is marked as non-exhaustive.

@@ -23,17 +23,17 @@ pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
                 .set_bit()
                 .cpuperiod_sel()
                 .bits(match cpu_clock_speed {
-                    CpuClock::Clock80MHz => 0,
-                    CpuClock::Clock160MHz => 1,
-                    CpuClock::Clock240MHz => 2,
+                    CpuClock::_80MHz => 0,
+                    CpuClock::_160MHz => 1,
+                    CpuClock::_240MHz => 2,
                 })
         });
 
         rtc_cntl.reg().modify(|_, w| {
             w.dig_reg_dbias_wak().bits(match cpu_clock_speed {
-                CpuClock::Clock80MHz => DIG_DBIAS_80M_160M,
-                CpuClock::Clock160MHz => DIG_DBIAS_80M_160M,
-                CpuClock::Clock240MHz => DIG_DBIAS_240M,
+                CpuClock::_80MHz => DIG_DBIAS_80M_160M,
+                CpuClock::_160MHz => DIG_DBIAS_80M_160M,
+                CpuClock::_240MHz => DIG_DBIAS_240M,
             } as u8)
         });
 
