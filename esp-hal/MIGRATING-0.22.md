@@ -328,25 +328,22 @@ To avoid abbreviations and contractions (as per the esp-hal guidelines), some er
 
 ## I2C Configuration changes
 
-The timeout field in `Config` changed from `Option<u32>` to a dedicated `Timeout` enum.
+The timeout field in `Config` changed from `Option<u32>` to a dedicated `SclTimeout` enum.
 
 ```diff
 - timeout: Some(10)
-+ timeout: Timeout::BusCycles(10)
++ timeout: SclTimeout::BusCycles(10)
 ```
-
-or (ESP32, ESP32-S2)
 
 ```diff
 - timeout: None
-+ timeout: Timeout::Max
++ timeout: SclTimeout::Max
 ```
 
-or (other chips)
-
+(Disabled isn't supported on ESP32 / ESP32-S2)
 ```diff
 - timeout: None
-+ timeout: Timeout::Disabled
++ timeout: SclTimeout::Disabled
 ```
 
 ## The crate prelude has been removed
