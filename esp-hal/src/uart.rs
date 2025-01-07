@@ -257,11 +257,6 @@ const CMD_CHAR_DEFAULT: u8 = 0x2b;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Error {
-    /// A zero lenght buffer was passed.
-    ///
-    /// This error occurs when an empty buffer is passed.
-    ZeroLengthBufferPassed,
-
     /// The RX FIFO overflow happened.
     ///
     /// This error occurs when RX FIFO is full and a new byte is received.
@@ -292,7 +287,6 @@ impl core::error::Error for Error {}
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::ZeroLengthBufferPassed => write!(f, "A zero lenght buffer was passed"),
             Error::FifoOverflowed => write!(f, "The RX FIFO overflowed"),
             Error::GlitchOccurred => write!(f, "A glitch was detected on the RX line"),
             Error::FrameFormatViolated => write!(f, "A framing error was detected on the RX line"),
@@ -1801,10 +1795,10 @@ where
     ///
     /// # Ok
     /// When successful, returns the number of bytes written to buf.
-    /// This method will never return Ok(0)
+    /// If buffer is empty, Ok(0) is returned.
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if buf.is_empty() {
-            return Err(Error::ZeroLengthBufferPassed);
+            return Ok(0);
         }
 
         loop {
