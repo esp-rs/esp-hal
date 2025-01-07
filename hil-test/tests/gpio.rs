@@ -1,7 +1,8 @@
 //! GPIO Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable generic-queue
+//% FEATURES: unstable embassy generic-queue
+//% FEATURES(stable):
 
 #![no_std]
 #![no_main]
@@ -9,14 +10,22 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
+#[cfg(feature = "unstable")]
+use embassy_time::{Duration, Timer};
 use esp_hal::{
     delay::Delay,
-    gpio::{AnyPin, Input, Io, Level, Output, Pin, Pull},
-    interrupt::InterruptConfigurable,
+    gpio::{AnyPin, Input, Level, Output, OutputOpenDrain, Pin, Pull},
     macros::handler,
+};
+#[cfg(feature = "unstable")]
+use esp_hal::{
+    gpio::{Event, Flex, Io},
+    interrupt::InterruptConfigurable,
     timer::timg::TimerGroup,
 };
 use hil_test as _;
+#[cfg(feature = "unstable")]
+use portable_atomic::{AtomicUsize, Ordering};
 
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
 static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
@@ -39,20 +48,13 @@ pub fn interrupt_handler() {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use embassy_time::{Duration, Timer};
-    use esp_hal::gpio::{Event, Flex, OutputOpenDrain};
-    use portable_atomic::{AtomicUsize, Ordering};
-
     use super::*;
 
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let mut io = Io::new(peripherals.IO_MUX);
-        io.set_interrupt_handler(interrupt_handler);
 
         let delay = Delay::new();
 
@@ -60,6 +62,11 @@ mod tests {
 
         #[cfg(feature = "unstable")]
         {
+            // Interrupts are unstable
+            let mut io = Io::new(peripherals.IO_MUX);
+            io.set_interrupt_handler(interrupt_handler);
+
+            // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
             esp_hal_embassy::init(timg0.timer0);
         }
@@ -72,6 +79,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")] // Timers are unstable
     async fn async_edge(ctx: Context) {
         let counter = AtomicUsize::new(0);
         let Context {
@@ -198,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(feature = "unstable")] // Interrupts are unstable
     fn gpio_interrupt(ctx: Context) {
         let mut test_gpio1 = Input::new(ctx.test_gpio1, Pull::Down);
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low);

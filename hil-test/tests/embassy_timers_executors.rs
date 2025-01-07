@@ -122,7 +122,7 @@ fn set_up_embassy_with_systimer(peripherals: Peripherals) {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod test {
     use super::*;
     use crate::test_cases::*;

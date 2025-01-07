@@ -66,7 +66,7 @@ async fn drive_pins(gpio1: impl Into<AnyPin>, gpio2: impl Into<AnyPin>) -> usize
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(executor = hil_test::Executor::new())]
 mod tests {
 
     use super::*;

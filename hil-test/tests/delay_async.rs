@@ -70,7 +70,7 @@ async fn test_async_delay_ms(mut timer: impl DelayNs, duration: u32) {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 2, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 2, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
