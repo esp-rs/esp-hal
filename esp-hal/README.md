@@ -48,9 +48,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 ## `unstable` feature
 
-We aim to avoid enabling experimental features automatically. Allowing automatic access could result in users unintentionally utilizing APIs that are still under development.
-
-This feature is **NOT** enabled by default. 
+The stable feature set is designed to remain consistent and reliable. Other parts guarded by the `unstable` feature, however, are still under active development and may undergo breaking changes and are disabled by default.
 
 ## Minimum Supported Rust Version (MSRV)
 
