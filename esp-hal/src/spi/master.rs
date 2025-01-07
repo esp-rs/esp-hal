@@ -2137,28 +2137,11 @@ mod dma {
 mod ehal1 {
     use embedded_hal::spi::SpiBus;
     use embedded_hal_async::spi::SpiBus as SpiBusAsync;
-    use embedded_hal_nb::spi::FullDuplex;
 
     use super::*;
 
     impl<Dm> embedded_hal::spi::ErrorType for Spi<'_, Dm> {
         type Error = Error;
-    }
-
-    impl<Dm> FullDuplex for Spi<'_, Dm>
-    where
-        Dm: DriverMode,
-    {
-        fn read(&mut self) -> nb::Result<u8, Self::Error> {
-            let mut buffer = [0u8; 1];
-            self.driver().read_bytes(&mut buffer)?;
-            Ok(buffer[0])
-        }
-
-        fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-            self.driver().write_bytes(&[word])?;
-            Ok(())
-        }
     }
 
     impl<Dm> SpiBus for Spi<'_, Dm>
