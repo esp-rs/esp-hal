@@ -235,7 +235,7 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
 
     loop {
         _ = io::server::run(
-            &mut Server::<64>::new(ip),
+            &mut Server::<_, 64>::new_with_et(ip),
             &ServerOptions::new(ip, Some(&mut gw_buf)),
             &mut bound_socket,
             &mut buf,
