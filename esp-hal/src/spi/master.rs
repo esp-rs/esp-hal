@@ -72,7 +72,12 @@ use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
     dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
-    gpio::{interconnect::PeripheralOutput, InputSignal, NoPin, OutputSignal},
+    gpio::{
+        interconnect::{PeripheralInput, PeripheralOutput},
+        InputSignal,
+        NoPin,
+        OutputSignal,
+    },
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
@@ -676,9 +681,24 @@ where
 
     /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
     ///
+    /// Enables input functionality for the pin, and connects it to the MISO
+    /// signal.
+    pub fn with_miso<MISO: PeripheralInput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
+        crate::into_mapped_ref!(miso);
+        miso.enable_input(true, private::Internal);
+
+        self.driver().info.miso.connect_to(&mut miso);
+
+        self
+    }
+
+    /// Assign the SIO1/MISO pin for the SPI instance.
+    ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO signal and SIO1 input signal.
-    pub fn with_miso<MISO: PeripheralOutput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
+    ///
+    /// Note: You do not need to call [Self::with_miso] when this is used.
+    pub fn with_sio1<SIO1: PeripheralOutput>(self, miso: impl Peripheral<P = SIO1> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
         miso.enable_input(true, private::Internal);
         miso.enable_output(true, private::Internal);

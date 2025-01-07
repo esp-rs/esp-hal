@@ -386,3 +386,11 @@ e.g.)
 The previous blocking implementation of `read_bytes` has been removed, and the non-blocking `drain_fifo` has instead been renamed to `read_bytes` in its place.
 
 Any code which was previously using `read_bytes` to fill a buffer in a blocking manner will now need to implement the necessary logic to block until the buffer is filled in their application instead.
+
+## Spi `with_miso` has been split
+
+Previously, `with_miso` set up the provided pin as an input and output, which was necessary for half duplex.
+Full duplex does not require this, and it also creates an artificial restriction.
+
+If you were using half duplex SPI with `with_miso`,
+you should now use `with_sio1` instead to get the previous behavior.

@@ -68,14 +68,16 @@ mod tests {
             }
         }
 
+        let (miso, mosi) = mosi.split();
         #[cfg(pcnt)]
-        let (mosi_loopback_pcnt, mosi) = mosi.split();
+        let mosi_loopback_pcnt = miso.clone();
+
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
         let spi = Spi::new(peripherals.SPI2, Config::default().with_frequency(10.MHz()))
             .unwrap()
             .with_sck(sclk)
-            .with_miso(unsafe { mosi.clone_unchecked() })
+            .with_miso(miso)
             .with_mosi(mosi);
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
