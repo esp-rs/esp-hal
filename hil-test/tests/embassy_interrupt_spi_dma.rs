@@ -121,7 +121,7 @@ mod test {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(10000.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap()
         .with_miso(unsafe { mosi.clone_unchecked() })
@@ -135,7 +135,7 @@ mod test {
             peripherals.SPI3,
             Config::default()
                 .with_frequency(10000.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap()
         .with_dma(dma_channel2)
@@ -229,7 +229,7 @@ mod test {
                 peripherals.spi,
                 Config::default()
                     .with_frequency(100.kHz())
-                    .with_mode(Mode::Mode0),
+                    .with_mode(Mode::_0),
             )
             .unwrap()
             .with_dma(peripherals.dma_channel)

@@ -43,7 +43,7 @@ fn main() -> ! {
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
-            .with_mode(Mode::Mode0),
+            .with_mode(Mode::_0),
     )
     .unwrap()
     .with_sck(sclk)
