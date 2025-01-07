@@ -278,7 +278,7 @@ pub enum Error {
     /// This error occurs when the received data does not conform to the
     /// expected UART frame format.
     #[allow(clippy::enum_variant_names, reason = "Frame error is a common term")]
-    RxFrameError,
+    RxFrame,
 
     /// A parity error was detected on the RX line.
     ///
@@ -286,7 +286,7 @@ pub enum Error {
     /// match the expected parity configuration.
     /// with the `async` feature.
     #[allow(clippy::enum_variant_names, reason = "Parity error is a common term")]
-    RxParityError,
+    RxParity,
 }
 
 impl core::error::Error for Error {}
@@ -297,8 +297,8 @@ impl core::fmt::Display for Error {
             Error::InvalidArgument => write!(f, "An invalid configuration argument was provided"),
             Error::RxFifoOvf => write!(f, "The RX FIFO overflowed"),
             Error::RxGlitchDetected => write!(f, "A glitch was detected on the RX line"),
-            Error::RxFrameError => write!(f, "A framing error was detected on the RX line"),
-            Error::RxParityError => write!(f, "A parity error was detected on the RX line"),
+            Error::RxFrame => write!(f, "A framing error was detected on the RX line"),
+            Error::RxParity => write!(f, "A parity error was detected on the RX line"),
         }
     }
 }
@@ -1527,8 +1527,8 @@ where
 
 #[derive(Debug, EnumSetType)]
 pub(crate) enum TxEvent {
-    TxDone,
-    TxFiFoEmpty,
+    Done,
+    FiFoEmpty,
 }
 
 #[derive(Debug, EnumSetType)]
@@ -1659,8 +1659,8 @@ impl UartTxFuture {
         let mut event_triggered = false;
         for event in self.events {
             event_triggered |= match event {
-                TxEvent::TxDone => interrupts_enabled.tx_done().bit_is_clear(),
-                TxEvent::TxFiFoEmpty => interrupts_enabled.txfifo_empty().bit_is_clear(),
+                TxEvent::Done => interrupts_enabled.tx_done().bit_is_clear(),
+                TxEvent::FiFoEmpty => interrupts_enabled.txfifo_empty().bit_is_clear(),
             }
         }
         event_triggered
@@ -1670,8 +1670,8 @@ impl UartTxFuture {
         self.uart.register_block().int_ena().modify(|_, w| {
             for event in self.events {
                 match event {
-                    TxEvent::TxDone => w.tx_done().bit(enable),
-                    TxEvent::TxFiFoEmpty => w.txfifo_empty().bit(enable),
+                    TxEvent::Done => w.tx_done().bit(enable),
+                    TxEvent::FiFoEmpty => w.txfifo_empty().bit(enable),
                 };
             }
             w
@@ -1759,7 +1759,7 @@ where
             }
 
             offset = next_offset;
-            UartTxFuture::new(self.uart.reborrow(), TxEvent::TxFiFoEmpty).await;
+            UartTxFuture::new(self.uart.reborrow(), TxEvent::FiFoEmpty).await;
         }
 
         Ok(count)
@@ -1773,7 +1773,7 @@ where
     pub async fn flush_async(&mut self) -> Result<(), Error> {
         let count = self.tx_fifo_count();
         if count > 0 {
-            UartTxFuture::new(self.uart.reborrow(), TxEvent::TxDone).await;
+            UartTxFuture::new(self.uart.reborrow(), TxEvent::Done).await;
         }
 
         Ok(())
@@ -1840,8 +1840,8 @@ where
                 match event_happened {
                     RxEvent::FifoOvf => return Err(Error::RxFifoOvf),
                     RxEvent::GlitchDetected => return Err(Error::RxGlitchDetected),
-                    RxEvent::FrameError => return Err(Error::RxFrameError),
-                    RxEvent::ParityError => return Err(Error::RxParityError),
+                    RxEvent::FrameError => return Err(Error::RxFrame),
+                    RxEvent::ParityError => return Err(Error::RxParity),
                     RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
                 }
             }
