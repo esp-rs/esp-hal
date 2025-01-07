@@ -257,34 +257,34 @@ const CMD_CHAR_DEFAULT: u8 = 0x2b;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Error {
-    /// An invalid configuration argument was provided.
+    /// A zero lenght buffer was passed.
     ///
-    /// This error occurs when an incorrect or invalid argument is passed during
-    /// the configuration of the UART peripheral.
-    InvalidArgument,
+    /// This error occurs when an empty buffer is passed.
+    ZeroLengthBufferPassed,
 
-    /// The RX FIFO overflowed.
-    RxFifoOvf,
+    /// The RX FIFO overflow happened.
+    ///
+    /// This error occurs when RX FIFO is full and a new byte is received.
+    FifoOverflowed,
 
     /// A glitch was detected on the RX line.
     ///
     /// This error occurs when an unexpected or erroneous signal (glitch) is
     /// detected on the UART RX line, which could lead to incorrect data
     /// reception.
-    RxGlitchDetected,
+    GlitchOccurred,
 
     /// A framing error was detected on the RX line.
     ///
     /// This error occurs when the received data does not conform to the
     /// expected UART frame format.
-    RxFrame,
+    FrameFormatViolated,
 
     /// A parity error was detected on the RX line.
     ///
     /// This error occurs when the parity bit in the received data does not
     /// match the expected parity configuration.
-    /// with the `async` feature.
-    RxParity,
+    ParityMismatch,
 }
 
 impl core::error::Error for Error {}
@@ -292,11 +292,11 @@ impl core::error::Error for Error {}
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::InvalidArgument => write!(f, "An invalid configuration argument was provided"),
-            Error::RxFifoOvf => write!(f, "The RX FIFO overflowed"),
-            Error::RxGlitchDetected => write!(f, "A glitch was detected on the RX line"),
-            Error::RxFrame => write!(f, "A framing error was detected on the RX line"),
-            Error::RxParity => write!(f, "A parity error was detected on the RX line"),
+            Error::ZeroLengthBufferPassed => write!(f, "A zero lenght buffer was passed"),
+            Error::FifoOverflowed => write!(f, "The RX FIFO overflowed"),
+            Error::GlitchOccurred => write!(f, "A glitch was detected on the RX line"),
+            Error::FrameFormatViolated => write!(f, "A framing error was detected on the RX line"),
+            Error::ParityMismatch => write!(f, "A parity error was detected on the RX line"),
         }
     }
 }
@@ -1804,7 +1804,7 @@ where
     /// This method will never return Ok(0)
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if buf.is_empty() {
-            return Err(Error::InvalidArgument);
+            return Err(Error::ZeroLengthBufferPassed);
         }
 
         loop {
@@ -1836,10 +1836,10 @@ where
             // check error events
             for event_happened in events_happened {
                 match event_happened {
-                    RxEvent::FifoOvf => return Err(Error::RxFifoOvf),
-                    RxEvent::GlitchDetected => return Err(Error::RxGlitchDetected),
-                    RxEvent::FrameError => return Err(Error::RxFrame),
-                    RxEvent::ParityError => return Err(Error::RxParity),
+                    RxEvent::FifoOvf => return Err(Error::FifoOverflowed),
+                    RxEvent::GlitchDetected => return Err(Error::GlitchOccurred),
+                    RxEvent::FrameError => return Err(Error::FrameFormatViolated),
+                    RxEvent::ParityError => return Err(Error::ParityMismatch),
                     RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
                 }
             }
