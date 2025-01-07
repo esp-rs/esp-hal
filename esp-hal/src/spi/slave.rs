@@ -29,7 +29,7 @@
 //! dma_buffers!(32000);
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Mode::Mode0,
+//!     Mode::_0,
 //! )
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
@@ -699,33 +699,32 @@ impl Info {
         {
             reg_block.pin().modify(|_, w| {
                 w.ck_idle_edge()
-                    .bit(matches!(data_mode, Mode::Mode0 | Mode::Mode1))
+                    .bit(matches!(data_mode, Mode::_0 | Mode::_1))
             });
-            reg_block.user().modify(|_, w| {
-                w.ck_i_edge()
-                    .bit(matches!(data_mode, Mode::Mode1 | Mode::Mode2))
-            });
+            reg_block
+                .user()
+                .modify(|_, w| w.ck_i_edge().bit(matches!(data_mode, Mode::_1 | Mode::_2)));
             reg_block.ctrl2().modify(|_, w| unsafe {
                 match data_mode {
-                    Mode::Mode0 => {
+                    Mode::_0 => {
                         w.miso_delay_mode().bits(0);
                         w.miso_delay_num().bits(0);
                         w.mosi_delay_mode().bits(2);
                         w.mosi_delay_num().bits(2)
                     }
-                    Mode::Mode1 => {
+                    Mode::_1 => {
                         w.miso_delay_mode().bits(2);
                         w.miso_delay_num().bits(0);
                         w.mosi_delay_mode().bits(0);
                         w.mosi_delay_num().bits(0)
                     }
-                    Mode::Mode2 => {
+                    Mode::_2 => {
                         w.miso_delay_mode().bits(0);
                         w.miso_delay_num().bits(0);
                         w.mosi_delay_mode().bits(1);
                         w.mosi_delay_num().bits(2)
                     }
-                    Mode::Mode3 => {
+                    Mode::_3 => {
                         w.miso_delay_mode().bits(1);
                         w.miso_delay_num().bits(0);
                         w.mosi_delay_mode().bits(0);
@@ -736,7 +735,7 @@ impl Info {
 
             if dma {
                 assert!(
-                    matches!(data_mode, Mode::Mode1 | Mode::Mode3),
+                    matches!(data_mode, Mode::_1 | Mode::_3),
                     "Mode {:?} is not supported with DMA",
                     data_mode
                 );
@@ -755,13 +754,13 @@ impl Info {
             }
             reg_block.user().modify(|_, w| {
                 w.tsck_i_edge()
-                    .bit(matches!(data_mode, Mode::Mode1 | Mode::Mode2));
+                    .bit(matches!(data_mode, Mode::_1 | Mode::_2));
                 w.rsck_i_edge()
-                    .bit(matches!(data_mode, Mode::Mode1 | Mode::Mode2))
+                    .bit(matches!(data_mode, Mode::_1 | Mode::_2))
             });
             ctrl1_reg.modify(|_, w| {
                 w.clk_mode_13()
-                    .bit(matches!(data_mode, Mode::Mode1 | Mode::Mode3))
+                    .bit(matches!(data_mode, Mode::_1 | Mode::_3))
             });
         }
     }

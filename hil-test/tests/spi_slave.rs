@@ -125,7 +125,7 @@ mod tests {
         let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
 
         Context {
-            spi: Spi::new(peripherals.SPI2, Mode::Mode1)
+            spi: Spi::new(peripherals.SPI2, Mode::_1)
                 .with_sck(sclk)
                 .with_mosi(mosi)
                 .with_miso(miso)

@@ -245,7 +245,7 @@ is not compatible with the hardware.
      peripherals.SPI2,
      Config {
          frequency: 100.kHz(),
-         mode: SpiMode::Mode0,
+         mode: SpiMode::_0,
          ..Config::default()
      },
 -);
@@ -405,3 +405,12 @@ The specific CPU clock variants are renamed from e.g. `Clock80MHz` to `_80MHz`.
 ```
 
 Additionally the enum is marked as non-exhaustive.
+
+## SPI Modes
+
+The SPI mode variants are renamed from e.g. `Mode0` to `_0`.
+
+```diff
+- Mode::Mode0
++ Mode::_0
+```

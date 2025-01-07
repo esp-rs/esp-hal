@@ -44,7 +44,7 @@
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config::default().with_frequency(100.kHz()).with_mode(Mode::Mode0)
+//!     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
 //! )
 //! .unwrap()
 //! .with_sck(sclk)
@@ -469,7 +469,7 @@ impl Default for Config {
         use fugit::RateExtU32;
         Config {
             frequency: 1_u32.MHz(),
-            mode: Mode::Mode0,
+            mode: Mode::_0,
             read_bit_order: BitOrder::MsbFirst,
             write_bit_order: BitOrder::MsbFirst,
         }
@@ -2945,11 +2945,11 @@ impl Driver {
 
         pin_reg.modify(|_, w| {
             w.ck_idle_edge()
-                .bit(matches!(data_mode, Mode::Mode2 | Mode::Mode3))
+                .bit(matches!(data_mode, Mode::_2 | Mode::_3))
         });
         reg_block.user().modify(|_, w| {
             w.ck_out_edge()
-                .bit(matches!(data_mode, Mode::Mode1 | Mode::Mode2))
+                .bit(matches!(data_mode, Mode::_1 | Mode::_2))
         });
     }
 
