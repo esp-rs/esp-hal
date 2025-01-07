@@ -181,20 +181,20 @@ fn main() -> Result<()> {
 
     let workspace = std::env::current_dir()?;
 
+    let out_path = Path::new("target");
+
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildDocumentationIndex(args) => build_documentation_index(&workspace, args),
         Cli::BuildExamples(args) => examples(
             &workspace,
             args,
-            CargoAction::Build(PathBuf::from("target/examples")),
+            CargoAction::Build(out_path.join("examples")),
         ),
         Cli::BuildPackage(args) => build_package(&workspace, args),
-        Cli::BuildTests(args) => tests(
-            &workspace,
-            args,
-            CargoAction::Build(PathBuf::from("target/tests")),
-        ),
+        Cli::BuildTests(args) => {
+            tests(&workspace, args, CargoAction::Build(out_path.join("tests")))
+        }
         Cli::BumpVersion(args) => bump_version(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
@@ -235,7 +235,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     };
 
     // Load all examples which support the specified chip and parse their metadata:
-    let mut examples = xtask::load_examples(&example_path, action.clone())?
+    let mut examples = xtask::load_examples(&example_path)?
         .iter()
         .filter_map(|example| {
             if example.supports_chip(args.chip) {
@@ -413,7 +413,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let target = target_triple(Package::HilTest, &args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = xtask::load_examples(&package_path.join("tests"), action.clone())?
+    let mut tests = xtask::load_examples(&package_path.join("tests"))?
         .into_iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();

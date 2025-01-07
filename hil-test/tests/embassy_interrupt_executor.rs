@@ -2,8 +2,8 @@
 //! code.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable integrated-timers
-//% FEATURES: unstable generic-queue
+//% FEATURES(integrated): unstable integrated-timers
+//% FEATURES(generic): unstable generic-queue
 
 #![no_std]
 #![no_main]

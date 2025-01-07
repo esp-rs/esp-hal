@@ -7,6 +7,7 @@ use std::{
 };
 
 use anyhow::{bail, Result};
+use serde::{Deserialize, Serialize};
 
 use crate::windows_safe_path;
 
@@ -16,13 +17,24 @@ pub enum CargoAction {
     Run,
 }
 
-/// Execute cargo with the given arguments and from the specified directory.
-pub fn run(args: &[String], cwd: &Path) -> Result<()> {
-    run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [])
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Artifact {
+    pub executable: PathBuf,
 }
 
 /// Execute cargo with the given arguments and from the specified directory.
-pub fn run_with_env<I, K, V>(args: &[String], cwd: &Path, envs: I) -> Result<()>
+pub fn run(args: &[String], cwd: &Path) -> Result<()> {
+    run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [], false)?;
+    Ok(())
+}
+
+/// Execute cargo with the given arguments and from the specified directory.
+pub fn run_and_capture(args: &[String], cwd: &Path) -> Result<String> {
+    run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [], true)
+}
+
+/// Execute cargo with the given arguments and from the specified directory.
+pub fn run_with_env<I, K, V>(args: &[String], cwd: &Path, envs: I, capture: bool) -> Result<String>
 where
     I: IntoIterator<Item = (K, V)>,
     K: AsRef<OsStr>,
@@ -38,19 +50,26 @@ where
     // using now or in future!
     let cwd = windows_safe_path(cwd);
 
-    let status = Command::new(get_cargo())
+    let output = Command::new(get_cargo())
         .args(args)
         .current_dir(cwd)
         .envs(envs)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .stdin(Stdio::inherit())
-        .status()?;
+        .stdout(if capture {
+            Stdio::piped()
+        } else {
+            Stdio::inherit()
+        })
+        .stderr(if capture {
+            Stdio::piped()
+        } else {
+            Stdio::inherit()
+        })
+        .output()?;
 
     // Make sure that we return an appropriate exit code here, as Github Actions
     // requires this in order to function correctly:
-    if status.success() {
-        Ok(())
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
         bail!("Failed to execute cargo subcommand")
     }
@@ -145,16 +164,16 @@ impl CargoArgsBuilder {
     }
 
     #[must_use]
-    pub fn build(self) -> Vec<String> {
+    pub fn build(&self) -> Vec<String> {
         let mut args = vec![];
 
-        if let Some(toolchain) = self.toolchain {
+        if let Some(ref toolchain) = self.toolchain {
             args.push(format!("+{toolchain}"));
         }
 
-        args.push(self.subcommand);
+        args.push(self.subcommand.clone());
 
-        if let Some(target) = self.target {
+        if let Some(ref target) = self.target {
             args.push(format!("--target={target}"));
         }
 
@@ -162,8 +181,8 @@ impl CargoArgsBuilder {
             args.push(format!("--features={}", self.features.join(",")));
         }
 
-        for arg in self.args {
-            args.push(arg);
+        for arg in self.args.iter() {
+            args.push(arg.clone());
         }
 
         args
