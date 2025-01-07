@@ -1795,7 +1795,7 @@ where
     ///
     /// # Ok
     /// When successful, returns the number of bytes written to buf.
-    /// If buffer is empty, Ok(0) is returned.
+    /// If the passed in buffer is of length 0, Ok(0) is returned.
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if buf.is_empty() {
             return Ok(0);
