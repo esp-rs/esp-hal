@@ -291,7 +291,7 @@ pub fn load_examples(path: &Path, action: CargoAction) -> Result<Vec<Metadata>> 
         if feature_sets.is_empty() {
             feature_sets.push(Vec::new());
         }
-        if action == CargoAction::Build {
+        if matches!(action, CargoAction::Build(_)) {
             // Only build the first feature set for each example.
             // Rebuilding with a different feature set just wastes time because the latter
             // one will overwrite the former one(s).
@@ -331,7 +331,7 @@ pub fn execute_app(
     target: &str,
     app: &Metadata,
     action: CargoAction,
-    mut repeat: usize,
+    repeat: usize,
     debug: bool,
 ) -> Result<()> {
     log::info!(
@@ -348,36 +348,30 @@ pub fn execute_app(
 
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Package: {}", package.display());
-    let (bin, subcommand) = if action == CargoAction::Build {
-        repeat = 1; // Do not repeat builds in a loop
-        let bin = if package.starts_with("src/bin") {
-            format!("--bin={}", app.name())
-        } else if package.starts_with("tests") {
-            format!("--test={}", app.name())
-        } else {
-            format!("--example={}", app.name())
-        };
-        (bin, "build")
-    } else if package.starts_with("src/bin") {
-        (format!("--bin={}", app.name()), "run")
-    } else if package.starts_with("tests") {
-        (format!("--test={}", app.name()), "test")
-    } else {
-        (format!("--example={}", app.name()), "run")
-    };
 
     let mut builder = CargoArgsBuilder::default()
-        .subcommand(subcommand)
         .target(target)
-        .features(&features)
-        .arg(bin);
+        .features(&features);
+
+    let bin_arg = if package.starts_with("src/bin") {
+        format!("--bin={}", app.name())
+    } else if package.starts_with("tests") {
+        format!("--test={}", app.name())
+    } else {
+        format!("--example={}", app.name())
+    };
+    builder.add_arg(bin_arg);
+
+    let subcommand = if matches!(action, CargoAction::Build(_)) {
+        "build"
+    } else if package.starts_with("tests") {
+        "test"
+    } else {
+        "run"
+    };
 
     if !debug {
         builder.add_arg("--release");
-    }
-
-    if subcommand == "test" && chip == Chip::Esp32c2 {
-        builder.add_arg("--").add_arg("--speed").add_arg("15000");
     }
 
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
@@ -386,14 +380,22 @@ pub fn execute_app(
         builder.add_arg("-Zbuild-std=core,alloc");
     }
 
-    let args = builder.build();
+    if subcommand == "test" && chip == Chip::Esp32c2 {
+        builder.add_arg("--").add_arg("--speed").add_arg("15000");
+    }
+
+    let args = builder.subcommand(subcommand).build();
     log::debug!("{args:#?}");
 
-    for i in 0..repeat {
-        if repeat != 1 {
-            log::info!("Run {}/{}", i + 1, repeat);
-        }
+    if matches!(action, CargoAction::Build(_)) {
         cargo::run(&args, package_path)?;
+    } else {
+        for i in 0..repeat {
+            if repeat != 1 {
+                log::info!("Run {}/{}", i + 1, repeat);
+            }
+            cargo::run(&args, package_path)?;
+        }
     }
 
     Ok(())

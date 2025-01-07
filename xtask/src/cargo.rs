@@ -2,7 +2,7 @@
 
 use std::{
     ffi::OsStr,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -10,9 +10,9 @@ use anyhow::{bail, Result};
 
 use crate::windows_safe_path;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CargoAction {
-    Build,
+    Build(PathBuf),
     Run,
 }
 
