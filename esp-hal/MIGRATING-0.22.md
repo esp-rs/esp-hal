@@ -483,3 +483,13 @@ The ADC attenuation variants are renamed from e.g. `Attenuation0dB` to `_0dB`.
 -Attenuation::Attenuation0dB
 +Attenuation::_0dB
 ```
+
+## `macro` module is private now
+
+Macros from `procmacros` crate (`handler`, `ram`, `load_lp_code`) are now imported via `esp-hal`.
+
+```diff
+- use esp_hal::macros::{handler, ram, load_lp_code};
++ use esp_hal::{handler, ram, load_lp_code};
+```
+

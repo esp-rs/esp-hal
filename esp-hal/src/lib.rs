@@ -143,8 +143,6 @@
 // MUST be the first module
 mod fmt;
 
-pub mod asynch;
-
 #[cfg(riscv)]
 pub use esp_riscv_rt::{self, entry, riscv};
 #[cfg(xtensa)]
@@ -156,13 +154,17 @@ pub use xtensa_lx_rt::{self, entry};
 #[cfg(any(esp32, esp32s3))]
 pub use self::soc::cpu_control;
 #[cfg(efuse)]
+#[cfg(feature = "unstable")]
 pub use self::soc::efuse;
 #[cfg(lp_core)]
+#[cfg(feature = "unstable")]
 pub use self::soc::lp_core;
 pub use self::soc::peripherals;
+#[cfg(feature = "unstable")]
 #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
+#[cfg(feature = "unstable")]
 pub use self::soc::ulp_core;
 
 #[cfg(any(dport, hp_sys, pcr, system))]
@@ -216,6 +218,7 @@ unstable_module! {
     pub mod aes;
     #[cfg(any(adc, dac))]
     pub mod analog;
+    pub mod asynch;
     #[cfg(assist_debug)]
     pub mod assist_debug;
     pub mod config;
@@ -543,7 +546,7 @@ pub fn init(config: Config) -> Peripherals {
 
     // Handle watchdog configuration with defaults
     cfg_if::cfg_if! {
-        if #[cfg(any(doc, feature = "unstable"))]
+        if #[cfg(feature = "unstable")]
         {
             #[cfg(not(any(esp32, esp32s2)))]
             if config.watchdog.swd {

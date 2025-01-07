@@ -44,8 +44,6 @@ extern "C" {
     );
 }
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! regi2c_write {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
         paste::paste! {
@@ -62,10 +60,9 @@ macro_rules! regi2c_write {
     };
 }
 
-pub use regi2c_write; // TODO: can be removed as soon as ROM is stabilized
+#[allow(unused_imports)]
+pub(crate) use regi2c_write;
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! regi2c_write_mask {
     ( $block: ident, $reg_add: ident, $indata: expr ) => {
         paste::paste! {
@@ -84,7 +81,8 @@ macro_rules! regi2c_write_mask {
     };
 }
 
-pub use regi2c_write_mask; // TODO: can be removed as soon as ROM is stabilized
+#[allow(unused_imports)]
+pub(crate) use regi2c_write_mask;
 
 #[inline(always)]
 pub(crate) fn ets_delay_us(us: u32) {
