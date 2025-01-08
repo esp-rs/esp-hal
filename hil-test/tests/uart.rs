@@ -6,7 +6,6 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal_nb::serial::{Read, Write};
 use esp_hal::{
     uart::{self, ClockSource, Uart},
     Blocking,
@@ -38,13 +37,8 @@ mod tests {
 
     #[test]
     fn test_send_receive(mut ctx: Context) {
-        ctx.uart.write(0x42).ok();
-        let read = loop {
-            if let Ok(byte) = ctx.uart.read() {
-                break byte;
-            }
-        };
-
+        ctx.uart.write_byte(0x42);
+        let read = ctx.uart.read_byte();
         assert_eq!(read, 0x42);
     }
 
@@ -60,16 +54,9 @@ mod tests {
         let mut i = 0;
 
         while i < BUF_SIZE {
-            match ctx.uart.read() {
-                Ok(byte) => {
-                    buffer[i] = byte;
-                    i += 1;
-                }
-                Err(embedded_hal_nb::nb::Error::WouldBlock) => continue,
-                Err(embedded_hal_nb::nb::Error::Other(_)) => panic!(),
-            }
+            buffer[i] = ctx.uart.read_byte();
+            i += 1;
         }
-
         assert_eq!(data, buffer);
     }
 
@@ -98,12 +85,9 @@ mod tests {
                         .with_clock_source(clock_source),
                 )
                 .unwrap();
-            ctx.uart.write(byte_to_write).ok();
-            let read = loop {
-                if let Ok(byte) = ctx.uart.read() {
-                    break byte;
-                }
-            };
+            ctx.uart.write_byte(byte_to_write);
+            let read = ctx.uart.read_byte();
+
             assert_eq!(read, byte_to_write);
             byte_to_write = !byte_to_write;
         }
