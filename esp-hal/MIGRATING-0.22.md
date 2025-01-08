@@ -415,11 +415,20 @@ The specific CPU clock variants are renamed from e.g. `Clock80MHz` to `_80MHz`.
 
 Additionally the enum is marked as non-exhaustive.
 
-## SPI Modes
+## SPI Changes
 
 The SPI mode variants are renamed from e.g. `Mode0` to `_0`.
 
 ```diff
 - Mode::Mode0
 + Mode::_0
+```
+
+The Address and Command enums have similarly had their variants changed from e.g. `Address1` to `_1Bit` and `Command1` to `_1Bit` respectively:
+
+```diff
+- Address::Address1
++ Address::_1Bit
+- Command::Command1
++ Command::_1Bit
 ```
