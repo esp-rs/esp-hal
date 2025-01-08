@@ -396,6 +396,23 @@ e.g.
 + GlitchOccurred
 ```
 
+RX/TX pin assignment moved from constructors to builder functions.
+
+e.g.
+
+```diff
+  let mut uart1 = Uart::new(
+      peripherals.UART1,
+-     Config::default(),
+-     peripherals.GPIO1,
+-     peripherals.GPIO2,
+- ).unwrap();
++     Config::default())
++     .unwrap()
++     .with_rx(peripherals.GPIO1)
++     .with_tx(peripherals.GPIO2);
+```
+
 ## Spi `with_miso` has been split
 
 Previously, `with_miso` set up the provided pin as an input and output, which was necessary for half duplex.
