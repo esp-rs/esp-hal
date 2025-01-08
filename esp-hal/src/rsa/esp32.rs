@@ -12,11 +12,8 @@ impl<Dm: crate::DriverMode> Rsa<'_, Dm> {
     /// After the RSA Accelerator is released from reset, the memory blocks
     /// needs to be initialized, only after that peripheral should be used.
     /// This function would return without an error if the memory is initialized
-    pub fn ready(&mut self) -> Option<()> {
-        if self.rsa.clean().read().clean().bit_is_clear() {
-            return None;
-        }
-        Some(())
+    pub fn ready(&mut self) {
+        while !self.rsa.clean().read().clean().bit_is_clear() {}
     }
 
     /// Writes the multi-mode configuration to the RSA hardware.
