@@ -646,24 +646,17 @@ where
         let count = data.len();
 
         for &byte in data {
-            if self.write_byte(byte).is_none() {
-                return Err(Error::WouldBlock);
-            }
+            self.write_byte(byte);
         }
 
         Ok(count)
     }
 
-    fn write_byte(&mut self, word: u8) -> Option<()> {
-        if self.tx_fifo_count() < UART_FIFO_SIZE {
-            self.register_block()
-                .fifo()
-                .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
-
-            Some(())
-        } else {
-            None
-        }
+    fn write_byte(&mut self, word: u8) {
+        while self.tx_fifo_count() >= UART_FIFO_SIZE {}
+        self.register_block()
+            .fifo()
+            .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
     }
 
     #[allow(clippy::useless_conversion)]
@@ -679,12 +672,8 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> Option<()> {
-        if self.is_tx_idle() {
-            Some(())
-        } else {
-            None
-        }
+    pub fn flush(&mut self) {
+        while self.is_tx_idle() {}
     }
 
     /// Checks if the TX line is idle for this UART instance.
@@ -859,20 +848,17 @@ where
             }
         }
 
-        if self.rx_fifo_count() > 0 {
-            // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    let byte = crate::interrupt::free(|| fifo.read().rxfifo_rd_byte().bits());
-                } else {
-                    let byte = fifo.read().rxfifo_rd_byte().bits();
-                }
+        while self.rx_fifo_count() == 0 {}
+        // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let byte = crate::interrupt::free(|| fifo.read().rxfifo_rd_byte().bits());
+            } else {
+                let byte = fifo.read().rxfifo_rd_byte().bits();
             }
-
-            Some(byte)
-        } else {
-            None
         }
+
+        byte
     }
 
     /// Reads bytes from the UART
@@ -920,12 +906,8 @@ where
     fn flush_buffer(&mut self, buf: &mut [u8]) -> usize {
         let mut count = 0;
         while count < buf.len() {
-            if let Some(byte) = self.read_byte() {
-                buf[count] = byte;
-                count += 1;
-            } else {
-                break;
-            }
+            buf[count] = self.read_byte();
+            count += 1;
         }
         count
     }
@@ -1206,12 +1188,12 @@ where
     }
 
     /// Write a byte out over the UART
-    fn write_byte(&mut self, word: u8) -> Option<()> {
+    fn write_byte(&mut self, word: u8) {
         self.tx.write_byte(word)
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> Option<()> {
+    pub fn flush(&mut self) {
         self.tx.flush()
     }
 
@@ -1494,13 +1476,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        loop {
-            match self.flush() {
-                Some(_) => break,
-                None => { /* Wait */ }
-            }
-        }
-
+        self.flush();
         Ok(())
     }
 }
@@ -1700,7 +1676,7 @@ impl UartTx<'_, Async> {
             }
 
             for byte in &words[offset..next_offset] {
-                self.write_byte(*byte).unwrap(); // should never fail
+                self.write_byte(*byte);
                 count += 1;
             }
 
