@@ -458,3 +458,17 @@ The Address and Command enums have similarly had their variants changed from e.g
 - Command::Command1
 + Command::_1Bit
 ```
+
+## SPI master driver configuration
+
+SPI `Config::with_frequency` has been renamed to `with_clock`. This function now takes either
+a `fugit::HertzU32` or `BusClockConfig`.
+
+```diff
+ let config = Config::default()
+-   .with_frequency(10.MHz());
++   .with_clock(10.MHz());
+```
+
+The new structure supports configuring a clock source, although currently only `ClockSource::Apb`
+is available.
