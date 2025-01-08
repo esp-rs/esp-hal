@@ -97,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART: Remove blocking version of `read_bytes` and rename `drain_fifo` to `read_bytes` instead (#2895)
 - Renamed variants of `CpuClock`, made the enum non-exhaustive (#2899)
 - SPI: Fix naming violations for `Mode` enum variants (#2902)
+- SPI: Fix naming violations for `Address` and `Command` enum variants (#2906)
 
 ### Fixed
 
