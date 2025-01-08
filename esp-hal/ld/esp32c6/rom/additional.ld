@@ -15,5 +15,3 @@ PROVIDE(strchr = 0x40000534);
 PROVIDE(strlcpy = 0x40000544);
 PROVIDE(strstr = 0x400004cc);
 PROVIDE(strcasecmp = 0x40000524);
-PROVIDE(strdup = 0x40000530);
-PROVIDE(atoi = 0x400005a0);
