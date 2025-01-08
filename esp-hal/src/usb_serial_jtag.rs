@@ -198,28 +198,6 @@ where
         Ok(())
     }
 
-    /// Write data to the serial output in a non-blocking manner
-    /// Requires manual flushing (automatically flushed every 64 bytes)
-    pub fn write_byte_nb(&mut self, word: u8) -> Option<()> {
-        let reg_block = USB_DEVICE::register_block();
-
-        if reg_block
-            .ep1_conf()
-            .read()
-            .serial_in_ep_data_free()
-            .bit_is_set()
-        {
-            // the FIFO is not full
-            unsafe {
-                reg_block.ep1().write(|w| w.rdwr_byte().bits(word));
-            }
-
-            Some(())
-        } else {
-            None
-        }
-    }
-
     /// Flush the output FIFO and block until it has been sent
     pub fn flush_tx(&mut self) -> Result<(), Error> {
         let reg_block = USB_DEVICE::register_block();
@@ -230,18 +208,6 @@ where
         }
 
         Ok(())
-    }
-
-    /// Flush the output FIFO but don't block if it isn't ready immediately
-    pub fn flush_tx_nb(&mut self) -> Option<()> {
-        let reg_block = USB_DEVICE::register_block();
-        reg_block.ep1_conf().modify(|_, w| w.wr_done().set_bit());
-
-        if reg_block.ep1_conf().read().bits() & 0b011 == 0b000 {
-            None
-        } else {
-            Some(())
-        }
     }
 }
 
@@ -407,20 +373,9 @@ where
         self.tx.write_bytes(data)
     }
 
-    /// Write data to the serial output in a non-blocking manner
-    /// Requires manual flushing (automatically flushed every 64 bytes)
-    pub fn write_byte_nb(&mut self, word: u8) -> Option<()> {
-        self.tx.write_byte_nb(word)
-    }
-
     /// Flush the output FIFO and block until it has been sent
     pub fn flush_tx(&mut self) -> Result<(), Error> {
         self.tx.flush_tx()
-    }
-
-    /// Flush the output FIFO but don't block if it isn't ready immediately
-    pub fn flush_tx_nb(&mut self) -> Option<()> {
-        self.tx.flush_tx_nb()
     }
 
     /// Read a single byte but don't block if it isn't ready immediately
@@ -540,74 +495,6 @@ where
         self.write_bytes(ch.encode_utf8(&mut buffer).as_bytes())?;
 
         Ok(())
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
-        embedded_hal_nb::serial::Read::read(&mut self.rx)
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
-        self.read_byte()
-            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
-        embedded_hal_nb::serial::Write::write(&mut self.tx, word)
-    }
-
-    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
-        embedded_hal_nb::serial::Write::flush(&mut self.tx)
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
-        self.write_byte_nb(word)
-            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
-    }
-
-    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
-        self.flush_tx_nb()
-            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
     }
 }
 
