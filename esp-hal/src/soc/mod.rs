@@ -53,16 +53,20 @@ pub struct MappedPsram {
 // Values other than 0 indicate that we cannot attempt setting the mac address
 // again, and values other than 2 indicate that we should read the mac address
 // from eFuse.
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 static MAC_OVERRIDE_STATE: AtomicU8 = AtomicU8::new(0);
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 static mut MAC_OVERRIDE: [u8; 6] = [0; 6];
 
 /// Error indicating issues with setting the MAC address.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub enum SetMacError {
     /// The MAC address has already been set and cannot be changed.
     AlreadySet,
 }
 
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 impl self::efuse::Efuse {
     /// Set the base mac address
     ///

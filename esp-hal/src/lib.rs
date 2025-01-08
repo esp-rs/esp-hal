@@ -155,9 +155,11 @@ pub use xtensa_lx_rt::{self, entry};
 pub use self::soc::cpu_control;
 #[cfg(efuse)]
 #[instability::unstable]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::efuse;
 #[cfg(lp_core)]
 #[instability::unstable]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::lp_core;
 pub use self::soc::peripherals;
 #[instability::unstable]
@@ -165,6 +167,7 @@ pub use self::soc::peripherals;
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
 #[instability::unstable]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::ulp_core;
 
 #[cfg(any(dport, hp_sys, pcr, system))]
