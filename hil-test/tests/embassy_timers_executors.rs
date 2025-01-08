@@ -68,7 +68,7 @@ mod test_cases {
         let t1 = esp_hal::time::now();
         periodic.start(100.millis()).unwrap();
 
-        while periodic.wait().is_none() {}
+        periodic.wait();
 
         let t2 = esp_hal::time::now();
 
