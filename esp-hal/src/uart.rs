@@ -1398,56 +1398,6 @@ impl<Dm> embedded_hal_nb::serial::ErrorType for UartRx<'_, Dm> {
     type Error = Error;
 }
 
-impl<Dm> embedded_hal_nb::serial::Read for Uart<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> embedded_hal_nb::nb::Result<u8, Self::Error> {
-        self.read_byte()
-            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for UartRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        match self.read_byte() {
-            Some(b) => Ok(b),
-            None => Err(nb::Error::WouldBlock),
-        }
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for Uart<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
-        self.write_byte(word)
-            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
-    }
-
-    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
-        self.flush().ok_or(embedded_hal_nb::nb::Error::WouldBlock)
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for UartTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> embedded_hal_nb::nb::Result<(), Self::Error> {
-        self.write_byte(word)
-            .ok_or(embedded_hal_nb::nb::Error::WouldBlock)
-    }
-
-    fn flush(&mut self) -> embedded_hal_nb::nb::Result<(), Self::Error> {
-        self.flush().ok_or(embedded_hal_nb::nb::Error::WouldBlock)
-    }
-}
-
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::ErrorType for Uart<'_, Dm> {
