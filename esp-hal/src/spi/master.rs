@@ -34,7 +34,7 @@
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: embassy_embedded_hal::shared_bus
 
-use core::{cell::Cell, marker::PhantomData};
+use core::marker::PhantomData;
 
 #[instability::unstable]
 pub use dma::*;
@@ -429,11 +429,11 @@ pub enum ClockSource {
 /// Bus clock configuration.
 ///
 /// This struct holds information necessary to configure the SPI bus clock.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct BusClockConfig {
     /// The saved register value, calculated when first needed.
-    reg: Cell<Option<Result<u32, ConfigError>>>,
+    reg: Result<u32, ConfigError>,
 
     /// The target frequency
     frequency: HertzU32,
@@ -442,33 +442,29 @@ pub struct BusClockConfig {
     clock_source: ClockSource,
 }
 
-impl Clone for BusClockConfig {
-    fn clone(&self) -> Self {
-        _ = self.recalculate();
-
-        Self {
-            reg: self.reg.clone(),
-            frequency: self.frequency,
-            clock_source: self.clock_source,
-        }
-    }
-}
-
 impl Default for BusClockConfig {
     fn default() -> Self {
-        BusClockConfig {
-            reg: Cell::new(None),
-            frequency: 1_u32.MHz(),
-            clock_source: ClockSource::Apb,
-        }
+        Self::new(1_u32.MHz(), ClockSource::Apb)
     }
 }
 
 impl BusClockConfig {
+    fn new(frequency: HertzU32, clock_source: ClockSource) -> Self {
+        let mut this = Self {
+            reg: Ok(0),
+            frequency,
+            clock_source,
+        };
+
+        this.reg = this.recalculate();
+
+        this
+    }
+
     /// Set the frequency of the SPI bus clock.
     pub fn with_frequency(mut self, frequency: HertzU32) -> Self {
         self.frequency = frequency;
-        self.reg.set(None);
+        self.reg = self.recalculate();
 
         self
     }
@@ -476,25 +472,21 @@ impl BusClockConfig {
     /// Set the clock source of the SPI bus.
     pub fn with_clock_source(mut self, clock_source: ClockSource) -> Self {
         self.clock_source = clock_source;
-        self.reg.set(None);
+        self.reg = self.recalculate();
 
         self
     }
 
     fn recalculate(&self) -> Result<u32, ConfigError> {
-        if let Some(result) = self.reg.get() {
-            return result;
-        }
-
         // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
 
         let clocks = Clocks::get();
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-                let apb_clk_freq = HertzU32::Hz(clocks.pll_48m_clock.to_Hz());
+                let apb_clk_freq = clocks.pll_48m_clock;
             } else {
-                let apb_clk_freq = HertzU32::Hz(clocks.apb_clock.to_Hz());
+                let apb_clk_freq = clocks.apb_clock;
             }
         }
 
@@ -522,6 +514,7 @@ impl BusClockConfig {
             let mut errval: i32;
 
             let raw_freq = self.frequency.raw() as i32;
+            let raw_apb_freq = apb_clk_freq.raw() as i32;
 
             // Start at n = 2. We need to be able to set h/l so we have at least
             // one high and one low pulse.
@@ -530,7 +523,7 @@ impl BusClockConfig {
                 // Effectively, this does:
                 // pre = round((APB_CLK_FREQ / n) / frequency)
 
-                pre = ((apb_clk_freq.raw() as i32 / n) + (raw_freq / 2)) / raw_freq;
+                pre = ((raw_apb_freq / n) + (raw_freq / 2)) / raw_freq;
 
                 if pre <= 0 {
                     pre = 1;
@@ -540,7 +533,7 @@ impl BusClockConfig {
                     pre = 16;
                 }
 
-                errval = (apb_clk_freq.raw() as i32 / (pre * n) - raw_freq).abs();
+                errval = (raw_apb_freq / (pre * n) - raw_freq).abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
                     bestn = n;
@@ -566,34 +559,30 @@ impl BusClockConfig {
                 | ((pre as u32 - 1) << 18);
         }
 
-        self.reg.set(Some(Ok(reg_val)));
         Ok(reg_val)
     }
 
     fn raw_clock_reg_value(&self) -> Result<u32, ConfigError> {
-        self.recalculate()
+        self.reg
     }
 }
 
 impl From<HertzU32> for BusClockConfig {
     fn from(frequency: HertzU32) -> Self {
-        BusClockConfig {
-            frequency,
-            ..Default::default()
-        }
+        Self::new(frequency, ClockSource::Apb)
     }
 }
 
 impl core::hash::Hash for BusClockConfig {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.reg.get().hash(state);
+        self.reg.hash(state);
         self.frequency.to_Hz().hash(state); // HertzU32 doesn't implement Hash
         self.clock_source.hash(state);
     }
 }
 
 /// SPI peripheral configuration
-#[derive(Clone, Debug, PartialEq, Eq, procmacros::BuilderLite)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
