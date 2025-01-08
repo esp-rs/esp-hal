@@ -78,8 +78,6 @@ jobs:
           toolchain: stable
           components: rust-src
 
-      - uses: Swatinem/rust-cache@v2
-
       - name: Build and Check
         uses: ./.github/actions/check-esp-hal
         with:
@@ -95,7 +93,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
@@ -126,7 +123,6 @@ jobs:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: ${{ env.MSRV }}
           components: rust-src
-      - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all RISC-V chips.
       - name: msrv RISCV (esp-hal)
@@ -176,7 +172,6 @@ jobs:
         with:
           toolchain: nightly
           components: rustfmt
-      - uses: Swatinem/rust-cache@v2
 
       # Check the formatting of all packages:
       - run: cargo xtask fmt-packages --check
@@ -192,7 +187,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
 
       # Check the formatting of all packages:
       - run: cd esp-config && cargo test --features build

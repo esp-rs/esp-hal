@@ -43,8 +43,6 @@ jobs:
           toolchain: nightly
           components: rust-src, clippy, rustfmt
 
-      - uses: Swatinem/rust-cache@v2
-
       - name: Build and Check
         uses: ./.github/actions/check-esp-hal
         with:
