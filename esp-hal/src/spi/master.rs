@@ -135,103 +135,103 @@ pub enum Command {
     /// No command is sent.
     None,
     /// A 1-bit command.
-    Command1(u16, DataMode),
+    _1Bit(u16, DataMode),
     /// A 2-bit command.
-    Command2(u16, DataMode),
+    _2Bit(u16, DataMode),
     /// A 3-bit command.
-    Command3(u16, DataMode),
+    _3Bit(u16, DataMode),
     /// A 4-bit command.
-    Command4(u16, DataMode),
+    _4Bit(u16, DataMode),
     /// A 5-bit command.
-    Command5(u16, DataMode),
+    _5Bit(u16, DataMode),
     /// A 6-bit command.
-    Command6(u16, DataMode),
+    _6Bit(u16, DataMode),
     /// A 7-bit command.
-    Command7(u16, DataMode),
+    _7Bit(u16, DataMode),
     /// A 8-bit command.
-    Command8(u16, DataMode),
+    _8Bit(u16, DataMode),
     /// A 9-bit command.
-    Command9(u16, DataMode),
+    _9Bit(u16, DataMode),
     /// A 10-bit command.
-    Command10(u16, DataMode),
+    _10Bit(u16, DataMode),
     /// A 11-bit command.
-    Command11(u16, DataMode),
+    _11Bit(u16, DataMode),
     /// A 12-bit command.
-    Command12(u16, DataMode),
+    _12Bit(u16, DataMode),
     /// A 13-bit command.
-    Command13(u16, DataMode),
+    _13Bit(u16, DataMode),
     /// A 14-bit command.
-    Command14(u16, DataMode),
+    _14Bit(u16, DataMode),
     /// A 15-bit command.
-    Command15(u16, DataMode),
+    _15Bit(u16, DataMode),
     /// A 16-bit command.
-    Command16(u16, DataMode),
+    _16Bit(u16, DataMode),
 }
 
 impl Command {
     fn width(&self) -> usize {
         match self {
             Command::None => 0,
-            Command::Command1(_, _) => 1,
-            Command::Command2(_, _) => 2,
-            Command::Command3(_, _) => 3,
-            Command::Command4(_, _) => 4,
-            Command::Command5(_, _) => 5,
-            Command::Command6(_, _) => 6,
-            Command::Command7(_, _) => 7,
-            Command::Command8(_, _) => 8,
-            Command::Command9(_, _) => 9,
-            Command::Command10(_, _) => 10,
-            Command::Command11(_, _) => 11,
-            Command::Command12(_, _) => 12,
-            Command::Command13(_, _) => 13,
-            Command::Command14(_, _) => 14,
-            Command::Command15(_, _) => 15,
-            Command::Command16(_, _) => 16,
+            Command::_1Bit(_, _) => 1,
+            Command::_2Bit(_, _) => 2,
+            Command::_3Bit(_, _) => 3,
+            Command::_4Bit(_, _) => 4,
+            Command::_5Bit(_, _) => 5,
+            Command::_6Bit(_, _) => 6,
+            Command::_7Bit(_, _) => 7,
+            Command::_8Bit(_, _) => 8,
+            Command::_9Bit(_, _) => 9,
+            Command::_10Bit(_, _) => 10,
+            Command::_11Bit(_, _) => 11,
+            Command::_12Bit(_, _) => 12,
+            Command::_13Bit(_, _) => 13,
+            Command::_14Bit(_, _) => 14,
+            Command::_15Bit(_, _) => 15,
+            Command::_16Bit(_, _) => 16,
         }
     }
 
     fn value(&self) -> u16 {
         match self {
             Command::None => 0,
-            Command::Command1(value, _)
-            | Command::Command2(value, _)
-            | Command::Command3(value, _)
-            | Command::Command4(value, _)
-            | Command::Command5(value, _)
-            | Command::Command6(value, _)
-            | Command::Command7(value, _)
-            | Command::Command8(value, _)
-            | Command::Command9(value, _)
-            | Command::Command10(value, _)
-            | Command::Command11(value, _)
-            | Command::Command12(value, _)
-            | Command::Command13(value, _)
-            | Command::Command14(value, _)
-            | Command::Command15(value, _)
-            | Command::Command16(value, _) => *value,
+            Command::_1Bit(value, _)
+            | Command::_2Bit(value, _)
+            | Command::_3Bit(value, _)
+            | Command::_4Bit(value, _)
+            | Command::_5Bit(value, _)
+            | Command::_6Bit(value, _)
+            | Command::_7Bit(value, _)
+            | Command::_8Bit(value, _)
+            | Command::_9Bit(value, _)
+            | Command::_10Bit(value, _)
+            | Command::_11Bit(value, _)
+            | Command::_12Bit(value, _)
+            | Command::_13Bit(value, _)
+            | Command::_14Bit(value, _)
+            | Command::_15Bit(value, _)
+            | Command::_16Bit(value, _) => *value,
         }
     }
 
     fn mode(&self) -> DataMode {
         match self {
             Command::None => DataMode::Single,
-            Command::Command1(_, mode)
-            | Command::Command2(_, mode)
-            | Command::Command3(_, mode)
-            | Command::Command4(_, mode)
-            | Command::Command5(_, mode)
-            | Command::Command6(_, mode)
-            | Command::Command7(_, mode)
-            | Command::Command8(_, mode)
-            | Command::Command9(_, mode)
-            | Command::Command10(_, mode)
-            | Command::Command11(_, mode)
-            | Command::Command12(_, mode)
-            | Command::Command13(_, mode)
-            | Command::Command14(_, mode)
-            | Command::Command15(_, mode)
-            | Command::Command16(_, mode) => *mode,
+            Command::_1Bit(_, mode)
+            | Command::_2Bit(_, mode)
+            | Command::_3Bit(_, mode)
+            | Command::_4Bit(_, mode)
+            | Command::_5Bit(_, mode)
+            | Command::_6Bit(_, mode)
+            | Command::_7Bit(_, mode)
+            | Command::_8Bit(_, mode)
+            | Command::_9Bit(_, mode)
+            | Command::_10Bit(_, mode)
+            | Command::_11Bit(_, mode)
+            | Command::_12Bit(_, mode)
+            | Command::_13Bit(_, mode)
+            | Command::_14Bit(_, mode)
+            | Command::_15Bit(_, mode)
+            | Command::_16Bit(_, mode) => *mode,
         }
     }
 
@@ -252,145 +252,145 @@ pub enum Address {
     /// No address phase.
     None,
     /// A 1-bit address.
-    Address1(u32, DataMode),
+    _1Bit(u32, DataMode),
     /// A 2-bit address.
-    Address2(u32, DataMode),
+    _2Bit(u32, DataMode),
     /// A 3-bit address.
-    Address3(u32, DataMode),
+    _3Bit(u32, DataMode),
     /// A 4-bit address.
-    Address4(u32, DataMode),
+    _4Bit(u32, DataMode),
     /// A 5-bit address.
-    Address5(u32, DataMode),
+    _5Bit(u32, DataMode),
     /// A 6-bit address.
-    Address6(u32, DataMode),
+    _6Bit(u32, DataMode),
     /// A 7-bit address.
-    Address7(u32, DataMode),
+    _7Bit(u32, DataMode),
     /// A 8-bit address.
-    Address8(u32, DataMode),
+    _8Bit(u32, DataMode),
     /// A 9-bit address.
-    Address9(u32, DataMode),
+    _9Bit(u32, DataMode),
     /// A 10-bit address.
-    Address10(u32, DataMode),
+    _10Bit(u32, DataMode),
     /// A 11-bit address.
-    Address11(u32, DataMode),
+    _11Bit(u32, DataMode),
     /// A 12-bit address.
-    Address12(u32, DataMode),
+    _12Bit(u32, DataMode),
     /// A 13-bit address.
-    Address13(u32, DataMode),
+    _13Bit(u32, DataMode),
     /// A 14-bit address.
-    Address14(u32, DataMode),
+    _14Bit(u32, DataMode),
     /// A 15-bit address.
-    Address15(u32, DataMode),
+    _15Bit(u32, DataMode),
     /// A 16-bit address.
-    Address16(u32, DataMode),
+    _16Bit(u32, DataMode),
     /// A 17-bit address.
-    Address17(u32, DataMode),
+    _17Bit(u32, DataMode),
     /// A 18-bit address.
-    Address18(u32, DataMode),
+    _18Bit(u32, DataMode),
     /// A 19-bit address.
-    Address19(u32, DataMode),
+    _19Bit(u32, DataMode),
     /// A 20-bit address.
-    Address20(u32, DataMode),
+    _20Bit(u32, DataMode),
     /// A 21-bit address.
-    Address21(u32, DataMode),
+    _21Bit(u32, DataMode),
     /// A 22-bit address.
-    Address22(u32, DataMode),
+    _22Bit(u32, DataMode),
     /// A 23-bit address.
-    Address23(u32, DataMode),
+    _23Bit(u32, DataMode),
     /// A 24-bit address.
-    Address24(u32, DataMode),
+    _24Bit(u32, DataMode),
     /// A 25-bit address.
-    Address25(u32, DataMode),
+    _25Bit(u32, DataMode),
     /// A 26-bit address.
-    Address26(u32, DataMode),
+    _26Bit(u32, DataMode),
     /// A 27-bit address.
-    Address27(u32, DataMode),
+    _27Bit(u32, DataMode),
     /// A 28-bit address.
-    Address28(u32, DataMode),
+    _28Bit(u32, DataMode),
     /// A 29-bit address.
-    Address29(u32, DataMode),
+    _29Bit(u32, DataMode),
     /// A 30-bit address.
-    Address30(u32, DataMode),
+    _30Bit(u32, DataMode),
     /// A 31-bit address.
-    Address31(u32, DataMode),
+    _31Bit(u32, DataMode),
     /// A 32-bit address.
-    Address32(u32, DataMode),
+    _32Bit(u32, DataMode),
 }
 
 impl Address {
     fn width(&self) -> usize {
         match self {
             Address::None => 0,
-            Address::Address1(_, _) => 1,
-            Address::Address2(_, _) => 2,
-            Address::Address3(_, _) => 3,
-            Address::Address4(_, _) => 4,
-            Address::Address5(_, _) => 5,
-            Address::Address6(_, _) => 6,
-            Address::Address7(_, _) => 7,
-            Address::Address8(_, _) => 8,
-            Address::Address9(_, _) => 9,
-            Address::Address10(_, _) => 10,
-            Address::Address11(_, _) => 11,
-            Address::Address12(_, _) => 12,
-            Address::Address13(_, _) => 13,
-            Address::Address14(_, _) => 14,
-            Address::Address15(_, _) => 15,
-            Address::Address16(_, _) => 16,
-            Address::Address17(_, _) => 17,
-            Address::Address18(_, _) => 18,
-            Address::Address19(_, _) => 19,
-            Address::Address20(_, _) => 20,
-            Address::Address21(_, _) => 21,
-            Address::Address22(_, _) => 22,
-            Address::Address23(_, _) => 23,
-            Address::Address24(_, _) => 24,
-            Address::Address25(_, _) => 25,
-            Address::Address26(_, _) => 26,
-            Address::Address27(_, _) => 27,
-            Address::Address28(_, _) => 28,
-            Address::Address29(_, _) => 29,
-            Address::Address30(_, _) => 30,
-            Address::Address31(_, _) => 31,
-            Address::Address32(_, _) => 32,
+            Address::_1Bit(_, _) => 1,
+            Address::_2Bit(_, _) => 2,
+            Address::_3Bit(_, _) => 3,
+            Address::_4Bit(_, _) => 4,
+            Address::_5Bit(_, _) => 5,
+            Address::_6Bit(_, _) => 6,
+            Address::_7Bit(_, _) => 7,
+            Address::_8Bit(_, _) => 8,
+            Address::_9Bit(_, _) => 9,
+            Address::_10Bit(_, _) => 10,
+            Address::_11Bit(_, _) => 11,
+            Address::_12Bit(_, _) => 12,
+            Address::_13Bit(_, _) => 13,
+            Address::_14Bit(_, _) => 14,
+            Address::_15Bit(_, _) => 15,
+            Address::_16Bit(_, _) => 16,
+            Address::_17Bit(_, _) => 17,
+            Address::_18Bit(_, _) => 18,
+            Address::_19Bit(_, _) => 19,
+            Address::_20Bit(_, _) => 20,
+            Address::_21Bit(_, _) => 21,
+            Address::_22Bit(_, _) => 22,
+            Address::_23Bit(_, _) => 23,
+            Address::_24Bit(_, _) => 24,
+            Address::_25Bit(_, _) => 25,
+            Address::_26Bit(_, _) => 26,
+            Address::_27Bit(_, _) => 27,
+            Address::_28Bit(_, _) => 28,
+            Address::_29Bit(_, _) => 29,
+            Address::_30Bit(_, _) => 30,
+            Address::_31Bit(_, _) => 31,
+            Address::_32Bit(_, _) => 32,
         }
     }
 
     fn value(&self) -> u32 {
         match self {
             Address::None => 0,
-            Address::Address1(value, _)
-            | Address::Address2(value, _)
-            | Address::Address3(value, _)
-            | Address::Address4(value, _)
-            | Address::Address5(value, _)
-            | Address::Address6(value, _)
-            | Address::Address7(value, _)
-            | Address::Address8(value, _)
-            | Address::Address9(value, _)
-            | Address::Address10(value, _)
-            | Address::Address11(value, _)
-            | Address::Address12(value, _)
-            | Address::Address13(value, _)
-            | Address::Address14(value, _)
-            | Address::Address15(value, _)
-            | Address::Address16(value, _)
-            | Address::Address17(value, _)
-            | Address::Address18(value, _)
-            | Address::Address19(value, _)
-            | Address::Address20(value, _)
-            | Address::Address21(value, _)
-            | Address::Address22(value, _)
-            | Address::Address23(value, _)
-            | Address::Address24(value, _)
-            | Address::Address25(value, _)
-            | Address::Address26(value, _)
-            | Address::Address27(value, _)
-            | Address::Address28(value, _)
-            | Address::Address29(value, _)
-            | Address::Address30(value, _)
-            | Address::Address31(value, _)
-            | Address::Address32(value, _) => *value,
+            Address::_1Bit(value, _)
+            | Address::_2Bit(value, _)
+            | Address::_3Bit(value, _)
+            | Address::_4Bit(value, _)
+            | Address::_5Bit(value, _)
+            | Address::_6Bit(value, _)
+            | Address::_7Bit(value, _)
+            | Address::_8Bit(value, _)
+            | Address::_9Bit(value, _)
+            | Address::_10Bit(value, _)
+            | Address::_11Bit(value, _)
+            | Address::_12Bit(value, _)
+            | Address::_13Bit(value, _)
+            | Address::_14Bit(value, _)
+            | Address::_15Bit(value, _)
+            | Address::_16Bit(value, _)
+            | Address::_17Bit(value, _)
+            | Address::_18Bit(value, _)
+            | Address::_19Bit(value, _)
+            | Address::_20Bit(value, _)
+            | Address::_21Bit(value, _)
+            | Address::_22Bit(value, _)
+            | Address::_23Bit(value, _)
+            | Address::_24Bit(value, _)
+            | Address::_25Bit(value, _)
+            | Address::_26Bit(value, _)
+            | Address::_27Bit(value, _)
+            | Address::_28Bit(value, _)
+            | Address::_29Bit(value, _)
+            | Address::_30Bit(value, _)
+            | Address::_31Bit(value, _)
+            | Address::_32Bit(value, _) => *value,
         }
     }
 
@@ -401,38 +401,38 @@ impl Address {
     fn mode(&self) -> DataMode {
         match self {
             Address::None => DataMode::Single,
-            Address::Address1(_, mode)
-            | Address::Address2(_, mode)
-            | Address::Address3(_, mode)
-            | Address::Address4(_, mode)
-            | Address::Address5(_, mode)
-            | Address::Address6(_, mode)
-            | Address::Address7(_, mode)
-            | Address::Address8(_, mode)
-            | Address::Address9(_, mode)
-            | Address::Address10(_, mode)
-            | Address::Address11(_, mode)
-            | Address::Address12(_, mode)
-            | Address::Address13(_, mode)
-            | Address::Address14(_, mode)
-            | Address::Address15(_, mode)
-            | Address::Address16(_, mode)
-            | Address::Address17(_, mode)
-            | Address::Address18(_, mode)
-            | Address::Address19(_, mode)
-            | Address::Address20(_, mode)
-            | Address::Address21(_, mode)
-            | Address::Address22(_, mode)
-            | Address::Address23(_, mode)
-            | Address::Address24(_, mode)
-            | Address::Address25(_, mode)
-            | Address::Address26(_, mode)
-            | Address::Address27(_, mode)
-            | Address::Address28(_, mode)
-            | Address::Address29(_, mode)
-            | Address::Address30(_, mode)
-            | Address::Address31(_, mode)
-            | Address::Address32(_, mode) => *mode,
+            Address::_1Bit(_, mode)
+            | Address::_2Bit(_, mode)
+            | Address::_3Bit(_, mode)
+            | Address::_4Bit(_, mode)
+            | Address::_5Bit(_, mode)
+            | Address::_6Bit(_, mode)
+            | Address::_7Bit(_, mode)
+            | Address::_8Bit(_, mode)
+            | Address::_9Bit(_, mode)
+            | Address::_10Bit(_, mode)
+            | Address::_11Bit(_, mode)
+            | Address::_12Bit(_, mode)
+            | Address::_13Bit(_, mode)
+            | Address::_14Bit(_, mode)
+            | Address::_15Bit(_, mode)
+            | Address::_16Bit(_, mode)
+            | Address::_17Bit(_, mode)
+            | Address::_18Bit(_, mode)
+            | Address::_19Bit(_, mode)
+            | Address::_20Bit(_, mode)
+            | Address::_21Bit(_, mode)
+            | Address::_22Bit(_, mode)
+            | Address::_23Bit(_, mode)
+            | Address::_24Bit(_, mode)
+            | Address::_25Bit(_, mode)
+            | Address::_26Bit(_, mode)
+            | Address::_27Bit(_, mode)
+            | Address::_28Bit(_, mode)
+            | Address::_29Bit(_, mode)
+            | Address::_30Bit(_, mode)
+            | Address::_31Bit(_, mode)
+            | Address::_32Bit(_, mode) => *mode,
         }
     }
 }
