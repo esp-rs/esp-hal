@@ -79,7 +79,7 @@
 //! let (mut rx, mut tx) = uart1.split();
 //!
 //! // Each component can be used individually to interact with the UART:
-//! tx.write_bytes(&[42u8]).expect("write error!");
+//! tx.write_bytes(&[42u8]);
 //! let mut byte = [0u8; 1];
 //! rx.read_bytes(&mut byte);
 //! # }
@@ -903,7 +903,7 @@ where
     /// Read bytes from the RX FIFO without checking for errors.
     fn flush_buffer(&mut self, buf: &mut [u8]) -> usize {
         let mut count = 0;
-        while count < buf.len() {
+        while count < buf.len() && self.rx_fifo_count() > 0 {
             buf[count] = self.read_byte();
             count += 1;
         }
