@@ -28,8 +28,8 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx).unwrap();
-        let rx = UartRx::new(peripherals.UART1, uart::Config::default(), rx).unwrap();
+        let tx = UartTx::new(peripherals.UART0, uart::Config::default()).unwrap().with_tx(tx);
+        let rx = UartRx::new(peripherals.UART1, uart::Config::default()).unwrap().with_rx(rx);
 
         Context { rx, tx }
     }
