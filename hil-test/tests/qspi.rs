@@ -75,8 +75,8 @@ fn transfer_write(
     let transfer = spi
         .half_duplex_write(
             DataMode::Quad,
-            Command::Command8(write as u16, command_data_mode),
-            Address::Address24(
+            Command::_8Bit(write as u16, command_data_mode),
+            Address::_24Bit(
                 write as u32 | (write as u32) << 8 | (write as u32) << 16,
                 DataMode::Quad,
             ),
@@ -124,7 +124,7 @@ fn execute_write_read(mut spi: SpiUnderTest, mut mosi_mirror: Output<'static>, e
         (spi, dma_rx_buf) = transfer_read(
             spi,
             dma_rx_buf,
-            Command::Command8(expected as u16, command_data_mode),
+            Command::_8Bit(expected as u16, command_data_mode),
         );
         assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
     }
