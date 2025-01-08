@@ -54,6 +54,7 @@ use crate::{
 /// Clock source for the temperature sensor
 #[derive(Debug, Clone, Default, PartialEq, Eq, Copy, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum ClockSource {
     /// Use RC_FAST clock source
     RcFast,

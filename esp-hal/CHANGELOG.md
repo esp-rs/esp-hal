@@ -100,6 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: Fix naming violations for `Mode` enum variants (#2902)
 - SPI: Fix naming violations for `Address` and `Command` enum variants (#2906)
 
+- `ClockSource` enums are now `#[non_exhaustive]` (#2912)
+
 ### Fixed
 
 - Xtensa devices now correctly enable the `esp-hal-procmacros/rtc-slow` feature (#2594)
