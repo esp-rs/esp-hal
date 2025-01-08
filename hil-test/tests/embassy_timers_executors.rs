@@ -64,7 +64,7 @@ mod test_cases {
     }
 
     pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
-        let mut periodic = PeriodicTimer::new_typed(timer);
+        let mut periodic = PeriodicTimer::new(timer);
 
         let t1 = esp_hal::time::now();
         periodic.start(100.millis()).unwrap();
@@ -81,7 +81,7 @@ mod test_cases {
     }
 
     pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
-        let mut timer = OneShotTimer::new_typed(timer);
+        let mut timer = OneShotTimer::new(timer);
 
         let t1 = esp_hal::time::now();
         timer.delay_millis(50);

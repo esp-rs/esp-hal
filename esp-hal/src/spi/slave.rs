@@ -94,8 +94,8 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 ///
 /// See the [module-level documentation][self] for more details.
 #[instability::unstable]
-pub struct Spi<'d, Dm, T = AnySpi> {
-    spi: PeripheralRef<'d, T>,
+pub struct Spi<'d, Dm> {
+    spi: PeripheralRef<'d, AnySpi>,
     #[allow(dead_code)]
     data_mode: Mode,
     _mode: PhantomData<Dm>,
@@ -105,18 +105,7 @@ impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     #[instability::unstable]
     pub fn new(spi: impl Peripheral<P = impl Instance> + 'd, mode: Mode) -> Spi<'d, Blocking> {
-        Self::new_typed(spi.map_into(), mode)
-    }
-}
-
-impl<'d, Dm, T> Spi<'d, Dm, T>
-where
-    T: Instance,
-{
-    /// Constructs an SPI instance in 8bit dataframe mode.
-    #[instability::unstable]
-    pub fn new_typed(spi: impl Peripheral<P = T> + 'd, mode: Mode) -> Spi<'d, Dm, T> {
-        crate::into_ref!(spi);
+        crate::into_mapped_ref!(spi);
 
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
@@ -200,10 +189,7 @@ pub mod dma {
         DriverMode,
     };
 
-    impl<'d, T> Spi<'d, Blocking, T>
-    where
-        T: InstanceDma,
-    {
+    impl<'d> Spi<'d, Blocking> {
         /// Configures the SPI peripheral with the provided DMA channel and
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
@@ -213,9 +199,9 @@ pub mod dma {
             channel: impl Peripheral<P = CH> + 'd,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, Blocking, T>
+        ) -> SpiDma<'d, Blocking>
         where
-            CH: DmaChannelFor<T>,
+            CH: DmaChannelFor<AnySpi>,
         {
             self.spi.info().set_data_mode(self.data_mode, true);
             SpiDma::new(
@@ -229,21 +215,19 @@ pub mod dma {
 
     /// A DMA capable SPI instance.
     #[instability::unstable]
-    pub struct SpiDma<'d, Dm, T = AnySpi>
+    pub struct SpiDma<'d, Dm>
     where
-        T: InstanceDma,
         Dm: DriverMode,
     {
-        pub(crate) spi: PeripheralRef<'d, T>,
-        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<T>>,
+        pub(crate) spi: PeripheralRef<'d, AnySpi>,
+        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<AnySpi>>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
         _guard: PeripheralGuard,
     }
 
-    impl<Dm, T> core::fmt::Debug for SpiDma<'_, Dm, T>
+    impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
     where
-        T: InstanceDma,
         Dm: DriverMode,
     {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -251,9 +235,8 @@ pub mod dma {
         }
     }
 
-    impl<Dm, T> DmaSupport for SpiDma<'_, Dm, T>
+    impl<Dm> DmaSupport for SpiDma<'_, Dm>
     where
-        T: InstanceDma,
         Dm: DriverMode,
     {
         fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
@@ -270,12 +253,11 @@ pub mod dma {
         }
     }
 
-    impl<'d, Dm, T> DmaSupportTx for SpiDma<'d, Dm, T>
+    impl<'d, Dm> DmaSupportTx for SpiDma<'d, Dm>
     where
-        T: InstanceDma,
         Dm: DriverMode,
     {
-        type TX = ChannelTx<'d, Dm, PeripheralTxChannel<T>>;
+        type TX = ChannelTx<'d, Dm, PeripheralTxChannel<AnySpi>>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -286,12 +268,11 @@ pub mod dma {
         }
     }
 
-    impl<'d, Dm, T> DmaSupportRx for SpiDma<'d, Dm, T>
+    impl<'d, Dm> DmaSupportRx for SpiDma<'d, Dm>
     where
-        T: InstanceDma,
         Dm: DriverMode,
     {
-        type RX = ChannelRx<'d, Dm, PeripheralRxChannel<T>>;
+        type RX = ChannelRx<'d, Dm, PeripheralRxChannel<AnySpi>>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx
@@ -302,13 +283,10 @@ pub mod dma {
         }
     }
 
-    impl<'d, T> SpiDma<'d, Blocking, T>
-    where
-        T: InstanceDma,
-    {
+    impl<'d> SpiDma<'d, Blocking> {
         fn new(
-            spi: PeripheralRef<'d, T>,
-            channel: PeripheralRef<'d, PeripheralDmaChannel<T>>,
+            spi: PeripheralRef<'d, AnySpi>,
+            channel: PeripheralRef<'d, PeripheralDmaChannel<AnySpi>>,
             rx_descriptors: &'static mut [DmaDescriptor],
             tx_descriptors: &'static mut [DmaDescriptor],
         ) -> Self {
@@ -326,10 +304,9 @@ pub mod dma {
         }
     }
 
-    impl<Dm, T> SpiDma<'_, Dm, T>
+    impl<Dm> SpiDma<'_, Dm>
     where
         Dm: DriverMode,
-        T: InstanceDma,
     {
         fn driver(&self) -> DmaDriver {
             DmaDriver {

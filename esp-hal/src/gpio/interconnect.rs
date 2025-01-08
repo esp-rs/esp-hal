@@ -41,8 +41,8 @@ impl<P: InputPin> PeripheralInput for P {}
 impl<P: OutputPin> PeripheralOutput for P {}
 
 // Pin drivers
-impl<P: InputPin> PeripheralInput for Flex<'static, P> {}
-impl<P: OutputPin> PeripheralOutput for Flex<'static, P> {}
+impl PeripheralInput for Flex<'static> {}
+impl PeripheralOutput for Flex<'static> {}
 
 // Placeholders
 impl PeripheralInput for NoPin {}
@@ -226,11 +226,8 @@ where
     }
 }
 
-impl<P> From<Flex<'static, P>> for InputSignal
-where
-    P: InputPin,
-{
-    fn from(input: Flex<'static, P>) -> Self {
+impl From<Flex<'static>> for InputSignal {
+    fn from(input: Flex<'static>) -> Self {
         Self::new(input.degrade())
     }
 }
@@ -364,11 +361,8 @@ where
     }
 }
 
-impl<P> From<Flex<'static, P>> for OutputSignal
-where
-    P: OutputPin,
-{
-    fn from(input: Flex<'static, P>) -> Self {
+impl From<Flex<'static>> for OutputSignal {
+    fn from(input: Flex<'static>) -> Self {
         Self::new(input.degrade())
     }
 }
@@ -576,11 +570,8 @@ impl From<OutputConnection> for InputConnection {
     }
 }
 
-impl<P> From<Flex<'static, P>> for InputConnection
-where
-    P: InputPin,
-{
-    fn from(pin: Flex<'static, P>) -> Self {
+impl From<Flex<'static>> for InputConnection {
+    fn from(pin: Flex<'static>) -> Self {
         pin.peripheral_input().into()
     }
 }
@@ -668,11 +659,8 @@ impl From<OutputSignal> for OutputConnection {
     }
 }
 
-impl<P> From<Flex<'static, P>> for OutputConnection
-where
-    P: OutputPin,
-{
-    fn from(pin: Flex<'static, P>) -> Self {
+impl From<Flex<'static>> for OutputConnection {
+    fn from(pin: Flex<'static>) -> Self {
         pin.into_peripheral_output().into()
     }
 }
