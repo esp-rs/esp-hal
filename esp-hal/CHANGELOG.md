@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `adc::{AdcCalSource, Attenuation, Resolution}` now implement `Hash` and `defmt::Format` (#2840)
 - `rtc_cntl::{RtcFastClock, RtcSlowClock, RtcCalSel}` now implement `PartialEq`, `Eq`, `Hash` and `defmt::Format` (#2840)
 - Added `tsens::TemperatureSensor` peripheral for ESP32C6 and ESP32C3 (#2875)
+- Added `with_rx()` and `with_tx()` methods to Uart, UartRx, and UartTx ()
 
 ### Changed
 

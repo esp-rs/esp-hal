@@ -28,11 +28,13 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx)
+        let tx = UartTx::new(peripherals.UART0, uart::Config::default())
             .unwrap()
+            .with_tx(tx)
             .into_async();
-        let rx = UartRx::new(peripherals.UART1, uart::Config::default(), rx)
+        let rx = UartRx::new(peripherals.UART1, uart::Config::default())
             .unwrap()
+            .with_rx(rx)
             .into_async();
 
         Context { rx, tx }
