@@ -29,8 +29,8 @@ mod tests {
 
         let uart = Uart::new(peripherals.UART0, uart::Config::default())
             .unwrap()
-            .with_rx(rx)
             .with_tx(tx)
+            .with_rx(rx)
             .into_async();
 
         Context { uart }

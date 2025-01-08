@@ -91,8 +91,8 @@ async fn main(spawner: Spawner) {
 
     let mut uart0 = Uart::new(peripherals.UART0, config)
         .unwrap()
-        .with_rx(rx_pin)
         .with_tx(tx_pin)
+        .with_rx(rx_pin)
         .into_async();
     uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(AT_CMD));
 

@@ -32,8 +32,8 @@ mod tests {
 
         let uart = Uart::new(peripherals.UART1, uart::Config::default())
             .unwrap()
-            .with_rx(rx)
-            .with_tx(tx);
+            .with_tx(tx)
+            .with_rx(rx);
 
         Context { uart }
     }

@@ -32,8 +32,8 @@ fn main() -> ! {
 
     let mut uart0 = Uart::new(peripherals.UART0, uart::Config::default())
         .unwrap()
-        .with_rx(rx_pin)
-        .with_tx(tx_pin);
+        .with_tx(tx_pin)
+        .with_rx(rx_pin);
 
     // read two characters which get parsed as the channel
     let mut cnt = 0;
