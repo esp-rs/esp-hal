@@ -154,17 +154,17 @@ pub use xtensa_lx_rt::{self, entry};
 #[cfg(any(esp32, esp32s3))]
 pub use self::soc::cpu_control;
 #[cfg(efuse)]
-#[cfg(feature = "unstable")]
+#[instability::unstable]
 pub use self::soc::efuse;
 #[cfg(lp_core)]
-#[cfg(feature = "unstable")]
+#[instability::unstable]
 pub use self::soc::lp_core;
 pub use self::soc::peripherals;
-#[cfg(feature = "unstable")]
+#[instability::unstable]
 #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
-#[cfg(feature = "unstable")]
+#[instability::unstable]
 pub use self::soc::ulp_core;
 
 #[cfg(any(dport, hp_sys, pcr, system))]
