@@ -310,7 +310,7 @@ where
         Ok(())
     }
 
-    /// "Wait" until the count down finishes without blocking.
+    /// "Wait", by blocking, until the count down finishes.
     pub fn wait(&mut self) {
         while !self.inner.is_interrupt_set() {}
         self.inner.clear_interrupt();
