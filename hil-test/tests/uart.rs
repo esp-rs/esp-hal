@@ -30,7 +30,10 @@ mod tests {
 
         let (rx, tx) = pin.split();
 
-        let uart = Uart::new(peripherals.UART1, uart::Config::default(), rx, tx).unwrap();
+        let uart = Uart::new(peripherals.UART1, uart::Config::default())
+            .unwrap()
+            .with_rx(rx)
+            .with_tx(tx);
 
         Context { uart }
     }

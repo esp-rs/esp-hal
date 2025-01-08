@@ -26,10 +26,10 @@
 //!
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
-//!     Config::default(),
-//!     peripherals.GPIO1,
-//!     peripherals.GPIO2,
-//! ).unwrap();
+//!     Config::default())
+//!     .unwrap()
+//!     .with_rx(peripherals.GPIO1)
+//!     .with_tx(peripherals.GPIO2);
 //! # }
 //! ```
 //! 
@@ -57,9 +57,9 @@
 //! # let mut uart1 = Uart::new(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     peripherals.GPIO1,
-//! #     peripherals.GPIO2,
-//! # ).unwrap();
+//! # ).unwrap()
+//! # .with_rx(peripherals.GPIO1)
+//! # .with_tx(peripherals.GPIO2);
 //! // Write bytes out over the UART:
 //! uart1.write_bytes(b"Hello, world!").expect("write error!");
 //! # }
@@ -72,9 +72,9 @@
 //! # let mut uart1 = Uart::new(
 //! #     peripherals.UART1,
 //! #     Config::default(),
-//! #     peripherals.GPIO1,
-//! #     peripherals.GPIO2,
-//! # ).unwrap();
+//! # ).unwrap()
+//! # .with_rx(peripherals.GPIO1)
+//! # .with_tx(peripherals.GPIO2);
 //! // The UART can be split into separate Transmit and Receive components:
 //! let (mut rx, mut tx) = uart1.split();
 //!
@@ -93,10 +93,10 @@
 //! let (_, tx) = peripherals.GPIO1.split();
 //! let mut uart1 = Uart::new(
 //!     peripherals.UART1,
-//!     Config::default(),
-//!     rx.inverted(),
-//!     tx.inverted(),
-//! ).unwrap();
+//!     Config::default())
+//!     .unwrap()
+//!     .with_rx(rx.inverted())
+//!     .with_tx(tx.inverted());
 //! # }
 //! ```
 //! 
@@ -107,14 +107,14 @@
 //!
 //! let tx = UartTx::new(
 //!     peripherals.UART0,
-//!     Config::default(),
-//!     peripherals.GPIO1,
-//! ).unwrap();
+//!     Config::default())
+//!     .unwrap()
+//!     .with_tx(peripherals.GPIO1);
 //! let rx = UartRx::new(
 //!     peripherals.UART1,
-//!     Config::default(),
-//!     peripherals.GPIO2,
-//! ).unwrap();
+//!     Config::default())
+//!     .unwrap()
+//!     .with_rx(peripherals.GPIO2);
 //! # }
 //! ```
 //! 
@@ -156,10 +156,10 @@
 //!
 //! let mut uart0 = Uart::new(
 //!     peripherals.UART0,
-//!     config,
-//!     tx_pin,
-//!     rx_pin
-//! ).unwrap();
+//!     config)
+//!     .unwrap()
+//!     .with_rx(rx_pin)
+//!     .with_tx(tx_pin);
 //!
 //! uart0.set_interrupt_handler(interrupt_handler);
 //!
@@ -499,24 +499,6 @@ where
         }
     }
 
-    fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
-        crate::into_mapped_ref!(rx);
-        rx.init_input(Pull::Up, Internal);
-        self.uart.info().rx_signal.connect_to(rx);
-
-        self
-    }
-
-    fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        crate::into_mapped_ref!(tx);
-        // Make sure we don't cause an unexpected low pulse on the pin.
-        tx.set_output_high(true, Internal);
-        tx.set_to_push_pull_output(Internal);
-        self.uart.info().tx_signal.connect_to(tx);
-
-        self
-    }
-
     fn init(self, config: Config) -> Result<Uart<'d, Dm, T>, ConfigError> {
         let rx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
         let tx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
@@ -642,6 +624,20 @@ where
         self
     }
 
+    /// Assign the TX pin for UART instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the UART
+    /// TX signal.
+    pub fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        crate::into_mapped_ref!(tx);
+        // Make sure we don't cause an unexpected low pulse on the pin.
+        tx.set_output_high(true, Internal);
+        tx.set_to_push_pull_output(Internal);
+        self.uart.info().tx_signal.connect_to(tx);
+
+        self
+    }
+
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the RX half.
@@ -736,9 +732,8 @@ impl<'d> UartTx<'d, Blocking> {
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
-        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, ConfigError> {
-        Self::new_typed(uart.map_into(), config, tx)
+        Self::new_typed(uart.map_into(), config)
     }
 }
 
@@ -750,10 +745,8 @@ where
     pub fn new_typed(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, ConfigError> {
         let (_, uart_tx) = UartBuilder::<'d, Blocking, T>::new(uart)
-            .with_tx(tx)
             .init(config)?
             .split();
 
@@ -829,6 +822,17 @@ where
         crate::into_mapped_ref!(cts);
         cts.init_input(Pull::None, Internal);
         self.uart.info().cts_signal.connect_to(cts);
+
+        self
+    }
+
+    /// Assign the RX pin for UART instance.
+    ///
+    /// Sets the specified pin to input and connects it to the UART RX signal.
+    pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(rx);
+        rx.init_input(Pull::Up, Internal);
+        self.uart.info().rx_signal.connect_to(rx);
 
         self
     }
@@ -950,9 +954,8 @@ impl<'d> UartRx<'d, Blocking> {
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
-        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Result<Self, ConfigError> {
-        UartRx::new_typed(uart.map_into(), config, rx)
+        UartRx::new_typed(uart.map_into(), config)
     }
 }
 
@@ -964,9 +967,8 @@ where
     pub fn new_typed(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
     ) -> Result<Self, ConfigError> {
-        let (uart_rx, _) = UartBuilder::new(uart).with_rx(rx).init(config)?.split();
+        let (uart_rx, _) = UartBuilder::new(uart).init(config)?.split();
 
         Ok(uart_rx)
     }
@@ -1015,10 +1017,8 @@ impl<'d> Uart<'d, Blocking> {
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
-        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
-        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, ConfigError> {
-        Self::new_typed(uart.map_into(), config, rx, tx)
+        Self::new_typed(uart.map_into(), config)
     }
 }
 
@@ -1030,10 +1030,8 @@ where
     pub fn new_typed(
         uart: impl Peripheral<P = T> + 'd,
         config: Config,
-        rx: impl Peripheral<P = impl PeripheralInput> + 'd,
-        tx: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Result<Self, ConfigError> {
-        UartBuilder::new(uart).with_tx(tx).with_rx(rx).init(config)
+        UartBuilder::new(uart).init(config)
     }
 
     /// Reconfigures the driver to operate in [`Async`] mode.
@@ -1042,6 +1040,31 @@ where
             rx: self.rx.into_async(),
             tx: self.tx.into_async(),
         }
+    }
+
+    /// Assign the RX pin for UART instance.
+    ///
+    /// Sets the specified pin to input and connects it to the UART RX signal.
+    pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        crate::into_mapped_ref!(rx);
+        rx.init_input(Pull::Up, Internal);
+        self.rx.uart.info().rx_signal.connect_to(rx);
+
+        self
+    }
+
+    /// Assign the TX pin for UART instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the UART
+    /// TX signal.
+    pub fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        crate::into_mapped_ref!(tx);
+        // Make sure we don't cause an unexpected low pulse on the pin.
+        tx.set_output_high(true, Internal);
+        tx.set_to_push_pull_output(Internal);
+        self.tx.uart.info().tx_signal.connect_to(tx);
+
+        self
     }
 }
 

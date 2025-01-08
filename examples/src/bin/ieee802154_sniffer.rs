@@ -24,19 +24,16 @@ fn main() -> ! {
     // Default pins for Uart/Serial communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32c6")] {
-            let (mut tx_pin, mut rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
+            let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         } else if #[cfg(feature = "esp32h2")] {
             let (mut tx_pin, mut rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
         }
     }
 
-    let mut uart0 = Uart::new(
-        peripherals.UART0,
-        uart::Config::default(),
-        &mut rx_pin,
-        &mut tx_pin,
-    )
-    .unwrap();
+    let mut uart0 = Uart::new(peripherals.UART0, uart::Config::default())
+        .unwrap()
+        .with_rx(rx_pin)
+        .with_tx(tx_pin);
 
     // read two characters which get parsed as the channel
     let mut cnt = 0;
