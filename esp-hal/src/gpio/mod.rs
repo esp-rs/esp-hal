@@ -18,10 +18,7 @@
 //! into peripheral signals for advanced use.
 //!
 //! Pin drivers can be created using [`Flex::new`], [`Input::new`],
-//! [`Output::new`] and [`OutputOpenDrain::new`]. If you need the pin drivers to
-//! carry the type of the pin, you can use the [`Flex::new_typed`],
-//! [`Input::new_typed`], [`Output::new_typed`], and
-//! [`OutputOpenDrain::new_typed`] functions.
+//! [`Output::new`] and [`OutputOpenDrain::new`].
 //!
 //! Each pin is a different type initially. Internally, `esp-hal` will often
 //! erase their types automatically, but they can also be converted into
@@ -313,6 +310,7 @@ pub trait RtcPin: Pin {
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
+#[cfg(any(lp_io, rtc_cntl))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     fn rtcio_pullup(&mut self, enable: bool);
@@ -1096,7 +1094,7 @@ macro_rules! gpio {
             }
 
             impl $crate::gpio::AnyPin {
-                /// Conjure a new, type-erased GPIO pin out of thin air.
+                /// Conjure a new GPIO pin out of thin air.
                 ///
                 /// # Safety
                 ///
@@ -1109,6 +1107,15 @@ macro_rules! gpio {
                     const PINS: &[u8] = &[$($gpionum),*];
                     assert!(PINS.contains(&pin), "Pin {} does not exist", pin);
                     Self(pin)
+                }
+
+                pub(crate) fn is_output(&self) -> bool {
+                    match self.0 {
+                        $(
+                            $gpionum => $crate::if_output_pin!($($type),* { true } else { false }),
+                        )+
+                        _ => false,
+                    }
                 }
             }
 
@@ -1208,21 +1215,21 @@ macro_rules! gpio {
 /// for both high and low logical [`Level`]s.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Output<'d, P = AnyPin> {
-    pin: Flex<'d, P>,
+pub struct Output<'d> {
+    pin: Flex<'d>,
 }
 
-impl<P> private::Sealed for Output<'_, P> {}
+impl private::Sealed for Output<'_> {}
 
-impl<'d, P> Peripheral for Output<'d, P> {
-    type P = Flex<'d, P>;
+impl<'d> Peripheral for Output<'d> {
+    type P = Flex<'d>;
     unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
     }
 }
 
 impl<'d> Output<'d> {
-    /// Creates a new, type-erased GPIO output driver.
+    /// Creates a new GPIO output driver.
     ///
     /// The `initial_output` parameter sets the initial output level of the pin.
     ///
@@ -1251,47 +1258,7 @@ impl<'d> Output<'d> {
     /// ```
     #[inline]
     pub fn new(pin: impl Peripheral<P = impl OutputPin> + 'd, initial_output: Level) -> Self {
-        Self::new_typed(pin.map_into(), initial_output)
-    }
-}
-
-impl<'d, P> Output<'d, P>
-where
-    P: OutputPin,
-{
-    /// Creates a new, typed GPIO output driver.
-    ///
-    /// The `initial_output` parameter sets the initial output level of the pin.
-    ///
-    /// This constructor is useful when you want to limit which GPIO pin can be
-    /// used for a particular function.
-    ///
-    /// ## Example
-    ///
-    /// The following example configures `GPIO5` to pulse a LED once. The
-    /// example assumes that the LED is connected such that it is on when
-    /// the pin is low.
-    ///
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{GpioPin, Level, Output};
-    /// use esp_hal::delay::Delay;
-    ///
-    /// fn blink_once(led: &mut Output<'_, GpioPin<5>>, delay: &mut Delay) {
-    ///     led.set_low();
-    ///     delay.delay_millis(500);
-    ///     led.set_high();
-    /// }
-    ///
-    /// let mut led = Output::new_typed(peripherals.GPIO5, Level::High);
-    /// let mut delay = Delay::new();
-    ///
-    /// blink_once(&mut led, &mut delay);
-    /// # }
-    /// ```
-    #[inline]
-    pub fn new_typed(pin: impl Peripheral<P = P> + 'd, initial_output: Level) -> Self {
-        let mut pin = Flex::new_typed(pin);
+        let mut pin = Flex::new(pin);
 
         pin.set_level(initial_output);
         pin.set_as_output();
@@ -1381,21 +1348,21 @@ where
 /// voltage of their pins and convert it to a logical [`Level`].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Input<'d, P = AnyPin> {
-    pin: Flex<'d, P>,
+pub struct Input<'d> {
+    pin: Flex<'d>,
 }
 
-impl<P> private::Sealed for Input<'_, P> {}
+impl private::Sealed for Input<'_> {}
 
-impl<'d, P> Peripheral for Input<'d, P> {
-    type P = Flex<'d, P>;
+impl<'d> Peripheral for Input<'d> {
+    type P = Flex<'d>;
     unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
     }
 }
 
 impl<'d> Input<'d> {
-    /// Creates a new, type-erased GPIO input.
+    /// Creates a new GPIO input.
     ///
     /// The `pull` parameter configures internal pull-up or pull-down
     /// resistors.
@@ -1434,60 +1401,7 @@ impl<'d> Input<'d> {
     /// ```
     #[inline]
     pub fn new(pin: impl Peripheral<P = impl InputPin> + 'd, pull: Pull) -> Self {
-        Self::new_typed(pin.map_into(), pull)
-    }
-}
-
-impl<'d, P> Input<'d, P>
-where
-    P: InputPin,
-{
-    /// Creates a new, typed GPIO input.
-    ///
-    /// The `pull` parameter configures internal pull-up or pull-down
-    /// resistors.
-    ///
-    /// This constructor is useful when you want to limit which GPIO pin can be
-    /// used for a particular function.
-    ///
-    /// ## Example
-    ///
-    /// The following example configures `GPIO5` to read a button press. The
-    /// example assumes that the button is connected such that the pin is low
-    /// when the button is pressed.
-    ///
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{GpioPin, Level, Input, Pull};
-    /// use esp_hal::delay::Delay;
-    ///
-    /// fn print_when_pressed(
-    ///     button: &mut Input<'_, GpioPin<5>>,
-    ///     delay: &mut Delay,
-    /// ) {
-    ///     let mut was_pressed = false;
-    ///     loop {
-    ///         let is_pressed = button.is_low();
-    ///         if is_pressed && !was_pressed {
-    ///             println!("Button pressed!");
-    ///         }
-    ///         was_pressed = is_pressed;
-    ///         delay.delay_millis(100);
-    ///     }
-    /// }
-    ///
-    /// let mut button = Input::new_typed(
-    ///     peripherals.GPIO5,
-    ///     Pull::Up,
-    /// );
-    /// let mut delay = Delay::new();
-    ///
-    /// print_when_pressed(&mut button, &mut delay);
-    /// # }
-    /// ```
-    #[inline]
-    pub fn new_typed(pin: impl Peripheral<P = P> + 'd, pull: Pull) -> Self {
-        let mut pin = Flex::new_typed(pin);
+        let mut pin = Flex::new(pin);
 
         pin.set_as_input(pull);
 
@@ -1620,12 +1534,7 @@ where
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.pin.wakeup_enable(enable, event);
     }
-}
 
-impl<P> Input<'_, P>
-where
-    P: InputPin + OutputPin,
-{
     /// Split the pin into an input and output signal.
     ///
     /// Peripheral signals allow connecting peripherals together without using
@@ -1654,21 +1563,21 @@ where
 /// resistors.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct OutputOpenDrain<'d, P = AnyPin> {
-    pin: Flex<'d, P>,
+pub struct OutputOpenDrain<'d> {
+    pin: Flex<'d>,
 }
 
-impl<P> private::Sealed for OutputOpenDrain<'_, P> {}
+impl private::Sealed for OutputOpenDrain<'_> {}
 
-impl<'d, P> Peripheral for OutputOpenDrain<'d, P> {
-    type P = Flex<'d, P>;
+impl<'d> Peripheral for OutputOpenDrain<'d> {
+    type P = Flex<'d>;
     unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
     }
 }
 
 impl<'d> OutputOpenDrain<'d> {
-    /// Creates a new, type-erased GPIO output driver.
+    /// Creates a new GPIO output driver.
     ///
     /// The `initial_output` parameter sets the initial output level of the pin.
     /// The `pull` parameter configures internal pull-up or pull-down
@@ -1707,53 +1616,7 @@ impl<'d> OutputOpenDrain<'d> {
         initial_output: Level,
         pull: Pull,
     ) -> Self {
-        Self::new_typed(pin.map_into(), initial_output, pull)
-    }
-}
-
-impl<'d, P> OutputOpenDrain<'d, P>
-where
-    P: InputPin + OutputPin,
-{
-    /// Creates a new, typed GPIO output driver.
-    ///
-    /// The `initial_output` parameter sets the initial output level of the pin.
-    /// The `pull` parameter configures internal pull-up or pull-down
-    /// resistors.
-    ///
-    /// ## Example
-    ///
-    /// The following example configures `GPIO5` to pulse a LED once. The
-    /// example assumes that the LED is connected such that it is on when
-    /// the pin is low.
-    ///
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{GpioPin, Level, OutputOpenDrain, Pull};
-    /// use esp_hal::delay::Delay;
-    ///
-    /// fn blink_once(
-    ///     led: &mut OutputOpenDrain<'_, GpioPin<5>>,
-    ///     delay: &mut Delay,
-    /// ) {
-    ///     led.set_low();
-    ///     delay.delay_millis(500);
-    ///     led.set_high();
-    /// }
-    ///
-    /// let mut led = OutputOpenDrain::new_typed(
-    ///     peripherals.GPIO5,
-    ///     Level::High,
-    ///     Pull::Up,
-    /// );
-    /// let mut delay = Delay::new();
-    ///
-    /// blink_once(&mut led, &mut delay);
-    /// # }
-    /// ```
-    #[inline]
-    pub fn new_typed(pin: impl Peripheral<P = P> + 'd, initial_output: Level, pull: Pull) -> Self {
-        let mut pin = Flex::new_typed(pin);
+        let mut pin = Flex::new(pin);
 
         pin.set_level(initial_output);
         pin.set_as_open_drain(pull);
@@ -1879,17 +1742,17 @@ where
 /// This driver allows changing the pin mode between input and output.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Flex<'d, P = AnyPin> {
-    pin: PeripheralRef<'d, P>,
+pub struct Flex<'d> {
+    pin: PeripheralRef<'d, AnyPin>,
 }
 
-impl<P> private::Sealed for Flex<'_, P> {}
+impl private::Sealed for Flex<'_> {}
 
-impl<P> Peripheral for Flex<'_, P> {
+impl Peripheral for Flex<'_> {
     type P = Self;
     unsafe fn clone_unchecked(&self) -> Self::P {
         Self {
-            pin: PeripheralRef::new(core::ptr::read(&*self.pin as *const P)),
+            pin: PeripheralRef::new(core::ptr::read(&*self.pin as *const AnyPin)),
         }
     }
 }
@@ -1899,19 +1762,7 @@ impl<'d> Flex<'d> {
     /// No mode change happens.
     #[inline]
     pub fn new(pin: impl Peripheral<P = impl Into<AnyPin>> + 'd) -> Self {
-        Self::new_typed(pin.map_into())
-    }
-}
-
-impl<'d, P> Flex<'d, P>
-where
-    P: Pin,
-{
-    /// Create flexible pin driver for a [Pin].
-    /// No mode change happens.
-    #[inline]
-    pub fn new_typed(pin: impl Peripheral<P = P> + 'd) -> Self {
-        crate::into_ref!(pin);
+        crate::into_mapped_ref!(pin);
         Self { pin }
     }
 
@@ -1923,12 +1774,7 @@ where
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.degrade_pin(private::Internal).split().0
     }
-}
 
-impl<P> Flex<'_, P>
-where
-    P: InputPin,
-{
     /// Set the GPIO to input mode.
     pub fn set_as_input(&mut self, pull: Pull) {
         self.pin.init_input(pull, private::Internal);
@@ -2020,12 +1866,7 @@ where
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
         self.listen_with_options(event.into(), false, false, enable);
     }
-}
 
-impl<P> Flex<'_, P>
-where
-    P: OutputPin,
-{
     /// Set the GPIO to output mode.
     #[instability::unstable]
     #[inline]
@@ -2093,6 +1934,7 @@ where
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+        assert!(self.pin.is_output());
         self.pin.degrade_pin(private::Internal).split()
     }
 
@@ -2110,7 +1952,7 @@ where
 // Unfortunate implementation details responsible for:
 // - making pin drivers work with the peripheral signal system
 // - making the pin drivers work with the sleep API
-impl<P: Pin> Pin for Flex<'_, P> {
+impl Pin for Flex<'_> {
     delegate::delegate! {
         to self.pin {
             fn number(&self) -> u8;
@@ -2120,7 +1962,8 @@ impl<P: Pin> Pin for Flex<'_, P> {
         }
     }
 }
-impl<P: RtcPin> RtcPin for Flex<'_, P> {
+#[cfg(any(lp_io, rtc_cntl))]
+impl RtcPin for Flex<'_> {
     delegate::delegate! {
         to self.pin {
             #[cfg(xtensa)]
@@ -2133,7 +1976,8 @@ impl<P: RtcPin> RtcPin for Flex<'_, P> {
         }
     }
 }
-impl<P: RtcPinWithResistors> RtcPinWithResistors for Flex<'_, P> {
+#[cfg(any(lp_io, rtc_cntl))]
+impl RtcPinWithResistors for Flex<'_> {
     delegate::delegate! {
         to self.pin {
             fn rtcio_pullup(&mut self, enable: bool);
@@ -2262,7 +2106,7 @@ pub(crate) mod internal {
         }
     }
 
-    #[cfg(any(xtensa, esp32c2, esp32c3, esp32c6))]
+    #[cfg(any(lp_io, rtc_cntl))]
     impl RtcPin for AnyPin {
         #[cfg(xtensa)]
         #[allow(unused_braces)] // False positive :/
@@ -2291,7 +2135,7 @@ pub(crate) mod internal {
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, xtensa))]
+    #[cfg(any(lp_io, rtc_cntl))]
     impl RtcPinWithResistors for AnyPin {
         fn rtcio_pullup(&mut self, enable: bool) {
             handle_rtcio_with_resistors!(self, target, {
@@ -2348,10 +2192,7 @@ mod asynch {
     pub(super) static PIN_WAKERS: [AtomicWaker; NUM_PINS] =
         [const { AtomicWaker::new() }; NUM_PINS];
 
-    impl<P> Flex<'_, P>
-    where
-        P: InputPin,
-    {
+    impl Flex<'_> {
         /// Wait until the pin experiences a particular [`Event`].
         ///
         /// The GPIO driver will disable listening for the event once it occurs,
@@ -2434,10 +2275,7 @@ mod asynch {
         }
     }
 
-    impl<P> Input<'_, P>
-    where
-        P: InputPin,
-    {
+    impl Input<'_> {
         /// Wait until the pin experiences a particular [`Event`].
         ///
         /// The GPIO driver will disable listening for the event once it occurs,
@@ -2488,11 +2326,11 @@ mod asynch {
     }
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    struct PinFuture<'d, P: InputPin> {
-        pin: Flex<'d, P>,
+    struct PinFuture<'d> {
+        pin: Flex<'d>,
     }
 
-    impl<P: InputPin> PinFuture<'_, P> {
+    impl PinFuture<'_> {
         fn pin_mask(&self) -> u32 {
             let bank = GpioRegisterAccess::from(self.pin.number() as usize);
             1 << (self.pin.number() - bank.offset())
@@ -2509,7 +2347,7 @@ mod asynch {
         }
     }
 
-    impl<P: InputPin> core::future::Future for PinFuture<'_, P> {
+    impl core::future::Future for PinFuture<'_> {
         type Output = ();
 
         fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -2523,7 +2361,7 @@ mod asynch {
         }
     }
 
-    impl<P: InputPin> Drop for PinFuture<'_, P> {
+    impl Drop for PinFuture<'_> {
         fn drop(&mut self) {
             // If the pin isn't listening, the future has either been dropped before setup,
             // or the interrupt has already been handled.
@@ -2554,17 +2392,11 @@ mod embedded_hal_impls {
 
     use super::*;
 
-    impl<P> digital::ErrorType for Input<'_, P>
-    where
-        P: InputPin,
-    {
+    impl digital::ErrorType for Input<'_> {
         type Error = core::convert::Infallible;
     }
 
-    impl<P> digital::InputPin for Input<'_, P>
-    where
-        P: InputPin,
-    {
+    impl digital::InputPin for Input<'_> {
         fn is_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_high(self))
         }
@@ -2574,17 +2406,11 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<P> digital::ErrorType for Output<'_, P>
-    where
-        P: OutputPin,
-    {
+    impl digital::ErrorType for Output<'_> {
         type Error = core::convert::Infallible;
     }
 
-    impl<P> digital::OutputPin for Output<'_, P>
-    where
-        P: OutputPin,
-    {
+    impl digital::OutputPin for Output<'_> {
         fn set_low(&mut self) -> Result<(), Self::Error> {
             Self::set_low(self);
             Ok(())
@@ -2596,10 +2422,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<P> digital::StatefulOutputPin for Output<'_, P>
-    where
-        P: OutputPin,
-    {
+    impl digital::StatefulOutputPin for Output<'_> {
         fn is_set_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_set_high(self))
         }
@@ -2609,10 +2432,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<P> digital::InputPin for OutputOpenDrain<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
+    impl digital::InputPin for OutputOpenDrain<'_> {
         fn is_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_high(self))
         }
@@ -2622,17 +2442,11 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<P> digital::ErrorType for OutputOpenDrain<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
+    impl digital::ErrorType for OutputOpenDrain<'_> {
         type Error = core::convert::Infallible;
     }
 
-    impl<P> digital::OutputPin for OutputOpenDrain<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
+    impl digital::OutputPin for OutputOpenDrain<'_> {
         fn set_low(&mut self) -> Result<(), Self::Error> {
             Self::set_low(self);
             Ok(())
@@ -2644,10 +2458,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<P> digital::StatefulOutputPin for OutputOpenDrain<'_, P>
-    where
-        P: InputPin + OutputPin,
-    {
+    impl digital::StatefulOutputPin for OutputOpenDrain<'_> {
         fn is_set_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_set_high(self))
         }
@@ -2657,10 +2468,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<P> digital::InputPin for Flex<'_, P>
-    where
-        P: InputPin,
-    {
+    impl digital::InputPin for Flex<'_> {
         fn is_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_high(self))
         }
@@ -2670,14 +2478,11 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<P> digital::ErrorType for Flex<'_, P> {
+    impl digital::ErrorType for Flex<'_> {
         type Error = core::convert::Infallible;
     }
 
-    impl<P> digital::OutputPin for Flex<'_, P>
-    where
-        P: OutputPin,
-    {
+    impl digital::OutputPin for Flex<'_> {
         fn set_low(&mut self) -> Result<(), Self::Error> {
             Self::set_low(self);
             Ok(())
@@ -2689,10 +2494,7 @@ mod embedded_hal_impls {
         }
     }
 
-    impl<P> digital::StatefulOutputPin for Flex<'_, P>
-    where
-        P: OutputPin,
-    {
+    impl digital::StatefulOutputPin for Flex<'_> {
         fn is_set_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_set_high(self))
         }
@@ -2708,10 +2510,7 @@ mod embedded_hal_async_impls {
 
     use super::*;
 
-    impl<P> Wait for Flex<'_, P>
-    where
-        P: InputPin,
-    {
+    impl Wait for Flex<'_> {
         async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
             Self::wait_for_high(self).await;
             Ok(())
@@ -2738,10 +2537,7 @@ mod embedded_hal_async_impls {
         }
     }
 
-    impl<P> Wait for Input<'_, P>
-    where
-        P: InputPin,
-    {
+    impl Wait for Input<'_> {
         async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
             Self::wait_for_high(self).await;
             Ok(())

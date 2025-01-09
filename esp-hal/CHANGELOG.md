@@ -127,6 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `prelude` module has been removed (#2845)
 
+- Removed all peripheral instance type parameters and `new_typed` constructors (#2907)
+
 ## [0.22.0] - 2024-11-20
 
 ### Added

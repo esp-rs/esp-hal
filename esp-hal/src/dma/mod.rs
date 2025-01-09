@@ -1668,18 +1668,18 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 ///
 /// ```rust,no_run
 #[doc = crate::before_snippet!()]
+/// use esp_hal::spi::AnySpi;
 /// use esp_hal::spi::master::{Spi, SpiDma, Config, Instance as SpiInstance};
 /// use esp_hal::dma::DmaChannelFor;
 /// use esp_hal::peripheral::Peripheral;
 /// use esp_hal::Blocking;
 ///
-/// fn configures_spi_dma<'d, S, CH>(
-///     spi: Spi<'d, Blocking, S>,
+/// fn configures_spi_dma<'d, CH>(
+///     spi: Spi<'d, Blocking>,
 ///     channel: impl Peripheral<P = CH> + 'd,
-/// ) -> SpiDma<'d, Blocking, S>
+/// ) -> SpiDma<'d, Blocking>
 /// where
-///     S: SpiInstance,
-///     CH: DmaChannelFor<S> + 'd,
+///     CH: DmaChannelFor<AnySpi> + 'd,
 ///  {
 ///     spi.with_dma(channel)
 /// }

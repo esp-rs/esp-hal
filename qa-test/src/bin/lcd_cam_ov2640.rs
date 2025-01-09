@@ -167,15 +167,12 @@ fn main() -> ! {
 
 pub const OV2640_ADDRESS: u8 = 0x30;
 
-pub struct Sccb<'d, T> {
-    i2c: I2c<'d, Blocking, T>,
+pub struct Sccb<'d> {
+    i2c: I2c<'d, Blocking>,
 }
 
-impl<'d, T> Sccb<'d, T>
-where
-    T: i2c::master::Instance,
-{
-    pub fn new(i2c: I2c<'d, Blocking, T>) -> Self {
+impl<'d> Sccb<'d> {
+    pub fn new(i2c: I2c<'d, Blocking>) -> Self {
         Self { i2c }
     }
 

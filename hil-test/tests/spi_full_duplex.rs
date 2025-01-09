@@ -14,7 +14,6 @@ use esp_hal::{
     dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, NoPin},
-    peripheral::Peripheral,
     spi::master::{Config, Spi},
     time::RateExtU32,
     Blocking,

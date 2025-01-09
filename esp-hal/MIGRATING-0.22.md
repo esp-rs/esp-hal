@@ -262,6 +262,15 @@ is not compatible with the hardware.
 +.unwrap();
 ```
 
+## Peripheral instance type parameters and `new_typed` constructors have been removed
+
+Call `new` instead and remove the type parameters if you've used them.
+
+```diff
+-let mut spi: Spi<'lt, SPI2> = Spi::new_typed(..).unwrap();
++let mut spi: Spi<'lt> = Spi::new(..).unwrap();
+```
+
 ## LCD_CAM configuration changes
 
 - `cam` now has a `Config` strurct that contains frequency, bit/byte order, VSync filter options.
