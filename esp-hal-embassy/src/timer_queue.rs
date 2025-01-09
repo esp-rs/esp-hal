@@ -54,6 +54,7 @@ impl TimerQueue {
     }
 
     fn alarm(&self) -> AlarmHandle {
+        // FIXME this is UB on multi-core
         unsafe {
             let alarm = &mut *self.alarm.get();
             *alarm.get_or_insert_with(|| set_up_alarm(self.priority, self.context()))
