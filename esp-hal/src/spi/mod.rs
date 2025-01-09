@@ -35,6 +35,8 @@ pub enum Error {
     /// Error indicating that the operation is unsupported by the current
     /// implementation.
     Unsupported,
+    /// The given arguments are invalid.
+    ArgumentsInvalid,
     /// An unknown error occurred during SPI communication.
     Unknown,
 }
@@ -98,14 +100,16 @@ pub enum BitOrder {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum DataMode {
-    /// `Single` Data Mode - 1 bit, 2 wires.
+    /// Clock, CS and one data line (SIO0)
+    SingleThreeWire,
+    /// `Single` Data Mode - 1 bit, two data lines. (SIO0, SIO1)
     Single,
-    /// `Dual` Data Mode - 2 bit, 2 wires
+    /// `Dual` Data Mode - 2 bits, two data lines. (SIO0, SIO1)
     Dual,
-    /// `Quad` Data Mode - 4 bit, 4 wires
+    /// `Quad` Data Mode - 4 bit, 4 data lines. (SIO0 .. SIO3)
     Quad,
     #[cfg(spi_octal)]
-    /// `Octal` Data Mode - 8 bit, 8 wires
+    /// `Octal` Data Mode - 8 bit, 8 data lines. (SIO0 .. SIO7)
     Octal,
 }
 
