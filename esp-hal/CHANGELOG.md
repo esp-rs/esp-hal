@@ -129,6 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DmaTxBuf::{compute_chunk_size, compute_descriptor_count, new_with_block_size}` (#2543)
 
 - The `prelude` module has been removed (#2845)
+- SPI: Removed `pub fn read_byte` and `pub fn write_byte` (#2915)
 
 - Removed all peripheral instance type parameters and `new_typed` constructors (#2907)
 
@@ -198,6 +199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Many peripherals are now disabled by default and also get disabled when the driver is dropped (#2544)
 
 - Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
+- UART: `read_byte` and `write_byte` made private. (#2915)
 
 ### Fixed
 
