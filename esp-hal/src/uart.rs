@@ -198,9 +198,8 @@
 //!         let serial = serial.as_mut().unwrap();
 //!
 //!         let mut cnt = 0;
-//!         while let nb::Result::Ok(_c) = serial.read_byte() {
-//!             cnt += 1;
-//!         }
+//!         let mut buff = [0u8; 64];
+//!         let cnt = serial.read_bytes(&mut buff);
 //!         writeln!(serial, "Read {} bytes", cnt).ok();
 //!
 //!         let pending_interrupts = serial.interrupts();
@@ -1133,8 +1132,8 @@ where
         sync_regs(register_block);
     }
 
-    /// Write a byte out over the UART
-    pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+    // Write a byte out over the UART
+    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
         self.tx.write_byte(word)
     }
 
@@ -1143,8 +1142,8 @@ where
         self.tx.flush()
     }
 
-    /// Read a byte from the UART
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    // Read a byte from the UART
+    fn read_byte(&mut self) -> nb::Result<u8, Error> {
         self.rx.read_byte()
     }
 
