@@ -14,7 +14,6 @@ mod tests {
         uart::{self, UartRx, UartTx},
     };
     use hil_test as _;
-    use nb::block;
 
     #[test]
     fn test_that_creating_tx_does_not_cause_a_pulse() {
@@ -27,7 +26,8 @@ mod tests {
             .with_rx(rx);
 
         // start reception
-        _ = rx.read_byte(); // this will just return WouldBlock
+        let mut buf = [0u8; 1];
+        _ = rx.read_bytes(&mut buf); // this will just return WouldBlock
 
         unsafe { tx.set_output_high(false, esp_hal::Internal::conjure()) };
 
@@ -38,8 +38,8 @@ mod tests {
 
         tx.flush().unwrap();
         tx.write_bytes(&[0x42]).unwrap();
-        let read = block!(rx.read_byte());
+        while rx.read_bytes(&mut buf) == 0 {}
 
-        assert_eq!(read, Ok(0x42));
+        assert_eq!(buf[0], 0x42);
     }
 }

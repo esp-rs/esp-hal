@@ -80,7 +80,8 @@
 //!
 //! // Each component can be used individually to interact with the UART:
 //! tx.write_bytes(&[42u8]).expect("write error!");
-//! let byte = rx.read_byte().expect("read error!");
+//! let mut byte = [0u8; 1];
+//! rx.read_bytes(&mut byte);
 //! # }
 //! ```
 //! 
@@ -197,7 +198,6 @@
 //!         let mut serial = SERIAL.borrow_ref_mut(cs);
 //!         let serial = serial.as_mut().unwrap();
 //!
-//!         let mut cnt = 0;
 //!         let mut buff = [0u8; 64];
 //!         let cnt = serial.read_bytes(&mut buff);
 //!         writeln!(serial, "Read {} bytes", cnt).ok();
@@ -825,8 +825,8 @@ where
         self.uart.info().apply_config(config)
     }
 
-    /// Read a byte from the UART
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    // Read a byte from the UART
+    fn read_byte(&mut self) -> nb::Result<u8, Error> {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
                 // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:

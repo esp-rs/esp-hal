@@ -429,7 +429,7 @@ e.g.
 +     .with_tx(peripherals.GPIO2);
 ```
 
-The `write_byte` and `read_byte` made private.
+`write_byte` and `read_byte` are now private.
 
 e.g.
 
@@ -478,8 +478,11 @@ The Address and Command enums have similarly had their variants changed from e.g
 + Command::_1Bit
 ```
 
-The `write_byte` and `read_byte` was removed. 
-`driver.write_bytes(&[data])?` could be used.
+`write_byte` and `read_byte` were removed and `write_bytes` and `read_bytes` can be used as replacement.
+
+e.g.
+
+`driver.write_bytes(&[data])?` and `driver.read_bytes(&mut buffer)?`
 
 ## GPIO Changes
 
