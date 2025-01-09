@@ -6,7 +6,7 @@
 
 #[cfg(not(single_queue))]
 use core::cell::Cell;
-use core::cell::{RefCell, UnsafeCell};
+use core::cell::RefCell;
 
 use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{interrupt::Priority, sync::RawPriorityLimitedMutex};
@@ -14,12 +14,16 @@ use queue_impl::RawQueue;
 
 use crate::time_driver::{set_up_alarm, AlarmHandle};
 
+struct TimerQueueInner {
+    queue: RawQueue,
+    alarm: Option<AlarmHandle>,
+}
+
 pub(crate) struct TimerQueue {
-    inner: Mutex<RawPriorityLimitedMutex, RefCell<RawQueue>>,
+    inner: Mutex<RawPriorityLimitedMutex, RefCell<TimerQueueInner>>,
     priority: Priority,
     #[cfg(not(single_queue))]
     context: Cell<*mut ()>,
-    alarm: UnsafeCell<Option<AlarmHandle>>,
 }
 
 unsafe impl Sync for TimerQueue {}
@@ -29,12 +33,14 @@ impl TimerQueue {
         Self {
             inner: Mutex::const_new(
                 RawPriorityLimitedMutex::new(prio),
-                RefCell::new(RawQueue::new()),
+                RefCell::new(TimerQueueInner {
+                    queue: RawQueue::new(),
+                    alarm: None,
+                }),
             ),
             priority: prio,
             #[cfg(not(single_queue))]
             context: Cell::new(core::ptr::null_mut()),
-            alarm: UnsafeCell::new(None),
         }
     }
 
@@ -53,33 +59,33 @@ impl TimerQueue {
         core::ptr::null_mut()
     }
 
-    fn alarm(&self) -> AlarmHandle {
-        // FIXME this is UB on multi-core
-        unsafe {
-            let alarm = &mut *self.alarm.get();
-            *alarm.get_or_insert_with(|| set_up_alarm(self.priority, self.context()))
-        }
-    }
-
     pub fn dispatch(&self) {
         let now = esp_hal::time::now().ticks();
-        let next_expiration = self.inner.lock(|q| q.borrow_mut().next_expiration(now));
-        self.arm_alarm(next_expiration);
+        self.arm_alarm(now);
     }
 
     fn arm_alarm(&self, mut next_expiration: u64) {
-        let alarm = self.alarm();
+        loop {
+            let set = self.inner.lock(|inner| {
+                let mut q = inner.borrow_mut();
+                next_expiration = q.queue.next_expiration(next_expiration);
 
-        while !alarm.update(next_expiration) {
-            // next_expiration is in the past, dequeue and find a new expiration
-            next_expiration = self
-                .inner
-                .lock(|q| q.borrow_mut().next_expiration(next_expiration));
+                let alarm = q
+                    .alarm
+                    .get_or_insert_with(|| set_up_alarm(self.priority, self.context()));
+                alarm.update(next_expiration)
+            });
+            if set {
+                break;
+            }
         }
     }
 
     pub fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
-        if self.inner.lock(|q| q.borrow_mut().schedule_wake(at, waker)) {
+        if self
+            .inner
+            .lock(|inner| inner.borrow_mut().queue.schedule_wake(at, waker))
+        {
             self.dispatch();
         }
     }
