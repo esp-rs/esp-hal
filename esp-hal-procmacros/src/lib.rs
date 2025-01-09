@@ -429,7 +429,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// [Builder Lite]: https://matklad.github.io/2022/05/29/builder-lite.html
-#[proc_macro_derive(BuilderLite)]
+#[proc_macro_derive(BuilderLite, attributes(builder_lite_into))]
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::DeriveInput);
 
@@ -455,11 +455,21 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
                     _ => None,
                 });
 
-            let (field_type, field_assigns) = if let Some(inner_type) = maybe_path_type {
-                (inner_type, quote! { Some(#field_ident) })
+            let (mut field_type, mut field_assigns) = if let Some(inner_type) = maybe_path_type {
+                (quote! { #inner_type }, quote! { Some(#field_ident) })
             } else {
-                (field_type, quote! { #field_ident })
+                (quote! { #field_type }, quote! { #field_ident })
             };
+
+            // Wrap type and assignment with `Into` if needed.
+            if field
+                .attrs
+                .iter()
+                .any(|attr| attr.path().is_ident("builder_lite_into"))
+            {
+                field_type = quote! { impl Into<#field_type> };
+                field_assigns = quote! { #field_ident .into() };
+            }
 
             fns.push(quote! {
                 #[doc = concat!(" Assign the given value to the `", stringify!(#field_ident) ,"` field.")]

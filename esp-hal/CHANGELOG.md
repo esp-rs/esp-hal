@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `tsens::TemperatureSensor` peripheral for ESP32C6 and ESP32C3 (#2875)
 - Added `with_rx()` and `with_tx()` methods to Uart, UartRx, and UartTx ()
 
+- `spi::master::BusClockConfig` (#2897)
+- BuilderLite now has a `#[builder_lite_into]` helper to accept convertible types (#2897)
+
 ### Changed
 
 - Bump MSRV to 1.83 (#2615)
@@ -103,6 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ClockSource` enums are now `#[non_exhaustive]` (#2912)
 
 - `gpio::{Input, Flex}::wakeup_enable` now returns an error instead of panicking. (#2916)
+- SPI `Config::frequency` has been replaced by `clock`. (#2897)
+- SPI `Config::with_frequency` has been renamed to `with_clock`. (#2897)
 
 ### Fixed
 
