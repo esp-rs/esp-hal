@@ -31,6 +31,7 @@
 //! # use esp_hal::twai::TwaiConfiguration;
 //! # use esp_hal::twai::BaudRate;
 //! # use esp_hal::twai::TwaiMode;
+//! # use nb::block;
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
 //! let twai_rx_pin = peripherals.GPIO3;
@@ -61,14 +62,10 @@
 //!
 //! loop {
 //!     // Wait for a frame to be received.
-//!     let frame = loop {
-//!         if let Ok(frame) = twai.receive() {
-//!            break frame;
-//!        }
-//!    };
+//!     let frame = block!(twai.receive()).unwrap();
 //!
 //!     // Transmit the frame back.
-//!     while twai.transmit(&frame).is_err() {}
+//!     let _result = block!(twai.transmit(&frame)).unwrap();
 //! }
 //! # }
 //! ```
@@ -84,6 +81,7 @@
 //! # use esp_hal::twai::EspTwaiFrame;
 //! # use esp_hal::twai::StandardId;
 //! # use esp_hal::twai::TwaiMode;
+//! # use nb::block;
 //! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
 //! // transceiver.
 //! let can_rx_pin = peripherals.GPIO3;
@@ -113,11 +111,7 @@
 //!
 //! let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO,
 //!     &[1, 2, 3]).unwrap(); // Wait for a frame to be received.
-//! let frame = loop {
-//!    if let Ok(frame) = can.receive() {
-//!       break frame;
-//!   }
-//! };
+//! let frame = block!(can.receive()).unwrap();
 //!
 //! # loop {}
 //! # }
@@ -1146,12 +1140,12 @@ where
     }
 
     /// Sends the specified `EspTwaiFrame` over the TWAI bus.
-    pub fn transmit(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
+    pub fn transmit(&mut self, frame: &EspTwaiFrame) -> nb::Result<(), EspTwaiError> {
         self.tx.transmit(frame)
     }
 
     /// Receives a TWAI frame from the TWAI bus.
-    pub fn receive(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
+    pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
         self.rx.receive()
     }
 
@@ -1185,16 +1179,18 @@ where
     /// NOTE: TODO: This may not work if using the self reception/self test
     /// functionality. See notes 1 and 2 in the "Frame Identifier" section
     /// of the reference manual.
-    pub fn transmit(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
+    pub fn transmit(&mut self, frame: &EspTwaiFrame) -> nb::Result<(), EspTwaiError> {
         let register_block = self.twai.register_block();
         let status = register_block.status().read();
 
         // Check that the peripheral is not in a bus off state.
         if status.bus_off_st().bit_is_set() {
-            return Err(EspTwaiError::BusOff);
+            return nb::Result::Err(nb::Error::Other(EspTwaiError::BusOff));
         }
         // Check that the peripheral is not already transmitting a packet.
-        while !status.tx_buf_st().bit_is_set() {}
+        if !status.tx_buf_st().bit_is_set() {
+            return nb::Result::Err(nb::Error::WouldBlock);
+        }
 
         write_frame(register_block, frame);
 
@@ -1214,24 +1210,28 @@ where
     Dm: DriverMode,
 {
     /// Receive a frame
-    pub fn receive(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
+    pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
         let register_block = self.twai.register_block();
         let status = register_block.status().read();
 
         // Check that the peripheral is not in a bus off state.
         if status.bus_off_st().bit_is_set() {
-            return Err(EspTwaiError::BusOff);
+            return nb::Result::Err(nb::Error::Other(EspTwaiError::BusOff));
         }
 
         // Check that we actually have packets to receive.
-        while !status.rx_buf_st().bit_is_set() {}
+        if !status.rx_buf_st().bit_is_set() {
+            return nb::Result::Err(nb::Error::WouldBlock);
+        }
 
         // Check if the packet in the receive buffer is valid or overrun.
         if status.miss_st().bit_is_set() {
-            return Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun));
+            return nb::Result::Err(nb::Error::Other(EspTwaiError::EmbeddedHAL(
+                ErrorKind::Overrun,
+            )));
         }
 
-        read_frame(register_block)
+        Ok(read_frame(register_block)?)
     }
 }
 
@@ -1302,21 +1302,18 @@ where
     type Error = EspTwaiError;
 
     /// Transmit a frame.
-    fn transmit(
-        &mut self,
-        frame: &Self::Frame,
-    ) -> embedded_hal_nb::nb::Result<Option<Self::Frame>, Self::Error> {
+    fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
         self.tx.transmit(frame)?;
 
         // Success in readying packet for transmit. No packets can be replaced in the
         // transmit buffer so return None in accordance with the
         // embedded-can/embedded-hal trait.
-        embedded_hal_nb::nb::Result::Ok(None)
+        nb::Result::Ok(None)
     }
 
     /// Return a received frame if there are any available.
-    fn receive(&mut self) -> embedded_hal_nb::nb::Result<Self::Frame, Self::Error> {
-        Ok(self.rx.receive()?)
+    fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
+        self.rx.receive()
     }
 }
 

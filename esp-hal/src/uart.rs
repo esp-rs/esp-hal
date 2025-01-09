@@ -673,7 +673,7 @@ where
 
     /// Flush the transmit buffer of the UART
     pub fn flush(&mut self) {
-        while self.is_tx_idle() {}
+        while !self.is_tx_idle() {}
     }
 
     /// Checks if the TX line is idle for this UART instance.
