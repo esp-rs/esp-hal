@@ -55,6 +55,8 @@
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/index.html
 //! [Inverting TX and RX Pins]: crate::uart#inverting-rx-and-tx-pins
 
+use core::fmt::Display;
+
 use portable_atomic::{AtomicPtr, AtomicU32, Ordering};
 use procmacros::ram;
 use strum::EnumCount;
@@ -205,6 +207,30 @@ impl From<Level> for bool {
         }
     }
 }
+
+/// Errors that can occur when configuring a pin to be a wakeup source.
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum WakeConfigError {
+    /// Returned when trying to configure a pin to wake up from light sleep on
+    /// an edge trigger, which is not supported.
+    EdgeTriggeringNotSupported,
+}
+
+impl Display for WakeConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            WakeConfigError::EdgeTriggeringNotSupported => {
+                write!(
+                    f,
+                    "Edge triggering is not supported for wake-up from light sleep"
+                )
+            }
+        }
+    }
+}
+
+impl core::error::Error for WakeConfigError {}
 
 /// Pull setting for an input.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
@@ -1617,8 +1643,8 @@ where
     /// This will unlisten for interrupts
     #[instability::unstable]
     #[inline]
-    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
-        self.pin.wakeup_enable(enable, event);
+    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
+        self.pin.wakeup_enable(enable, event)
     }
 }
 
@@ -1959,11 +1985,11 @@ where
         int_enable: bool,
         nmi_enable: bool,
         wake_up_from_light_sleep: bool,
-    ) {
+    ) -> Result<(), WakeConfigError> {
         if wake_up_from_light_sleep {
             match event {
                 Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {
-                    panic!("Edge triggering is not supported for wake-up from light sleep");
+                    return Err(WakeConfigError::EdgeTriggeringNotSupported);
                 }
                 _ => {}
             }
@@ -1974,7 +2000,9 @@ where
             Some(gpio_intr_enable(int_enable, nmi_enable)),
             event as u8,
             wake_up_from_light_sleep,
-        )
+        );
+
+        Ok(())
     }
 
     /// Listen for interrupts.
@@ -1982,7 +2010,9 @@ where
     /// See [`Input::listen`] for more information and an example.
     #[inline]
     pub fn listen(&mut self, event: Event) {
-        self.listen_with_options(event, true, false, false)
+        // Unwrap can't fail currently as listen_with_options is only supposed to return
+        // an error if wake_up_from_light_sleep is true.
+        unwrap!(self.listen_with_options(event, true, false, false));
     }
 
     /// Stop listening for interrupts.
@@ -2017,8 +2047,8 @@ where
     /// This will unlisten for interrupts
     #[instability::unstable]
     #[inline]
-    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
-        self.listen_with_options(event.into(), false, false, enable);
+    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
+        self.listen_with_options(event.into(), false, false, enable)
     }
 }
 
