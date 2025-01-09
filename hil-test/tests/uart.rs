@@ -26,9 +26,7 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let (_, pin) = hil_test::common_test_pins!(peripherals);
-
-        let (rx, tx) = pin.split();
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let uart = Uart::new(peripherals.UART1, uart::Config::default())
             .unwrap()

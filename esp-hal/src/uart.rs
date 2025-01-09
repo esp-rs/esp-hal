@@ -830,6 +830,11 @@ where
     /// Assign the RX pin for UART instance.
     ///
     /// Sets the specified pin to input and connects it to the UART RX signal.
+    ///
+    /// Note: when you listen for the output of the UART peripheral, you should
+    /// configure the driver side (i.e. the TX pin), or ensure that the line is
+    /// initially high, to avoid receiving a non-data byte caused by an
+    /// initial low signal level.
     pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
         rx.init_input(Pull::Up, Internal);
@@ -1046,6 +1051,11 @@ where
     /// Assign the RX pin for UART instance.
     ///
     /// Sets the specified pin to input and connects it to the UART RX signal.
+    ///
+    /// Note: when you listen for the output of the UART peripheral, you should
+    /// configure the driver side (i.e. the TX pin), or ensure that the line is
+    /// initially high, to avoid receiving a non-data byte caused by an
+    /// initial low signal level.
     pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
         rx.init_input(Pull::Up, Internal);
