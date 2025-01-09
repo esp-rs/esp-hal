@@ -429,6 +429,18 @@ e.g.
 +     .with_tx(peripherals.GPIO2);
 ```
 
+The `write_byte` and `read_byte` made private.
+
+e.g.
+
+```dif
+- while let nb::Result::Ok(_c) = serial.read_byte() {
+-     cnt += 1;
+- }
++ let mut buff = [0u8; 64];
++ let cnt = serial.read_bytes(&mut buff);
+```
+
 ## Spi `with_miso` has been split
 
 Previously, `with_miso` set up the provided pin as an input and output, which was necessary for half duplex.
@@ -465,6 +477,9 @@ The Address and Command enums have similarly had their variants changed from e.g
 - Command::Command1
 + Command::_1Bit
 ```
+
+The `write_byte` and `read_byte` was removed. 
+`driver.write_bytes(&[data])?` could be used.
 
 ## GPIO Changes
 
