@@ -20,6 +20,7 @@ use esp_hal::{
     sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaDigest},
 };
 use hil_test as _;
+use nb::block;
 
 /// Dummy data used to feed the hasher.
 const SOURCE_DATA: &[u8] = &[b'a'; 258];
@@ -36,9 +37,9 @@ fn assert_sw_hash<D: Digest>(input: &[u8], expected_output: &[u8]) {
 fn hash_sha<S: ShaAlgorithm>(sha: &mut Sha<'static>, mut input: &[u8], output: &mut [u8]) {
     let mut digest = sha.start::<S>();
     while !input.is_empty() {
-        input = digest.update(input);
+        input = block!(digest.update(input)).unwrap();
     }
-    digest.finish(output);
+    block!(digest.finish(output)).unwrap();
 }
 
 fn hash_digest<'a, S: ShaAlgorithm>(sha: &'a mut Sha<'static>, input: &[u8], output: &mut [u8]) {
@@ -270,22 +271,22 @@ mod tests {
                 let mut all_done = true;
                 if !sha1_remaining.is_empty() {
                     let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha1);
-                    sha1_remaining = digest.update(sha1_remaining);
-                    digest.save(&mut sha1);
+                    sha1_remaining = block!(digest.update(sha1_remaining)).unwrap();
+                    block!(digest.save(&mut sha1));
                     all_done = false;
                 }
                 #[cfg(not(feature = "esp32"))]
                 if !sha224_remaining.is_empty() {
                     let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha224);
-                    sha224_remaining = digest.update(sha224_remaining);
-                    digest.save(&mut sha224);
+                    sha224_remaining = block!(digest.update(sha224_remaining)).unwrap();
+                    block!(digest.save(&mut sha224));
                     all_done = false;
                 }
 
                 if !sha256_remaining.is_empty() {
                     let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha256);
-                    sha256_remaining = digest.update(sha256_remaining);
-                    digest.save(&mut sha256);
+                    sha256_remaining = block!(digest.update(sha256_remaining)).unwrap();
+                    block!(digest.save(&mut sha256));
                     all_done = false;
                 }
 
@@ -293,15 +294,15 @@ mod tests {
                 {
                     if !sha384_remaining.is_empty() {
                         let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha384);
-                        sha384_remaining = digest.update(sha384_remaining);
-                        digest.save(&mut sha384);
+                        sha384_remaining = block!(digest.update(sha384_remaining)).unwrap();
+                        block!(digest.save(&mut sha384));
                         all_done = false;
                     }
 
                     if !sha512_remaining.is_empty() {
                         let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha512);
-                        sha512_remaining = digest.update(sha512_remaining);
-                        digest.save(&mut sha512);
+                        sha512_remaining = block!(digest.update(sha512_remaining)).unwrap();
+                        block!(digest.save(&mut sha512));
                         all_done = false;
                     }
                 }
@@ -312,17 +313,17 @@ mod tests {
             }
 
             let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha1);
-            digest.finish(sha1_p.1);
+            block!(digest.finish(sha1_p.1)).unwrap();
             let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha224);
-            digest.finish(sha224_p.1);
+            block!(digest.finish(sha224_p.1)).unwrap();
             let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha256);
-            digest.finish(sha256_p.1);
+            block!(digest.finish(sha256_p.1)).unwrap();
             #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
             {
                 let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha384);
-                digest.finish(sha384_p.1);
+                block!(digest.finish(sha384_p.1)).unwrap();
                 let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha512);
-                digest.finish(sha512_p.1);
+                block!(digest.finish(sha512_p.1)).unwrap();
             }
         });
     }

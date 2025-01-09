@@ -34,6 +34,8 @@
 //!
 //! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/hmac.rs
 
+use core::convert::Infallible;
+
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::HMAC,
@@ -131,7 +133,7 @@ impl<'d> Hmac<'d> {
     }
 
     /// Step 2. Configure HMAC keys and key purposes.
-    pub fn configure(&mut self, m: HmacPurpose, key_id: KeyId) -> Result<(), Error> {
+    pub fn configure(&mut self, m: HmacPurpose, key_id: KeyId) -> nb::Result<(), Error> {
         self.hmac
             .set_para_purpose()
             .write(|w| unsafe { w.purpose_set().bits(m as u8) });
@@ -143,33 +145,39 @@ impl<'d> Hmac<'d> {
             .write(|w| w.set_para_end().set_bit());
 
         if self.hmac.query_error().read().query_check().bit_is_set() {
-            return Err(Error::KeyPurposeMismatch);
+            return Err(nb::Error::Other(Error::KeyPurposeMismatch));
         }
 
         Ok(())
     }
 
     /// Process the msg block after block
-    pub fn update<'a>(&mut self, msg: &'a [u8]) -> &'a [u8] {
-        while (*self).is_busy() {}
+    ///
+    /// Call this function as many times as necessary (msg.len() > 0)
+    pub fn update<'a>(&mut self, msg: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
+        if self.is_busy() {
+            return Err(nb::Error::WouldBlock);
+        }
 
         self.next_command();
 
-        let remaining = self.write_data(msg);
+        let remaining = self.write_data(msg).unwrap();
 
-        remaining
+        Ok(remaining)
     }
 
     /// Finalizes the HMAC computation and retrieves the resulting hash output.
-    pub fn finalize(&mut self, output: &mut [u8]) {
-        while (*self).is_busy() {}
+    pub fn finalize(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
+        if self.is_busy() {
+            return Err(nb::Error::WouldBlock);
+        }
 
         self.next_command();
 
         let msg_len = self.byte_written as u64;
 
-        self.write_data(&[0x80]);
-        self.flush_data();
+        nb::block!(self.write_data(&[0x80])).unwrap();
+        nb::block!(self.flush_data()).unwrap();
         self.next_command();
         debug_assert!(self.byte_written % 4 == 0);
 
@@ -196,6 +204,7 @@ impl<'d> Hmac<'d> {
             .write(|w| w.set_result_end().set_bit());
         self.byte_written = 64;
         self.next_command = NextCommand::None;
+        Ok(())
     }
 
     fn is_busy(&mut self) -> bool {
@@ -219,7 +228,7 @@ impl<'d> Hmac<'d> {
         self.next_command = NextCommand::None;
     }
 
-    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> &'a [u8] {
+    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         let mod_length = self.byte_written % 64;
 
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
@@ -248,11 +257,13 @@ impl<'d> Hmac<'d> {
             }
         }
 
-        remaining
+        Ok(remaining)
     }
 
-    fn flush_data(&mut self) {
-        while self.is_busy() {}
+    fn flush_data(&mut self) -> nb::Result<(), Infallible> {
+        if self.is_busy() {
+            return Err(nb::Error::WouldBlock);
+        }
 
         let flushed = self.alignment_helper.flush_to(
             #[cfg(esp32s2)]
@@ -270,6 +281,8 @@ impl<'d> Hmac<'d> {
             while self.is_busy() {}
             self.next_command = NextCommand::MessagePad;
         }
+
+        Ok(())
     }
 
     fn padding(&mut self, msg_len: u64) {

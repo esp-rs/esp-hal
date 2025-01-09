@@ -43,11 +43,7 @@
 //! let mut delay = Delay::new();
 //!
 //! loop {
-//!     let pin_value: u16 = loop {
-//!        if let Some(value) = adc1.read_oneshot(&mut pin) {
-//!          break value;
-//!       }
-//!    };
+//!     let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut pin)).unwrap();
 //!
 //!     delay.delay_millis(1500);
 //! }
