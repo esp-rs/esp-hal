@@ -435,12 +435,6 @@ mod peripheral_macros {
                     unsafe { &*Self::PTR }
                 }
             }
-
-            impl core::ops::DerefMut for $name {
-                fn deref_mut(&mut self) -> &mut Self::Target {
-                    unsafe { &mut *(Self::PTR as *mut _)  }
-                }
-            }
         };
     }
 }
