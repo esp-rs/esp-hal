@@ -194,6 +194,8 @@ mod macros;
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use procmacros::load_lp_code;
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use procmacros::{handler, ram};
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
@@ -364,6 +366,7 @@ pub use private::Internal;
 ///   reset occurs during a write or a reset interrupts the zero initialization
 ///   on first boot.
 /// - Structs must contain only `Persistable` fields and padding
+#[instability::unstable]
 pub unsafe trait Persistable: Sized {}
 
 macro_rules! impl_persistable {
@@ -381,6 +384,7 @@ impl_persistable!(atomic AtomicU8, AtomicI8, AtomicU16, AtomicI16, AtomicU32, At
 unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}
 
 #[doc(hidden)]
+#[instability::unstable]
 pub mod __macro_implementation {
     //! Unstable private implementation details of esp-hal-procmacros.
 
