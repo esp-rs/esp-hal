@@ -793,6 +793,7 @@ where
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         (
             interconnect::InputSignal::new(self.degrade_pin(private::Internal)),
@@ -1300,6 +1301,8 @@ where
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[inline]
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         self.pin.split()
     }
@@ -1309,6 +1312,7 @@ where
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
+    #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.peripheral_input()
     }
@@ -1319,6 +1323,7 @@ where
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     #[inline]
+    #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.pin.into_peripheral_output()
     }
@@ -1496,6 +1501,7 @@ where
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
+    #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.peripheral_input()
     }
@@ -1627,6 +1633,8 @@ where
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[inline]
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         self.pin.split()
     }
@@ -1637,6 +1645,7 @@ where
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     #[inline]
+    #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.pin.into_peripheral_output()
     }
@@ -1762,6 +1771,8 @@ where
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[inline]
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         self.pin.split()
     }
@@ -1771,6 +1782,7 @@ where
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
+    #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.peripheral_input()
     }
@@ -1781,6 +1793,7 @@ where
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     #[inline]
+    #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.pin.into_peripheral_output()
     }
@@ -1917,6 +1930,7 @@ where
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
+    #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.degrade_pin(private::Internal).split().0
     }
@@ -2089,6 +2103,8 @@ where
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[inline]
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         self.pin.degrade_pin(private::Internal).split()
     }
@@ -2099,6 +2115,7 @@ where
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     #[inline]
+    #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.split().1
     }
@@ -2151,6 +2168,7 @@ pub(crate) mod internal {
         /// using external hardware.
         #[inline]
         #[allow(unused_braces, reason = "False positive")]
+        #[instability::unstable]
         pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
             handle_gpio_input!(self, target, { target.split() })
         }
