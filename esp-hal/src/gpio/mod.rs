@@ -205,6 +205,8 @@ impl From<Level> for bool {
 /// Errors that can occur when configuring a pin to be a wakeup source.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
 pub enum WakeConfigError {
     /// Returned when trying to configure a pin to wake up from light sleep on
     /// an edge trigger, which is not supported.
@@ -1797,6 +1799,7 @@ impl<'d> Flex<'d> {
     /// Create flexible pin driver for a [Pin].
     /// No mode change happens.
     #[inline]
+    #[instability::unstable]
     pub fn new(pin: impl Peripheral<P = impl Into<AnyPin>> + 'd) -> Self {
         crate::into_mapped_ref!(pin);
         Self { pin }
@@ -1813,6 +1816,8 @@ impl<'d> Flex<'d> {
     }
 
     /// Set the GPIO to input mode.
+    #[inline]
+    #[instability::unstable]
     pub fn set_as_input(&mut self, pull: Pull) {
         self.pin.init_input(pull, private::Internal);
         self.pin.enable_output(false, private::Internal);
@@ -1820,18 +1825,21 @@ impl<'d> Flex<'d> {
 
     /// Get whether the pin input level is high.
     #[inline]
+    #[instability::unstable]
     pub fn is_high(&self) -> bool {
         self.level() == Level::High
     }
 
     /// Get whether the pin input level is low.
     #[inline]
+    #[instability::unstable]
     pub fn is_low(&self) -> bool {
         self.level() == Level::Low
     }
 
     /// Get the current pin input level.
     #[inline]
+    #[instability::unstable]
     pub fn level(&self) -> Level {
         self.pin.is_input_high(private::Internal).into()
     }
@@ -1866,6 +1874,7 @@ impl<'d> Flex<'d> {
     ///
     /// See [`Input::listen`] for more information and an example.
     #[inline]
+    #[instability::unstable]
     pub fn listen(&mut self, event: Event) {
         // Unwrap can't fail currently as listen_with_options is only supposed to return
         // an error if wake_up_from_light_sleep is true.
@@ -1874,18 +1883,21 @@ impl<'d> Flex<'d> {
 
     /// Stop listening for interrupts.
     #[inline]
+    #[instability::unstable]
     pub fn unlisten(&mut self) {
         set_int_enable(self.pin.number(), Some(0), 0, false);
     }
 
     /// Check if the pin is listening for interrupts.
     #[inline]
+    #[instability::unstable]
     pub fn is_listening(&self) -> bool {
         is_int_enabled(self.pin.number())
     }
 
     /// Clear the interrupt status bit for this Pin
     #[inline]
+    #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
         GpioRegisterAccess::from(self.pin.number() as usize)
             .write_interrupt_status_clear(1 << (self.pin.number() % 32));
@@ -1893,6 +1905,7 @@ impl<'d> Flex<'d> {
 
     /// Checks if the interrupt status bit for this Pin is set
     #[inline]
+    #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
         GpioRegisterAccess::from(self.pin.number() as usize).read_interrupt_status()
             & 1 << (self.pin.number() % 32)
@@ -1902,57 +1915,64 @@ impl<'d> Flex<'d> {
     /// Enable as a wake-up source.
     ///
     /// This will unlisten for interrupts
-    #[instability::unstable]
     #[inline]
+    #[instability::unstable]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
         self.listen_with_options(event.into(), false, false, enable)
     }
 
     /// Set the GPIO to output mode.
-    #[instability::unstable]
     #[inline]
+    #[instability::unstable]
     pub fn set_as_output(&mut self) {
         self.pin.set_to_push_pull_output(private::Internal);
     }
 
     /// Set the output as high.
     #[inline]
+    #[instability::unstable]
     pub fn set_high(&mut self) {
         self.set_level(Level::High)
     }
 
     /// Set the output as low.
     #[inline]
+    #[instability::unstable]
     pub fn set_low(&mut self) {
         self.set_level(Level::Low)
     }
 
     /// Set the output level.
     #[inline]
+    #[instability::unstable]
     pub fn set_level(&mut self, level: Level) {
         self.pin.set_output_high(level.into(), private::Internal);
     }
 
     /// Is the output pin set as high?
     #[inline]
+    #[instability::unstable]
     pub fn is_set_high(&self) -> bool {
         self.output_level() == Level::High
     }
 
     /// Is the output pin set as low?
     #[inline]
+    #[instability::unstable]
     pub fn is_set_low(&self) -> bool {
         self.output_level() == Level::Low
     }
 
     /// What level output is set to
     #[inline]
+    #[instability::unstable]
     pub fn output_level(&self) -> Level {
         self.pin.is_set_high(private::Internal).into()
     }
 
     /// Toggle pin output
     #[inline]
+    #[instability::unstable]
     pub fn toggle(&mut self) {
         let level = self.output_level();
         self.set_level(!level);
@@ -1960,11 +1980,14 @@ impl<'d> Flex<'d> {
 
     /// Configure the [DriveStrength] of the pin
     #[inline]
+    #[instability::unstable]
     pub fn set_drive_strength(&mut self, strength: DriveStrength) {
         self.pin.set_drive_strength(strength, private::Internal);
     }
 
     /// Set the GPIO to open-drain mode.
+    #[inline]
+    #[instability::unstable]
     pub fn set_as_open_drain(&mut self, pull: Pull) {
         self.pin.set_to_open_drain_output(private::Internal);
         self.pin.pull_direction(pull, private::Internal);
@@ -2246,6 +2269,7 @@ mod asynch {
         /// Note that calling this function will overwrite previous
         /// [`listen`][Self::listen] operations for this pin.
         #[inline]
+        #[instability::unstable]
         pub async fn wait_for(&mut self, event: Event) {
             let mut future = PinFuture {
                 pin: unsafe { self.clone_unchecked() },
@@ -2286,6 +2310,8 @@ mod asynch {
         /// Wait until the pin is high.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
+        #[instability::unstable]
         pub async fn wait_for_high(&mut self) {
             self.wait_for(Event::HighLevel).await
         }
@@ -2293,6 +2319,8 @@ mod asynch {
         /// Wait until the pin is low.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
+        #[instability::unstable]
         pub async fn wait_for_low(&mut self) {
             self.wait_for(Event::LowLevel).await
         }
@@ -2300,6 +2328,8 @@ mod asynch {
         /// Wait for the pin to undergo a transition from low to high.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
+        #[instability::unstable]
         pub async fn wait_for_rising_edge(&mut self) {
             self.wait_for(Event::RisingEdge).await
         }
@@ -2307,6 +2337,8 @@ mod asynch {
         /// Wait for the pin to undergo a transition from high to low.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
+        #[instability::unstable]
         pub async fn wait_for_falling_edge(&mut self) {
             self.wait_for(Event::FallingEdge).await
         }
@@ -2315,6 +2347,8 @@ mod asynch {
         /// to low.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
+        #[instability::unstable]
         pub async fn wait_for_any_edge(&mut self) {
             self.wait_for(Event::AnyEdge).await
         }
@@ -2336,6 +2370,7 @@ mod asynch {
         /// Wait until the pin is high.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
         pub async fn wait_for_high(&mut self) {
             self.pin.wait_for_high().await
         }
@@ -2343,6 +2378,7 @@ mod asynch {
         /// Wait until the pin is low.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
         pub async fn wait_for_low(&mut self) {
             self.pin.wait_for_low().await
         }
@@ -2350,6 +2386,7 @@ mod asynch {
         /// Wait for the pin to undergo a transition from low to high.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
         pub async fn wait_for_rising_edge(&mut self) {
             self.pin.wait_for_rising_edge().await
         }
@@ -2357,6 +2394,7 @@ mod asynch {
         /// Wait for the pin to undergo a transition from high to low.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
         pub async fn wait_for_falling_edge(&mut self) {
             self.pin.wait_for_falling_edge().await
         }
@@ -2365,6 +2403,7 @@ mod asynch {
         /// to low.
         ///
         /// See [Self::wait_for] for more information.
+        #[inline]
         pub async fn wait_for_any_edge(&mut self) {
             self.pin.wait_for_any_edge().await
         }
@@ -2513,6 +2552,7 @@ mod embedded_hal_impls {
         }
     }
 
+    #[instability::unstable]
     impl digital::InputPin for Flex<'_> {
         fn is_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_high(self))
@@ -2523,10 +2563,12 @@ mod embedded_hal_impls {
         }
     }
 
+    #[instability::unstable]
     impl digital::ErrorType for Flex<'_> {
         type Error = core::convert::Infallible;
     }
 
+    #[instability::unstable]
     impl digital::OutputPin for Flex<'_> {
         fn set_low(&mut self) -> Result<(), Self::Error> {
             Self::set_low(self);
@@ -2539,6 +2581,7 @@ mod embedded_hal_impls {
         }
     }
 
+    #[instability::unstable]
     impl digital::StatefulOutputPin for Flex<'_> {
         fn is_set_high(&mut self) -> Result<bool, Self::Error> {
             Ok(Self::is_set_high(self))
@@ -2555,6 +2598,7 @@ mod embedded_hal_async_impls {
 
     use super::*;
 
+    #[instability::unstable]
     impl Wait for Flex<'_> {
         async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
             Self::wait_for_high(self).await;

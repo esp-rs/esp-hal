@@ -42,7 +42,7 @@ enumset                  = "1.1.5"
 esp-build                = { version = "0.1.0", path = "../esp-build" }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                    = "0.3.7"
-instability              = "0.3"
+instability              = "0.3.6"
 log                      = { version = "0.4.22", optional = true }
 nb                       = "1.1.0"
 paste                    = "1.0.15"
