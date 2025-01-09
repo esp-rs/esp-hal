@@ -85,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: Made Wi-Fi peripheral non virtual. (#2942)
 - `UartRx::check_for_errors`, `Uart::check_for_rx_errors`, `{Uart, UartRx}::read_buffered_bytes` (#2935)
 - Added `i2c` interrupt API (#2944)
+- SPI: Added support for 3-wire SPI (#2919)
 
 ### Changed
 
