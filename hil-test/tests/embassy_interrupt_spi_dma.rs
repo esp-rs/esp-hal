@@ -1,8 +1,8 @@
 //! Reproduction and regression test for a sneaky issue.
 
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6 esp32h2
-//% FEATURES: integrated-timers
-//% FEATURES: generic-queue
+//% FEATURES(integrated): unstable embassy integrated-timers
+//% FEATURES(generic): unstable embassy generic-queue
 
 #![no_std]
 #![no_main]
@@ -75,7 +75,7 @@ async fn interrupt_driven_task(mut i2s_tx: esp_hal::i2s::master::I2sTx<'static, 
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod test {
     use super::*;
 

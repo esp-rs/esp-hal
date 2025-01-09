@@ -79,23 +79,20 @@ use crate::{
     private::{self, Sealed},
 };
 
-pub mod interconnect;
 mod placeholder;
 
 pub use placeholder::NoPin;
 
-#[cfg(soc_etm)]
 crate::unstable_module! {
+    pub mod interconnect;
+
+    #[cfg(soc_etm)]
     pub mod etm;
-}
 
-#[cfg(lp_io)]
-crate::unstable_module! {
+    #[cfg(lp_io)]
     pub mod lp_io;
-}
 
-#[cfg(all(rtc_io, not(esp32)))]
-crate::unstable_module! {
+    #[cfg(all(rtc_io, not(esp32)))]
     pub mod rtc_io;
 }
 
@@ -820,6 +817,7 @@ where
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         (
             interconnect::InputSignal::new(self.degrade_pin(private::Internal)),
@@ -1296,6 +1294,8 @@ impl<'d> Output<'d> {
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[inline]
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         self.pin.split()
     }
@@ -1305,6 +1305,7 @@ impl<'d> Output<'d> {
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
+    #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.peripheral_input()
     }
@@ -1315,6 +1316,7 @@ impl<'d> Output<'d> {
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     #[inline]
+    #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.pin.into_peripheral_output()
     }
@@ -1439,6 +1441,7 @@ impl<'d> Input<'d> {
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
+    #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.peripheral_input()
     }
@@ -1565,6 +1568,8 @@ impl<'d> Input<'d> {
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[inline]
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         self.pin.split()
     }
@@ -1575,6 +1580,7 @@ impl<'d> Input<'d> {
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     #[inline]
+    #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.pin.into_peripheral_output()
     }
@@ -1654,6 +1660,8 @@ impl<'d> OutputOpenDrain<'d> {
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[inline]
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         self.pin.split()
     }
@@ -1663,6 +1671,7 @@ impl<'d> OutputOpenDrain<'d> {
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
+    #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.peripheral_input()
     }
@@ -1673,6 +1682,7 @@ impl<'d> OutputOpenDrain<'d> {
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     #[inline]
+    #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.pin.into_peripheral_output()
     }
@@ -1797,6 +1807,7 @@ impl<'d> Flex<'d> {
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     #[inline]
+    #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
         self.pin.degrade_pin(private::Internal).split().0
     }
@@ -1963,6 +1974,8 @@ impl<'d> Flex<'d> {
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    #[inline]
+    #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         assert!(self.pin.is_output());
         self.pin.degrade_pin(private::Internal).split()
@@ -1974,6 +1987,7 @@ impl<'d> Flex<'d> {
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     #[inline]
+    #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.split().1
     }
@@ -2028,6 +2042,7 @@ pub(crate) mod internal {
         /// using external hardware.
         #[inline]
         #[allow(unused_braces, reason = "False positive")]
+        #[instability::unstable]
         pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
             handle_gpio_input!(self, target, { target.split() })
         }

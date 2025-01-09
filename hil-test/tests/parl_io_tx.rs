@@ -1,6 +1,8 @@
 //! PARL_IO TX test
 
 //% CHIPS: esp32c6 esp32h2
+//% FEATURES: unstable
+
 #![no_std]
 #![no_main]
 

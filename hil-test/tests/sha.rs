@@ -1,11 +1,14 @@
 //! SHA Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
 
 use digest::{Digest, Update};
+#[cfg(not(feature = "esp32"))]
+use esp_hal::clock::CpuClock;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::sha::Sha224;
 #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
@@ -13,7 +16,6 @@ use esp_hal::sha::{Sha384, Sha512};
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha512_224, Sha512_256};
 use esp_hal::{
-    clock::CpuClock,
     rng::Rng,
     sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaDigest},
 };

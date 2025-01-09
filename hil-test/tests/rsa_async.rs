@@ -1,6 +1,7 @@
 //! Async RSA Test
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -48,7 +49,7 @@ const fn compute_mprime(modulus: &U512) -> u32 {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 5, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 

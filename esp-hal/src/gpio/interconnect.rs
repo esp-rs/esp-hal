@@ -212,6 +212,7 @@ fn disconnect_peripheral_output_from_pin(pin: &mut AnyPin, signal: gpio::OutputS
 /// A configurable input signal between a peripheral and a GPIO pin.
 ///
 /// Multiple input signals can be connected to one pin.
+#[instability::unstable]
 pub struct InputSignal {
     pin: AnyPin,
     is_inverted: bool,
@@ -347,6 +348,7 @@ impl DirectInputSignal {
 /// A configurable output signal between a peripheral and a GPIO pin.
 ///
 /// Multiple pins can be connected to one output signal.
+#[instability::unstable]
 pub struct OutputSignal {
     pin: AnyPin,
     is_inverted: bool,
@@ -506,6 +508,7 @@ enum InputConnectionInner {
 /// This is mainly intended for internal use, but it can be used to connect
 /// peripherals within the MCU without external hardware.
 #[derive(Clone)]
+#[doc(hidden)] // FIXME: replace with `#[unstable]` when we can mark delegated methods https://github.com/Kobzol/rust-delegate/issues/77
 pub struct InputConnection(InputConnectionInner);
 
 impl Peripheral for InputConnection {
@@ -614,6 +617,7 @@ enum OutputConnectionInner {
 ///
 /// This is mainly intended for internal use, but it can be used to connect
 /// peripherals within the MCU without external hardware.
+#[doc(hidden)] // FIXME: replace with `#[unstable]` when we can mark delegated methods https://github.com/Kobzol/rust-delegate/issues/77
 pub struct OutputConnection(OutputConnectionInner);
 
 impl Sealed for OutputConnection {}

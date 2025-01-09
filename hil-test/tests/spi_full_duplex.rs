@@ -1,7 +1,7 @@
 //! SPI Full Duplex test suite.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: generic-queue
+//% FEATURES: unstable generic-queue
 
 // FIXME: add async test cases that don't rely on PCNT
 
@@ -48,7 +48,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 

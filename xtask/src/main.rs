@@ -181,12 +181,20 @@ fn main() -> Result<()> {
 
     let workspace = std::env::current_dir()?;
 
+    let out_path = Path::new("target");
+
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildDocumentationIndex(args) => build_documentation_index(&workspace, args),
-        Cli::BuildExamples(args) => examples(&workspace, args, CargoAction::Build),
+        Cli::BuildExamples(args) => examples(
+            &workspace,
+            args,
+            CargoAction::Build(out_path.join("examples")),
+        ),
         Cli::BuildPackage(args) => build_package(&workspace, args),
-        Cli::BuildTests(args) => tests(&workspace, args, CargoAction::Build),
+        Cli::BuildTests(args) => {
+            tests(&workspace, args, CargoAction::Build(out_path.join("tests")))
+        }
         Cli::BumpVersion(args) => bump_version(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
@@ -227,7 +235,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     };
 
     // Load all examples which support the specified chip and parse their metadata:
-    let mut examples = xtask::load_examples(&example_path, action)?
+    let mut examples = xtask::load_examples(&example_path)?
         .iter()
         .filter_map(|example| {
             if example.supports_chip(args.chip) {
@@ -243,13 +251,18 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
 
     // Execute the specified action:
     match action {
-        CargoAction::Build => build_examples(args, examples, &package_path),
+        CargoAction::Build(out_path) => build_examples(args, examples, &package_path, out_path),
         CargoAction::Run if args.example.is_some() => run_example(args, examples, &package_path),
         CargoAction::Run => run_examples(args, examples, &package_path),
     }
 }
 
-fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
+fn build_examples(
+    args: ExampleArgs,
+    examples: Vec<Metadata>,
+    package_path: &Path,
+    out_path: PathBuf,
+) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
     let target = target_triple(args.package, &args.chip)?;
 
@@ -265,7 +278,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
                 args.chip,
                 target,
                 example,
-                CargoAction::Build,
+                CargoAction::Build(out_path.clone()),
                 1,
                 args.debug,
             )?;
@@ -282,7 +295,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
                 args.chip,
                 target,
                 example,
-                CargoAction::Build,
+                CargoAction::Build(out_path.clone()),
                 1,
                 args.debug,
             )
@@ -400,7 +413,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let target = target_triple(Package::HilTest, &args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = xtask::load_examples(&package_path.join("tests"), action)?
+    let mut tests = xtask::load_examples(&package_path.join("tests"))?
         .into_iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
@@ -420,7 +433,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
                 args.chip,
                 target,
                 test,
-                action,
+                action.clone(),
                 args.repeat.unwrap_or(1),
                 false,
             )?;
@@ -436,7 +449,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
                 args.chip,
                 target,
                 &test,
-                action,
+                action.clone(),
                 args.repeat.unwrap_or(1),
                 false,
             )
