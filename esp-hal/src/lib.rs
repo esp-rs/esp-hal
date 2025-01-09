@@ -144,10 +144,13 @@
 mod fmt;
 
 #[cfg(riscv)]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use esp_riscv_rt::{self, entry, riscv};
 #[cfg(xtensa)]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use xtensa_lx;
 #[cfg(xtensa)]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use xtensa_lx_rt::{self, entry};
 
 // TODO what should we reexport stably?
@@ -190,6 +193,7 @@ mod macros;
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use procmacros::load_lp_code;
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use procmacros::{handler, ram};
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727

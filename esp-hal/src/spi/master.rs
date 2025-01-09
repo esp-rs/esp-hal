@@ -95,6 +95,7 @@ use crate::{
 #[derive(Debug, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
+#[instability::unstable]
 pub enum SpiInterrupt {
     /// Indicates that the SPI transaction has completed successfully.
     ///
@@ -704,6 +705,11 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI CS
     /// signal.
+    ///
+    /// # Current Stability Limitations
+    /// The hardware chip select functionality is limited; only one CS line can
+    /// be set, regardless of the total number available. There is no
+    /// mechanism to select which CS line to use.
     #[instability::unstable]
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
@@ -741,6 +747,10 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO2 output and input signals.
+    ///
+    /// # Current Stability Limitations
+    /// QSPI operations are unstable, associated pins configuration is
+    /// inefficient.
     #[instability::unstable]
     pub fn with_sio2<SIO2: PeripheralOutput>(self, sio2: impl Peripheral<P = SIO2> + 'd) -> Self {
         // TODO: panic if not QSPI?
@@ -758,6 +768,10 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO3 output and input signals.
+    ///
+    /// # Current Stability Limitations
+    /// QSPI operations are unstable, associated pins configuration is
+    /// inefficient.
     #[instability::unstable]
     pub fn with_sio3<SIO3: PeripheralOutput>(self, sio3: impl Peripheral<P = SIO3> + 'd) -> Self {
         // TODO: panic if not QSPI?

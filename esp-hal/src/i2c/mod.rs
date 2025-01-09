@@ -8,4 +8,6 @@
 pub mod master;
 
 #[cfg(lp_i2c0)]
-pub mod lp_i2c;
+crate::unstable_module! {
+    pub mod lp_i2c;
+}

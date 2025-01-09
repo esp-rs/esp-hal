@@ -1040,6 +1040,7 @@ impl<'d> Uart<'d, Async> {
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
+#[instability::unstable]
 pub enum UartInterrupt {
     /// Indicates that the received has detected the configured
     /// [`Uart::set_at_cmd`] character.
@@ -1238,21 +1239,25 @@ impl InterruptConfigurable for Uart<'_, Blocking> {
 
 impl Uart<'_, Blocking> {
     /// Listen for the given interrupts
+    #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
         self.tx.uart.info().enable_listen(interrupts.into(), true)
     }
 
     /// Unlisten the given interrupts
+    #[instability::unstable]
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
         self.tx.uart.info().enable_listen(interrupts.into(), false)
     }
 
     /// Gets asserted interrupts
+    #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<UartInterrupt> {
         self.tx.uart.info().interrupts()
     }
 
     /// Resets asserted interrupts
+    #[instability::unstable]
     pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
         self.tx.uart.info().clear_interrupts(interrupts)
     }
@@ -1878,6 +1883,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 
 /// Low-power UART
 #[cfg(lp_uart)]
+#[instability::unstable]
 pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
