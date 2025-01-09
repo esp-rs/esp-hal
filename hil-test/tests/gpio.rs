@@ -7,19 +7,20 @@
 #![no_std]
 #![no_main]
 
+#[cfg(feature = "unstable")] // unused in stable build
 use core::cell::RefCell;
 
+#[cfg(feature = "unstable")] // unused in stable build
 use critical_section::Mutex;
 #[cfg(feature = "unstable")]
 use embassy_time::{Duration, Timer};
-use esp_hal::{
-    delay::Delay,
-    gpio::{AnyPin, Input, Level, Output, OutputOpenDrain, Pin, Pull},
-    handler,
-};
+use esp_hal::gpio::{AnyPin, Input, Level, Output, Pin, Pull};
 #[cfg(feature = "unstable")]
 use esp_hal::{
-    gpio::{Event, Flex, Io},
+    // OutputOpenDrain is here because will be unused otherwise
+    delay::Delay,
+    gpio::{Event, Flex, Io, OutputOpenDrain},
+    handler,
     interrupt::InterruptConfigurable,
     timer::timg::TimerGroup,
 };
@@ -27,16 +28,20 @@ use hil_test as _;
 #[cfg(feature = "unstable")]
 use portable_atomic::{AtomicUsize, Ordering};
 
+#[cfg(feature = "unstable")] // unused in stable build
 static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
+#[cfg(feature = "unstable")] // unused in stable build
 static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
 struct Context {
     test_gpio1: AnyPin,
     test_gpio2: AnyPin,
+    #[cfg(feature = "unstable")]
     delay: Delay,
 }
 
-#[handler]
+#[cfg_attr(feature = "unstable", handler)]
+#[cfg(feature = "unstable")]
 pub fn interrupt_handler() {
     critical_section::with(|cs| {
         *COUNTER.borrow_ref_mut(cs) += 1;
@@ -56,6 +61,7 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
+        #[cfg(feature = "unstable")]
         let delay = Delay::new();
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
@@ -74,6 +80,7 @@ mod tests {
         Context {
             test_gpio1: gpio1.degrade(),
             test_gpio2: gpio2.degrade(),
+            #[cfg(feature = "unstable")]
             delay,
         }
     }
@@ -244,6 +251,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")] // delay is unstable
     fn gpio_od(ctx: Context) {
         let mut test_gpio1 = OutputOpenDrain::new(ctx.test_gpio1, Level::High, Pull::Up);
         let mut test_gpio2 = OutputOpenDrain::new(ctx.test_gpio2, Level::High, Pull::Up);
