@@ -101,10 +101,10 @@ impl Efuse {
 
         // See <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_table.csv#L176-L179>
         let init_code: u16 = Self::read_field_le(match atten {
-            Attenuation::Attenuation0dB => ADC1_INIT_CODE_ATTEN0,
-            Attenuation::Attenuation2p5dB => ADC1_INIT_CODE_ATTEN1,
-            Attenuation::Attenuation6dB => ADC1_INIT_CODE_ATTEN2,
-            Attenuation::Attenuation11dB => ADC1_INIT_CODE_ATTEN3,
+            Attenuation::_0dB => ADC1_INIT_CODE_ATTEN0,
+            Attenuation::_2p5dB => ADC1_INIT_CODE_ATTEN1,
+            Attenuation::_6dB => ADC1_INIT_CODE_ATTEN2,
+            Attenuation::_11dB => ADC1_INIT_CODE_ATTEN3,
         });
 
         Some(init_code + 1000) // version 1 logic
@@ -115,10 +115,10 @@ impl Efuse {
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_rtc_calib.c#L49>
     pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
         match atten {
-            Attenuation::Attenuation0dB => 400,
-            Attenuation::Attenuation2p5dB => 550,
-            Attenuation::Attenuation6dB => 750,
-            Attenuation::Attenuation11dB => 1370,
+            Attenuation::_0dB => 400,
+            Attenuation::_2p5dB => 550,
+            Attenuation::_6dB => 750,
+            Attenuation::_11dB => 1370,
         }
     }
 
@@ -134,10 +134,10 @@ impl Efuse {
 
         // See <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_table.csv#L180-L183>
         let cal_code: u16 = Self::read_field_le(match atten {
-            Attenuation::Attenuation0dB => ADC1_CAL_VOL_ATTEN0,
-            Attenuation::Attenuation2p5dB => ADC1_CAL_VOL_ATTEN1,
-            Attenuation::Attenuation6dB => ADC1_CAL_VOL_ATTEN2,
-            Attenuation::Attenuation11dB => ADC1_CAL_VOL_ATTEN3,
+            Attenuation::_0dB => ADC1_CAL_VOL_ATTEN0,
+            Attenuation::_2p5dB => ADC1_CAL_VOL_ATTEN1,
+            Attenuation::_6dB => ADC1_CAL_VOL_ATTEN2,
+            Attenuation::_11dB => ADC1_CAL_VOL_ATTEN3,
         });
 
         let cal_code = if cal_code & (1 << 9) != 0 {
