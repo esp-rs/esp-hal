@@ -105,7 +105,7 @@ impl Efuse {
             2160 + diff_code0
         };
 
-        if matches!(atten, Attenuation::Attenuation0dB) {
+        if matches!(atten, Attenuation::_0dB) {
             return Some(code0);
         }
 
@@ -121,8 +121,8 @@ impl Efuse {
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_rtc_calib.c#L65>
     pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
         match atten {
-            Attenuation::Attenuation0dB => 400,
-            Attenuation::Attenuation11dB => 1370,
+            Attenuation::_0dB => 400,
+            Attenuation::_11dB => 1370,
         }
     }
 
@@ -144,7 +144,7 @@ impl Efuse {
             1540 + diff_code0
         };
 
-        if matches!(atten, Attenuation::Attenuation0dB) {
+        if matches!(atten, Attenuation::_0dB) {
             return Some(code0);
         }
 

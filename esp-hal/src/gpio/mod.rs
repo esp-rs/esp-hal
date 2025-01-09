@@ -243,13 +243,13 @@ pub enum Pull {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DriveStrength {
     /// Drive strength of approximately 5mA.
-    I5mA  = 0,
+    _5mA  = 0,
     /// Drive strength of approximately 10mA.
-    I10mA = 1,
+    _10mA = 1,
     /// Drive strength of approximately 20mA.
-    I20mA = 2,
+    _20mA = 2,
     /// Drive strength of approximately 40mA.
-    I40mA = 3,
+    _40mA = 3,
 }
 
 /// Alternate functions
@@ -493,7 +493,7 @@ pub trait OutputPin: Pin + Into<AnyPin> + 'static {
             if let Some(input_enable) = input_enable {
                 w.fun_ie().bit(input_enable);
             }
-            w.fun_drv().bits(DriveStrength::I20mA as u8);
+            w.fun_drv().bits(DriveStrength::_20mA as u8);
             w.slp_sel().clear_bit()
         });
     }

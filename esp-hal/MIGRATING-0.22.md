@@ -458,3 +458,21 @@ The Address and Command enums have similarly had their variants changed from e.g
 - Command::Command1
 + Command::_1Bit
 ```
+
+## GPIO Changes
+
+The GPIO drive strength variants are renamed from e.g. `I5mA` to `_5mA`.
+
+```diff
+-DriveStrength::I5mA
++DriveStrength::_5mA
+```
+
+## ADC Changes
+
+The ADC attenuation variants are renamed from e.g. `Attenuation0dB` to `_0dB`.
+
+```diff
+-Attenuation::Attenuation0dB
++Attenuation::_0dB
+```
