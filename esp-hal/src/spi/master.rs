@@ -546,8 +546,8 @@ impl<'d> Spi<'d, Blocking> {
         this.apply_config(&config)?;
 
         let this = this
-            .with_mosi(NoPin)
-            .with_miso(NoPin)
+            .with_sio0(NoPin)
+            .with_sio1(NoPin)
             .with_sck(NoPin)
             .with_cs(NoPin);
 
@@ -639,9 +639,21 @@ where
 {
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
+    /// Enables output functionality for the pin, and connects it to the MOSI.
+    pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
+        crate::into_mapped_ref!(mosi);
+        mosi.enable_output(false, private::Internal);
+
+        self.driver().info.mosi.connect_to(&mut mosi);
+
+        self
+    }
+
+    /// Assign the SIO0 pin for the SPI instance.
+    ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI signal and SIO0 input signal.
-    pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
+    pub fn with_sio0<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
         mosi.enable_output(true);
         mosi.enable_input(true);
@@ -3098,12 +3110,25 @@ impl Driver {
         no_mosi_miso: bool,
         data_mode: DataMode,
     ) -> Result<(), Error> {
+        let three_wire = cmd.mode() == DataMode::SingleThreeWire
+            || address.mode() == DataMode::SingleThreeWire
+            || data_mode == DataMode::SingleThreeWire;
+
+        if three_wire
+            && ((cmd != Command::None && cmd.mode() != DataMode::SingleThreeWire)
+                || (address != Address::None && address.mode() != DataMode::SingleThreeWire)
+                || data_mode != DataMode::SingleThreeWire)
+        {
+            return Err(Error::ArgumentsInvalid);
+        }
+
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
 
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
             w.usr_mosi_highpart().clear_bit();
+            w.sio().bit(three_wire);
             w.doutdin().clear_bit();
             w.usr_miso().bit(!is_write && !no_mosi_miso);
             w.usr_mosi().bit(is_write && !no_mosi_miso);

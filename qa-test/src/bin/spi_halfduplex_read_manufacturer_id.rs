@@ -71,8 +71,8 @@ fn main() -> ! {
     )
     .unwrap()
     .with_sck(sclk)
-    .with_mosi(mosi)
-    .with_miso(miso)
+    .with_sio0(mosi)
+    .with_sio1(miso)
     .with_sio2(sio2)
     .with_sio3(sio3)
     .with_cs(cs);

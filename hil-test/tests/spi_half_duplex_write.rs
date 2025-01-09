@@ -27,6 +27,81 @@ struct Context {
     pcnt_source: InputSignal,
 }
 
+fn perform_spi_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
+    const DMA_BUFFER_SIZE: usize = 4;
+
+    let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
+    let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+
+    let unit = ctx.pcnt_unit;
+    let mut spi = ctx.spi;
+
+    unit.channel0.set_edge_signal(ctx.pcnt_source);
+    unit.channel0
+        .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+    // Fill the buffer where each byte has 3 pos edges.
+    dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
+
+    let transfer = spi
+        .half_duplex_write(
+            mode,
+            Command::None,
+            Address::None,
+            0,
+            dma_tx_buf.len(),
+            dma_tx_buf,
+        )
+        .map_err(|e| e.0)
+        .unwrap();
+    (spi, dma_tx_buf) = transfer.wait();
+
+    assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
+
+    let transfer = spi
+        .half_duplex_write(
+            mode,
+            Command::None,
+            Address::None,
+            0,
+            dma_tx_buf.len(),
+            dma_tx_buf,
+        )
+        .map_err(|e| e.0)
+        .unwrap();
+    // dropping SPI would make us see an additional edge - so let's keep SPI alive
+    let (_spi, _) = transfer.wait();
+
+    assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
+}
+
+fn perform_spidmabus_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
+    const DMA_BUFFER_SIZE: usize = 4;
+
+    let (rx, rxd, buffer, descriptors) = dma_buffers!(1, DMA_BUFFER_SIZE);
+    let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
+    let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+
+    let unit = ctx.pcnt_unit;
+    let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
+
+    unit.channel0.set_edge_signal(ctx.pcnt_source);
+    unit.channel0
+        .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+    let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
+    // Write the buffer where each byte has 3 pos edges.
+    spi.half_duplex_write(mode, Command::None, Address::None, 0, &buffer)
+        .unwrap();
+
+    assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
+
+    spi.half_duplex_write(mode, Command::None, Address::None, 0, &buffer)
+        .unwrap();
+
+    assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
+}
+
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
@@ -59,7 +134,7 @@ mod tests {
         )
         .unwrap()
         .with_sck(sclk)
-        .with_mosi(mosi)
+        .with_sio0(mosi)
         .with_dma(dma_channel);
 
         Context {
@@ -71,78 +146,21 @@ mod tests {
 
     #[test]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 4;
-
-        let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
-        let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
-
-        let unit = ctx.pcnt_unit;
-        let mut spi = ctx.spi;
-
-        unit.channel0.set_edge_signal(ctx.pcnt_source);
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-
-        // Fill the buffer where each byte has 3 pos edges.
-        dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
-
-        let transfer = spi
-            .half_duplex_write(
-                DataMode::Single,
-                Command::None,
-                Address::None,
-                0,
-                dma_tx_buf.len(),
-                dma_tx_buf,
-            )
-            .map_err(|e| e.0)
-            .unwrap();
-        (spi, dma_tx_buf) = transfer.wait();
-
-        assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
-
-        let transfer = spi
-            .half_duplex_write(
-                DataMode::Single,
-                Command::None,
-                Address::None,
-                0,
-                dma_tx_buf.len(),
-                dma_tx_buf,
-            )
-            .map_err(|e| e.0)
-            .unwrap();
-        // dropping SPI would make us see an additional edge - so let's keep SPI alive
-        let (_spi, _) = transfer.wait();
-
-        assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
+        super::perform_spi_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
     }
 
     #[test]
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 4;
+        super::perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
+    }
 
-        let (rx, rxd, buffer, descriptors) = dma_buffers!(1, DMA_BUFFER_SIZE);
-        let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+    #[test]
+    fn test_spi_writes_are_correctly_by_pcnt_tree_wire(ctx: Context) {
+        super::perform_spi_writes_are_correctly_by_pcnt(ctx, DataMode::SingleThreeWire);
+    }
 
-        let unit = ctx.pcnt_unit;
-        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
-
-        unit.channel0.set_edge_signal(ctx.pcnt_source);
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-
-        let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
-        // Write the buffer where each byte has 3 pos edges.
-        spi.half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
-            .unwrap();
-
-        assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
-
-        spi.half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
-            .unwrap();
-
-        assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
+    #[test]
+    fn test_spidmabus_writes_are_correctly_by_pcnt_tree_wire(ctx: Context) {
+        super::perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::SingleThreeWire);
     }
 }
