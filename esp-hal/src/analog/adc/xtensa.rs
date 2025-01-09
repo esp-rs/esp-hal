@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 #[cfg(esp32s3)]
 pub use self::calibration::*;
 use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
@@ -380,14 +381,15 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
 }
 
 /// Analog-to-Digital Converter peripheral driver.
-pub struct Adc<'d, ADC> {
+pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _adc: PeripheralRef<'d, ADC>,
     active_channel: Option<u8>,
     last_init_code: u16,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
+    _phantom: PhantomData<Dm>,
 }
 
-impl<'d, ADCI> Adc<'d, ADCI>
+impl<'d, ADCI> Adc<'d, ADCI, crate::Blocking>
 where
     ADCI: RegisterAccess,
 {
@@ -467,6 +469,7 @@ where
             active_channel: None,
             last_init_code: 0,
             _guard: guard,
+            _phantom: PhantomData,
         }
     }
 

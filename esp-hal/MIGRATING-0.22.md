@@ -522,6 +522,15 @@ The GPIO drive strength variants are renamed from e.g. `I5mA` to `_5mA`.
 
 ## ADC Changes
 
+The ADC driver has gained a new `Async`/`Blocking` mode parameter.
+NOTE: Async support is only supported in ESP32C3 and ESP32C6 for now
+
+
+```diff
+- Adc<'d, ADC>;
++ Adc<'d, ADC, Blocking;
+```
+
 The ADC attenuation variants are renamed from e.g. `Attenuation0dB` to `_0dB`.
 
 ```diff

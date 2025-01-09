@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 #[cfg(not(esp32h2))]
 pub use self::calibration::*;
 use super::{AdcCalSource, AdcConfig, Attenuation};
@@ -6,10 +7,21 @@ use crate::clock::clocks_ll::regi2c_write_mask;
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
 use crate::efuse::Efuse;
 use crate::{
-    peripheral::PeripheralRef,
-    peripherals::APB_SARADC,
-    system::{GenericPeripheralGuard, Peripheral},
+    peripheral::PeripheralRef, peripherals::APB_SARADC, system::{GenericPeripheralGuard, Peripheral}, Blocking
 };
+
+#[cfg(any(esp32c3, esp32c6))]
+use crate::{
+    analog::adc::asynch::AdcFuture,
+    peripherals::Interrupt,
+    interrupt::{InterruptConfigurable, InterruptHandler},
+    Async,
+};
+
+#[cfg(esp32c3)]
+use Interrupt::APB_ADC as InterruptSource;
+#[cfg(esp32c6)]
+use Interrupt::APB_SARADC as InterruptSource;
 
 mod calibration;
 
@@ -383,15 +395,17 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
     }
 }
 
+
 /// Analog-to-Digital Converter peripheral driver.
-pub struct Adc<'d, ADCI> {
+pub struct Adc<'d, ADCI, Dm: crate::DriverMode> {
     _adc: PeripheralRef<'d, ADCI>,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
+    _phantom: PhantomData<Dm>
 }
 
-impl<'d, ADCI> Adc<'d, ADCI>
+impl<'d, ADCI> Adc<'d, ADCI, Blocking>
 where
     ADCI: RegisterAccess + 'd,
 {
@@ -415,6 +429,20 @@ where
             attenuations: config.attenuations,
             active_channel: None,
             _guard: guard,
+            _phantom: PhantomData
+        }
+    }
+
+    #[cfg(any(esp32c3, esp32c6))]
+    /// Reconfigures the ADC driver to operate in asynchronous mode.
+    pub fn into_async(mut self) -> Adc<'d, ADCI, Async> {
+        self.set_interrupt_handler(asynch::adc_interrupt_handler);
+        Adc {
+            _adc: self._adc,
+            attenuations: self.attenuations,
+            active_channel: self.active_channel,
+            _guard: self._guard,
+            _phantom: PhantomData
         }
     }
 
@@ -490,6 +518,19 @@ where
         self.active_channel = None;
 
         Ok(converted_value)
+    }
+}
+
+impl<ADCI> crate::private::Sealed for Adc<'_, ADCI, Blocking> {}
+
+#[cfg(any(esp32c3, esp32c6))]
+impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, InterruptSource);
+        }
+        unsafe { crate::interrupt::bind_interrupt(InterruptSource, handler.handler()) };
+        unwrap!(crate::interrupt::enable(InterruptSource, handler.priority()));
     }
 }
 
@@ -581,4 +622,220 @@ mod adc_implementation {
             (GpioPin<5>, 4),
         ]
     }
+}
+
+
+#[cfg(any(esp32c3, esp32c6))]
+impl<'d, ADCI> Adc<'d, ADCI, Async>
+where
+    ADCI: RegisterAccess + 'd,
+{
+
+    /// Create a new instance in [crate::Blocking] mode.
+    pub fn into_blocking(self) -> Adc<'d, ADCI, Blocking> {
+        crate::interrupt::disable(crate::Cpu::current(), InterruptSource);
+        Adc {
+            _adc: self._adc,
+            attenuations: self.attenuations,
+            active_channel: self.active_channel,
+            _guard: self._guard,
+            _phantom: PhantomData
+        }
+    }
+
+    /// Request that the ADC begin a conversion on the specified pin
+    ///
+    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// expected that the ADC will be able to sample whatever channel
+    /// underlies the pin.
+    ///
+    /// TODO: This method does not handle concurrent reads to multiple channels yet
+    pub async fn read_oneshot<PIN, CS>(
+        &mut self,
+        pin: &mut super::AdcPin<PIN, ADCI, CS>,
+    ) -> u16
+    where
+        ADCI: asynch::AsyncAccess,
+        PIN: super::AdcChannel,
+        CS: super::AdcCalScheme<ADCI>,
+    {
+        let channel = PIN::CHANNEL;
+        if self.attenuations[channel as usize].is_none() {
+            panic!("Channel {} is not configured reading!", channel);
+        }
+
+        let adc_ready_future = AdcFuture::new(self);
+
+        // Set ADC unit calibration according used scheme for pin
+        ADCI::set_init_code(pin.cal_scheme.adc_cal());
+
+        let attenuation = self.attenuations[channel as usize].unwrap() as u8;
+        ADCI::config_onetime_sample(channel, attenuation);
+        ADCI::start_onetime_sample();
+
+        // Wait for ADC to finish conversion and get value
+        adc_ready_future.await;
+        let converted_value = ADCI::read_data();
+
+        // There is a hardware limitation. If the APB clock frequency is high, the step
+        // of this reg signal: ``onetime_start`` may not be captured by the
+        // ADC digital controller (when its clock frequency is too slow). A rough
+        // estimate for this step should be at least 3 ADC digital controller
+        // clock cycle.
+        //
+        // This limitation will be removed in hardware future versions.
+        // We reset ``onetime_start`` in `reset` and assume enough time has passed until
+        // the next sample is requested.
+
+        ADCI::reset();
+
+        // Postprocess converted value according to calibration scheme used for pin
+        pin.cal_scheme.adc_val(converted_value)
+    }
+}
+
+#[cfg(any(esp32c3, esp32c6))]
+/// Async functionality
+pub(crate) mod asynch {
+    use core::{
+        marker::PhantomData,
+        sync::atomic::Ordering,
+        task::Poll
+    };
+    use portable_atomic::AtomicBool;
+    use procmacros::handler;
+    use crate::{
+        peripherals::APB_SARADC,
+        asynch::AtomicWaker,
+        analog::adc::Adc,
+        Async
+    };
+
+    static ADC1_DONE_WAKER: AtomicWaker = AtomicWaker::new();
+    static ADC1_DONE_SIGNAL: AtomicBool = AtomicBool::new(false);
+    #[cfg(esp32c3)]
+    static ADC2_DONE_WAKER: AtomicWaker = AtomicWaker::new();
+    #[cfg(esp32c3)]
+    static ADC2_DONE_SIGNAL: AtomicBool = AtomicBool::new(false);
+
+    #[handler]
+    pub(crate) fn adc_interrupt_handler() {
+        let saradc = APB_SARADC::regs();
+        let interrupt_status = saradc.int_st().read();
+
+        if interrupt_status.adc1_done().bit_is_set() {
+            ADC1_DONE_SIGNAL.store(true, Ordering::Relaxed);
+            saradc.int_clr().write(|w| {
+                w.adc1_done().clear_bit_by_one()
+            });
+            ADC1_DONE_WAKER.wake();
+        }
+
+        #[cfg(esp32c3)]
+        if interrupt_status.adc2_done().bit_is_set() {
+            ADC2_DONE_SIGNAL.store(true, Ordering::Relaxed);
+            saradc.int_clr().write(|w| {
+                w.adc2_done().clear_bit_by_one()
+            });
+            ADC2_DONE_WAKER.wake();
+        }
+    }
+
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub(crate) struct AdcFuture<ADCI: AsyncAccess> {
+        _phantom: PhantomData<ADCI>,
+    }
+
+    impl<ADCI: AsyncAccess> AdcFuture<ADCI> {
+        pub fn new(_instance: &Adc<'_, ADCI, Async>) -> Self {
+            ADCI::signal().store(false, Ordering::Relaxed);
+            ADCI::enable_interrupt();
+            Self { _phantom: PhantomData }
+        }
+    }
+
+
+    #[doc(hidden)]
+    pub trait AsyncAccess {
+        /// Enable the ADC interrupt
+        fn enable_interrupt();
+
+        /// Disable the ADC interrupt
+        fn disable_interrupt();
+
+        /// Obtain the waker for the ADC interrupt
+        fn waker() -> &'static AtomicWaker;
+
+        /// Obtain the signal for the ADC interrupt
+        fn signal() -> &'static AtomicBool;
+
+        /// Check if the ADC data is ready
+        fn is_data_ready() -> bool;
+    }
+
+    impl AsyncAccess for crate::peripherals::ADC1 {
+        fn enable_interrupt() {
+            APB_SARADC::regs().int_ena().modify(|_, w| w.adc1_done().set_bit());
+        }
+
+        fn disable_interrupt() {
+            APB_SARADC::regs().int_ena().modify(|_, w| w.adc1_done().clear_bit());
+        }
+
+        fn waker() -> &'static AtomicWaker {
+            &ADC1_DONE_WAKER
+        }
+
+        fn signal() -> &'static AtomicBool {
+            &ADC1_DONE_SIGNAL
+        }
+
+        fn is_data_ready() -> bool {
+            Self::signal().load(Ordering::Acquire)
+        }
+    }
+
+    #[cfg(esp32c3)]
+    impl AsyncAccess for crate::peripherals::ADC2 {
+        fn enable_interrupt() {
+            APB_SARADC::regs().int_ena().modify(|_, w| w.adc2_done().set_bit());
+        }
+
+        fn disable_interrupt() {
+            APB_SARADC::regs().int_ena().modify(|_, w| w.adc2_done().clear_bit());
+        }
+
+        fn waker() -> &'static AtomicWaker {
+            &ADC2_DONE_WAKER
+        }
+
+        fn signal() -> &'static AtomicBool {
+            &ADC2_DONE_SIGNAL
+        }
+
+        fn is_data_ready() -> bool {
+            Self::signal().load(Ordering::Acquire)
+        }
+    }
+
+    impl<ADCI: AsyncAccess> core::future::Future for AdcFuture<ADCI> {
+        type Output = ();
+
+        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>) -> core::task::Poll<Self::Output> {
+            ADCI::waker().register(cx.waker());
+
+            if ADCI::is_data_ready() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<ADCI: AsyncAccess> Drop for AdcFuture<ADCI> {
+        fn drop(&mut self) {
+            ADCI::disable_interrupt();
+        }
+    }
+
 }

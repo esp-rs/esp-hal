@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 use super::{AdcConfig, Attenuation};
 use crate::{
     peripheral::PeripheralRef,
@@ -198,13 +199,14 @@ impl RegisterAccess for ADC2 {
 }
 
 /// Analog-to-Digital Converter peripheral driver.
-pub struct Adc<'d, ADC> {
+pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _adc: PeripheralRef<'d, ADC>,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
+    _phantom: PhantomData<Dm>,
 }
 
-impl<'d, ADCI> Adc<'d, ADCI>
+impl<'d, ADCI> Adc<'d, ADCI, crate::Blocking>
 where
     ADCI: RegisterAccess,
 {
@@ -280,6 +282,7 @@ where
             _adc: adc_instance.into_ref(),
             attenuations: config.attenuations,
             active_channel: None,
+            _phantom: PhantomData,
         }
     }
 
@@ -329,7 +332,7 @@ where
     }
 }
 
-impl<ADC1> Adc<'_, ADC1> {
+impl<ADC1> Adc<'_, ADC1, crate::Blocking> {
     /// Enable the Hall sensor
     pub fn enable_hall_sensor() {
         RTC_IO::regs()
