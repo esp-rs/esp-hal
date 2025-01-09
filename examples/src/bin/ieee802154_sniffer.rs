@@ -40,7 +40,7 @@ fn main() -> ! {
     let mut read = [0u8; 2];
     loop {
         let mut buff = [0u8; 1];
-        uart0.read_bytes(&mut buff);
+        while uart0.read_bytes(&mut buff) == 0 {}
 
         if buff[0] == b'r' {
             continue;
