@@ -94,23 +94,14 @@ pub trait AddressMode: _private::AddressModeInternal + Copy + 'static {}
 
 mod _private {
     pub trait AddressModeInternal {
-        fn as_i2c_address(&self) -> super::I2cAddress;
+        fn as_i2c_address(&self) -> I2cAddress;
     }
 
     /// Internally used representation of an I2C address.
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[derive(Clone, Copy)]
     pub enum I2cAddress {
         /// Seven bit address
         SevenBit(super::SevenBitAddress),
-    }
-
-    impl I2cAddress {
-        pub fn as_u8(&self) -> u8 {
-            match self {
-                I2cAddress::SevenBit(addr) => *addr,
-            }
-        }
     }
 }
 
@@ -1498,10 +1489,14 @@ impl Driver<'_> {
 
         if start {
             // Load address and R/W bit into FIFO
-            write_fifo(
-                self.register_block(),
-                addr.as_u8() << 1 | OperationType::Write as u8,
-            );
+            match addr {
+                I2cAddress::SevenBit(addr) => {
+                    write_fifo(
+                        self.register_block(),
+                        addr << 1 | OperationType::Write as u8,
+                    );
+                }
+            }
         }
         Ok(())
     }
@@ -1577,10 +1572,11 @@ impl Driver<'_> {
 
         if start {
             // Load address and R/W bit into FIFO
-            write_fifo(
-                self.register_block(),
-                addr.as_u8() << 1 | OperationType::Read as u8,
-            );
+            match addr {
+                I2cAddress::SevenBit(addr) => {
+                    write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
+                }
+            }
         }
         Ok(())
     }
