@@ -445,7 +445,7 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal<Dm>, Dm: cr
     }
 
     crate::into_mapped_ref!(pin);
-    pin.init_input(crate::gpio::Pull::None, crate::private::Internal);
+    pin.init_input(crate::gpio::Pull::None);
     T::input_signal().connect_to(pin);
 
     T::set_divider(config.clk_divider);
@@ -471,7 +471,7 @@ fn configure_tx_channel<
     config: TxChannelConfig,
 ) -> Result<T, Error> {
     crate::into_mapped_ref!(pin);
-    pin.set_to_push_pull_output(crate::private::Internal);
+    pin.set_to_push_pull_output();
     T::output_signal().connect_to(pin);
 
     T::set_divider(config.clk_divider);

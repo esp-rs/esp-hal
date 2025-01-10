@@ -82,7 +82,6 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::spi2::RegisterBlock,
-    private,
     spi::AnySpi,
     system::PeripheralGuard,
     Blocking,
@@ -129,7 +128,7 @@ impl<'d> Spi<'d, Blocking> {
     #[instability::unstable]
     pub fn with_sck(self, sclk: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(sclk);
-        sclk.enable_input(true, private::Internal);
+        sclk.enable_input(true);
         self.spi.info().sclk.connect_to(sclk);
         self
     }
@@ -138,7 +137,7 @@ impl<'d> Spi<'d, Blocking> {
     #[instability::unstable]
     pub fn with_mosi(self, mosi: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
-        mosi.enable_input(true, private::Internal);
+        mosi.enable_input(true);
         self.spi.info().mosi.connect_to(mosi);
         self
     }
@@ -147,7 +146,7 @@ impl<'d> Spi<'d, Blocking> {
     #[instability::unstable]
     pub fn with_miso(self, miso: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
-        miso.set_to_push_pull_output(private::Internal);
+        miso.set_to_push_pull_output();
         self.spi.info().miso.connect_to(miso);
         self
     }
@@ -156,7 +155,7 @@ impl<'d> Spi<'d, Blocking> {
     #[instability::unstable]
     pub fn with_cs(self, cs: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
-        cs.enable_input(true, private::Internal);
+        cs.enable_input(true);
         self.spi.info().cs.connect_to(cs);
         self
     }

@@ -181,7 +181,7 @@ impl<const C: u8> EventChannel<C> {
     ) -> Event<'d> {
         crate::into_mapped_ref!(pin);
 
-        pin.init_input(pin_config.pull, private::Internal);
+        pin.init_input(pin_config.pull);
 
         enable_event_channel(C, pin.number());
         Event {
@@ -289,12 +289,12 @@ impl<const C: u8> TaskChannel<C> {
     ) -> Task<'d> {
         crate::into_mapped_ref!(pin);
 
-        pin.set_output_high(pin_config.initial_state.into(), private::Internal);
+        pin.set_output_high(pin_config.initial_state.into());
         if pin_config.open_drain {
-            pin.pull_direction(pin_config.pull, private::Internal);
-            pin.set_to_open_drain_output(private::Internal);
+            pin.pull_direction(pin_config.pull);
+            pin.set_to_open_drain_output();
         } else {
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
         }
 
         enable_task_channel(C, pin.number());

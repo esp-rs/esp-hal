@@ -448,11 +448,11 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     ) -> Self {
         crate::into_mapped_ref!(pin);
         // avoid the pin going low during configuration
-        pin.set_output_high(true, private::Internal);
+        pin.set_output_high(true);
 
-        pin.set_to_open_drain_output(private::Internal);
-        pin.enable_input(true, private::Internal);
-        pin.pull_direction(Pull::Up, private::Internal);
+        pin.set_to_open_drain_output();
+        pin.enable_input(true);
+        pin.pull_direction(Pull::Up);
 
         input.connect_to(&mut pin);
         output.connect_to(&mut pin);

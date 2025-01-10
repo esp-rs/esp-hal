@@ -123,7 +123,6 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
-    private::Internal,
     system::PeripheralGuard,
     Async,
     Blocking,
@@ -186,7 +185,7 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
         crate::into_ref!(instance);
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(Internal);
+            pin.set_to_push_pull_output();
             instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
@@ -228,7 +227,7 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
         crate::into_ref!(instance);
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(Internal);
+            pin.set_to_push_pull_output();
             instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
@@ -267,7 +266,7 @@ impl<'d> I2sParallel<'d, Blocking> {
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
-        clock_pin.set_to_push_pull_output(Internal);
+        clock_pin.set_to_push_pull_output();
         i2s.ws_signal().connect_to(clock_pin);
 
         pins.configure(i2s.reborrow());

@@ -387,7 +387,7 @@ where
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
     pub fn with_mclk<P: PeripheralOutput>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
         crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output(crate::private::Internal);
+        pin.set_to_push_pull_output();
         self.i2s_tx.i2s.mclk_signal().connect_to(pin);
 
         self
@@ -684,7 +684,6 @@ mod private {
         interrupt::InterruptHandler,
         peripheral::{Peripheral, PeripheralRef},
         peripherals::{Interrupt, I2S0},
-        private,
         DriverMode,
     };
 
@@ -717,7 +716,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.bclk_signal().connect_to(pin);
 
             self
@@ -728,7 +727,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.ws_signal().connect_to(pin);
 
             self
@@ -739,7 +738,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.dout_signal().connect_to(pin);
 
             self
@@ -775,7 +774,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.bclk_rx_signal().connect_to(pin);
 
             self
@@ -786,7 +785,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.ws_rx_signal().connect_to(pin);
 
             self
@@ -797,7 +796,7 @@ mod private {
             P: PeripheralInput,
         {
             crate::into_mapped_ref!(pin);
-            pin.init_input(crate::gpio::Pull::None, private::Internal);
+            pin.init_input(crate::gpio::Pull::None);
             self.i2s.din_signal().connect_to(pin);
 
             self

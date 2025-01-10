@@ -242,7 +242,6 @@ use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{uart0::RegisterBlock, Interrupt},
-    private::Internal,
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
@@ -614,7 +613,7 @@ where
     /// Configure RTS pin
     pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(rts);
-        rts.set_to_push_pull_output(Internal);
+        rts.set_to_push_pull_output();
         self.uart.info().rts_signal.connect_to(rts);
 
         self
@@ -627,8 +626,8 @@ where
     pub fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(tx);
         // Make sure we don't cause an unexpected low pulse on the pin.
-        tx.set_output_high(true, Internal);
-        tx.set_to_push_pull_output(Internal);
+        tx.set_output_high(true);
+        tx.set_to_push_pull_output();
         self.uart.info().tx_signal.connect_to(tx);
 
         self
@@ -797,7 +796,7 @@ where
     /// Configure CTS pin
     pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(cts);
-        cts.init_input(Pull::None, Internal);
+        cts.init_input(Pull::None);
         self.uart.info().cts_signal.connect_to(cts);
 
         self
@@ -813,7 +812,7 @@ where
     /// initial low signal level.
     pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
-        rx.init_input(Pull::Up, Internal);
+        rx.init_input(Pull::Up);
         self.uart.info().rx_signal.connect_to(rx);
 
         self
@@ -1005,7 +1004,7 @@ impl<'d> Uart<'d, Blocking> {
     /// initial low signal level.
     pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
-        rx.init_input(Pull::Up, Internal);
+        rx.init_input(Pull::Up);
         self.rx.uart.info().rx_signal.connect_to(rx);
 
         self
@@ -1018,8 +1017,8 @@ impl<'d> Uart<'d, Blocking> {
     pub fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(tx);
         // Make sure we don't cause an unexpected low pulse on the pin.
-        tx.set_output_high(true, Internal);
-        tx.set_to_push_pull_output(Internal);
+        tx.set_output_high(true);
+        tx.set_to_push_pull_output();
         self.tx.uart.info().tx_signal.connect_to(tx);
 
         self

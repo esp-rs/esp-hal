@@ -563,12 +563,8 @@ where
             }
 
             match cfg {
-                config::PinConfig::PushPull => self
-                    .output_pin
-                    .set_to_push_pull_output(crate::private::Internal),
-                config::PinConfig::OpenDrain => self
-                    .output_pin
-                    .set_to_open_drain_output(crate::private::Internal),
+                config::PinConfig::PushPull => self.output_pin.set_to_push_pull_output(),
+                config::PinConfig::OpenDrain => self.output_pin.set_to_open_drain_output(),
             };
 
             let timer_number = timer.number() as u8;

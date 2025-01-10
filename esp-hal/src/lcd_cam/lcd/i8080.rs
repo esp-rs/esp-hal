@@ -264,7 +264,7 @@ where
     /// Associates a CS pin with the I8080 interface.
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
-        cs.set_to_push_pull_output(crate::private::Internal);
+        cs.set_to_push_pull_output();
         OutputSignal::LCD_CS.connect_to(cs);
 
         self
@@ -278,10 +278,10 @@ where
     ) -> Self {
         crate::into_mapped_ref!(dc, wrx);
 
-        dc.set_to_push_pull_output(crate::private::Internal);
+        dc.set_to_push_pull_output();
         OutputSignal::LCD_DC.connect_to(dc);
 
-        wrx.set_to_push_pull_output(crate::private::Internal);
+        wrx.set_to_push_pull_output();
         OutputSignal::LCD_PCLK.connect_to(wrx);
 
         self
@@ -659,7 +659,7 @@ impl TxPins for TxEightBits<'_> {
         ];
 
         for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.into_iter()) {
-            pin.set_to_push_pull_output(crate::private::Internal);
+            pin.set_to_push_pull_output();
             signal.connect_to(pin);
         }
     }
@@ -728,7 +728,7 @@ impl TxPins for TxSixteenBits<'_> {
         ];
 
         for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.into_iter()) {
-            pin.set_to_push_pull_output(crate::private::Internal);
+            pin.set_to_push_pull_output();
             signal.connect_to(pin);
         }
     }
