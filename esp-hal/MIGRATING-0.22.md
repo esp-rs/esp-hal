@@ -429,7 +429,7 @@ e.g.
 +     .with_tx(peripherals.GPIO2);
 ```
 
-`write_byte` and `read_byte` are now private.
+`write_byte` and `read_byte` have been removed.
 
 e.g.
 
@@ -486,8 +486,6 @@ e.g.
 let mut byte = [0u8; 1];
 spi.read_bytes(&mut byte);
 ```
-
-`driver.write_bytes(&[data])?` and `driver.read_bytes(&mut buffer)?`
 
 ## GPIO Changes
 
