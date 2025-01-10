@@ -78,7 +78,7 @@
 /// let mut adc1_config = AdcConfig::new();
 /// let mut adc1_pin = adc1_config.enable_pin(
 ///     analog_pin,
-///     Attenuation::Attenuation11dB
+///     Attenuation::_11dB
 /// );
 /// let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
 /// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();

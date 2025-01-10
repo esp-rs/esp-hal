@@ -267,6 +267,8 @@ unstable_module! {
     pub mod touch;
     #[cfg(trace0)]
     pub mod trace;
+    #[cfg(tsens)]
+    pub mod tsens;
     #[cfg(any(twai0, twai1))]
     pub mod twai;
     #[cfg(usb_device)]

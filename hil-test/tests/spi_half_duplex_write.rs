@@ -1,6 +1,7 @@
 //! SPI Half Duplex Write Test
 
 //% CHIPS: esp32 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -54,7 +55,7 @@ mod tests {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap()
         .with_sck(sclk)

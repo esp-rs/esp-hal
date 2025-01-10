@@ -1,7 +1,7 @@
 //! SPI Full Duplex test suite.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: generic-queue
+//% FEATURES: unstable generic-queue
 
 // FIXME: add async test cases that don't rely on PCNT
 
@@ -14,7 +14,6 @@ use esp_hal::{
     dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, NoPin},
-    peripheral::Peripheral,
     spi::master::{Config, Spi},
     time::RateExtU32,
     Blocking,
@@ -49,7 +48,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
@@ -68,14 +67,16 @@ mod tests {
             }
         }
 
+        let (miso, mosi) = mosi.split();
         #[cfg(pcnt)]
-        let (mosi_loopback_pcnt, mosi) = mosi.split();
+        let mosi_loopback_pcnt = miso.clone();
+
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
         let spi = Spi::new(peripherals.SPI2, Config::default().with_frequency(10.MHz()))
             .unwrap()
             .with_sck(sclk)
-            .with_miso(unsafe { mosi.clone_unchecked() })
+            .with_miso(miso)
             .with_mosi(mosi);
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
@@ -254,6 +255,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(esp32))] // https://github.com/esp-rs/esp-hal/issues/2909
     async fn test_async_symmetric_transfer_huge_buffer(ctx: Context) {
         let write = &mut ctx.tx_buffer[0..4096];
         for byte in 0..write.len() {
@@ -286,6 +288,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(esp32))] // https://github.com/esp-rs/esp-hal/issues/2909
     async fn test_async_symmetric_transfer_huge_buffer_in_place(ctx: Context) {
         let write = &mut ctx.tx_buffer[0..4096];
         for byte in 0..write.len() {

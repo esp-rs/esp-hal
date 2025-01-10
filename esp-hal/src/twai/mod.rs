@@ -134,6 +134,7 @@ use crate::{
     twai::filter::SingleStandardFilter,
     Async,
     Blocking,
+    DriverMode,
 };
 
 pub mod filter;
@@ -662,28 +663,26 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TwaiConfiguration<'d, Dm: crate::DriverMode, T = AnyTwai> {
-    twai: PeripheralRef<'d, T>,
+pub struct TwaiConfiguration<'d, Dm: DriverMode> {
+    twai: PeripheralRef<'d, AnyTwai>,
     filter: Option<(FilterType, [u8; 8])>,
     phantom: PhantomData<Dm>,
     mode: TwaiMode,
     _guard: PeripheralGuard,
 }
 
-impl<'d, Dm, T> TwaiConfiguration<'d, Dm, T>
+impl<'d, Dm> TwaiConfiguration<'d, Dm>
 where
-    T: Instance,
-    Dm: crate::DriverMode,
+    Dm: DriverMode,
 {
     fn new_internal<TX: PeripheralOutput, RX: PeripheralInput>(
-        twai: impl Peripheral<P = T> + 'd,
+        twai: PeripheralRef<'d, AnyTwai>,
         rx_pin: impl Peripheral<P = RX> + 'd,
         tx_pin: impl Peripheral<P = TX> + 'd,
         baud_rate: BaudRate,
         no_transceiver: bool,
         mode: TwaiMode,
     ) -> Self {
-        crate::into_ref!(twai);
         crate::into_mapped_ref!(tx_pin, rx_pin);
 
         let guard = PeripheralGuard::new(twai.peripheral());
@@ -906,7 +905,7 @@ where
 
     /// Put the peripheral into Operation Mode, allowing the transmission and
     /// reception of packets using the new object.
-    pub fn start(self) -> Twai<'d, Dm, T> {
+    pub fn start(self) -> Twai<'d, Dm> {
         self.apply_filter();
         self.set_mode(self.mode);
 
@@ -975,7 +974,8 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        Self::new_typed(peripheral.map_into(), rx_pin, tx_pin, baud_rate, mode)
+        crate::into_mapped_ref!(peripheral);
+        Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode)
     }
 
     /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
@@ -990,44 +990,12 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        Self::new_no_transceiver_typed(peripheral.map_into(), rx_pin, tx_pin, baud_rate, mode)
-    }
-}
-
-impl<'d, T> TwaiConfiguration<'d, Blocking, T>
-where
-    T: Instance,
-{
-    /// Create a new instance of [TwaiConfiguration]
-    ///
-    /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new_typed<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
-        Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode)
-    }
-
-    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
-    /// directly
-    ///
-    /// You don't need a transceiver by following the description in the
-    /// `twai.rs` example
-    pub fn new_no_transceiver_typed<RX: PeripheralInput, TX: PeripheralOutput>(
-        peripheral: impl Peripheral<P = T> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
-        baud_rate: BaudRate,
-        mode: TwaiMode,
-    ) -> Self {
+        crate::into_mapped_ref!(peripheral);
         Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode)
     }
 
     /// Convert the configuration into an async configuration.
-    pub fn into_async(mut self) -> TwaiConfiguration<'d, Async, T> {
+    pub fn into_async(mut self) -> TwaiConfiguration<'d, Async> {
         self.set_interrupt_handler(self.twai.async_handler());
         TwaiConfiguration {
             twai: self.twai,
@@ -1039,12 +1007,9 @@ where
     }
 }
 
-impl<'d, T> TwaiConfiguration<'d, Async, T>
-where
-    T: Instance,
-{
+impl<'d> TwaiConfiguration<'d, Async> {
     /// Convert the configuration into a blocking configuration.
-    pub fn into_blocking(self) -> TwaiConfiguration<'d, Blocking, T> {
+    pub fn into_blocking(self) -> TwaiConfiguration<'d, Blocking> {
         use crate::{interrupt, Cpu};
 
         interrupt::disable(Cpu::current(), self.twai.interrupt());
@@ -1060,12 +1025,9 @@ where
     }
 }
 
-impl<T> crate::private::Sealed for TwaiConfiguration<'_, Blocking, T> where T: Instance {}
+impl crate::private::Sealed for TwaiConfiguration<'_, Blocking> {}
 
-impl<T> InterruptConfigurable for TwaiConfiguration<'_, Blocking, T>
-where
-    T: Instance,
-{
+impl InterruptConfigurable for TwaiConfiguration<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.internal_set_interrupt_handler(handler);
     }
@@ -1075,17 +1037,16 @@ where
 ///
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
-pub struct Twai<'d, Dm: crate::DriverMode, T = AnyTwai> {
-    twai: PeripheralRef<'d, T>,
-    tx: TwaiTx<'d, Dm, T>,
-    rx: TwaiRx<'d, Dm, T>,
+pub struct Twai<'d, Dm: DriverMode> {
+    twai: PeripheralRef<'d, AnyTwai>,
+    tx: TwaiTx<'d, Dm>,
+    rx: TwaiRx<'d, Dm>,
     phantom: PhantomData<Dm>,
 }
 
-impl<'d, T, Dm> Twai<'d, Dm, T>
+impl<'d, Dm> Twai<'d, Dm>
 where
-    T: Instance,
-    Dm: crate::DriverMode,
+    Dm: DriverMode,
 {
     fn mode(&self) -> TwaiMode {
         let mode = self.twai.register_block().mode().read();
@@ -1101,7 +1062,7 @@ where
 
     /// Stop the peripheral, putting it into reset mode and enabling
     /// reconfiguration.
-    pub fn stop(self) -> TwaiConfiguration<'d, Dm, T> {
+    pub fn stop(self) -> TwaiConfiguration<'d, Dm> {
         // Put the peripheral into reset/configuration mode by setting the reset mode
         // bit.
         self.twai
@@ -1190,22 +1151,21 @@ where
 
     /// Consumes this `Twai` instance and splits it into transmitting and
     /// receiving halves.
-    pub fn split(self) -> (TwaiRx<'d, Dm, T>, TwaiTx<'d, Dm, T>) {
+    pub fn split(self) -> (TwaiRx<'d, Dm>, TwaiTx<'d, Dm>) {
         (self.rx, self.tx)
     }
 }
 
 /// Interface to the TWAI transmitter part.
-pub struct TwaiTx<'d, Dm: crate::DriverMode, T = AnyTwai> {
-    twai: PeripheralRef<'d, T>,
+pub struct TwaiTx<'d, Dm: DriverMode> {
+    twai: PeripheralRef<'d, AnyTwai>,
     phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
 }
 
-impl<Dm, T> TwaiTx<'_, Dm, T>
+impl<Dm> TwaiTx<'_, Dm>
 where
-    T: Instance,
-    Dm: crate::DriverMode,
+    Dm: DriverMode,
 {
     /// Transmit a frame.
     ///
@@ -1239,16 +1199,15 @@ where
 }
 
 /// Interface to the TWAI receiver part.
-pub struct TwaiRx<'d, Dm: crate::DriverMode, T = AnyTwai> {
-    twai: PeripheralRef<'d, T>,
+pub struct TwaiRx<'d, Dm: DriverMode> {
+    twai: PeripheralRef<'d, AnyTwai>,
     phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
 }
 
-impl<Dm, T> TwaiRx<'_, Dm, T>
+impl<Dm> TwaiRx<'_, Dm>
 where
-    T: Instance,
-    Dm: crate::DriverMode,
+    Dm: DriverMode,
 {
     /// Receive a frame
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
@@ -1335,10 +1294,9 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
 }
 
 #[cfg(any(doc, feature = "unstable"))]
-impl<Dm, T> embedded_can::nb::Can for Twai<'_, Dm, T>
+impl<Dm> embedded_can::nb::Can for Twai<'_, Dm>
 where
-    T: Instance,
-    Dm: crate::DriverMode,
+    Dm: DriverMode,
 {
     type Frame = EspTwaiFrame;
     type Error = EspTwaiError;
@@ -1699,10 +1657,7 @@ mod asynch {
         }
     }
 
-    impl<T> Twai<'_, crate::Async, T>
-    where
-        T: Instance,
-    {
+    impl Twai<'_, Async> {
         /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
             self.tx.transmit_async(frame).await
@@ -1713,10 +1668,7 @@ mod asynch {
         }
     }
 
-    impl<T> TwaiTx<'_, crate::Async, T>
-    where
-        T: Instance,
-    {
+    impl TwaiTx<'_, Async> {
         /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
             self.twai.enable_interrupts();
@@ -1743,10 +1695,7 @@ mod asynch {
         }
     }
 
-    impl<T> TwaiRx<'_, crate::Async, T>
-    where
-        T: Instance,
-    {
+    impl TwaiRx<'_, Async> {
         /// Receives an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn receive_async(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
             self.twai.enable_interrupts();

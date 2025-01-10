@@ -82,3 +82,42 @@ macro_rules! unconnected_pin {
         }
     }};
 }
+
+// A simple looping executor to test async code without esp-hal-embassy (which
+// needs `esp-hal/unstable`).
+#[cfg(not(feature = "embassy"))]
+mod executor {
+    use core::marker::PhantomData;
+
+    use embassy_executor::{raw, Spawner};
+
+    #[export_name = "__pender"]
+    fn __pender(_: *mut ()) {}
+
+    pub struct Executor {
+        inner: raw::Executor,
+        not_send: PhantomData<*mut ()>,
+    }
+
+    impl Executor {
+        pub fn new() -> Self {
+            Self {
+                inner: raw::Executor::new(core::ptr::null_mut()),
+                not_send: PhantomData,
+            }
+        }
+
+        pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
+            init(self.inner.spawner());
+
+            loop {
+                unsafe { self.inner.poll() };
+            }
+        }
+    }
+}
+
+#[cfg(feature = "embassy")]
+pub use esp_hal_embassy::Executor;
+#[cfg(not(feature = "embassy"))]
+pub use executor::Executor;

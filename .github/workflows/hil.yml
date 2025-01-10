@@ -121,26 +121,10 @@ jobs:
       - name: Build tests
         run: cargo xtask build-tests ${{ matrix.target.soc }}
 
-      - name: Prepare artifact
-        run: |
-          # Create the 'tests' directory if it doesn't exist
-          mkdir -p tests
-
-          # Find ELF files in the specified path and move them to 'tests'
-          find "hil-test/target/${{ matrix.target.rust-target }}/release/deps/" -type f -exec file {} + | \
-          grep ELF | \
-          awk -F: '{print $1}' | \
-          xargs -I {} mv {} tests
-
-          # Rename files in 'tests' by removing everything after the first dash
-          for file in tests/*-*; do
-            base_name="$(basename "$file" | cut -d'-' -f1)"
-            mv "$file" "tests/$base_name"
-          done
       - uses: actions/upload-artifact@v4
         with:
           name: tests-${{ matrix.target.soc }}
-          path: /home/runner/work/esp-hal/esp-hal/tests
+          path: /home/runner/work/esp-hal/esp-hal/target/tests/${{ matrix.target.soc }}
           if-no-files-found: error
           overwrite: true
 

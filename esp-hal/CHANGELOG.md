@@ -54,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `AnyPin::steal(pin_number)` (#2854)
 - `adc::{AdcCalSource, Attenuation, Resolution}` now implement `Hash` and `defmt::Format` (#2840)
 - `rtc_cntl::{RtcFastClock, RtcSlowClock, RtcCalSel}` now implement `PartialEq`, `Eq`, `Hash` and `defmt::Format` (#2840)
+- Added `tsens::TemperatureSensor` peripheral for ESP32C6 and ESP32C3 (#2875)
+- Added `with_rx()` and `with_tx()` methods to Uart, UartRx, and UartTx ()
 
 ### Changed
 
@@ -87,11 +89,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `esp-pacs` with support for Wi-Fi on the ESP32 and made the peripheral non virtual
 - `SpiBitOrder`, `SpiDataMode`, `SpiMode` were renamed to `BitOder`, `DataMode` and `Mode` (#2828)
 - `crate::Mode` was renamed to `crate::DriverMode` (#2828)
+- `Spi::with_miso` has been overloaded into `Spi::with_miso` and `Spi::with_sio1` (#2557)
 - Renamed some I2C error variants (#2844)
 - I2C: Replaced potential panics with errors. (#2831)
 - UART: Make `AtCmdConfig` and `ConfigError` non-exhaustive (#2851)
 - UART: Make `AtCmdConfig` use builder-lite pattern (#2851)
 - UART: Fix naming violations for `DataBits`, `Parity`, and `StopBits` enum variants (#2893)
+- UART: Remove blocking version of `read_bytes` and rename `drain_fifo` to `read_bytes` instead (#2895)
+- Renamed variants of `CpuClock`, made the enum non-exhaustive (#2899)
+- SPI: Fix naming violations for `Mode` enum variants (#2902)
+- SPI: Fix naming violations for `Address` and `Command` enum variants (#2906)
+- `ClockSource` enums are now `#[non_exhaustive]` (#2912)
+- `gpio::{Input, Flex}::wakeup_enable` now returns an error instead of panicking. (#2916)
+- Removed the `I` prefix from `DriveStrength` enum variants. (#2922)
+- Removed the `Attenuation` prefix from `Attenuation` enum variants. (#2922)
 - Renamed / changed some I2C error variants (#2844, #2862)
 
 ### Fixed
@@ -118,6 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DmaTxBuf::{compute_chunk_size, compute_descriptor_count, new_with_block_size}` (#2543)
 
 - The `prelude` module has been removed (#2845)
+
+- Removed all peripheral instance type parameters and `new_typed` constructors (#2907)
 
 ## [0.22.0] - 2024-11-20
 

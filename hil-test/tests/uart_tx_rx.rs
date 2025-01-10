@@ -1,6 +1,7 @@
 //! UART TX/RX Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -28,8 +29,12 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx).unwrap();
-        let rx = UartRx::new(peripherals.UART1, uart::Config::default(), rx).unwrap();
+        let tx = UartTx::new(peripherals.UART0, uart::Config::default())
+            .unwrap()
+            .with_tx(tx);
+        let rx = UartRx::new(peripherals.UART1, uart::Config::default())
+            .unwrap()
+            .with_rx(rx);
 
         Context { rx, tx }
     }
@@ -53,8 +58,15 @@ mod tests {
         ctx.tx.flush().unwrap();
         ctx.tx.write_bytes(&bytes).unwrap();
 
-        ctx.rx.read_bytes(&mut buf).unwrap();
+        let mut bytes_read = 0;
+        loop {
+            bytes_read += ctx.rx.read_bytes(&mut buf[bytes_read..]);
+            if bytes_read == 3 {
+                break;
+            }
+        }
 
+        assert_eq!(bytes_read, 3);
         assert_eq!(buf, bytes);
     }
 }

@@ -1,7 +1,7 @@
 //! UART Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: generic-queue
+//% FEATURES: unstable embassy generic-queue
 
 #![no_std]
 #![no_main]
@@ -17,7 +17,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
@@ -27,8 +27,10 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let uart = Uart::new(peripherals.UART0, uart::Config::default(), rx, tx)
+        let uart = Uart::new(peripherals.UART0, uart::Config::default())
             .unwrap()
+            .with_tx(tx)
+            .with_rx(rx)
             .into_async();
 
         Context { uart }

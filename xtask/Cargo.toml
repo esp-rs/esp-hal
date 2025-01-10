@@ -17,5 +17,6 @@ log          = "0.4.22"
 minijinja    = "2.5.0"
 semver       = { version = "1.0.23",  features = ["serde"] }
 serde        = { version = "1.0.215", features = ["derive"] }
+serde_json   = "1.0.70"
 strum        = { version = "0.26.3",  features = ["derive"] }
 toml_edit    = "0.22.22"

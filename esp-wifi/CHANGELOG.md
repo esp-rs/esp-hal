@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed triggering a debug-assertion during scan (#2612)
+- Fix WPA2-ENTERPRISE functionality (#2896)
 
 ### Removed
 

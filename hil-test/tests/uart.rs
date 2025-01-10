@@ -1,6 +1,7 @@
 //! UART Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -26,11 +27,12 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let (_, pin) = hil_test::common_test_pins!(peripherals);
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let (rx, tx) = pin.split();
-
-        let uart = Uart::new(peripherals.UART1, uart::Config::default(), rx, tx).unwrap();
+        let uart = Uart::new(peripherals.UART1, uart::Config::default())
+            .unwrap()
+            .with_tx(tx)
+            .with_rx(rx);
 
         Context { uart }
     }

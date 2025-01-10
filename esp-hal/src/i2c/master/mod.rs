@@ -365,8 +365,8 @@ impl Default for Config {
 /// I2C driver
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct I2c<'d, Dm: DriverMode, T = AnyI2c> {
-    i2c: PeripheralRef<'d, T>,
+pub struct I2c<'d, Dm: DriverMode> {
+    i2c: PeripheralRef<'d, AnyI2c>,
     phantom: PhantomData<Dm>,
     config: Config,
     guard: PeripheralGuard,
@@ -374,7 +374,7 @@ pub struct I2c<'d, Dm: DriverMode, T = AnyI2c> {
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T: Instance, Dm: DriverMode> SetConfig for I2c<'_, Dm, T> {
+impl<Dm: DriverMode> SetConfig for I2c<'_, Dm> {
     type Config = Config;
     type ConfigError = ConfigError;
 
@@ -383,14 +383,11 @@ impl<T: Instance, Dm: DriverMode> SetConfig for I2c<'_, Dm, T> {
     }
 }
 
-impl<T, Dm: DriverMode> embedded_hal::i2c::ErrorType for I2c<'_, Dm, T> {
+impl<Dm: DriverMode> embedded_hal::i2c::ErrorType for I2c<'_, Dm> {
     type Error = Error;
 }
 
-impl<T, Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm, T>
-where
-    T: Instance,
-{
+impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
     fn transaction(
         &mut self,
         address: u8,
@@ -401,10 +398,7 @@ where
     }
 }
 
-impl<'d, T, Dm: DriverMode> I2c<'d, Dm, T>
-where
-    T: Instance,
-{
+impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     fn driver(&self) -> Driver<'_> {
         Driver {
             info: self.i2c.info(),
@@ -520,22 +514,7 @@ impl<'d> I2c<'d, Blocking> {
         i2c: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        Self::new_typed(i2c.map_into(), config)
-    }
-}
-
-impl<'d, T> I2c<'d, Blocking, T>
-where
-    T: Instance,
-{
-    /// Create a new I2C instance
-    /// This will enable the peripheral but the peripheral won't get
-    /// automatically disabled when this gets dropped.
-    pub fn new_typed(
-        i2c: impl Peripheral<P = T> + 'd,
-        config: Config,
-    ) -> Result<Self, ConfigError> {
-        crate::into_ref!(i2c);
+        crate::into_mapped_ref!(i2c);
 
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
@@ -554,7 +533,7 @@ where
     // TODO: missing interrupt APIs
 
     /// Configures the I2C peripheral to operate in asynchronous mode.
-    pub fn into_async(mut self) -> I2c<'d, Async, T> {
+    pub fn into_async(mut self) -> I2c<'d, Async> {
         self.set_interrupt_handler(self.driver().info.async_handler);
 
         I2c {
@@ -626,12 +605,9 @@ where
     }
 }
 
-impl<T> private::Sealed for I2c<'_, Blocking, T> where T: Instance {}
+impl private::Sealed for I2c<'_, Blocking> {}
 
-impl<T> InterruptConfigurable for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
+impl InterruptConfigurable for I2c<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         let interrupt = self.driver().info.interrupt;
         for core in Cpu::other() {
@@ -747,12 +723,9 @@ impl core::future::Future for I2cFuture<'_> {
     }
 }
 
-impl<'d, T> I2c<'d, Async, T>
-where
-    T: Instance,
-{
+impl<'d> I2c<'d, Async> {
     /// Configure the I2C peripheral to operate in blocking mode.
-    pub fn into_blocking(self) -> I2c<'d, Blocking, T> {
+    pub fn into_blocking(self) -> I2c<'d, Blocking> {
         crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
 
         I2c {
@@ -881,10 +854,7 @@ where
     }
 }
 
-impl<T> embedded_hal_async::i2c::I2c for I2c<'_, Async, T>
-where
-    T: Instance,
-{
+impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
     async fn transaction(
         &mut self,
         address: u8,

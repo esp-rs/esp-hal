@@ -26,17 +26,15 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - Drivers must take peripherals via the `PeripheralRef` pattern - they don't consume peripherals directly.
 - If a driver requires pins, those pins should be configured using `fn with_signal_name(self, pin: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self` or `fn with_signal_name(self, pin: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self`
 - If a driver supports multiple peripheral instances (for example, I2C0 is one such instance):
-  - The peripheral instance type must be positioned as the last type parameter of the driver type.
-  - The peripheral instance type must default to a type that supports any of the peripheral instances.
+  - The driver should not be generic over the peripheral instance.
   - The author must to use `crate::any_peripheral` to define the "any" peripheral instance type.
-  - The driver must implement a `new` constructor that automatically converts the peripheral instance into the any type, and a `new_typed` that preserves the peripheral type.
+  - The driver must implement a `new` constructor that automatically converts the peripheral instance into the any type.
 - If a driver is configurable, configuration options should be implemented as a `Config` struct in the same module where the driver is located.
   - The driver's constructor should take the config struct by value, and it should return `Result<Self, ConfigError>`.
   - The `ConfigError` enum should be separate from other `Error` enums used by the driver.
   - The driver should implement `fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError>`.
   - In case the driver's configuration is infallible (all possible combinations of options are supported by the hardware), the `ConfigError` should be implemented as an empty `enum`.
   - Configuration structs should derive `procmacros::BuilderLite` in order to automatically implement the Builder Lite pattern for them.
-- If a driver only supports a single peripheral instance, no instance type parameter is necessary.
 - If a driver implements both blocking and async operations, or only implements blocking operations, but may support asynchronous ones in the future, the driver's type signature must include a `crate::Mode` type parameter.
 - By default, constructors must configure the driver for blocking mode. The driver must implement `into_async` (and a matching `into_blocking`) function that reconfigures the driver.
   - `into_async` must configure the driver and/or the associated DMA channels. This most often means enabling an interrupt handler.

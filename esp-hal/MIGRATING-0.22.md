@@ -245,7 +245,7 @@ is not compatible with the hardware.
      peripherals.SPI2,
      Config {
          frequency: 100.kHz(),
-         mode: SpiMode::Mode0,
+         mode: SpiMode::_0,
          ..Config::default()
      },
 -);
@@ -260,6 +260,15 @@ is not compatible with the hardware.
 -);
 +)
 +.unwrap();
+```
+
+## Peripheral instance type parameters and `new_typed` constructors have been removed
+
+Call `new` instead and remove the type parameters if you've used them.
+
+```diff
+-let mut spi: Spi<'lt, SPI2> = Spi::new_typed(..).unwrap();
++let mut spi: Spi<'lt> = Spi::new(..).unwrap();
 ```
 
 ## LCD_CAM configuration changes
@@ -379,7 +388,7 @@ The `Config` struct's setters are now prefixed with `with_`. `parity_none`, `par
 
 The `DataBits`, `Parity`, and `StopBits` enum variants are no longer prefixed with the name of the enum.
 
-e.g.)
+e.g.
 
 ```diff
 - DataBits::DataBits8
@@ -388,4 +397,89 @@ e.g.)
 + Parity::None
 - StopBits::Stop1
 + StopBits::_1
+```
+
+The previous blocking implementation of `read_bytes` has been removed, and the non-blocking `drain_fifo` has instead been renamed to `read_bytes` in its place.
+
+Any code which was previously using `read_bytes` to fill a buffer in a blocking manner will now need to implement the necessary logic to block until the buffer is filled in their application instead.
+
+The `Error` enum variant uses object+verb naming.
+
+e.g.
+
+```diff
+- RxGlichDetected
++ GlitchOccurred
+```
+
+RX/TX pin assignment moved from constructors to builder functions.
+
+e.g.
+
+```diff
+  let mut uart1 = Uart::new(
+      peripherals.UART1,
+-     Config::default(),
+-     peripherals.GPIO1,
+-     peripherals.GPIO2,
+- ).unwrap();
++     Config::default())
++     .unwrap()
++     .with_rx(peripherals.GPIO1)
++     .with_tx(peripherals.GPIO2);
+```
+
+## Spi `with_miso` has been split
+
+Previously, `with_miso` set up the provided pin as an input and output, which was necessary for half duplex.
+Full duplex does not require this, and it also creates an artificial restriction.
+
+If you were using half duplex SPI with `with_miso`,
+you should now use `with_sio1` instead to get the previous behavior.
+
+## CPU Clocks
+
+The specific CPU clock variants are renamed from e.g. `Clock80MHz` to `_80MHz`.
+
+```diff
+- CpuClock::Clock80MHz
++ CpuClock::_80MHz
+```
+
+Additionally the enum is marked as non-exhaustive.
+
+## SPI Changes
+
+The SPI mode variants are renamed from e.g. `Mode0` to `_0`.
+
+```diff
+- Mode::Mode0
++ Mode::_0
+```
+
+The Address and Command enums have similarly had their variants changed from e.g. `Address1` to `_1Bit` and `Command1` to `_1Bit` respectively:
+
+```diff
+- Address::Address1
++ Address::_1Bit
+- Command::Command1
++ Command::_1Bit
+```
+
+## GPIO Changes
+
+The GPIO drive strength variants are renamed from e.g. `I5mA` to `_5mA`.
+
+```diff
+-DriveStrength::I5mA
++DriveStrength::_5mA
+```
+
+## ADC Changes
+
+The ADC attenuation variants are renamed from e.g. `Attenuation0dB` to `_0dB`.
+
+```diff
+-Attenuation::Attenuation0dB
++Attenuation::_0dB
 ```

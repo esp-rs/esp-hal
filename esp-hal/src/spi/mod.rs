@@ -71,16 +71,16 @@ impl embedded_hal::spi::Error for Error {
 pub enum Mode {
     /// Mode 0 (CPOL = 0, CPHA = 0): Clock is low when idle, data is captured on
     /// the rising edge and propagated on the falling edge.
-    Mode0,
+    _0,
     /// Mode 1 (CPOL = 0, CPHA = 1): Clock is low when idle, data is captured on
     /// the falling edge and propagated on the rising edge.
-    Mode1,
+    _1,
     /// Mode 2 (CPOL = 1, CPHA = 0): Clock is high when idle, data is captured
     /// on the falling edge and propagated on the rising edge.
-    Mode2,
+    _2,
     /// Mode 3 (CPOL = 1, CPHA = 1): Clock is high when idle, data is captured
     /// on the rising edge and propagated on the falling edge.
-    Mode3,
+    _3,
 }
 
 /// SPI Bit Order

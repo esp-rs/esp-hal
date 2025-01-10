@@ -1,6 +1,7 @@
 //! Misc UART TX/RX regression tests
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -21,7 +22,9 @@ mod tests {
 
         let (rx, mut tx) = hil_test::common_test_pins!(peripherals);
 
-        let mut rx = UartRx::new(peripherals.UART1, uart::Config::default(), rx).unwrap();
+        let mut rx = UartRx::new(peripherals.UART1, uart::Config::default())
+            .unwrap()
+            .with_rx(rx);
 
         // start reception
         _ = rx.read_byte(); // this will just return WouldBlock
@@ -29,7 +32,9 @@ mod tests {
         unsafe { tx.set_output_high(false, esp_hal::Internal::conjure()) };
 
         // set up TX and send a byte
-        let mut tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx).unwrap();
+        let mut tx = UartTx::new(peripherals.UART0, uart::Config::default())
+            .unwrap()
+            .with_tx(tx);
 
         tx.flush().unwrap();
         tx.write_bytes(&[0x42]).unwrap();

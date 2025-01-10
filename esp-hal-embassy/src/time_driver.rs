@@ -5,11 +5,11 @@ use esp_hal::{
     interrupt::{InterruptHandler, Priority},
     sync::Locked,
     time::{now, ExtU64},
-    timer::{AnyTimer, OneShotTimer},
+    timer::OneShotTimer,
     Blocking,
 };
 
-pub type Timer = OneShotTimer<'static, Blocking, AnyTimer>;
+pub type Timer = OneShotTimer<'static, Blocking>;
 
 enum AlarmState {
     Created(extern "C" fn()),

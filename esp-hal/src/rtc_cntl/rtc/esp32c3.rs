@@ -86,7 +86,7 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(RtcClock::xtal_freq(), XtalClock::RtcXtalFreq40M));
+    assert!(matches!(RtcClock::xtal_freq(), XtalClock::_40M));
 
     unsafe {
         // from esp_clk_init:

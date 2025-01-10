@@ -1,6 +1,7 @@
 //! QSPI Test Suite
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -75,8 +76,8 @@ fn transfer_write(
     let transfer = spi
         .half_duplex_write(
             DataMode::Quad,
-            Command::Command8(write as u16, command_data_mode),
-            Address::Address24(
+            Command::_8Bit(write as u16, command_data_mode),
+            Address::_24Bit(
                 write as u32 | (write as u32) << 8 | (write as u32) << 16,
                 DataMode::Quad,
             ),
@@ -124,7 +125,7 @@ fn execute_write_read(mut spi: SpiUnderTest, mut mosi_mirror: Output<'static>, e
         (spi, dma_rx_buf) = transfer_read(
             spi,
             dma_rx_buf,
-            Command::Command8(expected as u16, command_data_mode),
+            Command::_8Bit(expected as u16, command_data_mode),
         );
         assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
     }
@@ -212,7 +213,7 @@ mod tests {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap();
 
@@ -280,7 +281,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = ctx.spi.with_miso(pin).with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio1(pin).with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0010_0010);
     }
@@ -355,7 +356,7 @@ mod tests {
         let spi = ctx
             .spi
             .with_mosi(mosi)
-            .with_miso(gpio)
+            .with_sio1(gpio)
             .with_dma(ctx.dma_channel);
 
         super::execute_write(unit0, unit1, spi, 0b0000_0010, true);
