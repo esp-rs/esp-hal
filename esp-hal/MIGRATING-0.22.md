@@ -326,6 +326,26 @@ To avoid abbreviations and contractions (as per the esp-hal guidelines), some er
 + Error::ZeroLengthInvalid
 ```
 
+## I2C Configuration changes
+
+The timeout field in `Config` changed from `Option<u32>` to a dedicated `SclTimeout` enum.
+
+```diff
+- timeout: Some(10)
++ timeout: SclTimeout::BusCycles(10)
+```
+
+```diff
+- timeout: None
++ timeout: SclTimeout::Max
+```
+
+(Disabled isn't supported on ESP32 / ESP32-S2)
+```diff
+- timeout: None
++ timeout: SclTimeout::Disabled
+```
+
 ## The crate prelude has been removed
 
 The reexports that were previously part of the prelude are available through other paths:
