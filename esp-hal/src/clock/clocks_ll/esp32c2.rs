@@ -1,7 +1,6 @@
 use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
-    regi2c_write,
-    regi2c_write_mask,
+    rom::{regi2c_write, regi2c_write_mask},
 };
 
 const I2C_BBPLL: u32 = 0x66;

@@ -227,7 +227,7 @@ use crate::{
     asynch::AtomicWaker,
     gpio::interconnect::{PeripheralInput, PeripheralOutput},
     interrupt::InterruptConfigurable,
-    macros::handler,
+    handler,
     peripheral::Peripheral,
     peripherals::Interrupt,
     soc::constants,

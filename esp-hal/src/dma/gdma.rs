@@ -19,7 +19,7 @@ use critical_section::CriticalSection;
 use crate::{
     dma::*,
     interrupt::Priority,
-    macros::handler,
+    handler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
 };

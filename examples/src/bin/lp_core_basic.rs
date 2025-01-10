@@ -18,8 +18,8 @@ use esp_backtrace as _;
 use esp_hal::{
     entry,
     gpio::lp_io::LowPowerOutput,
+    load_lp_code,
     lp_core::{LpCore, LpCoreWakeupSource},
-    macros::load_lp_code,
 };
 use esp_println::{print, println};
 

@@ -67,8 +67,8 @@ use crate::{
     common_adapter::*,
     esp_wifi_result,
     hal::{
-        macros::ram,
         peripheral::{Peripheral, PeripheralRef},
+        ram,
     },
     EspWifiController,
 };

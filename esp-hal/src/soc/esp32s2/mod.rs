@@ -13,15 +13,16 @@ use core::ptr::addr_of_mut;
 
 use crate::rtc_cntl::SocResetReason;
 
-pub mod efuse;
+crate::unstable_module! {
+    pub mod efuse;
+    #[cfg(feature = "quad-psram")]
+    pub mod psram;
+    pub mod radio_clocks;
+    pub mod trng;
+    pub mod ulp_core;
+}
 pub mod gpio;
 pub mod peripherals;
-#[cfg(feature = "quad-psram")]
-pub mod psram;
-pub mod radio_clocks;
-pub mod trng;
-
-pub mod ulp_core;
 
 /// The name of the chip ("esp32s2") as `&str`
 #[macro_export]

@@ -13,7 +13,7 @@ const ADC_SARADC_ENT_TSENS_ADDR: u8 = 0x07;
 const ADC_SARADC_ENT_TSENS_ADDR_MSB: u8 = 2;
 const ADC_SARADC_ENT_TSENS_ADDR_LSB: u8 = 2;
 
-use crate::regi2c_write_mask;
+use crate::rom::regi2c_write_mask;
 
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.

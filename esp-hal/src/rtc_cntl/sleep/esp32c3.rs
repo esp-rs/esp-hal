@@ -1,7 +1,7 @@
 use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RtcFunction, RtcPinWithResistors},
-    regi2c_write_mask,
+    rom::regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
 };
 

@@ -2324,7 +2324,7 @@ macro_rules! instance {
     ($inst:ident, $peri:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
         impl Instance for crate::peripherals::$inst {
             fn parts(&self) -> (&Info, &State) {
-                #[crate::macros::handler]
+                #[crate::handler]
                 pub(super) fn irq_handler() {
                     async_handler(&PERIPHERAL, &STATE);
                 }
