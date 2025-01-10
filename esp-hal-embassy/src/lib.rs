@@ -162,7 +162,7 @@ pub fn init(time_driver: impl TimerCollection) {
     unsafe {
         use esp_hal::interrupt::software::SoftwareInterrupt;
 
-        #[esp_hal::macros::ram]
+        #[esp_hal::ram]
         extern "C" fn software3_interrupt() {
             // This interrupt is fired when the thread-mode executor's core needs to be
             // woken. It doesn't matter which core handles this interrupt first, the
