@@ -3,9 +3,9 @@
 use core::marker::PhantomData;
 
 use embassy_executor::{raw, Spawner};
-use esp_hal::Cpu;
 #[cfg(multi_core)]
-use esp_hal::{interrupt::software::SoftwareInterrupt, macros::handler};
+use esp_hal::interrupt::software::SoftwareInterrupt;
+use esp_hal::{interrupt::Priority, Cpu};
 #[cfg(low_power_wait)]
 use portable_atomic::{AtomicBool, Ordering};
 
@@ -15,16 +15,6 @@ pub(crate) const THREAD_MODE_CONTEXT: usize = 16;
 /// is not available on either Xtensa or RISC-V
 static SIGNAL_WORK_THREAD_MODE: [AtomicBool; Cpu::COUNT] =
     [const { AtomicBool::new(false) }; Cpu::COUNT];
-
-#[cfg(all(multi_core, low_power_wait))]
-#[handler]
-fn software3_interrupt() {
-    // This interrupt is fired when the thread-mode executor's core needs to be
-    // woken. It doesn't matter which core handles this interrupt first, the
-    // point is just to wake up the core that is currently executing
-    // `waiti`.
-    unsafe { SoftwareInterrupt::<3>::steal().reset() };
-}
 
 pub(crate) fn pend_thread_mode(_core: usize) {
     #[cfg(low_power_wait)]
@@ -68,11 +58,6 @@ impl Executor {
 This will use software-interrupt 3 which isn't available for anything else to wake the other core(s)."#
     )]
     pub fn new() -> Self {
-        #[cfg(all(multi_core, low_power_wait))]
-        unsafe {
-            SoftwareInterrupt::<3>::steal().set_interrupt_handler(software3_interrupt);
-        }
-
         Self {
             inner: raw::Executor::new((THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut ()),
             not_send: PhantomData,
@@ -100,6 +85,11 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
+        unwrap!(esp_hal::interrupt::enable(
+            esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
+            Priority::min(),
+        ));
+
         init(self.inner.spawner());
 
         #[cfg(low_power_wait)]

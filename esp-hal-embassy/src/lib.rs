@@ -158,5 +158,24 @@ impl_array!(4);
 /// # }
 /// ```
 pub fn init(time_driver: impl TimerCollection) {
+    #[cfg(all(feature = "executors", multi_core, low_power_wait))]
+    unsafe {
+        use esp_hal::interrupt::software::SoftwareInterrupt;
+
+        #[esp_hal::macros::ram]
+        extern "C" fn software3_interrupt() {
+            // This interrupt is fired when the thread-mode executor's core needs to be
+            // woken. It doesn't matter which core handles this interrupt first, the
+            // point is just to wake up the core that is currently executing
+            // `waiti`.
+            unsafe { SoftwareInterrupt::<3>::steal().reset() };
+        }
+
+        esp_hal::interrupt::bind_interrupt(
+            esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
+            software3_interrupt,
+        );
+    }
+
     EmbassyTimer::init(time_driver.timers())
 }
