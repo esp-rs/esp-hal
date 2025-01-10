@@ -512,6 +512,11 @@ where
         Ok(())
     }
 
+    /// Read bytes from SPI.
+    pub fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.driver().read_bytes(words)
+    }
+
     /// Sends `words` to the slave. Returns the `words` received from the slave
     pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         self.driver().transfer(words)
