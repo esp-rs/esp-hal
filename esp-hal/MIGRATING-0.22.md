@@ -482,6 +482,11 @@ The Address and Command enums have similarly had their variants changed from e.g
 
 e.g.
 
+```rust
+let mut byte = [0u8; 1];
+spi.read_bytes(&mut byte);
+```
+
 `driver.write_bytes(&[data])?` and `driver.read_bytes(&mut buffer)?`
 
 ## GPIO Changes
