@@ -64,6 +64,7 @@ where
         } else {
             Stdio::inherit()
         })
+        .stdin(Stdio::inherit())
         .output()?;
 
     // Make sure that we return an appropriate exit code here, as Github Actions
