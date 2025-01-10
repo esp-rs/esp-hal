@@ -505,21 +505,8 @@ where
         }
     }
 
-    /// Read a byte from SPI.
-    ///
-    /// Sends out a stuffing byte for every byte to read. This function doesn't
-    /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`Self::transfer`] instead.
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        self.driver().read_byte()
-    }
-
-    /// Write a byte to SPI.
-    pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        self.driver().write_byte(word)
-    }
-
-    /// Write bytes to SPI.
+    /// Write bytes to SPI. After writing, flush is called to ensure all data
+    /// has been transmitted.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         self.driver().write_bytes(words)?;
         self.driver().flush()?;
@@ -527,7 +514,13 @@ where
         Ok(())
     }
 
-    /// Sends `words` to the slave. Returns the `words` received from the slave
+    /// Read bytes from SPI. The provided slice is filled with data received
+    /// from the slave.
+    pub fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.driver().read_bytes(words)
+    }
+
+    /// Sends `words` to the slave. Returns the `words` received from the slave.
     pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         self.driver().transfer(words)
     }
@@ -2153,11 +2146,14 @@ mod ehal1 {
         Dm: DriverMode,
     {
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
-            self.driver().read_byte()
+            let mut buffer = [0u8; 1];
+            self.driver().read_bytes(&mut buffer)?;
+            Ok(buffer[0])
         }
 
         fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-            self.driver().write_byte(word)
+            self.driver().write_bytes(&[word])?;
+            Ok(())
         }
     }
 
@@ -2924,30 +2920,6 @@ impl Driver {
             w.wr_bit_order().bit(write_value);
             w
         });
-    }
-
-    fn read_byte(&self) -> nb::Result<u8, Error> {
-        if self.busy() {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        let reg_block = self.register_block();
-        Ok(u32::try_into(reg_block.w(0).read().bits()).unwrap_or_default())
-    }
-
-    fn write_byte(&self, word: u8) -> nb::Result<(), Error> {
-        if self.busy() {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        self.configure_datalen(0, 1);
-
-        let reg_block = self.register_block();
-        reg_block.w(0).write(|w| w.buf().set(word.into()));
-
-        self.start_operation();
-
-        Ok(())
     }
 
     #[cfg_attr(place_spi_driver_in_ram, ram)]

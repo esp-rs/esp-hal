@@ -429,6 +429,18 @@ e.g.
 +     .with_tx(peripherals.GPIO2);
 ```
 
+`write_byte` and `read_byte` have been removed.
+
+e.g.
+
+```dif
+- while let nb::Result::Ok(_c) = serial.read_byte() {
+-     cnt += 1;
+- }
++ let mut buff = [0u8; 64];
++ let cnt = serial.read_bytes(&mut buff);
+```
+
 ## Spi `with_miso` has been split
 
 Previously, `with_miso` set up the provided pin as an input and output, which was necessary for half duplex.
@@ -464,6 +476,15 @@ The Address and Command enums have similarly had their variants changed from e.g
 + Address::_1Bit
 - Command::Command1
 + Command::_1Bit
+```
+
+`write_byte` and `read_byte` were removed and `write_bytes` and `read_bytes` can be used as replacement.
+
+e.g.
+
+```rust
+let mut byte = [0u8; 1];
+spi.read_bytes(&mut byte);
 ```
 
 ## GPIO Changes
