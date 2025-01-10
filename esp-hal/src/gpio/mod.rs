@@ -270,17 +270,17 @@ pub enum DriveStrength {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AlternateFunction {
     /// Alternate function 0.
-    Function0 = 0,
+    _0 = 0,
     /// Alternate function 1.
-    Function1 = 1,
+    _1 = 1,
     /// Alternate function 2.
-    Function2 = 2,
+    _2 = 2,
     /// Alternate function 3.
-    Function3 = 3,
+    _3 = 3,
     /// Alternate function 4.
-    Function4 = 4,
+    _4 = 4,
     /// Alternate function 5.
-    Function5 = 5,
+    _5 = 5,
 }
 
 impl TryFrom<usize> for AlternateFunction {
@@ -288,12 +288,12 @@ impl TryFrom<usize> for AlternateFunction {
 
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(AlternateFunction::Function0),
-            1 => Ok(AlternateFunction::Function1),
-            2 => Ok(AlternateFunction::Function2),
-            3 => Ok(AlternateFunction::Function3),
-            4 => Ok(AlternateFunction::Function4),
-            5 => Ok(AlternateFunction::Function5),
+            0 => Ok(AlternateFunction::_0),
+            1 => Ok(AlternateFunction::_1),
+            2 => Ok(AlternateFunction::_2),
+            3 => Ok(AlternateFunction::_3),
+            4 => Ok(AlternateFunction::_4),
+            5 => Ok(AlternateFunction::_5),
             _ => Err(()),
         }
     }
@@ -1083,7 +1083,7 @@ macro_rules! gpio {
                             $(
                                 $(
                                     (
-                                        $crate::gpio::AlternateFunction::[< Function $af_output_num >],
+                                        $crate::gpio::AlternateFunction::[< _ $af_output_num >],
                                         $crate::gpio::OutputSignal::$af_output_signal
                                     ),
                                 )*
@@ -1096,7 +1096,7 @@ macro_rules! gpio {
                             $(
                                 $(
                                     (
-                                        $crate::gpio::AlternateFunction::[< Function $af_input_num >],
+                                        $crate::gpio::AlternateFunction::[< _ $af_input_num >],
                                         $crate::gpio::InputSignal::$af_input_signal
                                     ),
                                 )*
