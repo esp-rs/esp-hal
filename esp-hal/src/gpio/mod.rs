@@ -677,6 +677,9 @@ where
     /// external hardware.
     #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+        // FIXME: we should implement this in the gpio macro for output pins, but we
+        // should also have an input-only alternative for pins that can't be used as
+        // outputs.
         self.degrade().split()
     }
 }
