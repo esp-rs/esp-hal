@@ -419,15 +419,18 @@ mod peripheral_macros {
 
             impl $name {
                 #[doc = r"Pointer to the register block"]
+                #[instability::unstable]
                 pub const PTR: *const <super::pac::$base as core::ops::Deref>::Target = super::pac::$base::PTR;
 
                 #[doc = r"Return the pointer to the register block"]
                 #[inline(always)]
+                #[instability::unstable]
                 pub const fn ptr() -> *const <super::pac::$base as core::ops::Deref>::Target {
                     super::pac::$base::PTR
                 }
             }
 
+            #[doc(hidden)]
             impl core::ops::Deref for $name {
                 type Target = <super::pac::$base as core::ops::Deref>::Target;
 
