@@ -504,7 +504,8 @@ where
         }
     }
 
-    /// Write bytes to SPI.
+    /// Write bytes to SPI. After writing, flush is called to ensure all data
+    /// has been transmitted.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         self.driver().write_bytes(words)?;
         self.driver().flush()?;
@@ -512,12 +513,13 @@ where
         Ok(())
     }
 
-    /// Read bytes from SPI.
+    /// Read bytes from SPI. The provided slice is filled with data received
+    /// from the slave.
     pub fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.driver().read_bytes(words)
     }
 
-    /// Sends `words` to the slave. Returns the `words` received from the slave
+    /// Sends `words` to the slave. Returns the `words` received from the slave.
     pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         self.driver().transfer(words)
     }
