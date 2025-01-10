@@ -717,11 +717,11 @@ where
 
         // Set up the GPIO pins.
         let rx_pull = if no_transceiver {
-            tx_pin.set_to_open_drain_output(crate::private::Internal);
-            tx_pin.pull_direction(Pull::Up, crate::private::Internal);
+            tx_pin.set_to_open_drain_output();
+            tx_pin.pull_direction(Pull::Up);
             Pull::Up
         } else {
-            tx_pin.set_to_push_pull_output(crate::private::Internal);
+            tx_pin.set_to_push_pull_output();
             Pull::None
         };
         this.twai.output_signal().connect_to(tx_pin);
@@ -729,7 +729,7 @@ where
         // Setting up RX pin later allows us to use a single pin in tests.
         // `set_to_push_pull_output` disables input, here we re-enable it if rx_pin
         // uses the same GPIO.
-        rx_pin.init_input(rx_pull, crate::private::Internal);
+        rx_pin.init_input(rx_pull);
         this.twai.input_signal().connect_to(rx_pin);
 
         // Freeze REC by changing to LOM mode

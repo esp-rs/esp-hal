@@ -643,8 +643,8 @@ where
     /// to the MOSI signal and SIO0 input signal.
     pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
-        mosi.enable_output(true, private::Internal);
-        mosi.enable_input(true, private::Internal);
+        mosi.enable_output(true);
+        mosi.enable_input(true);
 
         self.driver().info.mosi.connect_to(&mut mosi);
         self.driver().info.sio0_input.connect_to(&mut mosi);
@@ -658,7 +658,7 @@ where
     /// signal.
     pub fn with_miso<MISO: PeripheralInput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
-        miso.enable_input(true, private::Internal);
+        miso.enable_input(true);
 
         self.driver().info.miso.connect_to(&mut miso);
 
@@ -673,8 +673,8 @@ where
     /// Note: You do not need to call [Self::with_miso] when this is used.
     pub fn with_sio1<SIO1: PeripheralOutput>(self, miso: impl Peripheral<P = SIO1> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
-        miso.enable_input(true, private::Internal);
-        miso.enable_output(true, private::Internal);
+        miso.enable_input(true);
+        miso.enable_output(true);
 
         self.driver().info.miso.connect_to(&mut miso);
         self.driver().info.sio1_output.connect_to(&mut miso);
@@ -688,7 +688,7 @@ where
     /// clock signal.
     pub fn with_sck<SCK: PeripheralOutput>(self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_mapped_ref!(sclk);
-        sclk.set_to_push_pull_output(private::Internal);
+        sclk.set_to_push_pull_output();
         self.driver().info.sclk.connect_to(sclk);
 
         self
@@ -706,7 +706,7 @@ where
     #[instability::unstable]
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
-        cs.set_to_push_pull_output(private::Internal);
+        cs.set_to_push_pull_output();
         self.driver().info.cs.connect_to(cs);
 
         self
@@ -748,8 +748,8 @@ where
     pub fn with_sio2<SIO2: PeripheralOutput>(self, sio2: impl Peripheral<P = SIO2> + 'd) -> Self {
         // TODO: panic if not QSPI?
         crate::into_mapped_ref!(sio2);
-        sio2.enable_input(true, private::Internal);
-        sio2.enable_output(true, private::Internal);
+        sio2.enable_input(true);
+        sio2.enable_output(true);
 
         unwrap!(self.driver().info.sio2_input).connect_to(&mut sio2);
         unwrap!(self.driver().info.sio2_output).connect_to(&mut sio2);
@@ -769,8 +769,8 @@ where
     pub fn with_sio3<SIO3: PeripheralOutput>(self, sio3: impl Peripheral<P = SIO3> + 'd) -> Self {
         // TODO: panic if not QSPI?
         crate::into_mapped_ref!(sio3);
-        sio3.enable_input(true, private::Internal);
-        sio3.enable_output(true, private::Internal);
+        sio3.enable_input(true);
+        sio3.enable_output(true);
 
         unwrap!(self.driver().info.sio3_input).connect_to(&mut sio3);
         unwrap!(self.driver().info.sio3_output).connect_to(&mut sio3);
