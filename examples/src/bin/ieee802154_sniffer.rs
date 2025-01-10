@@ -39,14 +39,14 @@ fn main() -> ! {
     let mut cnt = 0;
     let mut read = [0u8; 2];
     loop {
-        let mut buff = [0u8; 1];
-        while uart0.read_bytes(&mut buff) == 0 {}
+        let mut buf = [0u8; 1];
+        while uart0.read_bytes(&mut buf) == 0 {}
 
-        if buff[0] == b'r' {
+        if buf[0] == b'r' {
             continue;
         }
 
-        read[cnt] = buff[0];
+        read[cnt] = buf[0];
         cnt += 1;
 
         if cnt >= 2 {
@@ -76,8 +76,8 @@ fn main() -> ! {
             println!("@RAW {:02x?}", &frame.data);
         }
 
-        let mut buff = [0u8; 1];
-        if uart0.read_bytes(&mut buff) > 0 && buff[0] == b'r' {
+        let mut buf = [0u8; 1];
+        if uart0.read_bytes(&mut buf) > 0 && buf[0] == b'r' {
             software_reset();
         }
     }

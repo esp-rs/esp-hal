@@ -198,8 +198,8 @@
 //!         let mut serial = SERIAL.borrow_ref_mut(cs);
 //!         let serial = serial.as_mut().unwrap();
 //!
-//!         let mut buff = [0u8; 64];
-//!         let cnt = serial.read_bytes(&mut buff);
+//!         let mut buf = [0u8; 64];
+//!         let cnt = serial.read_bytes(&mut buf);
 //!         writeln!(serial, "Read {} bytes", cnt).ok();
 //!
 //!         let pending_interrupts = serial.interrupts();
