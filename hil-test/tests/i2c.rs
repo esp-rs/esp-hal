@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_hal::{
-    i2c::master::{Config, Error, I2c, Operation},
+    i2c::master::{AcknowledgeCheckFailedReason, Config, Error, I2c, Operation},
     Async,
     Blocking,
 };
@@ -51,10 +51,26 @@ mod tests {
 
     #[test]
     fn empty_write_returns_ack_error_for_unknown_address(mut ctx: Context) {
-        assert_eq!(
-            ctx.i2c.write(NON_EXISTENT_ADDRESS, &[]),
-            Err(Error::AckCheckFailed)
-        );
+        // on some chips we can determine the ack-check-failed reason but not on all
+        // chips
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32,esp32s2,esp32c2,esp32c3))] {
+                assert_eq!(
+                    ctx.i2c.write(NON_EXISTENT_ADDRESS, &[]),
+                    Err(Error::AcknowledgeCheckFailed(
+                        AcknowledgeCheckFailedReason::Unknown
+                    ))
+                );
+            } else {
+                assert_eq!(
+                    ctx.i2c.write(NON_EXISTENT_ADDRESS, &[]),
+                    Err(Error::AcknowledgeCheckFailed(
+                        AcknowledgeCheckFailedReason::Address
+                    ))
+                );
+            }
+        }
+
         assert_eq!(ctx.i2c.write(DUT_ADDRESS, &[]), Ok(()));
     }
 

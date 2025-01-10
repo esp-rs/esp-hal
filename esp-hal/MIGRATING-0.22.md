@@ -326,6 +326,13 @@ To avoid abbreviations and contractions (as per the esp-hal guidelines), some er
 + Error::ZeroLengthInvalid
 ```
 
+The `AckCheckFailed` variant changed to `AcknowledgeCheckFailed(AcknowledgeCheckFailedReason)`
+
+```diff
+-            Err(Error::AckCheckFailed)
++            Err(Error::AcknowledgeCheckFailed(reason))
+```
+
 ## The crate prelude has been removed
 
 The reexports that were previously part of the prelude are available through other paths:

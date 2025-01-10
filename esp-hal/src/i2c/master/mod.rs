@@ -93,7 +93,7 @@ pub enum Error {
     /// The transmission exceeded the FIFO size.
     FifoExceeded,
     /// The acknowledgment check failed.
-    AckCheckFailed,
+    AcknowledgeCheckFailed(AcknowledgeCheckFailedReason),
     /// A timeout occurred during transmission.
     Timeout,
     /// The arbitration for the bus was lost.
@@ -106,13 +106,58 @@ pub enum Error {
     ZeroLengthInvalid,
 }
 
+/// I2C no acknowledge error reason.
+///
+/// Consider this as a hint and make sure to always handle all cases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum AcknowledgeCheckFailedReason {
+    /// The device did not acknowledge its address. The device may be missing.
+    Address,
+
+    /// The device did not acknowledge the data. It may not be ready to process
+    /// requests at the moment.
+    Data,
+
+    /// Either the device did not acknowledge its address or the data, but it is
+    /// unknown which.
+    Unknown,
+}
+
+impl core::fmt::Display for AcknowledgeCheckFailedReason {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            AcknowledgeCheckFailedReason::Address => write!(f, "Address"),
+            AcknowledgeCheckFailedReason::Data => write!(f, "Data"),
+            AcknowledgeCheckFailedReason::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+impl From<&AcknowledgeCheckFailedReason> for embedded_hal::i2c::NoAcknowledgeSource {
+    fn from(value: &AcknowledgeCheckFailedReason) -> Self {
+        match value {
+            AcknowledgeCheckFailedReason::Address => {
+                embedded_hal::i2c::NoAcknowledgeSource::Address
+            }
+            AcknowledgeCheckFailedReason::Data => embedded_hal::i2c::NoAcknowledgeSource::Data,
+            AcknowledgeCheckFailedReason::Unknown => {
+                embedded_hal::i2c::NoAcknowledgeSource::Unknown
+            }
+        }
+    }
+}
+
 impl core::error::Error for Error {}
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Error::FifoExceeded => write!(f, "The transmission exceeded the FIFO size"),
-            Error::AckCheckFailed => write!(f, "The acknowledgment check failed"),
+            Error::AcknowledgeCheckFailed(reason) => {
+                write!(f, "The acknowledgment check failed. Reason: {}", reason)
+            }
             Error::Timeout => write!(f, "A timeout occurred during transmission"),
             Error::ArbitrationLost => write!(f, "The arbitration for the bus was lost"),
             Error::ExecutionIncomplete => {
@@ -211,12 +256,12 @@ impl Operation<'_> {
 
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
-        use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
+        use embedded_hal::i2c::ErrorKind;
 
         match self {
             Self::FifoExceeded => ErrorKind::Overrun,
             Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
-            Self::AckCheckFailed => ErrorKind::NoAcknowledge(NoAcknowledgeSource::Unknown),
+            Self::AcknowledgeCheckFailed(reason) => ErrorKind::NoAcknowledge(reason.into()),
             _ => ErrorKind::Other,
         }
     }
@@ -633,7 +678,9 @@ impl<'a> I2cFuture<'a> {
         }
 
         if r.nack().bit_is_set() {
-            return Err(Error::AckCheckFailed);
+            return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
+                self.info.register_block(),
+            )));
         }
 
         #[cfg(not(esp32))]
@@ -646,7 +693,9 @@ impl<'a> I2cFuture<'a> {
                 .resp_rec()
                 .bit_is_clear()
         {
-            return Err(Error::AckCheckFailed);
+            return Err(Error::AcknowledgeCheckFailed(
+                AcknowledgeCheckFailedReason::Data,
+            ));
         }
 
         Ok(())
@@ -1655,7 +1704,7 @@ impl Driver<'_> {
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AckCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.register_block())))
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)
                 } else {
@@ -1666,11 +1715,11 @@ impl Driver<'_> {
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AckCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.register_block())))
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)
                 } else if interrupts.trans_complete().bit_is_set() && self.register_block().sr().read().resp_rec().bit_is_clear() {
-                    Err(Error::AckCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(AcknowledgeCheckFailedReason::Data))
                 } else {
                     Ok(())
                 };
@@ -2251,6 +2300,23 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
     }) as *mut u32;
     unsafe {
         fifo_ptr.write_volatile(data as u32);
+    }
+}
+
+// Estimate the reason for an acknowledge check failure on a best effort basis.
+// When in doubt it's better to return `Unknown` than to return a wrong reason.
+fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeCheckFailedReason {
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32, esp32s2, esp32c2, esp32c3))] {
+            AcknowledgeCheckFailedReason::Unknown
+        } else {
+            // this is based on observations rather than documented behavior
+            if _register_block.fifo_st().read().txfifo_raddr().bits() <= 1 {
+                AcknowledgeCheckFailedReason::Address
+            } else {
+                AcknowledgeCheckFailedReason::Data
+            }
+        }
     }
 }
 
