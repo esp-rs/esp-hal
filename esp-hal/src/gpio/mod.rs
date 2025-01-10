@@ -348,11 +348,6 @@ pub trait Pin: Sealed {
     /// GPIO number
     fn number(&self) -> u8;
 
-    #[doc(hidden)]
-    fn mask(&self) -> u32 {
-        1 << (self.number() % 32)
-    }
-
     /// Type-erase (degrade) this pin into an [`AnyPin`].
     ///
     /// This converts pin singletons (`GpioPin<0>`, …), which are all different
