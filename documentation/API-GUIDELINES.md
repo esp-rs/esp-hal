@@ -13,7 +13,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 ## Amendments to the Rust API Guidelines
 
 - `C-RW-VALUE` and `C-SERDE` do not apply.
-- `C-QUESTION-MARK`: `?` is not applicable in the context of the `main` function in our driver, documentation example makes no sense.
+- `C-QUESTION-MARK`: `?` is not applicable in the context of the `main` function in our driver.
 - `C-COMMON-TRAITS`:
   The set of traits to implement depend on the type and use case. In esp-hal, we can highlight a few such use cases and provide recommendations what should be implemented. If nothing here applies, use your best judgement.
   - Driver structures: `Debug`
