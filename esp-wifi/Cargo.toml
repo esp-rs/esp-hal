@@ -124,11 +124,15 @@ sniffer = ["wifi"]
 ## Enable BLE support
 ble = ["esp-hal/bluetooth", "dep:bt-hci", "dep:embassy-sync"]
 
+## Enable WiFi channel state information. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv4N18wifi_init_config_t10csi_enableE)",
+csi = []
+
 ## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
 
 ## Provide utilities for smoltcp initialization. Adds smoltcp dependency
 utils = ["smoltcp"]
+
 
 
 # Implement serde Serialize / Deserialize
