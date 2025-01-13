@@ -1384,24 +1384,28 @@ impl<'d> Input<'d> {
     /// }
     /// ```
     #[inline]
+    #[instability::unstable]
     pub fn listen(&mut self, event: Event) {
         self.pin.listen(event);
     }
 
     /// Stop listening for interrupts
     #[inline]
+    #[instability::unstable]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
     }
 
     /// Clear the interrupt status bit for this Pin
     #[inline]
+    #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
         self.pin.clear_interrupt();
     }
 
     /// Checks if the interrupt status bit for this Pin is set
     #[inline]
+    #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
         self.pin.is_interrupt_set()
     }
@@ -1560,18 +1564,21 @@ impl<'d> OutputOpenDrain<'d> {
     ///
     /// See [`Input::listen`] for more information and an example.
     #[inline]
+    #[instability::unstable]
     pub fn listen(&mut self, event: Event) {
         self.pin.listen(event);
     }
 
     /// Stop listening for interrupts.
     #[inline]
+    #[instability::unstable]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
     }
 
     /// Clear the interrupt status bit for this Pin
     #[inline]
+    #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
         self.pin.clear_interrupt();
     }
