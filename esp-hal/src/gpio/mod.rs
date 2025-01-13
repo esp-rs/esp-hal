@@ -1661,6 +1661,10 @@ impl<'d> Flex<'d> {
         Self { pin }
     }
 
+    fn number(&self) -> u8 {
+        self.pin.number()
+    }
+
     /// Returns a peripheral [input][interconnect::InputSignal] connected to
     /// this pin.
     ///
@@ -1869,42 +1873,6 @@ impl<'d> Flex<'d> {
     #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.split().1
-    }
-}
-
-// Unfortunate implementation details responsible for:
-// - making pin drivers work with the peripheral signal system
-// - making the pin drivers work with the sleep API
-impl Pin for Flex<'_> {
-    delegate::delegate! {
-        to self.pin {
-            fn number(&self) -> u8;
-            fn output_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, OutputSignal)];
-            fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, InputSignal)];
-        }
-    }
-}
-#[cfg(any(lp_io, rtc_cntl))]
-impl RtcPin for Flex<'_> {
-    delegate::delegate! {
-        to self.pin {
-            #[cfg(xtensa)]
-            fn rtc_number(&self) -> u8;
-            #[cfg(any(xtensa, esp32c6))]
-            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
-            fn rtcio_pad_hold(&mut self, enable: bool);
-            #[cfg(any(esp32c3, esp32c2, esp32c6))]
-            unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8);
-        }
-    }
-}
-#[cfg(any(lp_io, rtc_cntl))]
-impl RtcPinWithResistors for Flex<'_> {
-    delegate::delegate! {
-        to self.pin {
-            fn rtcio_pullup(&mut self, enable: bool);
-            fn rtcio_pulldown(&mut self, enable: bool);
-        }
     }
 }
 
