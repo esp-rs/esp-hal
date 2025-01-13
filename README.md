@@ -1,9 +1,15 @@
+<center>
+
+![esp-rs Logo](./resources/esp-rs.svg)
+
 # esp-hal
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/esp-rs/esp-hal/ci.yml?labelColor=1C2C2E&label=CI&logo=github&style=flat-square)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/esp-rs/esp-hal/hil.yml?labelColor=1C2C2E&label=HIL&logo=github&style=flat-square&event=merge_group)
 ![MIT/Apache-2.0 licensed](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?labelColor=1C2C2E&label=join%20matrix&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
+
+</center>
 
 Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currently supports, to varying degrees, the following devices:
 
@@ -14,9 +20,9 @@ Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currentl
 
 Additionally provides limited support for programming the low-power RISC-V cores found on the _ESP32-C6_, _ESP32-S2_, and _ESP32-S3_ via the [esp-lp-hal] package.
 
-These packages are all `no_std`; if you are looking for `std` support, please use [esp-idf-svc] instead.
+For additional information regarding any of the crates in this repository, please refer to the relevant crate's `README.md` file. If you have any questions, comments, or concerns, please [open an issue], [start a new discussion], or join us on [Matrix].
 
-If you have any questions, comments, or concerns, please [open an issue], [start a new discussion], or join us on [Matrix]. For additional information regarding any of the crates in this repository, please refer to the relevant crate's README.
+If you are currently using (or considering using) `esp-hal` in a production environment and have any feedback or require support, please feel free to contact us at <rust.support@espressif.com>.
 
 > [!NOTE]
 >
@@ -34,8 +40,11 @@ For information relating to the development of Rust applications on ESP devices,
 
 For information about the HAL and how to use it in your own projects, please refer to the [documentation].
 
+When browsing the examples, we recommend viewing the tag for the `esp-hal` release you are using to ensure compatibility, e.g.) [v0.22.0], as the `main` branch is used for development and APIs may have changed in the meantime.
+
 [The Rust on ESP Book]: https://esp-rs.github.io/book/
 [documentation]: https://docs.esp-rs.org/esp-hal/
+[v0.22.0]: https://github.com/esp-rs/esp-hal/tree/v0.22.0/examples
 
 ## Resources
 
@@ -44,10 +53,6 @@ For information about the HAL and how to use it in your own projects, please ref
 - [The Embedonomicon](https://docs.rust-embedded.org/embedonomicon/)
 - [The Rust on ESP Book](https://esp-rs.github.io/book/)
 - [Embedded Rust (no_std) on Espressif](https://esp-rs.github.io/no_std-training/)
-
-## Crates
-
-This repository is home to a number of different packages; for more information regarding a particular package, please refer to its `README.md` and/or documentation.
 
 ## Contributing
 
@@ -58,7 +63,7 @@ We have a number of living documents to aid contributing to the project, please 
 
 ## License
 
-Licensed under either of:
+All packages within this repository are licensed under either of:
 
 - Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
