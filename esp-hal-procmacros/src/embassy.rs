@@ -1,4 +1,6 @@
 use darling::ast::NestedMeta;
+use main_mod::*;
+use proc_macro::TokenStream;
 use syn::{
     parse::{Parse, ParseBuffer},
     punctuated::Punctuated,
@@ -18,7 +20,14 @@ impl Parse for Args {
     }
 }
 
-pub(crate) mod main {
+pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
+    let args = syn::parse_macro_input!(args as Args);
+    let f = syn::parse_macro_input!(item as syn::ItemFn);
+
+    run(&args.meta, f, main_fn()).unwrap_or_else(|x| x).into()
+}
+
+pub(crate) mod main_mod {
     use std::{cell::RefCell, fmt::Display, thread};
 
     use darling::{export::NestedMeta, FromMeta};
@@ -155,7 +164,7 @@ pub(crate) mod main {
         }
     }
 
-    pub fn main() -> TokenStream {
+    pub fn main_fn() -> TokenStream {
         quote! {
             #[esp_hal::entry]
             fn main() -> ! {
