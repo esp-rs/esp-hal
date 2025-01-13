@@ -842,14 +842,19 @@ where
             }
         }
 
-        while self.rx_fifo_count() == 0 {}
-        // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                crate::interrupt::free(|| fifo.read().rxfifo_rd_byte().bits())
-            } else {
-                fifo.read().rxfifo_rd_byte().bits()
+        if self.rx_fifo_count() > 0 {
+            // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    let byte = crate::interrupt::free(|| fifo.read().rxfifo_rd_byte().bits());
+                } else {
+                    let byte = fifo.read().rxfifo_rd_byte().bits();
+                }
             }
+
+            Some(byte)
+        } else {
+            None
         }
     }
 
@@ -897,9 +902,13 @@ where
     /// Read bytes from the RX FIFO without checking for errors.
     fn flush_buffer(&mut self, buf: &mut [u8]) -> usize {
         let mut count = 0;
-        while count < buf.len() && self.rx_fifo_count() > 0 {
-            buf[count] = self.read_byte();
-            count += 1;
+        while count < buf.len() {
+            if let Some(byte) = self.read_byte() {
+                buf[count] = byte;
+                count += 1;
+            } else {
+                break;
+            }
         }
         count
     }

@@ -37,10 +37,9 @@ mod tests {
 
     #[test]
     fn test_send_receive(mut ctx: Context) {
-        let data: [u8; 1] = [0x42];
-        ctx.uart.write_bytes(&data);
+        ctx.uart.write_bytes(&[0x42]);
         let mut byte = [0u8; 1];
-        while ctx.uart.read_bytes(&mut byte) == 0 {}
+        ctx.uart.read_bytes(&mut byte).unwrap();
         assert_eq!(byte[0], 0x42);
     }
 
@@ -54,11 +53,7 @@ mod tests {
 
         let mut buffer = [0; BUF_SIZE];
 
-        let mut count = 0;
-
-        while count != BUF_SIZE {
-            count += ctx.uart.read_bytes(&mut buffer[count..]);
-        }
+        ctx.uart.read_bytes(&mut buffer).unwrap();
 
         assert_eq!(data, buffer);
     }
@@ -90,7 +85,7 @@ mod tests {
                 .unwrap();
             ctx.uart.write_bytes(&[byte_to_write]);
             let mut byte = [0u8; 1];
-            while ctx.uart.read_bytes(&mut byte) == 0 {}
+            ctx.uart.read_bytes(&mut byte).unwrap();
 
             assert_eq!(byte[0], byte_to_write);
             byte_to_write = !byte_to_write;
