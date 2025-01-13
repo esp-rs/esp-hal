@@ -294,12 +294,6 @@ impl core::fmt::Display for Error {
     }
 }
 
-impl embedded_hal_nb::serial::Error for Error {
-    fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
-        embedded_hal_nb::serial::ErrorKind::Other
-    }
-}
-
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl embedded_io::Error for Error {
@@ -1354,18 +1348,6 @@ where
             .map_err(|_| core::fmt::Error)?;
         Ok(())
     }
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for Uart<'_, Dm> {
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UartTx<'_, Dm> {
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UartRx<'_, Dm> {
-    type Error = Error;
 }
 
 #[cfg(any(doc, feature = "unstable"))]
