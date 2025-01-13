@@ -643,7 +643,7 @@ where
     /// You want to use this for full-duplex SPI or [DataMode::Single]
     pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
-        mosi.enable_output(false, private::Internal);
+        mosi.enable_output(false);
 
         self.driver().info.mosi.connect_to(&mut mosi);
 
