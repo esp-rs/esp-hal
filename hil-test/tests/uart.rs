@@ -37,9 +37,11 @@ mod tests {
 
     #[test]
     fn test_send_receive(mut ctx: Context) {
-        ctx.uart.write_byte(0x42);
-        let read = ctx.uart.read_byte();
-        assert_eq!(read, 0x42);
+        let data: [u8; 1] = [0x42];
+        ctx.uart.write_bytes(&data);
+        let mut byte = [0u8; 1];
+        while ctx.uart.read_bytes(&mut byte) == 0 {}
+        assert_eq!(byte[0], 0x42);
     }
 
     #[test]
@@ -47,16 +49,17 @@ mod tests {
         const BUF_SIZE: usize = 128; // UART_FIFO_SIZE
 
         let data = [13; BUF_SIZE];
-        let written = ctx.uart.write_bytes(&data).unwrap();
+        let written = ctx.uart.write_bytes(&data);
         assert_eq!(written, BUF_SIZE);
 
         let mut buffer = [0; BUF_SIZE];
-        let mut i = 0;
 
-        while i < BUF_SIZE {
-            buffer[i] = ctx.uart.read_byte();
-            i += 1;
+        let mut count = 0;
+
+        while count != BUF_SIZE {
+            count += ctx.uart.read_bytes(&mut buffer[count..]);
         }
+
         assert_eq!(data, buffer);
     }
 
@@ -85,10 +88,11 @@ mod tests {
                         .with_clock_source(clock_source),
                 )
                 .unwrap();
-            ctx.uart.write_byte(byte_to_write);
-            let read = ctx.uart.read_byte();
+            ctx.uart.write_bytes(&[byte_to_write]);
+            let mut byte = [0u8; 1];
+            while ctx.uart.read_bytes(&mut byte) == 0 {}
 
-            assert_eq!(read, byte_to_write);
+            assert_eq!(byte[0], byte_to_write);
             byte_to_write = !byte_to_write;
         }
     }

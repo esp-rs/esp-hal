@@ -61,7 +61,7 @@
 //! # .with_rx(peripherals.GPIO1)
 //! # .with_tx(peripherals.GPIO2);
 //! // Write bytes out over the UART:
-//! uart1.write_bytes(b"Hello, world!").expect("write error!");
+//! uart1.write_bytes(b"Hello, world!");
 //! # }
 //! ```
 //! 
@@ -636,14 +636,14 @@ where
     }
 
     /// Writes bytes
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub fn write_bytes(&mut self, data: &[u8]) -> usize {
         let count = data.len();
 
         for &byte in data {
             self.write_byte(byte);
         }
 
-        Ok(count)
+        count
     }
 
     fn write_byte(&mut self, word: u8) {
@@ -1117,7 +1117,7 @@ where
     }
 
     /// Write bytes out over the UART
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub fn write_bytes(&mut self, data: &[u8]) -> usize {
         self.tx.write_bytes(data)
     }
 
@@ -1323,7 +1323,7 @@ where
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write_bytes(s.as_bytes())?;
+        self.write_bytes(s.as_bytes());
         Ok(())
     }
 }
@@ -1344,8 +1344,7 @@ where
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write_bytes(s.as_bytes())
-            .map_err(|_| core::fmt::Error)?;
+        self.write_bytes(s.as_bytes());
         Ok(())
     }
 }
@@ -1442,7 +1441,7 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_bytes(buf)
+        Ok(self.write_bytes(buf))
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {

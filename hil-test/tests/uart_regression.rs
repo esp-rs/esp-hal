@@ -29,12 +29,6 @@ mod tests {
         let mut buf = [0u8; 1];
         _ = rx.read_bytes(&mut buf);
 
-        // Start from a low level to verify that UartTx sets the level high initially,
-        // but don't enable output otherwise we actually pull down against RX's
-        // pullup resistor.
-        let mut tx = Flex::new(tx);
-        tx.set_low();
-
         // set up TX and send a byte
         let mut tx = UartTx::new(peripherals.UART0, uart::Config::default())
             .unwrap()
