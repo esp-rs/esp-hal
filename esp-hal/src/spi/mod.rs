@@ -33,10 +33,8 @@ pub enum Error {
     /// communication.
     FifoSizeExeeded,
     /// Error indicating that the operation is unsupported by the current
-    /// implementation.
+    /// implementation or for the given arguments.
     Unsupported,
-    /// The given arguments are invalid.
-    ArgumentsInvalid,
     /// An unknown error occurred during SPI communication.
     Unknown,
 }

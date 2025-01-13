@@ -640,6 +640,7 @@ where
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
     /// Enables output functionality for the pin, and connects it to the MOSI.
+    /// You want to use this for full-duplex SPI or [DataMode::Single]
     pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
         mosi.enable_output(false, private::Internal);
@@ -653,6 +654,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI signal and SIO0 input signal.
+    /// Use this for half-duplex SPI except for [DataMode::Single]
     pub fn with_sio0<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
         mosi.enable_output(true);
@@ -668,6 +670,7 @@ where
     ///
     /// Enables input functionality for the pin, and connects it to the MISO
     /// signal.
+    /// You want to use this for full-duplex SPI or [DataMode::Single]
     pub fn with_miso<MISO: PeripheralInput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
         miso.enable_input(true);
@@ -681,6 +684,7 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO signal and SIO1 input signal.
+    /// Use this for half-duplex SPI except for [DataMode::Single
     ///
     /// Note: You do not need to call [Self::with_miso] when this is used.
     pub fn with_sio1<SIO1: PeripheralOutput>(self, miso: impl Peripheral<P = SIO1> + 'd) -> Self {
@@ -3119,7 +3123,7 @@ impl Driver {
                 || (address != Address::None && address.mode() != DataMode::SingleThreeWire)
                 || data_mode != DataMode::SingleThreeWire)
         {
-            return Err(Error::ArgumentsInvalid);
+            return Err(Error::Unsupported);
         }
 
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
