@@ -514,3 +514,13 @@ Macros from `procmacros` crate (`handler`, `ram`, `load_lp_code`) are now import
 + use esp_hal::{handler, ram, load_lp_code};
 ```
 
+## `entry` macro is removed, use `main` macro
+
+```diff
+-use esp_hal::entry;
++use esp_hal::main;
+
+-#[entry]
++#[main]
+fn main() {
+```
