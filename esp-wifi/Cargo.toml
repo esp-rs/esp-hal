@@ -134,7 +134,6 @@ smoltcp = ["dep:smoltcp"]
 utils = ["smoltcp"]
 
 
-
 # Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde", "heapless/serde"]
 
