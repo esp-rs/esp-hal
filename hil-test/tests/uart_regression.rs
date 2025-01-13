@@ -9,10 +9,7 @@
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
-    use esp_hal::{
-        gpio::Flex,
-        uart::{self, UartRx, UartTx},
-    };
+    use esp_hal::uart::{self, UartRx, UartTx};
     use hil_test as _;
 
     #[test]
@@ -27,7 +24,6 @@ mod tests {
 
         // start reception
         let mut buf = [0u8; 1];
-        _ = rx.read_bytes(&mut buf);
 
         // set up TX and send a byte
         let mut tx = UartTx::new(peripherals.UART0, uart::Config::default())
@@ -35,7 +31,7 @@ mod tests {
             .with_tx(tx);
 
         tx.flush();
-        tx.write_bytes(&[0x42]).unwrap();
+        tx.write_bytes(&[0x42]);
         rx.read_bytes(&mut buf).unwrap();
 
         assert_eq!(buf[0], 0x42);
