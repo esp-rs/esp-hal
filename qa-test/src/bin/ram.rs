@@ -18,7 +18,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, entry, ram, rtc_cntl::Rtc, time::ExtU64};
+use esp_hal::{delay::Delay, main, ram, rtc_cntl::Rtc, time::ExtU64};
 use esp_println::println;
 
 #[ram(rtc_fast)]
@@ -30,7 +30,7 @@ static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
 #[ram(rtc_fast, zeroed)]
 static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

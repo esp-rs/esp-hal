@@ -19,16 +19,16 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    entry,
     gpio::{Event, Input, Io, Level, Output, Pull},
     handler,
     interrupt::InterruptConfigurable,
+    main,
     ram,
 };
 
 static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

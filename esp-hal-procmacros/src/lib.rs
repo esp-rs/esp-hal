@@ -49,6 +49,7 @@
 
 use proc_macro::TokenStream;
 
+mod blocking_main;
 mod builder;
 #[cfg(feature = "embassy")]
 mod embassy;
@@ -178,8 +179,37 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[cfg(feature = "embassy")]
 #[proc_macro_attribute]
-pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
+pub fn embassy_main(args: TokenStream, item: TokenStream) -> TokenStream {
     embassy::main(args, item)
+}
+
+/// Attribute to declare the entry point of the program
+///
+/// The specified function will be called by the reset handler *after* RAM has
+/// been initialized. If present, the FPU will also be enabled before the
+/// function is called.
+///
+/// The type of the specified function must be `[unsafe] fn() -> !` (never
+/// ending function)
+///
+/// # Properties
+///
+/// The entry point will be called by the reset handler. The program can't
+/// reference to the entry point, much less invoke it.
+///
+/// # Examples
+///
+/// - Simple entry point
+///
+/// ``` no_run
+/// #[main]
+/// fn main() -> ! {
+///     loop { /* .. */ }
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn blocking_main(args: TokenStream, input: TokenStream) -> TokenStream {
+    blocking_main::main(args, input)
 }
 
 /// Automatically implement the [Builder Lite] pattern for a struct.

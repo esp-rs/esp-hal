@@ -70,11 +70,11 @@
 //! use esp_hal::{
 //!     clock::CpuClock,
 //!     delay::Delay,
-//!     entry,
 //!     gpio::{Io, Level, Output},
+//!     main,
 //! };
 //!
-//! #[entry]
+//! #[main]
 //! fn main() -> ! {
 //!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //!     let peripherals = esp_hal::init(config);
@@ -144,14 +144,19 @@
 mod fmt;
 
 #[cfg(riscv)]
+#[doc(hidden)]
+pub use esp_riscv_rt::entry as __entry;
+#[cfg(riscv)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use esp_riscv_rt::{self, entry, riscv};
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use esp_riscv_rt::{self, riscv};
+#[cfg(xtensa)]
+#[doc(hidden)]
+pub use xtensa_lx_rt::entry as __entry;
 #[cfg(xtensa)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use xtensa_lx;
-#[cfg(xtensa)]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use xtensa_lx_rt::{self, entry};
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use xtensa_lx_rt::{self, xtensa_lx};
 
 // TODO what should we reexport stably?
 #[cfg(any(esp32, esp32s3))]
@@ -189,6 +194,7 @@ pub mod uart;
 
 mod macros;
 
+pub use procmacros::blocking_main as main;
 #[cfg(any(lp_core, ulp_riscv_core))]
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]

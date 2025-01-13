@@ -12,7 +12,7 @@ use syn::{
     Type,
 };
 
-pub(crate) enum WhiteListCaller {
+pub enum WhiteListCaller {
     Interrupt,
 }
 
@@ -102,7 +102,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
-pub(crate) fn check_attr_whitelist(
+pub fn check_attr_whitelist(
     attrs: &[Attribute],
     caller: WhiteListCaller,
 ) -> Result<(), TokenStream> {

@@ -7,7 +7,7 @@ use syn::{
     Token,
 };
 
-pub(crate) struct Args {
+pub struct Args {
     pub(crate) meta: Vec<NestedMeta>,
 }
 
@@ -27,7 +27,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     run(&args.meta, f, main_fn()).unwrap_or_else(|x| x).into()
 }
 
-pub(crate) mod main_mod {
+pub mod main_mod {
     use std::{cell::RefCell, fmt::Display, thread};
 
     use darling::{export::NestedMeta, FromMeta};
@@ -166,7 +166,7 @@ pub(crate) mod main_mod {
 
     pub fn main_fn() -> TokenStream {
         quote! {
-            #[esp_hal::entry]
+            #[esp_hal::main]
             fn main() -> ! {
                 let mut executor = ::esp_hal_embassy::Executor::new();
                 let executor = unsafe { __make_static(&mut executor) };

@@ -34,13 +34,13 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma_buffers,
-    entry,
     gpio::{Input, Level, Output, Pull},
+    main,
     spi::{slave::Spi, Mode},
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

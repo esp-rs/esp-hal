@@ -29,7 +29,6 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma_rx_stream_buffer,
-    entry,
     i2c::{
         self,
         master::{Config, I2c},
@@ -38,12 +37,13 @@ use esp_hal::{
         cam::{self, Camera, RxEightBits},
         LcdCam,
     },
+    main,
     time::RateExtU32,
     Blocking,
 };
 use esp_println::{print, println};
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
