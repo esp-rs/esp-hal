@@ -1,20 +1,21 @@
-use alloc::boxed::Box;
-
 use esp_hal::sync::Locked;
 
-use crate::binary::{
-    c_types,
-    include::{esp_timer_create_args_t, ets_timer},
+use crate::{
+    binary::{
+        c_types::c_void,
+        include::{esp_timer_create_args_t, ets_timer},
+    },
+    compat::malloc::MallocBox as Box,
 };
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TimerCallback {
-    f: unsafe extern "C" fn(*mut c_types::c_void),
-    args: *mut c_types::c_void,
+    f: unsafe extern "C" fn(*mut c_void),
+    args: *mut c_void,
 }
 
 impl TimerCallback {
-    fn new(f: unsafe extern "C" fn(*mut c_types::c_void), args: *mut c_types::c_void) -> Self {
+    fn new(f: unsafe extern "C" fn(*mut c_void), args: *mut c_void) -> Self {
         Self { f, args }
     }
 
@@ -30,7 +31,7 @@ impl From<&esp_timer_create_args_t> for TimerCallback {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct Timer {
     pub ets_timer: *mut ets_timer,
     pub started: u64,
@@ -38,8 +39,39 @@ pub(crate) struct Timer {
     pub active: bool,
     pub periodic: bool,
     pub callback: TimerCallback,
+}
 
-    next: Option<Box<Timer>>,
+struct TimerItem {
+    timer: Timer,
+    next: Option<Box<TimerItem>>,
+}
+
+impl Timer {
+    pub(crate) fn new(
+        ets_timer: *mut ets_timer,
+        pfunction: unsafe extern "C" fn(*mut c_void),
+        parg: *mut c_void,
+    ) -> Self {
+        unsafe {
+            (*ets_timer).next = core::ptr::null_mut();
+            (*ets_timer).period = 0;
+            (*ets_timer).func = None;
+            (*ets_timer).priv_ = core::ptr::null_mut();
+        }
+
+        Self {
+            ets_timer,
+            started: 0,
+            timeout: 0,
+            active: false,
+            periodic: false,
+            callback: TimerCallback::new(pfunction, parg),
+        }
+    }
+
+    fn expired(&self, current_timestamp: u64) -> bool {
+        self.active && crate::timer::time_diff(self.started, current_timestamp) >= self.timeout
+    }
 }
 
 impl Timer {
@@ -49,7 +81,7 @@ impl Timer {
 }
 
 pub(crate) struct TimerQueue {
-    head: Option<Box<Timer>>,
+    head: Option<Box<TimerItem>>,
 }
 
 impl TimerQueue {
@@ -57,86 +89,58 @@ impl TimerQueue {
         Self { head: None }
     }
 
-    fn find(&mut self, ets_timer: *mut ets_timer) -> Option<&mut Box<Timer>> {
-        let mut current = self.head.as_mut();
+    fn find_item(&mut self, p: impl Fn(&TimerItem) -> bool) -> Option<&mut TimerItem> {
+        let mut current = &mut self.head;
         while let Some(timer) = current {
-            if timer.ets_timer == ets_timer {
+            if p(timer) {
                 return Some(timer);
             }
-            current = timer.next.as_mut();
+            current = &mut timer.next;
         }
 
         None
     }
 
-    pub(crate) unsafe fn find_next_due(
-        &mut self,
-        current_timestamp: u64,
-    ) -> Option<&mut Box<Timer>> {
-        let mut current = self.head.as_mut();
-        while let Some(timer) = current {
-            if timer.active
-                && crate::timer::time_diff(timer.started, current_timestamp) >= timer.timeout
-            {
-                return Some(timer);
-            }
-            current = timer.next.as_mut();
-        }
+    fn find_ets_timer(&mut self, ets_timer: *mut ets_timer) -> Option<&mut Timer> {
+        self.find_item(|timer| timer.timer.ets_timer == ets_timer)
+            .map(|item| &mut item.timer)
+    }
 
-        None
+    pub(crate) fn find_next_due(&mut self, current_timestamp: u64) -> Option<&mut Timer> {
+        self.find_item(|timer| timer.timer.expired(current_timestamp))
+            .map(|item| &mut item.timer)
     }
 
     fn remove(&mut self, ets_timer: *mut ets_timer) {
-        if let Some(head) = self.head.as_mut() {
-            if head.ets_timer == ets_timer {
-                self.head = head.next.take();
-                return;
+        if let Some(prev) = self.find_item(|timer| {
+            if let Some(next) = timer.next.as_ref() {
+                next.timer.ets_timer == ets_timer
+            } else {
+                false
             }
-        }
-
-        let timer = self.find(ets_timer);
-        if let Some(to_remove) = timer {
-            let tail = to_remove.next.take();
-
-            let mut current = self.head.as_mut();
-            let before = {
-                let mut found = None;
-                while let Some(before) = current {
-                    if before.next.as_mut().unwrap().ets_timer == ets_timer {
-                        found = Some(before);
-                        break;
-                    }
-                    current = before.next.as_mut();
-                }
-                found
+        }) {
+            // We are removing a timer in the middle/end of the list
+            let mut to_remove = unwrap!(prev.next.take());
+            prev.next = to_remove.next.take();
+            trace!("removed timer {:x}", to_remove.timer.ets_timer as usize);
+        } else if let Some(mut head) = self.head.take() {
+            // We are removing the head or the timer is not in the list
+            let next_head = if head.timer.ets_timer == ets_timer {
+                trace!("removed timer {:x}", ets_timer as usize);
+                head.next.take()
+            } else {
+                // Replace head, it's not what we wanted to remove
+                Some(head)
             };
-
-            if let Some(before) = before {
-                let to_remove = before.next.take().unwrap();
-                let to_remove = Box::into_raw(to_remove);
-                unsafe {
-                    crate::compat::malloc::free(to_remove as *mut _);
-                }
-                before.next = tail;
-            }
+            self.head = next_head;
         }
     }
 
-    fn push(&mut self, to_add: Box<Timer>) -> Result<(), ()> {
-        if self.head.is_none() {
-            self.head = Some(to_add);
-            return Ok(());
-        }
-
-        let mut current = self.head.as_mut();
-        while let Some(timer) = current {
-            if timer.next.is_none() {
-                timer.next = Some(to_add);
-                break;
-            }
-            current = timer.next.as_mut();
-        }
-        Ok(())
+    fn push(&mut self, timer: Timer) {
+        self.head = Some(Box::new(TimerItem {
+            timer,
+            next: self.head.take(),
+        }));
     }
 }
 
@@ -161,7 +165,7 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
     );
 
     TIMERS.with(|timers| {
-        if let Some(timer) = timers.find(ets_timer) {
+        if let Some(timer) = timers.find_ets_timer(ets_timer) {
             timer.started = systick;
             timer.timeout = ticks;
             timer.active = true;
@@ -175,7 +179,7 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
 pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
     trace!("timer disarm");
     TIMERS.with(|timers| {
-        if let Some(timer) = timers.find(ets_timer) {
+        if let Some(timer) = timers.find_ets_timer(ets_timer) {
             trace!("timer_disarm {:x}", timer.id());
             timer.active = false;
         } else {
@@ -187,7 +191,7 @@ pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
 pub fn compat_timer_done(ets_timer: *mut ets_timer) {
     trace!("timer done");
     TIMERS.with(|timers| {
-        if let Some(timer) = timers.find(ets_timer) {
+        if let Some(timer) = timers.find_ets_timer(ets_timer) {
             trace!("timer_done {:x}", timer.id());
             timer.active = false;
 
@@ -205,8 +209,8 @@ pub fn compat_timer_done(ets_timer: *mut ets_timer) {
 
 pub(crate) fn compat_timer_setfn(
     ets_timer: *mut ets_timer,
-    pfunction: unsafe extern "C" fn(*mut c_types::c_void),
-    parg: *mut c_types::c_void,
+    pfunction: unsafe extern "C" fn(*mut c_void),
+    parg: *mut c_void,
 ) {
     trace!(
         "timer_setfn {:x} {:?} {:?}",
@@ -214,35 +218,14 @@ pub(crate) fn compat_timer_setfn(
         pfunction,
         parg
     );
-    let set = TIMERS.with(|timers| unsafe {
-        if let Some(timer) = timers.find(ets_timer) {
+    TIMERS.with(|timers| unsafe {
+        if let Some(timer) = timers.find_ets_timer(ets_timer) {
             timer.callback = TimerCallback::new(pfunction, parg);
             timer.active = false;
 
             (*ets_timer).expire = 0;
-
-            true
         } else {
-            (*ets_timer).next = core::ptr::null_mut();
-            (*ets_timer).period = 0;
-            (*ets_timer).func = None;
-            (*ets_timer).priv_ = core::ptr::null_mut();
-
-            let timer =
-                crate::compat::malloc::calloc(1, core::mem::size_of::<Timer>()) as *mut Timer;
-            (*timer).next = None;
-            (*timer).ets_timer = ets_timer;
-            (*timer).started = 0;
-            (*timer).timeout = 0;
-            (*timer).active = false;
-            (*timer).periodic = false;
-            (*timer).callback = TimerCallback::new(pfunction, parg);
-
-            timers.push(Box::from_raw(timer)).is_ok()
+            timers.push(Timer::new(ets_timer, pfunction, parg));
         }
     });
-
-    if !set {
-        warn!("Failed to set timer function {:x}", ets_timer as usize);
-    }
 }

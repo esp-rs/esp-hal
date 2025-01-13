@@ -1,4 +1,4 @@
-use core::alloc::Layout;
+use core::{alloc::Layout, mem::MaybeUninit, ptr::NonNull};
 
 #[no_mangle]
 pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
@@ -90,5 +90,84 @@ pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
             esp_alloc::MemoryCapability::Internal.into(),
             core::alloc::Layout::from_size_align_unchecked(size, 4),
         )
+    }
+}
+
+struct Mallocator;
+
+impl Mallocator {
+    fn allocate(layout: Layout) -> *mut u8 {
+        extern "C" {
+            fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8;
+        }
+        unsafe { esp_wifi_allocate_from_internal_ram(layout.size()) }
+    }
+
+    fn deallocate(ptr: *mut u8, layout: Layout) {
+        unsafe { alloc::alloc::dealloc(ptr, layout) }
+    }
+}
+
+pub(crate) struct MallocBox<T> {
+    ptr: NonNull<T>,
+}
+
+impl<T> MallocBox<T> {
+    #[inline(always)]
+    pub fn try_new_uninit() -> Option<MallocBox<MaybeUninit<T>>> {
+        let ptr = if core::mem::size_of::<T>() == 0 {
+            NonNull::dangling()
+        } else {
+            let layout = Layout::new::<MaybeUninit<T>>();
+            let ptr = Mallocator::allocate(layout).cast::<MaybeUninit<T>>();
+            NonNull::new(ptr)?
+        };
+
+        Some(MallocBox { ptr })
+    }
+
+    #[inline(always)]
+    pub fn new_uninit() -> MallocBox<MaybeUninit<T>> {
+        unwrap!(
+            Self::try_new_uninit(),
+            "Failed to allocate {} bytes",
+            core::mem::size_of::<T>()
+        )
+    }
+
+    #[inline(always)]
+    pub fn new(value: T) -> MallocBox<T> {
+        let mut this = Self::new_uninit();
+        unsafe { this.ptr.as_mut().write(value) };
+        this.assume_init()
+    }
+}
+
+impl<T> MallocBox<MaybeUninit<T>> {
+    #[inline(always)]
+    pub fn assume_init(self) -> MallocBox<T> {
+        let ptr = self.ptr.cast::<T>();
+        core::mem::forget(self);
+        MallocBox { ptr }
+    }
+}
+
+impl<T> core::ops::Deref for MallocBox<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.as_ref() }
+    }
+}
+
+impl<T> core::ops::DerefMut for MallocBox<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.ptr.as_mut() }
+    }
+}
+
+impl<T> Drop for MallocBox<T> {
+    fn drop(&mut self) {
+        Mallocator::deallocate(self.ptr.as_ptr().cast(), Layout::new::<T>());
     }
 }
