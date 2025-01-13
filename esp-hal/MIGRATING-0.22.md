@@ -453,12 +453,25 @@ e.g.
 
 e.g.
 
-```dif
+```diff
 - while let nb::Result::Ok(_c) = serial.read_byte() {
 -     cnt += 1;
 - }
 + let mut buff = [0u8; 64];
 + let cnt = serial.read_bytes(&mut buff);
+```
+
+Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read
+
+e.g.
+
+```diff
+- uart.write(0x42).ok();
+- let read = block!(ctx.uart.read());
++ let data: [u8; 1] = [0x42];
++ uart.write_bytes(&data);
++ let mut byte = [0u8; 1];
++ while ctx.uart.read_bytes(&mut byte) == 0 {}
 ```
 
 ## Spi `with_miso` has been split
@@ -543,4 +556,12 @@ Macros from `procmacros` crate (`handler`, `ram`, `load_lp_code`) are now import
 -#[entry]
 +#[main]
 fn main() {
+```
+
+## `timer::wait` is now blocking
+
+```diff
+periodic.start(100.millis()).unwrap();
+- nb::block!(periodic.wait()).unwrap();
++ periodic.wait();
 ```
