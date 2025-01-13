@@ -1185,19 +1185,9 @@ where
         sync_regs(register_block);
     }
 
-    /// Write a byte out over the UART
-    fn write_byte(&mut self, word: u8) {
-        self.tx.write_byte(word)
-    }
-
     /// Flush the transmit buffer of the UART
     pub fn flush(&mut self) {
         self.tx.flush()
-    }
-
-    // Read a byte from the UART
-    fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        embedded_hal_nb::serial::Read::read(&mut self.rx)
     }
 
     /// Change the configuration.
