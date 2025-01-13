@@ -210,6 +210,9 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
                 features.push("coex".to_owned());
             }
         }
+        Package::EspHalEmbassy => {
+            features.push("esp-hal/unstable".to_owned());
+        }
         _ => {}
     }
     features

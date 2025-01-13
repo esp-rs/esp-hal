@@ -29,6 +29,19 @@
 //! Embassy **must** be initialized by calling the [init] function. This
 //! initialization must be performed *prior* to spawning any tasks.
 //!
+//! Initialization requires a number of timers to be passed in. The number of
+//! timers required depends on the timer queue flavour used, as well as the
+//! number of executors started. If you use the `multiple-integrated` timer
+//! queue flavour, then you need to pass as many timers as you start executors.
+//! In other cases, you can pass a single timer.
+//!
+//! ## Configuration
+//!
+//! You can configure the behaviour of the embassy runtime by using the
+//! following environment variables:
+#![doc = ""]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_hal_embassy_config_table.md"))]
+#![doc = ""]
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
@@ -49,8 +62,9 @@ pub use self::executor::{Executor, InterruptExecutor};
 use self::time_driver::{EmbassyTimer, Timer};
 
 #[cfg(feature = "executors")]
-mod executor;
+pub(crate) mod executor;
 mod time_driver;
+mod timer_queue;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -142,8 +156,9 @@ impl_array!(4);
 /// - A mutable static array of `OneShotTimer` instances
 /// - A 2, 3, 4 element array of `AnyTimer` instances
 ///
-/// Note that if you use the `integrated-timers` feature,
-/// you need to pass as many timers as you start executors.
+/// Note that if you use the `multiple-integrated` timer-queue flavour, then
+/// you need to pass as many timers as you start executors. In other cases,
+/// you can pass a single timer.
 ///
 /// # Examples
 ///
