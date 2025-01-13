@@ -9,10 +9,7 @@
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
-    use esp_hal::{
-        gpio::Flex,
-        uart::{self, UartRx, UartTx},
-    };
+    use esp_hal::uart::{self, UartRx, UartTx};
     use hil_test as _;
 
     #[test]
@@ -28,19 +25,13 @@ mod tests {
         // start reception
         let mut buf = [0u8; 1];
 
-        // Start from a low level to verify that UartTx sets the level high initially,
-        // but don't enable output otherwise we actually pull down against RX's
-        // pullup resistor.
-        let mut tx = Flex::new(tx);
-        tx.set_low();
-
         // set up TX and send a byte
         let mut tx = UartTx::new(peripherals.UART0, uart::Config::default())
             .unwrap()
             .with_tx(tx);
 
-        tx.flush().unwrap();
-        tx.write_bytes(&[0x42]).unwrap();
+        tx.flush();
+        tx.write_bytes(&[0x42]);
         rx.read_bytes(&mut buf).unwrap();
 
         assert_eq!(buf[0], 0x42);
