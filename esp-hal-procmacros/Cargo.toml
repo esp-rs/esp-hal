@@ -41,9 +41,3 @@ is-lp-core = []
 ## Provide an `#[entry]` macro for running applications on the ESP32-S2/S3's
 ## ULP core.
 is-ulp-core = []
-
-## Suport RISC-V architecture
-riscv = []
-
-## Suport Xtensa architecture
-xtensa = []

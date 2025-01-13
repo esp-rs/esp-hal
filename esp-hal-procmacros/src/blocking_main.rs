@@ -12,7 +12,7 @@ pub fn main(args: TokenStream, input: TokenStream) -> TokenStream {
     let f = parse_macro_input!(input as ItemFn);
 
     if f.sig.asyncness.is_some() {
-        return parse::Error::new(Span::call_site(), "If you want to use `async` please use `esp-hal-embassy` (https://docs.rs/esp-hal-embassy/latest/esp_hal_embassy/)")
+        return parse::Error::new(Span::call_site(), "If you want to use `async` please use `esp-hal-embassy`'s `#[esp_hal_embassy::main]` macro instead. (See https://docs.rs/esp-hal-embassy/latest/esp_hal_embassy/)")
             .to_compile_error()
             .into();
     }
