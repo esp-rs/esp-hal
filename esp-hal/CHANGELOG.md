@@ -55,7 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `adc::{AdcCalSource, Attenuation, Resolution}` now implement `Hash` and `defmt::Format` (#2840)
 - `rtc_cntl::{RtcFastClock, RtcSlowClock, RtcCalSel}` now implement `PartialEq`, `Eq`, `Hash` and `defmt::Format` (#2840)
 - Added `tsens::TemperatureSensor` peripheral for ESP32C6 and ESP32C3 (#2875)
-- Added `with_rx()` and `with_tx()` methods to Uart, UartRx, and UartTx ()
+- Added `with_rx()` and `with_tx()` methods to Uart, UartRx, and UartTx (#2904)
+
+- `UartRx::check_for_errors`, `Uart::check_for_rx_errors`, `{Uart, UartRx}::read_buffered_bytes` (#2935)
 
 ### Changed
 
@@ -106,6 +108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `I` prefix from `DriveStrength` enum variants. (#2922)
 - Removed the `Attenuation` prefix from `Attenuation` enum variants. (#2922)
 - Renamed / changed some I2C error variants (#2844, #2862)
+
+- `{Uart, UartRx}::read_bytes` now blocks until the buffer is filled. (#2935)
 
 ### Fixed
 
