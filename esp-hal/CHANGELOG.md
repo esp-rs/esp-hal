@@ -139,6 +139,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed all peripheral instance type parameters and `new_typed` constructors (#2907)
 
+- Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
+
 ## [0.22.0] - 2024-11-20
 
 ### Added
