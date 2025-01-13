@@ -230,7 +230,7 @@ where
 
 impl From<Flex<'static>> for InputSignal {
     fn from(input: Flex<'static>) -> Self {
-        Self::new(input.degrade())
+        Self::new(unsafe { AnyPin::steal(input.pin.number()) })
     }
 }
 
@@ -359,14 +359,14 @@ impl<P> From<P> for OutputSignal
 where
     P: OutputPin,
 {
-    fn from(input: P) -> Self {
-        Self::new(input.degrade())
+    fn from(output: P) -> Self {
+        Self::new(output.degrade())
     }
 }
 
 impl From<Flex<'static>> for OutputSignal {
-    fn from(input: Flex<'static>) -> Self {
-        Self::new(input.degrade())
+    fn from(output: Flex<'static>) -> Self {
+        Self::new(unsafe { AnyPin::steal(output.pin.number()) })
     }
 }
 

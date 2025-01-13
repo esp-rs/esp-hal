@@ -110,7 +110,8 @@ pub enum Error {
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
-/// let pin_0 = Input::new(peripherals.GPIO4, Pull::None);
+/// let mut pin_4 = peripherals.GPIO4;
+/// let pin_4_input = Input::new(&mut pin_4, Pull::None);
 ///
 /// let reason =
 ///     reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -119,7 +120,8 @@ pub enum Error {
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
-/// let ext0 = Ext0WakeupSource::new(pin_0, WakeupLevel::High);
+/// core::mem::drop(pin_4_input);
+/// let ext0 = Ext0WakeupSource::new(&mut pin_4, WakeupLevel::High);
 ///
 /// delay.delay_millis(100);
 /// rtc.sleep_deep(&[&timer, &ext0]);
@@ -161,19 +163,21 @@ impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
-/// let pin_4 = Input::new(peripherals.GPIO4, Pull::None);
 /// let mut pin_2 = peripherals.GPIO2;
+/// let mut pin_4 = peripherals.GPIO4;
+/// let pin_4_driver = Input::new(&mut pin_4, Pull::None);
 ///
-/// let reason =
-/// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
+/// let reason = reset_reason(Cpu::ProCpu)
+///     .unwrap_or(SocResetReason::ChipPowerOn);
 ///
 /// let wake_reason = wakeup_cause();
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
+/// // Drop the driver to access `pin_4`
+/// core::mem::drop(pin_4_driver);
 ///
-/// let mut wakeup_pins: [&mut dyn RtcPin; 2] =
-///     [&mut *pin_4.into_ref(), &mut pin_2];
+/// let mut wakeup_pins: [&mut dyn RtcPin; 2] = [&mut pin_4, &mut pin_2];
 ///
 /// let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
 ///
@@ -215,8 +219,9 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
-/// let pin2 = Input::new(peripherals.GPIO2, Pull::None);
+/// let mut pin2 = peripherals.GPIO2;
 /// let mut pin3 = peripherals.GPIO3;
+/// let mut pin2_input = Input::new(&mut pin2, Pull::None);
 ///
 /// let reason =
 /// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -225,8 +230,11 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
+/// core::mem::drop(pin2_input);
+///
 /// let wakeup_pins: &mut [(&mut dyn RtcPinWithResistors, WakeupLevel)] =
-///     &mut [(&mut *pin2.into_ref(), WakeupLevel::Low),
+/// &mut [
+///     (&mut pin2, WakeupLevel::Low),
 ///     (&mut pin3, WakeupLevel::High),
 /// ];
 ///
@@ -277,15 +285,9 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 ///
 /// let delay = Delay::new();
 /// let timer = TimerWakeupSource::new(Duration::from_secs(10));
-#[cfg_attr(
-    any(esp32c3, esp32c2),
-    doc = "let pin_0 = Input::new(peripherals.GPIO2, Pull::None);"
-)]
+#[cfg_attr(any(esp32c3, esp32c2), doc = "let mut pin_0 = peripherals.GPIO2;")]
 #[cfg_attr(any(esp32c3, esp32c2), doc = "let mut pin_1 = peripherals.GPIO3;")]
-#[cfg_attr(
-    esp32s3,
-    doc = "let pin_0 = Input::new(peripherals.GPIO17, Pull::None);"
-)]
+#[cfg_attr(esp32s3, doc = "let mut pin_0 = peripherals.GPIO17;")]
 #[cfg_attr(esp32s3, doc = "let mut pin_1 = peripherals.GPIO18;")]
 #[cfg_attr(
     any(esp32c3, esp32c2),
@@ -295,7 +297,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
     esp32s3,
     doc = "let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut ["
 )]
-///     (&mut *pin_0.into_ref(), WakeupLevel::Low),
+///     (&mut pin_0, WakeupLevel::Low),
 ///     (&mut pin_1, WakeupLevel::High),
 /// ];
 ///
