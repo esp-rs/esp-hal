@@ -362,7 +362,7 @@ where
     }
 }
 
-impl<'d, BUF> I2sParallelTransfer<'d, BUF, Async>
+impl<BUF> I2sParallelTransfer<'_, BUF, Async>
 where
     BUF: DmaTxBuffer,
 {
