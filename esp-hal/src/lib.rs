@@ -144,15 +144,9 @@
 mod fmt;
 
 #[cfg(riscv)]
-#[doc(hidden)]
-pub use esp_riscv_rt::entry as __entry;
-#[cfg(riscv)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use esp_riscv_rt::{self, riscv};
-#[cfg(xtensa)]
-#[doc(hidden)]
-pub use xtensa_lx_rt::entry as __entry;
 #[cfg(xtensa)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
@@ -390,12 +384,19 @@ impl_persistable!(atomic AtomicU8, AtomicI8, AtomicU16, AtomicI16, AtomicU32, At
 unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}
 
 #[doc(hidden)]
-#[instability::unstable]
 pub mod __macro_implementation {
-    //! Unstable private implementation details of esp-hal-procmacros.
+    //! Private implementation details of esp-hal-procmacros.
 
+    #[instability::unstable]
     pub const fn assert_is_zeroable<T: bytemuck::Zeroable>() {}
+
+    #[instability::unstable]
     pub const fn assert_is_persistable<T: super::Persistable>() {}
+
+    #[cfg(riscv)]
+    pub use esp_riscv_rt::entry as __entry;
+    #[cfg(xtensa)]
+    pub use xtensa_lx_rt::entry as __entry;
 }
 
 /// Available CPU cores

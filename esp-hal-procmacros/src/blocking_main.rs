@@ -24,7 +24,7 @@ pub fn main(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     quote::quote!(
-        #[esp_hal::__entry]
+        #[esp_hal::__macro_implementation::__entry]
         #f
     )
     .into()
