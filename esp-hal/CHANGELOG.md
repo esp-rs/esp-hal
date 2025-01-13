@@ -107,6 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `Attenuation` prefix from `Attenuation` enum variants. (#2922)
 - Renamed / changed some I2C error variants (#2844, #2862)
 
+- The `entry` macro is replaced by the `main` macro (#2941)
+
 ### Fixed
 
 - Xtensa devices now correctly enable the `esp-hal-procmacros/rtc-slow` feature (#2594)
