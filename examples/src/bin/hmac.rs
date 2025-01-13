@@ -60,8 +60,8 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    entry,
     hmac::{Hmac, HmacPurpose, KeyId},
+    main,
     rng::Rng,
 };
 use esp_println::println;
@@ -71,7 +71,7 @@ use sha2::Sha256;
 
 type HmacSha256 = HmacSw<Sha256>;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

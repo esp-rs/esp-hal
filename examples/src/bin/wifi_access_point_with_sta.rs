@@ -23,7 +23,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    entry,
+    main,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -46,7 +46,7 @@ use smoltcp::{
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());

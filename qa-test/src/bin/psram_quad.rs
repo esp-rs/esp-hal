@@ -14,7 +14,7 @@ use alloc::{string::String, vec::Vec};
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{entry, psram};
+use esp_hal::{main, psram};
 use esp_println::println;
 
 fn init_psram_heap(start: *mut u8, size: usize) {
@@ -30,7 +30,7 @@ fn init_psram_heap(start: *mut u8, size: usize) {
 #[cfg(is_not_release)]
 compile_error!("PSRAM example must be built in release mode!");
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());

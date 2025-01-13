@@ -16,7 +16,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
     delay::Delay,
-    entry,
+    main,
     rng::Rng,
     time::ExtU64,
     timer::timg::TimerGroup,
@@ -35,7 +35,7 @@ const SSID: &str = "esp-wifi 802.11 injection";
 /// This is an arbitrary MAC address, used for the fake beacon frames.
 const MAC_ADDRESS: [u8; 6] = [0x00, 0x80, 0x41, 0x13, 0x37, 0x42];
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());

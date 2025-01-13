@@ -35,7 +35,6 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma_loop_buffer,
-    entry,
     gpio::{Level, Output},
     i2c::{self, master::I2c},
     lcd_cam::{
@@ -47,13 +46,14 @@ use esp_hal::{
         },
         LcdCam,
     },
+    main,
     peripherals::Peripherals,
     time::RateExtU32,
     Blocking,
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
 

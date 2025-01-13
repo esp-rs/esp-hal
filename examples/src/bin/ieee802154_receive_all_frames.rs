@@ -5,11 +5,11 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::entry;
+use esp_hal::main;
 use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, peripherals.RADIO_CLK);

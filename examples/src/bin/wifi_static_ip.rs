@@ -19,7 +19,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    entry,
+    main,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -43,7 +43,7 @@ const PASSWORD: &str = env!("PASSWORD");
 const STATIC_IP: &str = env!("STATIC_IP");
 const GATEWAY_IP: &str = env!("GATEWAY_IP");
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());

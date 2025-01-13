@@ -13,8 +13,8 @@ use core::time::Duration;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    entry,
     gpio::{Input, Pull, RtcPin},
+    main,
     peripheral::Peripheral,
     rtc_cntl::{
         reset_reason,
@@ -27,7 +27,7 @@ use esp_hal::{
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

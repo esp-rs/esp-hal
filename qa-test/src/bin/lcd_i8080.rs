@@ -27,18 +27,18 @@ use esp_hal::{
     delay::Delay,
     dma::DmaTxBuf,
     dma_tx_buffer,
-    entry,
     gpio::{Input, Level, Output, Pull},
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
         LcdCam,
     },
+    main,
     time::RateExtU32,
     Blocking,
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

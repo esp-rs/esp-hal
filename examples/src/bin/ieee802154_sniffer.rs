@@ -10,14 +10,14 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    entry,
+    main,
     reset::software_reset,
     uart::{self, Uart},
 };
 use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

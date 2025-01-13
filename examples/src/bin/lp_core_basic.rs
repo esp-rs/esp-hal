@@ -16,14 +16,14 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    entry,
     gpio::lp_io::LowPowerOutput,
     load_lp_code,
     lp_core::{LpCore, LpCoreWakeupSource},
+    main,
 };
 use esp_println::{print, println};
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
