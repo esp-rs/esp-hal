@@ -19,7 +19,7 @@ pub(crate) extern "C" fn timer_task(_param: *mut esp_wifi_sys::c_types::c_void) 
     loop {
         let current_timestamp = systimer_count();
         let to_run = TIMERS.with(|timers| {
-            let to_run = unsafe { timers.find_next_due(current_timestamp) }?;
+            let to_run = timers.find_next_due(current_timestamp)?;
 
             to_run.active = to_run.periodic;
 

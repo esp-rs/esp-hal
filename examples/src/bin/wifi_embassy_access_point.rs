@@ -152,7 +152,6 @@ async fn main(spawner: Spawner) -> ! {
         use embedded_io_async::Write;
 
         let mut buffer = [0u8; 1024];
-        let mut pos = 0;
         loop {
             match socket.read(&mut buffer).await {
                 Ok(0) => {
@@ -160,16 +159,13 @@ async fn main(spawner: Spawner) -> ! {
                     break;
                 }
                 Ok(len) => {
-                    let to_print =
-                        unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
+                    let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
 
+                    print!("{}", to_print);
                     if to_print.contains("\r\n\r\n") {
-                        print!("{}", to_print);
                         println!();
                         break;
                     }
-
-                    pos += len;
                 }
                 Err(e) => {
                     println!("read error: {:?}", e);
