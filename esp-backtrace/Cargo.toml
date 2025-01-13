@@ -2,7 +2,7 @@
 name         = "esp-backtrace"
 version      = "0.14.2"
 edition      = "2021"
-rust-version = "1.76.0"
+rust-version = "1.79.0"
 description  = "Bare-metal backtrace support for Espressif devices"
 keywords     = ["backtrace", "embedded", "esp32", "espressif"]
 categories   = ["embedded", "hardware-support", "no-std"]
@@ -14,12 +14,14 @@ default-target = "riscv32imc-unknown-none-elf"
 features       = ["esp32c3", "panic-handler", "exception-handler", "println", "esp-println/uart"]
 
 [dependencies]
-defmt       = { version = "0.3.8",  optional = true }
+defmt       = { version = "0.3.10",  optional = true }
 esp-println = { version = "0.12.0", optional = true, default-features = false, path = "../esp-println" }
-semihosting = { version = "0.1.15", optional = true }
+semihosting = { version = "0.1.17", optional = true }
+embedded-io = { version = "0.6.1", optional = true }
 
 [build-dependencies]
-esp-build = { version = "0.1.0", path = "../esp-build" }
+esp-build       = { version = "0.1.0", path = "../esp-build" }
+esp-metadata    = { version = "0.4.0", path = "../esp-metadata" }
 
 [features]
 default = ["colors"]
@@ -45,6 +47,8 @@ print-float-registers = [] # TODO support esp32p4
 # You may optionally enable one or more of the below features to provide
 # additional functionality:
 colors               = []
+coredump             = [ "dep:embedded-io" ]
+coredump-all         = [ "dep:embedded-io" ]
 custom-halt          = []
 custom-pre-backtrace = []
 exception-handler    = []
