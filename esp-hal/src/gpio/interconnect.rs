@@ -442,8 +442,6 @@ impl OutputSignal {
             pub fn set_output_high(&mut self, on: bool);
             pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength);
             pub fn enable_open_drain(&mut self, on: bool);
-            pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool);
-            pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool);
             pub fn is_set_high(&self) -> bool;
         }
     }
@@ -490,8 +488,6 @@ impl DirectOutputSignal {
             fn set_output_high(&mut self, on: bool);
             fn set_drive_strength(&mut self, strength: gpio::DriveStrength);
             fn enable_open_drain(&mut self, on: bool);
-            fn internal_pull_up_in_sleep_mode(&mut self, on: bool);
-            fn internal_pull_down_in_sleep_mode(&mut self, on: bool);
             fn is_set_high(&self) -> bool;
         }
     }
@@ -708,8 +704,6 @@ impl OutputConnection {
             pub fn set_output_high(&mut self, on: bool);
             pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength);
             pub fn enable_open_drain(&mut self, on: bool);
-            pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool);
-            pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool);
 
             // These don't need to be public, the intended way is `connect_to` and `disconnect_from`
             fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal);

@@ -2045,18 +2045,6 @@ impl AnyPin {
             .modify(|_, w| w.pad_driver().bit(on));
     }
 
-    /// Configure internal pull-up resistor in sleep mode
-    #[inline]
-    pub(crate) fn internal_pull_up_in_sleep_mode(&mut self, on: bool) {
-        io_mux_reg(self.number()).modify(|_, w| w.mcu_wpu().bit(on));
-    }
-
-    /// Configure internal pull-down resistor in sleep mode
-    #[inline]
-    pub(crate) fn internal_pull_down_in_sleep_mode(&mut self, on: bool) {
-        io_mux_reg(self.number()).modify(|_, w| w.mcu_wpd().bit(on));
-    }
-
     /// Is the output set to high
     #[inline]
     pub(crate) fn is_set_high(&self) -> bool {

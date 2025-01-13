@@ -45,7 +45,7 @@ mod tests {
         ctx.tx.flush().unwrap();
         ctx.tx.write_bytes(&byte).unwrap();
         let mut buf = [0u8; 1];
-        while ctx.rx.read_bytes(&mut buf) == 0 {}
+        ctx.rx.read_bytes(&mut buf).unwrap();
 
         assert_eq!(buf[0], 0x42);
     }
@@ -58,15 +58,8 @@ mod tests {
         ctx.tx.flush().unwrap();
         ctx.tx.write_bytes(&bytes).unwrap();
 
-        let mut bytes_read = 0;
-        loop {
-            bytes_read += ctx.rx.read_bytes(&mut buf[bytes_read..]);
-            if bytes_read == 3 {
-                break;
-            }
-        }
+        ctx.rx.read_bytes(&mut buf).unwrap();
 
-        assert_eq!(bytes_read, 3);
         assert_eq!(buf, bytes);
     }
 }
