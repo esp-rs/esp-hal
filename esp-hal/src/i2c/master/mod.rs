@@ -47,6 +47,7 @@ use core::{
 #[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
 use embedded_hal::i2c::Operation as EhalOperation;
+use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 
 use crate::{
@@ -63,7 +64,6 @@ use crate::{
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
-    Cpu,
     DriverMode,
 };
 
@@ -530,7 +530,29 @@ impl<'d> I2c<'d, Blocking> {
         Ok(i2c)
     }
 
-    // TODO: missing interrupt APIs
+    /// Listen for the given interrupts
+    #[instability::unstable]
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<Event>>) {
+        self.i2c.info().enable_listen(interrupts.into(), true)
+    }
+
+    /// Unlisten the given interrupts
+    #[instability::unstable]
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<Event>>) {
+        self.i2c.info().enable_listen(interrupts.into(), false)
+    }
+
+    /// Gets asserted interrupts
+    #[instability::unstable]
+    pub fn interrupts(&mut self) -> EnumSet<Event> {
+        self.i2c.info().interrupts()
+    }
+
+    /// Resets asserted interrupts
+    #[instability::unstable]
+    pub fn clear_interrupts(&mut self, interrupts: EnumSet<Event>) {
+        self.i2c.info().clear_interrupts(interrupts)
+    }
 
     /// Configures the I2C peripheral to operate in asynchronous mode.
     pub fn into_async(mut self) -> I2c<'d, Async> {
@@ -609,19 +631,25 @@ impl private::Sealed for I2c<'_, Blocking> {}
 
 impl InterruptConfigurable for I2c<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        let interrupt = self.driver().info.interrupt;
-        for core in Cpu::other() {
-            crate::interrupt::disable(core, interrupt);
-        }
-        unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+        self.i2c.info().set_interrupt_handler(handler);
     }
 }
 
 #[cfg_attr(esp32, allow(dead_code))]
-pub(crate) enum Event {
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum Event {
+    /// Triggered when op_code of the master indicates an END command and an END
+    /// condition is detected.
     EndDetect,
+
+    /// Triggered when the I2C controller detects a STOP bit.
     TxComplete,
+
+    /// Triggered when FIFO_PRT_EN is 1 and the
+    /// pointers of TX FIFO are less than TXFIFO_WM_THRHD[4:0].
     #[cfg(not(any(esp32, esp32s2)))]
     TxFifoWatermark,
 }
@@ -726,7 +754,7 @@ impl core::future::Future for I2cFuture<'_> {
 impl<'d> I2c<'d, Async> {
     /// Configure the I2C peripheral to operate in blocking mode.
     pub fn into_blocking(self) -> I2c<'d, Blocking> {
-        crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
+        self.i2c.info().disable_interrupts();
 
         I2c {
             i2c: self.i2c,
@@ -1039,6 +1067,73 @@ impl Info {
     /// Returns the register block for this I2C instance.
     pub fn register_block(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
+    }
+
+    /// Listen for the given interrupts
+    fn enable_listen(&self, interrupts: EnumSet<Event>, enable: bool) {
+        let reg_block = self.register_block();
+
+        reg_block.int_ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    Event::EndDetect => w.end_detect().bit(enable),
+                    Event::TxComplete => w.trans_complete().bit(enable),
+                    #[cfg(not(any(esp32, esp32s2)))]
+                    Event::TxFifoWatermark => w.txfifo_wm().bit(enable),
+                };
+            }
+            w
+        });
+    }
+
+    fn interrupts(&self) -> EnumSet<Event> {
+        let mut res = EnumSet::new();
+        let reg_block = self.register_block();
+
+        let ints = reg_block.int_raw().read();
+
+        if ints.end_detect().bit_is_set() {
+            res.insert(Event::EndDetect);
+        }
+        if ints.trans_complete().bit_is_set() {
+            res.insert(Event::TxComplete);
+        }
+        #[cfg(not(any(esp32, esp32s2)))]
+        if ints.txfifo_wm().bit_is_set() {
+            res.insert(Event::TxFifoWatermark);
+        }
+
+        res
+    }
+
+    fn clear_interrupts(&self, interrupts: EnumSet<Event>) {
+        let reg_block = self.register_block();
+
+        reg_block.int_clr().write(|w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    Event::EndDetect => w.end_detect().clear_bit_by_one(),
+                    Event::TxComplete => w.trans_complete().clear_bit_by_one(),
+                    #[cfg(not(any(esp32, esp32s2)))]
+                    Event::TxFifoWatermark => w.txfifo_wm().clear_bit_by_one(),
+                };
+            }
+            w
+        });
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, self.interrupt);
+        }
+        self.enable_listen(EnumSet::all(), false);
+        self.clear_interrupts(EnumSet::all());
+        unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
+        unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
+    }
+
+    fn disable_interrupts(&self) {
+        crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
     }
 }
 
