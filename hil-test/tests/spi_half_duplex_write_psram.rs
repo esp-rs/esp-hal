@@ -71,7 +71,7 @@ mod tests {
         )
         .unwrap()
         .with_sck(sclk)
-        .with_mosi(mosi)
+        .with_sio0(mosi)
         .with_dma(dma_channel);
 
         Context {
