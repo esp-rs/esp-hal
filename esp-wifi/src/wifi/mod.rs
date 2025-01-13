@@ -83,11 +83,11 @@ pub mod utils;
 #[cfg(coex)]
 use include::{coex_adapter_funcs_t, coex_pre_init, esp_coex_adapter_register};
 
-#[cfg(all(csi_enable, esp32c6))]
+#[cfg(all(csi, esp32c6))]
 use crate::binary::include::wifi_csi_acquire_config_t;
-#[cfg(csi_enable)]
+#[cfg(csi)]
 pub use crate::binary::include::wifi_csi_info_t;
-#[cfg(csi_enable)]
+#[cfg(csi)]
 use crate::binary::include::{
     esp_wifi_set_csi,
     esp_wifi_set_csi_config,
@@ -352,13 +352,13 @@ impl Default for ClientConfiguration {
     }
 }
 
-#[cfg(csi_enable)]
+#[cfg(csi)]
 pub(crate) trait CsiCallback: FnMut(crate::binary::include::wifi_csi_info_t) {}
 
-#[cfg(csi_enable)]
+#[cfg(csi)]
 impl<T> CsiCallback for T where T: FnMut(crate::binary::include::wifi_csi_info_t) {}
 
-#[cfg(csi_enable)]
+#[cfg(csi)]
 unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
@@ -370,7 +370,7 @@ unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
 #[derive(Clone, PartialEq, Eq)]
 // https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
 /// Channel state information(CSI) configuration
-#[cfg(all(not(esp32c6), csi_enable))]
+#[cfg(all(not(esp32c6), csi))]
 pub struct CsiConfig {
     /// Enable to receive legacy long training field(lltf) data.
     pub lltf_en: bool,
@@ -397,7 +397,7 @@ pub struct CsiConfig {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-#[cfg(all(esp32c6, csi_enable))]
+#[cfg(all(esp32c6, csi))]
 // See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
 pub struct CsiConfig {
     /// Enable to acquire CSI.
@@ -428,7 +428,7 @@ pub struct CsiConfig {
     pub reserved: u32,
 }
 
-#[cfg(csi_enable)]
+#[cfg(csi)]
 impl Default for CsiConfig {
     #[cfg(not(esp32c6))]
     fn default() -> Self {
@@ -464,7 +464,7 @@ impl Default for CsiConfig {
     }
 }
 
-#[cfg(csi_enable)]
+#[cfg(csi)]
 impl From<CsiConfig> for wifi_csi_config_t {
     fn from(config: CsiConfig) -> Self {
         #[cfg(not(esp32c6))]
@@ -503,7 +503,7 @@ impl From<CsiConfig> for wifi_csi_config_t {
     }
 }
 
-#[cfg(csi_enable)]
+#[cfg(csi)]
 impl CsiConfig {
     /// Set CSI data configuration
     pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
@@ -2447,7 +2447,7 @@ impl<'d> WifiController<'d> {
     }
 
     /// Set CSI configuration and register the receiving callback.
-    #[cfg(csi_enable)]
+    #[cfg(csi)]
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,

@@ -82,6 +82,8 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - Avoid abbreviations and contractions in the API, where possible.
   - Saving a few characters may introduce ambiguity, e.g `SpiTransDone`, is it `Transmit` or `Transfer`?
   - Common abbreviations, that are well understood such as `Dma` are perfectly fine.
+- Config options should not affect the public API.
+  - If you add a new configuration option using `esp-config`, the added option should not alter the public API of the package being configured.
 
 ## Maintainability
 
