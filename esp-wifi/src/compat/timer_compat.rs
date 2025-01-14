@@ -23,7 +23,8 @@ impl EtsTimer {
 
     fn set_timer_handle(&mut self, timer: timer_queue::Timer) {
         unsafe {
-            (*(self.0)).priv_ = core::mem::transmute(timer);
+            (*(self.0)).priv_ =
+                core::mem::transmute::<timer_queue::Timer, *mut c_types::c_void>(timer);
         }
     }
 
@@ -150,9 +151,7 @@ pub(crate) fn compat_timer_setfn(
     );
 
     let mut timer = EtsTimer(ets_timer);
-    unsafe {
-        timer.set_callback(core::mem::transmute(pfunction), core::mem::transmute(parg));
-    }
+    timer.set_callback(Some(pfunction), parg);
     timer.set_armed(false);
 }
 
