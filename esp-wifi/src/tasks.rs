@@ -20,7 +20,11 @@ pub(crate) extern "C" fn timer_task(_param: *mut esp_wifi_sys::c_types::c_void) 
         // run the due timer callback NOT in an interrupt free context
         if let Some((func, param)) = get_next_due_timer() {
             if let Some(func) = func {
-                trace!("trigger timer callback {:p} {:p}", func, param);
+                trace!(
+                    "trigger timer callback {:x} {:x}",
+                    func as usize,
+                    param as usize
+                );
                 unsafe {
                     func(param as *mut _);
                 }
