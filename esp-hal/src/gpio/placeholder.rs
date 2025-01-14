@@ -34,7 +34,6 @@ impl Level {
         *self == Level::High
     }
 
-    #[doc(hidden)]
     pub(crate) fn connect_input_to_peripheral(&mut self, signal: InputSignal) {
         let value = match self {
             Level::High => ONE_INPUT,
