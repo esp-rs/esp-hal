@@ -62,7 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bump MSRV to 1.83 (#2615)
 - In addition to taking by value, peripheral drivers can now mutably borrow DMA channel objects. (#2526)
 - DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
 - The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
@@ -110,6 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed / changed some I2C error variants (#2844, #2862)
 - The `entry` macro is replaced by the `main` macro (#2941)
 - `{Uart, UartRx}::read_bytes` now blocks until the buffer is filled. (#2935)
+- Bump MSRV to 1.84 (#2951)
 
 ### Fixed
 

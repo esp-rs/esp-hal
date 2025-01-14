@@ -2,7 +2,7 @@
 name         = "esp-hal-procmacros"
 version      = "0.15.0"
 edition      = "2021"
-rust-version = "1.83.0"
+rust-version = "1.84.0"
 description  = "Procedural macros for esp-hal"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"

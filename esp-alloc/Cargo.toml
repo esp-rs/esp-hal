@@ -2,7 +2,7 @@
 name         = "esp-alloc"
 version      = "0.5.0"
 edition      = "2021"
-rust-version = "1.68"
+rust-version = "1.84.0"
 description  = "A heap allocator for Espressif devices"
 keywords     = ["allocator", "embedded", "embedded-hal", "esp32", "espressif", "memory"]
 categories   = ["embedded", "memory-management", "no-std"]

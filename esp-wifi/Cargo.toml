@@ -2,7 +2,7 @@
 name = "esp-wifi"
 version = "0.11.0"
 edition = "2021"
-rust-version  = "1.83.0"
+rust-version  = "1.84.0"
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
 documentation = "https://docs.esp-rs.org/esp-hal/"
 keywords = ["wifi", "bluetooth", "esp-now", "esp32", "no-std"]

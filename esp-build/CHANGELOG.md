@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Use `panic` instead of `process::exit` in esp-build (#2402 )
+- Bump MSRV to 1.84 (#2951)
 
 ### Removed
 
