@@ -44,7 +44,7 @@ pub(crate) mod constants {
     pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
     /// The starting address of the Remote Control (RMT) module's RAM.
     pub const RMT_RAM_START: usize = 0x3ff56800;
-    /// The size, in bytes, of each RMT channel's dedicated RAM.
+    /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 64;
     /// The lower bound of the system's DRAM (Data RAM) address space.
     pub const SOC_DRAM_LOW: usize = 0x3FFA_E000;

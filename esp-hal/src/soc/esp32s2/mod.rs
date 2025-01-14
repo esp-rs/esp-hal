@@ -48,7 +48,7 @@ pub(crate) mod constants {
     pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
     /// Start address of the RMT (Remote Control) peripheral's RAM.
     pub const RMT_RAM_START: usize = 0x3f416400;
-    /// Size of the RAM allocated per RMT channel, in bytes.
+    /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 64;
     /// Start address of the system's DRAM (low range).
     pub const SOC_DRAM_LOW: usize = 0x3FFB_0000;
