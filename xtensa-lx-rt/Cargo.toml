@@ -2,7 +2,7 @@
 name         = "xtensa-lx-rt"
 version      = "0.17.2"
 edition      = "2021"
-rust-version = "1.65"
+rust-version = "1.84.0"
 description  = "Minimal startup/runtime for Xtensa LX CPUs"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"

@@ -2,7 +2,7 @@
 name         = "esp-riscv-rt"
 version      = "0.9.1"
 edition      = "2021"
-rust-version = "1.65"
+rust-version = "1.84.0"
 description  = "Minimal runtime / startup for RISC-V CPUs from Espressif"
 keywords     = ["esp32", "espressif", "riscv", "runtime", "startup"]
 categories   = ["embedded", "hardware-support", "no-std"]
