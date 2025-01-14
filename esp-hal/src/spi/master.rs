@@ -95,6 +95,7 @@ use crate::{
 #[derive(Debug, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
+#[instability::unstable]
 pub enum SpiInterrupt {
     /// Indicates that the SPI transaction has completed successfully.
     ///
@@ -504,21 +505,8 @@ where
         }
     }
 
-    /// Read a byte from SPI.
-    ///
-    /// Sends out a stuffing byte for every byte to read. This function doesn't
-    /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`Self::transfer`] instead.
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        self.driver().read_byte()
-    }
-
-    /// Write a byte to SPI.
-    pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        self.driver().write_byte(word)
-    }
-
-    /// Write bytes to SPI.
+    /// Write bytes to SPI. After writing, flush is called to ensure all data
+    /// has been transmitted.
     pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
         self.driver().write_bytes(words)?;
         self.driver().flush()?;
@@ -526,7 +514,13 @@ where
         Ok(())
     }
 
-    /// Sends `words` to the slave. Returns the `words` received from the slave
+    /// Read bytes from SPI. The provided slice is filled with data received
+    /// from the slave.
+    pub fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.driver().read_bytes(words)
+    }
+
+    /// Sends `words` to the slave. Returns the `words` received from the slave.
     pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         self.driver().transfer(words)
     }
@@ -649,8 +643,8 @@ where
     /// to the MOSI signal and SIO0 input signal.
     pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
-        mosi.enable_output(true, private::Internal);
-        mosi.enable_input(true, private::Internal);
+        mosi.enable_output(true);
+        mosi.enable_input(true);
 
         self.driver().info.mosi.connect_to(&mut mosi);
         self.driver().info.sio0_input.connect_to(&mut mosi);
@@ -664,7 +658,7 @@ where
     /// signal.
     pub fn with_miso<MISO: PeripheralInput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
-        miso.enable_input(true, private::Internal);
+        miso.enable_input(true);
 
         self.driver().info.miso.connect_to(&mut miso);
 
@@ -679,8 +673,8 @@ where
     /// Note: You do not need to call [Self::with_miso] when this is used.
     pub fn with_sio1<SIO1: PeripheralOutput>(self, miso: impl Peripheral<P = SIO1> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
-        miso.enable_input(true, private::Internal);
-        miso.enable_output(true, private::Internal);
+        miso.enable_input(true);
+        miso.enable_output(true);
 
         self.driver().info.miso.connect_to(&mut miso);
         self.driver().info.sio1_output.connect_to(&mut miso);
@@ -694,7 +688,7 @@ where
     /// clock signal.
     pub fn with_sck<SCK: PeripheralOutput>(self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_mapped_ref!(sclk);
-        sclk.set_to_push_pull_output(private::Internal);
+        sclk.set_to_push_pull_output();
         self.driver().info.sclk.connect_to(sclk);
 
         self
@@ -704,10 +698,15 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the SPI CS
     /// signal.
+    ///
+    /// # Current Stability Limitations
+    /// The hardware chip select functionality is limited; only one CS line can
+    /// be set, regardless of the total number available. There is no
+    /// mechanism to select which CS line to use.
     #[instability::unstable]
     pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
-        cs.set_to_push_pull_output(private::Internal);
+        cs.set_to_push_pull_output();
         self.driver().info.cs.connect_to(cs);
 
         self
@@ -741,12 +740,16 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO2 output and input signals.
+    ///
+    /// # Current Stability Limitations
+    /// QSPI operations are unstable, associated pins configuration is
+    /// inefficient.
     #[instability::unstable]
     pub fn with_sio2<SIO2: PeripheralOutput>(self, sio2: impl Peripheral<P = SIO2> + 'd) -> Self {
         // TODO: panic if not QSPI?
         crate::into_mapped_ref!(sio2);
-        sio2.enable_input(true, private::Internal);
-        sio2.enable_output(true, private::Internal);
+        sio2.enable_input(true);
+        sio2.enable_output(true);
 
         unwrap!(self.driver().info.sio2_input).connect_to(&mut sio2);
         unwrap!(self.driver().info.sio2_output).connect_to(&mut sio2);
@@ -758,12 +761,16 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO3 output and input signals.
+    ///
+    /// # Current Stability Limitations
+    /// QSPI operations are unstable, associated pins configuration is
+    /// inefficient.
     #[instability::unstable]
     pub fn with_sio3<SIO3: PeripheralOutput>(self, sio3: impl Peripheral<P = SIO3> + 'd) -> Self {
         // TODO: panic if not QSPI?
         crate::into_mapped_ref!(sio3);
-        sio3.enable_input(true, private::Internal);
-        sio3.enable_output(true, private::Internal);
+        sio3.enable_input(true);
+        sio3.enable_output(true);
 
         unwrap!(self.driver().info.sio3_input).connect_to(&mut sio3);
         unwrap!(self.driver().info.sio3_output).connect_to(&mut sio3);
@@ -973,25 +980,27 @@ mod dma {
         }
     }
 
-    #[cfg(any(doc, feature = "unstable"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl SpiDma<'_, Blocking> {
         /// Listen for the given interrupts
+        #[instability::unstable]
         pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.driver().enable_listen(interrupts.into(), true);
         }
 
         /// Unlisten the given interrupts
+        #[instability::unstable]
         pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.driver().enable_listen(interrupts.into(), false);
         }
 
         /// Gets asserted interrupts
+        #[instability::unstable]
         pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
             self.driver().interrupts()
         }
 
         /// Resets asserted interrupts
+        #[instability::unstable]
         pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.driver().clear_interrupts(interrupts.into());
         }
@@ -1638,25 +1647,27 @@ mod dma {
         }
     }
 
-    #[cfg(any(doc, feature = "unstable"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl SpiDmaBus<'_, Blocking> {
         /// Listen for the given interrupts
+        #[instability::unstable]
         pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.spi_dma.listen(interrupts.into());
         }
 
         /// Unlisten the given interrupts
+        #[instability::unstable]
         pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.spi_dma.unlisten(interrupts.into());
         }
 
         /// Gets asserted interrupts
+        #[instability::unstable]
         pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
             self.spi_dma.interrupts()
         }
 
         /// Resets asserted interrupts
+        #[instability::unstable]
         pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.spi_dma.clear_interrupts(interrupts.into());
         }
@@ -2139,11 +2150,14 @@ mod ehal1 {
         Dm: DriverMode,
     {
         fn read(&mut self) -> nb::Result<u8, Self::Error> {
-            self.driver().read_byte()
+            let mut buffer = [0u8; 1];
+            self.driver().read_bytes(&mut buffer)?;
+            Ok(buffer[0])
         }
 
         fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-            self.driver().write_byte(word)
+            self.driver().write_bytes(&[word])?;
+            Ok(())
         }
     }
 
@@ -2912,30 +2926,6 @@ impl Driver {
         });
     }
 
-    fn read_byte(&self) -> nb::Result<u8, Error> {
-        if self.busy() {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        let reg_block = self.register_block();
-        Ok(u32::try_into(reg_block.w(0).read().bits()).unwrap_or_default())
-    }
-
-    fn write_byte(&self, word: u8) -> nb::Result<(), Error> {
-        if self.busy() {
-            return Err(nb::Error::WouldBlock);
-        }
-
-        self.configure_datalen(0, 1);
-
-        let reg_block = self.register_block();
-        reg_block.w(0).write(|w| w.buf().set(word.into()));
-
-        self.start_operation();
-
-        Ok(())
-    }
-
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn fill_fifo(&self, chunk: &[u8]) {
         // TODO: replace with `array_chunks` and `from_le_bytes`
@@ -3370,7 +3360,7 @@ macro_rules! master_instance {
             }
 
             fn handler(&self) -> InterruptHandler {
-                #[$crate::macros::handler]
+                #[$crate::handler]
                 #[cfg_attr(place_spi_driver_in_ram, ram)]
                 fn handle() {
                     handle_async(unsafe { $crate::peripherals::$peri::steal() })

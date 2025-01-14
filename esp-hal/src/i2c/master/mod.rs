@@ -48,6 +48,7 @@ use _private::{AddressModeInternal, I2cAddress};
 #[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
 use embedded_hal::i2c::Operation as EhalOperation;
+use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 
 use crate::{
@@ -64,7 +65,6 @@ use crate::{
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
-    Cpu,
     DriverMode,
 };
 
@@ -186,7 +186,7 @@ pub enum Error {
     /// The transmission exceeded the FIFO size.
     FifoExceeded,
     /// The acknowledgment check failed.
-    AckCheckFailed,
+    AcknowledgeCheckFailed(AcknowledgeCheckFailedReason),
     /// A timeout occurred during transmission.
     Timeout,
     /// The arbitration for the bus was lost.
@@ -199,13 +199,58 @@ pub enum Error {
     ZeroLengthInvalid,
 }
 
+/// I2C no acknowledge error reason.
+///
+/// Consider this as a hint and make sure to always handle all cases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum AcknowledgeCheckFailedReason {
+    /// The device did not acknowledge its address. The device may be missing.
+    Address,
+
+    /// The device did not acknowledge the data. It may not be ready to process
+    /// requests at the moment.
+    Data,
+
+    /// Either the device did not acknowledge its address or the data, but it is
+    /// unknown which.
+    Unknown,
+}
+
+impl core::fmt::Display for AcknowledgeCheckFailedReason {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            AcknowledgeCheckFailedReason::Address => write!(f, "Address"),
+            AcknowledgeCheckFailedReason::Data => write!(f, "Data"),
+            AcknowledgeCheckFailedReason::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+impl From<&AcknowledgeCheckFailedReason> for embedded_hal::i2c::NoAcknowledgeSource {
+    fn from(value: &AcknowledgeCheckFailedReason) -> Self {
+        match value {
+            AcknowledgeCheckFailedReason::Address => {
+                embedded_hal::i2c::NoAcknowledgeSource::Address
+            }
+            AcknowledgeCheckFailedReason::Data => embedded_hal::i2c::NoAcknowledgeSource::Data,
+            AcknowledgeCheckFailedReason::Unknown => {
+                embedded_hal::i2c::NoAcknowledgeSource::Unknown
+            }
+        }
+    }
+}
+
 impl core::error::Error for Error {}
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Error::FifoExceeded => write!(f, "The transmission exceeded the FIFO size"),
-            Error::AckCheckFailed => write!(f, "The acknowledgment check failed"),
+            Error::AcknowledgeCheckFailed(reason) => {
+                write!(f, "The acknowledgment check failed. Reason: {}", reason)
+            }
             Error::Timeout => write!(f, "A timeout occurred during transmission"),
             Error::ArbitrationLost => write!(f, "The arbitration for the bus was lost"),
             Error::ExecutionIncomplete => {
@@ -310,12 +355,12 @@ impl Operation<'_> {
 
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
-        use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
+        use embedded_hal::i2c::ErrorKind;
 
         match self {
             Self::FifoExceeded => ErrorKind::Overrun,
             Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
-            Self::AckCheckFailed => ErrorKind::NoAcknowledge(NoAcknowledgeSource::Unknown),
+            Self::AcknowledgeCheckFailed(reason) => ErrorKind::NoAcknowledge(reason.into()),
             _ => ErrorKind::Other,
         }
     }
@@ -537,11 +582,11 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     ) -> Self {
         crate::into_mapped_ref!(pin);
         // avoid the pin going low during configuration
-        pin.set_output_high(true, private::Internal);
+        pin.set_output_high(true);
 
-        pin.set_to_open_drain_output(private::Internal);
-        pin.enable_input(true, private::Internal);
-        pin.pull_direction(Pull::Up, private::Internal);
+        pin.set_to_open_drain_output();
+        pin.enable_input(true);
+        pin.pull_direction(Pull::Up);
 
         input.connect_to(&mut pin);
         output.connect_to(&mut pin);
@@ -574,7 +619,29 @@ impl<'d> I2c<'d, Blocking> {
         Ok(i2c)
     }
 
-    // TODO: missing interrupt APIs
+    /// Listen for the given interrupts
+    #[instability::unstable]
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<Event>>) {
+        self.i2c.info().enable_listen(interrupts.into(), true)
+    }
+
+    /// Unlisten the given interrupts
+    #[instability::unstable]
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<Event>>) {
+        self.i2c.info().enable_listen(interrupts.into(), false)
+    }
+
+    /// Gets asserted interrupts
+    #[instability::unstable]
+    pub fn interrupts(&mut self) -> EnumSet<Event> {
+        self.i2c.info().interrupts()
+    }
+
+    /// Resets asserted interrupts
+    #[instability::unstable]
+    pub fn clear_interrupts(&mut self, interrupts: EnumSet<Event>) {
+        self.i2c.info().clear_interrupts(interrupts)
+    }
 
     /// Configures the I2C peripheral to operate in asynchronous mode.
     pub fn into_async(mut self) -> I2c<'d, Async> {
@@ -661,19 +728,25 @@ impl private::Sealed for I2c<'_, Blocking> {}
 
 impl InterruptConfigurable for I2c<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        let interrupt = self.driver().info.interrupt;
-        for core in Cpu::other() {
-            crate::interrupt::disable(core, interrupt);
-        }
-        unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+        self.i2c.info().set_interrupt_handler(handler);
     }
 }
 
 #[cfg_attr(esp32, allow(dead_code))]
-pub(crate) enum Event {
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum Event {
+    /// Triggered when op_code of the master indicates an END command and an END
+    /// condition is detected.
     EndDetect,
+
+    /// Triggered when the I2C controller detects a STOP bit.
     TxComplete,
+
+    /// Triggered when FIFO_PRT_EN is 1 and the
+    /// pointers of TX FIFO are less than TXFIFO_WM_THRHD[4:0].
     #[cfg(not(any(esp32, esp32s2)))]
     TxFifoWatermark,
 }
@@ -730,7 +803,9 @@ impl<'a> I2cFuture<'a> {
         }
 
         if r.nack().bit_is_set() {
-            return Err(Error::AckCheckFailed);
+            return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
+                self.info.register_block(),
+            )));
         }
 
         #[cfg(not(esp32))]
@@ -743,7 +818,9 @@ impl<'a> I2cFuture<'a> {
                 .resp_rec()
                 .bit_is_clear()
         {
-            return Err(Error::AckCheckFailed);
+            return Err(Error::AcknowledgeCheckFailed(
+                AcknowledgeCheckFailedReason::Data,
+            ));
         }
 
         Ok(())
@@ -774,7 +851,7 @@ impl core::future::Future for I2cFuture<'_> {
 impl<'d> I2c<'d, Async> {
     /// Configure the I2C peripheral to operate in blocking mode.
     pub fn into_blocking(self) -> I2c<'d, Blocking> {
-        crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
+        self.i2c.info().disable_interrupts();
 
         I2c {
             i2c: self.i2c,
@@ -1102,6 +1179,73 @@ impl Info {
     /// Returns the register block for this I2C instance.
     pub fn register_block(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
+    }
+
+    /// Listen for the given interrupts
+    fn enable_listen(&self, interrupts: EnumSet<Event>, enable: bool) {
+        let reg_block = self.register_block();
+
+        reg_block.int_ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    Event::EndDetect => w.end_detect().bit(enable),
+                    Event::TxComplete => w.trans_complete().bit(enable),
+                    #[cfg(not(any(esp32, esp32s2)))]
+                    Event::TxFifoWatermark => w.txfifo_wm().bit(enable),
+                };
+            }
+            w
+        });
+    }
+
+    fn interrupts(&self) -> EnumSet<Event> {
+        let mut res = EnumSet::new();
+        let reg_block = self.register_block();
+
+        let ints = reg_block.int_raw().read();
+
+        if ints.end_detect().bit_is_set() {
+            res.insert(Event::EndDetect);
+        }
+        if ints.trans_complete().bit_is_set() {
+            res.insert(Event::TxComplete);
+        }
+        #[cfg(not(any(esp32, esp32s2)))]
+        if ints.txfifo_wm().bit_is_set() {
+            res.insert(Event::TxFifoWatermark);
+        }
+
+        res
+    }
+
+    fn clear_interrupts(&self, interrupts: EnumSet<Event>) {
+        let reg_block = self.register_block();
+
+        reg_block.int_clr().write(|w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    Event::EndDetect => w.end_detect().clear_bit_by_one(),
+                    Event::TxComplete => w.trans_complete().clear_bit_by_one(),
+                    #[cfg(not(any(esp32, esp32s2)))]
+                    Event::TxFifoWatermark => w.txfifo_wm().clear_bit_by_one(),
+                };
+            }
+            w
+        });
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, self.interrupt);
+        }
+        self.enable_listen(EnumSet::all(), false);
+        self.clear_interrupts(EnumSet::all());
+        unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
+        unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
+    }
+
+    fn disable_interrupts(&self) {
+        crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
     }
 }
 
@@ -1787,7 +1931,7 @@ impl Driver<'_> {
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AckCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.register_block())))
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)
                 } else {
@@ -1798,11 +1942,11 @@ impl Driver<'_> {
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AckCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.register_block())))
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)
                 } else if interrupts.trans_complete().bit_is_set() && self.register_block().sr().read().resp_rec().bit_is_clear() {
-                    Err(Error::AckCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(AcknowledgeCheckFailedReason::Data))
                 } else {
                     Ok(())
                 };
@@ -2394,11 +2538,28 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
     }
 }
 
+// Estimate the reason for an acknowledge check failure on a best effort basis.
+// When in doubt it's better to return `Unknown` than to return a wrong reason.
+fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeCheckFailedReason {
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32, esp32s2, esp32c2, esp32c3))] {
+            AcknowledgeCheckFailedReason::Unknown
+        } else {
+            // this is based on observations rather than documented behavior
+            if _register_block.fifo_st().read().txfifo_raddr().bits() <= 1 {
+                AcknowledgeCheckFailedReason::Address
+            } else {
+                AcknowledgeCheckFailedReason::Data
+            }
+        }
+    }
+}
+
 macro_rules! instance {
     ($inst:ident, $peri:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
         impl Instance for crate::peripherals::$inst {
             fn parts(&self) -> (&Info, &State) {
-                #[crate::macros::handler]
+                #[crate::handler]
                 pub(super) fn irq_handler() {
                     async_handler(&PERIPHERAL, &STATE);
                 }

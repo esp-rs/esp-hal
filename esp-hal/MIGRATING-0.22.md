@@ -326,6 +326,13 @@ To avoid abbreviations and contractions (as per the esp-hal guidelines), some er
 + Error::ZeroLengthInvalid
 ```
 
+The `AckCheckFailed` variant changed to `AcknowledgeCheckFailed(AcknowledgeCheckFailedReason)`
+
+```diff
+-            Err(Error::AckCheckFailed)
++            Err(Error::AcknowledgeCheckFailed(reason))
+```
+
 ## I2C Configuration changes
 
 The timeout field in `Config` changed from `Option<u32>` to a dedicated `SclTimeout` enum.
@@ -442,6 +449,18 @@ e.g.
 +     .with_tx(peripherals.GPIO2);
 ```
 
+`write_byte` and `read_byte` have been removed.
+
+e.g.
+
+```dif
+- while let nb::Result::Ok(_c) = serial.read_byte() {
+-     cnt += 1;
+- }
++ let mut buff = [0u8; 64];
++ let cnt = serial.read_bytes(&mut buff);
+```
+
 ## Spi `with_miso` has been split
 
 Previously, `with_miso` set up the provided pin as an input and output, which was necessary for half duplex.
@@ -477,4 +496,51 @@ The Address and Command enums have similarly had their variants changed from e.g
 + Address::_1Bit
 - Command::Command1
 + Command::_1Bit
+```
+
+`write_byte` and `read_byte` were removed and `write_bytes` and `read_bytes` can be used as replacement.
+
+e.g.
+
+```rust
+let mut byte = [0u8; 1];
+spi.read_bytes(&mut byte);
+```
+
+## GPIO Changes
+
+The GPIO drive strength variants are renamed from e.g. `I5mA` to `_5mA`.
+
+```diff
+-DriveStrength::I5mA
++DriveStrength::_5mA
+```
+
+## ADC Changes
+
+The ADC attenuation variants are renamed from e.g. `Attenuation0dB` to `_0dB`.
+
+```diff
+-Attenuation::Attenuation0dB
++Attenuation::_0dB
+```
+
+## `macro` module is private now
+
+Macros from `procmacros` crate (`handler`, `ram`, `load_lp_code`) are now imported via `esp-hal`.
+
+```diff
+- use esp_hal::macros::{handler, ram, load_lp_code};
++ use esp_hal::{handler, ram, load_lp_code};
+```
+
+## `entry` macro is removed, use `main` macro
+
+```diff
+-use esp_hal::entry;
++use esp_hal::main;
+
+-#[entry]
++#[main]
+fn main() {
 ```

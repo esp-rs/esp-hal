@@ -1,6 +1,6 @@
 use crate::{
     clock::{Clock, PllClock, XtalClock},
-    regi2c_write,
+    rom::regi2c_write,
 };
 
 const REF_CLK_FREQ: u32 = 1000000;

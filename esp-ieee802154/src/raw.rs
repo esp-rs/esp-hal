@@ -2,8 +2,8 @@ use core::{cell::RefCell, ptr::addr_of};
 
 use critical_section::Mutex;
 use esp_hal::{
+    handler,
     interrupt::Priority,
-    macros::handler,
     peripherals::RADIO_CLK,
     system::{RadioClockController, RadioPeripherals},
 };

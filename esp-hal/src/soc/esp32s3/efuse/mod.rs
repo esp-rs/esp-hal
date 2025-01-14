@@ -132,10 +132,10 @@ impl Efuse {
 
         Some(
             adc_icode[match atten {
-                Attenuation::Attenuation0dB => 0,
-                Attenuation::Attenuation2p5dB => 1,
-                Attenuation::Attenuation6dB => 2,
-                Attenuation::Attenuation11dB => 3,
+                Attenuation::_0dB => 0,
+                Attenuation::_2p5dB => 1,
+                Attenuation::_6dB => 2,
+                Attenuation::_11dB => 3,
             }],
         )
     }
@@ -180,10 +180,10 @@ impl Efuse {
         adc2_vol[0] = adc1_vol[0] - adc_vol_diff[4] + 40;
 
         let atten = match atten {
-            Attenuation::Attenuation0dB => 0,
-            Attenuation::Attenuation2p5dB => 1,
-            Attenuation::Attenuation6dB => 2,
-            Attenuation::Attenuation11dB => 3,
+            Attenuation::_0dB => 0,
+            Attenuation::_2p5dB => 1,
+            Attenuation::_6dB => 2,
+            Attenuation::_11dB => 3,
         };
 
         Some(if unit == 0 {

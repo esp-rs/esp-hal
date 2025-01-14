@@ -13,7 +13,7 @@ use crate::{
         HCI_OUT_COLLECTOR,
     },
     compat::common::{self, str_from_c, ConcurrentQueue},
-    hal::macros::ram,
+    hal::ram,
 };
 
 #[cfg_attr(esp32c3, path = "os_adapter_esp32c3.rs")]

@@ -10,11 +10,13 @@
 //!    * I2S_DEFAULT_CLK_SRC: 1 - I2S clock source
 //!    * I2S_SCLK: 96_000_000 - I2S clock frequency
 
-pub mod efuse;
+crate::unstable_module! {
+    pub mod efuse;
+    pub mod radio_clocks;
+    pub mod trng;
+}
 pub mod gpio;
 pub mod peripherals;
-pub mod radio_clocks;
-pub mod trng;
 
 /// The name of the chip ("esp32h2") as `&str`
 #[macro_export]

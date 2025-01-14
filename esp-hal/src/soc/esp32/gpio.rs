@@ -61,7 +61,7 @@ pub(crate) const INPUT_SIGNAL_MAX: u16 = 539;
 pub(crate) const ONE_INPUT: u8 = 0x38;
 pub(crate) const ZERO_INPUT: u8 = 0x30;
 
-pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::Function2;
+pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_2;
 
 pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
     unsafe {

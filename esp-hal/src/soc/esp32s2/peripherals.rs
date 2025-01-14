@@ -66,7 +66,7 @@ crate::peripherals! {
         ULP_RISCV_CORE <= virtual,
         USB0 <= USB0,
         USB_WRAP <= USB_WRAP,
-        WIFI <= virtual,
+        WIFI <= WIFI,
         XTS_AES <= XTS_AES,
     ],
     pins: [

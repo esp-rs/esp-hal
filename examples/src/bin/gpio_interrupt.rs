@@ -8,6 +8,7 @@
 //! - BUTTON => GPIO0 (ESP32, ESP32-S2, ESP32-S3) / GPIO9
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -18,15 +19,16 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    entry,
     gpio::{Event, Input, Io, Level, Output, Pull},
+    handler,
     interrupt::InterruptConfigurable,
-    macros::{handler, ram},
+    main,
+    ram,
 };
 
 static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

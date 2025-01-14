@@ -13,6 +13,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 ## Amendments to the Rust API Guidelines
 
 - `C-RW-VALUE` and `C-SERDE` do not apply.
+- `C-QUESTION-MARK`: `?` is not applicable in the context of the `main` function in our driver.
 - `C-COMMON-TRAITS`:
   The set of traits to implement depend on the type and use case. In esp-hal, we can highlight a few such use cases and provide recommendations what should be implemented. If nothing here applies, use your best judgement.
   - Driver structures: `Debug`
@@ -81,6 +82,8 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - Avoid abbreviations and contractions in the API, where possible.
   - Saving a few characters may introduce ambiguity, e.g `SpiTransDone`, is it `Transmit` or `Transfer`?
   - Common abbreviations, that are well understood such as `Dma` are perfectly fine.
+- Config options should not affect the public API.
+  - If you add a new configuration option using `esp-config`, the added option should not alter the public API of the package being configured.
 
 ## Maintainability
 

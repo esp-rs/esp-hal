@@ -14,7 +14,7 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptConfigurable, InterruptHandler},
     lcd_cam::{cam::Cam, lcd::Lcd},
-    macros::handler,
+    handler,
     peripheral::Peripheral,
     peripherals::{Interrupt, LCD_CAM},
     system::GenericPeripheralGuard,

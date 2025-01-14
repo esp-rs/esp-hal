@@ -9,12 +9,12 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    entry,
+    main,
     tsens::{Config, TemperatureSensor},
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());

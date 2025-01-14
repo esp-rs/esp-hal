@@ -16,7 +16,7 @@ use embassy_executor::{raw::TaskStorage, Spawner};
 use esp_backtrace as _;
 use esp_hal::{
     clock::{Clock, CpuClock},
-    macros::handler,
+    handler,
     time::Duration,
     timer::{systimer::SystemTimer, OneShotTimer},
 };

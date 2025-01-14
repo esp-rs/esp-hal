@@ -80,7 +80,8 @@
 //!
 //! // Each component can be used individually to interact with the UART:
 //! tx.write_bytes(&[42u8]).expect("write error!");
-//! let byte = rx.read_byte().expect("read error!");
+//! let mut byte = [0u8; 1];
+//! rx.read_bytes(&mut byte);
 //! # }
 //! ```
 //! 
@@ -197,11 +198,10 @@
 //!         let mut serial = SERIAL.borrow_ref_mut(cs);
 //!         let serial = serial.as_mut().unwrap();
 //!
-//!         let mut cnt = 0;
-//!         while let nb::Result::Ok(_c) = serial.read_byte() {
-//!             cnt += 1;
+//!         let mut buf = [0u8; 64];
+//!         if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
+//!             writeln!(serial, "Read {} bytes", cnt).ok();
 //!         }
-//!         writeln!(serial, "Read {} bytes", cnt).ok();
 //!
 //!         let pending_interrupts = serial.interrupts();
 //!         writeln!(
@@ -242,7 +242,6 @@ use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{uart0::RegisterBlock, Interrupt},
-    private::Internal,
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
@@ -614,7 +613,7 @@ where
     /// Configure RTS pin
     pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(rts);
-        rts.set_to_push_pull_output(Internal);
+        rts.set_to_push_pull_output();
         self.uart.info().rts_signal.connect_to(rts);
 
         self
@@ -627,8 +626,8 @@ where
     pub fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(tx);
         // Make sure we don't cause an unexpected low pulse on the pin.
-        tx.set_output_high(true, Internal);
-        tx.set_to_push_pull_output(Internal);
+        tx.set_output_high(true);
+        tx.set_to_push_pull_output();
         self.uart.info().tx_signal.connect_to(tx);
 
         self
@@ -797,7 +796,7 @@ where
     /// Configure CTS pin
     pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(cts);
-        cts.init_input(Pull::None, Internal);
+        cts.init_input(Pull::None);
         self.uart.info().cts_signal.connect_to(cts);
 
         self
@@ -813,7 +812,7 @@ where
     /// initial low signal level.
     pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
-        rx.init_input(Pull::Up, Internal);
+        rx.init_input(Pull::Up);
         self.uart.info().rx_signal.connect_to(rx);
 
         self
@@ -826,8 +825,24 @@ where
         self.uart.info().apply_config(config)
     }
 
-    /// Read a byte from the UART
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    /// Reads and clears errors.
+    #[instability::unstable]
+    pub fn check_for_errors(&mut self) -> Result<(), Error> {
+        let errors = RxEvent::FifoOvf
+            | RxEvent::FifoTout
+            | RxEvent::GlitchDetected
+            | RxEvent::FrameError
+            | RxEvent::ParityError;
+        let events = self.uart.info().rx_events(errors);
+        let result = rx_event_check_for_error(events);
+        if result.is_err() {
+            self.uart.info().clear_rx_events(errors);
+        }
+        result
+    }
+
+    // Read a byte from the UART
+    fn read_byte(&mut self) -> Option<u8> {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
                 // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
@@ -850,18 +865,58 @@ where
                 }
             }
 
-            Ok(byte)
+            Some(byte)
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
+    }
+
+    /// Reads bytes from the UART
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+        let buffered = self.read_buffered_bytes(buf)?;
+        let buf = &mut buf[buffered..];
+
+        for byte in buf.iter_mut() {
+            loop {
+                if let Some(b) = self.read_byte() {
+                    *byte = b;
+                    break;
+                }
+                self.check_for_errors()?;
+            }
+        }
+        Ok(())
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes without blocking.
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> usize {
+    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         let mut count = 0;
         while count < buf.len() {
-            if let Ok(byte) = self.read_byte() {
+            if let Some(byte) = self.read_byte() {
+                buf[count] = byte;
+                count += 1;
+            } else {
+                break;
+            }
+        }
+        if let Err(err) = self.check_for_errors() {
+            // Drain the buffer. We don't know where the error occurred, so returning
+            // these bytes would be incorrect. We also don't know if the number of buffered
+            // bytes fit into the buffer.
+            // TODO: make this behaviour configurable using UART_ERR_WR_MASK. If the user
+            // wants to keep the bytes regardless of errors, they should be able to do so.
+            while self.read_byte().is_some() {}
+            return Err(err);
+        }
+        Ok(count)
+    }
+
+    /// Read bytes from the RX FIFO without checking for errors.
+    fn flush_buffer(&mut self, buf: &mut [u8]) -> usize {
+        let mut count = 0;
+        while count < buf.len() {
+            if let Some(byte) = self.read_byte() {
                 buf[count] = byte;
                 count += 1;
             } else {
@@ -1005,7 +1060,7 @@ impl<'d> Uart<'d, Blocking> {
     /// initial low signal level.
     pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
-        rx.init_input(Pull::Up, Internal);
+        rx.init_input(Pull::Up);
         self.rx.uart.info().rx_signal.connect_to(rx);
 
         self
@@ -1018,8 +1073,8 @@ impl<'d> Uart<'d, Blocking> {
     pub fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(tx);
         // Make sure we don't cause an unexpected low pulse on the pin.
-        tx.set_output_high(true, Internal);
-        tx.set_to_push_pull_output(Internal);
+        tx.set_output_high(true);
+        tx.set_to_push_pull_output();
         self.tx.uart.info().tx_signal.connect_to(tx);
 
         self
@@ -1040,6 +1095,7 @@ impl<'d> Uart<'d, Async> {
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
+#[instability::unstable]
 pub enum UartInterrupt {
     /// Indicates that the received has detected the configured
     /// [`Uart::set_at_cmd`] character.
@@ -1087,10 +1143,21 @@ where
         self.tx.write_bytes(data)
     }
 
+    /// Reads and clears errors set by received data.
+    #[instability::unstable]
+    pub fn check_for_rx_errors(&mut self) -> Result<(), Error> {
+        self.rx.check_for_errors()
+    }
+
+    /// Reads bytes from the UART
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+        self.rx.read_bytes(buf)
+    }
+
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes without blocking.
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> usize {
-        self.rx.read_bytes(buf)
+    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        self.rx.read_buffered_bytes(buf)
     }
 
     /// Configures the AT-CMD detection settings
@@ -1133,8 +1200,8 @@ where
         sync_regs(register_block);
     }
 
-    /// Write a byte out over the UART
-    pub fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
+    // Write a byte out over the UART
+    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
         self.tx.write_byte(word)
     }
 
@@ -1143,9 +1210,9 @@ where
         self.tx.flush()
     }
 
-    /// Read a byte from the UART
-    pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        self.rx.read_byte()
+    // Read a byte from the UART
+    fn read_byte(&mut self) -> nb::Result<u8, Error> {
+        embedded_hal_nb::serial::Read::read(&mut self.rx)
     }
 
     /// Change the configuration.
@@ -1238,21 +1305,25 @@ impl InterruptConfigurable for Uart<'_, Blocking> {
 
 impl Uart<'_, Blocking> {
     /// Listen for the given interrupts
+    #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
         self.tx.uart.info().enable_listen(interrupts.into(), true)
     }
 
     /// Unlisten the given interrupts
+    #[instability::unstable]
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
         self.tx.uart.info().enable_listen(interrupts.into(), false)
     }
 
     /// Gets asserted interrupts
+    #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<UartInterrupt> {
         self.tx.uart.info().interrupts()
     }
 
     /// Resets asserted interrupts
+    #[instability::unstable]
     pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
         self.tx.uart.info().clear_interrupts(interrupts)
     }
@@ -1336,7 +1407,10 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
+        match self.read_byte() {
+            Some(b) => Ok(b),
+            None => Err(nb::Error::WouldBlock),
+        }
     }
 }
 
@@ -1410,7 +1484,7 @@ where
             // Block until we received at least one byte
         }
 
-        Ok(self.read_bytes(buf))
+        self.read_buffered_bytes(buf)
     }
 }
 
@@ -1491,6 +1565,20 @@ pub(crate) enum RxEvent {
     ParityError,
 }
 
+fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), Error> {
+    for event in events {
+        match event {
+            RxEvent::FifoOvf => return Err(Error::FifoOverflowed),
+            RxEvent::GlitchDetected => return Err(Error::GlitchOccurred),
+            RxEvent::FrameError => return Err(Error::FrameFormatViolated),
+            RxEvent::ParityError => return Err(Error::ParityMismatch),
+            RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
+        }
+    }
+
+    Ok(())
+}
+
 /// A future that resolves when the passed interrupt is triggered,
 /// or has been triggered in the meantime (flag set in INT_RAW).
 /// Upon construction the future enables the passed interrupt and when it
@@ -1514,44 +1602,6 @@ impl UartRxFuture {
             registered: false,
         }
     }
-
-    fn triggered_events(&self) -> EnumSet<RxEvent> {
-        let interrupts_enabled = self.uart.register_block().int_ena().read();
-        let mut events_triggered = EnumSet::new();
-        for event in self.events {
-            let event_triggered = match event {
-                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
-                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_clear(),
-
-                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
-                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
-                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
-                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_clear(),
-                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_clear(),
-            };
-            if event_triggered {
-                events_triggered |= event;
-            }
-        }
-        events_triggered
-    }
-
-    fn enable_listen(&self, enable: bool) {
-        self.uart.register_block().int_ena().modify(|_, w| {
-            for event in self.events {
-                match event {
-                    RxEvent::FifoFull => w.rxfifo_full().bit(enable),
-                    RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
-                    RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
-                    RxEvent::FifoTout => w.rxfifo_tout().bit(enable),
-                    RxEvent::GlitchDetected => w.glitch_det().bit(enable),
-                    RxEvent::FrameError => w.frm_err().bit(enable),
-                    RxEvent::ParityError => w.parity_err().bit(enable),
-                };
-            }
-            w
-        });
-    }
 }
 
 impl core::future::Future for UartRxFuture {
@@ -1563,10 +1613,10 @@ impl core::future::Future for UartRxFuture {
     ) -> core::task::Poll<Self::Output> {
         if !self.registered {
             self.state.rx_waker.register(cx.waker());
-            self.enable_listen(true);
+            self.uart.enable_listen_rx(self.events, true);
             self.registered = true;
         }
-        let events = self.triggered_events();
+        let events = self.uart.enabled_rx_events(self.events);
         if !events.is_empty() {
             Poll::Ready(events)
         } else {
@@ -1580,7 +1630,7 @@ impl Drop for UartRxFuture {
         // Although the isr disables the interrupt that occurred directly, we need to
         // disable the other interrupts (= the ones that did not occur), as
         // soon as this future goes out of scope.
-        self.enable_listen(false);
+        self.uart.enable_listen_rx(self.events, false);
     }
 }
 
@@ -1774,17 +1824,9 @@ impl UartRx<'_, Async> {
 
             let events_happened = UartRxFuture::new(self.uart.reborrow(), events).await;
             // always drain the fifo, if an error has occurred the data is lost
-            let read_bytes = self.read_bytes(buf);
+            let read_bytes = self.flush_buffer(buf);
             // check error events
-            for event_happened in events_happened {
-                match event_happened {
-                    RxEvent::FifoOvf => return Err(Error::FifoOverflowed),
-                    RxEvent::GlitchDetected => return Err(Error::GlitchOccurred),
-                    RxEvent::FrameError => return Err(Error::FrameFormatViolated),
-                    RxEvent::ParityError => return Err(Error::ParityMismatch),
-                    RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
-                }
-            }
+            rx_event_check_for_error(events_happened)?;
             // Unfortunately, the uart's rx-timeout counter counts up whenever there is
             // data in the fifo, even if the interrupt is disabled and the status bit
             // cleared. Since we do not drain the fifo in the interrupt handler, we need to
@@ -1878,6 +1920,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 
 /// Low-power UART
 #[cfg(lp_uart)]
+#[instability::unstable]
 pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
@@ -2222,6 +2265,87 @@ impl Info {
         Ok(())
     }
 
+    fn enable_listen_rx(&self, events: EnumSet<RxEvent>, enable: bool) {
+        self.register_block().int_ena().modify(|_, w| {
+            for event in events {
+                match event {
+                    RxEvent::FifoFull => w.rxfifo_full().bit(enable),
+                    RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
+
+                    RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
+                    RxEvent::FifoTout => w.rxfifo_tout().bit(enable),
+                    RxEvent::GlitchDetected => w.glitch_det().bit(enable),
+                    RxEvent::FrameError => w.frm_err().bit(enable),
+                    RxEvent::ParityError => w.parity_err().bit(enable),
+                };
+            }
+            w
+        });
+    }
+
+    fn enabled_rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
+        let events = events.into();
+        let interrupts_enabled = self.register_block().int_ena().read();
+        let mut events_triggered = EnumSet::new();
+        for event in events {
+            let event_triggered = match event {
+                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
+                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_clear(),
+
+                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
+                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
+                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
+                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_clear(),
+                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_clear(),
+            };
+            if event_triggered {
+                events_triggered |= event;
+            }
+        }
+        events_triggered
+    }
+
+    fn rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
+        let events = events.into();
+        let interrupts_enabled = self.register_block().int_st().read();
+        let mut events_triggered = EnumSet::new();
+        for event in events {
+            let event_triggered = match event {
+                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_set(),
+                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_set(),
+
+                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_set(),
+                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_set(),
+                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_set(),
+                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_set(),
+                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_set(),
+            };
+            if event_triggered {
+                events_triggered |= event;
+            }
+        }
+        events_triggered
+    }
+
+    fn clear_rx_events(&self, events: impl Into<EnumSet<RxEvent>>) {
+        let events = events.into();
+        self.register_block().int_clr().write(|w| {
+            for event in events {
+                match event {
+                    RxEvent::FifoFull => w.rxfifo_full().clear_bit_by_one(),
+                    RxEvent::CmdCharDetected => w.at_cmd_char_det().clear_bit_by_one(),
+
+                    RxEvent::FifoOvf => w.rxfifo_ovf().clear_bit_by_one(),
+                    RxEvent::FifoTout => w.rxfifo_tout().clear_bit_by_one(),
+                    RxEvent::GlitchDetected => w.glitch_det().clear_bit_by_one(),
+                    RxEvent::FrameError => w.frm_err().clear_bit_by_one(),
+                    RxEvent::ParityError => w.parity_err().clear_bit_by_one(),
+                };
+            }
+            w
+        });
+    }
+
     /// Configures the RX-FIFO threshold
     ///
     /// # Errors
@@ -2510,7 +2634,7 @@ macro_rules! impl_instance {
     ($inst:ident, $peri:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst {
             fn parts(&self) -> (&'static Info, &'static State) {
-                #[crate::macros::handler]
+                #[crate::handler]
                 pub(super) fn irq_handler() {
                     intr_handler(&PERIPHERAL, &STATE);
                 }
