@@ -119,7 +119,7 @@ fn compat_timer_arm_us_with_drift(ets_timer: *mut ets_timer, us: u32, repeat: bo
 }
 
 pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
-    trace!("timer disarm {:p}", ets_timer);
+    trace!("timer disarm {:x}", ets_timer as usize);
     TIMERS.with(|timers| {
         let mut timer = EtsTimer(ets_timer);
         if timer.armed() {
