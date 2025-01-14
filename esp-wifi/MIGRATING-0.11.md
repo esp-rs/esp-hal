@@ -21,3 +21,9 @@ configurations to match the new format.
 ## `csi_enabled` option converted to feature
 
 As part of limiting public API changes due to config options, the `csi_enabled` option has been changed to feature. The feature must now be activated in `esp-wifi` crate to activate the corresponding functionality. 
+
+```diff
+# In `Cargo.toml`:
+-esp-wifi = { version = "0.12.0", features = ["wifi"] }
++esp-wifi = { version = "0.12.0", features = ["wifi", "csi"] }
+```
