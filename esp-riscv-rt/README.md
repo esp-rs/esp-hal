@@ -16,8 +16,7 @@ Much of the code in this package originated in the [rust-embedded/riscv] reposit
 
 ## Minimum Supported Rust Version (MSRV)
 
-This crate is guaranteed to compile on stable Rust 1.65 and up. It _might_
-compile with older versions but that may change in any new patch release.
+This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
 
 ## License
 

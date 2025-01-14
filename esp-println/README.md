@@ -107,6 +107,10 @@ If you experience linker errors, make sure you have _some_ reference to `esp_pri
 If you don't use `esp_println` directly, you'll need to add e.g. `use esp_println as _;` to your
 import statements. This ensures that the global logger will not be removed by the compiler.
 
+## Minimum Supported Rust Version (MSRV)
+
+This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
+
 # License
 
 Licensed under either of:

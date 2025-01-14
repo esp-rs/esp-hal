@@ -36,8 +36,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 ## Minimum Supported Rust Version (MSRV)
 
-This crate is guaranteed to compile on stable Rust 1.76 and up. It _might_
-compile with older versions but that may change in any new patch release.
+This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
 
 ## License
 

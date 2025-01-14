@@ -14,8 +14,7 @@ Build utilities for use with `esp-hal` and other related packages, intended for 
 
 ## Minimum Supported Rust Version (MSRV)
 
-This crate is guaranteed to compile on stable Rust 1.60 and up. It _might_
-compile with older versions but that may change in any new patch release.
+This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
 
 ## License
 

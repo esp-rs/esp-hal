@@ -44,6 +44,10 @@ When using the panic and/or exception handler make sure to include `use esp_back
 Please note that `defmt` does _not_ provide MSRV guarantees with releases, and as such we are not able to make any MSRV guarantees when this feature is enabled. For more information refer to the MSRV section of `defmt`'s README:
 https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv
 
+## Minimum Supported Rust Version (MSRV)
+
+This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
+
 ## License
 
 Licensed under either of:

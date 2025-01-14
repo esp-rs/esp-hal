@@ -10,6 +10,10 @@ A simple `no_std` heap allocator for RISC-V and Xtensa processors from Espressif
 
 **NOTE:** using this as your global allocator requires using Rust 1.68 or greater, or the `nightly` release channel.
 
+## Minimum Supported Rust Version (MSRV)
+
+This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
+
 ## License
 
 Licensed under either of:
