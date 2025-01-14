@@ -103,9 +103,9 @@ pub enum I2cAddress {
     SevenBit(u8),
 }
 
-impl Into<I2cAddress> for u8 {
-    fn into(self) -> I2cAddress {
-        I2cAddress::SevenBit(self)
+impl From<u8> for I2cAddress {
+    fn from(value: u8) -> Self {
+        I2cAddress::SevenBit(value)
     }
 }
 
@@ -659,18 +659,20 @@ impl<'d> I2c<'d, Blocking> {
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
-    pub fn write_read<A: Into<I2cAddress> + Copy>(
+    pub fn write_read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
+        let address = address.into();
+
         self.driver()
-            .write_blocking(address.into(), write_buffer, true, read_buffer.is_empty())
+            .write_blocking(address, write_buffer, true, read_buffer.is_empty())
             .inspect_err(|_| self.internal_recover())?;
 
         self.driver()
-            .read_blocking(address.into(), read_buffer, true, true, false)
+            .read_blocking(address, read_buffer, true, true, false)
             .inspect_err(|_| self.internal_recover())?;
 
         Ok(())
@@ -867,19 +869,21 @@ impl<'d> I2c<'d, Async> {
 
     /// Writes bytes to slave with address `address` and then reads enough
     /// bytes to fill `buffer` *in a single transaction*
-    pub async fn write_read<A: Into<I2cAddress> + Copy>(
+    pub async fn write_read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
+        let address = address.into();
+
         self.driver()
-            .write(address.into(), write_buffer, true, read_buffer.is_empty())
+            .write(address, write_buffer, true, read_buffer.is_empty())
             .await
             .inspect_err(|_| self.internal_recover())?;
 
         self.driver()
-            .read(address.into(), read_buffer, true, true, false)
+            .read(address, read_buffer, true, true, false)
             .await
             .inspect_err(|_| self.internal_recover())?;
 
