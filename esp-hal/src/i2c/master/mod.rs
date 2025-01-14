@@ -125,7 +125,7 @@ impl From<u8> for I2cAddress {
 #[non_exhaustive]
 // TODO: when supporting interrupts, document that SCL = high also triggers an
 // interrupt.
-pub enum SclTimeout {
+pub enum BusTimeout {
     /// Use the maximum timeout value.
     Maximum,
 
@@ -137,28 +137,28 @@ pub enum SclTimeout {
     BusCycles(u32),
 }
 
-impl SclTimeout {
+impl BusTimeout {
     fn cycles(&self) -> u32 {
         match self {
             #[cfg(esp32)]
-            SclTimeout::Maximum => 0xF_FFFF,
+            BusTimeout::Maximum => 0xF_FFFF,
 
             #[cfg(esp32s2)]
-            SclTimeout::Maximum => 0xFF_FFFF,
+            BusTimeout::Maximum => 0xFF_FFFF,
 
             #[cfg(not(any(esp32, esp32s2)))]
-            SclTimeout::Maximum => 0x1F,
+            BusTimeout::Maximum => 0x1F,
 
             #[cfg(not(any(esp32, esp32s2)))]
-            SclTimeout::Disabled => 1,
+            BusTimeout::Disabled => 1,
 
-            SclTimeout::BusCycles(cycles) => *cycles,
+            BusTimeout::BusCycles(cycles) => *cycles,
         }
     }
 
     #[cfg(not(esp32))]
     fn is_set(&self) -> bool {
-        matches!(self, SclTimeout::BusCycles(_) | SclTimeout::Maximum)
+        matches!(self, BusTimeout::BusCycles(_) | BusTimeout::Maximum)
     }
 }
 
@@ -412,7 +412,7 @@ pub struct Config {
     pub frequency: HertzU32,
 
     /// I2C SCL timeout period.
-    pub timeout: SclTimeout,
+    pub timeout: BusTimeout,
 }
 
 impl core::hash::Hash for Config {
@@ -427,7 +427,7 @@ impl Default for Config {
         use fugit::RateExtU32;
         Config {
             frequency: 100.kHz(),
-            timeout: SclTimeout::BusCycles(10),
+            timeout: BusTimeout::BusCycles(10),
         }
     }
 }
@@ -1050,7 +1050,7 @@ fn configure_clock(
     scl_stop_setup_time: u32,
     scl_start_hold_time: u32,
     scl_stop_hold_time: u32,
-    timeout: SclTimeout,
+    timeout: BusTimeout,
 ) -> Result<(), ConfigError> {
     unsafe {
         // divider
@@ -1329,7 +1329,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: SclTimeout,
+        timeout: BusTimeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1341,9 +1341,9 @@ impl Driver<'_> {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let timeout = SclTimeout::BusCycles(match timeout {
-            SclTimeout::Maximum => 0xF_FFFF,
-            SclTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xF_FFFF)?,
+        let timeout = BusTimeout::BusCycles(match timeout {
+            BusTimeout::Maximum => 0xF_FFFF,
+            BusTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xF_FFFF)?,
         });
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
@@ -1411,7 +1411,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: SclTimeout,
+        timeout: BusTimeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1442,9 +1442,9 @@ impl Driver<'_> {
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold;
 
-        let timeout = SclTimeout::BusCycles(match timeout {
-            SclTimeout::Maximum => 0xFF_FFFF,
-            SclTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xFF_FFFF)?,
+        let timeout = BusTimeout::BusCycles(match timeout {
+            BusTimeout::Maximum => 0xFF_FFFF,
+            BusTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xFF_FFFF)?,
         });
 
         configure_clock(
@@ -1473,7 +1473,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: SclTimeout,
+        timeout: BusTimeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1519,14 +1519,14 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold - 1;
 
         let timeout = match timeout {
-            SclTimeout::Maximum => SclTimeout::BusCycles(0x1F),
-            SclTimeout::Disabled => SclTimeout::Disabled,
-            SclTimeout::BusCycles(cycles) => {
+            BusTimeout::Maximum => BusTimeout::BusCycles(0x1F),
+            BusTimeout::Disabled => BusTimeout::Disabled,
+            BusTimeout::BusCycles(cycles) => {
                 let to_peri = (cycles * 2 * half_cycle).max(1);
                 let log2 = to_peri.ilog2();
                 // Round up so that we don't shorten timeouts.
                 let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                SclTimeout::BusCycles(check_timeout(raw, 0x1F)?)
+                BusTimeout::BusCycles(check_timeout(raw, 0x1F)?)
             }
         };
 
