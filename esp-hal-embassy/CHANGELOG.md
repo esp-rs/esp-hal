@@ -9,8 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE` (#2701)
+- Added `ESP_HAL_EMBASSY_CONFIG_GENERIC_QUEUE_SIZE` instead of using `embassy-time/generic-queue-*` (#2701)
+
 ### Changed
 
+- Bump MSRV to 1.83 (#2615)
+- Updated embassy-time to v0.4 (#2701)
 - Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 - Bump MSRV to 1.84 (#2951)
 
@@ -19,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue with using thread-mode executors on both cores (#2924)
 
 ### Removed
+
+- The `integrated-timers` option has been replaced by configuration options. (#2701)
 
 ## 0.5.0 - 2024-11-20
 

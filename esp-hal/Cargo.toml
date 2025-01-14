@@ -27,7 +27,7 @@ defmt                    = { version = "0.3.8", optional = true }
 delegate                 = "0.13.2"
 digest                   = { version = "0.10.7", default-features = false, optional = true }
 document-features        = "0.2.10"
-embassy-embedded-hal     = { version = "0.2.0", optional = true }
+embassy-embedded-hal     = { version = "0.3.0", optional = true }
 embassy-futures          = "0.1.1"
 embassy-sync             = "0.6.1"
 embassy-usb-driver       = { version = "0.1.0", optional = true }

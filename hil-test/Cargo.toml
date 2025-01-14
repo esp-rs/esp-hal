@@ -200,7 +200,7 @@ defmt-rtt          = { version = "0.4.1", optional = true }
 embassy-executor   = "0.6.0"
 embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.0"
-embassy-time       = "0.3.2"
+embassy-time       = "0.4.0"
 embedded-hal       = "1.0.0"
 embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
@@ -219,9 +219,9 @@ xtensa-lx-rt       = { path = "../xtensa-lx-rt", optional = true }
 crypto-bigint       = { version = "0.5.5", default-features = false }
 digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
-embassy-executor    = { version = "0.6.0", default-features = false }
+embassy-executor    = { version = "0.7.0", default-features = false }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test       = { version = "0.5.0", git = "https://github.com/probe-rs/embedded-test.git", rev = "7109473", default-features = false, features = ["embassy", "external-executor"] }
+embedded-test       = { version = "0.6.0", default-features = false, features = ["embassy", "external-executor"] }
 fugit               = "0.3.7"
 hex-literal         = "0.4.1"
 nb                  = "1.1.0"
@@ -289,14 +289,6 @@ esp32s3 = [
 # Async & Embassy:
 embassy = [
     "dep:esp-hal-embassy",
-]
-generic-queue = [
-    "embassy",
-    "embassy-time/generic-queue-64"
-]
-integrated-timers = [
-    "embassy",
-    "esp-hal-embassy/integrated-timers",
 ]
 octal-psram = ["esp-hal/octal-psram", "esp-alloc"]
 
