@@ -461,7 +461,7 @@ e.g.
 + serial.read_bytes(&mut buff);
 ```
 
-Uart `write_bytes` is now blocking and return the number of bytes written. `read_bytes` block until it fills the provided buffer with readed bytes, use `read_buffered_bytes` to read the available bytes wihtout blocking.
+Uart `write_bytes` is now blocking and return the number of bytes written. `read_bytes` will block until it fills the provided buffer with received bytes, use `read_buffered_bytes` to read the available bytes without blocking.
 
 e.g.
 
