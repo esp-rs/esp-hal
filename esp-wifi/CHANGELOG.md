@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Bump smoltcp to 0.12.0 (#2849)
+- `csi_enabled` option converted to feature (#2945)
 - Bump MSRV to 1.84 (#2951)
 
 ### Fixed
