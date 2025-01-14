@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
+- Bump MSRV to 1.84 (#2951)
 
 ### Removed
 

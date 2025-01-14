@@ -7,13 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-
 ### Added
 
 ### Changed
 
-- Bump MSRV to 1.83 (#2615)
 - Bump smoltcp to 0.12.0 (#2849)
+- Bump MSRV to 1.84 (#2951)
 
 ### Fixed
 

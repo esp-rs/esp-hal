@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `singleton` macro has been updated to match the cortex-m counterpart (#2537)
+- Bump MSRV to 1.84 (#2951)
 
 ### Removed
 
