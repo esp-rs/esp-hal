@@ -338,10 +338,18 @@ impl Driver for EmbassyTimer {
             // Try to enqueue in the current owner's timer queue. This will fail if the
             // owner has a lower priority ceiling than the current context.
 
-            // FIXME: this is UB, use Exposed Provenance API (or something better) when
-            // available. Expose provenance in `InnerExecutor::init`, and use it here.
-            let executor = &*(executor.cast::<crate::executor::InnerExecutor>());
-            executor.timer_queue.schedule_wake(at, waker);
+            // SAFETY: we've exposed provenance in `InnerExecutor::init`, which is called
+            // when the executor is started. Because the executor wasn't running
+            // before init, it is impossible to get a pointer here that has no
+            // provenance exposed.
+            // The cast is then safe, because the RawExecutor is the first field of the
+            // InnerExecutor, and repr(C) guarantees that the fields are laid out in the
+            // order they are defined, and the first field has 0 offset.
+            let executor_addr = executor as usize;
+            let executor = core::ptr::with_exposed_provenance_mut::<crate::executor::InnerExecutor>(
+                executor_addr,
+            );
+            (*executor).timer_queue.schedule_wake(at, waker);
         }
 
         #[cfg(single_queue)]

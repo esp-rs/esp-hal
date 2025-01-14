@@ -51,7 +51,11 @@ impl InnerExecutor {
     }
 
     pub(crate) fn init(&self) {
+        let inner_executor_ptr = self as *const _ as *mut InnerExecutor;
+        // Expose provenance so that casting back to InnerExecutor in the time driver is
+        // not UB.
+        _ = inner_executor_ptr.expose_provenance();
         #[cfg(not(single_queue))]
-        self.timer_queue.set_context(self as *const _ as *mut ());
+        self.timer_queue.set_context(inner_executor_ptr.cast());
     }
 }
