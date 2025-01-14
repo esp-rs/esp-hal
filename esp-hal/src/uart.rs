@@ -452,6 +452,7 @@ impl Default for Config {
 /// Configuration for the AT-CMD detection functionality
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 #[non_exhaustive]
 pub struct AtCmdConfig {
     /// Optional idle time before the AT command detection begins, in clock
@@ -1161,6 +1162,7 @@ where
     }
 
     /// Configures the AT-CMD detection settings
+    #[instability::unstable]
     pub fn set_at_cmd(&mut self, config: AtCmdConfig) {
         let register_block = self.register_block();
 
