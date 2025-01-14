@@ -335,22 +335,22 @@ The `AckCheckFailed` variant changed to `AcknowledgeCheckFailed(AcknowledgeCheck
 
 ## I2C Configuration changes
 
-The timeout field in `Config` changed from `Option<u32>` to a dedicated `SclTimeout` enum.
+The timeout field in `Config` changed from `Option<u32>` to a dedicated `BusTimeout` enum.
 
 ```diff
 - timeout: Some(10)
-+ timeout: SclTimeout::BusCycles(10)
++ timeout: BusTimeout::BusCycles(10)
 ```
 
 ```diff
 - timeout: None
-+ timeout: SclTimeout::Max
++ timeout: BusTimeout::Max
 ```
 
 (Disabled isn't supported on ESP32 / ESP32-S2)
 ```diff
 - timeout: None
-+ timeout: SclTimeout::Disabled
++ timeout: BusTimeout::Disabled
 ```
 
 ## The crate prelude has been removed
