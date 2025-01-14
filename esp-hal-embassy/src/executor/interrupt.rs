@@ -39,8 +39,11 @@ impl CallbackContext {
         }
     }
 
-    fn get(&self) -> *mut InnerExecutor {
-        unsafe { *self.raw_executor.get() }
+    /// # Safety:
+    ///
+    /// The caller must ensure `set` has been called before.
+    unsafe fn get(&self) -> &InnerExecutor {
+        unsafe { &**self.raw_executor.get() }
     }
 
     fn set(&self, executor: *mut InnerExecutor) {
@@ -53,7 +56,8 @@ extern "C" fn handle_interrupt<const NUM: u8>() {
     swi.reset();
 
     unsafe {
-        let executor = unwrap!(EXECUTORS[NUM as usize].get().as_mut());
+        // SAFETY: The executor is always initialized before the interrupt is enabled.
+        let executor = EXECUTORS[NUM as usize].get();
         executor.inner.poll();
     }
 }
