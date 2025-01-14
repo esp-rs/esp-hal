@@ -458,10 +458,10 @@ e.g.
 -     cnt += 1;
 - }
 + let mut buff = [0u8; 64];
-+ let cnt = serial.read_bytes(&mut buff);
++ serial.read_bytes(&mut buff);
 ```
 
-Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read
+Uart `write_bytes` is now blocking and return the number of bytes written. `read_bytes` block until it fills the provided buffer with readed bytes, use `read_buffered_bytes` to read the available bytes wihtout blocking.
 
 e.g.
 
@@ -471,7 +471,7 @@ e.g.
 + let data: [u8; 1] = [0x42];
 + uart.write_bytes(&data);
 + let mut byte = [0u8; 1];
-+ while ctx.uart.read_bytes(&mut byte) == 0 {}
++ ctx.uart.read_bytes(&mut byte);
 ```
 
 ## Spi `with_miso` has been split
