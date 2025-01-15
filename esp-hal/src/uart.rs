@@ -283,10 +283,11 @@ pub struct Config {
     pub rx: RxConfig,
     /// UART Transmit part configuration.
     pub tx: TxConfig,
-    /// Shared UART configuration. 
+    /// Shared UART configuration.
     pub shared: SharedConfig,
 }
 
+/// UART Recieve part configuration.
 #[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -297,26 +298,28 @@ pub struct RxConfig {
     pub rx_timeout: Option<u8>,
 }
 
+/// UART Transmit part configuration.
 #[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct TxConfig {}
 
+/// UART configuration items affecting the overall behavior of the peripheral.
 #[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct SharedConfig {
-        /// The baud rate (speed) of the UART communication in bits per second
-        /// (bps).
-        pub baudrate: u32,
-        /// Number of data bits in each frame (5, 6, 7, or 8 bits).
-        pub data_bits: DataBits,
-        /// Parity setting (None, Even, or Odd).
-        pub parity: Parity,
-        /// Number of stop bits in each frame (1, 1.5, or 2 bits).
-        pub stop_bits: StopBits,
-        /// Clock source used by the UART peripheral.
-        pub clock_source: ClockSource,
+    /// The baud rate (speed) of the UART communication in bits per second
+    /// (bps).
+    pub baudrate: u32,
+    /// Number of data bits in each frame (5, 6, 7, or 8 bits).
+    pub data_bits: DataBits,
+    /// Parity setting (None, Even, or Odd).
+    pub parity: Parity,
+    /// Number of stop bits in each frame (1, 1.5, or 2 bits).
+    pub stop_bits: StopBits,
+    /// Clock source used by the UART peripheral.
+    pub clock_source: ClockSource,
 }
 
 impl SharedConfig {
@@ -342,20 +345,39 @@ impl SharedConfig {
     }
 }
 
-impl Config {
-   // TODO: what?
+impl Default for RxConfig {
+    fn default() -> RxConfig {
+        RxConfig {
+            rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
+            rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
+        }
+    }
 }
 
-impl Default for Config {
-    fn default() -> Config {
-        Config {
+impl Default for TxConfig {
+    fn default() -> TxConfig {
+        TxConfig {}
+    }
+}
+
+impl Default for SharedConfig {
+    fn default() -> SharedConfig {
+        SharedConfig {
             baudrate: 115_200,
             data_bits: Default::default(),
             parity: Default::default(),
             stop_bits: Default::default(),
             clock_source: Default::default(),
-            rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-            rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
+        }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            rx: RxConfig::default(),
+            tx: TxConfig::default(),
+            shared: SharedConfig::default(),
         }
     }
 }
@@ -500,7 +522,7 @@ where
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config)
+        self.apply_config(&config.rx, &config.shared)
     }
 }
 
@@ -514,7 +536,7 @@ where
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config)
+        self.apply_config(&config.tx)
     }
 }
 
@@ -548,8 +570,9 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the RX half.
-    pub fn apply_config(&mut self, config: &TxConfig) -> Result<(), ConfigError> {
-        self.uart.info().apply_config(config)
+    pub fn apply_config(&mut self, _config: &TxConfig) -> Result<(), ConfigError> {
+        // Nothing to do so far.
+        Ok(())
     }
 
     /// Writes bytes
@@ -734,8 +757,19 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the TX half.
-    pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
-        self.uart.info().apply_config(config)
+    pub fn apply_config(
+        &mut self,
+        rx_config: &RxConfig,
+        shared_config: &SharedConfig,
+    ) -> Result<(), ConfigError> {
+        // self.uart.info().apply_config(config)
+        self.uart
+            .info()
+            .set_rx_fifo_full_threshold(rx_config.rx_fifo_full_threshold)?;
+        self.uart
+            .info()
+            .set_rx_timeout(rx_config.rx_timeout, shared_config.symbol_length())?;
+        Ok(())
     }
 
     /// Reads and clears errors.
@@ -1158,7 +1192,9 @@ where
 
     /// Change the configuration.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.rx.apply_config(config.rx)?;
+        self.rx.apply_config(&config.rx, &config.shared)?;
+        self.tx.apply_config(&config.tx)?;
+        self.rx.uart.info().apply_config(&config.shared)?;
         Ok(())
     }
 
@@ -1183,7 +1219,7 @@ where
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
 
-        self.rx.uart.info().apply_config(&config)?;
+        self.apply_config(&config)?;
 
         // Don't wait after transmissions by default,
         // so that bytes written to TX FIFO are always immediately transmitted.
@@ -1881,13 +1917,13 @@ pub mod lp_uart {
 
             // Override protocol parameters from the configuration
             // uart_hal_set_baudrate(&hal, cfg->uart_proto_cfg.baud_rate, sclk_freq);
-            me.change_baud_internal(config.baudrate, config.clock_source);
+            me.change_baud_internal(config.shared.baudrate, config.shared.clock_source);
             // uart_hal_set_parity(&hal, cfg->uart_proto_cfg.parity);
-            me.change_parity(config.parity);
+            me.change_parity(config.shared.parity);
             // uart_hal_set_data_bit_num(&hal, cfg->uart_proto_cfg.data_bits);
-            me.change_data_bits(config.data_bits);
+            me.change_data_bits(config.shared.data_bits);
             // uart_hal_set_stop_bits(&hal, cfg->uart_proto_cfg.stop_bits);
-            me.change_stop_bits(config.stop_bits);
+            me.change_stop_bits(config.shared.stop_bits);
             // uart_hal_set_tx_idle_num(&hal, LP_UART_TX_IDLE_NUM_DEFAULT);
             me.change_tx_idle(0); // LP_UART_TX_IDLE_NUM_DEFAULT == 0
 
@@ -2163,9 +2199,9 @@ impl Info {
         crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
     }
 
-    fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
-        self.set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        self.set_rx_timeout(config.rx_timeout, config.symbol_length())?;
+    fn apply_config(&self, config: &SharedConfig) -> Result<(), ConfigError> {
+        // self.set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
+        // self.set_rx_timeout(config.rx_timeout, config.symbol_length())?;
         self.change_baud(config.baudrate, config.clock_source);
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
