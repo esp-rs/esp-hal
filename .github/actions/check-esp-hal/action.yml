@@ -34,6 +34,8 @@ runs:
       shell: bash
       run: cargo $LINTING_TOOLCHAIN xtask run-doc-test esp-hal ${{ inputs.device }}
     - name: Check documentation
+      env:
+        RUSTDOCFLAGS: -Dwarnings
       shell: bash
       run: cargo $LINTING_TOOLCHAIN xtask build-documentation --packages esp-hal --chips ${{ inputs.device }}
     # Build all supported examples for the low-power core first (if present):
