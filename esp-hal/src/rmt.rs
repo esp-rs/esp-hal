@@ -1326,8 +1326,7 @@ pub trait TxChannelAsync: TxChannelInternal<Async> {
         }
 
         Self::clear_interrupts();
-        Self::listen_interrupt(Event::End);
-        Self::listen_interrupt(Event::Error);
+        Self::listen_interrupt(Event::End | Event::Error);
         Self::send_raw(data, false, 0)?;
 
         RmtTxFuture::new(self).await;
@@ -1389,8 +1388,7 @@ pub trait RxChannelAsync: RxChannelInternal<Async> {
         }
 
         Self::clear_interrupts();
-        Self::listen_interrupt(Event::End);
-        Self::listen_interrupt(Event::Error);
+        Self::listen_interrupt(Event::End | Event::Error);
         Self::start_receive_raw();
 
         RmtRxFuture::new(self).await;
