@@ -1912,12 +1912,14 @@ mod chip_specific {
                     fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         rmt.int_ena().modify(|_, w| {
-                            for event in events {
-                                match event {
-                                    $crate::rmt::Event::Error => w.[< ch $ch_num _tx_err >]().bit(enable),
-                                    $crate::rmt::Event::End => w.[< ch $ch_num _tx_end >]().bit(enable),
-                                    $crate::rmt::Event::Threshold => w.[< ch $ch_num _tx_thr_event >]().bit(enable),
-                                };
+                            if events.contains($crate::rmt::Event::Error) {
+                                w.[< ch $ch_num _tx_err >]().bit(enable);
+                            }
+                            if events.contains($crate::rmt::Event::End) {
+                                w.[< ch $ch_num _tx_end >]().bit(enable);
+                            }
+                            if events.contains($crate::rmt::Event::Threshold) {
+                                w.[< ch $ch_num _tx_thr_event >]().bit(enable);
                             }
                             w
                         });
@@ -2030,12 +2032,14 @@ mod chip_specific {
                     fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         rmt.int_ena().modify(|_, w| {
-                            for event in events {
-                                match event {
-                                    $crate::rmt::Event::Error => w.[< ch $ch_num _rx_err >]().bit(enable),
-                                    $crate::rmt::Event::End => w.[< ch $ch_num _rx_end >]().bit(enable),
-                                    $crate::rmt::Event::Threshold => w.[< ch $ch_num _rx_thr_event >]().bit(enable),
-                                };
+                            if events.contains($crate::rmt::Event::Error) {
+                                w.[< ch $ch_num _rx_err >]().bit(enable);
+                            }
+                            if events.contains($crate::rmt::Event::End) {
+                                w.[< ch $ch_num _rx_end >]().bit(enable);
+                            }
+                            if events.contains($crate::rmt::Event::Threshold) {
+                                w.[< ch $ch_num _rx_thr_event >]().bit(enable);
                             }
                             w
                         });
@@ -2256,12 +2260,14 @@ mod chip_specific {
                     fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         rmt.int_ena().modify(|_,w| {
-                            for event in events {
-                                match event {
-                                    $crate::rmt::Event::Error => w.[< ch $ch_num _err >]().bit(enable),
-                                    $crate::rmt::Event::End => w.[< ch $ch_num _tx_end >]().bit(enable),
-                                    $crate::rmt::Event::Threshold => w.[< ch $ch_num _tx_thr_event >]().bit(enable),
-                                };
+                            if events.contains($crate::rmt::Event::Error) {
+                                w.[< ch $ch_num _err >]().bit(enable);
+                            }
+                            if events.contains($crate::rmt::Event::End) {
+                                w.[< ch $ch_num _tx_end >]().bit(enable);
+                            }
+                            if events.contains($crate::rmt::Event::Threshold) {
+                                w.[< ch $ch_num _tx_thr_event >]().bit(enable);
                             }
                             w
                         });
@@ -2379,12 +2385,14 @@ mod chip_specific {
                     fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
                         let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                         rmt.int_ena().modify(|_, w| {
-                            for event in events {
-                                match event {
-                                    $crate::rmt::Event::Error => w.[< ch $ch_num _err >]().bit(enable),
-                                    $crate::rmt::Event::End => w.[< ch $ch_num _rx_end >]().bit(enable),
-                                    $crate::rmt::Event::Threshold => w.[< ch $ch_num _tx_thr_event >]().bit(enable),
-                                };
+                            if events.contains($crate::rmt::Event::Error) {
+                                w.[< ch $ch_num _err >]().bit(enable);
+                            }
+                            if events.contains($crate::rmt::Event::End) {
+                                w.[< ch $ch_num _rx_end >]().bit(enable);
+                            }
+                            if events.contains($crate::rmt::Event::Threshold) {
+                                w.[< ch $ch_num _tx_thr_event >]().bit(enable);
                             }
                             w
                         });
