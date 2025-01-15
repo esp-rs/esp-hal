@@ -194,6 +194,7 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             };
         }
         Package::EspWifi => {
+            features.push("esp-hal/unstable".to_owned());
             if config.contains("wifi") {
                 features.push("wifi".to_owned());
                 features.push("esp-now".to_owned());
@@ -201,7 +202,6 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
                 features.push("utils".to_owned());
                 features.push("smoltcp/proto-ipv4".to_owned());
                 features.push("smoltcp/proto-ipv6".to_owned());
-                features.push("esp-hal/unstable".to_owned());
             }
             if config.contains("ble") {
                 features.push("ble".to_owned());
