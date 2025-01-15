@@ -2,6 +2,7 @@
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable
+//% FEATURES(stable):
 
 // FIXME: add async test cases that don't rely on PCNT
 
@@ -11,20 +12,28 @@
 use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
-    dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
-    dma_buffers,
-    gpio::{Level, NoPin},
     spi::master::{Config, Spi},
-    time::RateExtU32,
     Blocking,
 };
-#[cfg(pcnt)]
-use esp_hal::{
-    gpio::interconnect::InputSignal,
-    pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
-};
+use fugit::RateExtU32;
 use hil_test as _;
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "unstable")] {
+        use esp_hal::{
+            dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
+            dma_buffers,
+            gpio::{Level, NoPin},
+        };
+        #[cfg(pcnt)]
+        use esp_hal::{
+            gpio::interconnect::InputSignal,
+            pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
+        };
+    }
+}
+
+#[cfg(feature = "unstable")]
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
         type DmaChannel = esp_hal::dma::Spi2DmaChannel;
@@ -35,15 +44,18 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: Spi<'static, Blocking>,
+    #[cfg(feature = "unstable")]
     dma_channel: DmaChannel,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
+    #[cfg(feature = "unstable")]
     rx_descriptors: &'static mut [DmaDescriptor],
     tx_buffer: &'static mut [u8],
+    #[cfg(feature = "unstable")]
     tx_descriptors: &'static mut [DmaDescriptor],
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     pcnt_source: InputSignal,
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     pcnt_unit: Unit<'static, 0>,
 }
 
@@ -56,9 +68,9 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let sclk = peripherals.GPIO0;
         let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
+        #[cfg(feature = "unstable")]
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
                 let dma_channel = peripherals.DMA_SPI2;
@@ -67,33 +79,58 @@ mod tests {
             }
         }
 
-        let (miso, mosi) = mosi.split();
-        #[cfg(pcnt)]
-        let mosi_loopback_pcnt = miso.clone();
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "unstable")] {
+                let (miso, mosi) = mosi.split();
+
+                #[cfg(pcnt)]
+                let mosi_loopback_pcnt = miso.clone();
+
+                let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+            } else {
+                use esp_hal::peripheral::Peripheral;
+                let miso = unsafe { mosi.clone_unchecked() };
+
+                static mut TX_BUFFER: [u8; 4096] = [0; 4096];
+                static mut RX_BUFFER: [u8; 4096] = [0; 4096];
+
+                let tx_buffer = unsafe { (&raw mut TX_BUFFER).as_mut().unwrap() };
+                let rx_buffer = unsafe { (&raw mut RX_BUFFER).as_mut().unwrap() };
+            }
+        }
 
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
         let spi = Spi::new(peripherals.SPI2, Config::default().with_frequency(10.MHz()))
             .unwrap()
-            .with_sck(sclk)
+            .with_sck(peripherals.GPIO0)
             .with_miso(miso)
             .with_mosi(mosi);
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "unstable")] {
+                #[cfg(pcnt)]
+                let pcnt = Pcnt::new(peripherals.PCNT);
 
-        #[cfg(pcnt)]
-        let pcnt = Pcnt::new(peripherals.PCNT);
-        Context {
-            spi,
-            dma_channel,
-            rx_buffer,
-            rx_descriptors,
-            tx_buffer,
-            tx_descriptors,
-            #[cfg(pcnt)]
-            pcnt_source: mosi_loopback_pcnt,
-            #[cfg(pcnt)]
-            pcnt_unit: pcnt.unit0,
+                Context {
+                    spi,
+                    rx_buffer,
+                    tx_buffer,
+                    dma_channel,
+                    rx_descriptors,
+                    tx_descriptors,
+                    #[cfg(pcnt)]
+                    pcnt_source: mosi_loopback_pcnt,
+                    #[cfg(pcnt)]
+                    pcnt_unit: pcnt.unit0,
+                }
+            } else {
+                Context {
+                    spi,
+                    rx_buffer,
+                    tx_buffer,
+                }
+            }
         }
     }
 
@@ -144,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     fn test_asymmetric_write(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
@@ -162,7 +199,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     async fn test_async_asymmetric_write(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
@@ -181,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     async fn async_write_after_sync_write_waits_for_flush(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef];
 
@@ -206,7 +243,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     fn test_asymmetric_write_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
@@ -224,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     async fn test_async_asymmetric_write_transfer(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
@@ -305,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     fn test_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -345,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     fn test_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -385,6 +422,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn test_symmetric_dma_transfer(ctx: Context) {
         // This test case sends a large amount of data, multiple times to verify that
         // https://github.com/esp-rs/esp-hal/issues/2151 is and remains fixed.
@@ -415,6 +453,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn test_asymmetric_dma_transfer(ctx: Context) {
         const WRITE_SIZE: usize = 4;
         const READ_SIZE: usize = 2;
@@ -451,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     fn test_dma_bus_read_write_pcnt(ctx: Context) {
         const TRANSFER_SIZE: usize = 4;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
@@ -484,6 +523,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn test_dma_bus_symmetric_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -503,6 +543,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn test_dma_bus_asymmetric_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -522,6 +563,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn test_dma_bus_symmetric_transfer_huge_buffer(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4096;
 
@@ -543,7 +585,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     async fn test_async_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -577,7 +619,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(all(pcnt, feature = "unstable"))]
     async fn test_async_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -613,6 +655,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn test_write_read(ctx: Context) {
         let spi = ctx
             .spi
@@ -656,6 +699,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn cancel_stops_transaction(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         // This means that without working cancellation, the test case should
@@ -680,6 +724,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn can_transmit_after_cancel(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         ctx.spi
@@ -717,6 +762,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "unstable")]
     async fn cancelling_an_awaited_transfer_does_nothing(ctx: Context) {
         // Set up a large buffer that would trigger a timeout
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
