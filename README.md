@@ -42,11 +42,11 @@ For information relating to the development of Rust applications on ESP devices,
 
 For information about the HAL and how to use it in your own projects, please refer to the [documentation].
 
-When browsing the examples, we recommend viewing the tag for the `esp-hal` release you are using to ensure compatibility, e.g.) [v0.22.0], as the `main` branch is used for development and APIs may have changed in the meantime.
+When browsing the examples, we recommend viewing the tag for the `esp-hal` release you are using to ensure compatibility, e.g. [v0.23.1], as the `main` branch is used for development and APIs may have changed in the meantime.
 
 [The Rust on ESP Book]: https://esp-rs.github.io/book/
 [documentation]: https://docs.esp-rs.org/esp-hal/
-[v0.22.0]: https://github.com/esp-rs/esp-hal/tree/v0.22.0/examples
+[v0.23.1]: https://github.com/esp-rs/esp-hal/tree/v0.23.1/examples
 
 ## Resources
 
