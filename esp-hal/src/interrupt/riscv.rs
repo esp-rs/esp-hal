@@ -771,7 +771,7 @@ mod plic {
             let plic = &*crate::peripherals::PLIC_MX::PTR;
             plic.mxint_enable().modify(|r, w| {
                 let old = r.cpu_mxint_enable().bits();
-                let new = old | 1 << (which as isize);
+                let new = old | (1 << (which as isize));
                 w.cpu_mxint_enable().bits(new)
             });
         }

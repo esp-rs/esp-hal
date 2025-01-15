@@ -166,7 +166,7 @@ impl Display for RegionStats {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for RegionStats {
-    fn format(&self, fmt: defmt::Formatter) {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
         let usage_percent = self.used * 100 / self.size;
 
         if self.capabilities.contains(MemoryCapability::Internal) {
@@ -287,7 +287,7 @@ impl Display for HeapStats {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for HeapStats {
-    fn format(&self, fmt: defmt::Formatter) {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(fmt, "HEAP INFO\n");
         defmt::write!(fmt, "Size: {}\n", self.size);
         defmt::write!(fmt, "Current usage: {}\n", self.current_usage);

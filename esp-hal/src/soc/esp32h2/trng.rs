@@ -345,7 +345,7 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
 
     let mut temp: u32 = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32)
         << REGI2C_RTC_SLAVE_ID_S as u32)
-        | (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32;
+        | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << (REGI2C_RTC_ADDR_S as u32));
     reg_write(I2C_MST_I2C0_CTRL_REG, temp);
     while reg_get_bit(I2C_MST_I2C0_CTRL_REG, REGI2C_RTC_BUSY) != 0 {}
     temp = reg_get_field(

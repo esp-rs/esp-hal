@@ -2933,8 +2933,10 @@ impl Driver {
         let mut w_iter = self.register_block().w_iter();
         for c in c_iter.by_ref() {
             if let Some(w_reg) = w_iter.next() {
-                let word =
-                    (c[0] as u32) | (c[1] as u32) << 8 | (c[2] as u32) << 16 | (c[3] as u32) << 24;
+                let word = (c[0] as u32)
+                    | ((c[1] as u32) << 8)
+                    | ((c[2] as u32) << 16)
+                    | ((c[3] as u32) << 24);
                 w_reg.write(|w| w.buf().set(word));
             }
         }
@@ -2942,8 +2944,8 @@ impl Driver {
         if !rem.is_empty() {
             if let Some(w_reg) = w_iter.next() {
                 let word = match rem.len() {
-                    3 => (rem[0] as u32) | (rem[1] as u32) << 8 | (rem[2] as u32) << 16,
-                    2 => (rem[0] as u32) | (rem[1] as u32) << 8,
+                    3 => (rem[0] as u32) | ((rem[1] as u32) << 8) | ((rem[2] as u32) << 16),
+                    2 => (rem[0] as u32) | ((rem[1] as u32) << 8),
                     1 => rem[0] as u32,
                     _ => unreachable!(),
                 };

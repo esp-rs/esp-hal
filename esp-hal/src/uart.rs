@@ -1782,7 +1782,7 @@ impl UartRx<'_, Async> {
     /// - `RXFIFO_FULL`
     /// - `RXFIFO_OVF`
     /// - `AT_CMD_CHAR_DET` (only if `set_at_cmd` was called)
-    /// - `RXFIFO_TOUT` (only if `set_rx_timeout was called)
+    /// - `RXFIFO_TOUT` (only if `set_rx_timeout` was called)
     ///
     /// The interrupts in question are enabled during the body of this
     /// function. The method immediately returns when the interrupt
@@ -1951,10 +1951,7 @@ pub mod lp_uart {
             // FIXME: use GPIO APIs to configure pins
             lp_aon
                 .gpio_mux()
-                .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 4) });
-            lp_aon
-                .gpio_mux()
-                .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 5) });
+                .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | (1 << 4) | (1 << 5)) });
 
             lp_io.gpio(4).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
             lp_io.gpio(5).modify(|_, w| unsafe { w.mcu_sel().bits(1) });

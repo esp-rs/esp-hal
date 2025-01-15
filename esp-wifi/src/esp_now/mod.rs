@@ -263,7 +263,7 @@ impl ReceivedData {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for ReceivedData {
-    fn format(&self, fmt: defmt::Formatter) {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(fmt, "ReceivedData {}, Info {}", &self.data[..], &self.info,)
     }
 }

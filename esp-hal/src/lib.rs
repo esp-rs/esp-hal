@@ -136,7 +136,7 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![deny(missing_docs, rust_2018_idioms)]
+#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
 

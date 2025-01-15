@@ -45,7 +45,7 @@
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
-#![deny(missing_docs)]
+#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![no_std]
 

@@ -42,7 +42,7 @@ pub struct LowPowerOutput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     /// Create a new output pin for use by the low-power core
-    #[instability::unstable] 
+    #[instability::unstable]
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: OutputPin + RtcPin,
@@ -78,7 +78,7 @@ pub struct LowPowerInput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     /// Create a new input pin for use by the low-power core
-    #[instability::unstable] 
+    #[instability::unstable]
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: InputPin + RtcPin,
@@ -123,7 +123,7 @@ pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     /// Create a new output pin for use by the low-power core
-    #[instability::unstable] 
+    #[instability::unstable]
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: InputPin + OutputPin + RtcPin,
@@ -186,7 +186,7 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
 pub(crate) fn init_low_power_pin(pin: u8) {
     unsafe { LP_AON::steal() }
         .gpio_mux()
-        .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << pin) });
+        .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | (1 << pin)) });
 
     unsafe { LP_IO::steal() }
         .gpio(pin as usize)

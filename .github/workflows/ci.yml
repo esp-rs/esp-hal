@@ -24,7 +24,6 @@ env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MSRV: "1.84.0"
-  RUSTDOCFLAGS: -Dwarnings
   DEFMT_LOG: trace
 
 # Cancel any currently running workflows from the same PR, branch, or

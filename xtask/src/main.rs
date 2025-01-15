@@ -858,7 +858,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 }
 
 fn lint_package(chip: &Chip, path: &Path, args: &[&str], fix: bool) -> Result<()> {
-    log::info!("Linting package: {}", path.display());
+    log::info!("Linting package: {} ({})", path.display(), chip);
 
     let builder = CargoArgsBuilder::default().subcommand("clippy");
 
