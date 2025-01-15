@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## 0.10.0 - 2025-01-15
+
 ### Fixed
 
 - Fixed `interrupt:free` incorrectly providing `CriticalSection` (#2537)
@@ -37,4 +45,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0] - 2020-09-19
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/xtensa-lx?since=2024-02-21
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/xtensa-lx?since=2025-01-15

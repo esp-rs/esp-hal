@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.23.0] - 2025-01-15
+
+### Added
+
 - ESP32-S3: Added SDMMC signals (#2556)
 - Added `set_priority` to the `DmaChannel` trait on GDMA devices (#2403, #2526)
 - Added `into_async` and `into_blocking` functions for `ParlIoTxOnly`, `ParlIoRxOnly` (#2526)
@@ -134,10 +144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
 - Removed `Camera::set_` functions (#2610)
 - `DmaTxBuf::{compute_chunk_size, compute_descriptor_count, new_with_block_size}` (#2543)
-
 - The `prelude` module has been removed (#2845)
 - SPI: Removed `pub fn read_byte` and `pub fn write_byte` (#2915)
-
 - Removed all peripheral instance type parameters and `new_typed` constructors (#2907)
 
 ## [0.22.0] - 2024-11-20
@@ -1060,7 +1068,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/esp-rs/esp-hal/compare/v0.22.10..v0.23.0
 [0.22.0]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/esp-rs/esp-hal/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...v0.21.0

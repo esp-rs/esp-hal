@@ -9,9 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added the `BuilderLite` derive macro which implements the Builder Lite pattern for a struct (#2614)
+### Changed
 
 ### Fixed
+
+### Removed
+
+## 0.16.0 - 2025-01-15
+
+### Added
+
+- Added the `BuilderLite` derive macro which implements the Builder Lite pattern for a struct (#2614)
 
 ### Changed
 
@@ -58,4 +66,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-hal-procmacros?since=2024-11-20
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-hal-procmacros?since=2025-01-15
