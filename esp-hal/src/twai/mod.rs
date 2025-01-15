@@ -1373,9 +1373,9 @@ fn read_frame(register_block: &RegisterBlock) -> Result<EspTwaiFrame, EspTwaiErr
     // Read the frame information and extract the frame id format and dlc.
     let data_0 = register_block.data_0().read().tx_byte_0().bits();
 
-    let is_standard_format = data_0 & 0b1 << 7 == 0;
-    let is_data_frame = data_0 & 0b1 << 6 == 0;
-    let self_reception = data_0 & 0b1 << 4 != 0;
+    let is_standard_format = data_0 & (0b1 << 7) == 0;
+    let is_data_frame = data_0 & (0b1 << 6) == 0;
+    let self_reception = data_0 & (0b1 << 4) != 0;
     let dlc = data_0 & 0b1111;
 
     if dlc > 8 {
@@ -1404,10 +1404,10 @@ fn read_frame(register_block: &RegisterBlock) -> Result<EspTwaiFrame, EspTwaiErr
         let data_3 = register_block.data_3().read().tx_byte_3().bits();
         let data_4 = register_block.data_4().read().tx_byte_4().bits();
 
-        let raw_id: u32 = (data_1 as u32) << 21
-            | (data_2 as u32) << 13
-            | (data_3 as u32) << 5
-            | (data_4 as u32) >> 3;
+        let raw_id: u32 = ((data_1 as u32) << 21)
+            | ((data_2 as u32) << 13)
+            | ((data_3 as u32) << 5)
+            | ((data_4 as u32) >> 3);
 
         let id = Id::from(ExtendedId::new(raw_id).unwrap());
         (id, register_block.data_5().as_ptr())
@@ -1442,7 +1442,7 @@ fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
     let rtr_bit: u8 = frame.is_remote as u8;
     let dlc_bits: u8 = frame.dlc as u8 & 0b1111;
 
-    let data_0: u8 = frame_format << 7 | rtr_bit << 6 | self_reception << 4 | dlc_bits;
+    let data_0: u8 = (frame_format << 7) | (rtr_bit << 6) | (self_reception << 4) | dlc_bits;
 
     register_block
         .data_0()

@@ -210,8 +210,8 @@ impl SingleStandardFilter {
         acceptance_mask |= (rtr_mask as u32) << 20;
 
         // Pack the payload bytes into the full layout.
-        acceptance_code |= (payload_code[0] as u32) << 8 | (payload_code[1] as u32);
-        acceptance_mask |= (payload_mask[0] as u32) << 8 | (payload_mask[1] as u32);
+        acceptance_code |= ((payload_code[0] as u32) << 8) | (payload_code[1] as u32);
+        acceptance_mask |= ((payload_mask[0] as u32) << 8) | (payload_mask[1] as u32);
 
         Self {
             raw: code_mask_to_register_array(acceptance_code, acceptance_mask),

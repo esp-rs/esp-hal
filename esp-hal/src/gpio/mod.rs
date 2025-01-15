@@ -1764,7 +1764,7 @@ impl<'d> Flex<'d> {
     #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
         GpioRegisterAccess::from(self.pin.number() as usize).read_interrupt_status()
-            & 1 << (self.pin.number() % 32)
+            & (1 << (self.pin.number() % 32))
             != 0
     }
 

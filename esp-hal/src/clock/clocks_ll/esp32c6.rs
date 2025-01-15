@@ -387,20 +387,20 @@ pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
 }
 
 pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
-    assert!(msb - lsb < 8);
+    assert!(msb < 8 + lsb);
     let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    regi2c_enable_block(block);
+
+    let block_shifted = (block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S;
+    let reg_add_shifted = (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S;
+    let write_bit = (0x1 & REGI2C_RTC_WR_CNTL_V as u32) << REGI2C_RTC_WR_CNTL_S;
 
     unsafe {
-        regi2c_enable_block(block);
-
         // Read the i2c bus register
-        let mut temp: u32 = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32)
-            << REGI2C_RTC_SLAVE_ID_S as u32)
-            | (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32;
-
-        lp_i2c_ana
-            .i2c0_ctrl()
-            .modify(|_, w| w.lp_i2c_ana_mast_i2c0_ctrl().bits(temp));
+        lp_i2c_ana.i2c0_ctrl().modify(|_, w| {
+            w.lp_i2c_ana_mast_i2c0_ctrl()
+                .bits(block_shifted | reg_add_shifted)
+        });
 
         while lp_i2c_ana
             .i2c0_ctrl()
@@ -409,23 +409,25 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
             .bit()
         {}
 
-        temp = lp_i2c_ana
+        let mut temp = lp_i2c_ana
             .i2c0_data()
             .read()
             .lp_i2c_ana_mast_i2c0_rdata()
             .bits() as u32;
 
-        // Write the i2c bus register
+        // Mask the value field
         temp &= (!(0xFFFFFFFF << lsb)) | (0xFFFFFFFF << (msb + 1));
-        temp |= (data as u32 & (!(0xFFFFFFFF << (msb as u32 - lsb as u32 + 1)))) << (lsb as u32);
-        temp = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S as u32)
-            | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32)
-            | ((0x1 & REGI2C_RTC_WR_CNTL_V as u32) << REGI2C_RTC_WR_CNTL_S as u32)
-            | ((temp & REGI2C_RTC_DATA_V as u32) << REGI2C_RTC_DATA_S as u32);
 
-        lp_i2c_ana
-            .i2c0_ctrl()
-            .modify(|_, w| w.lp_i2c_ana_mast_i2c0_ctrl().bits(temp));
+        // Write the value into the temporary
+        temp |= (data as u32 & (!(0xFFFFFFFF << (msb - lsb + 1)))) << lsb;
+
+        // Write the i2c bus register
+        let new_value = (temp & REGI2C_RTC_DATA_V as u32) << REGI2C_RTC_DATA_S;
+
+        lp_i2c_ana.i2c0_ctrl().modify(|_, w| {
+            w.lp_i2c_ana_mast_i2c0_ctrl()
+                .bits(block_shifted | reg_add_shifted | write_bit | new_value)
+        });
 
         while lp_i2c_ana
             .i2c0_ctrl()

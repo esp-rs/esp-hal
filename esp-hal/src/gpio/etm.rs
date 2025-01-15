@@ -344,7 +344,9 @@ fn enable_task_channel(channel: u8, pin: u8) {
     // bit 0 = en, bit 1-3 = channel
     unsafe {
         ptr.write_volatile(
-            ptr.read_volatile() & !(0xf << shift) | 1 << shift | (channel as u32) << (shift + 1),
+            ptr.read_volatile() & !(0xf << shift)
+                | (1 << shift)
+                | ((channel as u32) << (shift + 1)),
         );
     }
 }

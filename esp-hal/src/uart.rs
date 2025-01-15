@@ -1951,10 +1951,7 @@ pub mod lp_uart {
             // FIXME: use GPIO APIs to configure pins
             lp_aon
                 .gpio_mux()
-                .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 4) });
-            lp_aon
-                .gpio_mux()
-                .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << 5) });
+                .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | (1 << 4) | (1 << 5)) });
 
             lp_io.gpio(4).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
             lp_io.gpio(5).modify(|_, w| unsafe { w.mcu_sel().bits(1) });

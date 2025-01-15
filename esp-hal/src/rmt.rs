@@ -226,8 +226,8 @@ use fugit::HertzU32;
 use crate::{
     asynch::AtomicWaker,
     gpio::interconnect::{PeripheralInput, PeripheralOutput},
-    interrupt::InterruptConfigurable,
     handler,
+    interrupt::InterruptConfigurable,
     peripheral::Peripheral,
     peripherals::Interrupt,
     soc::constants,
@@ -279,8 +279,9 @@ pub trait PulseCode: crate::private::Sealed {
 
 impl PulseCode for u32 {
     fn new(level1: bool, length1: u16, level2: bool, length2: u16) -> Self {
-        (((level1 as u32) << 15) | length1 as u32 & 0b111_1111_1111_1111)
-            | (((level2 as u32) << 15) | length2 as u32 & 0b111_1111_1111_1111) << 16
+        let level1 = ((level1 as u32) << 15) | (length1 as u32 & 0b111_1111_1111_1111);
+        let level2 = ((level2 as u32) << 15) | (length2 as u32 & 0b111_1111_1111_1111);
+        level1 | (level2 << 16)
     }
 
     fn empty() -> Self {
