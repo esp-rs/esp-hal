@@ -1,6 +1,6 @@
 [package]
 name          = "esp-hal"
-version       = "0.23.0"
+version       = "0.23.1"
 edition       = "2021"
 rust-version  = "1.84.0"
 description   = "Bare-metal HAL for Espressif devices"
