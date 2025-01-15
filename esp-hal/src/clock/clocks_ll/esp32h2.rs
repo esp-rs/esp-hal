@@ -51,7 +51,6 @@ const REGI2C_RTC_SLAVE_ID_V: u8 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_S: u8 = 0;
 const REGI2C_RTC_ADDR_V: u8 = 0xFF;
 const REGI2C_RTC_ADDR_S: u8 = 8;
-const REGI2C_RTC_WR_CNTL_V: u8 = 0x1;
 const REGI2C_RTC_WR_CNTL_S: u8 = 24;
 const REGI2C_RTC_DATA_V: u8 = 0xFF;
 const REGI2C_RTC_DATA_S: u8 = 16;
@@ -241,45 +240,28 @@ fn regi2c_enable_block(block: u8) {
         .modify(|_, w| w.clk_i2c_mst_en().set_bit());
 
     // Before config I2C register, enable corresponding slave.
-    match block {
-        v if v == REGI2C_BBPLL => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BBPLL_RD_MASK);
-        }
-        v if v == REGI2C_BIAS => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BIAS_RD_MASK);
-        }
-        v if v == REGI2C_PMU => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_DIG_REG_RD_MASK);
-        }
-        v if v == REGI2C_ULP_CAL => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_ULP_CAL_RD_MASK);
-        }
-        v if v == REGI2C_SAR_I2C => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_SAR_I2C_RD_MASK);
-        }
-        _ => (),
-    }
+
+    let en_mask = match block {
+        v if v == REGI2C_BBPLL => REGI2C_BBPLL_RD_MASK,
+        v if v == REGI2C_BIAS => REGI2C_BIAS_RD_MASK,
+        v if v == REGI2C_PMU => REGI2C_DIG_REG_RD_MASK,
+        v if v == REGI2C_ULP_CAL => REGI2C_ULP_CAL_RD_MASK,
+        v if v == REGI2C_SAR_I2C => REGI2C_SAR_I2C_RD_MASK,
+        _ => return,
+    };
+    reg_set_bit(I2C_MST_ANA_CONF1_REG, en_mask)
 }
 
 fn regi2c_disable_block(block: u8) {
-    match block {
-        v if v == REGI2C_BBPLL => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BBPLL_RD_MASK);
-        }
-        v if v == REGI2C_BIAS => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BIAS_RD_MASK);
-        }
-        v if v == REGI2C_PMU => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_DIG_REG_RD_MASK);
-        }
-        v if v == REGI2C_ULP_CAL => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_ULP_CAL_RD_MASK);
-        }
-        v if v == REGI2C_SAR_I2C => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_SAR_I2C_RD_MASK);
-        }
-        _ => (),
-    }
+    let en_mask = match block {
+        v if v == REGI2C_BBPLL => REGI2C_BBPLL_RD_MASK,
+        v if v == REGI2C_BIAS => REGI2C_BIAS_RD_MASK,
+        v if v == REGI2C_PMU => REGI2C_DIG_REG_RD_MASK,
+        v if v == REGI2C_ULP_CAL => REGI2C_ULP_CAL_RD_MASK,
+        v if v == REGI2C_SAR_I2C => REGI2C_SAR_I2C_RD_MASK,
+        _ => return,
+    };
+    reg_clr_bit(I2C_MST_ANA_CONF1_REG, en_mask)
 }
 
 fn reg_set_bit(reg: u32, bit: u32) {
@@ -314,7 +296,7 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
 
     let block_shifted = (block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S;
     let reg_add_shifted = (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S;
-    let write_bit = (0x1 & REGI2C_RTC_WR_CNTL_V as u32) << REGI2C_RTC_WR_CNTL_S;
+    let write_bit = 1u32 << REGI2C_RTC_WR_CNTL_S;
 
     // Read the i2c bus register
     while reg_get_bit(I2C_MST_I2C0_CTRL_REG, REGI2C_RTC_BUSY) != 0 {}
