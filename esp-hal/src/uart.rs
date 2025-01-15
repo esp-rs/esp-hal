@@ -275,7 +275,7 @@ pub enum StopBits {
 }
 
 /// UART Configuration
-#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[derive(Debug, Clone, Copy, Default, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
@@ -299,7 +299,7 @@ pub struct RxConfig {
 }
 
 /// UART Transmit part configuration.
-#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[derive(Debug, Clone, Copy, Default, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct TxConfig {}
@@ -354,12 +354,6 @@ impl Default for RxConfig {
     }
 }
 
-impl Default for TxConfig {
-    fn default() -> TxConfig {
-        TxConfig {}
-    }
-}
-
 impl Default for SharedConfig {
     fn default() -> SharedConfig {
         SharedConfig {
@@ -368,16 +362,6 @@ impl Default for SharedConfig {
             parity: Default::default(),
             stop_bits: Default::default(),
             clock_source: Default::default(),
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            rx: RxConfig::default(),
-            tx: TxConfig::default(),
-            shared: SharedConfig::default(),
         }
     }
 }
@@ -572,6 +556,7 @@ where
     /// Note that this also changes the configuration of the RX half.
     pub fn apply_config(&mut self, _config: &TxConfig) -> Result<(), ConfigError> {
         // Nothing to do so far.
+        self.uart.info().txfifo_reset();
         Ok(())
     }
 
@@ -762,13 +747,14 @@ where
         rx_config: &RxConfig,
         shared_config: &SharedConfig,
     ) -> Result<(), ConfigError> {
-        // self.uart.info().apply_config(config)
         self.uart
             .info()
             .set_rx_fifo_full_threshold(rx_config.rx_fifo_full_threshold)?;
         self.uart
             .info()
             .set_rx_timeout(rx_config.rx_timeout, shared_config.symbol_length())?;
+
+        self.uart.info().rxfifo_reset();
         Ok(())
     }
 
@@ -2200,8 +2186,6 @@ impl Info {
     }
 
     fn apply_config(&self, config: &SharedConfig) -> Result<(), ConfigError> {
-        // self.set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        // self.set_rx_timeout(config.rx_timeout, config.symbol_length())?;
         self.change_baud(config.baudrate, config.clock_source);
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
