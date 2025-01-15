@@ -1,6 +1,6 @@
 [package]
 name         = "xtensa-lx-rt"
-version      = "0.17.2"
+version      = "0.18.0"
 edition      = "2021"
 rust-version = "1.84.0"
 description  = "Minimal startup/runtime for Xtensa LX CPUs"
@@ -16,13 +16,13 @@ features = ["esp32"]
 document-features = "0.2.10"
 macros            = { version = "0.2.2", package = "xtensa-lx-rt-proc-macros", path = "./procmacros" }
 r0                = "1.0.0"
-xtensa-lx         = { version = "0.9.0", path = "../xtensa-lx" }
+xtensa-lx         = { version = "0.10.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-anyhow          = "1.0.89"
+anyhow          = "1.0.95"
 enum-as-inner   = "0.6.1"
-minijinja       = "2.3.1"
-serde           = { version = "1.0.210", features = ["derive"] }
+minijinja       = "2.6.0"
+serde           = { version = "1.0.217", features = ["derive"] }
 strum           = { version = "0.26.3", features = ["derive"] }
 toml            = "0.8.19"
 
