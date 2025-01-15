@@ -44,7 +44,8 @@ use core::mem::transmute;
 
 use crate::{
     gpio::{AlternateFunction, GpioPin},
-    peripherals::{io_mux, GPIO, IO_MUX},
+    pac::io_mux,
+    peripherals::{GPIO, IO_MUX},
     Cpu,
 };
 

@@ -43,7 +43,7 @@ const I2C_BBPLL_OC_DCUR: u32 = 5;
 
 pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
     let efuse = unsafe { &*crate::peripherals::EFUSE::ptr() };
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
 
     let rtc_cntl_dbias_hp_volt: u32 =
         RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5().read().rd_vol_level_hp_inv().bits() as u32;
@@ -144,7 +144,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 }
 
 pub(crate) fn esp32_rtc_bbpll_enable() {
-    unsafe { &*crate::peripherals::RTC_CNTL::ptr() }
+    unsafe { &*crate::peripherals::LPWR::ptr() }
         .options0()
         .modify(|_, w| {
             w.bias_i2c_force_pd()
@@ -171,7 +171,7 @@ pub(crate) fn esp32_rtc_bbpll_enable() {
 
 pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
     let apb_cntl = unsafe { &*crate::peripherals::APB_CTRL::ptr() };
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
 
     unsafe {
         let value = (((freq.hz()) >> 12) & UINT16_MAX) | ((((freq.hz()) >> 12) & UINT16_MAX) << 16);
@@ -203,7 +203,7 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
 pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
     let efuse = unsafe { &*crate::peripherals::EFUSE::ptr() };
     let dport = unsafe { &*crate::peripherals::DPORT::ptr() };
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
 
     unsafe {
         const RTC_CNTL_DBIAS_1V25: u32 = 7;

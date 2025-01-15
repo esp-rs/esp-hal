@@ -48,7 +48,7 @@ const I2C_RTC_BOD_MASK: u32 = 1 << 22;
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
     let dport = unsafe { &*crate::peripherals::SYSTEM::ptr() };
     let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
     let sens = unsafe { &*crate::peripherals::SENS::ptr() };

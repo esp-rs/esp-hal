@@ -415,7 +415,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         block.timer(tim as usize).cfg0().read().period().bits()
     }
 
-    unsafe fn ch() -> &'static crate::peripherals::mcpwm0::CH {
+    unsafe fn ch() -> &'static crate::pac::mcpwm0::CH {
         let block = unsafe { &*PWM::block() };
         block.ch(OP as usize)
     }
@@ -571,7 +571,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
         dt_fed.write(|w| unsafe { w.fed().bits(dead_time) });
     }
 
-    unsafe fn ch() -> &'static crate::peripherals::mcpwm0::CH {
+    unsafe fn ch() -> &'static crate::pac::mcpwm0::CH {
         let block = unsafe { &*PWM::block() };
         block.ch(OP as usize)
     }

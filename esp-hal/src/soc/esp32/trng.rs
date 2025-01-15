@@ -3,7 +3,7 @@
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
     let sens = unsafe { &*crate::peripherals::SENS::ptr() };
     let dport = unsafe { &*crate::peripherals::DPORT::ptr() };
     let apb_ctrl = unsafe { &*crate::peripherals::APB_CTRL::ptr() };

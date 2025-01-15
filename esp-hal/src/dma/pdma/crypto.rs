@@ -8,7 +8,7 @@ use crate::{
     peripherals::Interrupt,
 };
 
-pub(super) type CryptoRegisterBlock = crate::peripherals::crypto_dma::RegisterBlock;
+pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;
 
 /// The RX half of a Crypto DMA channel.
 #[derive(Debug)]

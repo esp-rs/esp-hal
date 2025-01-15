@@ -129,7 +129,7 @@ impl WakeSource for TimerWakeupSource {
         _sleep_config: &mut RtcSleepConfig,
     ) {
         triggers.set_timer(true);
-        let rtc_cntl = unsafe { &*esp32c2::RTC_CNTL::ptr() };
+        let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
         let clock_freq = RtcClock::slow_freq();
         // TODO: maybe add sleep time adjustlemnt like idf
         // TODO: maybe add check to prevent overflow?
@@ -183,7 +183,7 @@ impl RtcioWakeupSource<'_, '_> {
 
 fn isolate_digital_gpio() {
     // like esp_sleep_isolate_digital_gpio
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
     let io_mux = unsafe { &*crate::peripherals::IO_MUX::ptr() };
     let gpio = unsafe { &*crate::peripherals::GPIO::ptr() };
 
@@ -250,7 +250,7 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
         // But this last block of things gets skipped if hold is disabled globally (see
         // gpio_ll_deep_sleep_hold_is_en)
 
-        let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::PTR };
+        let rtc_cntl = unsafe { &*crate::peripherals::LPWR::PTR };
 
         rtc_cntl
             .cntl_gpio_wakeup()
@@ -473,9 +473,9 @@ fn register_modify_bits(reg: u32, bits: u32, set: bool) {
 }
 
 fn rtc_sleep_pu(val: bool) {
-    let rtc_cntl = unsafe { &*esp32c2::RTC_CNTL::ptr() };
-    let syscon = unsafe { &*esp32c2::APB_CTRL::ptr() };
-    let bb = unsafe { &*esp32c2::BB::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
+    let syscon = unsafe { &*crate::peripherals::APB_CTRL::ptr() };
+    let bb = unsafe { &*crate::peripherals::BB::ptr() };
 
     rtc_cntl
         .dig_pwc()
@@ -555,9 +555,9 @@ impl RtcSleepConfig {
 
         // settings derived from esp_clk_init -> rtc_init
         unsafe {
-            let rtc_cntl = &*esp32c2::RTC_CNTL::ptr();
-            let extmem = &*esp32c2::EXTMEM::ptr();
-            let system = &*esp32c2::SYSTEM::ptr();
+            let rtc_cntl = &*crate::peripherals::LPWR::ptr();
+            let extmem = &*crate::peripherals::EXTMEM::ptr();
+            let system = &*crate::peripherals::SYSTEM::ptr();
 
             regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
 
@@ -607,10 +607,10 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.icache_tag_mem_force_on().clear_bit());
                 // clear register clock force on
                 // clear register clock force on
-                (*esp32c2::SPI0::ptr())
+                (*crate::peripherals::SPI0::ptr())
                     .clock_gate()
                     .modify(|_, w| w.clk_en().clear_bit());
-                (*esp32c2::SPI1::ptr())
+                (*crate::peripherals::SPI1::ptr())
                     .clock_gate()
                     .modify(|_, w| w.clk_en().clear_bit());
             }
@@ -686,7 +686,7 @@ impl RtcSleepConfig {
 
     pub(crate) fn apply(&self) {
         // like esp-idf rtc_sleep_init()
-        let rtc_cntl = unsafe { &*esp32c2::RTC_CNTL::ptr() };
+        let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
 
         if self.lslp_mem_inf_fpu() {
             rtc_sleep_pu(true);
@@ -800,7 +800,7 @@ impl RtcSleepConfig {
 
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
         unsafe {
-            let rtc_cntl = &*esp32c2::RTC_CNTL::ptr();
+            let rtc_cntl = &*crate::peripherals::LPWR::ptr();
 
             // set bits for what can wake us up
             rtc_cntl
@@ -816,7 +816,7 @@ impl RtcSleepConfig {
     pub(crate) fn finish_sleep(&self) {
         // In deep sleep mode, we never get here
         unsafe {
-            let rtc_cntl = &*esp32c2::RTC_CNTL::ptr();
+            let rtc_cntl = &*crate::peripherals::LPWR::ptr();
 
             rtc_cntl.int_clr().write(|w| {
                 w.slp_reject()

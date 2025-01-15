@@ -2,7 +2,7 @@ use strum::FromRepr;
 
 use crate::{
     clock::XtalClock,
-    peripherals::{APB_CTRL, EXTMEM, RTC_CNTL, SPI0, SPI1, SYSTEM},
+    peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
     rom::regi2c_write_mask,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };
@@ -26,7 +26,7 @@ const I2C_ULP_IR_FORCE_XPD_CK_MSB: u32 = 2;
 const I2C_ULP_IR_FORCE_XPD_CK_LSB: u32 = 2;
 
 pub(crate) fn init() {
-    let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*LPWR::ptr() };
 
     regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
 
@@ -90,7 +90,7 @@ pub(crate) fn configure_clock() {
 
     unsafe {
         // from esp_clk_init:
-        let rtc_cntl = &*esp32c3::RTC_CNTL::ptr();
+        let rtc_cntl = &*LPWR::ptr();
         // clk_ll_rc_fast_enable();
         rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
         rtc_cntl.timer1().modify(|_, w| w.ck8m_wait().bits(5));
@@ -109,7 +109,7 @@ pub(crate) fn configure_clock() {
     };
 
     unsafe {
-        let rtc_cntl = &*RTC_CNTL::ptr();
+        let rtc_cntl = &*LPWR::ptr();
         rtc_cntl.store1().write(|w| w.bits(cal_val));
     }
 }
@@ -141,7 +141,7 @@ fn clock_control_init() {
 
 /// Perform power control related initialization
 fn power_control_init() {
-    let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*LPWR::ptr() };
     let system = unsafe { &*SYSTEM::ptr() };
     rtc_cntl
         .clk_conf()
@@ -234,7 +234,7 @@ fn power_control_init() {
 
 /// Configure whether certain peripherals are powered down in deep sleep
 fn rtc_sleep_pu() {
-    let rtc_cntl = unsafe { &*RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*LPWR::ptr() };
     let apb_ctrl = unsafe { &*APB_CTRL::ptr() };
 
     rtc_cntl.dig_pwc().modify(|_, w| {

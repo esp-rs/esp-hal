@@ -23,6 +23,7 @@ pub use self::plic::*;
 pub use self::vectored::*;
 use super::InterruptStatus;
 use crate::{
+    pac,
     peripherals::{self, Interrupt},
     Cpu,
 };
@@ -227,7 +228,7 @@ pub fn _setup_interrupts() {
         // at least after the 2nd stage bootloader there are some interrupts enabled
         // (e.g. UART)
         for peripheral_interrupt in 0..255 {
-            crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
+            Interrupt::try_from(peripheral_interrupt)
                 .map(|intr| {
                     #[cfg(multi_core)]
                     disable(Cpu::AppCpu, intr);
@@ -293,15 +294,15 @@ pub fn status(_core: Cpu) -> InterruptStatus {
     #[cfg(large_intr_status)]
     unsafe {
         InterruptStatus::from(
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+            (*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_0()
                 .read()
                 .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+            (*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1()
                 .read()
                 .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+            (*peripherals::INTERRUPT_CORE0::PTR)
                 .int_status_reg_2()
                 .read()
                 .bits(),
@@ -311,19 +312,19 @@ pub fn status(_core: Cpu) -> InterruptStatus {
     #[cfg(very_large_intr_status)]
     unsafe {
         InterruptStatus::from(
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+            (*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_0()
                 .read()
                 .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+            (*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1()
                 .read()
                 .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+            (*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_2()
                 .read()
                 .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+            (*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_3()
                 .read()
                 .bits(),
@@ -333,11 +334,11 @@ pub fn status(_core: Cpu) -> InterruptStatus {
     #[cfg(not(any(large_intr_status, very_large_intr_status)))]
     unsafe {
         InterruptStatus::from(
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+            (*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_0()
                 .read()
                 .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
+            (*peripherals::INTERRUPT_CORE0::PTR)
                 .intr_status_reg_1()
                 .read()
                 .bits(),
@@ -460,7 +461,7 @@ mod vectored {
     ///
     /// This will replace any previously bound interrupt handler
     pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
-        let ptr = &peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
+        let ptr = &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
             as *mut unsafe extern "C" fn();
         ptr.write_volatile(handler);
     }
@@ -468,7 +469,7 @@ mod vectored {
     /// Returns the currently bound interrupt handler.
     pub fn bound_handler(interrupt: Interrupt) -> Option<unsafe extern "C" fn()> {
         unsafe {
-            let addr = peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
+            let addr = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
             if addr as usize == 0 {
                 return None;
             }
@@ -504,7 +505,7 @@ mod vectored {
             fn EspDefaultHandler(interrupt: Interrupt);
         }
 
-        let handler = peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
+        let handler = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
 
         if core::ptr::eq(
             handler as *const _,

@@ -240,8 +240,9 @@ use crate::{
         Pull,
     },
     interrupt::{InterruptConfigurable, InterruptHandler},
+    pac::uart0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{uart0::RegisterBlock, Interrupt},
+    peripherals::Interrupt,
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
@@ -849,7 +850,7 @@ where
                 // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
                 let fifo = unsafe {
                     &*((self.register_block().fifo().as_ptr() as *mut u8).add(0x20C00000)
-                        as *mut crate::peripherals::uart0::FIFO)
+                        as *mut crate::pac::uart0::FIFO)
                 };
             } else {
                 let fifo = self.register_block().fifo();
@@ -1926,7 +1927,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
-        peripherals::{LP_CLKRST, LP_UART},
+        peripherals::{LPWR, LP_UART},
         uart::{Config, DataBits, Parity, StopBits},
     };
     /// LP-UART driver
@@ -1981,8 +1982,8 @@ pub mod lp_uart {
             // Get source clock frequency
             // default == SOC_MOD_CLK_RTC_FAST == 2
 
-            // LP_CLKRST.lpperi.lp_uart_clk_sel = 0;
-            unsafe { LP_CLKRST::steal() }
+            // LPWR.lpperi.lp_uart_clk_sel = 0;
+            unsafe { LPWR::steal() }
                 .lpperi()
                 .modify(|_, w| w.lp_uart_clk_sel().clear_bit());
 
@@ -2450,7 +2451,7 @@ impl Info {
         };
 
         if clock_source == ClockSource::RcFast {
-            unsafe { crate::peripherals::RTC_CNTL::steal() }
+            unsafe { crate::peripherals::LPWR::steal() }
                 .clk_conf()
                 .modify(|_, w| w.dig_clk8m_en().variant(true));
             // esp_rom_delay_us(SOC_DELAY_RC_FAST_DIGI_SWITCH);

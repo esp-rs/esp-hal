@@ -105,7 +105,7 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
 }
 
 pub(crate) fn esp32c2_rtc_bbpll_enable() {
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
 
     rtc_cntl.options0().modify(|_, w| {
         w.bb_i2c_force_pd()
@@ -159,7 +159,7 @@ pub(crate) fn esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
 }
 
 pub(crate) fn esp32c2_rtc_apb_freq_update(apb_freq: ApbClock) {
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
 
     let value = ((apb_freq.hz() >> 12) & u16::MAX as u32)
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);

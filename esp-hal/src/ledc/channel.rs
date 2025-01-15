@@ -15,8 +15,8 @@ use crate::{
         interconnect::{OutputConnection, PeripheralOutput},
         OutputSignal,
     },
+    pac::ledc::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::ledc::RegisterBlock,
 };
 
 /// Fade parameter sub-errors
