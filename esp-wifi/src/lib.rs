@@ -336,6 +336,8 @@ impl EspWifiRngSource for Rng {}
 impl private::Sealed for Rng {}
 impl EspWifiRngSource for Trng<'_> {}
 impl private::Sealed for Trng<'_> {}
+impl<R: EspWifiRngSource + private::Sealed> EspWifiRngSource for &'_ mut R {}
+impl<R: EspWifiRngSource + private::Sealed> private::Sealed for &'_ mut R {}
 
 /// Initialize for using WiFi and or BLE.
 ///
