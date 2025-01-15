@@ -1943,13 +1943,13 @@ mod sealed {
 
         fn interface(self) -> wifi_interface_t;
 
-        fn register_transmit_waker(self, cx: &mut core::task::Context) {
+        fn register_transmit_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::TRANSMIT_WAKER.register(cx.waker())
         }
 
-        fn register_receive_waker(self, cx: &mut core::task::Context);
+        fn register_receive_waker(self, cx: &mut core::task::Context<'_>);
 
-        fn register_link_state_waker(self, cx: &mut core::task::Context);
+        fn register_link_state_waker(self, cx: &mut core::task::Context<'_>);
 
         fn link_state(self) -> embassy_net_driver::LinkState;
     }
@@ -1973,11 +1973,11 @@ mod sealed {
             wifi_interface_t_WIFI_IF_STA
         }
 
-        fn register_receive_waker(self, cx: &mut core::task::Context) {
+        fn register_receive_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::STA_RECEIVE_WAKER.register(cx.waker());
         }
 
-        fn register_link_state_waker(self, cx: &mut core::task::Context) {
+        fn register_link_state_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::STA_LINK_STATE_WAKER.register(cx.waker());
         }
 
@@ -2009,11 +2009,11 @@ mod sealed {
             wifi_interface_t_WIFI_IF_AP
         }
 
-        fn register_receive_waker(self, cx: &mut core::task::Context) {
+        fn register_receive_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::AP_RECEIVE_WAKER.register(cx.waker());
         }
 
-        fn register_link_state_waker(self, cx: &mut core::task::Context) {
+        fn register_link_state_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::AP_LINK_STATE_WAKER.register(cx.waker());
         }
 
@@ -2324,7 +2324,7 @@ impl PromiscuousPkt<'_> {
 }
 
 #[cfg(feature = "sniffer")]
-static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt)>> = Locked::new(None);
+static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt<'_>)>> = Locked::new(None);
 
 #[cfg(feature = "sniffer")]
 unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
@@ -2375,7 +2375,7 @@ impl Sniffer {
         })
     }
     /// Set the callback for receiving a packet.
-    pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt)) {
+    pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt<'_>)) {
         SNIFFER_CB.with(|callback| *callback = Some(cb));
     }
 }
@@ -3153,19 +3153,22 @@ pub(crate) mod embassy {
 
         fn receive(
             &mut self,
-            cx: &mut core::task::Context,
+            cx: &mut core::task::Context<'_>,
         ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
             self.mode.register_receive_waker(cx);
             self.mode.register_transmit_waker(cx);
             self.mode.rx_token()
         }
 
-        fn transmit(&mut self, cx: &mut core::task::Context) -> Option<Self::TxToken<'_>> {
+        fn transmit(&mut self, cx: &mut core::task::Context<'_>) -> Option<Self::TxToken<'_>> {
             self.mode.register_transmit_waker(cx);
             self.mode.tx_token()
         }
 
-        fn link_state(&mut self, cx: &mut core::task::Context) -> embassy_net_driver::LinkState {
+        fn link_state(
+            &mut self,
+            cx: &mut core::task::Context<'_>,
+        ) -> embassy_net_driver::LinkState {
             self.mode.register_link_state_waker(cx);
             self.mode.link_state()
         }

@@ -3,7 +3,7 @@
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![cfg_attr(not(feature = "build"), no_std)]
-#![deny(missing_docs, rust_2018_idioms)]
+#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 
 #[cfg(feature = "build")]
 mod generate;

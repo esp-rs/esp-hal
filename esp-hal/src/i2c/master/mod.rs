@@ -727,8 +727,8 @@ pub enum Event {
     /// Triggered when the I2C controller detects a STOP bit.
     TxComplete,
 
-    /// Triggered when FIFO_PRT_EN is 1 and the
-    /// pointers of TX FIFO are less than TXFIFO_WM_THRHD[4:0].
+    /// Triggered when the TX FIFO watermark check is enabled and the TX fifo
+    /// falls below the configured watermark.
     #[cfg(not(any(esp32, esp32s2)))]
     TxFifoWatermark,
 }

@@ -1782,7 +1782,7 @@ impl UartRx<'_, Async> {
     /// - `RXFIFO_FULL`
     /// - `RXFIFO_OVF`
     /// - `AT_CMD_CHAR_DET` (only if `set_at_cmd` was called)
-    /// - `RXFIFO_TOUT` (only if `set_rx_timeout was called)
+    /// - `RXFIFO_TOUT` (only if `set_rx_timeout` was called)
     ///
     /// The interrupts in question are enabled during the body of this
     /// function. The method immediately returns when the interrupt
