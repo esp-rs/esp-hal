@@ -126,12 +126,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None
             ),
             (
-                "csi_enable",
-                "WiFi channel state information enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Bool(false),
-                None
-            ),
-            (
                 "ampdu_rx_enable",
                 "WiFi AMPDU RX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
                 Value::Bool(true),

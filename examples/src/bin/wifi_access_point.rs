@@ -20,7 +20,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    entry,
+    main,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -38,7 +38,7 @@ use esp_wifi::{
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());

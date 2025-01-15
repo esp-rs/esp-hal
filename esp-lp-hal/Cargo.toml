@@ -2,7 +2,7 @@
 name         = "esp-lp-hal"
 version      = "0.1.0"
 edition      = "2021"
-rust-version = "1.76.0"
+rust-version = "1.84.0"
 description  = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
 keywords     = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
 categories   = ["embedded", "hardware-support", "no-std"]

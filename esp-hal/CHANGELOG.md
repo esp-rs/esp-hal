@@ -55,11 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `adc::{AdcCalSource, Attenuation, Resolution}` now implement `Hash` and `defmt::Format` (#2840)
 - `rtc_cntl::{RtcFastClock, RtcSlowClock, RtcCalSel}` now implement `PartialEq`, `Eq`, `Hash` and `defmt::Format` (#2840)
 - Added `tsens::TemperatureSensor` peripheral for ESP32C6 and ESP32C3 (#2875)
-- Added `with_rx()` and `with_tx()` methods to Uart, UartRx, and UartTx ()
+- Added `with_rx()` and `with_tx()` methods to Uart, UartRx, and UartTx (#2904)
+- ESP32-S2: Made Wi-Fi peripheral non virtual. (#2942)
+- `UartRx::check_for_errors`, `Uart::check_for_rx_errors`, `{Uart, UartRx}::read_buffered_bytes` (#2935)
+- Added `i2c` interrupt API (#2944)
 
 ### Changed
 
-- Bump MSRV to 1.83 (#2615)
 - In addition to taking by value, peripheral drivers can now mutably borrow DMA channel objects. (#2526)
 - DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
 - The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
@@ -101,11 +103,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: Fix naming violations for `Address` and `Command` enum variants (#2906)
 - `ClockSource` enums are now `#[non_exhaustive]` (#2912)
 - `macros` module is now private (#2900)
-
 - `gpio::{Input, Flex}::wakeup_enable` now returns an error instead of panicking. (#2916)
+- I2C: Have a dedicated enum to specify the timeout (#2864)
 - Removed the `I` prefix from `DriveStrength` enum variants. (#2922)
 - Removed the `Attenuation` prefix from `Attenuation` enum variants. (#2922)
 - Renamed / changed some I2C error variants (#2844, #2862)
+- The `entry` macro is replaced by the `main` macro (#2941)
+- `{Uart, UartRx}::read_bytes` now blocks until the buffer is filled. (#2935)
+- Bump MSRV to 1.84 (#2951)
 
 ### Fixed
 
@@ -199,6 +204,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `get_` prefixes from functions (#2528)
 - The `Camera` and `I8080` drivers' constructors now only accepts blocking-mode DMA channels. (#2519)
 - Many peripherals are now disabled by default and also get disabled when the driver is dropped (#2544)
+- Updated embassy-time to v0.4 (#2701)
 
 - Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 - UART: `read_byte` and `write_byte` made private. (#2915)

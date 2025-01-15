@@ -4,7 +4,7 @@
 //! Set SSID and PASSWORD env variable before running this example.
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/log esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/log esp-wifi/csi esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -15,7 +15,7 @@ extern crate alloc;
 use blocking_network_stack::Stack;
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{clock::CpuClock, entry, rng::Rng, time, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, main, rng::Rng, time, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     init,
@@ -37,7 +37,7 @@ use smoltcp::{
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());

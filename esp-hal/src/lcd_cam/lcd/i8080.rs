@@ -484,7 +484,7 @@ impl<BUF: DmaTxBuffer, Dm: DriverMode> DerefMut for I8080Transfer<'_, BUF, Dm> {
     }
 }
 
-impl<'d, BUF: DmaTxBuffer> I8080Transfer<'d, BUF, crate::Async> {
+impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
     /// Waits for [Self::is_done] to return true.
     pub async fn wait_for_done(&mut self) {
         use core::{

@@ -27,7 +27,6 @@ mod tests {
 
         // start reception
         let mut buf = [0u8; 1];
-        _ = rx.read_bytes(&mut buf); // this will just return WouldBlock
 
         // Start from a low level to verify that UartTx sets the level high initially,
         // but don't enable output otherwise we actually pull down against RX's
@@ -42,7 +41,7 @@ mod tests {
 
         tx.flush().unwrap();
         tx.write_bytes(&[0x42]).unwrap();
-        while rx.read_bytes(&mut buf) == 0 {}
+        rx.read_bytes(&mut buf).unwrap();
 
         assert_eq!(buf[0], 0x42);
     }

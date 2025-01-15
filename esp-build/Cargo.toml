@@ -2,7 +2,7 @@
 name         = "esp-build"
 version      = "0.1.0"
 edition      = "2021"
-rust-version = "1.60.0"
+rust-version = "1.84.0"
 description  = "Build utilities for esp-hal"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"

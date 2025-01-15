@@ -70,11 +70,11 @@
 //! use esp_hal::{
 //!     clock::CpuClock,
 //!     delay::Delay,
-//!     entry,
 //!     gpio::{Io, Level, Output},
+//!     main,
 //! };
 //!
-//! #[entry]
+//! #[main]
 //! fn main() -> ! {
 //!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //!     let peripherals = esp_hal::init(config);
@@ -145,13 +145,12 @@ mod fmt;
 
 #[cfg(riscv)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use esp_riscv_rt::{self, entry, riscv};
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use esp_riscv_rt::{self, riscv};
 #[cfg(xtensa)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use xtensa_lx;
-#[cfg(xtensa)]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use xtensa_lx_rt::{self, entry};
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use xtensa_lx_rt::{self, xtensa_lx};
 
 // TODO what should we reexport stably?
 #[cfg(any(esp32, esp32s3))]
@@ -189,6 +188,7 @@ pub mod uart;
 
 mod macros;
 
+pub use procmacros::blocking_main as main;
 #[cfg(any(lp_core, ulp_riscv_core))]
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -384,12 +384,19 @@ impl_persistable!(atomic AtomicU8, AtomicI8, AtomicU16, AtomicI16, AtomicU32, At
 unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}
 
 #[doc(hidden)]
-#[instability::unstable]
 pub mod __macro_implementation {
-    //! Unstable private implementation details of esp-hal-procmacros.
+    //! Private implementation details of esp-hal-procmacros.
 
+    #[instability::unstable]
     pub const fn assert_is_zeroable<T: bytemuck::Zeroable>() {}
+
+    #[instability::unstable]
     pub const fn assert_is_persistable<T: super::Persistable>() {}
+
+    #[cfg(riscv)]
+    pub use esp_riscv_rt::entry as __entry;
+    #[cfg(xtensa)]
+    pub use xtensa_lx_rt::entry as __entry;
 }
 
 /// Available CPU cores

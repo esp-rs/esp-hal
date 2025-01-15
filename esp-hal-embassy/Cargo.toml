@@ -2,7 +2,7 @@
 name         = "esp-hal-embassy"
 version      = "0.5.0"
 edition      = "2021"
-rust-version = "1.83.0"
+rust-version = "1.84.0"
 description  = "Embassy support for esp-hal"
 keywords     = ["async", "embedded", "esp32", "espressif"]
 categories   = ["asynchronous", "embedded", "hardware-support", "no-std"]
@@ -14,16 +14,20 @@ default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]
 
 [dependencies]
-critical-section    = "1.2.0"
-defmt               = { version = "0.3.8", optional = true }
-document-features   = "0.2.10"
-embassy-executor    = { version = "0.6.3", optional = true }
-embassy-time-driver = { version = "0.1.0", features = [ "tick-hz-1_000_000" ] }
-esp-hal             = { version = "0.22.0", path = "../esp-hal" }
-log                 = { version = "0.4.22", optional = true }
-macros              = { version = "0.15.0", features = ["embassy"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-portable-atomic     = "1.9.0"
-static_cell         = "2.1.0"
+critical-section          = "1.2.0"
+defmt                     = { version = "0.3.8", optional = true }
+document-features         = "0.2.10"
+embassy-executor          = { version = "0.7.0", features = ["timer-item-payload-size-4"], optional = true }
+embassy-sync              = { version = "0.6.1" }
+embassy-time              = { version = "0.4.0" }
+embassy-time-driver       = { version = "0.2.0", features = [ "tick-hz-1_000_000" ] }
+embassy-time-queue-utils  = { version = "0.1.0", features = ["_generic-queue"] }
+esp-config                = { version = "0.2.0", path = "../esp-config" }
+esp-hal                   = { version = "0.22.0", path = "../esp-hal" }
+log                       = { version = "0.4.22", optional = true }
+macros                    = { version = "0.15.0", features = ["embassy"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+portable-atomic           = "1.9.0"
+static_cell               = "2.1.0"
 
 [build-dependencies]
 esp-build    = { version = "0.1.0", path = "../esp-build" }
@@ -47,8 +51,6 @@ defmt = ["dep:defmt", "embassy-executor?/defmt", "esp-hal/defmt"]
 log = ["dep:log"]
 ## Provide `Executor` and `InterruptExecutor`
 executors = ["dep:embassy-executor", "esp-hal/__esp_hal_embassy"]
-## Use the executor-integrated `embassy-time` timer queue.
-integrated-timers = ["embassy-executor?/integrated-timers"]
 
 [lints.rust]
 unexpected_cfgs = "allow"

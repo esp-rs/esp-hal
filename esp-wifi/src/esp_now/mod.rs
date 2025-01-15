@@ -18,7 +18,7 @@ use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 #[cfg(not(coex))]
 use crate::config::PowerSaveMode;
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 use crate::wifi::CsiConfig;
 use crate::{
     binary::include::*,
@@ -373,7 +373,7 @@ impl EspNowManager<'_> {
     }
 
     /// Set CSI configuration and register the receiving callback.
-    #[cfg(csi_enable)]
+    #[cfg(feature = "csi")]
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,

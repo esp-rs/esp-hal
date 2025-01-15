@@ -980,25 +980,27 @@ mod dma {
         }
     }
 
-    #[cfg(any(doc, feature = "unstable"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl SpiDma<'_, Blocking> {
         /// Listen for the given interrupts
+        #[instability::unstable]
         pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.driver().enable_listen(interrupts.into(), true);
         }
 
         /// Unlisten the given interrupts
+        #[instability::unstable]
         pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.driver().enable_listen(interrupts.into(), false);
         }
 
         /// Gets asserted interrupts
+        #[instability::unstable]
         pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
             self.driver().interrupts()
         }
 
         /// Resets asserted interrupts
+        #[instability::unstable]
         pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.driver().clear_interrupts(interrupts.into());
         }
@@ -1645,25 +1647,27 @@ mod dma {
         }
     }
 
-    #[cfg(any(doc, feature = "unstable"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     impl SpiDmaBus<'_, Blocking> {
         /// Listen for the given interrupts
+        #[instability::unstable]
         pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.spi_dma.listen(interrupts.into());
         }
 
         /// Unlisten the given interrupts
+        #[instability::unstable]
         pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.spi_dma.unlisten(interrupts.into());
         }
 
         /// Gets asserted interrupts
+        #[instability::unstable]
         pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
             self.spi_dma.interrupts()
         }
 
         /// Resets asserted interrupts
+        #[instability::unstable]
         pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.spi_dma.clear_interrupts(interrupts.into());
         }

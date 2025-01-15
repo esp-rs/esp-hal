@@ -2,7 +2,7 @@
 name         = "xtensa-lx"
 version      = "0.9.0"
 edition      = "2021"
-rust-version = "1.65"
+rust-version = "1.84.0"
 description  = "Low-level access to Xtensa LX processors and peripherals"
 repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"

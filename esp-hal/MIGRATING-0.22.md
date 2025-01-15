@@ -333,6 +333,26 @@ The `AckCheckFailed` variant changed to `AcknowledgeCheckFailed(AcknowledgeCheck
 +            Err(Error::AcknowledgeCheckFailed(reason))
 ```
 
+## I2C Configuration changes
+
+The timeout field in `Config` changed from `Option<u32>` to a dedicated `BusTimeout` enum.
+
+```diff
+- timeout: Some(10)
++ timeout: BusTimeout::BusCycles(10)
+```
+
+```diff
+- timeout: None
++ timeout: BusTimeout::Max
+```
+
+(Disabled isn't supported on ESP32 / ESP32-S2)
+```diff
+- timeout: None
++ timeout: BusTimeout::Disabled
+```
+
 ## The crate prelude has been removed
 
 The reexports that were previously part of the prelude are available through other paths:
@@ -514,3 +534,13 @@ Macros from `procmacros` crate (`handler`, `ram`, `load_lp_code`) are now import
 + use esp_hal::{handler, ram, load_lp_code};
 ```
 
+## `entry` macro is removed, use `main` macro
+
+```diff
+-use esp_hal::entry;
++use esp_hal::main;
+
+-#[entry]
++#[main]
+fn main() {
+```

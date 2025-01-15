@@ -34,7 +34,6 @@ impl Level {
         *self == Level::High
     }
 
-    #[doc(hidden)]
     pub(crate) fn connect_input_to_peripheral(&mut self, signal: InputSignal) {
         let value = match self {
             Level::High => ONE_INPUT,
@@ -50,8 +49,6 @@ impl Level {
     pub(crate) fn set_output_high(&mut self, _on: bool) {}
     pub(crate) fn set_drive_strength(&mut self, _strength: DriveStrength) {}
     pub(crate) fn enable_open_drain(&mut self, _on: bool) {}
-    pub(crate) fn internal_pull_up_in_sleep_mode(&mut self, _on: bool) {}
-    pub(crate) fn internal_pull_down_in_sleep_mode(&mut self, _on: bool) {}
 
     pub(crate) fn is_set_high(&self) -> bool {
         false

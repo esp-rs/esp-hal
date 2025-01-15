@@ -28,12 +28,20 @@ use crate::{
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
 /// [`PeripheralOutput`] as arguments instead of pin types.
+#[allow(
+    private_bounds,
+    reason = "InputConnection is unstable, but the trait needs to be public"
+)]
 pub trait PeripheralInput: Into<InputConnection> + 'static + crate::private::Sealed {}
 
 /// A signal that can be connected to a peripheral input and/or output.
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
 /// [`PeripheralInput`] as arguments instead of pin types.
+#[allow(
+    private_bounds,
+    reason = "OutputConnection is unstable, but the trait needs to be public"
+)]
 pub trait PeripheralOutput: Into<OutputConnection> + 'static + crate::private::Sealed {}
 
 // Pins
@@ -427,7 +435,7 @@ impl OutputSignal {
     }
 
     delegate::delegate! {
-        #[doc(hidden)]
+        #[instability::unstable]
         to self.pin {
             pub fn pull_direction(&self, pull: Pull);
             pub fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::InputSignal)];
@@ -442,8 +450,6 @@ impl OutputSignal {
             pub fn set_output_high(&mut self, on: bool);
             pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength);
             pub fn enable_open_drain(&mut self, on: bool);
-            pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool);
-            pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool);
             pub fn is_set_high(&self) -> bool;
         }
     }
@@ -490,8 +496,6 @@ impl DirectOutputSignal {
             fn set_output_high(&mut self, on: bool);
             fn set_drive_strength(&mut self, strength: gpio::DriveStrength);
             fn enable_open_drain(&mut self, on: bool);
-            fn internal_pull_up_in_sleep_mode(&mut self, on: bool);
-            fn internal_pull_down_in_sleep_mode(&mut self, on: bool);
             fn is_set_high(&self) -> bool;
         }
     }
@@ -509,7 +513,7 @@ enum InputConnectionInner {
 /// This is mainly intended for internal use, but it can be used to connect
 /// peripherals within the MCU without external hardware.
 #[derive(Clone)]
-#[doc(hidden)] // FIXME: replace with `#[unstable]` when we can mark delegated methods https://github.com/Kobzol/rust-delegate/issues/77
+#[instability::unstable]
 pub struct InputConnection(InputConnectionInner);
 
 impl Peripheral for InputConnection {
@@ -584,7 +588,7 @@ impl Sealed for InputConnection {}
 
 impl InputConnection {
     delegate::delegate! {
-        #[doc(hidden)]
+        #[instability::unstable]
         to match &self.0 {
             InputConnectionInner::Input(pin) => pin,
             InputConnectionInner::DirectInput(pin) => pin,
@@ -596,7 +600,7 @@ impl InputConnection {
             pub fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::InputSignal)];
         }
 
-        #[doc(hidden)]
+        #[instability::unstable]
         to match &mut self.0 {
             InputConnectionInner::Input(pin) => pin,
             InputConnectionInner::DirectInput(pin) => pin,
@@ -620,7 +624,7 @@ enum OutputConnectionInner {
 ///
 /// This is mainly intended for internal use, but it can be used to connect
 /// peripherals within the MCU without external hardware.
-#[doc(hidden)] // FIXME: replace with `#[unstable]` when we can mark delegated methods https://github.com/Kobzol/rust-delegate/issues/77
+#[instability::unstable]
 pub struct OutputConnection(OutputConnectionInner);
 
 impl Sealed for OutputConnection {}
@@ -680,7 +684,7 @@ impl From<DirectOutputSignal> for OutputConnection {
 
 impl OutputConnection {
     delegate::delegate! {
-        #[doc(hidden)]
+        #[instability::unstable]
         to match &self.0 {
             OutputConnectionInner::Output(pin) => pin,
             OutputConnectionInner::DirectOutput(pin) => pin,
@@ -692,7 +696,7 @@ impl OutputConnection {
             pub fn is_set_high(&self) -> bool;
             pub fn output_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::OutputSignal)];
         }
-        #[doc(hidden)]
+        #[instability::unstable]
         to match &mut self.0 {
             OutputConnectionInner::Output(pin) => pin,
             OutputConnectionInner::DirectOutput(pin) => pin,
@@ -708,8 +712,6 @@ impl OutputConnection {
             pub fn set_output_high(&mut self, on: bool);
             pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength);
             pub fn enable_open_drain(&mut self, on: bool);
-            pub fn internal_pull_up_in_sleep_mode(&mut self, on: bool);
-            pub fn internal_pull_down_in_sleep_mode(&mut self, on: bool);
 
             // These don't need to be public, the intended way is `connect_to` and `disconnect_from`
             fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal);

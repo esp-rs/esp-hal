@@ -199,8 +199,9 @@
 //!         let serial = serial.as_mut().unwrap();
 //!
 //!         let mut buf = [0u8; 64];
-//!         let cnt = serial.read_bytes(&mut buf);
-//!         writeln!(serial, "Read {} bytes", cnt).ok();
+//!         if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
+//!             writeln!(serial, "Read {} bytes", cnt).ok();
+//!         }
 //!
 //!         let pending_interrupts = serial.interrupts();
 //!         writeln!(
@@ -451,6 +452,7 @@ impl Default for Config {
 /// Configuration for the AT-CMD detection functionality
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 #[non_exhaustive]
 pub struct AtCmdConfig {
     /// Optional idle time before the AT command detection begins, in clock
@@ -824,8 +826,24 @@ where
         self.uart.info().apply_config(config)
     }
 
+    /// Reads and clears errors.
+    #[instability::unstable]
+    pub fn check_for_errors(&mut self) -> Result<(), Error> {
+        let errors = RxEvent::FifoOvf
+            | RxEvent::FifoTout
+            | RxEvent::GlitchDetected
+            | RxEvent::FrameError
+            | RxEvent::ParityError;
+        let events = self.uart.info().rx_events(errors);
+        let result = rx_event_check_for_error(events);
+        if result.is_err() {
+            self.uart.info().clear_rx_events(errors);
+        }
+        result
+    }
+
     // Read a byte from the UART
-    fn read_byte(&mut self) -> nb::Result<u8, Error> {
+    fn read_byte(&mut self) -> Option<u8> {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
                 // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
@@ -848,18 +866,58 @@ where
                 }
             }
 
-            Ok(byte)
+            Some(byte)
         } else {
-            Err(nb::Error::WouldBlock)
+            None
         }
+    }
+
+    /// Reads bytes from the UART
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+        let buffered = self.read_buffered_bytes(buf)?;
+        let buf = &mut buf[buffered..];
+
+        for byte in buf.iter_mut() {
+            loop {
+                if let Some(b) = self.read_byte() {
+                    *byte = b;
+                    break;
+                }
+                self.check_for_errors()?;
+            }
+        }
+        Ok(())
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes without blocking.
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> usize {
+    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         let mut count = 0;
         while count < buf.len() {
-            if let Ok(byte) = self.read_byte() {
+            if let Some(byte) = self.read_byte() {
+                buf[count] = byte;
+                count += 1;
+            } else {
+                break;
+            }
+        }
+        if let Err(err) = self.check_for_errors() {
+            // Drain the buffer. We don't know where the error occurred, so returning
+            // these bytes would be incorrect. We also don't know if the number of buffered
+            // bytes fit into the buffer.
+            // TODO: make this behaviour configurable using UART_ERR_WR_MASK. If the user
+            // wants to keep the bytes regardless of errors, they should be able to do so.
+            while self.read_byte().is_some() {}
+            return Err(err);
+        }
+        Ok(count)
+    }
+
+    /// Read bytes from the RX FIFO without checking for errors.
+    fn flush_buffer(&mut self, buf: &mut [u8]) -> usize {
+        let mut count = 0;
+        while count < buf.len() {
+            if let Some(byte) = self.read_byte() {
                 buf[count] = byte;
                 count += 1;
             } else {
@@ -1086,13 +1144,25 @@ where
         self.tx.write_bytes(data)
     }
 
-    /// Read all available bytes from the RX FIFO into the provided buffer and
-    /// returns the number of read bytes without blocking.
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> usize {
+    /// Reads and clears errors set by received data.
+    #[instability::unstable]
+    pub fn check_for_rx_errors(&mut self) -> Result<(), Error> {
+        self.rx.check_for_errors()
+    }
+
+    /// Reads bytes from the UART
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
         self.rx.read_bytes(buf)
     }
 
+    /// Read all available bytes from the RX FIFO into the provided buffer and
+    /// returns the number of read bytes without blocking.
+    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        self.rx.read_buffered_bytes(buf)
+    }
+
     /// Configures the AT-CMD detection settings
+    #[instability::unstable]
     pub fn set_at_cmd(&mut self, config: AtCmdConfig) {
         let register_block = self.register_block();
 
@@ -1144,7 +1214,7 @@ where
 
     // Read a byte from the UART
     fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        self.rx.read_byte()
+        embedded_hal_nb::serial::Read::read(&mut self.rx)
     }
 
     /// Change the configuration.
@@ -1339,7 +1409,10 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
+        match self.read_byte() {
+            Some(b) => Ok(b),
+            None => Err(nb::Error::WouldBlock),
+        }
     }
 }
 
@@ -1413,7 +1486,7 @@ where
             // Block until we received at least one byte
         }
 
-        Ok(self.read_bytes(buf))
+        self.read_buffered_bytes(buf)
     }
 }
 
@@ -1494,6 +1567,20 @@ pub(crate) enum RxEvent {
     ParityError,
 }
 
+fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), Error> {
+    for event in events {
+        match event {
+            RxEvent::FifoOvf => return Err(Error::FifoOverflowed),
+            RxEvent::GlitchDetected => return Err(Error::GlitchOccurred),
+            RxEvent::FrameError => return Err(Error::FrameFormatViolated),
+            RxEvent::ParityError => return Err(Error::ParityMismatch),
+            RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
+        }
+    }
+
+    Ok(())
+}
+
 /// A future that resolves when the passed interrupt is triggered,
 /// or has been triggered in the meantime (flag set in INT_RAW).
 /// Upon construction the future enables the passed interrupt and when it
@@ -1517,44 +1604,6 @@ impl UartRxFuture {
             registered: false,
         }
     }
-
-    fn triggered_events(&self) -> EnumSet<RxEvent> {
-        let interrupts_enabled = self.uart.register_block().int_ena().read();
-        let mut events_triggered = EnumSet::new();
-        for event in self.events {
-            let event_triggered = match event {
-                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
-                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_clear(),
-
-                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
-                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
-                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
-                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_clear(),
-                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_clear(),
-            };
-            if event_triggered {
-                events_triggered |= event;
-            }
-        }
-        events_triggered
-    }
-
-    fn enable_listen(&self, enable: bool) {
-        self.uart.register_block().int_ena().modify(|_, w| {
-            for event in self.events {
-                match event {
-                    RxEvent::FifoFull => w.rxfifo_full().bit(enable),
-                    RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
-                    RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
-                    RxEvent::FifoTout => w.rxfifo_tout().bit(enable),
-                    RxEvent::GlitchDetected => w.glitch_det().bit(enable),
-                    RxEvent::FrameError => w.frm_err().bit(enable),
-                    RxEvent::ParityError => w.parity_err().bit(enable),
-                };
-            }
-            w
-        });
-    }
 }
 
 impl core::future::Future for UartRxFuture {
@@ -1566,10 +1615,10 @@ impl core::future::Future for UartRxFuture {
     ) -> core::task::Poll<Self::Output> {
         if !self.registered {
             self.state.rx_waker.register(cx.waker());
-            self.enable_listen(true);
+            self.uart.enable_listen_rx(self.events, true);
             self.registered = true;
         }
-        let events = self.triggered_events();
+        let events = self.uart.enabled_rx_events(self.events);
         if !events.is_empty() {
             Poll::Ready(events)
         } else {
@@ -1583,7 +1632,7 @@ impl Drop for UartRxFuture {
         // Although the isr disables the interrupt that occurred directly, we need to
         // disable the other interrupts (= the ones that did not occur), as
         // soon as this future goes out of scope.
-        self.enable_listen(false);
+        self.uart.enable_listen_rx(self.events, false);
     }
 }
 
@@ -1777,17 +1826,9 @@ impl UartRx<'_, Async> {
 
             let events_happened = UartRxFuture::new(self.uart.reborrow(), events).await;
             // always drain the fifo, if an error has occurred the data is lost
-            let read_bytes = self.read_bytes(buf);
+            let read_bytes = self.flush_buffer(buf);
             // check error events
-            for event_happened in events_happened {
-                match event_happened {
-                    RxEvent::FifoOvf => return Err(Error::FifoOverflowed),
-                    RxEvent::GlitchDetected => return Err(Error::GlitchOccurred),
-                    RxEvent::FrameError => return Err(Error::FrameFormatViolated),
-                    RxEvent::ParityError => return Err(Error::ParityMismatch),
-                    RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
-                }
-            }
+            rx_event_check_for_error(events_happened)?;
             // Unfortunately, the uart's rx-timeout counter counts up whenever there is
             // data in the fifo, even if the interrupt is disabled and the status bit
             // cleared. Since we do not drain the fifo in the interrupt handler, we need to
@@ -2224,6 +2265,87 @@ impl Info {
         self.txfifo_reset();
 
         Ok(())
+    }
+
+    fn enable_listen_rx(&self, events: EnumSet<RxEvent>, enable: bool) {
+        self.register_block().int_ena().modify(|_, w| {
+            for event in events {
+                match event {
+                    RxEvent::FifoFull => w.rxfifo_full().bit(enable),
+                    RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
+
+                    RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
+                    RxEvent::FifoTout => w.rxfifo_tout().bit(enable),
+                    RxEvent::GlitchDetected => w.glitch_det().bit(enable),
+                    RxEvent::FrameError => w.frm_err().bit(enable),
+                    RxEvent::ParityError => w.parity_err().bit(enable),
+                };
+            }
+            w
+        });
+    }
+
+    fn enabled_rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
+        let events = events.into();
+        let interrupts_enabled = self.register_block().int_ena().read();
+        let mut events_triggered = EnumSet::new();
+        for event in events {
+            let event_triggered = match event {
+                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
+                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_clear(),
+
+                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
+                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
+                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
+                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_clear(),
+                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_clear(),
+            };
+            if event_triggered {
+                events_triggered |= event;
+            }
+        }
+        events_triggered
+    }
+
+    fn rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
+        let events = events.into();
+        let interrupts_enabled = self.register_block().int_st().read();
+        let mut events_triggered = EnumSet::new();
+        for event in events {
+            let event_triggered = match event {
+                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_set(),
+                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_set(),
+
+                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_set(),
+                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_set(),
+                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_set(),
+                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_set(),
+                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_set(),
+            };
+            if event_triggered {
+                events_triggered |= event;
+            }
+        }
+        events_triggered
+    }
+
+    fn clear_rx_events(&self, events: impl Into<EnumSet<RxEvent>>) {
+        let events = events.into();
+        self.register_block().int_clr().write(|w| {
+            for event in events {
+                match event {
+                    RxEvent::FifoFull => w.rxfifo_full().clear_bit_by_one(),
+                    RxEvent::CmdCharDetected => w.at_cmd_char_det().clear_bit_by_one(),
+
+                    RxEvent::FifoOvf => w.rxfifo_ovf().clear_bit_by_one(),
+                    RxEvent::FifoTout => w.rxfifo_tout().clear_bit_by_one(),
+                    RxEvent::GlitchDetected => w.glitch_det().clear_bit_by_one(),
+                    RxEvent::FrameError => w.frm_err().clear_bit_by_one(),
+                    RxEvent::ParityError => w.parity_err().clear_bit_by_one(),
+                };
+            }
+            w
+        });
     }
 
     /// Configures the RX-FIFO threshold

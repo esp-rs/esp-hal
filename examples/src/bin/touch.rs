@@ -18,10 +18,10 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    entry,
     gpio::GpioPin,
     handler,
     interrupt::InterruptConfigurable,
+    main,
     ram,
     rtc_cntl::Rtc,
     touch::{Continuous, Touch, TouchConfig, TouchPad},
@@ -47,7 +47,7 @@ fn interrupt_handler() {
     });
 }
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());

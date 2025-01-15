@@ -11,11 +11,11 @@
 
 use embedded_storage::{ReadStorage, Storage};
 use esp_backtrace as _;
-use esp_hal::entry;
+use esp_hal::main;
 use esp_println::println;
 use esp_storage::FlashStorage;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let mut bytes = [0u8; 32];
 

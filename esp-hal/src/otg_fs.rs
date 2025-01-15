@@ -298,7 +298,7 @@ pub mod asynch {
         }
     }
 
-    impl<'d> embassy_usb_driver::Bus for Bus<'d> {
+    impl embassy_usb_driver::Bus for Bus<'_> {
         async fn poll(&mut self) -> Event {
             self.inner.poll().await
         }
@@ -336,12 +336,6 @@ pub mod asynch {
 
     #[handler(priority = crate::interrupt::Priority::max())]
     fn interrupt_handler() {
-        unsafe {
-            on_interrupt(
-                Driver::REGISTERS,
-                &STATE,
-                Usb::ENDPOINT_COUNT,
-            )
-        }
+        unsafe { on_interrupt(Driver::REGISTERS, &STATE, Usb::ENDPOINT_COUNT) }
     }
 }
