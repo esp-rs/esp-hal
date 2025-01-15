@@ -102,7 +102,7 @@ pub mod operator;
 /// MCPWM timers
 pub mod timer;
 
-type RegisterBlock = crate::peripherals::mcpwm0::RegisterBlock;
+type RegisterBlock = crate::pac::mcpwm0::RegisterBlock;
 
 /// The MCPWM peripheral
 #[non_exhaustive]

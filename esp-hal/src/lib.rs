@@ -164,6 +164,7 @@ pub use self::soc::efuse;
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::lp_core;
 pub use self::soc::peripherals;
+pub(crate) use self::soc::peripherals::pac;
 #[instability::unstable]
 #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
 pub use self::soc::psram;

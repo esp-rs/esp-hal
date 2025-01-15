@@ -38,6 +38,7 @@
 
 use crate::{
     gpio::{AlternateFunction, GpioPin},
+    pac::io_mux,
     peripherals::GPIO,
 };
 
@@ -56,7 +57,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_1;
 
-pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
+pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
     unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
 }
 

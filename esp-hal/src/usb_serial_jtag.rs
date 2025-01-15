@@ -136,8 +136,9 @@ use procmacros::handler;
 use crate::{
     asynch::AtomicWaker,
     interrupt::InterruptConfigurable,
+    pac::usb_device::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{usb_device::RegisterBlock, Interrupt, USB_DEVICE},
+    peripherals::{Interrupt, USB_DEVICE},
     system::PeripheralClockControl,
     Async,
     Blocking,

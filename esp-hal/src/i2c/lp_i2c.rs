@@ -4,7 +4,7 @@ use fugit::HertzU32;
 
 use crate::{
     gpio::lp_io::LowPowerOutputOpenDrain,
-    peripherals::{LP_CLKRST, LP_I2C0},
+    peripherals::{LPWR, LP_I2C0},
 };
 
 const LP_I2C_FILTER_CYC_NUM_DEF: u8 = 7;
@@ -161,7 +161,7 @@ impl LpI2c {
             .modify(|_, w| w.lp_ext_i2c_reset_en().clear_bit());
 
         // Set LP I2C source clock
-        unsafe { &*LP_CLKRST::PTR }
+        unsafe { &*LPWR::PTR }
             .lpperi()
             .modify(|_, w| w.lp_i2c_clk_sel().clear_bit());
 
@@ -187,7 +187,7 @@ impl LpI2c {
         me.reset_fifo();
 
         // Set LP I2C source clock
-        unsafe { &*LP_CLKRST::PTR }
+        unsafe { &*LPWR::PTR }
             .lpperi()
             .modify(|_, w| w.lp_i2c_clk_sel().clear_bit());
 

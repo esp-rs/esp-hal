@@ -149,7 +149,7 @@ pub struct CpuControl<'d> {
 }
 
 unsafe fn internal_park_core(core: Cpu) {
-    let rtc_control = crate::peripherals::RTC_CNTL::PTR;
+    let rtc_control = crate::peripherals::LPWR::PTR;
     let rtc_control = &*rtc_control;
 
     match core {
@@ -194,7 +194,7 @@ impl<'d> CpuControl<'d> {
 
     /// Unpark the given core
     pub fn unpark_core(&mut self, core: Cpu) {
-        let rtc_control = crate::peripherals::RTC_CNTL::PTR;
+        let rtc_control = crate::peripherals::LPWR::PTR;
         let rtc_control = unsafe { &*rtc_control };
 
         match core {

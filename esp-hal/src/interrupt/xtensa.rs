@@ -7,6 +7,7 @@ use xtensa_lx_rt::exception::Context;
 pub use self::vectored::*;
 use super::InterruptStatus;
 use crate::{
+    pac,
     peripherals::{self, Interrupt},
     Cpu,
 };
@@ -136,7 +137,7 @@ pub(crate) fn setup_interrupts() {
     // at least after the 2nd stage bootloader there are some interrupts enabled
     // (e.g. UART)
     for peripheral_interrupt in 0..255 {
-        crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
+        peripherals::Interrupt::try_from(peripheral_interrupt)
             .map(|intr| {
                 #[cfg(multi_core)]
                 disable(Cpu::AppCpu, intr);
@@ -314,25 +315,23 @@ pub fn status(core: Cpu) -> InterruptStatus {
 }
 
 #[cfg(esp32)]
-unsafe fn core0_interrupt_peripheral() -> *const crate::peripherals::dport::RegisterBlock {
-    crate::peripherals::DPORT::PTR
+unsafe fn core0_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
+    peripherals::DPORT::PTR
 }
 
 #[cfg(esp32)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::dport::RegisterBlock {
-    crate::peripherals::DPORT::PTR
+unsafe fn core1_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
+    peripherals::DPORT::PTR
 }
 
 #[cfg(any(esp32s2, esp32s3))]
-unsafe fn core0_interrupt_peripheral() -> *const crate::peripherals::interrupt_core0::RegisterBlock
-{
-    crate::peripherals::INTERRUPT_CORE0::PTR
+unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt_core0::RegisterBlock {
+    peripherals::INTERRUPT_CORE0::PTR
 }
 
 #[cfg(esp32s3)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::peripherals::interrupt_core1::RegisterBlock
-{
-    crate::peripherals::INTERRUPT_CORE1::PTR
+unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::RegisterBlock {
+    peripherals::INTERRUPT_CORE1::PTR
 }
 
 /// Get the current run level (the level below which interrupts are masked).
@@ -508,7 +507,7 @@ mod vectored {
     ///
     /// This will replace any previously bound interrupt handler
     pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
-        let ptr = &peripherals::__INTERRUPTS[interrupt as usize]._handler as *const _
+        let ptr = &pac::__INTERRUPTS[interrupt as usize]._handler as *const _
             as *mut unsafe extern "C" fn();
         ptr.write_volatile(handler);
     }
@@ -516,7 +515,7 @@ mod vectored {
     /// Returns the currently bound interrupt handler.
     pub fn bound_handler(interrupt: Interrupt) -> Option<unsafe extern "C" fn()> {
         unsafe {
-            let addr = peripherals::__INTERRUPTS[interrupt as usize]._handler;
+            let addr = pac::__INTERRUPTS[interrupt as usize]._handler;
             if addr as usize == 0 {
                 return None;
             }
@@ -644,7 +643,7 @@ mod vectored {
             fn EspDefaultHandler(level: u32, interrupt: Interrupt);
         }
 
-        let handler = peripherals::__INTERRUPTS[interrupt as usize]._handler;
+        let handler = pac::__INTERRUPTS[interrupt as usize]._handler;
         if core::ptr::eq(
             handler as *const _,
             EspDefaultHandler as *const unsafe extern "C" fn(),

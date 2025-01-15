@@ -18,8 +18,8 @@ use critical_section::CriticalSection;
 
 use crate::{
     dma::*,
-    interrupt::Priority,
     handler,
+    interrupt::Priority,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
 };
@@ -108,26 +108,26 @@ impl DmaTxChannel for AnyGdmaTxChannel {}
 
 impl AnyGdmaTxChannel {
     #[inline(always)]
-    fn ch(&self) -> &crate::peripherals::dma::ch::CH {
+    fn ch(&self) -> &crate::pac::dma::ch::CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0 as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    fn int(&self) -> &crate::peripherals::dma::int_ch::INT_CH {
+    fn int(&self) -> &crate::pac::dma::int_ch::INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.int_ch(self.0 as usize)
     }
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
-    fn int(&self) -> &crate::peripherals::dma::out_int_ch::OUT_INT_CH {
+    fn int(&self) -> &crate::pac::dma::out_int_ch::OUT_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.out_int_ch(self.0 as usize)
     }
     #[cfg(esp32s3)]
     #[inline(always)]
-    fn int(&self) -> &crate::peripherals::dma::ch::out_int::OUT_INT {
+    fn int(&self) -> &crate::pac::dma::ch::out_int::OUT_INT {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0 as usize).out_int()
     }
@@ -350,28 +350,28 @@ impl DmaRxChannel for AnyGdmaRxChannel {}
 
 impl AnyGdmaRxChannel {
     #[inline(always)]
-    fn ch(&self) -> &crate::peripherals::dma::ch::CH {
+    fn ch(&self) -> &crate::pac::dma::ch::CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0 as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    fn int(&self) -> &crate::peripherals::dma::int_ch::INT_CH {
+    fn int(&self) -> &crate::pac::dma::int_ch::INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.int_ch(self.0 as usize)
     }
 
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
-    fn int(&self) -> &crate::peripherals::dma::in_int_ch::IN_INT_CH {
+    fn int(&self) -> &crate::pac::dma::in_int_ch::IN_INT_CH {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.in_int_ch(self.0 as usize)
     }
 
     #[cfg(esp32s3)]
     #[inline(always)]
-    fn int(&self) -> &crate::peripherals::dma::ch::in_int::IN_INT {
+    fn int(&self) -> &crate::pac::dma::ch::in_int::IN_INT {
         let dma = unsafe { &*crate::peripherals::DMA::PTR };
         dma.ch(self.0 as usize).in_int()
     }

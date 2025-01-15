@@ -12,7 +12,7 @@ const DIG_DBIAS_240M: u32 = RTC_CNTL_DBIAS_1V25;
 
 pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
     let system_control = unsafe { &*crate::peripherals::SYSTEM::PTR };
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
 
     unsafe {
         system_control

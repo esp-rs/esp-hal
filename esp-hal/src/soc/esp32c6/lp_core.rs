@@ -43,30 +43,30 @@ pub enum LpCoreClockSource {
 
 /// Represents the Low Power (LP) core peripheral.
 pub struct LpCore<'d> {
-    _lp_core: PeripheralRef<'d, crate::soc::peripherals::LP_CORE>,
+    _lp_core: PeripheralRef<'d, crate::peripherals::LP_CORE>,
 }
 
 impl<'d> LpCore<'d> {
     /// Create a new instance using [LpCoreClockSource::RcFastClk]
-    pub fn new(lp_core: impl Peripheral<P = crate::soc::peripherals::LP_CORE> + 'd) -> Self {
+    pub fn new(lp_core: impl Peripheral<P = crate::peripherals::LP_CORE> + 'd) -> Self {
         LpCore::new_with_clock(lp_core, LpCoreClockSource::RcFastClk)
     }
 
     /// Create a new instance using the given clock
     pub fn new_with_clock(
-        lp_core: impl Peripheral<P = crate::soc::peripherals::LP_CORE> + 'd,
+        lp_core: impl Peripheral<P = crate::peripherals::LP_CORE> + 'd,
         clk_src: LpCoreClockSource,
     ) -> Self {
         crate::into_ref!(lp_core);
 
         match clk_src {
             LpCoreClockSource::RcFastClk => unsafe {
-                (*crate::soc::peripherals::LP_CLKRST::PTR)
+                (*crate::peripherals::LPWR::PTR)
                     .lp_clk_conf()
                     .modify(|_, w| w.fast_clk_sel().clear_bit());
             },
             LpCoreClockSource::XtalD2Clk => unsafe {
-                (*crate::soc::peripherals::LP_CLKRST::PTR)
+                (*crate::peripherals::LPWR::PTR)
                     .lp_clk_conf()
                     .modify(|_, w| w.fast_clk_sel().set_bit());
             },

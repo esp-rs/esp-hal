@@ -55,11 +55,9 @@ use crate::{
     clock::Clocks,
     gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
     interrupt::{InterruptConfigurable, InterruptHandler},
+    pac::i2c0::{RegisterBlock, COMD},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{
-        i2c0::{RegisterBlock, COMD},
-        Interrupt,
-    },
+    peripherals::Interrupt,
     private,
     system::{PeripheralClockControl, PeripheralGuard},
     Async,

@@ -36,6 +36,7 @@
 //! `gpio` peripheral to access the appropriate registers.
 use crate::{
     gpio::{AlternateFunction, GpioPin},
+    pac::io_mux,
     peripherals::GPIO,
 };
 
@@ -54,7 +55,7 @@ pub(crate) const ZERO_INPUT: u8 = 0x1f;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_1;
 
-pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
+pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
     unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
 }
 
@@ -178,7 +179,7 @@ macro_rules! rtc_pins {
         $(
             impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
                 unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
-                    let rtc_cntl = unsafe { $crate::peripherals::RTC_CNTL::steal() };
+                    let rtc_cntl = unsafe { $crate::peripherals::LPWR::steal() };
                     let gpio_wakeup = rtc_cntl.cntl_gpio_wakeup();
                     paste::paste! {
                         gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
@@ -188,7 +189,7 @@ macro_rules! rtc_pins {
 
                 fn rtcio_pad_hold(&mut self, enable: bool) {
                     paste::paste! {
-                        unsafe { $crate::peripherals::RTC_CNTL::steal() }
+                        unsafe { $crate::peripherals::LPWR::steal() }
                             .pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
                     }
                 }

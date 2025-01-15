@@ -90,7 +90,7 @@ fn reset_mac() {
 
 fn init_clocks() {
     // undo the power down in base_settings (esp32c3_sleep)
-    let rtc_cntl = unsafe { crate::peripherals::RTC_CNTL::steal() };
+    let rtc_cntl = unsafe { crate::peripherals::LPWR::steal() };
     rtc_cntl
         .dig_iso()
         .modify(|_, w| w.wifi_force_iso().clear_bit().bt_force_iso().clear_bit());

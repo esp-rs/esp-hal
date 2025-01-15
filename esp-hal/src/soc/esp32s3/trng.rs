@@ -21,7 +21,7 @@ use crate::rom::regi2c_write_mask;
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     unsafe {
-        let rtc_cntl = &*crate::peripherals::RTC_CNTL::ptr();
+        let rtc_cntl = &*crate::peripherals::LPWR::ptr();
         let system = &*crate::peripherals::SYSTEM::ptr();
         let apb_saradc = &*crate::peripherals::APB_SARADC::ptr();
         let sens = &*crate::peripherals::SENS::ptr();

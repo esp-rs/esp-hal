@@ -92,7 +92,7 @@ pub enum LSGlobalClkSource {
 /// LEDC (LED PWM Controller)
 pub struct Ledc<'d> {
     _instance: PeripheralRef<'d, crate::peripherals::LEDC>,
-    ledc: &'d crate::peripherals::ledc::RegisterBlock,
+    ledc: &'d crate::pac::ledc::RegisterBlock,
 }
 
 #[cfg(esp32)]

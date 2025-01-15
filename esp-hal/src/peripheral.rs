@@ -264,18 +264,12 @@ mod peripheral_macros {
                 ),* $(,)?
             ]
         ) => {
-
-
-            /// Contains the generated peripherals which implement [`Peripheral`]
-            mod peripherals {
-                pub use super::pac::*;
-                $(
-                    $crate::create_peripheral!($name <= $from_pac);
-                )*
-                $(
-                    $crate::create_peripheral!($unstable_name <= $unstable_from_pac);
-                )*
-            }
+            $(
+                $crate::create_peripheral!($name <= $from_pac);
+            )*
+            $(
+                $crate::create_peripheral!($unstable_name <= $unstable_from_pac);
+            )*
 
             pub(crate) mod gpio {
                 $crate::gpio! {
@@ -366,9 +360,8 @@ mod peripheral_macros {
             // expose the new structs, implement interrupt binder
 
             $(
-                pub use peripherals::$name;
                 $(
-                    impl peripherals::$name {
+                    impl $name {
                         $(
                             paste::paste!{
                                 /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
@@ -383,9 +376,8 @@ mod peripheral_macros {
             )*
 
             $(
-                pub use peripherals::$unstable_name;
                 $(
-                    impl peripherals::$unstable_name {
+                    impl $unstable_name {
                         $(
                             paste::paste!{
                                 /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
@@ -465,19 +457,19 @@ mod peripheral_macros {
             impl $name {
                 #[doc = r"Pointer to the register block"]
                 #[instability::unstable]
-                pub const PTR: *const <super::pac::$base as core::ops::Deref>::Target = super::pac::$base::PTR;
+                pub const PTR: *const <pac::$base as core::ops::Deref>::Target = pac::$base::PTR;
 
                 #[doc = r"Return the pointer to the register block"]
                 #[inline(always)]
                 #[instability::unstable]
-                pub const fn ptr() -> *const <super::pac::$base as core::ops::Deref>::Target {
-                    super::pac::$base::PTR
+                pub const fn ptr() -> *const <pac::$base as core::ops::Deref>::Target {
+                    pac::$base::PTR
                 }
             }
 
             #[doc(hidden)]
             impl core::ops::Deref for $name {
-                type Target = <super::pac::$base as core::ops::Deref>::Target;
+                type Target = <pac::$base as core::ops::Deref>::Target;
 
                 fn deref(&self) -> &Self::Target {
                     unsafe { &*Self::PTR }

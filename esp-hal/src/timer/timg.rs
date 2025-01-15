@@ -75,8 +75,9 @@ use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
     interrupt::{self, InterruptConfigurable, InterruptHandler},
+    pac::timg0::RegisterBlock,
     peripheral::Peripheral,
-    peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
+    peripherals::{Interrupt, TIMG0},
     private::Sealed,
     sync::{lock, RawMutex},
     system::PeripheralClockControl,
@@ -412,7 +413,7 @@ impl Timer {
         self.timer
     }
 
-    fn t(&self) -> &crate::peripherals::timg0::T {
+    fn t(&self) -> &crate::pac::timg0::T {
         self.register_block().t(self.timer_number().into())
     }
 
