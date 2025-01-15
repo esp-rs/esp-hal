@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `PriorityLock` being ineffective with `Priority::max()` on RISC-V CPUs (#2964)
+
 ### Removed
 
 ## [0.23.0] - 2025-01-15

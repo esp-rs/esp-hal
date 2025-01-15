@@ -35,6 +35,11 @@ mod single_core {
 
     impl RawLock for PriorityLock {
         unsafe fn enter(&self) -> critical_section::RawRestoreState {
+            #[cfg(riscv)]
+            if self.0 == Priority::max() {
+                return InterruptLock.enter();
+            }
+
             let prev_interrupt_priority = unsafe { Self::change_current_level(self.0) };
             assert!(prev_interrupt_priority <= self.0);
 
@@ -46,6 +51,10 @@ mod single_core {
         }
 
         unsafe fn exit(&self, token: critical_section::RawRestoreState) {
+            #[cfg(riscv)]
+            if self.0 == Priority::max() {
+                return InterruptLock.exit(token);
+            }
             assert!(Self::current_priority() <= self.0);
             // Ensure no preceeding memory accesses are reordered to after interrupts are
             // enabled.
