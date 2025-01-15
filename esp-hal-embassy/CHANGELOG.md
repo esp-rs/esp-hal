@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## 0.6.0 - 2025-01-15
+
+### Added
+
 - Added `ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE` (#2701)
 - Added `ESP_HAL_EMBASSY_CONFIG_GENERIC_QUEUE_SIZE` instead of using `embassy-time/generic-queue-*` (#2701)
 
@@ -78,4 +88,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.0 - 2024-06-04
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-hal-embassy?since=2024-11-20
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-hal-embassy?since=2025-01-15

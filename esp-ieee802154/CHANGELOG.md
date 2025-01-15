@@ -11,12 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
-- Bump MSRV to 1.84 (#2951)
-
 ### Fixed
 
 ### Removed
+
+## 0.5.0 - 2025-01-15
+
+### Changed
+
+- Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
+- Bump MSRV to 1.84 (#2951)
 
 ## 0.4.0 - 2024-11-20
 
@@ -61,4 +65,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-ieee802154?since=2024-11-20
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-ieee802154?since=2025-01-15

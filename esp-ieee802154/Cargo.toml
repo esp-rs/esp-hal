@@ -1,6 +1,6 @@
 [package]
 name         = "esp-ieee802154"
-version      = "0.4.0"
+version      = "0.5.0"
 edition      = "2021"
 rust-version = "1.84.0"
 description  = "Low-level IEEE 802.15.4 driver for the ESP32-C6 and ESP32-H2"
@@ -21,17 +21,17 @@ test  = false
 byte              = "0.2.7"
 critical-section  = "1.2.0"
 document-features = "0.2.10"
-esp-hal           = { version = "0.22.0", path = "../esp-hal" }
+esp-hal           = { version = "0.23.0", path = "../esp-hal" }
 esp-wifi-sys      = "0.7.0"
 heapless          = "0.8.0"
 ieee802154        = "0.6.1"
 cfg-if            = "1.0.0"
-esp-config        = { version = "0.2.0", path = "../esp-config" }
-defmt             = { version = "0.3.8", optional = true }
-log               = { version = "0.4.22", optional = true }
+esp-config        = { version = "0.3.0", path = "../esp-config" }
+defmt             = { version = "0.3.10", optional = true }
+log               = { version = "0.4.25", optional = true }
 
 [build-dependencies]
-esp-config        = { version = "0.2.0", path = "../esp-config" }
+esp-config        = { version = "0.3.0", path = "../esp-config" }
 
 
 [features]

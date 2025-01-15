@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## 0.12.0 - 2025-01-15
+
+### Changed
+
 - Bump smoltcp to 0.12.0 (#2849)
 - `csi_enabled` option converted to feature (#2945)
 - Bump MSRV to 1.84 (#2951)
@@ -20,8 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed triggering a debug-assertion during scan (#2612)
 - Fix WPA2-ENTERPRISE functionality (#2896)
 - Make sure to de-allocate memory used by timers on removal (#2936)
-
-### Removed
 
 ## 0.11.0 - 2024-11-20
 
@@ -209,4 +215,4 @@ Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2
 
 Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2024-11-20
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2025-01-15
