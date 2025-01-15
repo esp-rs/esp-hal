@@ -279,24 +279,47 @@ pub enum StopBits {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
-    /// The baud rate (speed) of the UART communication in bits per second
-    /// (bps).
-    pub baudrate: u32,
-    /// Number of data bits in each frame (5, 6, 7, or 8 bits).
-    pub data_bits: DataBits,
-    /// Parity setting (None, Even, or Odd).
-    pub parity: Parity,
-    /// Number of stop bits in each frame (1, 1.5, or 2 bits).
-    pub stop_bits: StopBits,
-    /// Clock source used by the UART peripheral.
-    pub clock_source: ClockSource,
+    /// UART Recieve part configuration.
+    pub rx: RxConfig,
+    /// UART Transmit part configuration.
+    pub tx: TxConfig,
+    /// Shared UART configuration. 
+    pub shared: SharedConfig,
+}
+
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct RxConfig {
     /// Threshold level at which the RX FIFO is considered full.
     pub rx_fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
     pub rx_timeout: Option<u8>,
 }
 
-impl Config {
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct TxConfig {}
+
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct SharedConfig {
+        /// The baud rate (speed) of the UART communication in bits per second
+        /// (bps).
+        pub baudrate: u32,
+        /// Number of data bits in each frame (5, 6, 7, or 8 bits).
+        pub data_bits: DataBits,
+        /// Parity setting (None, Even, or Odd).
+        pub parity: Parity,
+        /// Number of stop bits in each frame (1, 1.5, or 2 bits).
+        pub stop_bits: StopBits,
+        /// Clock source used by the UART peripheral.
+        pub clock_source: ClockSource,
+}
+
+impl SharedConfig {
     /// Calculates the total symbol length in bits based on the configured
     /// data bits, parity, and stop bits.
     fn symbol_length(&self) -> u8 {
@@ -317,6 +340,10 @@ impl Config {
         };
         length
     }
+}
+
+impl Config {
+   // TODO: what?
 }
 
 impl Default for Config {
@@ -521,7 +548,7 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the RX half.
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+    pub fn apply_config(&mut self, config: &TxConfig) -> Result<(), ConfigError> {
         self.uart.info().apply_config(config)
     }
 
@@ -707,7 +734,7 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the TX half.
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+    pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
         self.uart.info().apply_config(config)
     }
 
@@ -1131,7 +1158,7 @@ where
 
     /// Change the configuration.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.rx.apply_config(config)?;
+        self.rx.apply_config(config.rx)?;
         Ok(())
     }
 
