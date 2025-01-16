@@ -258,6 +258,17 @@ is not compatible with the hardware.
 +.unwrap();
 ```
 
+Additionally, the configuration structs now implement the Builder Lite pattern.
+
+```diff
+-let config = Config {
+-    frequency: 100.kHz(),
+-    mode: Mode::_0,
+-    ..Config::default()
+-}
++let config = Config::default().with_frequency(100.kHz()).with_mode(Mode::_0);
+```
+
 ## Peripheral instance type parameters and `new_typed` constructors have been removed
 
 Call `new` instead and remove the type parameters if you've used them.
