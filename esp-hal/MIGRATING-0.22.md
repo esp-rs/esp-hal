@@ -489,10 +489,11 @@ Additionally the enum is marked as non-exhaustive.
 
 ## SPI Changes
 
-The SPI mode variants are renamed from e.g. `Mode0` to `_0`.
+A number of enums have had their `Spi` prefix dropped and the SPI mode variants
+are renamed from e.g. `Mode0` to `_0`.
 
 ```diff
-- Mode::Mode0
+- SpiMode::Mode0
 + Mode::_0
 ```
 
