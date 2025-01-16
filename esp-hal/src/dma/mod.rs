@@ -2464,7 +2464,9 @@ impl<'d, CH> Channel<'d, Blocking, CH>
 where
     CH: DmaChannel,
 {
-    pub(crate) fn new(channel: impl Peripheral<P = CH>) -> Self {
+    /// Creates a new DMA channel driver.
+    #[instability::unstable]
+    pub fn new(channel: impl Peripheral<P = CH>) -> Self {
         let (rx, tx) = unsafe {
             channel
                 .clone_unchecked()
