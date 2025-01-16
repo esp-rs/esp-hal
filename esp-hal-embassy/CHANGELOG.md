@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed an issue where the `ESP_HAL_EMBASSY_CONFIG_LOW_POWER_WAIT` option was not possible to disable (#2975)
+
 ### Removed
 
 ## 0.6.0 - 2025-01-15
