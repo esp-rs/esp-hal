@@ -78,11 +78,9 @@ mod tests {
         for (baudrate, clock_source) in configs {
             ctx.uart
                 .apply_config(
-                    &uart::Config::default().with_shared(
-                        uart::SharedConfig::default()
+                    &uart::Config::default()
                             .with_baudrate(baudrate)
                             .with_clock_source(clock_source),
-                    ),
                 )
                 .unwrap();
             ctx.uart.write_bytes(&[byte_to_write]).unwrap();
