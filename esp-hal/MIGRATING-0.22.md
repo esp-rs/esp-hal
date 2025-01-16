@@ -235,7 +235,7 @@ https://github.com/rust-embedded/embedded-hal/blob/master/docs/migrating-from-0.
 
 ## Driver constructors now take a configuration and are fallible
 
-The old `new_with_config` constructor have been removed, and `new` constructors now always take
+The old `new_with_config` constructors have been removed, and `new` constructors now always take
 a configuration structure. They have also been updated to return a `ConfigError` if the configuration
 is not compatible with the hardware.
 
