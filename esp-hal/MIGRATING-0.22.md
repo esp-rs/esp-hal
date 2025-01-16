@@ -29,10 +29,7 @@ by `esp_hal::init()`. The channels themselves have been renamed to match other p
 - GDMA devices provide `set_priority` to change DMA in/out channel priority
 
 ```diff
- let mut spi = Spi::new_with_config(
-     peripherals.SPI2,
-     Config::default(),
- )
+ let mut spi = spi
  // other setup
 -.with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 +.with_dma(dma_channel);
@@ -40,10 +37,7 @@ by `esp_hal::init()`. The channels themselves have been renamed to match other p
 
 ```diff
 +dma_channel.set_priority(DmaPriority::Priority1);
- let mut spi = Spi::new_with_config(
-     peripherals.SPI2,
-     Config::default(),
- )
+ let mut spi = spi
  // other setup
 -.with_dma(dma_channel.configure(false, DmaPriority::Priority1));
 +.with_dma(dma_channel);
