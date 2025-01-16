@@ -471,6 +471,9 @@ mod uart_printer {
 }
 
 #[cfg(not(feature = "critical-section"))]
+use core::marker::PhantomData;
+
+#[cfg(not(feature = "critical-section"))]
 type LockInner<'a> = PhantomData<&'a ()>;
 #[cfg(feature = "critical-section")]
 type LockInner<'a> = critical_section::CriticalSection<'a>;

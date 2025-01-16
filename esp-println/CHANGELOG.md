@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix build failure when `critical-section` feature is disabled
+
 ### Removed
 
 ## 0.13.0 - 2025-01-15
