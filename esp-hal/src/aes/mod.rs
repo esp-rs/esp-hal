@@ -274,6 +274,7 @@ pub mod dma {
     }
 
     /// A DMA capable AES instance.
+    #[instability::unstable]
     pub struct AesDma<'d> {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,

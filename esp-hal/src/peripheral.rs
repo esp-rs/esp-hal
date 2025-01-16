@@ -273,7 +273,7 @@ mod peripheral_macros {
                     $crate::create_peripheral!($name <= $from_pac);
                 )*
                 $(
-                    $crate::create_peripheral!($unstable_name <= $unstable_from_pac);
+                    $crate::create_peripheral!(#[instability::unstable] $unstable_name <= $unstable_from_pac);
                 )*
             }
 
@@ -383,6 +383,7 @@ mod peripheral_macros {
             )*
 
             $(
+                #[instability::unstable]
                 pub use peripherals::$unstable_name;
                 $(
                     impl peripherals::$unstable_name {
@@ -427,7 +428,8 @@ mod peripheral_macros {
     #[macro_export]
     /// Macro to create a peripheral structure.
     macro_rules! create_peripheral {
-        ($name:ident <= virtual) => {
+        ($(#[$attr:meta])? $name:ident <= virtual) => {
+            $(#[$attr])?
             #[derive(Debug)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             #[non_exhaustive]
@@ -459,8 +461,8 @@ mod peripheral_macros {
             impl $crate::private::Sealed for $name {}
         };
 
-        ($name:ident <= $base:ident) => {
-            $crate::create_peripheral!($name <= virtual);
+        ($(#[$attr:meta])? $name:ident <= $base:ident) => {
+            $crate::create_peripheral!($(#[$attr])? $name <= virtual);
 
             impl $name {
                 #[doc = r"Pointer to the register block"]
