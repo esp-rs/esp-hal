@@ -243,11 +243,7 @@ is not compatible with the hardware.
 -let mut spi = Spi::new_with_config(
 +let mut spi = Spi::new(
      peripherals.SPI2,
-     Config {
-         frequency: 100.kHz(),
-         mode: SpiMode::_0,
-         ..Config::default()
-     },
+     config,
 -);
 +)
 +.unwrap();
