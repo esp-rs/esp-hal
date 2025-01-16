@@ -53,11 +53,9 @@ async fn main(spawner: Spawner) {
     };
 
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
-    let rx_config = RxChannelConfig {
-        clk_divider: 255,
-        idle_threshold: 10000,
-        ..RxChannelConfig::default()
-    };
+    let rx_config = RxChannelConfig::default()
+        .with_clk_divider(255)
+        .with_idle_threshold(10000);
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
