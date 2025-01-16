@@ -454,7 +454,7 @@ e.g.
 
 e.g.
 
-```dif
+```diff
 - while let nb::Result::Ok(_c) = serial.read_byte() {
 -     cnt += 1;
 - }
