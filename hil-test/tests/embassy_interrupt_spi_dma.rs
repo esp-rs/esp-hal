@@ -18,7 +18,7 @@ use esp_hal::{
     },
     time::RateExtU32,
     timer::AnyTimer,
-    Async,
+    Blocking,
 };
 use esp_hal_embassy::InterruptExecutor;
 use hil_test as _;
@@ -37,14 +37,14 @@ static INTERRUPT_TASK_WORKING: AtomicBool = AtomicBool::new(false);
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
 #[embassy_executor::task]
-async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Async>) {
+async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Blocking>) {
     let mut ticker = Ticker::every(Duration::from_millis(1));
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let mut spi = spi.with_buffers(dma_rx_buf, dma_tx_buf);
+    let mut spi = spi.with_buffers(dma_rx_buf, dma_tx_buf).into_async();
 
     loop {
         let mut buffer: [u8; 8] = [0; 8];
@@ -59,8 +59,10 @@ async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Async>
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 #[embassy_executor::task]
-async fn interrupt_driven_task(mut i2s_tx: esp_hal::i2s::master::I2sTx<'static, Async>) {
+async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocking>) {
     let mut ticker = Ticker::every(Duration::from_millis(1));
+
+    let mut i2s_tx = i2s_tx.into_async().i2s_tx.build();
 
     loop {
         let mut buffer: [u8; 8] = [0; 8];
@@ -137,14 +139,13 @@ mod test {
                 .with_mode(Mode::_0),
         )
         .unwrap()
-        .with_dma(dma_channel2)
-        .into_async();
+        .with_dma(dma_channel2);
 
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         let other_peripheral = {
             let (_, rx_descriptors, _, tx_descriptors) = dma_buffers!(128);
 
-            let other_peripheral = esp_hal::i2s::master::I2s::new(
+            esp_hal::i2s::master::I2s::new(
                 peripherals.I2S0,
                 esp_hal::i2s::master::Standard::Philips,
                 esp_hal::i2s::master::DataFormat::Data8Channel8,
@@ -153,11 +154,6 @@ mod test {
                 rx_descriptors,
                 tx_descriptors,
             )
-            .into_async()
-            .i2s_tx
-            .build();
-
-            other_peripheral
         };
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);

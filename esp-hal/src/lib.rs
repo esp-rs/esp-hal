@@ -143,6 +143,8 @@
 // MUST be the first module
 mod fmt;
 
+use core::marker::PhantomData;
+
 #[cfg(riscv)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
@@ -321,7 +323,9 @@ pub struct Blocking;
 
 /// Driver initialized in async mode.
 #[derive(Debug)]
-pub struct Async;
+pub struct Async(PhantomData<*const ()>);
+
+unsafe impl Sync for Async {}
 
 impl crate::DriverMode for Blocking {}
 impl crate::DriverMode for Async {}

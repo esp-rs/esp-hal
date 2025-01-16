@@ -1,4 +1,25 @@
-# Migration Guide from v0.23.x to v?.??.?
+# Migration Guide from v0.23.x to v1.0.0-beta.0
+
+## `Async` drivers can no longer be sent between cores and executors
+
+To work around this limitation, send the blocking driver, and configure it into `Async` mode
+in the target context.
+
+```diff
+ #[embassy_executor::task]
+-async fn interrupt_driven_task(mut spi: Spi<'static, Async>) {
++async fn interrupt_driven_task(spi: Spi<'static, Blocking>) {
++    let mut spi = spi.into_async();
+     ...
+ }
+
+ let spi = Spi::new(...)
+     .unwrap()
+     // ...
+-    .into_async();
+
+ send_spawner.spawn(interrupt_driven_task(spi)).unwrap();
+```
 
 ## RMT changes
 

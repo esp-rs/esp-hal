@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 
+- `Async` drivers are no longer `Send` (#2980)
+
 ### Fixed
 
 - `DmaDescriptor` is now `#[repr(C)]` (#2988)
