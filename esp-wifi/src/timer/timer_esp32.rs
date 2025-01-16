@@ -3,18 +3,8 @@
 use crate::hal::{interrupt, peripherals};
 
 pub(crate) fn setup_radio_isr() {
-    // wifi enabled in set_isr
     #[cfg(feature = "ble")]
     {
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::RWBT,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::BT_BB,
-            interrupt::Priority::Priority1,
-        ));
-
         // It's a mystery why these interrupts are enabled now since it worked without
         // this before Now at least without disabling these nothing will work
         interrupt::disable(crate::hal::Cpu::ProCpu, peripherals::Interrupt::ETH_MAC);
