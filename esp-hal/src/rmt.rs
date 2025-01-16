@@ -51,6 +51,7 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
+//! # use esp_hal::gpio::Level;
 //! # use esp_hal::peripherals::Peripherals;
 //! # use esp_hal::rmt::TxChannelConfig;
 //! # use esp_hal::rmt::Rmt;
@@ -64,12 +65,12 @@
 //!         peripherals.GPIO1,
 //!         TxChannelConfig::default()
 //!             .with_clk_divider(1)
-//!             .with_idle_output_level(false)
+//!             .with_idle_output_level(Level::Low)
 //!             .with_idle_output(false)
 //!             .with_carrier_modulation(false)
 //!             .with_carrier_high(1)
 //!             .with_carrier_low(1)
-//!             .with_carrier_level(false),
+//!             .with_carrier_level(Level::Low),
 //!     )
 //!     .unwrap();
 //! # }
@@ -219,7 +220,7 @@ use fugit::HertzU32;
 
 use crate::{
     asynch::AtomicWaker,
-    gpio::interconnect::{PeripheralInput, PeripheralOutput},
+    gpio::{interconnect::{PeripheralInput, PeripheralOutput}, Level},
     handler,
     interrupt::InterruptConfigurable,
     peripheral::Peripheral,
@@ -304,13 +305,13 @@ impl PulseCode for u32 {
 }
 
 /// Channel configuration for TX channels
-#[derive(Debug, Copy, Clone, Default, procmacros::BuilderLite)]
+#[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TxChannelConfig {
     /// Channel's clock divider
     pub clk_divider: u8,
     /// Set the idle output level to low/high
-    pub idle_output_level: bool,
+    pub idle_output_level: Level,
     /// Enable idle output
     pub idle_output: bool,
     /// Enable carrier modulation
@@ -320,11 +321,25 @@ pub struct TxChannelConfig {
     /// Carrier low phase in ticks
     pub carrier_low: u16,
     /// Level of the carrier
-    pub carrier_level: bool,
+    pub carrier_level: Level,
+}
+
+impl core::default::Default for TxChannelConfig {
+    fn default() -> Self {
+        Self {
+            clk_divider: Default::default(),
+            idle_output_level: Level::Low,
+            idle_output: Default::default(),
+            carrier_modulation: Default::default(),
+            carrier_high: Default::default(),
+            carrier_low: Default::default(),
+            carrier_level: Level::Low,
+        }
+    }
 }
 
 /// Channel configuration for RX channels
-#[derive(Debug, Copy, Clone, Default, procmacros::BuilderLite)]
+#[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxChannelConfig {
     /// Channel's clock divider
@@ -336,11 +351,25 @@ pub struct RxChannelConfig {
     /// Carrier low phase in ticks
     pub carrier_low: u16,
     /// Level of the carrier
-    pub carrier_level: bool,
+    pub carrier_level: Level,
     /// Filter threshold in ticks
     pub filter_threshold: u8,
     /// Idle threshold in ticks
     pub idle_threshold: u16,
+}
+
+impl core::default::Default for RxChannelConfig {
+    fn default() -> Self {
+        Self {
+            clk_divider: Default::default(),
+            carrier_modulation: Default::default(),
+            carrier_high: Default::default(),
+            carrier_low: Default::default(),
+            carrier_level: Level::Low,
+            filter_threshold: Default::default(),
+            idle_threshold: Default::default(),
+        }
+    }
 }
 
 pub use impl_for_chip::{ChannelCreator, Rmt};
@@ -1549,9 +1578,9 @@ where
 
     fn set_wrap_mode(wrap: bool);
 
-    fn set_carrier(carrier: bool, high: u16, low: u16, level: bool);
+    fn set_carrier(carrier: bool, high: u16, low: u16, level: Level);
 
-    fn set_idle_output(enable: bool, level: bool);
+    fn set_idle_output(enable: bool, level: Level);
 
     fn set_memsize(memsize: u8);
 
@@ -1641,7 +1670,7 @@ where
 
     fn set_wrap_mode(wrap: bool);
 
-    fn set_carrier(carrier: bool, high: u16, low: u16, level: bool);
+    fn set_carrier(carrier: bool, high: u16, low: u16, level: Level);
 
     fn set_memsize(memsize: u8);
 
@@ -1828,7 +1857,7 @@ mod chip_specific {
                     rmt.ch_tx_conf0($ch_num).modify(|_, w| w.mem_tx_wrap_en().bit(wrap));
                 }
 
-                fn set_carrier(carrier: bool, high: u16, low: u16, level: bool) {
+                fn set_carrier(carrier: bool, high: u16, low: u16, level: $crate::gpio::Level) {
                     let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
                     rmt.chcarrier_duty($ch_num)
@@ -1837,13 +1866,13 @@ mod chip_specific {
                     rmt.ch_tx_conf0($ch_num).modify(|_, w| {
                         w.carrier_en().bit(carrier);
                         w.carrier_eff_en().set_bit();
-                        w.carrier_out_lv().bit(level)
+                        w.carrier_out_lv().bit(level.into())
                     });
                 }
 
-                fn set_idle_output(enable: bool, level: bool) {
+                fn set_idle_output(enable: bool, level: $crate::gpio::Level) {
                     let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_tx_conf0($ch_num).modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level));
+                    rmt.ch_tx_conf0($ch_num).modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
                 fn set_memsize(memsize: u8) {
@@ -1964,7 +1993,7 @@ mod chip_specific {
                     rmt.ch_rx_conf1($ch_index).modify(|_, w| w.mem_rx_wrap_en().bit(wrap));
                 }
 
-                fn set_carrier(carrier: bool, high: u16, low: u16, level: bool) {
+                fn set_carrier(carrier: bool, high: u16, low: u16, level: $crate::gpio::Level) {
                     let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
                     rmt.ch_rx_carrier_rm($ch_index).write(|w| unsafe {
@@ -1973,7 +2002,7 @@ mod chip_specific {
                     });
 
                     rmt.ch_rx_conf0($ch_index)
-                        .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level));
+                        .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level.into()));
                 }
 
                 fn set_memsize(memsize: u8) {
@@ -2176,20 +2205,20 @@ mod chip_specific {
                     rmt.apb_conf().modify(|_, w| w.mem_tx_wrap_en().bit(wrap));
                 }
 
-                fn set_carrier(carrier: bool, high: u16, low: u16, level: bool) {
+                fn set_carrier(carrier: bool, high: u16, low: u16, level: $crate::gpio::Level) {
                     let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
                     rmt.chcarrier_duty($ch_num)
                         .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
                     rmt.chconf0($ch_num)
-                        .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level));
+                        .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level.into()));
                 }
 
-                fn set_idle_output(enable: bool, level: bool) {
+                fn set_idle_output(enable: bool, level: $crate::gpio::Level) {
                     let rmt = unsafe { &*crate::peripherals::RMT::PTR };
                     rmt.chconf1($ch_num)
-                        .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level));
+                        .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
                 fn set_memsize(memsize: u8) {
@@ -2314,14 +2343,14 @@ mod chip_specific {
                     // no-op
                 }
 
-                fn set_carrier(carrier: bool, high: u16, low: u16, level: bool) {
+                fn set_carrier(carrier: bool, high: u16, low: u16, level: $crate::gpio::Level) {
                     let rmt = unsafe { &*crate::peripherals::RMT::PTR };
 
                     rmt.chcarrier_duty($ch_num)
                         .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
                     rmt.chconf0($ch_num)
-                        .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level));
+                        .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level.into()));
                 }
 
                 fn set_memsize(memsize: u8) {
