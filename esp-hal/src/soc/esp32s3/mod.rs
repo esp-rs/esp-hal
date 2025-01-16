@@ -50,7 +50,7 @@ pub(crate) mod constants {
 
     /// The starting address of the Remote Control (RMT) module's RAM.
     pub const RMT_RAM_START: usize = 0x60016800;
-    /// The size, in bytes, of each RMT channel's dedicated RAM.
+    /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
     /// RMT Clock source value.
     pub const RMT_CLOCK_SRC: u8 = 1;
