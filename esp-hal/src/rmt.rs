@@ -62,15 +62,14 @@
 //!     .channel0
 //!     .configure(
 //!         peripherals.GPIO1,
-//!         TxChannelConfig {
-//!             clk_divider: 1,
-//!             idle_output_level: false,
-//!             idle_output: false,
-//!             carrier_modulation: false,
-//!             carrier_high: 1,
-//!             carrier_low: 1,
-//!             carrier_level: false,
-//!         },
+//!         TxChannelConfig::default()
+//!             .with_clk_divider(1)
+//!             .with_idle_output_level(false)
+//!             .with_idle_output(false)
+//!             .with_carrier_modulation(false)
+//!             .with_carrier_high(1)
+//!             .with_carrier_low(1)
+//!             .with_carrier_level(false),
 //!     )
 //!     .unwrap();
 //! # }
@@ -87,10 +86,7 @@
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
 //! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 //!
-//! let tx_config = TxChannelConfig {
-//!     clk_divider: 255,
-//!     ..TxChannelConfig::default()
-//! };
+//! let tx_config = TxChannelConfig::default().with_clk_divider(255);
 //!
 //! let mut channel = rmt
 //!     .channel0
@@ -127,11 +123,9 @@
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
 //! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 //!
-//! let rx_config = RxChannelConfig {
-//!     clk_divider: 1,
-//!     idle_threshold: 10000,
-//!     ..RxChannelConfig::default()
-//! };
+//! let rx_config = RxChannelConfig::default()
+//!     .with_clk_divider(1)
+//!     .with_idle_threshold(10000);
 #![cfg_attr(
     any(esp32, esp32s2),
     doc = "let mut channel = rmt.channel0.configure(peripherals.GPIO4, rx_config).unwrap();"
@@ -310,7 +304,7 @@ impl PulseCode for u32 {
 }
 
 /// Channel configuration for TX channels
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TxChannelConfig {
     /// Channel's clock divider
@@ -330,7 +324,7 @@ pub struct TxChannelConfig {
 }
 
 /// Channel configuration for RX channels
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxChannelConfig {
     /// Channel's clock divider
