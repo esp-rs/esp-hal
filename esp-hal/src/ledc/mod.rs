@@ -75,7 +75,9 @@ use self::{
 };
 use crate::{
     gpio::interconnect::PeripheralOutput,
+    pac,
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::LEDC,
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
 };
 
@@ -91,8 +93,8 @@ pub enum LSGlobalClkSource {
 
 /// LEDC (LED PWM Controller)
 pub struct Ledc<'d> {
-    _instance: PeripheralRef<'d, crate::peripherals::LEDC>,
-    ledc: &'d crate::pac::ledc::RegisterBlock,
+    _instance: PeripheralRef<'d, LEDC>,
+    ledc: &'d pac::ledc::RegisterBlock,
 }
 
 #[cfg(esp32)]
@@ -119,14 +121,14 @@ impl Speed for LowSpeed {
 
 impl<'d> Ledc<'d> {
     /// Return a new LEDC
-    pub fn new(_instance: impl Peripheral<P = crate::peripherals::LEDC> + 'd) -> Self {
+    pub fn new(_instance: impl Peripheral<P = LEDC> + 'd) -> Self {
         crate::into_ref!(_instance);
 
         if PeripheralClockControl::enable(PeripheralEnable::Ledc) {
             PeripheralClockControl::reset(PeripheralEnable::Ledc);
         }
 
-        let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
+        let ledc = LEDC::regs();
         Ledc { _instance, ledc }
     }
 

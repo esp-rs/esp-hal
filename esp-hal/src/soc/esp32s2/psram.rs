@@ -51,6 +51,7 @@
 //! # }
 //! ```
 
+use crate::peripherals::{EXTMEM, SPI0, SPI1};
 pub use crate::soc::psram_common::*;
 
 const EXTMEM_ORIGIN: usize = 0x3f500000;
@@ -171,14 +172,10 @@ pub(crate) fn init_psram(config: PsramConfig) {
             panic!("cache_dbus_mmu_set failed");
         }
 
-        let extmem = &*esp32s2::EXTMEM::PTR;
-        extmem.pro_dcache_ctrl1().modify(|_, w| {
-            w.pro_dcache_mask_bus0()
-                .clear_bit()
-                .pro_dcache_mask_bus1()
-                .clear_bit()
-                .pro_dcache_mask_bus2()
-                .clear_bit()
+        EXTMEM::regs().pro_dcache_ctrl1().modify(|_, w| {
+            w.pro_dcache_mask_bus0().clear_bit();
+            w.pro_dcache_mask_bus1().clear_bit();
+            w.pro_dcache_mask_bus2().clear_bit()
         });
     }
 
@@ -359,7 +356,7 @@ pub(crate) mod utils {
         }
 
         unsafe {
-            let spi1 = &*esp32s2::SPI1::PTR;
+            let spi1 = SPI1::regs();
             let backup_usr = spi1.user().read().bits();
             let backup_usr1 = spi1.user1().read().bits();
             let backup_usr2 = spi1.user2().read().bits();
@@ -454,8 +451,7 @@ pub(crate) mod utils {
             match mode {
                 CommandMode::PsramCmdQpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_QIO_MODE);
-                    let spi1 = &*esp32s2::SPI1::PTR;
-                    spi1.ctrl().modify(|_, w| w.fcmd_quad().set_bit());
+                    SPI1::regs().ctrl().modify(|_, w| w.fcmd_quad().set_bit());
                 }
                 CommandMode::PsramCmdSpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_SLOWRD_MODE);
@@ -573,7 +569,7 @@ pub(crate) mod utils {
         const PSRAM_FAST_READ_QUAD_DUMMY: u32 = 0x5;
 
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
+            let spi = SPI0::regs();
 
             spi.cache_sctrl()
                 .modify(|_, w| w.usr_sram_dio().clear_bit()); // disable dio mode for cache command
@@ -634,16 +630,16 @@ pub(crate) mod utils {
         const SPI_MEM_SCLKCNT_H_S: u32 = 8;
         const SPI_MEM_SCLKCNT_L_S: u32 = 0;
 
-        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
-
         if 1 >= freqdiv {
-            spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
+            SPI0::regs()
+                .sram_clk()
+                .modify(|_, w| w.sclk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = (((freqdiv - 1) as u32) << SPI_MEM_SCLKCNT_N_S)
                 | (((freqdiv / 2 - 1) as u32) << SPI_MEM_SCLKCNT_H_S)
                 | (((freqdiv - 1) as u32) << SPI_MEM_SCLKCNT_L_S);
             unsafe {
-                spi.sram_clk().modify(|_, w| w.bits(freqbits));
+                SPI0::regs().sram_clk().modify(|_, w| w.bits(freqbits));
             }
         }
     }

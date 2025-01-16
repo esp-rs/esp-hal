@@ -21,11 +21,11 @@ use crate::rom::regi2c_write_mask;
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     unsafe {
-        let rtc_cntl = &*crate::peripherals::LPWR::ptr();
-        let system = &*crate::peripherals::SYSTEM::ptr();
-        let apb_saradc = &*crate::peripherals::APB_SARADC::ptr();
-        let sens = &*crate::peripherals::SENS::ptr();
-        let syscon = &*crate::peripherals::APB_CTRL::ptr();
+        let rtc_cntl = crate::peripherals::LPWR::regs();
+        let system = crate::peripherals::SYSTEM::regs();
+        let apb_saradc = crate::peripherals::APB_SARADC::regs();
+        let sens = crate::peripherals::SENS::regs();
+        let syscon = crate::peripherals::APB_CTRL::regs();
 
         // `wifi_clk_en` register is defined in a really weird way, for now just simple
         // bit edit
@@ -121,9 +121,9 @@ pub(crate) fn ensure_randomness() {
 
 /// Disable true randomness. Unlocks `ADC` peripheral.
 pub(crate) fn revert_trng() {
-    let system = unsafe { &*crate::peripherals::SYSTEM::ptr() };
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
-    let sens = unsafe { &*crate::peripherals::SENS::ptr() };
+    let system = crate::peripherals::SYSTEM::regs();
+    let apb_saradc = crate::peripherals::APB_SARADC::regs();
+    let sens = crate::peripherals::SENS::regs();
 
     unsafe {
         regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENCAL_REF_ADDR, 0);

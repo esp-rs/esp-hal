@@ -1,3 +1,5 @@
+use crate::peripherals::{APB_SARADC, LPWR, SENS, SYSTEM};
+
 const ANA_CONFIG_REG: u32 = 0x6000E044;
 const ANA_CONFIG2_REG: u32 = 0x6000E048;
 const I2C_SAR_ADC: u8 = 0x69;
@@ -48,10 +50,10 @@ const I2C_RTC_BOD_MASK: u32 = 1 << 22;
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
-    let rtc_cntl = unsafe { &*crate::peripherals::LPWR::ptr() };
-    let dport = unsafe { &*crate::peripherals::SYSTEM::ptr() };
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
-    let sens = unsafe { &*crate::peripherals::SENS::ptr() };
+    let rtc_cntl = LPWR::regs();
+    let dport = SYSTEM::regs();
+    let apb_saradc = APB_SARADC::regs();
+    let sens = SENS::regs();
 
     unsafe {
         // Enable 8M clock source for RNG (this is actually enough to produce strong
@@ -161,10 +163,6 @@ pub(crate) fn ensure_randomness() {
 
 /// Disable true randomness. Unlocks `ADC` peripheral.
 pub(crate) fn revert_trng() {
-    let dport = unsafe { &*crate::peripherals::SYSTEM::ptr() };
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
-    let sens = unsafe { &*crate::peripherals::SENS::ptr() };
-
     unsafe {
         // Restore internal I2C bus state
         regi2c_write_mask(
@@ -213,17 +211,21 @@ pub(crate) fn revert_trng() {
         );
 
         // Restore SARADC to default mode
-        sens.sar_meas1_mux()
+        SENS::regs()
+            .sar_meas1_mux()
             .modify(|_, w| w.sar1_dig_force().clear_bit());
 
-        dport
+        SYSTEM::regs()
             .perip_clk_en0()
             .modify(|_, w| w.apb_saradc_clk_en().set_bit());
 
-        sens.sar_power_xpd_sar()
+        SENS::regs()
+            .sar_power_xpd_sar()
             .modify(|_, w| w.force_xpd_sar().bits(0));
 
-        apb_saradc.ctrl2().modify(|_, w| w.timer_en().clear_bit());
+        APB_SARADC::regs()
+            .ctrl2()
+            .modify(|_, w| w.timer_en().clear_bit());
     }
 }
 // Temporarily not in PACs

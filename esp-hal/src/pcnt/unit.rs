@@ -13,7 +13,7 @@ use core::marker::PhantomData;
 
 use critical_section::CriticalSection;
 
-use crate::{pcnt::channel::Channel, system::GenericPeripheralGuard};
+use crate::{pcnt::channel::Channel, peripherals::PCNT, system::GenericPeripheralGuard};
 
 /// Invalid filter threshold value
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -110,7 +110,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     ///
     /// Note: The specified value must be negative.
     pub fn set_low_limit(&self, value: Option<i16>) -> Result<(), InvalidLowLimit> {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let unit = pcnt.unit(NUM);
 
         if let Some(value) = value {
@@ -141,7 +141,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     ///
     /// Note: The specified value must be positive.
     pub fn set_high_limit(&self, value: Option<i16>) -> Result<(), InvalidHighLimit> {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let unit = pcnt.unit(NUM);
 
         if let Some(value) = value {
@@ -163,7 +163,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// When the count equals this value a threshold0 interrupt is triggered.
     /// If None is specified, then no interrupt is triggered.
     pub fn set_threshold0(&self, value: Option<i16>) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let unit = pcnt.unit(NUM);
 
         if let Some(value) = value {
@@ -180,7 +180,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// When the count equals this value a threshold1 interrupt is triggered.
     /// If None is specified, then no interrupt is triggered.
     pub fn set_threshold1(&self, value: Option<i16>) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let unit = pcnt.unit(NUM);
 
         if let Some(value) = value {
@@ -199,7 +199,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     ///
     /// Note: This maximum possible threshold is 1023.
     pub fn set_filter(&self, threshold: Option<u16>) -> Result<(), InvalidFilterThreshold> {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let unit = pcnt.unit(NUM);
 
         match threshold {
@@ -220,7 +220,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Resets the counter value to zero.
     pub fn clear(&self) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         critical_section::with(|_cs| {
             pcnt.ctrl().modify(|_, w| w.cnt_rst_u(NUM as u8).set_bit());
             // TODO: does this need a delay? (liebman / Jan 2 2023)
@@ -231,7 +231,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Pause the counter
     pub fn pause(&self) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         critical_section::with(|_cs| {
             pcnt.ctrl()
                 .modify(|_, w| w.cnt_pause_u(NUM as u8).set_bit());
@@ -240,7 +240,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Resume the counter
     pub fn resume(&self) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         critical_section::with(|_cs| {
             pcnt.ctrl()
                 .modify(|_, w| w.cnt_pause_u(NUM as u8).clear_bit());
@@ -249,7 +249,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Get the latest events for this unit.
     pub fn events(&self) -> Events {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let status = pcnt.u_status(NUM).read();
 
         Events {
@@ -263,13 +263,13 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Get the mode of the last zero crossing
     pub fn zero_mode(&self) -> ZeroMode {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         pcnt.u_status(NUM).read().zero_mode().bits().into()
     }
 
     /// Enable interrupts for this unit.
     pub fn listen(&self) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         critical_section::with(|_cs| {
             pcnt.int_ena()
                 .modify(|_, w| w.cnt_thr_event_u(NUM as u8).set_bit());
@@ -278,7 +278,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Disable interrupts for this unit.
     pub fn unlisten(&self, _cs: CriticalSection<'_>) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         critical_section::with(|_cs| {
             pcnt.int_ena()
                 .modify(|_, w| w.cnt_thr_event_u(NUM as u8).clear_bit());
@@ -287,13 +287,13 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Returns true if an interrupt is active for this unit.
     pub fn interrupt_is_set(&self) -> bool {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         pcnt.int_raw().read().cnt_thr_event_u(NUM as u8).bit()
     }
 
     /// Clear the interrupt bit for this unit.
     pub fn reset_interrupt(&self) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         critical_section::with(|_cs| {
             pcnt.int_clr()
                 .write(|w| w.cnt_thr_event_u(NUM as u8).set_bit());
@@ -330,7 +330,7 @@ impl<const NUM: usize> Counter<'_, NUM> {
 
     /// Get the current counter value.
     pub fn get(&self) -> i16 {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         pcnt.u_cnt(NUM).read().cnt().bits() as i16
     }
 }

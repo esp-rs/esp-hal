@@ -17,6 +17,7 @@ use crate::{
     },
     pac::ledc::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::LEDC,
 };
 
 /// Fade parameter sub-errors
@@ -161,7 +162,7 @@ impl<'a, S: TimerSpeed> Channel<'a, S> {
         output_pin: impl Peripheral<P = impl PeripheralOutput> + 'a,
     ) -> Self {
         crate::into_mapped_ref!(output_pin);
-        let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
+        let ledc = LEDC::regs();
         Channel {
             ledc,
             timer: None,

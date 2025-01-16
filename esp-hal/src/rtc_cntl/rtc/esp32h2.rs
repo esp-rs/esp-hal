@@ -98,7 +98,7 @@ pub(crate) fn init() {
             0,
         );
 
-        let pmu = &*crate::peripherals::PMU::PTR;
+        let pmu = PMU::regs();
 
         pmu.power_pd_top_cntl().write(|w| w.bits(0));
         pmu.power_pd_hpaon_cntl().write(|w| w.bits(0));
@@ -133,10 +133,9 @@ pub(crate) fn configure_clock() {
         }
     };
 
-    unsafe {
-        let lp_aon = &*LP_AON::ptr();
-        lp_aon.store1().modify(|_, w| w.bits(cal_val));
-    }
+    LP_AON::regs()
+        .store1()
+        .modify(|_, w| unsafe { w.bits(cal_val) });
 }
 
 // Terminology:
@@ -277,7 +276,7 @@ impl RtcClock {
     fn set_fast_freq(fast_freq: RtcFastClock) {
         // components/hal/esp32s2/include/hal/clk_tree_ll.h
         unsafe {
-            let lp_clkrst = &*LPWR::PTR;
+            let lp_clkrst = LPWR::regs();
             lp_clkrst.lp_clk_conf().modify(|_, w| {
                 w.fast_clk_sel().bits(match fast_freq {
                     RtcFastClock::RtcFastClockRcFast => 0b00,
@@ -291,7 +290,7 @@ impl RtcClock {
 
     fn set_slow_freq(slow_freq: RtcSlowClock) {
         unsafe {
-            let lp_clkrst = &*LPWR::PTR;
+            let lp_clkrst = LPWR::regs();
 
             lp_clkrst
                 .lp_clk_conf()
@@ -307,7 +306,7 @@ impl RtcClock {
 
     /// Get the RTC_SLOW_CLK source
     pub fn slow_freq() -> RtcSlowClock {
-        let lp_clrst = unsafe { &*LPWR::ptr() };
+        let lp_clrst = LPWR::regs();
 
         let slow_freq = lp_clrst.lp_clk_conf().read().slow_clk_sel().bits();
         match slow_freq {
@@ -348,9 +347,9 @@ impl RtcClock {
             };
         }
 
-        let lp_clkrst = unsafe { &*LPWR::ptr() };
-        let pcr = unsafe { &*PCR::ptr() };
-        let pmu = unsafe { &*PMU::ptr() };
+        let lp_clkrst = LPWR::regs();
+        let pcr = PCR::regs();
+        let pmu = PMU::regs();
 
         let clk_src = RtcClock::slow_freq();
 
@@ -465,7 +464,7 @@ impl RtcClock {
 
         // Check if there is already running calibration process
         // TODO: &mut TIMG0 for calibration
-        let timg0 = unsafe { &*TIMG0::ptr() };
+        let timg0 = TIMG0::regs();
 
         if timg0
             .rtccalicfg()
@@ -601,7 +600,7 @@ impl RtcClock {
     }
 
     pub(crate) fn estimate_xtal_frequency() -> u32 {
-        let timg0 = unsafe { crate::peripherals::TIMG0::steal() };
+        let timg0 = TIMG0::regs();
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
         timg0.rtccalicfg().modify(|_, w| unsafe {

@@ -151,7 +151,7 @@ pub(crate) fn esp32c6_rtc_bbpll_configure_raw(_xtal_freq: u32, pll_freq: u32) {
 }
 
 pub(crate) fn esp32c6_rtc_bbpll_enable() {
-    let pmu = unsafe { &*crate::peripherals::PMU::PTR };
+    let pmu = crate::peripherals::PMU::regs();
 
     pmu.imm_hp_ck_power().modify(|_, w| {
         w.tie_high_xpd_bb_i2c()
@@ -199,7 +199,7 @@ pub(crate) fn esp32c6_rtc_freq_to_pll_mhz_raw(cpu_clock_speed_mhz: u32) {
     // 80MHz after the switch. PLL = 480MHz, so divider is 6.
     clk_ll_mspi_fast_set_hs_divider(6);
 
-    let pcr = unsafe { &*crate::peripherals::PCR::PTR };
+    let pcr = crate::peripherals::PCR::regs();
     unsafe {
         pcr.cpu_freq_conf().modify(|_, w| {
             w.cpu_hs_div_num()
@@ -218,7 +218,7 @@ pub(crate) fn esp32c6_rtc_freq_to_pll_mhz_raw(cpu_clock_speed_mhz: u32) {
 }
 
 pub(crate) fn esp32c6_rtc_apb_freq_update(apb_freq: ApbClock) {
-    let lp_aon = unsafe { &*crate::peripherals::LP_AON::ptr() };
+    let lp_aon = crate::peripherals::LP_AON::regs();
     let value = ((apb_freq.hz() >> 12) & u16::MAX as u32)
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);
 
@@ -230,7 +230,7 @@ pub(crate) fn esp32c6_rtc_apb_freq_update(apb_freq: ApbClock) {
 fn clk_ll_mspi_fast_set_hs_divider(divider: u32) {
     // SOC_ROOT_CLK ------> MSPI_FAST_CLK
     // HS divider option: 4, 5, 6 (PCR_MSPI_FAST_HS_DIV_NUM=3, 4, 5)
-    let pcr = unsafe { &*crate::peripherals::PCR::PTR };
+    let pcr = crate::peripherals::PCR::regs();
 
     unsafe {
         match divider {
@@ -270,8 +270,8 @@ const REGI2C_ULP_CAL_DEVICE_EN: u16 = 1 << 6;
 const REGI2C_SAR_I2C_DEVICE_EN: u16 = 1 << 7;
 
 fn regi2c_enable_block(block: u8) {
-    let modem_lpcon = unsafe { &*crate::peripherals::MODEM_LPCON::ptr() };
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    let modem_lpcon = crate::peripherals::MODEM_LPCON::regs();
+    let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
 
     modem_lpcon
         .clk_conf()
@@ -314,7 +314,7 @@ fn regi2c_disable_block(block: u8) {
     };
 
     unsafe {
-        let lp_i2c_ana = &*crate::peripherals::LP_I2C_ANA_MST::ptr();
+        let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
         lp_i2c_ana.device_en().modify(|r, w| {
             w.lp_i2c_ana_mast_i2c_device_en()
                 .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !en_bit)
@@ -324,7 +324,7 @@ fn regi2c_disable_block(block: u8) {
 
 pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     regi2c_enable_block(block);
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
 
     let block_shifted = (block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S;
     let reg_add_shifted = (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S;
@@ -348,7 +348,7 @@ pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
 
 pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
     assert!(msb < 8 + lsb);
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
     regi2c_enable_block(block);
 
     let block_shifted = (block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S;

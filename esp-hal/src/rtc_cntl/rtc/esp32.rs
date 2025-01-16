@@ -19,10 +19,7 @@ pub(crate) fn configure_clock() {
         }
     };
 
-    unsafe {
-        let rtc_cntl = &*LPWR::ptr();
-        rtc_cntl.store1().write(|w| w.bits(cal_val));
-    }
+    LPWR::regs().store1().write(|w| unsafe { w.bits(cal_val) });
 }
 
 // Terminology:

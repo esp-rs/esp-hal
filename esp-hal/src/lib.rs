@@ -587,24 +587,24 @@ pub fn init(config: Config) -> Peripherals {
 
             match config.watchdog.timg0 {
                 WatchdogStatus::Enabled(duration) => {
-                    let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
+                    let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new();
                     timg0_wd.enable();
                     timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
                 }
                 WatchdogStatus::Disabled => {
-                    crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
+                    crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new().disable();
                 }
             }
 
             #[cfg(timg1)]
             match config.watchdog.timg1 {
                 WatchdogStatus::Enabled(duration) => {
-                    let mut timg1_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
+                    let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new();
                     timg1_wd.enable();
                     timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
                 }
                 WatchdogStatus::Disabled => {
-                    crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();
+                    crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new().disable();
                 }
             }
         }
@@ -615,10 +615,10 @@ pub fn init(config: Config) -> Peripherals {
 
             rtc.rwdt.disable();
 
-            crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
+            crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new().disable();
 
             #[cfg(timg1)]
-            crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();
+            crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new().disable();
         }
     }
 

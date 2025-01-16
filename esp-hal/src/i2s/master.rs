@@ -1217,7 +1217,7 @@ mod private {
         #[cfg(any(esp32c6, esp32h2))]
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             let i2s = self.register_block();
-            let pcr = unsafe { &*crate::peripherals::PCR::PTR }; // I2S clocks are configured via PCR
+            let pcr = crate::peripherals::PCR::regs(); // I2S clocks are configured via PCR
 
             let clkm_div_x: u32;
             let clkm_div_y: u32;

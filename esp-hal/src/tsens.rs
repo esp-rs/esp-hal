@@ -47,7 +47,7 @@
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::TSENS,
+    peripherals::{APB_SARADC, TSENS},
     system::GenericPeripheralGuard,
 };
 
@@ -152,22 +152,22 @@ impl<'d> TemperatureSensor<'d> {
     /// Power up the temperature sensor
     pub fn power_up(&self) {
         debug!("Power up");
-        let abp_saradc = unsafe { &*crate::peripherals::APB_SARADC::PTR };
-        abp_saradc.tsens_ctrl().modify(|_, w| w.pu().set_bit());
+        APB_SARADC::regs()
+            .tsens_ctrl()
+            .modify(|_, w| w.pu().set_bit());
     }
 
     /// Power down the temperature sensor - useful if you want to save power
     pub fn power_down(&self) {
-        let abp_saradc = unsafe { &*crate::peripherals::APB_SARADC::PTR };
-        abp_saradc.tsens_ctrl().modify(|_, w| w.pu().clear_bit());
+        APB_SARADC::regs()
+            .tsens_ctrl()
+            .modify(|_, w| w.pu().clear_bit());
     }
 
     /// Change the temperature sensor configuration
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::PTR };
-
         // Set clock source
-        apb_saradc.tsens_ctrl2().write(|w| {
+        APB_SARADC::regs().tsens_ctrl2().write(|w| {
             w.clk_sel()
                 .bit(matches!(config.clock_source, ClockSource::Xtal))
         });
@@ -178,9 +178,7 @@ impl<'d> TemperatureSensor<'d> {
     /// Get the raw temperature value
     #[inline]
     pub fn get_temperature(&self) -> Temperature {
-        let abp_saradc = unsafe { &*crate::peripherals::APB_SARADC::PTR };
-
-        let raw_value = abp_saradc.tsens_ctrl().read().out().bits();
+        let raw_value = APB_SARADC::regs().tsens_ctrl().read().out().bits();
 
         // TODO Address multiple temperature ranges and offsets
         let offset = -1i8;

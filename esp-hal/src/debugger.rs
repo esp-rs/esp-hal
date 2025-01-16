@@ -9,9 +9,7 @@ pub fn debugger_connected() -> bool {
 
     #[cfg(riscv)]
     {
-        use crate::peripherals::ASSIST_DEBUG;
-        let assist_debug = unsafe { &*ASSIST_DEBUG::ptr() };
-        assist_debug
+        crate::peripherals::ASSIST_DEBUG::regs()
             .core_0_debug_mode()
             .read()
             .core_0_debug_module_active()

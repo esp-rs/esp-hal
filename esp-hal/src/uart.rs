@@ -1230,7 +1230,7 @@ where
             if #[cfg(any(esp32, esp32s2))] {
                 // Nothing to do
             } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                unsafe { crate::peripherals::SYSTEM::steal() }
+                crate::peripherals::SYSTEM::regs()
                     .perip_clk_en0()
                     .modify(|_, w| w.uart_mem_clk_en().set_bit());
             } else {
@@ -1927,7 +1927,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
-        peripherals::{LPWR, LP_UART},
+        peripherals::{LPWR, LP_AON, LP_IO, LP_UART},
         uart::{Config, DataBits, Parity, StopBits},
     };
     /// LP-UART driver
@@ -1946,16 +1946,17 @@ pub mod lp_uart {
             _tx: LowPowerOutput<'_, 5>,
             _rx: LowPowerInput<'_, 4>,
         ) -> Self {
-            let lp_io = unsafe { crate::peripherals::LP_IO::steal() };
-            let lp_aon = unsafe { crate::peripherals::LP_AON::steal() };
-
             // FIXME: use GPIO APIs to configure pins
-            lp_aon
+            LP_AON::regs()
                 .gpio_mux()
                 .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | (1 << 4) | (1 << 5)) });
 
-            lp_io.gpio(4).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
-            lp_io.gpio(5).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+            LP_IO::regs()
+                .gpio(4)
+                .modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+            LP_IO::regs()
+                .gpio(5)
+                .modify(|_, w| unsafe { w.mcu_sel().bits(1) });
 
             let mut me = Self { uart };
 
@@ -1983,7 +1984,7 @@ pub mod lp_uart {
             // default == SOC_MOD_CLK_RTC_FAST == 2
 
             // LPWR.lpperi.lp_uart_clk_sel = 0;
-            unsafe { LPWR::steal() }
+            LPWR::regs()
                 .lpperi()
                 .modify(|_, w| w.lp_uart_clk_sel().clear_bit());
 
@@ -2443,6 +2444,8 @@ impl Info {
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
     fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+        use crate::peripherals::LPWR;
+
         let clocks = Clocks::get();
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
@@ -2451,7 +2454,7 @@ impl Info {
         };
 
         if clock_source == ClockSource::RcFast {
-            unsafe { crate::peripherals::LPWR::steal() }
+            LPWR::regs()
                 .clk_conf()
                 .modify(|_, w| w.dig_clk8m_en().variant(true));
             // esp_rom_delay_us(SOC_DELAY_RC_FAST_DIGI_SWITCH);
@@ -2502,7 +2505,7 @@ impl Info {
         let clk_div = clk.div_ceil(max_div * baudrate);
 
         // UART clocks are configured via PCR
-        let pcr = unsafe { crate::peripherals::PCR::steal() };
+        let pcr = crate::peripherals::PCR::regs();
 
         if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
             pcr.uart0_conf()

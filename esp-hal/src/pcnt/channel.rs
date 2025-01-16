@@ -14,6 +14,7 @@ use crate::{
     gpio::{interconnect::PeripheralInput, InputSignal},
     peripheral::Peripheral,
     system::GenericPeripheralGuard,
+    peripherals::PCNT,
 };
 
 /// Represents a channel within a pulse counter unit.
@@ -42,7 +43,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// * `low` - The behaviour of the channel when the control signal is low.
     /// * `high` - The behaviour of the channel when the control signal is high.
     pub fn set_ctrl_mode(&self, low: CtrlMode, high: CtrlMode) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let conf0 = pcnt.unit(UNIT).conf0();
 
         conf0.modify(|_, w| {
@@ -61,7 +62,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// * `pos_edge` - The effect on the counter when the input signal goes 0 ->
     ///   1.
     pub fn set_input_mode(&self, neg_edge: EdgeMode, pos_edge: EdgeMode) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let conf0 = pcnt.unit(UNIT).conf0();
 
         conf0.modify(|_, w| {

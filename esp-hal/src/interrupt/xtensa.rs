@@ -6,11 +6,7 @@ use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
 use super::InterruptStatus;
-use crate::{
-    pac,
-    peripherals::{self, Interrupt},
-    Cpu,
-};
+use crate::{pac, peripherals::Interrupt, Cpu};
 
 /// Interrupt Error
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -137,7 +133,7 @@ pub(crate) fn setup_interrupts() {
     // at least after the 2nd stage bootloader there are some interrupts enabled
     // (e.g. UART)
     for peripheral_interrupt in 0..255 {
-        peripherals::Interrupt::try_from(peripheral_interrupt)
+        Interrupt::try_from(peripheral_interrupt)
             .map(|intr| {
                 #[cfg(multi_core)]
                 disable(Cpu::AppCpu, intr);
@@ -316,22 +312,22 @@ pub fn status(core: Cpu) -> InterruptStatus {
 
 #[cfg(esp32)]
 unsafe fn core0_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    peripherals::DPORT::PTR
+    pac::DPORT::PTR
 }
 
 #[cfg(esp32)]
 unsafe fn core1_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    peripherals::DPORT::PTR
+    pac::DPORT::PTR
 }
 
 #[cfg(any(esp32s2, esp32s3))]
 unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt_core0::RegisterBlock {
-    peripherals::INTERRUPT_CORE0::PTR
+    pac::INTERRUPT_CORE0::PTR
 }
 
 #[cfg(esp32s3)]
 unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::RegisterBlock {
-    peripherals::INTERRUPT_CORE1::PTR
+    pac::INTERRUPT_CORE1::PTR
 }
 
 /// Get the current run level (the level below which interrupts are masked).
@@ -656,7 +652,6 @@ mod vectored {
         }
     }
 
-    #[allow(clippy::unusual_byte_groupings)]
     #[cfg(esp32)]
     mod chip_specific {
         use super::*;
@@ -668,16 +663,15 @@ mod vectored {
         );
         #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
-            use peripherals::Interrupt::*;
             [
-                TG0_T0_EDGE,
-                TG0_T1_EDGE,
-                TG0_WDT_EDGE,
-                TG0_LACT_EDGE,
-                TG1_T0_EDGE,
-                TG1_T1_EDGE,
-                TG1_WDT_EDGE,
-                TG1_LACT_EDGE,
+                Interrupt::TG0_T0_EDGE,
+                Interrupt::TG0_T1_EDGE,
+                Interrupt::TG0_WDT_EDGE,
+                Interrupt::TG0_LACT_EDGE,
+                Interrupt::TG1_T0_EDGE,
+                Interrupt::TG1_T1_EDGE,
+                Interrupt::TG1_WDT_EDGE,
+                Interrupt::TG1_LACT_EDGE,
             ]
             .contains(&interrupt)
         }
@@ -694,19 +688,18 @@ mod vectored {
         );
         #[inline]
         pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
-            use peripherals::Interrupt::*;
             [
-                TG0_T0_EDGE,
-                TG0_T1_EDGE,
-                TG0_WDT_EDGE,
-                TG0_LACT_EDGE,
-                TG1_T0_EDGE,
-                TG1_T1_EDGE,
-                TG1_WDT_EDGE,
-                TG1_LACT_EDGE,
-                SYSTIMER_TARGET0,
-                SYSTIMER_TARGET1,
-                SYSTIMER_TARGET2,
+                Interrupt::TG0_T0_EDGE,
+                Interrupt::TG0_T1_EDGE,
+                Interrupt::TG0_WDT_EDGE,
+                Interrupt::TG0_LACT_EDGE,
+                Interrupt::TG1_T0_EDGE,
+                Interrupt::TG1_T1_EDGE,
+                Interrupt::TG1_WDT_EDGE,
+                Interrupt::TG1_LACT_EDGE,
+                Interrupt::SYSTIMER_TARGET0,
+                Interrupt::SYSTIMER_TARGET1,
+                Interrupt::SYSTIMER_TARGET2,
             ]
             .contains(&interrupt)
         }

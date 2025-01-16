@@ -9,7 +9,10 @@ use core::marker::PhantomData;
 use fugit::HertzU32;
 
 use super::PeripheralGuard;
-use crate::mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral};
+use crate::{
+    mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral},
+    pac,
+};
 
 /// A MCPWM timer
 ///
@@ -93,19 +96,19 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         (reg.value().bits(), reg.direction().bit_is_set().into())
     }
 
-    fn cfg0(&mut self) -> &crate::pac::mcpwm0::timer::CFG0 {
+    fn cfg0(&mut self) -> &pac::mcpwm0::timer::CFG0 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
         unsafe { Self::tmr() }.cfg0()
     }
 
-    fn cfg1(&mut self) -> &crate::pac::mcpwm0::timer::CFG1 {
+    fn cfg1(&mut self) -> &pac::mcpwm0::timer::CFG1 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
         unsafe { Self::tmr() }.cfg1()
     }
 
-    unsafe fn tmr() -> &'static crate::pac::mcpwm0::TIMER {
+    unsafe fn tmr() -> &'static pac::mcpwm0::TIMER {
         let block = unsafe { &*PWM::block() };
         block.timer(TIM as usize)
     }

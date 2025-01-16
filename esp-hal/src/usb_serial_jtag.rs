@@ -911,7 +911,7 @@ impl embedded_io_async::Read for UsbSerialJtagRx<'_, Async> {
 
 #[handler]
 fn async_interrupt_handler() {
-    let usb = USB_DEVICE::register_block();
+    let usb = USB_DEVICE::regs();
     let interrupts = usb.int_st().read();
 
     let tx = interrupts.serial_in_empty().bit_is_set();

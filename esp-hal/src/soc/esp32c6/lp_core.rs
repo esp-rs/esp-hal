@@ -19,9 +19,10 @@
 //!
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/lp_core_basic.rs
 
-use esp32c6 as pac;
-
-use crate::peripheral::{Peripheral, PeripheralRef};
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::{LPWR, LP_AON, LP_CORE, LP_PERI, PMU},
+};
 
 /// Represents the possible wakeup sources for the LP (Low Power) core.
 #[derive(Debug, Clone, Copy)]
@@ -43,34 +44,30 @@ pub enum LpCoreClockSource {
 
 /// Represents the Low Power (LP) core peripheral.
 pub struct LpCore<'d> {
-    _lp_core: PeripheralRef<'d, crate::peripherals::LP_CORE>,
+    _lp_core: PeripheralRef<'d, LP_CORE>,
 }
 
 impl<'d> LpCore<'d> {
     /// Create a new instance using [LpCoreClockSource::RcFastClk]
-    pub fn new(lp_core: impl Peripheral<P = crate::peripherals::LP_CORE> + 'd) -> Self {
+    pub fn new(lp_core: impl Peripheral<P = LP_CORE> + 'd) -> Self {
         LpCore::new_with_clock(lp_core, LpCoreClockSource::RcFastClk)
     }
 
     /// Create a new instance using the given clock
     pub fn new_with_clock(
-        lp_core: impl Peripheral<P = crate::peripherals::LP_CORE> + 'd,
+        lp_core: impl Peripheral<P = LP_CORE> + 'd,
         clk_src: LpCoreClockSource,
     ) -> Self {
         crate::into_ref!(lp_core);
 
         match clk_src {
-            LpCoreClockSource::RcFastClk => unsafe {
-                (*crate::peripherals::LPWR::PTR)
-                    .lp_clk_conf()
-                    .modify(|_, w| w.fast_clk_sel().clear_bit());
-            },
-            LpCoreClockSource::XtalD2Clk => unsafe {
-                (*crate::peripherals::LPWR::PTR)
-                    .lp_clk_conf()
-                    .modify(|_, w| w.fast_clk_sel().set_bit());
-            },
-        }
+            LpCoreClockSource::RcFastClk => LPWR::regs()
+                .lp_clk_conf()
+                .modify(|_, w| w.fast_clk_sel().clear_bit()),
+            LpCoreClockSource::XtalD2Clk => LPWR::regs()
+                .lp_clk_conf()
+                .modify(|_, w| w.fast_clk_sel().set_bit()),
+        };
 
         let mut this = Self { _lp_core: lp_core };
         this.stop();
@@ -95,17 +92,18 @@ impl<'d> LpCore<'d> {
 }
 
 fn ulp_lp_core_stop() {
-    let pmu = unsafe { &*pac::PMU::PTR };
-    pmu.lp_cpu_pwr1()
+    PMU::regs()
+        .lp_cpu_pwr1()
         .modify(|_, w| unsafe { w.lp_cpu_wakeup_en().bits(0) });
-    pmu.lp_cpu_pwr1()
+    PMU::regs()
+        .lp_cpu_pwr1()
         .modify(|_, w| w.lp_cpu_sleep_req().set_bit());
 }
 
 fn ulp_lp_core_run(wakeup_src: LpCoreWakeupSource) {
-    let lp_aon = unsafe { &*pac::LP_AON::PTR };
-    let pmu = unsafe { &*pac::PMU::PTR };
-    let lp_peri = unsafe { &*pac::LP_PERI::PTR };
+    let lp_aon = LP_AON::regs();
+    let pmu = PMU::regs();
+    let lp_peri = LP_PERI::regs();
 
     // Enable LP-Core
     lp_aon.lpcore().modify(|_, w| w.disable().clear_bit());

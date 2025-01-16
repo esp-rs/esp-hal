@@ -418,7 +418,7 @@ macro_rules! uart_wakeup_impl {
             impl WakeSource for [< Uart $num WakeupSource >] {
                 fn apply(&self, _rtc: &Rtc<'_>, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
                     triggers.[< set_uart $num >](true);
-                    let uart = unsafe { crate::peripherals::[< UART $num >]::steal() };
+                    let uart = crate::peripherals::[< UART $num >]::regs();
 
                     #[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
                     uart.sleep_conf()

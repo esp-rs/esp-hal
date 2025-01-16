@@ -65,9 +65,9 @@ pub(crate) const ZERO_INPUT: u8 = 0x30;
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_2;
 
 pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
-    unsafe {
-        let iomux = &*IO_MUX::PTR;
+    let iomux = IO_MUX::regs();
 
+    unsafe {
         match gpio_num {
             0 => transmute::<&'static io_mux::GPIO0, &'static io_mux::GPIO0>(iomux.gpio0()),
             1 => transmute::<&'static io_mux::GPIO1, &'static io_mux::GPIO0>(iomux.gpio1()),
@@ -545,7 +545,7 @@ macro_rules! rtcio_analog {
             fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
                 // disable input
                 paste::paste!{
-                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                    $crate::peripherals::RTC_IO::regs()
                         .$pin_reg.modify(|_,w| unsafe {
                             w.[<$prefix fun_ie>]().bit(input_enable);
                             w.[<$prefix mux_sel>]().bit(mux);
@@ -555,7 +555,7 @@ macro_rules! rtcio_analog {
             }
 
             fn rtcio_pad_hold(&mut self, enable: bool) {
-                unsafe { $crate::peripherals::LPWR::steal() }
+                $crate::peripherals::LPWR::regs()
                     .hold_force()
                     .modify(|_, w| w.$hold().bit(enable));
             }
@@ -567,14 +567,14 @@ macro_rules! rtcio_analog {
             impl $crate::gpio::RtcPinWithResistors for $crate::gpio::GpioPin<$pin_num> {
                 fn rtcio_pullup(&mut self, enable: bool) {
                     paste::paste! {
-                        unsafe { $crate::peripherals::RTC_IO::steal() }
+                        $crate::peripherals::RTC_IO::regs()
                             .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
                     }
                 }
 
                 fn rtcio_pulldown(&mut self, enable: bool) {
                     paste::paste! {
-                        unsafe { $crate::peripherals::RTC_IO::steal() }
+                        $crate::peripherals::RTC_IO::regs()
                             .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
                     }
                 }
@@ -585,7 +585,7 @@ macro_rules! rtcio_analog {
             /// Configures the pin for analog mode.
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::gpio::RtcPin;
-                let rtcio = unsafe{ $crate::peripherals::RTC_IO::steal() };
+                let rtcio = $crate::peripherals::RTC_IO::regs();
 
                 paste::paste! {
                     // disable input
@@ -650,7 +650,7 @@ macro_rules! rtcio_analog {
 macro_rules! touch {
     (@pin_specific $touch_num:expr, true) => {
         paste::paste! {
-            unsafe { RTC_IO::steal() }.[< touch_pad $touch_num >]().write(|w| unsafe {
+            RTC_IO::regs().[< touch_pad $touch_num >]().write(|w| unsafe {
                 w.xpd().set_bit();
                 // clear input_enable
                 w.fun_ie().clear_bit();
@@ -668,7 +668,7 @@ macro_rules! touch {
 
     (@pin_specific $touch_num:expr, false) => {
         paste::paste! {
-            unsafe { RTC_IO::steal() }.[< touch_pad $touch_num >]().write(|w| {
+            RTC_IO::regs().[< touch_pad $touch_num >]().write(|w| {
                 w.xpd().set_bit();
                 w.tie_opt().clear_bit()
             });
@@ -688,9 +688,9 @@ macro_rules! touch {
                 use $crate::peripherals::{GPIO, RTC_IO, SENS};
                 use $crate::gpio::RtcPin;
 
-                let gpio = unsafe { GPIO::steal() };
-                let rtcio = unsafe { RTC_IO::steal() };
-                let sens = unsafe { SENS::steal() };
+                let gpio = GPIO::regs();
+                let rtcio = RTC_IO::regs();
+                let sens = SENS::regs();
 
                 // Pad to normal mode (not open-drain)
                 gpio.pin(self.rtc_number() as usize).write(|w| w.pad_driver().clear_bit());
@@ -720,8 +720,7 @@ macro_rules! touch {
 
             fn touch_measurement(&self, _: $crate::private::Internal) -> u16 {
                 paste::paste! {
-                    unsafe { $crate::peripherals::SENS::steal() }
-                        . $touch_out_reg ().read()
+                    $crate::peripherals::SENS::regs() . $touch_out_reg ().read()
                         . [<touch_meas_out $touch_num>] ().bits()
                 }
             }
@@ -732,8 +731,7 @@ macro_rules! touch {
 
             fn set_threshold(&self, threshold: u16, _: $crate::private::Internal) {
                 paste::paste! {
-                    unsafe { $crate::peripherals::SENS::steal() }
-                        . $touch_thres_reg ()
+                    $crate::peripherals::SENS::regs() . $touch_thres_reg ()
                         .write(|w| unsafe {
                             w. [<touch_out_th $touch_num>] ().bits(threshold)
                         });
@@ -788,8 +786,8 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => unsafe { GPIO::steal() }.status().read().bits(),
-            Self::Bank1 => unsafe { GPIO::steal() }.status1().read().bits(),
+            Self::Bank0 => GPIO::regs().status().read().bits(),
+            Self::Bank1 => GPIO::regs().status1().read().bits(),
         }
     }
 }

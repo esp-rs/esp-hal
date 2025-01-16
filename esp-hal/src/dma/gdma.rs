@@ -21,7 +21,7 @@ use crate::{
     handler,
     interrupt::Priority,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::Interrupt,
+    peripherals::{pac, Interrupt, DMA},
 };
 
 /// An arbitrary GDMA channel
@@ -108,28 +108,24 @@ impl DmaTxChannel for AnyGdmaTxChannel {}
 
 impl AnyGdmaTxChannel {
     #[inline(always)]
-    fn ch(&self) -> &crate::pac::dma::ch::CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(self.0 as usize)
+    fn ch(&self) -> &pac::dma::ch::CH {
+        DMA::regs().ch(self.0 as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    fn int(&self) -> &crate::pac::dma::int_ch::INT_CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.int_ch(self.0 as usize)
+    fn int(&self) -> &pac::dma::int_ch::INT_CH {
+        DMA::regs().int_ch(self.0 as usize)
     }
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
-    fn int(&self) -> &crate::pac::dma::out_int_ch::OUT_INT_CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.out_int_ch(self.0 as usize)
+    fn int(&self) -> &pac::dma::out_int_ch::OUT_INT_CH {
+        DMA::regs().out_int_ch(self.0 as usize)
     }
     #[cfg(esp32s3)]
     #[inline(always)]
-    fn int(&self) -> &crate::pac::dma::ch::out_int::OUT_INT {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(self.0 as usize).out_int()
+    fn int(&self) -> &pac::dma::ch::out_int::OUT_INT {
+        DMA::regs().ch(self.0 as usize).out_int()
     }
 }
 
@@ -350,30 +346,26 @@ impl DmaRxChannel for AnyGdmaRxChannel {}
 
 impl AnyGdmaRxChannel {
     #[inline(always)]
-    fn ch(&self) -> &crate::pac::dma::ch::CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(self.0 as usize)
+    fn ch(&self) -> &pac::dma::ch::CH {
+        DMA::regs().ch(self.0 as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    fn int(&self) -> &crate::pac::dma::int_ch::INT_CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.int_ch(self.0 as usize)
+    fn int(&self) -> &pac::dma::int_ch::INT_CH {
+        DMA::regs().int_ch(self.0 as usize)
     }
 
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
-    fn int(&self) -> &crate::pac::dma::in_int_ch::IN_INT_CH {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.in_int_ch(self.0 as usize)
+    fn int(&self) -> &pac::dma::in_int_ch::IN_INT_CH {
+        DMA::regs().in_int_ch(self.0 as usize)
     }
 
     #[cfg(esp32s3)]
     #[inline(always)]
-    fn int(&self) -> &crate::pac::dma::ch::in_int::IN_INT {
-        let dma = unsafe { &*crate::peripherals::DMA::PTR };
-        dma.ch(self.0 as usize).in_int()
+    fn int(&self) -> &pac::dma::ch::in_int::IN_INT {
+        DMA::regs().ch(self.0 as usize).in_int()
     }
 }
 
@@ -796,9 +788,11 @@ crate::dma::impl_dma_eligible! {
 }
 
 pub(super) fn init_dma(_cs: CriticalSection<'_>) {
-    let dma = unsafe { crate::soc::peripherals::DMA::steal() };
-    dma.misc_conf().modify(|_, w| w.ahbm_rst_inter().set_bit());
-    dma.misc_conf()
+    DMA::regs()
+        .misc_conf()
+        .modify(|_, w| w.ahbm_rst_inter().set_bit());
+    DMA::regs()
+        .misc_conf()
         .modify(|_, w| w.ahbm_rst_inter().clear_bit());
-    dma.misc_conf().modify(|_, w| w.clk_en().set_bit());
+    DMA::regs().misc_conf().modify(|_, w| w.clk_en().set_bit());
 }

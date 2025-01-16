@@ -39,7 +39,7 @@
 use crate::{
     gpio::{AlternateFunction, GpioPin},
     pac::io_mux,
-    peripherals::GPIO,
+    peripherals::{GPIO, IO_MUX},
 };
 
 /// The total number of GPIO pins available.
@@ -57,8 +57,8 @@ pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_1;
 
-pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
-    unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
+pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
+    IO_MUX::regs().gpio(gpio_num as usize)
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
@@ -411,7 +411,7 @@ macro_rules! rtcio_analog {
 
                 // disable input
                 paste::paste!{
-                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                    $crate::peripherals::RTC_IO::regs()
                         .$pin_reg.modify(|_,w| unsafe {
                             w.[<$prefix fun_ie>]().bit(input_enable);
                             w.[<$prefix mux_sel>]().bit(mux);
@@ -421,7 +421,7 @@ macro_rules! rtcio_analog {
             }
 
             fn rtcio_pad_hold(&mut self, enable: bool) {
-                unsafe { $crate::peripherals::LPWR::steal() }
+                $crate::peripherals::LPWR::regs()
                     .pad_hold()
                     .modify(|_, w| w.$hold().bit(enable));
             }
@@ -431,14 +431,14 @@ macro_rules! rtcio_analog {
         {
             fn rtcio_pullup(&mut self, enable: bool) {
                 paste::paste! {
-                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                    $crate::peripherals::RTC_IO::regs()
                         .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
                 }
             }
 
             fn rtcio_pulldown(&mut self, enable: bool) {
                 paste::paste! {
-                    unsafe { $crate::peripherals::RTC_IO::steal() }
+                    $crate::peripherals::RTC_IO::regs()
                         .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
                 }
             }
@@ -450,7 +450,7 @@ macro_rules! rtcio_analog {
                 use $crate::gpio::RtcPin;
                 enable_iomux_clk_gate();
 
-                let rtcio = unsafe{ $crate::peripherals::RTC_IO::steal() };
+                let rtcio = $crate::peripherals::RTC_IO::regs();
 
                 paste::paste! {
                     // disable input
@@ -527,8 +527,8 @@ pub(crate) enum InterruptStatusRegisterAccess {
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
         match self {
-            Self::Bank0 => unsafe { GPIO::steal() }.pcpu_int().read().bits(),
-            Self::Bank1 => unsafe { GPIO::steal() }.pcpu_int1().read().bits(),
+            Self::Bank0 => GPIO::regs().pcpu_int().read().bits(),
+            Self::Bank1 => GPIO::regs().pcpu_int1().read().bits(),
         }
     }
 }
@@ -538,7 +538,7 @@ impl crate::otg_fs::UsbDm for GpioPin<19> {}
 impl crate::otg_fs::UsbDp for GpioPin<20> {}
 
 fn enable_iomux_clk_gate() {
-    unsafe { crate::peripherals::SENS::steal() }
+    crate::peripherals::SENS::regs()
         .sar_peri_clk_gate_conf()
         .modify(|_, w| w.iomux_clk_en().set_bit());
 }

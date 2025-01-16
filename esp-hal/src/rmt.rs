@@ -228,11 +228,14 @@ use fugit::HertzU32;
 
 use crate::{
     asynch::AtomicWaker,
-    gpio::{interconnect::{PeripheralInput, PeripheralOutput}, Level},
+    gpio::{
+        interconnect::{PeripheralInput, PeripheralOutput},
+        Level,
+    },
     handler,
     interrupt::InterruptConfigurable,
     peripheral::Peripheral,
-    peripherals::Interrupt,
+    peripherals::{Interrupt, RMT},
     soc::constants,
     system::{self, GenericPeripheralGuard},
     Async,
@@ -387,7 +390,7 @@ where
     Dm: crate::DriverMode,
 {
     pub(crate) fn new_internal(
-        peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
+        peripheral: impl Peripheral<P = RMT> + 'd,
         frequency: HertzU32,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
@@ -431,7 +434,7 @@ where
 impl<'d> Rmt<'d, Blocking> {
     /// Create a new RMT instance
     pub fn new(
-        peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
+        peripheral: impl Peripheral<P = RMT> + 'd,
         frequency: HertzU32,
     ) -> Result<Self, Error> {
         Self::new_internal(peripheral, frequency)
@@ -856,6 +859,7 @@ mod impl_for_chip {
 
     use crate::{
         peripheral::{Peripheral, PeripheralRef},
+        peripherals::RMT,
         system::GenericPeripheralGuard,
     };
 
@@ -864,7 +868,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
+        pub(super) peripheral: PeripheralRef<'d, RMT>,
         /// RMT Channel 0.
         pub channel0: ChannelCreator<Dm, 0>,
         /// RMT Channel 1.
@@ -888,9 +892,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) fn create(
-            peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
-        ) -> Self {
+        pub(super) fn create(peripheral: impl Peripheral<P = RMT> + 'd) -> Self {
             crate::into_ref!(peripheral);
             Self {
                 peripheral,
@@ -983,6 +985,7 @@ mod impl_for_chip {
 
     use crate::{
         peripheral::{Peripheral, PeripheralRef},
+        peripherals::RMT,
         system::GenericPeripheralGuard,
     };
 
@@ -991,7 +994,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
+        pub(super) peripheral: PeripheralRef<'d, RMT>,
         /// RMT Channel 0.
         pub channel0: ChannelCreator<Dm, 0>,
         /// RMT Channel 1.
@@ -1007,9 +1010,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) fn create(
-            peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
-        ) -> Self {
+        pub(super) fn create(peripheral: impl Peripheral<P = RMT> + 'd) -> Self {
             crate::into_ref!(peripheral);
 
             Self {
@@ -1071,6 +1072,7 @@ mod impl_for_chip {
 
     use crate::{
         peripheral::{Peripheral, PeripheralRef},
+        peripherals::RMT,
         system::GenericPeripheralGuard,
     };
 
@@ -1079,7 +1081,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
+        pub(super) peripheral: PeripheralRef<'d, RMT>,
         /// RMT Channel 0.
         pub channel0: ChannelCreator<Dm, 0>,
         /// RMT Channel 1.
@@ -1103,9 +1105,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) fn create(
-            peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
-        ) -> Self {
+        pub(super) fn create(peripheral: impl Peripheral<P = RMT> + 'd) -> Self {
             crate::into_ref!(peripheral);
 
             Self {
@@ -1715,11 +1715,12 @@ where
 
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
+    use crate::peripherals::RMT;
+
     pub fn configure_clock(div: u32) {
         #[cfg(not(pcr))]
         {
-            let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-            rmt.sys_conf().modify(|_, w| unsafe {
+            RMT::regs().sys_conf().modify(|_, w| unsafe {
                 w.clk_en().clear_bit();
                 w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC);
                 w.sclk_div_num().bits(div as u8);
@@ -1731,30 +1732,32 @@ mod chip_specific {
 
         #[cfg(pcr)]
         {
-            let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-            pcr.rmt_sclk_conf().modify(|_, w| unsafe {
+            use crate::peripherals::PCR;
+            PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
                 w.sclk_div_num().bits(div as u8);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0)
             });
 
             #[cfg(esp32c6)]
-            pcr.rmt_sclk_conf()
+            PCR::regs()
+                .rmt_sclk_conf()
                 .modify(|_, w| unsafe { w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC) });
             #[cfg(not(esp32c6))]
-            pcr.rmt_sclk_conf()
+            PCR::regs()
+                .rmt_sclk_conf()
                 .modify(|_, w| w.sclk_sel().bit(crate::soc::constants::RMT_CLOCK_SRC));
 
-            let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-            rmt.sys_conf().modify(|_, w| w.apb_fifo_mask().set_bit());
+            RMT::regs()
+                .sys_conf()
+                .modify(|_, w| w.apb_fifo_mask().set_bit());
         }
     }
 
     #[allow(unused)]
     #[cfg(not(esp32s3))]
     pub fn pending_interrupt_for_channel() -> Option<usize> {
-        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-        let st = rmt.int_st().read();
+        let st = RMT::regs().int_st().read();
 
         if st.ch0_tx_end().bit() || st.ch0_tx_err().bit() {
             Some(0)
@@ -1772,8 +1775,7 @@ mod chip_specific {
     #[allow(unused)]
     #[cfg(esp32s3)]
     pub fn pending_interrupt_for_channel() -> Option<usize> {
-        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-        let st = rmt.int_st().read();
+        let st = RMT::regs().int_st().read();
 
         if st.ch0_tx_end().bit() || st.ch0_tx_err().bit() {
             Some(0)
@@ -1798,7 +1800,10 @@ mod chip_specific {
 
     macro_rules! impl_tx_channel {
         ($signal:ident, $ch_num:literal) => {
-            impl<Dm> $crate::rmt::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
+            impl<Dm> $crate::rmt::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num>
+            where
+                Dm: $crate::DriverMode,
+            {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -1814,17 +1819,19 @@ mod chip_specific {
                 }
 
                 fn set_divider(divider: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_tx_conf0($ch_num).modify(|_, w| unsafe { w.div_cnt().bits(divider) });
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_tx_conf0($ch_num)
+                        .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
                 }
 
                 fn update() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_tx_conf0($ch_num).modify(|_, w| w.conf_update().set_bit());
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_tx_conf0($ch_num)
+                        .modify(|_, w| w.conf_update().set_bit());
                 }
 
                 fn set_generate_repeat_interrupt(repeats: u16) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     if repeats > 1 {
                         rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe {
                             w.loop_count_reset().set_bit();
@@ -1839,11 +1846,12 @@ mod chip_specific {
                         });
                     }
 
-                    rmt.ch_tx_lim($ch_num).modify(|_, w| w.loop_count_reset().clear_bit());
+                    rmt.ch_tx_lim($ch_num)
+                        .modify(|_, w| w.loop_count_reset().clear_bit());
                 }
 
                 fn clear_interrupts() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.int_clr().write(|w| {
                         w.ch_tx_end($ch_num).set_bit();
@@ -1854,19 +1862,21 @@ mod chip_specific {
                 }
 
                 fn set_continuous(continuous: bool) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
-                    rmt.ch_tx_conf0($ch_num).modify(|_, w| w.tx_conti_mode().bit(continuous));
+                    rmt.ch_tx_conf0($ch_num)
+                        .modify(|_, w| w.tx_conti_mode().bit(continuous));
                 }
 
                 fn set_wrap_mode(wrap: bool) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
-                    rmt.ch_tx_conf0($ch_num).modify(|_, w| w.mem_tx_wrap_en().bit(wrap));
+                    rmt.ch_tx_conf0($ch_num)
+                        .modify(|_, w| w.mem_tx_wrap_en().bit(wrap));
                 }
 
                 fn set_carrier(carrier: bool, high: u16, low: u16, level: $crate::gpio::Level) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chcarrier_duty($ch_num)
                         .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
@@ -1879,18 +1889,20 @@ mod chip_specific {
                 }
 
                 fn set_idle_output(enable: bool, level: $crate::gpio::Level) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_tx_conf0($ch_num).modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_tx_conf0($ch_num)
+                        .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
                 fn set_memsize(memsize: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
-                    rmt.ch_tx_conf0($ch_num).modify(|_, w| unsafe { w.mem_size().bits(memsize) });
+                    rmt.ch_tx_conf0($ch_num)
+                        .modify(|_, w| unsafe { w.mem_size().bits(memsize) });
                 }
 
                 fn start_tx() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.ref_cnt_rst().write(|w| unsafe { w.bits(1 << $ch_num) });
                     Self::update();
@@ -1904,44 +1916,49 @@ mod chip_specific {
                 }
 
                 fn is_done() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_tx_end($ch_num).bit()
                 }
 
                 fn is_error() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_tx_err($ch_num).bit()
                 }
 
                 fn is_threshold_set() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_tx_thr_event($ch_num).bit()
                 }
 
                 fn reset_threshold_set() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_clr()
                         .write(|w| w.ch_tx_thr_event($ch_num).set_bit());
                 }
 
                 fn set_threshold(threshold: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_tx_lim($ch_num)
+                        .modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
                 }
 
                 fn is_loopcount_interrupt_set() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_tx_loop($ch_num).bit()
                 }
 
                 fn stop() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_tx_conf0($ch_num).modify(|_, w| w.tx_stop().set_bit());
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_tx_conf0($ch_num)
+                        .modify(|_, w| w.tx_stop().set_bit());
                     Self::update();
                 }
 
-                fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                fn enable_listen_interrupt(
+                    events: enumset::EnumSet<$crate::rmt::Event>,
+                    enable: bool,
+                ) {
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_ena().modify(|_, w| {
                         if events.contains($crate::rmt::Event::Error) {
                             w.ch_tx_err($ch_num).bit(enable);
@@ -1956,12 +1973,15 @@ mod chip_specific {
                     });
                 }
             }
-        }
+        };
     }
 
     macro_rules! impl_rx_channel {
         ($signal:ident, $ch_num:literal, $ch_index:literal) => {
-            impl<Dm> $crate::rmt::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
+            impl<Dm> $crate::rmt::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num>
+            where
+                Dm: $crate::DriverMode,
+            {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -1977,17 +1997,19 @@ mod chip_specific {
                 }
 
                 fn set_divider(divider: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_rx_conf0($ch_index).modify(|_, w| unsafe { w.div_cnt().bits(divider) });
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_rx_conf0($ch_index)
+                        .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
                 }
 
                 fn update() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_rx_conf1($ch_index).modify(|_, w| w.conf_update().set_bit());
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_rx_conf1($ch_index)
+                        .modify(|_, w| w.conf_update().set_bit());
                 }
 
                 fn clear_interrupts() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.int_clr().write(|w| {
                         w.ch_rx_end($ch_index).set_bit();
@@ -1997,29 +2019,35 @@ mod chip_specific {
                 }
 
                 fn set_wrap_mode(wrap: bool) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_rx_conf1($ch_index).modify(|_, w| w.mem_rx_wrap_en().bit(wrap));
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_rx_conf1($ch_index)
+                        .modify(|_, w| w.mem_rx_wrap_en().bit(wrap));
                 }
 
                 fn set_carrier(carrier: bool, high: u16, low: u16, level: $crate::gpio::Level) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.ch_rx_carrier_rm($ch_index).write(|w| unsafe {
                         w.carrier_high_thres().bits(high);
                         w.carrier_low_thres().bits(low)
                     });
 
-                    rmt.ch_rx_conf0($ch_index)
-                        .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level.into()));
+                    rmt.ch_rx_conf0($ch_index).modify(|_, w| {
+                        w.carrier_en()
+                            .bit(carrier)
+                            .carrier_out_lv()
+                            .bit(level.into())
+                    });
                 }
 
                 fn set_memsize(memsize: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_rx_conf0($ch_index).modify(|_, w| unsafe { w.mem_size().bits(memsize) });
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_rx_conf0($ch_index)
+                        .modify(|_, w| unsafe { w.mem_size().bits(memsize) });
                 }
 
                 fn start_rx() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.ch_rx_conf1($ch_index).modify(|_, w| {
                         w.mem_wr_rst().set_bit();
                         w.apb_mem_rst().set_bit();
@@ -2029,22 +2057,23 @@ mod chip_specific {
                 }
 
                 fn is_done() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_rx_end($ch_index).bit()
                 }
 
                 fn is_error() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_rx_err($ch_index).bit()
                 }
 
                 fn stop() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_rx_conf1($ch_index).modify(|_, w| w.rx_en().clear_bit());
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_rx_conf1($ch_index)
+                        .modify(|_, w| w.rx_en().clear_bit());
                 }
 
                 fn set_filter_threshold(value: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.ch_rx_conf1($ch_index).modify(|_, w| unsafe {
                         w.rx_filter_en().bit(value > 0);
@@ -2053,13 +2082,17 @@ mod chip_specific {
                 }
 
                 fn set_idle_threshold(value: u16) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
-                    rmt.ch_rx_conf0($ch_index).modify(|_, w| unsafe { w.idle_thres().bits(value) });
+                    rmt.ch_rx_conf0($ch_index)
+                        .modify(|_, w| unsafe { w.idle_thres().bits(value) });
                 }
 
-                fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                fn enable_listen_interrupt(
+                    events: enumset::EnumSet<$crate::rmt::Event>,
+                    enable: bool,
+                ) {
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_ena().modify(|_, w| {
                         if events.contains($crate::rmt::Event::Error) {
                             w.ch_rx_err($ch_index).bit(enable);
@@ -2074,7 +2107,7 @@ mod chip_specific {
                     });
                 }
             }
-        }
+        };
     }
 
     pub(crate) use impl_rx_channel;
@@ -2083,8 +2116,10 @@ mod chip_specific {
 
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
+    use crate::peripherals::RMT;
+
     pub fn configure_clock() {
-        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+        let rmt = RMT::regs();
 
         rmt.ch0conf1().modify(|_, w| w.ref_always_on().set_bit());
         rmt.ch1conf1().modify(|_, w| w.ref_always_on().set_bit());
@@ -2107,7 +2142,7 @@ mod chip_specific {
     #[allow(unused)]
     #[cfg(esp32)]
     pub fn pending_interrupt_for_channel() -> Option<usize> {
-        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+        let rmt = RMT::regs();
         let st = rmt.int_st().read();
 
         if st.ch0_rx_end().bit() || st.ch0_tx_end().bit() || st.ch0_err().bit() {
@@ -2134,7 +2169,7 @@ mod chip_specific {
     #[allow(unused)]
     #[cfg(esp32s2)]
     pub fn pending_interrupt_for_channel() -> Option<usize> {
-        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+        let rmt = RMT::regs();
         let st = rmt.int_st().read();
 
         if st.ch0_rx_end().bit() || st.ch0_tx_end().bit() || st.ch0_err().bit() {
@@ -2152,7 +2187,10 @@ mod chip_specific {
 
     macro_rules! impl_tx_channel {
         ($signal:ident, $ch_num:literal) => {
-            impl<Dm> super::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
+            impl<Dm> super::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num>
+            where
+                Dm: $crate::DriverMode,
+            {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -2168,8 +2206,9 @@ mod chip_specific {
                 }
 
                 fn set_divider(divider: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.chconf0($ch_num).modify(|_, w| unsafe { w.div_cnt().bits(divider) });
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.chconf0($ch_num)
+                        .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
                 }
 
                 fn update() {
@@ -2178,11 +2217,13 @@ mod chip_specific {
 
                 #[cfg(not(esp32))]
                 fn set_generate_repeat_interrupt(repeats: u16) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     if repeats > 1 {
-                        rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe { w.tx_loop_num().bits(repeats) });
+                        rmt.ch_tx_lim($ch_num)
+                            .modify(|_, w| unsafe { w.tx_loop_num().bits(repeats) });
                     } else {
-                        rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe { w.tx_loop_num().bits(0) });
+                        rmt.ch_tx_lim($ch_num)
+                            .modify(|_, w| unsafe { w.tx_loop_num().bits(0) });
                     }
                 }
 
@@ -2192,7 +2233,7 @@ mod chip_specific {
                 }
 
                 fn clear_interrupts() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.int_clr().write(|w| {
                         w.ch_err($ch_num).set_bit();
@@ -2202,41 +2243,47 @@ mod chip_specific {
                 }
 
                 fn set_continuous(continuous: bool) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
-                    rmt.chconf1($ch_num).modify(|_, w| w.tx_conti_mode().bit(continuous));
+                    rmt.chconf1($ch_num)
+                        .modify(|_, w| w.tx_conti_mode().bit(continuous));
                 }
 
                 fn set_wrap_mode(wrap: bool) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     // this is "okay", because we use all TX channels always in wrap mode
                     rmt.apb_conf().modify(|_, w| w.mem_tx_wrap_en().bit(wrap));
                 }
 
                 fn set_carrier(carrier: bool, high: u16, low: u16, level: $crate::gpio::Level) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chcarrier_duty($ch_num)
                         .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
-                    rmt.chconf0($ch_num)
-                        .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level.into()));
+                    rmt.chconf0($ch_num).modify(|_, w| {
+                        w.carrier_en()
+                            .bit(carrier)
+                            .carrier_out_lv()
+                            .bit(level.into())
+                    });
                 }
 
                 fn set_idle_output(enable: bool, level: $crate::gpio::Level) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.chconf1($ch_num)
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
                 fn set_memsize(memsize: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
-                    rmt.chconf0($ch_num).modify(|_, w| unsafe { w.mem_size().bits(memsize) });
+                    rmt.chconf0($ch_num)
+                        .modify(|_, w| unsafe { w.mem_size().bits(memsize) });
                 }
 
                 fn start_tx() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chconf1($ch_num).modify(|_, w| {
                         w.mem_rd_rst().set_bit();
@@ -2246,29 +2293,30 @@ mod chip_specific {
                 }
 
                 fn is_done() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_tx_end($ch_num).bit()
                 }
 
                 fn is_error() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_err($ch_num).bit()
                 }
 
                 fn is_threshold_set() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_tx_thr_event($ch_num).bit()
                 }
 
                 fn reset_threshold_set() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_clr()
                         .write(|w| w.ch_tx_thr_event($ch_num).set_bit());
                 }
 
                 fn set_threshold(threshold: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.ch_tx_lim($ch_num).modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_tx_lim($ch_num)
+                        .modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
                 }
 
                 fn is_loopcount_interrupt_set() -> bool {
@@ -2279,14 +2327,17 @@ mod chip_specific {
                 fn stop() {
                     #[cfg(esp32s2)]
                     {
-                        let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                        let rmt = crate::peripherals::RMT::regs();
                         rmt.chconf1($ch_num).modify(|_, w| w.tx_stop().set_bit());
                     }
                 }
 
-                fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.int_ena().modify(|_,w| {
+                fn enable_listen_interrupt(
+                    events: enumset::EnumSet<$crate::rmt::Event>,
+                    enable: bool,
+                ) {
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.int_ena().modify(|_, w| {
                         if events.contains($crate::rmt::Event::Error) {
                             w.ch_err($ch_num).bit(enable);
                         }
@@ -2300,12 +2351,15 @@ mod chip_specific {
                     });
                 }
             }
-        }
+        };
     }
 
     macro_rules! impl_rx_channel {
         ($signal:ident, $ch_num:literal) => {
-            impl<Dm> super::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
+            impl<Dm> super::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num>
+            where
+                Dm: $crate::DriverMode,
+            {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -2321,8 +2375,9 @@ mod chip_specific {
                 }
 
                 fn set_divider(divider: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-                    rmt.chconf0($ch_num).modify(|_, w| unsafe { w.div_cnt().bits(divider) });
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.chconf0($ch_num)
+                        .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
                 }
 
                 fn update() {
@@ -2330,7 +2385,7 @@ mod chip_specific {
                 }
 
                 fn clear_interrupts() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chconf1($ch_num).modify(|_, w| {
                         w.mem_wr_rst().set_bit();
@@ -2352,23 +2407,28 @@ mod chip_specific {
                 }
 
                 fn set_carrier(carrier: bool, high: u16, low: u16, level: $crate::gpio::Level) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chcarrier_duty($ch_num)
                         .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
-                    rmt.chconf0($ch_num)
-                        .modify(|_, w| w.carrier_en().bit(carrier).carrier_out_lv().bit(level.into()));
+                    rmt.chconf0($ch_num).modify(|_, w| {
+                        w.carrier_en()
+                            .bit(carrier)
+                            .carrier_out_lv()
+                            .bit(level.into())
+                    });
                 }
 
                 fn set_memsize(memsize: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
-                    rmt.chconf0($ch_num).modify(|_, w| unsafe { w.mem_size().bits(memsize) });
+                    rmt.chconf0($ch_num)
+                        .modify(|_, w| unsafe { w.mem_size().bits(memsize) });
                 }
 
                 fn start_rx() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chconf1($ch_num).modify(|_, w| {
                         w.mem_wr_rst().set_bit();
@@ -2379,22 +2439,22 @@ mod chip_specific {
                 }
 
                 fn is_done() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_rx_end($ch_num).bit()
                 }
 
                 fn is_error() -> bool {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_err($ch_num).bit()
                 }
 
                 fn stop() {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.chconf1($ch_num).modify(|_, w| w.rx_en().clear_bit());
                 }
 
                 fn set_filter_threshold(value: u8) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.chconf1($ch_num).modify(|_, w| unsafe {
                         w.rx_filter_en().bit(value > 0);
                         w.rx_filter_thres().bits(value)
@@ -2402,13 +2462,16 @@ mod chip_specific {
                 }
 
                 fn set_idle_threshold(value: u16) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
-
-                    rmt.chconf0($ch_num).modify(|_, w| unsafe { w.idle_thres().bits(value) });
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.chconf0($ch_num)
+                        .modify(|_, w| unsafe { w.idle_thres().bits(value) });
                 }
 
-                fn enable_listen_interrupt(events: enumset::EnumSet<$crate::rmt::Event>, enable: bool) {
-                    let rmt = unsafe { &*crate::peripherals::RMT::PTR };
+                fn enable_listen_interrupt(
+                    events: enumset::EnumSet<$crate::rmt::Event>,
+                    enable: bool,
+                ) {
+                    let rmt = crate::peripherals::RMT::regs();
                     rmt.int_ena().modify(|_, w| {
                         if events.contains($crate::rmt::Event::Error) {
                             w.ch_err($ch_num).bit(enable);
@@ -2423,7 +2486,7 @@ mod chip_specific {
                     });
                 }
             }
-        }
+        };
     }
 
     pub(crate) use impl_rx_channel;

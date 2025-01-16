@@ -81,8 +81,7 @@ use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     pac::spi2::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    private,
-    private::Sealed,
+    private::{self, Sealed},
     spi::AnySpi,
     system::PeripheralGuard,
     Async,
@@ -2531,7 +2530,7 @@ impl Driver {
         unsafe {
             // use default clock source PLL_F80M_CLK (ESP32-C6) and
             // PLL_F48M_CLK (ESP32-H2)
-            crate::peripherals::PCR::steal()
+            crate::peripherals::PCR::regs()
                 .spi2_clkm_conf()
                 .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
@@ -3139,13 +3138,10 @@ impl Driver {
         });
 
         #[cfg(any(esp32c6, esp32h2))]
-        unsafe {
-            let pcr = crate::peripherals::PCR::steal();
-
-            // use default clock source PLL_F80M_CLK
-            pcr.spi2_clkm_conf()
-                .modify(|_, w| w.spi2_clkm_sel().bits(1));
-        }
+        // use default clock source PLL_F80M_CLK
+        crate::peripherals::PCR::regs()
+            .spi2_clkm_conf()
+            .modify(|_, w| unsafe { w.spi2_clkm_sel().bits(1) });
 
         #[cfg(not(esp32))]
         reg_block.misc().write(|w| unsafe { w.bits(0) });

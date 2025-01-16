@@ -138,7 +138,7 @@ impl TimerGroupInstance for TIMG0 {
                         .modify(|_, w| w.use_xtal().clear_bit());
                 }
             } else if #[cfg(any(esp32c6, esp32h2))] {
-                unsafe { &*crate::peripherals::PCR::PTR }
+                crate::peripherals::PCR::regs()
                     .timergroup0_timer_clk_conf()
                     .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             }
@@ -165,7 +165,7 @@ impl TimerGroupInstance for TIMG0 {
                         .modify(|_, w| w.wdt_use_xtal().clear_bit());
                 }
             } else if #[cfg(any(esp32c6, esp32h2))] {
-                unsafe { &*crate::peripherals::PCR::PTR }
+                crate::peripherals::PCR::regs()
                     .timergroup0_wdt_clk_conf()
                     .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
             }
@@ -194,7 +194,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
                 // ESP32 has only APB clock source, do nothing
                 // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
             } else if #[cfg(any(esp32c6, esp32h2))] {
-                unsafe { &*crate::peripherals::PCR::PTR }
+                crate::peripherals::PCR::regs()
                     .timergroup1_timer_clk_conf()
                     .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             } else if #[cfg(any(esp32s2, esp32s3))] {
@@ -222,7 +222,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
                 // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
                 // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
             } else if #[cfg(any(esp32c6, esp32h2))] {
-                unsafe { &*crate::peripherals::PCR::PTR }
+                crate::peripherals::PCR::regs()
                     .timergroup1_wdt_clk_conf()
                     .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             }
@@ -870,12 +870,12 @@ mod asynch {
     #[handler]
     pub(crate) fn timg0_timer0_handler() {
         lock(&INT_ENA_LOCK[0], || {
-            unsafe { &*crate::peripherals::TIMG0::PTR }
+            crate::peripherals::TIMG0::regs()
                 .int_ena()
                 .modify(|_, w| w.t(0).clear_bit())
         });
 
-        unsafe { &*crate::peripherals::TIMG0::PTR }
+        crate::peripherals::TIMG0::regs()
             .int_clr()
             .write(|w| w.t(0).clear_bit_by_one());
 
@@ -886,11 +886,11 @@ mod asynch {
     #[handler]
     pub(crate) fn timg1_timer0_handler() {
         lock(&INT_ENA_LOCK[1], || {
-            unsafe { &*crate::peripherals::TIMG1::PTR }
+            crate::peripherals::TIMG1::regs()
                 .int_ena()
                 .modify(|_, w| w.t(0).clear_bit())
         });
-        unsafe { &*crate::peripherals::TIMG1::PTR }
+        crate::peripherals::TIMG1::regs()
             .int_clr()
             .write(|w| w.t(0).clear_bit_by_one());
 
@@ -901,11 +901,11 @@ mod asynch {
     #[handler]
     pub(crate) fn timg0_timer1_handler() {
         lock(&INT_ENA_LOCK[0], || {
-            unsafe { &*crate::peripherals::TIMG0::PTR }
+            crate::peripherals::TIMG0::regs()
                 .int_ena()
                 .modify(|_, w| w.t(1).clear_bit())
         });
-        unsafe { &*crate::peripherals::TIMG0::PTR }
+        crate::peripherals::TIMG0::regs()
             .int_clr()
             .write(|w| w.t(1).clear_bit_by_one());
 
@@ -916,12 +916,12 @@ mod asynch {
     #[handler]
     pub(crate) fn timg1_timer1_handler() {
         lock(&INT_ENA_LOCK[1], || {
-            unsafe { &*crate::peripherals::TIMG1::PTR }
+            crate::peripherals::TIMG1::regs()
                 .int_ena()
                 .modify(|_, w| w.t(1).clear_bit())
         });
 
-        unsafe { &*crate::peripherals::TIMG1::PTR }
+        crate::peripherals::TIMG1::regs()
             .int_clr()
             .write(|w| w.t(1).clear_bit_by_one());
 

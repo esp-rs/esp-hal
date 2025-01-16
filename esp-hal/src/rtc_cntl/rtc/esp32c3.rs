@@ -26,7 +26,7 @@ const I2C_ULP_IR_FORCE_XPD_CK_MSB: u32 = 2;
 const I2C_ULP_IR_FORCE_XPD_CK_LSB: u32 = 2;
 
 pub(crate) fn init() {
-    let rtc_cntl = unsafe { &*LPWR::ptr() };
+    let rtc_cntl = LPWR::regs();
 
     regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
 
@@ -90,7 +90,7 @@ pub(crate) fn configure_clock() {
 
     unsafe {
         // from esp_clk_init:
-        let rtc_cntl = &*LPWR::ptr();
+        let rtc_cntl = LPWR::regs();
         // clk_ll_rc_fast_enable();
         rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
         rtc_cntl.timer1().modify(|_, w| w.ck8m_wait().bits(5));
@@ -108,10 +108,7 @@ pub(crate) fn configure_clock() {
         }
     };
 
-    unsafe {
-        let rtc_cntl = &*LPWR::ptr();
-        rtc_cntl.store1().write(|w| w.bits(cal_val));
-    }
+    LPWR::regs().store1().write(|w| unsafe { w.bits(cal_val) });
 }
 
 fn calibrate_ocode() {}
@@ -120,9 +117,9 @@ fn set_rtc_dig_dbias() {}
 
 /// Perform clock control related initialization
 fn clock_control_init() {
-    let extmem = unsafe { &*EXTMEM::ptr() };
-    let spi_mem_0 = unsafe { &*SPI0::ptr() };
-    let spi_mem_1 = unsafe { &*SPI1::ptr() };
+    let extmem = EXTMEM::regs();
+    let spi_mem_0 = SPI0::regs();
+    let spi_mem_1 = SPI1::regs();
 
     // Clear CMMU clock force on
     extmem
@@ -141,8 +138,8 @@ fn clock_control_init() {
 
 /// Perform power control related initialization
 fn power_control_init() {
-    let rtc_cntl = unsafe { &*LPWR::ptr() };
-    let system = unsafe { &*SYSTEM::ptr() };
+    let rtc_cntl = LPWR::regs();
+    let system = SYSTEM::regs();
     rtc_cntl
         .clk_conf()
         .modify(|_, w| w.ck8m_force_pu().clear_bit());
@@ -234,8 +231,8 @@ fn power_control_init() {
 
 /// Configure whether certain peripherals are powered down in deep sleep
 fn rtc_sleep_pu() {
-    let rtc_cntl = unsafe { &*LPWR::ptr() };
-    let apb_ctrl = unsafe { &*APB_CTRL::ptr() };
+    let rtc_cntl = LPWR::regs();
+    let apb_ctrl = APB_CTRL::regs();
 
     rtc_cntl.dig_pwc().modify(|_, w| {
         w.lslp_mem_force_pu()
