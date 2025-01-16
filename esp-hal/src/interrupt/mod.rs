@@ -102,11 +102,18 @@ pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
 /// Trait implemented by drivers which allow the user to set an
 /// [InterruptHandler]
 pub trait InterruptConfigurable: crate::private::Sealed {
-    /// Set the interrupt handler
-    ///
-    /// Note that this will replace any previously registered interrupt handler.
-    /// Some peripherals offer a shared interrupt handler for multiple purposes.
-    /// It's the users duty to honor this.
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for the peripheral."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for the peripheral on the current core."
+    )]
+    #[doc = ""]
+    /// Note that this will replace any previously registered interrupt
+    /// handlers. Some peripherals offer a shared interrupt handler for
+    /// multiple purposes. It's the users duty to honor this.
     ///
     /// You can restore the default/unhandled interrupt handler by using
     /// [DEFAULT_INTERRUPT_HANDLER]

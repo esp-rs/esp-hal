@@ -1276,13 +1276,33 @@ where
 impl crate::private::Sealed for Uart<'_, Blocking> {}
 
 impl InterruptConfigurable for Uart<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // `self.tx.uart` and `self.rx.uart` are the same
         self.tx.uart.info().set_interrupt_handler(handler);
     }
 }
 
 impl Uart<'_, Blocking> {
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for the peripheral."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for the peripheral on the current core."
+    )]
+    #[doc = ""]
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    ///
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        // `self.tx.uart` and `self.rx.uart` are the same
+        self.tx.uart.info().set_interrupt_handler(handler);
+    }
+
     /// Listen for the given interrupts
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {

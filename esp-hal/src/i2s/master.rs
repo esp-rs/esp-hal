@@ -264,33 +264,49 @@ impl<Dm> I2s<'_, Dm>
 where
     Dm: DriverMode,
 {
-    /// Sets the interrupt handler
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for the peripheral."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for the peripheral on the current core."
+    )]
+    #[doc = ""]
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
     ///
-    /// Interrupts are not enabled at the peripheral level here.
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.set_interrupt_handler(handler);
     }
 
     /// Listen for the given interrupts
+    #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.enable_listen(interrupts.into(), true);
     }
 
     /// Unlisten the given interrupts
+    #[instability::unstable]
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.enable_listen(interrupts.into(), false);
     }
 
     /// Gets asserted interrupts
+    #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<I2sInterrupt> {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.interrupts()
     }
 
     /// Resets asserted interrupts
+    #[instability::unstable]
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.clear_interrupts(interrupts.into());
