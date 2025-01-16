@@ -737,10 +737,7 @@ where
     ///
     /// Note that this also changes the configuration of the TX half.
     #[instability::unstable]
-    pub fn apply_config(
-        &mut self,
-        config: &Config
-    ) -> Result<(), ConfigError> {
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
             .info()
             .set_rx_fifo_full_threshold(config.rx.rx_fifo_full_threshold)?;
@@ -1174,7 +1171,7 @@ where
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
         self.tx.apply_config(&config.tx)?;
-        self.rx.uart.info().apply_config(&config)?;
+        self.rx.uart.info().apply_config(config)?;
         Ok(())
     }
 
