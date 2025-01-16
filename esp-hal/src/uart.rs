@@ -1040,7 +1040,7 @@ pub enum UartInterrupt {
     TxDone,
 
     /// The receiver has received more data than what
-    /// [`Config::rx_fifo_full_threshold`] specifies.
+    /// [`RxConfig::rx_fifo_full_threshold`] specifies.
     RxFifoFull,
 }
 
