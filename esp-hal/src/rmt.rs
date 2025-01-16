@@ -79,8 +79,9 @@
 //! ### TX operation
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator};
 //! # use esp_hal::delay::Delay;
+//! # use esp_hal::gpio::Level;
+//! # use esp_hal::rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator};
 //!
 //! // Configure frequency based on chip type
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
@@ -96,8 +97,8 @@
 //!
 //! let delay = Delay::new();
 //!
-//! let mut data = [PulseCode::new(true, 200, false, 50); 20];
-//! data[data.len() - 2] = PulseCode::new(true, 3000, false, 500);
+//! let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
+//! data[data.len() - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
 //! data[data.len() - 1] = PulseCode::empty();
 //!
 //! loop {
@@ -179,7 +180,10 @@
 //!                 }
 //!
 //!                 let count = WIDTH / (total / entry.length1() as usize);
-//!                 let c = if entry.level1() { '-' } else { '_' };
+//!                 let c = match entry.level1() {
+//!                     Level::High => '-',
+//!                     Level::Low => '_',
+//!                 };
 //!                 for _ in 0..count + 1 {
 //!                     print!("{}", c);
 //!                 }
@@ -189,7 +193,10 @@
 //!                 }
 //!
 //!                 let count = WIDTH / (total / entry.length2() as usize);
-//!                 let c = if entry.level2() { '-' } else { '_' };
+//!                 let c = match entry.level2() {
+//!                     Level::High => '-',
+//!                     Level::Low => '_',
+//!                 };
 //!                 for _ in 0..count + 1 {
 //!                     print!("{}", c);
 //!                 }
@@ -210,6 +217,7 @@
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{
+    default::Default,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
@@ -251,7 +259,7 @@ pub enum Error {
 ///  Convenience trait to work with pulse codes.
 pub trait PulseCode: crate::private::Sealed {
     /// Create a new instance
-    fn new(level1: bool, length1: u16, level2: bool, length2: u16) -> Self;
+    fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self;
 
     /// Create a new empty instance
     fn empty() -> Self;
@@ -260,22 +268,22 @@ pub trait PulseCode: crate::private::Sealed {
     fn reset(&mut self);
 
     /// Logical output level in the first pulse code interval
-    fn level1(&self) -> bool;
+    fn level1(&self) -> Level;
 
     /// Length of the first pulse code interval (in clock cycles)
     fn length1(&self) -> u16;
 
     /// Logical output level in the second pulse code interval
-    fn level2(&self) -> bool;
+    fn level2(&self) -> Level;
 
     /// Length of the second pulse code interval (in clock cycles)
     fn length2(&self) -> u16;
 }
 
 impl PulseCode for u32 {
-    fn new(level1: bool, length1: u16, level2: bool, length2: u16) -> Self {
-        let level1 = ((level1 as u32) << 15) | (length1 as u32 & 0b111_1111_1111_1111);
-        let level2 = ((level2 as u32) << 15) | (length2 as u32 & 0b111_1111_1111_1111);
+    fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
+        let level1 = ((bool::from(level1) as u32) << 15) | (length1 as u32 & 0b111_1111_1111_1111);
+        let level2 = ((bool::from(level2) as u32) << 15) | (length2 as u32 & 0b111_1111_1111_1111);
         level1 | (level2 << 16)
     }
 
@@ -287,16 +295,16 @@ impl PulseCode for u32 {
         *self = 0
     }
 
-    fn level1(&self) -> bool {
-        self & (1 << 15) != 0
+    fn level1(&self) -> Level {
+        (self & (1 << 15) != 0).into()
     }
 
     fn length1(&self) -> u16 {
         (self & 0b111_1111_1111_1111) as u16
     }
 
-    fn level2(&self) -> bool {
-        self & (1 << 31) != 0
+    fn level2(&self) -> Level {
+        (self & (1 << 31) != 0).into()
     }
 
     fn length2(&self) -> u16 {
@@ -324,7 +332,7 @@ pub struct TxChannelConfig {
     pub carrier_level: Level,
 }
 
-impl core::default::Default for TxChannelConfig {
+impl Default for TxChannelConfig {
     fn default() -> Self {
         Self {
             clk_divider: Default::default(),
@@ -358,7 +366,7 @@ pub struct RxChannelConfig {
     pub idle_threshold: u16,
 }
 
-impl core::default::Default for RxChannelConfig {
+impl Default for RxChannelConfig {
     fn default() -> Self {
         Self {
             clk_divider: Default::default(),

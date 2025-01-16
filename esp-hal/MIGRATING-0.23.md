@@ -60,3 +60,13 @@ take the more descriptive `gpio::Level` type instead of a plain `bool`.
      .unwrap();
 ```
 
+### `PulseCode` now uses `gpio::Level` instead of `bool` to specify output levels
+
+The more descriptive `gpio::Level` enum is now used to specify output levels of `PulseCode`:
+
+```diff
++ use esp_hal::gpio::Level;
++ 
+- let code = PulseCode::new(true, 200, false, 50);
++ let code = PulseCode::new(Level::High, 200, Level::Low, 50);
+```
