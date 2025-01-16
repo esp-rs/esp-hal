@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `DmaDescriptor` is now `#[repr(C)]` (#2988)
+
 ### Removed
 
 ## [0.23.1] - 2025-01-15
