@@ -354,21 +354,19 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
+        me.configure_clock(frequency)?;
+        Ok(me)
+    }
 
-        #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32s2))]
+    fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
         if frequency != HertzU32::MHz(80) {
             return Err(Error::UnreachableTargetFrequency);
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                self::chip_specific::configure_clock();
-            } else {
-                me.configure_clock(frequency)?;
-            }
-        }
+        self::chip_specific::configure_clock();
 
-        Ok(me)
+        Ok(())
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
