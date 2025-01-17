@@ -906,6 +906,7 @@ where
 }
 
 /// Parallel IO TX channel
+#[instability::unstable]
 pub struct ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
@@ -987,6 +988,7 @@ where
 }
 
 /// Parallel IO RX channel
+#[instability::unstable]
 pub struct ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
