@@ -202,6 +202,12 @@ impl From<Level> for bool {
     }
 }
 
+/// A configuration error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConfigError {}
+
 /// Errors that can occur when configuring a pin to be a wakeup source.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -358,13 +364,19 @@ pub trait Pin: Sealed {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{AnyPin, Pin, Output, Level};
+    /// use esp_hal::gpio::{AnyPin, Pin, Output, OutputConfig, Level};
     /// use esp_hal::delay::Delay;
     ///
     /// fn toggle_pins(pins: [AnyPin; 2], delay: &mut Delay) {
     ///     let [red, blue] = pins;
-    ///     let mut red = Output::new(red, Level::High);
-    ///     let mut blue = Output::new(blue, Level::Low);
+    ///     let mut red = Output::new(
+    ///         red,
+    ///         OutputConfig::default().with_level(Level::High)
+    ///     ).unwrap();
+    ///     let mut blue = Output::new(
+    ///         blue,
+    ///         OutputConfig::default().with_level(Level::Low)
+    ///     ).unwrap();
     ///
     ///     loop {
     ///         red.toggle();
@@ -1083,6 +1095,21 @@ macro_rules! gpio {
     };
 }
 
+/// Output pin configuration.
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
+#[non_exhaustive]
+pub struct OutputConfig {
+    /// Initial output level of the pin.
+    pub level: Level,
+}
+
+impl Default for OutputConfig {
+    fn default() -> Self {
+        Self { level: Level::Low }
+    }
+}
+
 /// Push-pull digital output.
 ///
 /// This driver configures the GPIO pin to be a push-pull output driver.
@@ -1116,7 +1143,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Level, Output};
+    /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// use esp_hal::delay::Delay;
     ///
     /// fn blink_once(led: &mut Output<'_>, delay: &mut Delay) {
@@ -1125,20 +1152,24 @@ impl<'d> Output<'d> {
     ///     led.set_high();
     /// }
     ///
-    /// let mut led = Output::new(peripherals.GPIO5, Level::High);
+    /// let config = OutputConfig::default().with_level(Level::High);
+    /// let mut led = Output::new(peripherals.GPIO5, config).unwrap();
     /// let mut delay = Delay::new();
     ///
     /// blink_once(&mut led, &mut delay);
     /// # }
     /// ```
     #[inline]
-    pub fn new(pin: impl Peripheral<P = impl OutputPin> + 'd, initial_output: Level) -> Self {
+    pub fn new(
+        pin: impl Peripheral<P = impl OutputPin> + 'd,
+        config: OutputConfig,
+    ) -> Result<Self, ConfigError> {
         let mut pin = Flex::new(pin);
 
-        pin.set_level(initial_output);
+        pin.set_level(config.level);
         pin.set_as_output();
 
-        Self { pin }
+        Ok(Self { pin })
     }
 
     /// Split the pin into an input and output signal.
@@ -1221,6 +1252,21 @@ impl<'d> Output<'d> {
     }
 }
 
+/// Input pin configuration.
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
+#[non_exhaustive]
+pub struct InputConfig {
+    /// Initial pull of the pin.
+    pub pull: Pull,
+}
+
+impl Default for InputConfig {
+    fn default() -> Self {
+        Self { pull: Pull::None }
+    }
+}
+
 /// Digital input.
 ///
 /// This driver configures the GPIO pin to be an input. Input drivers read the
@@ -1254,7 +1300,7 @@ impl<'d> Input<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Level, Input, Pull};
+    /// use esp_hal::gpio::{Level, Input, InputConfig, Pull};
     /// use esp_hal::delay::Delay;
     ///
     /// fn print_when_pressed(button: &mut Input<'_>, delay: &mut Delay) {
@@ -1269,22 +1315,23 @@ impl<'d> Input<'d> {
     ///     }
     /// }
     ///
-    /// let mut button = Input::new(
-    ///     peripherals.GPIO5,
-    ///     Pull::Up,
-    /// );
+    /// let config = InputConfig::default().with_pull(Pull::Up);
+    /// let mut button = Input::new(peripherals.GPIO5, config).unwrap();
     /// let mut delay = Delay::new();
     ///
     /// print_when_pressed(&mut button, &mut delay);
     /// # }
     /// ```
     #[inline]
-    pub fn new(pin: impl Peripheral<P = impl InputPin> + 'd, pull: Pull) -> Self {
+    pub fn new(
+        pin: impl Peripheral<P = impl InputPin> + 'd,
+        config: InputConfig,
+    ) -> Result<Self, ConfigError> {
         let mut pin = Flex::new(pin);
 
-        pin.set_as_input(pull);
+        pin.set_as_input(config.pull);
 
-        Self { pin }
+        Ok(Self { pin })
     }
 
     /// Returns a peripheral [input][interconnect::InputSignal] connected to
@@ -1331,7 +1378,7 @@ impl<'d> Input<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Event, Input, Pull, Io};
+    /// use esp_hal::gpio::{Event, Input, InputConfig, Pull, Io};
     ///
     /// let mut io = Io::new(peripherals.IO_MUX);
     /// io.set_interrupt_handler(handler);
@@ -1339,7 +1386,8 @@ impl<'d> Input<'d> {
     /// // Set up the input and store it in the static variable.
     /// // This example uses a push button that is high when not
     /// // pressed and low when pressed.
-    /// let mut button = Input::new(peripherals.GPIO5, Pull::Up);
+    /// let config = InputConfig::default().with_pull(Pull::Up);
+    /// let mut button = Input::new(peripherals.GPIO5, config).unwrap();
     ///
     /// critical_section::with(|cs| {
     ///     // Here we are listening for a low level to demonstrate
@@ -1441,6 +1489,26 @@ impl<'d> Input<'d> {
     }
 }
 
+/// Open-drain output pin configuration.
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
+#[non_exhaustive]
+pub struct OutputOpenDrainConfig {
+    /// Initial output level of the pin.
+    pub level: Level,
+    /// Initial pull of the pin.
+    pub pull: Pull,
+}
+
+impl Default for OutputOpenDrainConfig {
+    fn default() -> Self {
+        Self {
+            level: Level::Low,
+            pull: Pull::None,
+        }
+    }
+}
+
 /// Open drain digital output.
 ///
 /// This driver configures the GPIO pin to be an open drain output driver.
@@ -1478,7 +1546,9 @@ impl<'d> OutputOpenDrain<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Level, OutputOpenDrain, Pull};
+    /// use esp_hal::gpio::{
+    ///     Level, OutputOpenDrain, OutputOpenDrainConfig, Pull,
+    /// };
     /// use esp_hal::delay::Delay;
     ///
     /// fn blink_once(led: &mut OutputOpenDrain<'_>, delay: &mut Delay) {
@@ -1487,11 +1557,10 @@ impl<'d> OutputOpenDrain<'d> {
     ///     led.set_high();
     /// }
     ///
-    /// let mut led = OutputOpenDrain::new(
-    ///     peripherals.GPIO5,
-    ///     Level::High,
-    ///     Pull::Up,
-    /// );
+    /// let config = OutputOpenDrainConfig::default()
+    ///     .with_level(Level::High)
+    ///     .with_pull(Pull::Up);
+    /// let mut led = OutputOpenDrain::new(peripherals.GPIO5, config).unwrap();
     /// let mut delay = Delay::new();
     ///
     /// blink_once(&mut led, &mut delay);
@@ -1500,15 +1569,14 @@ impl<'d> OutputOpenDrain<'d> {
     #[inline]
     pub fn new(
         pin: impl Peripheral<P = impl InputPin + OutputPin> + 'd,
-        initial_output: Level,
-        pull: Pull,
-    ) -> Self {
+        config: OutputOpenDrainConfig,
+    ) -> Result<Self, ConfigError> {
         let mut pin = Flex::new(pin);
 
-        pin.set_level(initial_output);
-        pin.set_as_open_drain(pull);
+        pin.set_level(config.level);
+        pin.set_as_open_drain(config.pull);
 
-        Self { pin }
+        Ok(Self { pin })
     }
 
     /// Split the pin into an input and output signal.
