@@ -14,7 +14,7 @@ use core::time::Duration;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{Input, Pull, RtcPinWithResistors},
+    gpio::{Input, InputConfig, Pull, RtcPinWithResistors},
     main,
     peripheral::Peripheral,
     rtc_cntl::{
@@ -34,7 +34,11 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
-    let pin2 = Input::new(peripherals.GPIO2, Pull::None);
+    let pin2 = Input::new(
+        peripherals.GPIO2,
+        InputConfig::default().with_pull(Pull::None),
+    )
+    .unwrap();
     let mut pin3 = peripherals.GPIO3;
 
     println!("up and runnning!");
