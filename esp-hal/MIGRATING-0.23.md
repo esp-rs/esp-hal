@@ -93,3 +93,16 @@ periodic.start(100.millis()).unwrap();
 - nb::block!(periodic.wait()).unwrap();
 + periodic.wait();
 ```
+
+## SPI Changes
+
+`spi::DataMode` changed the meaning of `DataMode::Single` - it now means 3-wire SPI (using one data line).
+
+Use `DataMode::SingleTwoDataLines` to get the previous behavior.
+
+```diff
+- DataMode::Single,
++ DataMode::SingleTwoDataLines,
+```
+
+`Spi` now offers both, `with_mosi` and `with_sio0`. Consider using `with_sio` for half-duplex SPI except for [DataMode::SingleTwoDataLines] or for a mixed-bus.
