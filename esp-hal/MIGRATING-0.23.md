@@ -127,3 +127,17 @@ Use `DataMode::SingleTwoDataLines` to get the previous behavior.
 ```
 
 `Spi` now offers both, `with_mosi` and `with_sio0`. Consider using `with_sio` for half-duplex SPI except for [DataMode::SingleTwoDataLines] or for a mixed-bus.
+
+### SPI master driver configuration
+
+SPI `Config::with_frequency` has been renamed to `with_clock`. This function now takes either
+a `fugit::HertzU32` or `BusClockConfig`.
+
+```diff
+ let config = Config::default()
+-   .with_frequency(10.MHz());
++   .with_clock(10.MHz());
+```
+
+The new structure supports configuring a clock source, although currently only `ClockSource::Apb`
+is available.
