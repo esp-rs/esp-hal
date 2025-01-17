@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
 - RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
 - RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
+- Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read (#2882)
+- Uart `flush` is now blocking (#2882)
+- Removed `embedded-hal-nb` traits (#2882)
+- `timer::wait` is now blocking (#2882)
 
 ### Fixed
 
@@ -130,11 +134,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `Attenuation` prefix from `Attenuation` enum variants. (#2922)
 - Renamed / changed some I2C error variants (#2844, #2862)
 - The `entry` macro is replaced by the `main` macro (#2941)
-- Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read (#2882)
-- Uart `flush` is now blocking (#2882)
-- Removed `embedded-hal-nb` traits (#2882)
-- `timer::wait` is now blocking (#2882)
-
 - `{Uart, UartRx}::read_bytes` now blocks until the buffer is filled. (#2935)
 - Bump MSRV to 1.84 (#2951)
 
