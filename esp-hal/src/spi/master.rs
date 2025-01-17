@@ -2602,13 +2602,14 @@ impl Driver {
     ) -> Result<(), Error> {
         let reg_block = self.register_block();
         match cmd_mode {
+            DataMode::Single => (),
             DataMode::SingleTwoDataLines => (),
             // FIXME: more detailed error - Only 1-bit commands are supported.
             _ => return Err(Error::Unsupported),
         }
 
         match address_mode {
-            DataMode::SingleTwoDataLines => {
+            DataMode::Single | DataMode::SingleTwoDataLines => {
                 reg_block.ctrl().modify(|_, w| {
                     w.fread_dio().clear_bit();
                     w.fread_qio().clear_bit();
