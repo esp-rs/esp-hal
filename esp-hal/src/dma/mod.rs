@@ -274,6 +274,7 @@ impl defmt::Format for DmaDescriptorFlags {
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(C)]
 pub struct DmaDescriptor {
     /// Descriptor flags.
     pub flags: DmaDescriptorFlags,
@@ -2463,7 +2464,9 @@ impl<'d, CH> Channel<'d, Blocking, CH>
 where
     CH: DmaChannel,
 {
-    pub(crate) fn new(channel: impl Peripheral<P = CH>) -> Self {
+    /// Creates a new DMA channel driver.
+    #[instability::unstable]
+    pub fn new(channel: impl Peripheral<P = CH>) -> Self {
         let (rx, tx) = unsafe {
             channel
                 .clone_unchecked()
