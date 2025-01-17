@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
+
 ## [0.23.1] - 2025-01-15
 
 ### Fixed

@@ -16,7 +16,6 @@ use esp_hal::{
     delay::Delay,
     gpio::{Input, Pull, RtcPinWithResistors},
     main,
-    peripheral::Peripheral,
     rtc_cntl::{
         reset_reason,
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel},
@@ -34,8 +33,9 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
-    let pin2 = Input::new(peripherals.GPIO2, Pull::None);
+    let mut pin2 = peripherals.GPIO2;
     let mut pin3 = peripherals.GPIO3;
+    let input = Input::new(&mut pin2, Pull::None);
 
     println!("up and runnning!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -46,8 +46,10 @@ fn main() -> ! {
     let delay = Delay::new();
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
+    core::mem::drop(input);
+
     let wakeup_pins: &mut [(&mut dyn RtcPinWithResistors, WakeupLevel)] = &mut [
-        (&mut *pin2.into_ref(), WakeupLevel::Low),
+        (&mut pin2, WakeupLevel::Low),
         (&mut pin3, WakeupLevel::High),
     ];
 
