@@ -7,6 +7,7 @@
 #![no_main]
 
 use esp_hal::{
+    gpio::Level,
     rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
     time::RateExtU32,
 };
@@ -38,21 +39,16 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx_config = TxChannelConfig {
-            clk_divider: 255,
-            ..TxChannelConfig::default()
-        };
+        let tx_config = TxChannelConfig::default().with_clk_divider(255);
 
         let tx_channel = {
             use esp_hal::rmt::TxChannelCreator;
             rmt.channel0.configure(tx, tx_config).unwrap()
         };
 
-        let rx_config = RxChannelConfig {
-            clk_divider: 255,
-            idle_threshold: 1000,
-            ..RxChannelConfig::default()
-        };
+        let rx_config = RxChannelConfig::default()
+            .with_clk_divider(255)
+            .with_idle_threshold(1000);
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32")] {
@@ -78,9 +74,9 @@ mod tests {
             }
         }
 
-        let mut tx_data = [PulseCode::new(true, 200, false, 50); 20];
+        let mut tx_data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 
-        tx_data[tx_data.len() - 2] = PulseCode::new(true, 3000, false, 500);
+        tx_data[tx_data.len() - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
         tx_data[tx_data.len() - 1] = PulseCode::empty();
 
         let mut rcv_data: [u32; 20] = [PulseCode::empty(); 20];
@@ -122,7 +118,7 @@ mod tests {
             rmt.channel0.configure(tx, tx_config).unwrap()
         };
 
-        let tx_data = [PulseCode::new(true, 200, false, 50); 20];
+        let tx_data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 
         let tx_transaction = tx_channel.transmit(&tx_data);
 
