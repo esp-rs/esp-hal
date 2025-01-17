@@ -662,6 +662,7 @@ where
     /// The pin is configured to open-drain mode.
     ///
     /// Note: You do not need to call [Self::with_mosi] when this is used.
+    #[instability::unstable]
     pub fn with_sio0<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
         mosi.enable_output(true);
@@ -699,6 +700,7 @@ where
     /// The pin is configured to open-drain mode.
     ///
     /// Note: You do not need to call [Self::with_miso] when this is used.
+    #[instability::unstable]
     pub fn with_sio1<SIO1: PeripheralOutput>(self, miso: impl Peripheral<P = SIO1> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
         miso.enable_input(true);
