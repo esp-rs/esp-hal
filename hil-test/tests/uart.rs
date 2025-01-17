@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn test_send_receive(mut ctx: Context) {
-        ctx.uart.write_bytes(&[0x42]);
+        ctx.uart.write_bytes(&[0x42]).unwrap();
         let mut byte = [0u8; 1];
         ctx.uart.read_bytes(&mut byte).unwrap();
         assert_eq!(byte[0], 0x42);
@@ -48,7 +48,7 @@ mod tests {
         const BUF_SIZE: usize = 128; // UART_FIFO_SIZE
 
         let data = [13; BUF_SIZE];
-        let written = ctx.uart.write_bytes(&data);
+        let written = ctx.uart.write_bytes(&data).unwrap();
         assert_eq!(written, BUF_SIZE);
 
         let mut buffer = [0; BUF_SIZE];
@@ -83,7 +83,7 @@ mod tests {
                         .with_clock_source(clock_source),
                 )
                 .unwrap();
-            ctx.uart.write_bytes(&[byte_to_write]);
+            ctx.uart.write_bytes(&[byte_to_write]).unwrap();
             let mut byte = [0u8; 1];
             ctx.uart.read_bytes(&mut byte).unwrap();
 

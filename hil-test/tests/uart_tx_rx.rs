@@ -43,7 +43,7 @@ mod tests {
         let byte = [0x42];
 
         ctx.tx.flush();
-        ctx.tx.write_bytes(&byte);
+        ctx.tx.write_bytes(&byte).unwrap();
         let mut buf = [0u8; 1];
         ctx.rx.read_bytes(&mut buf).unwrap();
 
@@ -56,7 +56,7 @@ mod tests {
         let mut buf = [0u8; 3];
 
         ctx.tx.flush();
-        ctx.tx.write_bytes(&bytes);
+        ctx.tx.write_bytes(&bytes).unwrap();
 
         ctx.rx.read_bytes(&mut buf).unwrap();
 

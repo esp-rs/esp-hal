@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
 - RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
 - Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read (#2882)
+- Uart `read_bytes` is now blocking  returns the number of bytes read (#2882)
 - Uart `flush` is now blocking (#2882)
 - Removed `embedded-hal-nb` traits (#2882)
 - `timer::wait` is now blocking (#2882)

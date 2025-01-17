@@ -81,7 +81,7 @@ e.g.
 - uart.write(0x42).ok();
 - let read = block!(ctx.uart.read());
 + let data: [u8; 1] = [0x42];
-+ uart.write_bytes(&data);
++ uart.write_bytes(&data).unwrap();
 + let mut byte = [0u8; 1];
 + uart.read_bytes(&mut byte);
 ```

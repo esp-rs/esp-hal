@@ -61,7 +61,7 @@
 //! # .with_rx(peripherals.GPIO1)
 //! # .with_tx(peripherals.GPIO2);
 //! // Write bytes out over the UART:
-//! uart1.write_bytes(b"Hello, world!");
+//! uart1.write_bytes(b"Hello, world!").expect("write error!");
 //! # }
 //! ```
 //! 
@@ -79,7 +79,7 @@
 //! let (mut rx, mut tx) = uart1.split();
 //!
 //! // Each component can be used individually to interact with the UART:
-//! tx.write_bytes(&[42u8]);
+//! tx.write_bytes(&[42u8]).expect("write error!");
 //! let mut byte = [0u8; 1];
 //! rx.read_bytes(&mut byte);
 //! # }
@@ -636,14 +636,14 @@ where
     }
 
     /// Writes bytes
-    pub fn write_bytes(&mut self, data: &[u8]) -> usize {
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         let count = data.len();
 
         for &byte in data {
             self.write_byte(byte);
         }
 
-        count
+        Ok(count)
     }
 
     fn write_byte(&mut self, word: u8) {
@@ -1126,7 +1126,7 @@ where
     }
 
     /// Write bytes out over the UART
-    pub fn write_bytes(&mut self, data: &[u8]) -> usize {
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         self.tx.write_bytes(data)
     }
 
@@ -1332,7 +1332,7 @@ where
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write_bytes(s.as_bytes());
+        self.write_bytes(s.as_bytes())?;
         Ok(())
     }
 }
@@ -1353,7 +1353,8 @@ where
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write_bytes(s.as_bytes());
+        self.write_bytes(s.as_bytes())
+            .map_err(|_| core::fmt::Error)?;
         Ok(())
     }
 }
@@ -1450,7 +1451,7 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        Ok(self.write_bytes(buf))
+        self.write_bytes(buf)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
