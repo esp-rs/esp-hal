@@ -11,7 +11,7 @@ use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
 use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{AnyPin, Input, Level, Output, OutputConfig, Pull},
+    gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pull},
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
         DataMode,

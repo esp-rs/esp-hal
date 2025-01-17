@@ -116,10 +116,10 @@ mod tests {
         }
 
         let mosi_gpio =
-            Output::new(mosi_pin, OutpuConfig::default().with_level(Level::Low)).unwrap();
-        let cs_gpio = Output::new(cs_pin, OutpuConfig::default().with_level(Level::High)).unwrap();
+            Output::new(mosi_pin, OutputConfig::default().with_level(Level::Low)).unwrap();
+        let cs_gpio = Output::new(cs_pin, OutputConfig::default().with_level(Level::High)).unwrap();
         let sclk_gpio =
-            Output::new(sclk_pin, OutpuConfig::default().with_level(Level::Low)).unwrap();
+            Output::new(sclk_pin, OutputConfig::default().with_level(Level::Low)).unwrap();
         let miso_gpio = Input::new(miso_pin, InputConfig::default().with_pull(Pull::None)).unwrap();
 
         let cs = cs_gpio.peripheral_input();
