@@ -66,7 +66,30 @@ The more descriptive `gpio::Level` enum is now used to specify output levels of 
 
 ```diff
 + use esp_hal::gpio::Level;
-+ 
++
 - let code = PulseCode::new(true, 200, false, 50);
 + let code = PulseCode::new(Level::High, 200, Level::Low, 50);
+```
+
+## UART changes
+
+Uart `write_bytes` is now blocking and return the number of bytes written. `read_bytes` will block until it fills the provided buffer with received bytes, use `read_buffered_bytes` to read the available bytes without blocking.
+
+e.g.
+
+```diff
+- uart.write(0x42).ok();
+- let read = block!(ctx.uart.read());
++ let data: [u8; 1] = [0x42];
++ uart.write_bytes(&data).unwrap();
++ let mut byte = [0u8; 1];
++ uart.read_bytes(&mut byte);
+```
+
+## `timer::wait` is now blocking
+
+```diff
+periodic.start(100.millis()).unwrap();
+- nb::block!(periodic.wait()).unwrap();
++ periodic.wait();
 ```

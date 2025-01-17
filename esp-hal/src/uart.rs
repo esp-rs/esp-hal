@@ -294,12 +294,6 @@ impl core::fmt::Display for Error {
     }
 }
 
-impl embedded_hal_nb::serial::Error for Error {
-    fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
-        embedded_hal_nb::serial::ErrorKind::Other
-    }
-}
-
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl embedded_io::Error for Error {
@@ -645,22 +639,18 @@ where
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         let count = data.len();
 
-        data.iter()
-            .try_for_each(|c| nb::block!(self.write_byte(*c)))?;
+        for &byte in data {
+            self.write_byte(byte);
+        }
 
         Ok(count)
     }
 
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        if self.tx_fifo_count() < UART_FIFO_SIZE {
-            self.register_block()
-                .fifo()
-                .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
-
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
+    fn write_byte(&mut self, word: u8) {
+        while self.tx_fifo_count() >= UART_FIFO_SIZE {}
+        self.register_block()
+            .fifo()
+            .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
     }
 
     #[allow(clippy::useless_conversion)]
@@ -676,12 +666,8 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> nb::Result<(), Error> {
-        if self.is_tx_idle() {
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
+    pub fn flush(&mut self) {
+        while !self.is_tx_idle() {}
     }
 
     /// Checks if the TX line is idle for this UART instance.
@@ -1202,19 +1188,9 @@ where
         sync_regs(register_block);
     }
 
-    // Write a byte out over the UART
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        self.tx.write_byte(word)
-    }
-
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> nb::Result<(), Error> {
+    pub fn flush(&mut self) {
         self.tx.flush()
-    }
-
-    // Read a byte from the UART
-    fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        embedded_hal_nb::serial::Read::read(&mut self.rx)
     }
 
     /// Change the configuration.
@@ -1383,65 +1359,6 @@ where
     }
 }
 
-impl<Dm> embedded_hal_nb::serial::ErrorType for Uart<'_, Dm> {
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UartTx<'_, Dm> {
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UartRx<'_, Dm> {
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for Uart<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for UartRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        match self.read_byte() {
-            Some(b) => Ok(b),
-            None => Err(nb::Error::WouldBlock),
-        }
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for Uart<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush()
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for UartTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush()
-    }
-}
-
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::ErrorType for Uart<'_, Dm> {
@@ -1538,14 +1455,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        loop {
-            match self.flush() {
-                Ok(_) => break,
-                Err(nb::Error::WouldBlock) => { /* Wait */ }
-                Err(nb::Error::Other(e)) => return Err(e),
-            }
-        }
-
+        self.flush();
         Ok(())
     }
 }
@@ -1745,7 +1655,7 @@ impl UartTx<'_, Async> {
             }
 
             for byte in &words[offset..next_offset] {
-                self.write_byte(*byte).unwrap(); // should never fail
+                self.write_byte(*byte);
                 count += 1;
             }
 

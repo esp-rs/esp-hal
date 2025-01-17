@@ -462,6 +462,8 @@ e.g.
 + let cnt = serial.read_bytes(&mut buff);
 ```
 
+
+
 ## Spi `with_miso` has been split
 
 Previously, `with_miso` set up the provided pin as an input and output, which was necessary for half duplex.
