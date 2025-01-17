@@ -98,8 +98,8 @@ fn main() -> ! {
     dma_tx_buf.set_length(0);
     let transfer = spi
         .half_duplex_write(
-            DataMode::FourWire,
-            Command::_8Bit(0x06, DataMode::FourWire),
+            DataMode::SingleTwoDataLines,
+            Command::_8Bit(0x06, DataMode::SingleTwoDataLines),
             Address::None,
             0,
             0,
@@ -113,9 +113,9 @@ fn main() -> ! {
     // erase sector
     let transfer = spi
         .half_duplex_write(
-            DataMode::FourWire,
-            Command::_8Bit(0x20, DataMode::FourWire),
-            Address::_24Bit(0x000000, DataMode::FourWire),
+            DataMode::SingleTwoDataLines,
+            Command::_8Bit(0x20, DataMode::SingleTwoDataLines),
+            Address::_24Bit(0x000000, DataMode::SingleTwoDataLines),
             0,
             dma_tx_buf.len(),
             dma_tx_buf,
@@ -128,8 +128,8 @@ fn main() -> ! {
     // write enable
     let transfer = spi
         .half_duplex_write(
-            DataMode::FourWire,
-            Command::_8Bit(0x06, DataMode::FourWire),
+            DataMode::SingleTwoDataLines,
+            Command::_8Bit(0x06, DataMode::SingleTwoDataLines),
             Address::None,
             0,
             dma_tx_buf.len(),
@@ -147,8 +147,8 @@ fn main() -> ! {
     let transfer = spi
         .half_duplex_write(
             DataMode::Quad,
-            Command::_8Bit(0x32, DataMode::FourWire),
-            Address::_24Bit(0x000000, DataMode::FourWire),
+            Command::_8Bit(0x32, DataMode::SingleTwoDataLines),
+            Address::_24Bit(0x000000, DataMode::SingleTwoDataLines),
             0,
             dma_tx_buf.len(),
             dma_tx_buf,
@@ -163,7 +163,7 @@ fn main() -> ! {
         let transfer = spi
             .half_duplex_read(
                 DataMode::Quad,
-                Command::_8Bit(0xeb, DataMode::FourWire),
+                Command::_8Bit(0xeb, DataMode::SingleTwoDataLines),
                 Address::_32Bit(0x000000 << 8, DataMode::Quad),
                 4,
                 dma_rx_buf.len(),

@@ -102,7 +102,7 @@ mod tests {
         dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
         let transfer = spi
             .half_duplex_write(
-                DataMode::FourWire,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -117,7 +117,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_write(
-                DataMode::FourWire,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -153,13 +153,25 @@ mod tests {
 
         let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
         // Write the buffer where each byte has 3 pos edges.
-        spi.half_duplex_write(DataMode::FourWire, Command::None, Address::None, 0, &buffer)
-            .unwrap();
+        spi.half_duplex_write(
+            DataMode::SingleTwoDataLines,
+            Command::None,
+            Address::None,
+            0,
+            &buffer,
+        )
+        .unwrap();
 
         assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
-        spi.half_duplex_write(DataMode::FourWire, Command::None, Address::None, 0, &buffer)
-            .unwrap();
+        spi.half_duplex_write(
+            DataMode::SingleTwoDataLines,
+            Command::None,
+            Address::None,
+            0,
+            &buffer,
+        )
+        .unwrap();
 
         assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }

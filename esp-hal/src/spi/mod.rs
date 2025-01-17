@@ -98,16 +98,16 @@ pub enum BitOrder {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum DataMode {
-    /// 4-Wire Data Mode - 1 bit, two data lines. (MOSI, MISO)
-    FourWire,
-    /// 3-Wire Data Mode, Clock, CS and one data line (SIO0)
+    /// 1 bit, two data lines. (MOSI, MISO)
+    SingleTwoDataLines,
+    /// 1 bit, 1 data line (SIO0)
     Single,
-    /// `Dual` Data Mode - 2 bits, two data lines. (SIO0, SIO1)
+    /// 2 bits, two data lines. (SIO0, SIO1)
     Dual,
-    /// `Quad` Data Mode - 4 bit, 4 data lines. (SIO0 .. SIO3)
+    /// 4 bit, 4 data lines. (SIO0 .. SIO3)
     Quad,
     #[cfg(spi_octal)]
-    /// `Octal` Data Mode - 8 bit, 8 data lines. (SIO0 .. SIO7)
+    /// 8 bit, 8 data lines. (SIO0 .. SIO7)
     Octal,
 }
 

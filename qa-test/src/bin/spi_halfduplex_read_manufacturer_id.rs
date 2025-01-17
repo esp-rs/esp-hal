@@ -83,9 +83,9 @@ fn main() -> ! {
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
         spi.half_duplex_read(
-            DataMode::FourWire,
-            Command::_8Bit(0x90, DataMode::FourWire),
-            Address::_24Bit(0x000000, DataMode::FourWire),
+            DataMode::SingleTwoDataLines,
+            Command::_8Bit(0x90, DataMode::SingleTwoDataLines),
+            Address::_24Bit(0x000000, DataMode::SingleTwoDataLines),
             0,
             &mut data,
         )
@@ -97,7 +97,7 @@ fn main() -> ! {
         let mut data = [0u8; 2];
         spi.half_duplex_read(
             DataMode::Dual,
-            Command::_8Bit(0x92, DataMode::FourWire),
+            Command::_8Bit(0x92, DataMode::SingleTwoDataLines),
             Address::_32Bit(0x000000_00, DataMode::Dual),
             0,
             &mut data,
@@ -110,7 +110,7 @@ fn main() -> ! {
         let mut data = [0u8; 2];
         spi.half_duplex_read(
             DataMode::Quad,
-            Command::_8Bit(0x94, DataMode::FourWire),
+            Command::_8Bit(0x94, DataMode::SingleTwoDataLines),
             Address::_32Bit(0x000000_00, DataMode::Quad),
             4,
             &mut data,
