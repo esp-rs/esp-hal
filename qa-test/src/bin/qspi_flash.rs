@@ -98,8 +98,8 @@ fn main() -> ! {
     dma_tx_buf.set_length(0);
     let transfer = spi
         .half_duplex_write(
-            DataMode::Single,
-            Command::_8Bit(0x06, DataMode::Single),
+            DataMode::FourWire,
+            Command::_8Bit(0x06, DataMode::FourWire),
             Address::None,
             0,
             0,
@@ -113,9 +113,9 @@ fn main() -> ! {
     // erase sector
     let transfer = spi
         .half_duplex_write(
-            DataMode::Single,
-            Command::_8Bit(0x20, DataMode::Single),
-            Address::_24Bit(0x000000, DataMode::Single),
+            DataMode::FourWire,
+            Command::_8Bit(0x20, DataMode::FourWire),
+            Address::_24Bit(0x000000, DataMode::FourWire),
             0,
             dma_tx_buf.len(),
             dma_tx_buf,
@@ -128,8 +128,8 @@ fn main() -> ! {
     // write enable
     let transfer = spi
         .half_duplex_write(
-            DataMode::Single,
-            Command::_8Bit(0x06, DataMode::Single),
+            DataMode::FourWire,
+            Command::_8Bit(0x06, DataMode::FourWire),
             Address::None,
             0,
             dma_tx_buf.len(),
@@ -147,8 +147,8 @@ fn main() -> ! {
     let transfer = spi
         .half_duplex_write(
             DataMode::Quad,
-            Command::_8Bit(0x32, DataMode::Single),
-            Address::_24Bit(0x000000, DataMode::Single),
+            Command::_8Bit(0x32, DataMode::FourWire),
+            Address::_24Bit(0x000000, DataMode::FourWire),
             0,
             dma_tx_buf.len(),
             dma_tx_buf,
@@ -163,7 +163,7 @@ fn main() -> ! {
         let transfer = spi
             .half_duplex_read(
                 DataMode::Quad,
-                Command::_8Bit(0xeb, DataMode::Single),
+                Command::_8Bit(0xeb, DataMode::FourWire),
                 Address::_32Bit(0x000000 << 8, DataMode::Quad),
                 4,
                 dma_rx_buf.len(),

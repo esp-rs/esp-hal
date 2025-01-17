@@ -146,21 +146,21 @@ mod tests {
 
     #[test]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
-        super::perform_spi_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
+        super::perform_spi_writes_are_correctly_by_pcnt(ctx, DataMode::FourWire);
     }
 
     #[test]
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
-        super::perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
+        super::perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::FourWire);
     }
 
     #[test]
     fn test_spi_writes_are_correctly_by_pcnt_tree_wire(ctx: Context) {
-        super::perform_spi_writes_are_correctly_by_pcnt(ctx, DataMode::SingleThreeWire);
+        super::perform_spi_writes_are_correctly_by_pcnt(ctx, DataMode::FourWire);
     }
 
     #[test]
     fn test_spidmabus_writes_are_correctly_by_pcnt_tree_wire(ctx: Context) {
-        super::perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::SingleThreeWire);
+        super::perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::FourWire);
     }
 }

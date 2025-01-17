@@ -32,9 +32,9 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::Single];
+        const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::FourWire];
     } else {
-        const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::Single, DataMode::Quad];
+        const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::FourWire, DataMode::Quad];
     }
 }
 
@@ -155,7 +155,7 @@ fn execute_write(
         assert_eq!(unit0.value() + unit1.value(), 8);
 
         if data_on_multiple_pins {
-            if command_data_mode == DataMode::Single {
+            if command_data_mode == DataMode::FourWire {
                 assert_eq!(unit0.value(), 1);
                 assert_eq!(unit1.value(), 7);
             } else {
@@ -173,7 +173,7 @@ fn execute_write(
         assert_eq!(unit0.value() + unit1.value(), 4);
 
         if data_on_multiple_pins {
-            if command_data_mode == DataMode::Single {
+            if command_data_mode == DataMode::FourWire {
                 assert_eq!(unit0.value(), 1);
                 assert_eq!(unit1.value(), 3);
             } else {
