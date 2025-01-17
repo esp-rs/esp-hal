@@ -513,7 +513,7 @@ where
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(&config.tx)
+        self.apply_config(config)
     }
 }
 
@@ -548,7 +548,7 @@ where
     ///
     /// Note that this also changes the configuration of the RX half.
     #[instability::unstable]
-    pub fn apply_config(&mut self, _config: &TxConfig) -> Result<(), ConfigError> {
+    pub fn apply_config(&mut self, _config: &Config) -> Result<(), ConfigError> {
         // Nothing to do so far.
         self.uart.info().txfifo_reset();
         Ok(())
@@ -1170,7 +1170,7 @@ where
     /// Change the configuration.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
-        self.tx.apply_config(&config.tx)?;
+        self.tx.apply_config(config)?;
         self.rx.uart.info().apply_config(config)?;
         Ok(())
     }
