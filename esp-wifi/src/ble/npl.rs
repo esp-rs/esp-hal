@@ -856,7 +856,7 @@ unsafe extern "C" fn ble_npl_eventq_remove(
     queue: *const ble_npl_eventq,
     event: *const ble_npl_event,
 ) {
-    info!("ble_npl_eventq_remove {:?} {:?}", queue, event);
+    trace!("ble_npl_eventq_remove {:?} {:?}", queue, event);
 
     assert!((*queue).dummy != 0);
     let evt = (*event).dummy as *mut Event;

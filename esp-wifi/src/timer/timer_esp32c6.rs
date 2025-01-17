@@ -7,8 +7,6 @@ use crate::{
 };
 
 pub(crate) fn setup_radio_isr() {
-    // wifi enabled in set_isr
-
     // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU
     // interrupt 31 which is masked by default for some reason for this
     // interrupt, mapping it to 0 doesn't deactivate it
@@ -19,18 +17,6 @@ pub(crate) fn setup_radio_isr() {
     interrupt_core0
         .modem_peri_timeout_intr_map()
         .write(|w| unsafe { w.modem_peri_timeout_intr_map().bits(31) });
-
-    #[cfg(feature = "ble")]
-    {
-        unwrap!(interrupt::enable(
-            Interrupt::LP_TIMER,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
-            Interrupt::BT_MAC,
-            interrupt::Priority::Priority1
-        ));
-    }
 }
 
 pub(crate) fn shutdown_radio_isr() {
