@@ -92,6 +92,7 @@ use core::marker::PhantomData;
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{ADC1, RNG},
+    private::Sealed,
 };
 
 /// Random number generator driver
@@ -135,6 +136,8 @@ impl Rng {
         }
     }
 }
+
+impl Sealed for Rng {}
 
 impl Peripheral for Rng {
     type P = Self;
@@ -248,6 +251,8 @@ impl rand_core::RngCore for Trng<'_> {
 /// Implementing a CryptoRng marker trait that indicates that the generator is
 /// cryptographically secure.
 impl rand_core::CryptoRng for Trng<'_> {}
+
+impl Sealed for Trng<'_> {}
 
 impl Peripheral for Trng<'_> {
     type P = Self;
