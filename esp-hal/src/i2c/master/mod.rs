@@ -47,6 +47,7 @@ use core::{
 #[cfg(any(doc, feature = "unstable"))]
 use embassy_embedded_hal::SetConfig;
 use embedded_hal::i2c::Operation as EhalOperation;
+use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 
 use crate::{
@@ -63,7 +64,6 @@ use crate::{
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
-    Cpu,
     DriverMode,
 };
 
@@ -85,6 +85,83 @@ const I2C_CHUNK_SIZE: usize = 254;
 // on ESP32 there is a chance to get trapped in `wait_for_completion` forever
 const MAX_ITERATIONS: u32 = 1_000_000;
 
+/// Representation of I2C address.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum I2cAddress {
+    /// 7-bit address mode type.
+    ///
+    /// Note that 7-bit addresses defined by drivers should be specified in
+    /// **right-aligned** form, e.g. in the range `0x00..=0x7F`.
+    ///
+    /// For example, a device that has the seven bit address of `0b011_0010`,
+    /// and therefore is addressed on the wire using:
+    ///
+    /// * `0b0110010_0` or `0x64` for *writes*
+    /// * `0b0110010_1` or `0x65` for *reads*
+    SevenBit(u8),
+}
+
+impl From<u8> for I2cAddress {
+    fn from(value: u8) -> Self {
+        I2cAddress::SevenBit(value)
+    }
+}
+
+/// I2C SCL timeout period.
+///
+/// When the level of SCL remains unchanged for more than `timeout` bus
+/// clock cycles, the bus goes to idle state.
+///
+/// Default value is `BusCycles(10)`.
+#[doc = ""]
+#[cfg_attr(
+    not(esp32),
+    doc = "Note that the effective timeout may be longer than the value configured here."
+)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+// TODO: when supporting interrupts, document that SCL = high also triggers an
+// interrupt.
+pub enum BusTimeout {
+    /// Use the maximum timeout value.
+    Maximum,
+
+    /// Disable timeout control.
+    #[cfg(not(any(esp32, esp32s2)))]
+    Disabled,
+
+    /// Timeout in bus clock cycles.
+    BusCycles(u32),
+}
+
+impl BusTimeout {
+    fn cycles(&self) -> u32 {
+        match self {
+            #[cfg(esp32)]
+            BusTimeout::Maximum => 0xF_FFFF,
+
+            #[cfg(esp32s2)]
+            BusTimeout::Maximum => 0xFF_FFFF,
+
+            #[cfg(not(any(esp32, esp32s2)))]
+            BusTimeout::Maximum => 0x1F,
+
+            #[cfg(not(any(esp32, esp32s2)))]
+            BusTimeout::Disabled => 1,
+
+            BusTimeout::BusCycles(cycles) => *cycles,
+        }
+    }
+
+    #[cfg(not(esp32))]
+    fn is_set(&self) -> bool {
+        matches!(self, BusTimeout::BusCycles(_) | BusTimeout::Maximum)
+    }
+}
+
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -93,7 +170,7 @@ pub enum Error {
     /// The transmission exceeded the FIFO size.
     FifoExceeded,
     /// The acknowledgment check failed.
-    AckCheckFailed,
+    AcknowledgeCheckFailed(AcknowledgeCheckFailedReason),
     /// A timeout occurred during transmission.
     Timeout,
     /// The arbitration for the bus was lost.
@@ -106,13 +183,58 @@ pub enum Error {
     ZeroLengthInvalid,
 }
 
+/// I2C no acknowledge error reason.
+///
+/// Consider this as a hint and make sure to always handle all cases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum AcknowledgeCheckFailedReason {
+    /// The device did not acknowledge its address. The device may be missing.
+    Address,
+
+    /// The device did not acknowledge the data. It may not be ready to process
+    /// requests at the moment.
+    Data,
+
+    /// Either the device did not acknowledge its address or the data, but it is
+    /// unknown which.
+    Unknown,
+}
+
+impl core::fmt::Display for AcknowledgeCheckFailedReason {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            AcknowledgeCheckFailedReason::Address => write!(f, "Address"),
+            AcknowledgeCheckFailedReason::Data => write!(f, "Data"),
+            AcknowledgeCheckFailedReason::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+impl From<&AcknowledgeCheckFailedReason> for embedded_hal::i2c::NoAcknowledgeSource {
+    fn from(value: &AcknowledgeCheckFailedReason) -> Self {
+        match value {
+            AcknowledgeCheckFailedReason::Address => {
+                embedded_hal::i2c::NoAcknowledgeSource::Address
+            }
+            AcknowledgeCheckFailedReason::Data => embedded_hal::i2c::NoAcknowledgeSource::Data,
+            AcknowledgeCheckFailedReason::Unknown => {
+                embedded_hal::i2c::NoAcknowledgeSource::Unknown
+            }
+        }
+    }
+}
+
 impl core::error::Error for Error {}
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Error::FifoExceeded => write!(f, "The transmission exceeded the FIFO size"),
-            Error::AckCheckFailed => write!(f, "The acknowledgment check failed"),
+            Error::AcknowledgeCheckFailed(reason) => {
+                write!(f, "The acknowledgment check failed. Reason: {}", reason)
+            }
             Error::Timeout => write!(f, "A timeout occurred during transmission"),
             Error::ArbitrationLost => write!(f, "The arbitration for the bus was lost"),
             Error::ExecutionIncomplete => {
@@ -133,6 +255,8 @@ impl core::fmt::Display for Error {
 pub enum ConfigError {
     /// Provided bus frequency is invalid for the current configuration.
     FrequencyInvalid,
+    /// Provided timeout is invalid for the current configuration.
+    TimeoutInvalid,
 }
 
 impl core::error::Error for ConfigError {}
@@ -143,6 +267,10 @@ impl core::fmt::Display for ConfigError {
             ConfigError::FrequencyInvalid => write!(
                 f,
                 "Provided bus frequency is invalid for the current configuration"
+            ),
+            ConfigError::TimeoutInvalid => write!(
+                f,
+                "Provided timeout is invalid for the current configuration"
             ),
         }
     }
@@ -211,12 +339,12 @@ impl Operation<'_> {
 
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
-        use embedded_hal::i2c::{ErrorKind, NoAcknowledgeSource};
+        use embedded_hal::i2c::ErrorKind;
 
         match self {
             Self::FifoExceeded => ErrorKind::Overrun,
             Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
-            Self::AckCheckFailed => ErrorKind::NoAcknowledge(NoAcknowledgeSource::Unknown),
+            Self::AcknowledgeCheckFailed(reason) => ErrorKind::NoAcknowledge(reason.into()),
             _ => ErrorKind::Other,
         }
     }
@@ -284,20 +412,7 @@ pub struct Config {
     pub frequency: HertzU32,
 
     /// I2C SCL timeout period.
-    ///
-    /// When the level of SCL remains unchanged for more than `timeout` bus
-    /// clock cycles, the bus goes to idle state.
-    ///
-    /// The default value is about 10 bus clock cycles.
-    #[doc = ""]
-    #[cfg_attr(
-        not(esp32),
-        doc = "Note that the effective timeout may be longer than the value configured here."
-    )]
-    #[cfg_attr(not(esp32), doc = "Configuring `None` disables timeout control.")]
-    #[cfg_attr(esp32, doc = "Configuring `None` equals to the maximum timeout value.")]
-    // TODO: when supporting interrupts, document that SCL = high also triggers an interrupt.
-    pub timeout: Option<u32>,
+    pub timeout: BusTimeout,
 }
 
 impl core::hash::Hash for Config {
@@ -312,7 +427,7 @@ impl Default for Config {
         use fugit::RateExtU32;
         Config {
             frequency: 100.kHz(),
-            timeout: Some(10),
+            timeout: BusTimeout::BusCycles(10),
         }
     }
 }
@@ -320,8 +435,8 @@ impl Default for Config {
 /// I2C driver
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct I2c<'d, Dm: DriverMode, T = AnyI2c> {
-    i2c: PeripheralRef<'d, T>,
+pub struct I2c<'d, Dm: DriverMode> {
+    i2c: PeripheralRef<'d, AnyI2c>,
     phantom: PhantomData<Dm>,
     config: Config,
     guard: PeripheralGuard,
@@ -329,7 +444,7 @@ pub struct I2c<'d, Dm: DriverMode, T = AnyI2c> {
 
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<T: Instance, Dm: DriverMode> SetConfig for I2c<'_, Dm, T> {
+impl<Dm: DriverMode> SetConfig for I2c<'_, Dm> {
     type Config = Config;
     type ConfigError = ConfigError;
 
@@ -338,28 +453,25 @@ impl<T: Instance, Dm: DriverMode> SetConfig for I2c<'_, Dm, T> {
     }
 }
 
-impl<T, Dm: DriverMode> embedded_hal::i2c::ErrorType for I2c<'_, Dm, T> {
+impl<Dm: DriverMode> embedded_hal::i2c::ErrorType for I2c<'_, Dm> {
     type Error = Error;
 }
 
-impl<T, Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm, T>
-where
-    T: Instance,
-{
+impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
     fn transaction(
         &mut self,
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction_impl(address, operations.iter_mut().map(Operation::from))
-            .inspect_err(|_| self.internal_recover())
+        self.transaction_impl(
+            I2cAddress::SevenBit(address),
+            operations.iter_mut().map(Operation::from),
+        )
+        .inspect_err(|_| self.internal_recover())
     }
 }
 
-impl<'d, T, Dm: DriverMode> I2c<'d, Dm, T>
-where
-    T: Instance,
-{
+impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     fn driver(&self) -> Driver<'_> {
         Driver {
             info: self.i2c.info(),
@@ -385,7 +497,7 @@ where
 
     fn transaction_impl<'a>(
         &mut self,
-        address: u8,
+        address: I2cAddress,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
@@ -454,11 +566,11 @@ where
     ) -> Self {
         crate::into_mapped_ref!(pin);
         // avoid the pin going low during configuration
-        pin.set_output_high(true, private::Internal);
+        pin.set_output_high(true);
 
-        pin.set_to_open_drain_output(private::Internal);
-        pin.enable_input(true, private::Internal);
-        pin.pull_direction(Pull::Up, private::Internal);
+        pin.set_to_open_drain_output();
+        pin.enable_input(true);
+        pin.pull_direction(Pull::Up);
 
         input.connect_to(&mut pin);
         output.connect_to(&mut pin);
@@ -475,22 +587,7 @@ impl<'d> I2c<'d, Blocking> {
         i2c: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        Self::new_typed(i2c.map_into(), config)
-    }
-}
-
-impl<'d, T> I2c<'d, Blocking, T>
-where
-    T: Instance,
-{
-    /// Create a new I2C instance
-    /// This will enable the peripheral but the peripheral won't get
-    /// automatically disabled when this gets dropped.
-    pub fn new_typed(
-        i2c: impl Peripheral<P = T> + 'd,
-        config: Config,
-    ) -> Result<Self, ConfigError> {
-        crate::into_ref!(i2c);
+        crate::into_mapped_ref!(i2c);
 
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
@@ -506,10 +603,32 @@ where
         Ok(i2c)
     }
 
-    // TODO: missing interrupt APIs
+    /// Listen for the given interrupts
+    #[instability::unstable]
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<Event>>) {
+        self.i2c.info().enable_listen(interrupts.into(), true)
+    }
+
+    /// Unlisten the given interrupts
+    #[instability::unstable]
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<Event>>) {
+        self.i2c.info().enable_listen(interrupts.into(), false)
+    }
+
+    /// Gets asserted interrupts
+    #[instability::unstable]
+    pub fn interrupts(&mut self) -> EnumSet<Event> {
+        self.i2c.info().interrupts()
+    }
+
+    /// Resets asserted interrupts
+    #[instability::unstable]
+    pub fn clear_interrupts(&mut self, interrupts: EnumSet<Event>) {
+        self.i2c.info().clear_interrupts(interrupts)
+    }
 
     /// Configures the I2C peripheral to operate in asynchronous mode.
-    pub fn into_async(mut self) -> I2c<'d, Async, T> {
+    pub fn into_async(mut self) -> I2c<'d, Async> {
         self.set_interrupt_handler(self.driver().info.async_handler);
 
         I2c {
@@ -521,27 +640,33 @@ where
     }
 
     /// Writes bytes to slave with address `address`
-    pub fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+    pub fn write<A: Into<I2cAddress>>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
-            .write_blocking(address, buffer, true, true)
+            .write_blocking(address.into(), buffer, true, true)
             .inspect_err(|_| self.internal_recover())
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
-    pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    pub fn read<A: Into<I2cAddress>>(
+        &mut self,
+        address: A,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
         self.driver()
-            .read_blocking(address, buffer, true, true, false)
+            .read_blocking(address.into(), buffer, true, true, false)
             .inspect_err(|_| self.internal_recover())
     }
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
-    pub fn write_read(
+    pub fn write_read<A: Into<I2cAddress>>(
         &mut self,
-        address: u8,
+        address: A,
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
+        let address = address.into();
+
         self.driver()
             .write_blocking(address, write_buffer, true, read_buffer.is_empty())
             .inspect_err(|_| self.internal_recover())?;
@@ -571,36 +696,39 @@ where
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    pub fn transaction<'a>(
+    pub fn transaction<'a, A: Into<I2cAddress>>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
-        self.transaction_impl(address, operations.into_iter().map(Operation::from))
+        self.transaction_impl(address.into(), operations.into_iter().map(Operation::from))
             .inspect_err(|_| self.internal_recover())
     }
 }
 
-impl<T> private::Sealed for I2c<'_, Blocking, T> where T: Instance {}
+impl private::Sealed for I2c<'_, Blocking> {}
 
-impl<T> InterruptConfigurable for I2c<'_, Blocking, T>
-where
-    T: Instance,
-{
+impl InterruptConfigurable for I2c<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        let interrupt = self.driver().info.interrupt;
-        for core in Cpu::other() {
-            crate::interrupt::disable(core, interrupt);
-        }
-        unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+        self.i2c.info().set_interrupt_handler(handler);
     }
 }
 
 #[cfg_attr(esp32, allow(dead_code))]
-pub(crate) enum Event {
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum Event {
+    /// Triggered when op_code of the master indicates an END command and an END
+    /// condition is detected.
     EndDetect,
+
+    /// Triggered when the I2C controller detects a STOP bit.
     TxComplete,
+
+    /// Triggered when the TX FIFO watermark check is enabled and the TX fifo
+    /// falls below the configured watermark.
     #[cfg(not(any(esp32, esp32s2)))]
     TxFifoWatermark,
 }
@@ -657,7 +785,9 @@ impl<'a> I2cFuture<'a> {
         }
 
         if r.nack().bit_is_set() {
-            return Err(Error::AckCheckFailed);
+            return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
+                self.info.register_block(),
+            )));
         }
 
         #[cfg(not(esp32))]
@@ -670,7 +800,9 @@ impl<'a> I2cFuture<'a> {
                 .resp_rec()
                 .bit_is_clear()
         {
-            return Err(Error::AckCheckFailed);
+            return Err(Error::AcknowledgeCheckFailed(
+                AcknowledgeCheckFailedReason::Data,
+            ));
         }
 
         Ok(())
@@ -698,13 +830,10 @@ impl core::future::Future for I2cFuture<'_> {
     }
 }
 
-impl<'d, T> I2c<'d, Async, T>
-where
-    T: Instance,
-{
+impl<'d> I2c<'d, Async> {
     /// Configure the I2C peripheral to operate in blocking mode.
-    pub fn into_blocking(self) -> I2c<'d, Blocking, T> {
-        crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
+    pub fn into_blocking(self) -> I2c<'d, Blocking> {
+        self.i2c.info().disable_interrupts();
 
         I2c {
             i2c: self.i2c,
@@ -715,29 +844,39 @@ where
     }
 
     /// Writes bytes to slave with address `address`
-    pub async fn write(&mut self, address: u8, buffer: &[u8]) -> Result<(), Error> {
+    pub async fn write<A: Into<I2cAddress>>(
+        &mut self,
+        address: A,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
         self.driver()
-            .write(address, buffer, true, true)
+            .write(address.into(), buffer, true, true)
             .await
             .inspect_err(|_| self.internal_recover())
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
-    pub async fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    pub async fn read<A: Into<I2cAddress>>(
+        &mut self,
+        address: A,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
         self.driver()
-            .read(address, buffer, true, true, false)
+            .read(address.into(), buffer, true, true, false)
             .await
             .inspect_err(|_| self.internal_recover())
     }
 
     /// Writes bytes to slave with address `address` and then reads enough
     /// bytes to fill `buffer` *in a single transaction*
-    pub async fn write_read(
+    pub async fn write_read<A: Into<I2cAddress>>(
         &mut self,
-        address: u8,
+        address: A,
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
+        let address = address.into();
+
         self.driver()
             .write(address, write_buffer, true, read_buffer.is_empty())
             .await
@@ -770,19 +909,19 @@ where
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    pub async fn transaction<'a>(
+    pub async fn transaction<'a, A: Into<I2cAddress>>(
         &mut self,
-        address: u8,
+        address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
-        self.transaction_impl_async(address, operations.into_iter().map(Operation::from))
+        self.transaction_impl_async(address.into(), operations.into_iter().map(Operation::from))
             .await
             .inspect_err(|_| self.internal_recover())
     }
 
     async fn transaction_impl_async<'a>(
         &mut self,
-        address: u8,
+        address: I2cAddress,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         let mut last_op: Option<OpKind> = None;
@@ -832,16 +971,13 @@ where
     }
 }
 
-impl<T> embedded_hal_async::i2c::I2c for I2c<'_, Async, T>
-where
-    T: Instance,
-{
+impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
     async fn transaction(
         &mut self,
         address: u8,
         operations: &mut [EhalOperation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction_impl_async(address, operations.iter_mut().map(Operation::from))
+        self.transaction_impl_async(address.into(), operations.iter_mut().map(Operation::from))
             .await
             .inspect_err(|_| self.internal_recover())
     }
@@ -914,7 +1050,7 @@ fn configure_clock(
     scl_stop_setup_time: u32,
     scl_start_hold_time: u32,
     scl_stop_hold_time: u32,
-    timeout: Option<u32>,
+    timeout: BusTimeout,
 ) -> Result<(), ConfigError> {
     unsafe {
         // divider
@@ -970,13 +1106,13 @@ fn configure_clock(
             if #[cfg(esp32)] {
                 register_block
                     .to()
-                    .write(|w| w.time_out().bits(unwrap!(timeout)));
+                    .write(|w| w.time_out().bits(timeout.cycles()));
             } else {
                 register_block
                     .to()
-                    .write(|w| w.time_out_en().bit(timeout.is_some())
+                    .write(|w| w.time_out_en().bit(timeout.is_set())
                     .time_out_value()
-                    .bits(timeout.unwrap_or(1) as _)
+                    .bits(timeout.cycles() as _)
                 );
             }
         }
@@ -985,6 +1121,7 @@ fn configure_clock(
 }
 
 /// Peripheral data describing a particular I2C instance.
+#[doc(hidden)]
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Info {
@@ -1019,6 +1156,73 @@ impl Info {
     /// Returns the register block for this I2C instance.
     pub fn register_block(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
+    }
+
+    /// Listen for the given interrupts
+    fn enable_listen(&self, interrupts: EnumSet<Event>, enable: bool) {
+        let reg_block = self.register_block();
+
+        reg_block.int_ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    Event::EndDetect => w.end_detect().bit(enable),
+                    Event::TxComplete => w.trans_complete().bit(enable),
+                    #[cfg(not(any(esp32, esp32s2)))]
+                    Event::TxFifoWatermark => w.txfifo_wm().bit(enable),
+                };
+            }
+            w
+        });
+    }
+
+    fn interrupts(&self) -> EnumSet<Event> {
+        let mut res = EnumSet::new();
+        let reg_block = self.register_block();
+
+        let ints = reg_block.int_raw().read();
+
+        if ints.end_detect().bit_is_set() {
+            res.insert(Event::EndDetect);
+        }
+        if ints.trans_complete().bit_is_set() {
+            res.insert(Event::TxComplete);
+        }
+        #[cfg(not(any(esp32, esp32s2)))]
+        if ints.txfifo_wm().bit_is_set() {
+            res.insert(Event::TxFifoWatermark);
+        }
+
+        res
+    }
+
+    fn clear_interrupts(&self, interrupts: EnumSet<Event>) {
+        let reg_block = self.register_block();
+
+        reg_block.int_clr().write(|w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    Event::EndDetect => w.end_detect().clear_bit_by_one(),
+                    Event::TxComplete => w.trans_complete().clear_bit_by_one(),
+                    #[cfg(not(any(esp32, esp32s2)))]
+                    Event::TxFifoWatermark => w.txfifo_wm().clear_bit_by_one(),
+                };
+            }
+            w
+        });
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, self.interrupt);
+        }
+        self.enable_listen(EnumSet::all(), false);
+        self.clear_interrupts(EnumSet::all());
+        unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
+        unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
+    }
+
+    fn disable_interrupts(&self) {
+        crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
     }
 }
 
@@ -1125,7 +1329,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: Option<u32>,
+        timeout: BusTimeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1137,8 +1341,9 @@ impl Driver<'_> {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let timeout = timeout.map_or(Some(0xF_FFFF), |to_bus| {
-            Some((to_bus * 2 * half_cycle).min(0xF_FFFF))
+        let timeout = BusTimeout::BusCycles(match timeout {
+            BusTimeout::Maximum => 0xF_FFFF,
+            BusTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xF_FFFF)?,
         });
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
@@ -1206,7 +1411,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: Option<u32>,
+        timeout: BusTimeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1237,6 +1442,11 @@ impl Driver<'_> {
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold;
 
+        let timeout = BusTimeout::BusCycles(match timeout {
+            BusTimeout::Maximum => 0xFF_FFFF,
+            BusTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xFF_FFFF)?,
+        });
+
         configure_clock(
             self.register_block(),
             0,
@@ -1249,7 +1459,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            timeout.map(|to_bus| (to_bus * 2 * half_cycle).min(0xFF_FFFF)),
+            timeout,
         )?;
 
         Ok(())
@@ -1263,7 +1473,7 @@ impl Driver<'_> {
         &self,
         source_clk: HertzU32,
         bus_freq: HertzU32,
-        timeout: Option<u32>,
+        timeout: BusTimeout,
     ) -> Result<(), ConfigError> {
         let source_clk = source_clk.raw();
         let bus_freq = bus_freq.raw();
@@ -1308,6 +1518,18 @@ impl Driver<'_> {
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold - 1;
 
+        let timeout = match timeout {
+            BusTimeout::Maximum => BusTimeout::BusCycles(0x1F),
+            BusTimeout::Disabled => BusTimeout::Disabled,
+            BusTimeout::BusCycles(cycles) => {
+                let to_peri = (cycles * 2 * half_cycle).max(1);
+                let log2 = to_peri.ilog2();
+                // Round up so that we don't shorten timeouts.
+                let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
+                BusTimeout::BusCycles(check_timeout(raw, 0x1F)?)
+            }
+        };
+
         configure_clock(
             self.register_block(),
             clkm_div,
@@ -1320,13 +1542,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            timeout.map(|to_bus| {
-                let to_peri = (to_bus * 2 * half_cycle).max(1);
-                let log2 = to_peri.ilog2();
-                // Round up so that we don't shorten timeouts.
-                let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                raw.min(0x1F)
-            }),
+            timeout,
         )?;
 
         Ok(())
@@ -1360,7 +1576,7 @@ impl Driver<'_> {
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_write<'a, I>(
         &self,
-        addr: u8,
+        addr: I2cAddress,
         bytes: &[u8],
         start: bool,
         cmd_iterator: &mut I,
@@ -1394,10 +1610,14 @@ impl Driver<'_> {
 
         if start {
             // Load address and R/W bit into FIFO
-            write_fifo(
-                self.register_block(),
-                addr << 1 | OperationType::Write as u8,
-            );
+            match addr {
+                I2cAddress::SevenBit(addr) => {
+                    write_fifo(
+                        self.register_block(),
+                        (addr << 1) | OperationType::Write as u8,
+                    );
+                }
+            }
         }
         Ok(())
     }
@@ -1412,7 +1632,7 @@ impl Driver<'_> {
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_read<'a, I>(
         &self,
-        addr: u8,
+        addr: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         will_continue: bool,
@@ -1473,7 +1693,14 @@ impl Driver<'_> {
 
         if start {
             // Load address and R/W bit into FIFO
-            write_fifo(self.register_block(), addr << 1 | OperationType::Read as u8);
+            match addr {
+                I2cAddress::SevenBit(addr) => {
+                    write_fifo(
+                        self.register_block(),
+                        (addr << 1) | OperationType::Read as u8,
+                    );
+                }
+            }
         }
         Ok(())
     }
@@ -1684,7 +1911,7 @@ impl Driver<'_> {
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AckCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.register_block())))
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)
                 } else {
@@ -1695,11 +1922,11 @@ impl Driver<'_> {
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AckCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.register_block())))
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)
                 } else if interrupts.trans_complete().bit_is_set() && self.register_block().sr().read().resp_rec().bit_is_clear() {
-                    Err(Error::AckCheckFailed)
+                    Err(Error::AcknowledgeCheckFailed(AcknowledgeCheckFailedReason::Data))
                 } else {
                     Ok(())
                 };
@@ -1908,7 +2135,7 @@ impl Driver<'_> {
 
     fn start_write_operation(
         &self,
-        address: u8,
+        address: I2cAddress,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -1945,7 +2172,7 @@ impl Driver<'_> {
     /// - `cmd_iterator` is an iterator over the command registers.
     fn start_read_operation(
         &self,
-        address: u8,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -1980,7 +2207,7 @@ impl Driver<'_> {
     /// - `cmd_iterator` is an iterator over the command registers.
     fn write_operation_blocking(
         &self,
-        address: u8,
+        address: I2cAddress,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -2012,7 +2239,7 @@ impl Driver<'_> {
     /// - `cmd_iterator` is an iterator over the command registers.
     fn read_operation_blocking(
         &self,
-        address: u8,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2042,7 +2269,7 @@ impl Driver<'_> {
     /// - `cmd_iterator` is an iterator over the command registers.
     async fn write_operation(
         &self,
-        address: u8,
+        address: I2cAddress,
         bytes: &[u8],
         start: bool,
         stop: bool,
@@ -2074,7 +2301,7 @@ impl Driver<'_> {
     /// - `cmd_iterator` is an iterator over the command registers.
     async fn read_operation(
         &self,
-        address: u8,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2096,7 +2323,7 @@ impl Driver<'_> {
 
     fn read_blocking(
         &self,
-        address: u8,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2118,7 +2345,7 @@ impl Driver<'_> {
 
     fn write_blocking(
         &self,
-        address: u8,
+        address: I2cAddress,
         buffer: &[u8],
         start: bool,
         stop: bool,
@@ -2141,7 +2368,7 @@ impl Driver<'_> {
 
     async fn read(
         &self,
-        address: u8,
+        address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
         stop: bool,
@@ -2164,7 +2391,7 @@ impl Driver<'_> {
 
     async fn write(
         &self,
-        address: u8,
+        address: I2cAddress,
         buffer: &[u8],
         start: bool,
         stop: bool,
@@ -2187,7 +2414,16 @@ impl Driver<'_> {
     }
 }
 
+fn check_timeout(v: u32, max: u32) -> Result<u32, ConfigError> {
+    if v <= max {
+        Ok(v)
+    } else {
+        Err(ConfigError::TimeoutInvalid)
+    }
+}
+
 /// Peripheral state for an I2C instance.
+#[doc(hidden)]
 #[non_exhaustive]
 pub struct State {
     /// Waker for the asynchronous operations.
@@ -2195,6 +2431,7 @@ pub struct State {
 }
 
 /// I2C Peripheral Instance
+#[doc(hidden)]
 pub trait Instance: Peripheral<P = Self> + Into<AnyI2c> + 'static {
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);
@@ -2281,11 +2518,28 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
     }
 }
 
+// Estimate the reason for an acknowledge check failure on a best effort basis.
+// When in doubt it's better to return `Unknown` than to return a wrong reason.
+fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeCheckFailedReason {
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32, esp32s2, esp32c2, esp32c3))] {
+            AcknowledgeCheckFailedReason::Unknown
+        } else {
+            // this is based on observations rather than documented behavior
+            if _register_block.fifo_st().read().txfifo_raddr().bits() <= 1 {
+                AcknowledgeCheckFailedReason::Address
+            } else {
+                AcknowledgeCheckFailedReason::Data
+            }
+        }
+    }
+}
+
 macro_rules! instance {
     ($inst:ident, $peri:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
         impl Instance for crate::peripherals::$inst {
             fn parts(&self) -> (&Info, &State) {
-                #[crate::macros::handler]
+                #[crate::handler]
                 pub(super) fn irq_handler() {
                     async_handler(&PERIPHERAL, &STATE);
                 }

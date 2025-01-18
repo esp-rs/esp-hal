@@ -26,7 +26,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
-    entry,
+    main,
     peripheral::Peripheral,
     spi::{
         master::{Config, Spi},
@@ -55,7 +55,7 @@ const DMA_BUFFER_SIZE: usize = 8192;
 const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
 const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
     info!("Starting SPI loopback test");
@@ -93,7 +93,7 @@ fn main() -> ! {
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
-            .with_mode(Mode::Mode0),
+            .with_mode(Mode::_0),
     )
     .unwrap()
     .with_sck(sclk)

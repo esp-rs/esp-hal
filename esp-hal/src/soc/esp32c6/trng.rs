@@ -383,7 +383,7 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
         // Read the i2c bus register
         let mut temp: u32 = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32)
             << REGI2C_RTC_SLAVE_ID_S as u32)
-            | (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32;
+            | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32);
 
         lp_i2c_ana
             .i2c0_ctrl()

@@ -25,6 +25,7 @@ pub enum Error {
     /// Error occurred due to a DMA-related issue.
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    #[allow(clippy::enum_variant_names, reason = "DMA is unstable")]
     DmaError(DmaError),
     /// Error indicating that the maximum DMA transfer size was exceeded.
     MaxDmaTransferSizeExceeded,
@@ -32,7 +33,7 @@ pub enum Error {
     /// communication.
     FifoSizeExeeded,
     /// Error indicating that the operation is unsupported by the current
-    /// implementation.
+    /// implementation or for the given arguments.
     Unsupported,
     /// An unknown error occurred during SPI communication.
     Unknown,
@@ -70,16 +71,16 @@ impl embedded_hal::spi::Error for Error {
 pub enum Mode {
     /// Mode 0 (CPOL = 0, CPHA = 0): Clock is low when idle, data is captured on
     /// the rising edge and propagated on the falling edge.
-    Mode0,
+    _0,
     /// Mode 1 (CPOL = 0, CPHA = 1): Clock is low when idle, data is captured on
     /// the falling edge and propagated on the rising edge.
-    Mode1,
+    _1,
     /// Mode 2 (CPOL = 1, CPHA = 0): Clock is high when idle, data is captured
     /// on the falling edge and propagated on the rising edge.
-    Mode2,
+    _2,
     /// Mode 3 (CPOL = 1, CPHA = 1): Clock is high when idle, data is captured
     /// on the rising edge and propagated on the falling edge.
-    Mode3,
+    _3,
 }
 
 /// SPI Bit Order
@@ -97,14 +98,16 @@ pub enum BitOrder {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum DataMode {
-    /// `Single` Data Mode - 1 bit, 2 wires.
+    /// 1 bit, two data lines. (MOSI, MISO)
+    SingleTwoDataLines,
+    /// 1 bit, 1 data line (SIO0)
     Single,
-    /// `Dual` Data Mode - 2 bit, 2 wires
+    /// 2 bits, two data lines. (SIO0, SIO1)
     Dual,
-    /// `Quad` Data Mode - 4 bit, 4 wires
+    /// 4 bit, 4 data lines. (SIO0 .. SIO3)
     Quad,
     #[cfg(spi_octal)]
-    /// `Octal` Data Mode - 8 bit, 8 wires
+    /// 8 bit, 8 data lines. (SIO0 .. SIO7)
     Octal,
 }
 

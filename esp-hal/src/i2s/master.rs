@@ -90,7 +90,6 @@ use crate::{
         DmaTransferRxCircular,
         DmaTransferTx,
         DmaTransferTxCircular,
-        PeripheralDmaChannel,
         PeripheralRxChannel,
         PeripheralTxChannel,
         ReadBuffer,
@@ -143,6 +142,7 @@ impl AcceptedWord for i32 {}
 /// I2S Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Error {
     /// An unspecified or unknown error occurred during an I2S operation.
     Unknown,
@@ -250,67 +250,18 @@ impl DataFormat {
 
 /// Instance of the I2S peripheral driver
 #[non_exhaustive]
-pub struct I2s<'d, Dm, T = AnyI2s>
+pub struct I2s<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     /// Handles the reception (RX) side of the I2S peripheral.
-    pub i2s_rx: RxCreator<'d, Dm, T>,
+    pub i2s_rx: RxCreator<'d, Dm>,
     /// Handles the transmission (TX) side of the I2S peripheral.
-    pub i2s_tx: TxCreator<'d, Dm, T>,
+    pub i2s_tx: TxCreator<'d, Dm>,
 }
 
-impl<'d, T> I2s<'d, Blocking, T>
+impl<Dm> I2s<'_, Dm>
 where
-    T: RegisterAccess,
-{
-    #[allow(clippy::too_many_arguments)]
-    fn new_internal(
-        i2s: PeripheralRef<'d, T>,
-        standard: Standard,
-        data_format: DataFormat,
-        sample_rate: impl Into<fugit::HertzU32>,
-        channel: PeripheralRef<'d, PeripheralDmaChannel<T>>,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self {
-        let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&i2s);
-        // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
-        // could be configured totally independently but for now handle all
-        // the targets the same and force same configuration for both, TX and RX
-
-        // make sure the peripheral is enabled before configuring it
-        let peripheral = i2s.peripheral();
-        let rx_guard = PeripheralGuard::new(peripheral);
-        let tx_guard = PeripheralGuard::new(peripheral);
-
-        i2s.set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));
-        i2s.configure(&standard, &data_format);
-        i2s.set_master();
-        i2s.update();
-
-        Self {
-            i2s_rx: RxCreator {
-                i2s: unsafe { i2s.clone_unchecked() },
-                rx_channel: channel.rx,
-                descriptors: rx_descriptors,
-                guard: rx_guard,
-            },
-            i2s_tx: TxCreator {
-                i2s,
-                tx_channel: channel.tx,
-                descriptors: tx_descriptors,
-                guard: tx_guard,
-            },
-        }
-    }
-}
-
-impl<Dm, T> I2s<'_, Dm, T>
-where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     /// Sets the interrupt handler
@@ -346,16 +297,10 @@ where
     }
 }
 
-impl<Dm, I> crate::private::Sealed for I2s<'_, Dm, I>
-where
-    I: RegisterAccess,
-    Dm: DriverMode,
-{
-}
+impl<Dm> crate::private::Sealed for I2s<'_, Dm> where Dm: DriverMode {}
 
-impl<Dm, I> InterruptConfigurable for I2s<'_, Dm, I>
+impl<Dm> InterruptConfigurable for I2s<'_, Dm>
 where
-    I: RegisterAccess,
     Dm: DriverMode,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
@@ -379,51 +324,45 @@ impl<'d> I2s<'d, Blocking> {
     where
         CH: DmaChannelFor<AnyI2s>,
     {
-        Self::new_typed(
-            i2s.map_into(),
-            standard,
-            data_format,
-            sample_rate,
-            channel,
-            rx_descriptors,
-            tx_descriptors,
-        )
-    }
-}
-
-impl<'d, T> I2s<'d, Blocking, T>
-where
-    T: RegisterAccess,
-{
-    /// Construct a new I2S peripheral driver instance for the first I2S
-    /// peripheral
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_typed<CH>(
-        i2s: impl Peripheral<P = T> + 'd,
-        standard: Standard,
-        data_format: DataFormat,
-        sample_rate: impl Into<fugit::HertzU32>,
-        channel: impl Peripheral<P = CH> + 'd,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self
-    where
-        CH: DmaChannelFor<T>,
-    {
         crate::into_ref!(i2s);
-        Self::new_internal(
-            i2s,
-            standard,
-            data_format,
-            sample_rate,
-            channel.map(|ch| ch.degrade()).into_ref(),
-            rx_descriptors,
-            tx_descriptors,
-        )
+
+        let channel = Channel::new(channel.map(|ch| ch.degrade()));
+        channel.runtime_ensure_compatible(&i2s);
+
+        // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
+        // could be configured totally independently but for now handle all
+        // the targets the same and force same configuration for both, TX and RX
+
+        // make sure the peripheral is enabled before configuring it
+        let peripheral = i2s.peripheral();
+        let rx_guard = PeripheralGuard::new(peripheral);
+        let tx_guard = PeripheralGuard::new(peripheral);
+
+        i2s.set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));
+        i2s.configure(&standard, &data_format);
+        i2s.set_master();
+        i2s.update();
+
+        let i2s = i2s.map_into();
+
+        Self {
+            i2s_rx: RxCreator {
+                i2s: unsafe { i2s.clone_unchecked() },
+                rx_channel: channel.rx,
+                descriptors: rx_descriptors,
+                guard: rx_guard,
+            },
+            i2s_tx: TxCreator {
+                i2s,
+                tx_channel: channel.tx,
+                descriptors: tx_descriptors,
+                guard: tx_guard,
+            },
+        }
     }
 
     /// Converts the I2S instance into async mode.
-    pub fn into_async(self) -> I2s<'d, Async, T> {
+    pub fn into_async(self) -> I2s<'d, Async> {
         I2s {
             i2s_rx: RxCreator {
                 i2s: self.i2s_rx.i2s,
@@ -441,15 +380,14 @@ where
     }
 }
 
-impl<'d, Dm, T> I2s<'d, Dm, T>
+impl<'d, Dm> I2s<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
     pub fn with_mclk<P: PeripheralOutput>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
         crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output(crate::private::Internal);
+        pin.set_to_push_pull_output();
         self.i2s_tx.i2s.mclk_signal().connect_to(pin);
 
         self
@@ -457,20 +395,18 @@ where
 }
 
 /// I2S TX channel
-pub struct I2sTx<'d, Dm, T = AnyI2s>
+pub struct I2sTx<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
-    i2s: PeripheralRef<'d, T>,
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<T>>,
+    i2s: PeripheralRef<'d, AnyI2s>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>,
     tx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
 
-impl<Dm, T> core::fmt::Debug for I2sTx<'_, Dm, T>
+impl<Dm> core::fmt::Debug for I2sTx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -478,9 +414,8 @@ where
     }
 }
 
-impl<Dm, T> DmaSupport for I2sTx<'_, Dm, T>
+impl<Dm> DmaSupport for I2sTx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
@@ -492,12 +427,11 @@ where
     }
 }
 
-impl<'d, Dm, T> DmaSupportTx for I2sTx<'d, Dm, T>
+impl<'d, Dm> DmaSupportTx for I2sTx<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
-    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<T>>;
+    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -508,9 +442,8 @@ where
     }
 }
 
-impl<Dm, T> I2sTx<'_, Dm, T>
+impl<Dm> I2sTx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
@@ -590,20 +523,18 @@ where
 }
 
 /// I2S RX channel
-pub struct I2sRx<'d, Dm, T = AnyI2s>
+pub struct I2sRx<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
-    i2s: PeripheralRef<'d, T>,
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<T>>,
+    i2s: PeripheralRef<'d, AnyI2s>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>,
     rx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
 
-impl<Dm, T> core::fmt::Debug for I2sRx<'_, Dm, T>
+impl<Dm> core::fmt::Debug for I2sRx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -611,9 +542,8 @@ where
     }
 }
 
-impl<Dm, T> DmaSupport for I2sRx<'_, Dm, T>
+impl<Dm> DmaSupport for I2sRx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
@@ -625,12 +555,11 @@ where
     }
 }
 
-impl<'d, Dm, T> DmaSupportRx for I2sRx<'d, Dm, T>
+impl<'d, Dm> DmaSupportRx for I2sRx<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
-    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<T>>;
+    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -641,9 +570,8 @@ where
     }
 }
 
-impl<Dm, T> I2sRx<'_, Dm, T>
+impl<Dm> I2sRx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn read_bytes(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
@@ -756,27 +684,24 @@ mod private {
         interrupt::InterruptHandler,
         peripheral::{Peripheral, PeripheralRef},
         peripherals::{Interrupt, I2S0},
-        private,
         DriverMode,
     };
 
-    pub struct TxCreator<'d, Dm, T>
+    pub struct TxCreator<'d, Dm>
     where
-        T: RegisterAccess,
         Dm: DriverMode,
     {
-        pub i2s: PeripheralRef<'d, T>,
-        pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<T>>,
+        pub i2s: PeripheralRef<'d, AnyI2s>,
+        pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
 
-    impl<'d, Dm, T> TxCreator<'d, Dm, T>
+    impl<'d, Dm> TxCreator<'d, Dm>
     where
         Dm: DriverMode,
-        T: RegisterAccess,
     {
-        pub fn build(self) -> I2sTx<'d, Dm, T> {
+        pub fn build(self) -> I2sTx<'d, Dm> {
             let peripheral = self.i2s.peripheral();
             I2sTx {
                 i2s: self.i2s,
@@ -791,7 +716,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.bclk_signal().connect_to(pin);
 
             self
@@ -802,7 +727,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.ws_signal().connect_to(pin);
 
             self
@@ -813,30 +738,28 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.dout_signal().connect_to(pin);
 
             self
         }
     }
 
-    pub struct RxCreator<'d, Dm, T>
+    pub struct RxCreator<'d, Dm>
     where
-        T: RegisterAccess,
         Dm: DriverMode,
     {
-        pub i2s: PeripheralRef<'d, T>,
-        pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<T>>,
+        pub i2s: PeripheralRef<'d, AnyI2s>,
+        pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
 
-    impl<'d, Dm, T> RxCreator<'d, Dm, T>
+    impl<'d, Dm> RxCreator<'d, Dm>
     where
         Dm: DriverMode,
-        T: RegisterAccess,
     {
-        pub fn build(self) -> I2sRx<'d, Dm, T> {
+        pub fn build(self) -> I2sRx<'d, Dm> {
             let peripheral = self.i2s.peripheral();
             I2sRx {
                 i2s: self.i2s,
@@ -851,7 +774,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.bclk_rx_signal().connect_to(pin);
 
             self
@@ -862,7 +785,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.ws_rx_signal().connect_to(pin);
 
             self
@@ -873,7 +796,7 @@ mod private {
             P: PeripheralInput,
         {
             crate::into_mapped_ref!(pin);
-            pin.init_input(crate::gpio::Pull::None, private::Internal);
+            pin.init_input(crate::gpio::Pull::None);
             self.i2s.din_signal().connect_to(pin);
 
             self
@@ -1875,10 +1798,11 @@ mod private {
 
 /// Async functionality
 pub mod asynch {
-    use super::{Error, I2sRx, I2sTx, RegisterAccess};
+    use super::{Error, I2sRx, I2sTx, RegisterAccessPrivate};
     use crate::{
         dma::{
             asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
+            DmaEligible,
             ReadBuffer,
             Rx,
             RxCircularState,
@@ -1889,10 +1813,7 @@ pub mod asynch {
         Async,
     };
 
-    impl<'d, T> I2sTx<'d, Async, T>
-    where
-        T: RegisterAccess,
-    {
+    impl<'d> I2sTx<'d, Async> {
         /// One-shot write I2S.
         pub async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_ptr(), words.len());
@@ -1919,7 +1840,7 @@ pub mod asynch {
         pub fn write_dma_circular_async<TXBUF: ReadBuffer>(
             mut self,
             words: TXBUF,
-        ) -> Result<I2sWriteDmaTransferAsync<'d, TXBUF, T>, Error> {
+        ) -> Result<I2sWriteDmaTransferAsync<'d, TXBUF>, Error> {
             let (ptr, len) = unsafe { words.read_buffer() };
 
             // Reset TX unit and TX FIFO
@@ -1950,19 +1871,13 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA write transfer.
-    pub struct I2sWriteDmaTransferAsync<'d, BUFFER, T = super::AnyI2s>
-    where
-        T: RegisterAccess,
-    {
-        i2s_tx: I2sTx<'d, Async, T>,
+    pub struct I2sWriteDmaTransferAsync<'d, BUFFER> {
+        i2s_tx: I2sTx<'d, Async>,
         state: TxCircularState,
         _buffer: BUFFER,
     }
 
-    impl<T, BUFFER> I2sWriteDmaTransferAsync<'_, BUFFER, T>
-    where
-        T: RegisterAccess,
-    {
+    impl<BUFFER> I2sWriteDmaTransferAsync<'_, BUFFER> {
         /// How many bytes can be pushed into the DMA transaction.
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
@@ -1999,10 +1914,7 @@ pub mod asynch {
         }
     }
 
-    impl<'d, T> I2sRx<'d, Async, T>
-    where
-        T: RegisterAccess,
-    {
+    impl<'d> I2sRx<'d, Async> {
         /// One-shot read I2S.
         pub async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_mut_ptr(), words.len());
@@ -2037,7 +1949,7 @@ pub mod asynch {
         pub fn read_dma_circular_async<RXBUF>(
             mut self,
             mut words: RXBUF,
-        ) -> Result<I2sReadDmaTransferAsync<'d, RXBUF, T>, Error>
+        ) -> Result<I2sReadDmaTransferAsync<'d, RXBUF>, Error>
         where
             RXBUF: WriteBuffer,
         {
@@ -2073,19 +1985,13 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA read transfer.
-    pub struct I2sReadDmaTransferAsync<'d, BUFFER, T = super::AnyI2s>
-    where
-        T: RegisterAccess,
-    {
-        i2s_rx: I2sRx<'d, Async, T>,
+    pub struct I2sReadDmaTransferAsync<'d, BUFFER> {
+        i2s_rx: I2sRx<'d, Async>,
         state: RxCircularState,
         _buffer: BUFFER,
     }
 
-    impl<T, BUFFER> I2sReadDmaTransferAsync<'_, BUFFER, T>
-    where
-        T: RegisterAccess,
-    {
+    impl<BUFFER> I2sReadDmaTransferAsync<'_, BUFFER> {
         /// How many bytes can be popped from the DMA transaction.
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {

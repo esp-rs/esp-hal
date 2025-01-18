@@ -1,6 +1,7 @@
 //! QSPI Test Suite
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -31,9 +32,9 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::Single];
+        const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::SingleTwoDataLines];
     } else {
-        const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::Single, DataMode::Quad];
+        const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::SingleTwoDataLines, DataMode::Quad];
     }
 }
 
@@ -75,8 +76,8 @@ fn transfer_write(
     let transfer = spi
         .half_duplex_write(
             DataMode::Quad,
-            Command::Command8(write as u16, command_data_mode),
-            Address::Address24(
+            Command::_8Bit(write as u16, command_data_mode),
+            Address::_24Bit(
                 write as u32 | (write as u32) << 8 | (write as u32) << 16,
                 DataMode::Quad,
             ),
@@ -124,7 +125,7 @@ fn execute_write_read(mut spi: SpiUnderTest, mut mosi_mirror: Output<'static>, e
         (spi, dma_rx_buf) = transfer_read(
             spi,
             dma_rx_buf,
-            Command::Command8(expected as u16, command_data_mode),
+            Command::_8Bit(expected as u16, command_data_mode),
         );
         assert_eq!(dma_rx_buf.as_slice(), &[expected; DMA_BUFFER_SIZE]);
     }
@@ -154,7 +155,7 @@ fn execute_write(
         assert_eq!(unit0.value() + unit1.value(), 8);
 
         if data_on_multiple_pins {
-            if command_data_mode == DataMode::Single {
+            if command_data_mode == DataMode::SingleTwoDataLines {
                 assert_eq!(unit0.value(), 1);
                 assert_eq!(unit1.value(), 7);
             } else {
@@ -172,7 +173,7 @@ fn execute_write(
         assert_eq!(unit0.value() + unit1.value(), 4);
 
         if data_on_multiple_pins {
-            if command_data_mode == DataMode::Single {
+            if command_data_mode == DataMode::SingleTwoDataLines {
                 assert_eq!(unit0.value(), 1);
                 assert_eq!(unit1.value(), 3);
             } else {
@@ -212,7 +213,7 @@ mod tests {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap();
 
@@ -230,7 +231,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = ctx.spi.with_mosi(pin).with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio0(pin).with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b0001_0001);
     }
@@ -240,7 +241,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = ctx.spi.with_miso(pin).with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio1(pin).with_dma(ctx.dma_channel);
 
         super::execute_read(spi, pin_mirror, 0b0010_0010);
     }
@@ -270,7 +271,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = ctx.spi.with_mosi(pin).with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio0(pin).with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0001_0001);
     }
@@ -280,7 +281,7 @@ mod tests {
         let [pin, pin_mirror, _] = ctx.gpios;
         let pin_mirror = Output::new(pin_mirror, Level::High);
 
-        let spi = ctx.spi.with_miso(pin).with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio1(pin).with_dma(ctx.dma_channel);
 
         super::execute_write_read(spi, pin_mirror, 0b0010_0010);
     }
@@ -323,7 +324,7 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let spi = ctx.spi.with_mosi(mosi).with_dma(ctx.dma_channel);
+        let spi = ctx.spi.with_sio0(mosi).with_dma(ctx.dma_channel);
 
         super::execute_write(unit0, unit1, spi, 0b0000_0001, false);
     }
@@ -354,8 +355,8 @@ mod tests {
 
         let spi = ctx
             .spi
-            .with_mosi(mosi)
-            .with_miso(gpio)
+            .with_sio0(mosi)
+            .with_sio1(gpio)
             .with_dma(ctx.dma_channel);
 
         super::execute_write(unit0, unit1, spi, 0b0000_0010, true);
@@ -387,7 +388,7 @@ mod tests {
 
         let spi = ctx
             .spi
-            .with_mosi(mosi)
+            .with_sio0(mosi)
             .with_sio2(gpio)
             .with_dma(ctx.dma_channel);
 
@@ -420,7 +421,7 @@ mod tests {
 
         let spi = ctx
             .spi
-            .with_mosi(mosi)
+            .with_sio0(mosi)
             .with_sio3(gpio)
             .with_dma(ctx.dma_channel);
 

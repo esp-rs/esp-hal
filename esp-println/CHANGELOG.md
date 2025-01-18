@@ -13,7 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix build failure when `critical-section` feature is disabled
+
 ### Removed
+
+## 0.13.0 - 2025-01-15
+
+### Changed
+
+- Bump MSRV to 1.84 (#2951)
 
 ## 0.12.0 - 2024-10-10
 
@@ -60,4 +68,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove RTT and defmt-raw support
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-println?since=2024-10-10
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-println?since=2025-01-15

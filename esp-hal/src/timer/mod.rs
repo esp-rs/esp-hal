@@ -35,7 +35,7 @@
 //!
 //! periodic.start(1.secs());
 //! loop {
-//!     nb::block!(periodic.wait());
+//!    periodic.wait();
 //! }
 //! # }
 //! ```
@@ -119,33 +119,25 @@ pub trait Timer: Into<AnyTimer> + InterruptConfigurable + 'static + crate::priva
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<'d, Dm, T = AnyTimer> {
-    inner: PeripheralRef<'d, T>,
+pub struct OneShotTimer<'d, Dm> {
+    inner: PeripheralRef<'d, AnyTimer>,
     _ph: PhantomData<Dm>,
 }
 
 impl<'d> OneShotTimer<'d, Blocking> {
     /// Construct a new instance of [`OneShotTimer`].
     pub fn new(inner: impl Peripheral<P = impl Timer> + 'd) -> OneShotTimer<'d, Blocking> {
-        Self::new_typed(inner.map_into())
-    }
-}
-
-impl<'d, T> OneShotTimer<'d, Blocking, T>
-where
-    T: Timer,
-{
-    /// Construct a typed instance of [`OneShotTimer`].
-    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
-        crate::into_ref!(inner);
+        crate::into_mapped_ref!(inner);
         Self {
             inner,
             _ph: PhantomData,
         }
     }
+}
 
+impl<'d> OneShotTimer<'d, Blocking> {
     /// Converts the driver to [`Async`] mode.
-    pub fn into_async(mut self) -> OneShotTimer<'d, Async, T> {
+    pub fn into_async(mut self) -> OneShotTimer<'d, Async> {
         let handler = self.inner.async_interrupt_handler();
         self.inner.set_interrupt_handler(handler);
         OneShotTimer {
@@ -155,10 +147,7 @@ where
     }
 }
 
-impl<T> OneShotTimer<'_, Async, T>
-where
-    T: Timer,
-{
+impl OneShotTimer<'_, Async> {
     /// Converts the driver to [`Blocking`] mode.
     pub fn into_blocking(self) -> Self {
         crate::interrupt::disable(Cpu::current(), self.inner.peripheral_interrupt());
@@ -167,12 +156,7 @@ where
             _ph: PhantomData,
         }
     }
-}
 
-impl<T> OneShotTimer<'_, Async, T>
-where
-    T: Timer,
-{
     /// Delay for *at least* `ns` nanoseconds.
     pub async fn delay_nanos_async(&mut self, ns: u32) {
         self.delay_async(MicrosDurationU64::from_ticks(ns.div_ceil(1000) as u64))
@@ -197,10 +181,9 @@ where
     }
 }
 
-impl<Dm, T> OneShotTimer<'_, Dm, T>
+impl<Dm> OneShotTimer<'_, Dm>
 where
     Dm: DriverMode,
-    T: Timer,
 {
     /// Delay for *at least* `ms` milliseconds.
     pub fn delay_millis(&mut self, ms: u32) {
@@ -267,61 +250,39 @@ where
     }
 }
 
-impl<Dm, T> crate::private::Sealed for OneShotTimer<'_, Dm, T>
-where
-    T: Timer,
-    Dm: DriverMode,
-{
-}
+impl<Dm> crate::private::Sealed for OneShotTimer<'_, Dm> where Dm: DriverMode {}
 
-impl<Dm, T> InterruptConfigurable for OneShotTimer<'_, Dm, T>
+impl<Dm> InterruptConfigurable for OneShotTimer<'_, Dm>
 where
     Dm: DriverMode,
-    T: Timer,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         OneShotTimer::set_interrupt_handler(self, handler);
     }
 }
 
-impl<T> embedded_hal::delay::DelayNs for OneShotTimer<'_, Blocking, T>
-where
-    T: Timer,
-{
+impl embedded_hal::delay::DelayNs for OneShotTimer<'_, Blocking> {
     fn delay_ns(&mut self, ns: u32) {
         self.delay_nanos(ns);
     }
 }
 
-impl<T> embedded_hal_async::delay::DelayNs for OneShotTimer<'_, Async, T>
-where
-    T: Timer,
-{
+impl embedded_hal_async::delay::DelayNs for OneShotTimer<'_, Async> {
     async fn delay_ns(&mut self, ns: u32) {
         self.delay_nanos_async(ns).await
     }
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<'d, Dm, T = AnyTimer> {
-    inner: PeripheralRef<'d, T>,
+pub struct PeriodicTimer<'d, Dm> {
+    inner: PeripheralRef<'d, AnyTimer>,
     _ph: PhantomData<Dm>,
 }
 
 impl<'d> PeriodicTimer<'d, Blocking> {
     /// Construct a new instance of [`PeriodicTimer`].
     pub fn new(inner: impl Peripheral<P = impl Timer> + 'd) -> PeriodicTimer<'d, Blocking> {
-        Self::new_typed(inner.map_into())
-    }
-}
-
-impl<'d, T> PeriodicTimer<'d, Blocking, T>
-where
-    T: Timer,
-{
-    /// Construct a typed instance of [`PeriodicTimer`].
-    pub fn new_typed(inner: impl Peripheral<P = T> + 'd) -> Self {
-        crate::into_ref!(inner);
+        crate::into_mapped_ref!(inner);
         Self {
             inner,
             _ph: PhantomData,
@@ -329,10 +290,9 @@ where
     }
 }
 
-impl<Dm, T> PeriodicTimer<'_, Dm, T>
+impl<Dm> PeriodicTimer<'_, Dm>
 where
     Dm: DriverMode,
-    T: Timer,
 {
     /// Start a new count down.
     pub fn start(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
@@ -350,15 +310,10 @@ where
         Ok(())
     }
 
-    /// "Wait" until the count down finishes without blocking.
-    pub fn wait(&mut self) -> nb::Result<(), void::Void> {
-        if self.inner.is_interrupt_set() {
-            self.inner.clear_interrupt();
-
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
+    /// "Wait", by blocking, until the count down finishes.
+    pub fn wait(&mut self) {
+        while !self.inner.is_interrupt_set() {}
+        self.inner.clear_interrupt();
     }
 
     /// Tries to cancel the active count down.
@@ -390,12 +345,11 @@ where
     }
 }
 
-impl<Dm, T> crate::private::Sealed for PeriodicTimer<'_, Dm, T> where T: Timer {}
+impl<Dm> crate::private::Sealed for PeriodicTimer<'_, Dm> {}
 
-impl<Dm, T> InterruptConfigurable for PeriodicTimer<'_, Dm, T>
+impl<Dm> InterruptConfigurable for PeriodicTimer<'_, Dm>
 where
     Dm: DriverMode,
-    T: Timer,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         PeriodicTimer::set_interrupt_handler(self, handler);

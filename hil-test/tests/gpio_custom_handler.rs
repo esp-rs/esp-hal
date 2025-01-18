@@ -6,7 +6,7 @@
 //! async API works for user handlers automatically.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: integrated-timers
+//% FEATURES: unstable embassy
 
 #![no_std]
 #![no_main]
@@ -14,8 +14,8 @@
 use embassy_time::{Duration, Timer};
 use esp_hal::{
     gpio::{AnyPin, Flex, Input, Io, Level, Output, Pull},
+    handler,
     interrupt::InterruptConfigurable,
-    macros::handler,
     timer::timg::TimerGroup,
 };
 use hil_test as _;
@@ -66,7 +66,7 @@ async fn drive_pins(gpio1: impl Into<AnyPin>, gpio2: impl Into<AnyPin>) -> usize
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(executor = hil_test::Executor::new())]
 mod tests {
 
     use super::*;

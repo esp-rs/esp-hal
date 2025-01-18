@@ -227,7 +227,7 @@ impl<'d> Camera<'d> {
     ) -> Self {
         crate::into_mapped_ref!(mclk);
 
-        mclk.set_to_push_pull_output(crate::private::Internal);
+        mclk.set_to_push_pull_output();
         OutputSignal::CAM_CLK.connect_to(mclk);
 
         self
@@ -240,7 +240,7 @@ impl<'d> Camera<'d> {
     ) -> Self {
         crate::into_mapped_ref!(pclk);
 
-        pclk.init_input(Pull::None, crate::private::Internal);
+        pclk.init_input(Pull::None);
         InputSignal::CAM_PCLK.connect_to(pclk);
 
         self
@@ -255,9 +255,9 @@ impl<'d> Camera<'d> {
     ) -> Self {
         crate::into_mapped_ref!(vsync, h_enable);
 
-        vsync.init_input(Pull::None, crate::private::Internal);
+        vsync.init_input(Pull::None);
         InputSignal::CAM_V_SYNC.connect_to(vsync);
-        h_enable.init_input(Pull::None, crate::private::Internal);
+        h_enable.init_input(Pull::None);
         InputSignal::CAM_H_ENABLE.connect_to(h_enable);
 
         self.lcd_cam
@@ -281,11 +281,11 @@ impl<'d> Camera<'d> {
     ) -> Self {
         crate::into_mapped_ref!(vsync, hsync, h_enable);
 
-        vsync.init_input(Pull::None, crate::private::Internal);
+        vsync.init_input(Pull::None);
         InputSignal::CAM_V_SYNC.connect_to(vsync);
-        hsync.init_input(Pull::None, crate::private::Internal);
+        hsync.init_input(Pull::None);
         InputSignal::CAM_H_SYNC.connect_to(hsync);
-        h_enable.init_input(Pull::None, crate::private::Internal);
+        h_enable.init_input(Pull::None);
         InputSignal::CAM_H_ENABLE.connect_to(h_enable);
 
         self.lcd_cam
@@ -500,7 +500,7 @@ impl RxEightBits {
         ];
 
         for (pin, signal) in pairs.into_iter() {
-            pin.init_input(Pull::None, crate::private::Internal);
+            pin.init_input(Pull::None);
             signal.connect_to(pin);
         }
 
@@ -577,7 +577,7 @@ impl RxSixteenBits {
         ];
 
         for (pin, signal) in pairs.into_iter() {
-            pin.init_input(Pull::None, crate::private::Internal);
+            pin.init_input(Pull::None);
             signal.connect_to(pin);
         }
 

@@ -7,18 +7,19 @@
 //! - SCL => GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% TAG: bmp180
 
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
 use esp_hal::{
-    entry,
     i2c::master::{Config, I2c},
+    main,
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

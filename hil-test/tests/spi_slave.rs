@@ -4,6 +4,7 @@
 //! testing Mode 1.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -94,7 +95,7 @@ impl BitbangSpi {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 10, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
@@ -125,7 +126,7 @@ mod tests {
         let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
 
         Context {
-            spi: Spi::new(peripherals.SPI2, Mode::Mode1)
+            spi: Spi::new(peripherals.SPI2, Mode::_1)
                 .with_sck(sclk)
                 .with_mosi(mosi)
                 .with_miso(miso)

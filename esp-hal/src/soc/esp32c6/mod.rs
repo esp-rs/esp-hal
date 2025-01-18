@@ -10,12 +10,14 @@
 //!    * I2S_DEFAULT_CLK_SRC: 2 - I2S clock source
 //!    * I2S_SCLK: 160_000_000 - I2S clock frequency
 
-pub mod efuse;
+crate::unstable_module! {
+    pub mod efuse;
+    pub mod lp_core;
+    pub mod radio_clocks;
+    pub mod trng;
+}
 pub mod gpio;
-pub mod lp_core;
 pub mod peripherals;
-pub mod radio_clocks;
-pub mod trng;
 
 /// The name of the chip ("esp32c6") as `&str`
 #[macro_export]
@@ -50,7 +52,7 @@ pub(crate) mod constants {
 
     /// The starting address of the RMT (Remote Control) peripheral's RAM.
     pub const RMT_RAM_START: usize = 0x60006400;
-    /// The size of each RMT channel's RAM in bytes.
+    /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
     /// The default clock source for the RMT peripheral.
     pub const RMT_CLOCK_SRC: u8 = 1;

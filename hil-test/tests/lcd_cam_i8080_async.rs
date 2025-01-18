@@ -1,7 +1,7 @@
 //! lcd_cam i8080 tests
 
 //% CHIPS: esp32s3
-//% FEATURES: generic-queue
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -28,7 +28,7 @@ struct Context<'d> {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 

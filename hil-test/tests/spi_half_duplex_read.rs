@@ -1,6 +1,7 @@
 //! SPI Half Duplex Read Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -50,7 +51,7 @@ mod tests {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap()
         .with_sck(sclk)
@@ -74,7 +75,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                DataMode::Single,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -92,7 +93,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                DataMode::Single,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -123,7 +124,7 @@ mod tests {
 
         let mut buffer = [0xAA; DMA_BUFFER_SIZE];
         spi.half_duplex_read(
-            DataMode::Single,
+            DataMode::SingleTwoDataLines,
             Command::None,
             Address::None,
             0,
@@ -137,7 +138,7 @@ mod tests {
         ctx.miso_mirror.set_high();
 
         spi.half_duplex_read(
-            DataMode::Single,
+            DataMode::SingleTwoDataLines,
             Command::None,
             Address::None,
             0,

@@ -73,7 +73,9 @@ cfg_if::cfg_if! {
 }
 
 /// The sampling/readout resolution of the ADC.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Resolution {
     /// 13-bit resolution
     #[default]
@@ -232,8 +234,8 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_HIGH_ADDR, msb as u32);
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_LOW_ADDR, lsb as u32);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_HIGH_ADDR, msb as u32);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_LOW_ADDR, lsb as u32);
     }
 
     fn reset() {
@@ -255,16 +257,16 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_DREF_ADDR, enable as u8);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_DREF_ADDR, enable as u8);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
             AdcCalSource::Gnd => {
-                crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_ENCAL_GND_ADDR, enable as u8);
+                crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_ENCAL_GND_ADDR, enable as u8);
             }
             AdcCalSource::Ref => {
-                crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC1_ENCAL_REF_ADDR, enable as u8);
+                crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC1_ENCAL_REF_ADDR, enable as u8);
             }
         }
     }
@@ -346,8 +348,8 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_HIGH_ADDR, msb as u32);
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_LOW_ADDR, lsb as u32);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_HIGH_ADDR, msb as u32);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_LOW_ADDR, lsb as u32);
     }
 
     fn reset() {
@@ -369,16 +371,16 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_DREF_ADDR, enable as u8);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_DREF_ADDR, enable as u8);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
             AdcCalSource::Gnd => {
-                crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_ENCAL_GND_ADDR, enable as u8);
+                crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_ENCAL_GND_ADDR, enable as u8);
             }
             AdcCalSource::Ref => {
-                crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC2_ENCAL_REF_ADDR, enable as u8);
+                crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC2_ENCAL_REF_ADDR, enable as u8);
             }
         }
     }

@@ -5,11 +5,13 @@
 //! The `SOC` module provides access, functions and structures that are useful
 //! for interacting with various system-related peripherals on `ESP32-C2` chip.
 
-pub mod efuse;
+crate::unstable_module! {
+    pub mod efuse;
+    pub mod radio_clocks;
+    pub mod trng;
+}
 pub mod gpio;
 pub mod peripherals;
-pub mod radio_clocks;
-pub mod trng;
 
 /// The name of the chip ("esp32c2") as `&str`
 #[macro_export]

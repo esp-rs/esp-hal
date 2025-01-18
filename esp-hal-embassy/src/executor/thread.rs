@@ -2,29 +2,22 @@
 
 use core::marker::PhantomData;
 
-use embassy_executor::{raw, Spawner};
-use esp_hal::Cpu;
+use embassy_executor::Spawner;
 #[cfg(multi_core)]
-use esp_hal::{interrupt::software::SoftwareInterrupt, macros::handler};
+use esp_hal::interrupt::software::SoftwareInterrupt;
+use esp_hal::{interrupt::Priority, Cpu};
 #[cfg(low_power_wait)]
 use portable_atomic::{AtomicBool, Ordering};
+
+use super::InnerExecutor;
 
 pub(crate) const THREAD_MODE_CONTEXT: usize = 16;
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V
+#[cfg(low_power_wait)]
 static SIGNAL_WORK_THREAD_MODE: [AtomicBool; Cpu::COUNT] =
     [const { AtomicBool::new(false) }; Cpu::COUNT];
-
-#[cfg(all(multi_core, low_power_wait))]
-#[handler]
-fn software3_interrupt() {
-    // This interrupt is fired when the thread-mode executor's core needs to be
-    // woken. It doesn't matter which core handles this interrupt first, the
-    // point is just to wake up the core that is currently executing
-    // `waiti`.
-    unsafe { SoftwareInterrupt::<3>::steal().reset() };
-}
 
 pub(crate) fn pend_thread_mode(_core: usize) {
     #[cfg(low_power_wait)]
@@ -55,7 +48,7 @@ pub(crate) fn pend_thread_mode(_core: usize) {
 create one instance per core. The executors don't steal tasks from each other."
 )]
 pub struct Executor {
-    inner: raw::Executor,
+    inner: InnerExecutor,
     not_send: PhantomData<*mut ()>,
 }
 
@@ -68,13 +61,11 @@ impl Executor {
 This will use software-interrupt 3 which isn't available for anything else to wake the other core(s)."#
     )]
     pub fn new() -> Self {
-        #[cfg(all(multi_core, low_power_wait))]
-        unsafe {
-            SoftwareInterrupt::<3>::steal().set_interrupt_handler(software3_interrupt);
-        }
-
         Self {
-            inner: raw::Executor::new((THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut ()),
+            inner: InnerExecutor::new(
+                Priority::Priority1,
+                (THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut (),
+            ),
             not_send: PhantomData,
         }
     }
@@ -100,13 +91,20 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
-        init(self.inner.spawner());
+        unwrap!(esp_hal::interrupt::enable(
+            esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
+            Priority::min(),
+        ));
+
+        self.inner.init();
+
+        init(self.inner.inner.spawner());
 
         #[cfg(low_power_wait)]
         let cpu = Cpu::current() as usize;
 
         loop {
-            unsafe { self.inner.poll() };
+            unsafe { self.inner.inner.poll() };
 
             #[cfg(low_power_wait)]
             Self::wait_impl(cpu);

@@ -1,6 +1,7 @@
 //! lcd_cam i8080 tests
 
 //% CHIPS: esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]

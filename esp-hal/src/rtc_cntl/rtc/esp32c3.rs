@@ -3,7 +3,7 @@ use strum::FromRepr;
 use crate::{
     clock::XtalClock,
     peripherals::{APB_CTRL, EXTMEM, RTC_CNTL, SPI0, SPI1, SYSTEM},
-    regi2c_write_mask,
+    rom::regi2c_write_mask,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };
 
@@ -86,7 +86,7 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(RtcClock::xtal_freq(), XtalClock::RtcXtalFreq40M));
+    assert!(matches!(RtcClock::xtal_freq(), XtalClock::_40M));
 
     unsafe {
         // from esp_clk_init:

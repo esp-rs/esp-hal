@@ -181,12 +181,20 @@ fn main() -> Result<()> {
 
     let workspace = std::env::current_dir()?;
 
+    let out_path = Path::new("target");
+
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
         Cli::BuildDocumentationIndex(args) => build_documentation_index(&workspace, args),
-        Cli::BuildExamples(args) => examples(&workspace, args, CargoAction::Build),
+        Cli::BuildExamples(args) => examples(
+            &workspace,
+            args,
+            CargoAction::Build(out_path.join("examples")),
+        ),
         Cli::BuildPackage(args) => build_package(&workspace, args),
-        Cli::BuildTests(args) => tests(&workspace, args, CargoAction::Build),
+        Cli::BuildTests(args) => {
+            tests(&workspace, args, CargoAction::Build(out_path.join("tests")))
+        }
         Cli::BumpVersion(args) => bump_version(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
@@ -227,7 +235,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     };
 
     // Load all examples which support the specified chip and parse their metadata:
-    let mut examples = xtask::load_examples(&example_path, action)?
+    let mut examples = xtask::load_examples(&example_path)?
         .iter()
         .filter_map(|example| {
             if example.supports_chip(args.chip) {
@@ -243,12 +251,18 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
 
     // Execute the specified action:
     match action {
-        CargoAction::Build => build_examples(args, examples, &package_path),
-        CargoAction::Run => run_example(args, examples, &package_path),
+        CargoAction::Build(out_path) => build_examples(args, examples, &package_path, out_path),
+        CargoAction::Run if args.example.is_some() => run_example(args, examples, &package_path),
+        CargoAction::Run => run_examples(args, examples, &package_path),
     }
 }
 
-fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
+fn build_examples(
+    args: ExampleArgs,
+    examples: Vec<Metadata>,
+    package_path: &Path,
+    out_path: PathBuf,
+) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
     let target = target_triple(args.package, &args.chip)?;
 
@@ -264,7 +278,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
                 args.chip,
                 target,
                 example,
-                CargoAction::Build,
+                CargoAction::Build(out_path.clone()),
                 1,
                 args.debug,
             )?;
@@ -281,7 +295,7 @@ fn build_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Pat
                 args.chip,
                 target,
                 example,
-                CargoAction::Build,
+                CargoAction::Build(out_path.clone()),
                 1,
                 args.debug,
             )
@@ -318,6 +332,79 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
     Ok(())
 }
 
+fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(args.package, &args.chip)?;
+
+    // Filter the examples down to only the binaries we're interested in
+    let mut examples: Vec<Metadata> = examples
+        .iter()
+        .filter(|ex| ex.supports_chip(args.chip))
+        .cloned()
+        .collect();
+    examples.sort_by_key(|ex| ex.tag());
+
+    let console = console::Term::stdout();
+
+    for example in examples {
+        let mut skip = false;
+
+        log::info!("Running example '{}'", example.name());
+        if let Some(description) = example.description() {
+            log::info!(
+                "\n\n{}\n\nPress ENTER to run example, `s` to skip",
+                description.trim()
+            );
+        } else {
+            log::info!("\n\nPress ENTER to run example, `s` to skip");
+        }
+
+        loop {
+            let key = console.read_key();
+
+            match key {
+                Ok(console::Key::Enter) => break,
+                Ok(console::Key::Char('s')) => {
+                    skip = true;
+                    break;
+                }
+                _ => (),
+            }
+        }
+
+        if !skip {
+            while !skip
+                && xtask::execute_app(
+                    package_path,
+                    args.chip,
+                    target,
+                    &example,
+                    CargoAction::Run,
+                    1,
+                    args.debug,
+                )
+                .is_err()
+            {
+                log::info!("Failed to run example. Retry or skip? (r/s)");
+                loop {
+                    let key = console.read_key();
+
+                    match key {
+                        Ok(console::Key::Char('r')) => break,
+                        Ok(console::Key::Char('s')) => {
+                            skip = true;
+                            break;
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     // Absolute path of the 'hil-test' package's root:
     let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
@@ -326,7 +413,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let target = target_triple(Package::HilTest, &args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = xtask::load_examples(&package_path.join("tests"), action)?
+    let mut tests = xtask::load_examples(&package_path.join("tests"))?
         .into_iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
@@ -346,7 +433,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
                 args.chip,
                 target,
                 test,
-                action,
+                action.clone(),
                 args.repeat.unwrap_or(1),
                 false,
             )?;
@@ -362,7 +449,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
                 args.chip,
                 target,
                 &test,
-                action,
+                action.clone(),
                 args.repeat.unwrap_or(1),
                 false,
             )
@@ -644,7 +731,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         &[
                             "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
-                            &format!("--features={chip},executors,defmt,integrated-timers,esp-hal/unstable"),
+                            &format!("--features={chip},executors,defmt,esp-hal/unstable"),
                         ],
                         args.fix,
                     )?;
@@ -771,7 +858,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 }
 
 fn lint_package(chip: &Chip, path: &Path, args: &[&str], fix: bool) -> Result<()> {
-    log::info!("Linting package: {}", path.display());
+    log::info!("Linting package: {} ({})", path.display(), chip);
 
     let builder = CargoArgsBuilder::default().subcommand("clippy");
 

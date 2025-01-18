@@ -1,7 +1,7 @@
 //! Cp0Disable exception regression test
 
 //% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: esp-wifi esp-alloc
+//% FEATURES: unstable esp-wifi esp-alloc
 
 #![no_std]
 #![no_main]
@@ -12,8 +12,8 @@ use critical_section::Mutex;
 use esp_hal::{
     clock::CpuClock,
     delay::Delay,
+    handler,
     interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
-    macros::handler,
     peripherals::Peripherals,
     rng::Rng,
     timer::timg::TimerGroup,

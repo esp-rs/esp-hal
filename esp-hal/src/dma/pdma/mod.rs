@@ -18,7 +18,7 @@ use crate::{
     asynch::AtomicWaker,
     dma::*,
     interrupt::Priority,
-    macros::handler,
+    handler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
 };

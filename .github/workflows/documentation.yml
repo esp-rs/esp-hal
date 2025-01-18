@@ -36,7 +36,7 @@ jobs:
         with:
           default: true
           ldproxy: false
-          version: 1.83.0.1
+          version: 1.84.0.0
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,13 +62,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
       - name: Prepare
         run: mkdir docs
       - name: Download all docs
         uses: actions/download-artifact@v4
         with:
           path: "docs/"
-      
+
       - name: Create index.html
         run: "cargo xtask build-documentation-index --packages=$(echo '${{ needs.setup.outputs.packages }}' | jq -r '[.[].name] | join(\",\")')"
 

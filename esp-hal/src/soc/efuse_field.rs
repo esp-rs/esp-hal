@@ -110,6 +110,7 @@ impl Efuse {
     ///
     /// This function panics if the field's bit length is not equal to 1.
     #[inline(always)]
+    #[cfg_attr(not(feature = "unstable"), allow(unused))]
     pub fn read_bit(field: EfuseField) -> bool {
         assert_eq!(field.bit_len, 1);
         Self::read_field_le::<u8>(field) != 0

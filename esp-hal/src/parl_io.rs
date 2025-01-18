@@ -185,6 +185,7 @@ pub enum ParlIoInterrupt {
 /// Parallel IO errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Error {
     /// General DMA error
     DmaError(DmaError),
@@ -389,7 +390,7 @@ impl<'d> ClkOutPin<'d> {
 }
 impl TxClkPin for ClkOutPin<'_> {
     fn configure(&mut self) {
-        self.pin.set_to_push_pull_output(crate::private::Internal);
+        self.pin.set_to_push_pull_output();
         crate::gpio::OutputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
     }
 }
@@ -411,8 +412,7 @@ impl TxClkPin for ClkInPin<'_> {
         pcr.parl_clk_tx_conf()
             .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin
-            .init_input(crate::gpio::Pull::None, crate::private::Internal);
+        self.pin.init_input(crate::gpio::Pull::None);
         crate::gpio::InputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
     }
 }
@@ -438,8 +438,7 @@ impl RxClkPin for RxClkInPin<'_> {
         pcr.parl_clk_rx_conf()
             .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin
-            .init_input(crate::gpio::Pull::None, crate::private::Internal);
+        self.pin.init_input(crate::gpio::Pull::None);
         crate::gpio::InputSignal::PARL_RX_CLK.connect_to(&mut self.pin);
 
         Instance::set_rx_clk_edge_sel(self.sample_edge);
@@ -477,8 +476,7 @@ where
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.tx_pins.configure()?;
-        self.valid_pin
-            .set_to_push_pull_output(crate::private::Internal);
+        self.valid_pin.set_to_push_pull_output();
         Instance::tx_valid_pin_signal().connect_to(&mut self.valid_pin);
         Instance::set_tx_hw_valid_en(true);
         Ok(())
@@ -549,7 +547,7 @@ macro_rules! tx_pins {
             {
                 fn configure(&mut self) -> Result<(), Error>{
                     $(
-                        self.[< pin_ $pin:lower >].set_to_push_pull_output(crate::private::Internal);
+                        self.[< pin_ $pin:lower >].set_to_push_pull_output();
                         crate::gpio::OutputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
@@ -668,8 +666,7 @@ where
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.rx_pins.configure()?;
-        self.valid_pin
-            .init_input(crate::gpio::Pull::None, crate::private::Internal);
+        self.valid_pin.init_input(crate::gpio::Pull::None);
         Instance::rx_valid_pin_signal().connect_to(&mut self.valid_pin);
         Instance::set_rx_sw_en(false);
         if let Some(sel) = self.enable_mode.pulse_submode_sel() {
@@ -768,7 +765,7 @@ macro_rules! rx_pins {
             {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
-                        self.[< pin_ $pin:lower >].init_input(crate::gpio::Pull::None, crate::private::Internal);
+                        self.[< pin_ $pin:lower >].init_input(crate::gpio::Pull::None);
                         crate::gpio::InputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
@@ -909,6 +906,7 @@ where
 }
 
 /// Parallel IO TX channel
+#[instability::unstable]
 pub struct ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
@@ -990,6 +988,7 @@ where
 }
 
 /// Parallel IO RX channel
+#[instability::unstable]
 pub struct ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,

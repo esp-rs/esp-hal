@@ -16,7 +16,7 @@ use core::ptr::addr_of_mut;
 
 use esp_backtrace as _;
 use esp_hal::{
-    entry,
+    main,
     otg_fs::{Usb, UsbBus},
 };
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
@@ -24,7 +24,7 @@ use usbd_serial::{SerialPort, USB_CLASS_CDC};
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

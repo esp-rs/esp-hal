@@ -174,6 +174,7 @@ unsafe fn internal_park_core(core: Cpu) {
 
 impl<'d> CpuControl<'d> {
     /// Creates a new instance of `CpuControl`.
+    #[instability::unstable]
     pub fn new(cpu_control: impl Peripheral<P = CPU_CTRL> + 'd) -> CpuControl<'d> {
         crate::into_ref!(cpu_control);
 

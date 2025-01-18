@@ -2,6 +2,7 @@
 
 // esp32 disabled as it does not have a systimer
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -12,7 +13,7 @@ use critical_section::Mutex;
 use embedded_hal::delay::DelayNs;
 use esp_hal::{
     delay::Delay,
-    macros::handler,
+    handler,
     time::ExtU64,
     timer::{
         systimer::{Alarm, SystemTimer},

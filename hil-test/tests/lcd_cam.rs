@@ -1,6 +1,7 @@
 //! LCD_CAM Camera and DPI tests
 
 //% CHIPS: esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]

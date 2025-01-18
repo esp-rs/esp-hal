@@ -8,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- SPI: Added support for 3-wire SPI (#2919)
+
+### Changed
+- RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
+- RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
+- RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
+- Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read (#2882)
+- Uart `read_bytes` is now blocking  returns the number of bytes read (#2882)
+- Uart `flush` is now blocking (#2882)
+- Removed `embedded-hal-nb` traits (#2882)
+- `timer::wait` is now blocking (#2882)
+
+### Fixed
+
+- `DmaDescriptor` is now `#[repr(C)]` (#2988)
+
+### Removed
+
+- Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
+
+## [0.23.1] - 2025-01-15
+
+### Fixed
+
+- Fixed `PriorityLock` being ineffective with `Priority::max()` on RISC-V CPUs (#2964)
+
+## [0.23.0] - 2025-01-15
+
+### Added
 
 - ESP32-S3: Added SDMMC signals (#2556)
 - Added `set_priority` to the `DmaChannel` trait on GDMA devices (#2403, #2526)
@@ -51,12 +80,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gpio::{GpioPin, AnyPin, Io, Output, OutputOpenDrain, Input, Flex}` now implement `Debug`, `defmt::Format` (#2842)
 - Add `tx_idle_num` to `uart::Config` with documentation of the expected transmission behavior (#2859)
 - More interrupts are available in `esp_hal::spi::master::SpiInterrupt`, add `enable_listen`,`interrupts` and `clear_interrupts` for ESP32/ESP32-S2 (#2833)
-
 - The `ExtU64` and `RateExtU32` traits have been added to `esp_hal::time` (#2845)
+- Added `AnyPin::steal(pin_number)` (#2854)
+- `adc::{AdcCalSource, Attenuation, Resolution}` now implement `Hash` and `defmt::Format` (#2840)
+- `rtc_cntl::{RtcFastClock, RtcSlowClock, RtcCalSel}` now implement `PartialEq`, `Eq`, `Hash` and `defmt::Format` (#2840)
+- Added `tsens::TemperatureSensor` peripheral for ESP32C6 and ESP32C3 (#2875)
+- Added `with_rx()` and `with_tx()` methods to Uart, UartRx, and UartTx (#2904)
+- ESP32-S2: Made Wi-Fi peripheral non virtual. (#2942)
+- `UartRx::check_for_errors`, `Uart::check_for_rx_errors`, `{Uart, UartRx}::read_buffered_bytes` (#2935)
+- Added `i2c` interrupt API (#2944)
 
 ### Changed
 
-- Bump MSRV to 1.83 (#2615)
 - In addition to taking by value, peripheral drivers can now mutably borrow DMA channel objects. (#2526)
 - DMA channel objects are no longer wrapped in `Channel`. The `Channel` drivers are now managed by DMA enabled peripheral drivers. (#2526)
 - The `Dpi` driver and `DpiTransfer` now have a `Mode` type parameter. The driver's asyncness is determined by the asyncness of the `Lcd` used to create it. (#2526)
@@ -86,10 +121,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `esp-pacs` with support for Wi-Fi on the ESP32 and made the peripheral non virtual
 - `SpiBitOrder`, `SpiDataMode`, `SpiMode` were renamed to `BitOder`, `DataMode` and `Mode` (#2828)
 - `crate::Mode` was renamed to `crate::DriverMode` (#2828)
+- `Spi::with_miso` has been overloaded into `Spi::with_miso` and `Spi::with_sio1` (#2557)
 - Renamed some I2C error variants (#2844)
 - I2C: Replaced potential panics with errors. (#2831)
 - UART: Make `AtCmdConfig` and `ConfigError` non-exhaustive (#2851)
 - UART: Make `AtCmdConfig` use builder-lite pattern (#2851)
+- UART: Fix naming violations for `DataBits`, `Parity`, and `StopBits` enum variants (#2893)
+- UART: Remove blocking version of `read_bytes` and rename `drain_fifo` to `read_bytes` instead (#2895)
+- Renamed variants of `CpuClock`, made the enum non-exhaustive (#2899)
+- SPI: Fix naming violations for `Mode` enum variants (#2902)
+- SPI: Fix naming violations for `Address` and `Command` enum variants (#2906)
+- `ClockSource` enums are now `#[non_exhaustive]` (#2912)
+- `macros` module is now private (#2900)
+- `gpio::{Input, Flex}::wakeup_enable` now returns an error instead of panicking. (#2916)
+- I2C: Have a dedicated enum to specify the timeout (#2864)
+- Removed the `I` prefix from `DriveStrength` enum variants. (#2922)
+- Removed the `Attenuation` prefix from `Attenuation` enum variants. (#2922)
+- Renamed / changed some I2C error variants (#2844, #2862)
+- The `entry` macro is replaced by the `main` macro (#2941)
+- `{Uart, UartRx}::read_bytes` now blocks until the buffer is filled. (#2935)
+- Bump MSRV to 1.84 (#2951)
 
 ### Fixed
 
@@ -98,6 +149,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `spi::master::Spi::{into_async, into_blocking}` are now correctly available on the typed driver, to. (#2674)
 - It is no longer possible to safely conjure `GpioPin` instances (#2688)
 - UART: Public API follows `C-WORD_ORDER` Rust API standard (`VerbObject` order) (#2851)
+- `DmaRxStreamBuf` now correctly resets the descriptors the next time it's used (#2890)
+- i2s: fix pin offset logic for parallel output on i2s1 (#2886)
 
 ### Removed
 
@@ -112,8 +165,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `embedded-hal 0.2.x` impls and deps from `esp-hal` (#2593)
 - Removed `Camera::set_` functions (#2610)
 - `DmaTxBuf::{compute_chunk_size, compute_descriptor_count, new_with_block_size}` (#2543)
-
 - The `prelude` module has been removed (#2845)
+- SPI: Removed `pub fn read_byte` and `pub fn write_byte` (#2915)
+- Removed all peripheral instance type parameters and `new_typed` constructors (#2907)
 
 ## [0.22.0] - 2024-11-20
 
@@ -179,6 +233,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `get_` prefixes from functions (#2528)
 - The `Camera` and `I8080` drivers' constructors now only accepts blocking-mode DMA channels. (#2519)
 - Many peripherals are now disabled by default and also get disabled when the driver is dropped (#2544)
+- Updated embassy-time to v0.4 (#2701)
+
+- Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
+- UART: `read_byte` and `write_byte` made private. (#2915)
 
 ### Fixed
 
@@ -222,6 +280,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Io::new_with_priority` and `Io::new_no_bind_interrupt`. (#2486)
 - `parl_io::{no_clk_pin(), NoClkPin}` (#2531)
 - Removed `get_core` function in favour of `Cpu::current` (#2533)
+
+- Removed `uart::Config` setters and `symbol_length`. (#2847)
 
 ## [0.21.1]
 
@@ -1029,7 +1089,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.23.1...HEAD
+[0.23.1]: https://github.com/esp-rs/esp-hal/compare/v0.23.0..v0.23.1
+[0.23.0]: https://github.com/esp-rs/esp-hal/compare/v0.22.0..v0.23.0
 [0.22.0]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/esp-rs/esp-hal/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...v0.21.0

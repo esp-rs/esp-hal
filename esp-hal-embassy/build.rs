@@ -1,10 +1,10 @@
-use std::{error::Error, str::FromStr};
+use std::{error::Error as StdError, str::FromStr};
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, Value};
+use esp_config::{generate_config, Error, Validator, Value};
 use esp_metadata::{Chip, Config};
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn StdError>> {
     // NOTE: update when adding new device support!
     // Ensure that exactly one chip has been specified:
     assert_unique_used_features!(
@@ -39,16 +39,70 @@ fn main() -> Result<(), Box<dyn Error>> {
     config.define_symbols();
 
     // emit config
-    generate_config(
+    let crate_config = generate_config(
         "esp_hal_embassy",
         &[(
             "low-power-wait",
             "Enables the lower-power wait if no tasks are ready to run on the thread-mode executor. This allows the MCU to use less power if the workload allows. Recommended for battery-powered systems. May impact analog performance.",
             Value::Bool(true),
             None
-        )],
+        ),
+        (
+            "timer-queue",
+            "<p>The flavour of the timer queue provided by this crate. Accepts one of `single-integrated`, `multiple-integrated` or `generic`. Integrated queues require the `executors` feature to be enabled.</p><p>If you use embassy-executor, the `single-integrated` queue is recommended for ease of use, while the `multiple-integrated` queue is recommended for performance. The `multiple-integrated` option needs one timer per executor.</p><p>The `generic` queue allows using embassy-time without the embassy executors.</p>",
+            Value::String(if cfg!(feature = "executors") {
+                String::from("single-integrated")
+            } else {
+                String::from("generic")
+            }),
+            Some(Validator::Custom(Box::new(|value| {
+                let Value::String(string) = value else {
+                    return Err(Error::Validation(String::from("Expected a string")));
+                };
+
+                if !cfg!(feature = "executors") {
+                    if string.as_str() != "generic" {
+                        return Err(Error::Validation(format!("Expected 'generic' because the `executors` feature is not enabled. Found {string}")));
+                    }
+                    return Ok(());
+                }
+
+                match string.as_str() {
+                    "single-integrated" => Ok(()), // preferred for ease of use
+                    "multiple-integrated" => Ok(()), // preferred for performance
+                    "generic" => Ok(()), // allows using embassy-time without the embassy executors
+                    _ => Err(Error::Validation(format!("Expected 'single-integrated', 'multiple-integrated' or 'generic', found {string}")))
+                }
+            })))
+        ),
+        (
+            "generic-queue-size",
+            "The capacity of the queue when the `generic` timer queue flavour is selected.",
+            Value::Integer(64),
+            Some(Validator::PositiveInteger),
+        ),
+    ],
         true,
     );
+
+    println!("cargo:rustc-check-cfg=cfg(integrated_timers)");
+    println!("cargo:rustc-check-cfg=cfg(single_queue)");
+    println!("cargo:rustc-check-cfg=cfg(generic_timers)");
+
+    match &crate_config["ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE"] {
+        Value::String(s) if s.as_str() == "single-integrated" => {
+            println!("cargo:rustc-cfg=integrated_timers");
+            println!("cargo:rustc-cfg=single_queue");
+        }
+        Value::String(s) if s.as_str() == "multiple-integrated" => {
+            println!("cargo:rustc-cfg=integrated_timers");
+        }
+        Value::String(s) if s.as_str() == "generic" => {
+            println!("cargo:rustc-cfg=generic_timers");
+            println!("cargo:rustc-cfg=single_queue");
+        }
+        _ => unreachable!(),
+    }
 
     Ok(())
 }

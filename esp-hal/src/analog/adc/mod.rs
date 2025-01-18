@@ -36,7 +36,7 @@
 //! let mut adc1_config = AdcConfig::new();
 //! let mut pin = adc1_config.enable_pin(
 //!     analog_pin,
-//!     Attenuation::Attenuation11dB,
+//!     Attenuation::_11dB,
 //! );
 //! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 //!
@@ -70,23 +70,26 @@ mod implementation;
 /// The effective measurement range for a given attenuation is dependent on the
 /// device being targeted. Please refer to "ADC Characteristics" section of your
 /// device's datasheet for more information.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Attenuation {
     /// 0dB attenuation
-    Attenuation0dB   = 0b00,
+    _0dB   = 0b00,
     /// 2.5dB attenuation
     #[cfg(not(esp32c2))]
-    Attenuation2p5dB = 0b01,
+    _2p5dB = 0b01,
     /// 6dB attenuation
     #[cfg(not(esp32c2))]
-    Attenuation6dB   = 0b10,
+    _6dB   = 0b10,
     /// 11dB attenuation
-    Attenuation11dB  = 0b11,
+    _11dB  = 0b11,
 }
 
 /// Calibration source of the ADC.
 #[cfg(not(esp32))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AdcCalSource {
     /// Use Ground as the calibration source
     Gnd,

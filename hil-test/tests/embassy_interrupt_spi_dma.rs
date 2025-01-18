@@ -1,8 +1,7 @@
 //! Reproduction and regression test for a sneaky issue.
 
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6 esp32h2
-//% FEATURES: integrated-timers
-//% FEATURES: generic-queue
+//% FEATURES: unstable embassy
 
 #![no_std]
 #![no_main]
@@ -75,7 +74,7 @@ async fn interrupt_driven_task(mut i2s_tx: esp_hal::i2s::master::I2sTx<'static, 
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod test {
     use super::*;
 
@@ -121,7 +120,7 @@ mod test {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(10000.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap()
         .with_miso(unsafe { mosi.clone_unchecked() })
@@ -135,7 +134,7 @@ mod test {
             peripherals.SPI3,
             Config::default()
                 .with_frequency(10000.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap()
         .with_dma(dma_channel2)
@@ -229,7 +228,7 @@ mod test {
                 peripherals.spi,
                 Config::default()
                     .with_frequency(100.kHz())
-                    .with_mode(Mode::Mode0),
+                    .with_mode(Mode::_0),
             )
             .unwrap()
             .with_dma(peripherals.dma_channel)

@@ -11,7 +11,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    entry,
     etm::Etm,
     gpio::{
         etm::{Channels, OutputConfig},
@@ -19,6 +18,7 @@ use esp_hal::{
         Output,
         Pull,
     },
+    main,
     time::ExtU64,
     timer::{
         systimer::{etm::Event, SystemTimer},
@@ -26,7 +26,7 @@ use esp_hal::{
     },
 };
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

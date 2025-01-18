@@ -450,6 +450,7 @@ where
 }
 
 /// USB Serial/JTAG peripheral instance
+#[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
     /// Get a reference to the peripheral's underlying register block
     fn register_block() -> &'static RegisterBlock;
@@ -539,71 +540,6 @@ where
         self.write_bytes(ch.encode_utf8(&mut buffer).as_bytes())?;
 
         Ok(())
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        embedded_hal_nb::serial::Read::read(&mut self.rx)
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        embedded_hal_nb::serial::Write::write(&mut self.tx, word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        embedded_hal_nb::serial::Write::flush(&mut self.tx)
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte_nb(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx_nb()
     }
 }
 

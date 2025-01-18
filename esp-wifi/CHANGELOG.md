@@ -7,18 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-
 ### Added
 
 ### Changed
 
-- Bump MSRV to 1.83 (#2615)
+### Fixed
+
+- Fixed a problem using BLE on ESP32-C6 when connected via Serial-JTAG (#2981)
+
+### Removed
+
+## 0.12.0 - 2025-01-15
+
+### Changed
+
+- Bump smoltcp to 0.12.0 (#2849)
+- `csi_enabled` option converted to feature (#2945)
+- Bump MSRV to 1.84 (#2951)
 
 ### Fixed
 
 - Fixed triggering a debug-assertion during scan (#2612)
-
-### Removed
+- Fix WPA2-ENTERPRISE functionality (#2896)
+- Make sure to de-allocate memory used by timers on removal (#2936)
 
 ## 0.11.0 - 2024-11-20
 
@@ -37,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the async APIs to have a `_async` postfix to avoid name collisions (#2446)
 - `phy_enable_usb` is enabled by default (#2446)
 - Removed `get_` prefixes from functions (#2528)
+
+- Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 
 ### Fixed
 
@@ -204,4 +217,4 @@ Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2
 
 Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2024-11-20
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2025-01-15

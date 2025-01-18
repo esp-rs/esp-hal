@@ -15,6 +15,8 @@
 #![no_std]
 #![no_main]
 
+use core::net::Ipv4Addr;
+
 use bleps::{
     ad_structure::{
         create_advertising_data,
@@ -32,7 +34,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    entry,
+    main,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -45,13 +47,13 @@ use esp_wifi::{
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
-    wire::{DhcpOption, IpAddress, Ipv4Address},
+    wire::{DhcpOption, IpAddress},
 };
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -172,7 +174,7 @@ fn main() -> ! {
         socket.work();
 
         socket
-            .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+            .open(IpAddress::Ipv4(Ipv4Addr::new(142, 250, 185, 115)), 80)
             .unwrap();
 
         socket

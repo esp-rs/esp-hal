@@ -6,22 +6,7 @@ use crate::{
 };
 
 pub(crate) fn setup_radio_isr() {
-    // wifi enabled in set_isr
-    #[cfg(feature = "ble")]
-    {
-        unwrap!(interrupt::enable(
-            Interrupt::RWBT,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
-            Interrupt::RWBLE,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
-            Interrupt::BT_BB,
-            interrupt::Priority::Priority1
-        ));
-    }
+    // no-op
 }
 
 pub(crate) fn shutdown_radio_isr() {

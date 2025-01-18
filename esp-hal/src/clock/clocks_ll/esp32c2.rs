@@ -1,7 +1,6 @@
 use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
-    regi2c_write,
-    regi2c_write_mask,
+    rom::{regi2c_write, regi2c_write_mask},
 };
 
 const I2C_BBPLL: u32 = 0x66;
@@ -65,7 +64,7 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
 
     // Configure 480M PLL
     match xtal_freq {
-        XtalClock::RtcXtalFreq26M => {
+        XtalClock::_26M => {
             div_ref = 12;
             div7_0 = 236;
             dr1 = 4;
@@ -74,7 +73,7 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
             dcur = 0;
             dbias = 2;
         }
-        XtalClock::RtcXtalFreq40M | XtalClock::RtcXtalFreqOther(_) => {
+        XtalClock::_40M | XtalClock::Other(_) => {
             div_ref = 0;
             div7_0 = 8;
             dr1 = 0;
@@ -150,8 +149,8 @@ pub(crate) fn esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
             .modify(|_, w| w.pre_div_cnt().bits(0).soc_clk_sel().bits(1));
         system_control.cpu_per_conf().modify(|_, w| {
             w.cpuperiod_sel().bits(match cpu_clock_speed {
-                CpuClock::Clock80MHz => 0,
-                CpuClock::Clock120MHz => 1,
+                CpuClock::_80MHz => 0,
+                CpuClock::_120MHz => 1,
             })
         });
     }

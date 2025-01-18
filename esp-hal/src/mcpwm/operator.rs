@@ -16,11 +16,11 @@ use crate::{
     gpio::interconnect::{OutputConnection, PeripheralOutput},
     mcpwm::{timer::Timer, PwmPeripheral},
     peripheral::{Peripheral, PeripheralRef},
-    private,
 };
 
 /// Input/Output Stream descriptor for each channel
 #[derive(Copy, Clone)]
+#[allow(clippy::upper_case_acronyms, reason = "peripheral is unstable")]
 pub enum PWMStream {
     /// PWM Stream A
     PWMA,
@@ -309,7 +309,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin.set_update_method(config.update_method);
 
         PWM::output_signal::<OP, IS_A>().connect_to(&mut pin.pin);
-        pin.pin.enable_output(true, private::Internal);
+        pin.pin.enable_output(true);
 
         pin
     }

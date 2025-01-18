@@ -123,7 +123,6 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
-    private::Internal,
     system::PeripheralGuard,
     Async,
     Blocking,
@@ -186,7 +185,7 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
         crate::into_ref!(instance);
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(Internal);
+            pin.set_to_push_pull_output();
             instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
@@ -228,20 +227,19 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
         crate::into_ref!(instance);
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output(Internal);
+            pin.set_to_push_pull_output();
             instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
 }
 
 /// I2S Parallel Interface
-pub struct I2sParallel<'d, Dm, I = AnyI2s>
+pub struct I2sParallel<'d, Dm>
 where
     Dm: DriverMode,
-    I: Instance,
 {
-    instance: PeripheralRef<'d, I>,
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<I>>,
+    instance: PeripheralRef<'d, AnyI2s>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>,
     _guard: PeripheralGuard,
 }
 
@@ -251,32 +249,13 @@ impl<'d> I2sParallel<'d, Blocking> {
         i2s: impl Peripheral<P = impl Instance> + 'd,
         channel: impl Peripheral<P = CH> + 'd,
         frequency: impl Into<fugit::HertzU32>,
-        pins: impl TxPins<'d>,
+        mut pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
     where
         CH: DmaChannelFor<AnyI2s>,
     {
-        Self::new_typed(i2s.map_into(), channel, frequency, pins, clock_pin)
-    }
-}
-
-impl<'d, I> I2sParallel<'d, Blocking, I>
-where
-    I: Instance,
-{
-    /// Create a new I2S Parallel Interface
-    pub fn new_typed<CH>(
-        i2s: impl Peripheral<P = I> + 'd,
-        channel: impl Peripheral<P = CH> + 'd,
-        frequency: impl Into<fugit::HertzU32>,
-        mut pins: impl TxPins<'d>,
-        clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
-    ) -> Self
-    where
-        CH: DmaChannelFor<I>,
-    {
-        crate::into_ref!(i2s);
+        crate::into_mapped_ref!(i2s);
         crate::into_mapped_ref!(clock_pin);
 
         let channel = Channel::new(channel.map(|ch| ch.degrade()));
@@ -287,7 +266,7 @@ where
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
-        clock_pin.set_to_push_pull_output(Internal);
+        clock_pin.set_to_push_pull_output();
         i2s.ws_signal().connect_to(clock_pin);
 
         pins.configure(i2s.reborrow());
@@ -299,7 +278,7 @@ where
     }
 
     /// Converts the I2S instance into async mode.
-    pub fn into_async(self) -> I2sParallel<'d, Async, I> {
+    pub fn into_async(self) -> I2sParallel<'d, Async> {
         I2sParallel {
             instance: self.instance,
             tx_channel: self.tx_channel.into_async(),
@@ -308,12 +287,9 @@ where
     }
 }
 
-impl<'d, I> I2sParallel<'d, Async, I>
-where
-    I: Instance,
-{
+impl<'d> I2sParallel<'d, Async> {
     /// Converts the I2S instance into async mode.
-    pub fn into_blocking(self) -> I2sParallel<'d, Blocking, I> {
+    pub fn into_blocking(self) -> I2sParallel<'d, Blocking> {
         I2sParallel {
             instance: self.instance,
             tx_channel: self.tx_channel.into_blocking(),
@@ -322,16 +298,15 @@ where
     }
 }
 
-impl<'d, I, Dm> I2sParallel<'d, Dm, I>
+impl<'d, Dm> I2sParallel<'d, Dm>
 where
-    I: Instance,
     Dm: DriverMode,
 {
     /// Write data to the I2S peripheral
     pub fn send<BUF: DmaTxBuffer>(
         mut self,
         mut data: BUF,
-    ) -> Result<I2sParallelTransfer<'d, BUF, Dm, I>, (DmaError, Self, BUF)> {
+    ) -> Result<I2sParallelTransfer<'d, BUF, Dm>, (DmaError, Self, BUF)> {
         self.instance.tx_reset();
         self.instance.tx_fifo_reset();
         let result = unsafe {
@@ -353,19 +328,17 @@ where
 
 /// Represents an ongoing (or potentially finished) transfer using the i2s
 /// parallel interface
-pub struct I2sParallelTransfer<'d, BUF, Dm, I = AnyI2s>
+pub struct I2sParallelTransfer<'d, BUF, Dm>
 where
-    I: Instance,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
-    i2s: ManuallyDrop<I2sParallel<'d, Dm, I>>,
+    i2s: ManuallyDrop<I2sParallel<'d, Dm>>,
     buf_view: ManuallyDrop<BUF::View>,
 }
 
-impl<'d, I, BUF, Dm> I2sParallelTransfer<'d, BUF, Dm, I>
+impl<'d, BUF, Dm> I2sParallelTransfer<'d, BUF, Dm>
 where
-    I: Instance,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
@@ -375,7 +348,7 @@ where
     }
 
     /// Wait for the transfer to finish
-    pub fn wait(mut self) -> (I2sParallel<'d, Dm, I>, BUF) {
+    pub fn wait(mut self) -> (I2sParallel<'d, Dm>, BUF) {
         self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
         let view = unsafe { ManuallyDrop::take(&mut self.buf_view) };
@@ -389,9 +362,8 @@ where
     }
 }
 
-impl<'d, I, BUF> I2sParallelTransfer<'d, BUF, Async, I>
+impl<BUF> I2sParallelTransfer<'_, BUF, Async>
 where
-    I: Instance,
     BUF: DmaTxBuffer,
 {
     /// Wait for the transfer to finish
@@ -400,9 +372,8 @@ where
     }
 }
 
-impl<I, BUF, Dm> Deref for I2sParallelTransfer<'_, BUF, Dm, I>
+impl<BUF, Dm> Deref for I2sParallelTransfer<'_, BUF, Dm>
 where
-    I: Instance,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
@@ -413,9 +384,8 @@ where
     }
 }
 
-impl<I, BUF, Dm> DerefMut for I2sParallelTransfer<'_, BUF, Dm, I>
+impl<BUF, Dm> DerefMut for I2sParallelTransfer<'_, BUF, Dm>
 where
-    I: Instance,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
@@ -424,9 +394,8 @@ where
     }
 }
 
-impl<I, BUF, Dm> Drop for I2sParallelTransfer<'_, BUF, Dm, I>
+impl<BUF, Dm> Drop for I2sParallelTransfer<'_, BUF, Dm>
 where
-    I: Instance,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
@@ -767,9 +736,10 @@ impl Instance for I2S1 {
             bits
         );
 
-        // signals for 8bit and 16bit both start at an offset of 8 for I2S1
-        // https://github.com/espressif/esp-idf/blob/9106c43accd9f5e75379f62f12597677213f5023/components/esp_lcd/i80/esp_lcd_panel_io_i2s.c#L701
-        match i + 8 {
+        // signals for 8bit  start at an offset of  8 for 16bit on I2S1
+        let pin_offset = if bits == 16 { 8 } else { 0 };
+
+        match i + pin_offset {
             0 => OutputSignal::I2S1O_DATA_0,
             1 => OutputSignal::I2S1O_DATA_1,
             2 => OutputSignal::I2S1O_DATA_2,

@@ -6,7 +6,7 @@
 //! - generated pulses => GPIO4
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy embassy-generic-timers esp-hal/unstable
+//% FEATURES: embassy esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -15,6 +15,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
+    gpio::Level,
     rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreatorAsync},
     time::RateExtU32,
     timer::timg::TimerGroup,
@@ -43,16 +44,13 @@ async fn main(_spawner: Spawner) {
         .channel0
         .configure(
             peripherals.GPIO4,
-            TxChannelConfig {
-                clk_divider: 255,
-                ..TxChannelConfig::default()
-            },
+            TxChannelConfig::default().with_clk_divider(255),
         )
         .unwrap();
 
-    let mut data = [PulseCode::new(true, 200, false, 50); 20];
+    let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 
-    data[data.len() - 2] = PulseCode::new(true, 3000, false, 500);
+    data[data.len() - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
     data[data.len() - 1] = PulseCode::empty();
 
     loop {

@@ -47,30 +47,10 @@
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
-use darling::{ast::NestedMeta, Error, FromMeta};
-use proc_macro::{Span, TokenStream};
-use proc_macro2::Ident;
-use proc_macro_crate::{crate_name, FoundCrate};
-use proc_macro_error2::abort;
-use quote::{format_ident, quote};
-use syn::{
-    parse,
-    parse::Error as ParseError,
-    spanned::Spanned,
-    Data,
-    DataStruct,
-    GenericArgument,
-    Item,
-    ItemFn,
-    Path,
-    PathArguments,
-    PathSegment,
-    ReturnType,
-    Type,
-};
+use proc_macro::TokenStream;
 
-use self::interrupt::{check_attr_whitelist, WhiteListCaller};
-
+mod blocking_main;
+mod builder;
 #[cfg(feature = "embassy")]
 mod embassy;
 mod interrupt;
@@ -81,15 +61,7 @@ mod interrupt;
     feature = "has-ulp-core"
 ))]
 mod lp_core;
-
-#[derive(Debug, Default, darling::FromMeta)]
-#[darling(default)]
-struct RamArgs {
-    rtc_fast: bool,
-    rtc_slow: bool,
-    persistent: bool,
-    zeroed: bool,
-}
+mod ram;
 
 /// Sets which segment of RAM to use for a function or static and how it should
 /// be initialized.
@@ -148,103 +120,7 @@ struct RamArgs {
 #[proc_macro_attribute]
 #[proc_macro_error2::proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
-    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
-        Ok(v) => v,
-        Err(e) => {
-            return TokenStream::from(Error::from(e).write_errors());
-        }
-    };
-
-    let RamArgs {
-        rtc_fast,
-        rtc_slow,
-        persistent,
-        zeroed,
-    } = match FromMeta::from_list(&attr_args) {
-        Ok(v) => v,
-        Err(e) => {
-            return e.write_errors().into();
-        }
-    };
-
-    let item: Item = parse(input).expect("failed to parse input");
-
-    #[cfg(not(feature = "rtc-slow"))]
-    if rtc_slow {
-        abort!(
-            Span::call_site(),
-            "rtc_slow is not available for this target"
-        );
-    }
-
-    let is_fn = matches!(item, Item::Fn(_));
-    let section_name = match (is_fn, rtc_fast, rtc_slow, persistent, zeroed) {
-        (true, false, false, false, false) => Ok(".rwtext"),
-        (true, true, false, false, false) => Ok(".rtc_fast.text"),
-        (true, false, true, false, false) => Ok(".rtc_slow.text"),
-
-        (false, false, false, false, false) => Ok(".data"),
-
-        (false, true, false, false, false) => Ok(".rtc_fast.data"),
-        (false, true, false, true, false) => Ok(".rtc_fast.persistent"),
-        (false, true, false, false, true) => Ok(".rtc_fast.bss"),
-
-        (false, false, true, false, false) => Ok(".rtc_slow.data"),
-        (false, false, true, true, false) => Ok(".rtc_slow.persistent"),
-        (false, false, true, false, true) => Ok(".rtc_slow.bss"),
-
-        _ => Err(()),
-    };
-
-    let section = match (is_fn, section_name) {
-        (true, Ok(section_name)) => quote::quote! {
-            #[link_section = #section_name]
-            #[inline(never)] // make certain function is not inlined
-        },
-        (false, Ok(section_name)) => quote::quote! {
-            #[link_section = #section_name]
-        },
-        (_, Err(_)) => {
-            abort!(Span::call_site(), "Invalid combination of ram arguments");
-        }
-    };
-
-    let trait_check = if zeroed {
-        Some("zeroable")
-    } else if persistent {
-        Some("persistable")
-    } else {
-        None
-    };
-    let trait_check = trait_check.map(|name| {
-        use proc_macro_crate::{crate_name, FoundCrate};
-
-        let hal = Ident::new(
-            if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
-                name
-            } else {
-                "crate"
-            },
-            Span::call_site().into(),
-        );
-
-        let assertion = quote::format_ident!("assert_is_{name}");
-        let Item::Static(ref item) = item else {
-            abort!(item, "Expected a `static`");
-        };
-        let ty = &item.ty;
-        quote::quote! {
-            const _: () = #hal::__macro_implementation::#assertion::<#ty>();
-        }
-    });
-
-    let output = quote::quote! {
-        #section
-        #item
-        #trait_check
-    };
-
-    output.into()
+    ram::ram(args, input)
 }
 
 /// Mark a function as an interrupt handler.
@@ -256,89 +132,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 #[proc_macro_error2::proc_macro_error]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
-    #[derive(Debug, FromMeta)]
-    struct MacroArgs {
-        priority: Option<syn::Expr>,
-    }
-
-    let mut f: ItemFn = syn::parse(input).expect("`#[handler]` must be applied to a function");
-    let original_span = f.span();
-
-    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
-        Ok(v) => v,
-        Err(e) => {
-            return TokenStream::from(darling::Error::from(e).write_errors());
-        }
-    };
-
-    let args = match MacroArgs::from_list(&attr_args) {
-        Ok(v) => v,
-        Err(e) => {
-            return TokenStream::from(e.write_errors());
-        }
-    };
-
-    let root = Ident::new(
-        if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
-            name
-        } else {
-            "crate"
-        },
-        Span::call_site().into(),
-    );
-
-    let priority = if let Some(priority) = args.priority {
-        quote::quote!( #priority )
-    } else {
-        quote::quote! { #root::interrupt::Priority::min() }
-    };
-
-    // XXX should we blacklist other attributes?
-
-    if let Err(error) = check_attr_whitelist(&f.attrs, WhiteListCaller::Interrupt) {
-        return error;
-    }
-
-    let valid_signature = f.sig.constness.is_none()
-        && f.sig.abi.is_none()
-        && f.sig.generics.params.is_empty()
-        && f.sig.generics.where_clause.is_none()
-        && f.sig.variadic.is_none()
-        && match f.sig.output {
-            ReturnType::Default => true,
-            ReturnType::Type(_, ref ty) => match **ty {
-                Type::Tuple(ref tuple) => tuple.elems.is_empty(),
-                Type::Never(..) => true,
-                _ => false,
-            },
-        }
-        && f.sig.inputs.len() <= 1;
-
-    if !valid_signature {
-        return ParseError::new(
-            f.span(),
-            "`#[handler]` handlers must have signature `[unsafe] fn([&mut Context]) [-> !]`",
-        )
-        .to_compile_error()
-        .into();
-    }
-
-    f.sig.abi = syn::parse_quote_spanned!(original_span => extern "C");
-    let orig = f.sig.ident;
-    let vis = f.vis.clone();
-    f.sig.ident = Ident::new(
-        &format!("__esp_hal_internal_{}", orig),
-        proc_macro2::Span::call_site(),
-    );
-    let new = f.sig.ident.clone();
-
-    quote::quote_spanned!(original_span =>
-        #f
-
-        #[allow(non_upper_case_globals)]
-        #vis const #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
-    )
-    .into()
+    interrupt::handler(args, input)
 }
 
 /// Load code to be run on the LP/ULP core.
@@ -385,16 +179,37 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[cfg(feature = "embassy")]
 #[proc_macro_attribute]
-pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    use self::embassy::{
-        main::{main, run},
-        Args,
-    };
+pub fn embassy_main(args: TokenStream, item: TokenStream) -> TokenStream {
+    embassy::main(args, item)
+}
 
-    let args = syn::parse_macro_input!(args as Args);
-    let f = syn::parse_macro_input!(item as syn::ItemFn);
-
-    run(&args.meta, f, main()).unwrap_or_else(|x| x).into()
+/// Attribute to declare the entry point of the program
+///
+/// The specified function will be called by the reset handler *after* RAM has
+/// been initialized. If present, the FPU will also be enabled before the
+/// function is called.
+///
+/// The type of the specified function must be `[unsafe] fn() -> !` (never
+/// ending function)
+///
+/// # Properties
+///
+/// The entry point will be called by the reset handler. The program can't
+/// reference to the entry point, much less invoke it.
+///
+/// # Examples
+///
+/// - Simple entry point
+///
+/// ``` no_run
+/// #[main]
+/// fn main() -> ! {
+///     loop { /* .. */ }
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn blocking_main(args: TokenStream, input: TokenStream) -> TokenStream {
+    blocking_main::main(args, input)
 }
 
 /// Automatically implement the [Builder Lite] pattern for a struct.
@@ -431,94 +246,5 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// [Builder Lite]: https://matklad.github.io/2022/05/29/builder-lite.html
 #[proc_macro_derive(BuilderLite)]
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::DeriveInput);
-
-    let span = input.span();
-    let ident = input.ident;
-
-    let mut fns = Vec::new();
-    if let Data::Struct(DataStruct { fields, .. }) = &input.data {
-        for field in fields {
-            let field_ident = field.ident.as_ref().unwrap();
-            let field_type = &field.ty;
-
-            let function_ident = format_ident!("with_{}", field_ident);
-
-            let maybe_path_type = extract_type_path(field_type)
-                .and_then(|path| extract_option_segment(path))
-                .and_then(|path_seg| match path_seg.arguments {
-                    PathArguments::AngleBracketed(ref params) => params.args.first(),
-                    _ => None,
-                })
-                .and_then(|generic_arg| match *generic_arg {
-                    GenericArgument::Type(ref ty) => Some(ty),
-                    _ => None,
-                });
-
-            let (field_type, field_assigns) = if let Some(inner_type) = maybe_path_type {
-                (inner_type, quote! { Some(#field_ident) })
-            } else {
-                (field_type, quote! { #field_ident })
-            };
-
-            fns.push(quote! {
-                #[doc = concat!(" Assign the given value to the `", stringify!(#field_ident) ,"` field.")]
-                #[must_use]
-                pub fn #function_ident(mut self, #field_ident: #field_type) -> Self {
-                    self.#field_ident = #field_assigns;
-                    self
-                }
-            });
-
-            if maybe_path_type.is_some() {
-                let function_ident = format_ident!("with_{}_none", field_ident);
-                fns.push(quote! {
-                    #[doc = concat!(" Set the value of `", stringify!(#field_ident), "` to `None`.")]
-                    #[must_use]
-                    pub fn #function_ident(mut self) -> Self {
-                        self.#field_ident = None;
-                        self
-                    }
-                });
-            }
-        }
-    } else {
-        return ParseError::new(
-            span,
-            "#[derive(Builder)] is only defined for structs, not for enums or unions!",
-        )
-        .to_compile_error()
-        .into();
-    }
-
-    let implementation = quote! {
-        #[automatically_derived]
-        impl #ident {
-            #(#fns)*
-        }
-    };
-
-    implementation.into()
-}
-
-// https://stackoverflow.com/a/56264023
-fn extract_type_path(ty: &Type) -> Option<&Path> {
-    match *ty {
-        Type::Path(ref typepath) if typepath.qself.is_none() => Some(&typepath.path),
-        _ => None,
-    }
-}
-
-// https://stackoverflow.com/a/56264023
-fn extract_option_segment(path: &Path) -> Option<&PathSegment> {
-    let idents_of_path = path.segments.iter().fold(String::new(), |mut acc, v| {
-        acc.push_str(&v.ident.to_string());
-        acc.push('|');
-        acc
-    });
-
-    vec!["Option|", "std|option|Option|", "core|option|Option|"]
-        .into_iter()
-        .find(|s| idents_of_path == *s)
-        .and_then(|_| path.segments.last())
+    builder::builder_lite_derive(item)
 }

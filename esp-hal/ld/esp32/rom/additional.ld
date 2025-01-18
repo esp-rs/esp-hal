@@ -16,5 +16,5 @@ PROVIDE ( strchr = 0x4000c53c );
 PROVIDE ( strlcpy = 0x4000c584 );
 PROVIDE ( strstr = 0x4000c674 );
 PROVIDE ( strcasecmp = 0x400011cc );
-PROVIDE ( strdup = 0x4000143c );
-PROVIDE ( atoi = 0x400566c4 );
+
+PROVIDE ( memchr = 0x4000c244 );
