@@ -136,6 +136,15 @@ impl Rng {
     }
 }
 
+impl Peripheral for Rng {
+    type P = Self;
+
+    #[inline]
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        self.clone()
+    }
+}
+
 impl rand_core::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
         self.random()
@@ -239,3 +248,15 @@ impl rand_core::RngCore for Trng<'_> {
 /// Implementing a CryptoRng marker trait that indicates that the generator is
 /// cryptographically secure.
 impl rand_core::CryptoRng for Trng<'_> {}
+
+impl Peripheral for Trng<'_> {
+    type P = Self;
+
+    #[inline]
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self {
+            rng: self.rng.clone_unchecked(),
+            _adc: self._adc.clone_unchecked(),
+        }
+    }
+}
