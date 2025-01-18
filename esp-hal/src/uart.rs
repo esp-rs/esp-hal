@@ -1226,7 +1226,7 @@ where
         // so that bytes written to TX FIFO are always immediately transmitted.
         self.register_block()
             .idle_conf()
-            .modify(|_, w| w.tx_idle_num().bits(0));
+            .modify(|_, w| unsafe { w.tx_idle_num().bits(0) });
 
         // Setting err_wr_mask stops uart from storing data when data is wrong according
         // to reference manual
