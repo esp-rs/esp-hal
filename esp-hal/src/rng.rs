@@ -144,7 +144,7 @@ impl Peripheral for Rng {
 
     #[inline]
     unsafe fn clone_unchecked(&self) -> Self::P {
-        self.clone()
+        *self
     }
 }
 
