@@ -411,19 +411,15 @@ where
     #[cfg(not(any(esp32, esp32s2)))]
     fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
+        let clock_divider =
+            clock_divider_solver::solve(src_clock.to_Hz(), frequency.to_Hz(), 256, 0b11111)
+                .ok_or(Error::UnreachableTargetFrequency)?;
 
-        if frequency > src_clock {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        let div = (src_clock / frequency) - 1;
-
-        if div > u8::MAX as u32 {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        self::chip_specific::configure_clock(div);
-
+        self::chip_specific::configure_clock(
+            clock_divider.div_num - 1,
+            clock_divider.div_a,
+            clock_divider.div_b,
+        );
         Ok(())
     }
 }
@@ -1715,7 +1711,7 @@ where
 
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
-    pub fn configure_clock(div: u32) {
+    pub fn configure_clock(div: u32, div_a: u32, div_b: u32) {
         #[cfg(not(pcr))]
         {
             let rmt = unsafe { &*crate::peripherals::RMT::PTR };
@@ -1723,8 +1719,8 @@ mod chip_specific {
                 w.clk_en().clear_bit();
                 w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC);
                 w.sclk_div_num().bits(div as u8);
-                w.sclk_div_a().bits(0);
-                w.sclk_div_b().bits(0);
+                w.sclk_div_a().bits(div_a as u8);
+                w.sclk_div_b().bits(div_b as u8);
                 w.apb_fifo_mask().set_bit()
             });
         }
@@ -1734,8 +1730,8 @@ mod chip_specific {
             let pcr = unsafe { &*crate::peripherals::PCR::PTR };
             pcr.rmt_sclk_conf().modify(|_, w| unsafe {
                 w.sclk_div_num().bits(div as u8);
-                w.sclk_div_a().bits(0);
-                w.sclk_div_b().bits(0)
+                w.sclk_div_a().bits(div_a as u8);
+                w.sclk_div_b().bits(div_b as u8)
             });
 
             #[cfg(esp32c6)]
@@ -2428,4 +2424,140 @@ mod chip_specific {
 
     pub(crate) use impl_rx_channel;
     pub(crate) use impl_tx_channel;
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+mod clock_divider_solver {
+    use core::{cmp::Ordering, hint::unreachable_unchecked};
+
+    // Calculate the greatest common divisor of a and b
+    const fn gcd(mut a: u32, mut b: u32) -> u32 {
+        while b != 0 {
+            (a, b) = (b, (a % b))
+        }
+        a
+    }
+
+    pub struct ClockDivider {
+        // Integral clock divider value.
+        pub div_num: u32,
+
+        // Fractional clock divider numerator value.
+        pub div_b: u32,
+
+        // Fractional clock divider denominator value.
+        pub div_a: u32,
+    }
+
+    pub fn solve(
+        source: u32,
+        target: u32,
+        integral_max: u32,
+        fractional_max: u32,
+    ) -> Option<ClockDivider> {
+        if target > source {
+            return None;
+        }
+
+        let quotient = source / target;
+        if quotient > integral_max {
+            return None;
+        }
+
+        let remainder = source % target;
+        if remainder == 0 {
+            return Some(ClockDivider {
+                div_num: quotient,
+                div_b: 0,
+                div_a: 0,
+            });
+        }
+
+        let gcd = gcd(target, remainder);
+        let numerator = remainder / gcd;
+        let denominator = target / gcd;
+        if numerator <= fractional_max && denominator <= fractional_max {
+            return Some(ClockDivider {
+                div_num: quotient,
+                div_b: numerator,
+                div_a: denominator,
+            });
+        }
+
+        // Search Stern-Brocot Tree
+        let target_frac = Fraction {
+            numerator,
+            denominator,
+        };
+        let mut l = Fraction {
+            numerator: 0,
+            denominator: 1,
+        };
+        let mut h = Fraction {
+            numerator: 1,
+            denominator: 1, // We only search the left half part
+        };
+        loop {
+            let m = Fraction {
+                numerator: l.numerator + h.numerator,
+                denominator: l.denominator + h.denominator,
+            };
+
+            if m.numerator > fractional_max || m.denominator > fractional_max {
+                // L and H, which is closer?
+                let err_l = m.sub(&l);
+                let err_h = h.sub(&m);
+                let m = if err_l.lt(&err_h) { l } else { h };
+                return Some(ClockDivider {
+                    div_num: quotient,
+                    div_b: m.numerator,
+                    div_a: m.denominator,
+                });
+            }
+
+            match m.cmp(&target_frac) {
+                Ordering::Less => {
+                    l = m;
+                }
+                Ordering::Greater => {
+                    h = m;
+                }
+                Ordering::Equal => {
+                    // SAFETY: Before search Stern-Brocot Tree,
+                    // we ensures that the simplest fractional
+                    // form of target_frac has a greater denominator
+                    // than the fractial_max. Therefore, in searches
+                    // within a smaller range, there will never be a
+                    // situation where M == targete_frac.
+                    unsafe { unreachable_unchecked() }
+                }
+            }
+        }
+    }
+
+    struct Fraction {
+        pub numerator: u32,
+        pub denominator: u32,
+    }
+
+    impl Fraction {
+        fn cmp(&self, other: &Self) -> Ordering {
+            let a = self.numerator * other.denominator;
+            let b = self.denominator * other.numerator;
+            a.cmp(&b)
+        }
+
+        const fn lt(&self, other: &Self) -> bool {
+            let a = self.numerator * other.denominator;
+            let b = self.denominator * other.numerator;
+            a < b
+        }
+
+        const fn sub(&self, rhs: &Self) -> Self {
+            Self {
+                numerator: self.numerator * rhs.denominator - self.denominator * rhs.numerator,
+                denominator: self.denominator * rhs.denominator,
+            }
+        }
+    }
 }
