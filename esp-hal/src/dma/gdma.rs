@@ -170,6 +170,29 @@ impl RegisterAccess for AnyGdmaTxChannel {
         self.ch()
             .out_link()
             .modify(|_, w| w.outlink_start().set_bit());
+
+        // Delay until there is data in the DMA's out buffer
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s3)] {
+                while self
+                    .ch()
+                    .outfifo_status()
+                    .read()
+                    .outfifo_empty_l3()
+                    .bit_is_set()
+                {}
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                // FIXME: For some reason, C6 and H2 may loop forever here
+            } else {
+                while self
+                    .ch()
+                    .outfifo_status()
+                    .read()
+                    .outfifo_empty()
+                    .bit_is_set()
+                {}
+            }
+        }
     }
 
     fn stop(&self) {

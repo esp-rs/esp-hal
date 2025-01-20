@@ -291,6 +291,7 @@ embassy = [
     "dep:esp-hal-embassy",
 ]
 octal-psram = ["esp-hal/octal-psram", "esp-alloc"]
+quad-psram = ["esp-hal/quad-psram", "esp-alloc"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.
