@@ -35,7 +35,7 @@
 //! }
 //! # }
 //! ```
-//! [`embedded-hal`]: https://docs.rs/embedded-hal/latest/embedded_hal/index.html
+//! [`embedded-hal`]:embedded_hal
 
 use core::marker::PhantomData;
 #[cfg(not(esp32))]
