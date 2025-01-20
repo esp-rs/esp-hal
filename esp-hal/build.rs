@@ -25,12 +25,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
     );
 
-    #[cfg(all(
-        feature = "flip-link",
-        not(any(feature = "esp32c6", feature = "esp32h2"))
-    ))]
-    esp_build::error!("flip-link is only available on ESP32-C6/ESP32-H2");
-
     // NOTE: update when adding new device support!
     // Determine the name of the configured device:
     let device_name = if cfg!(feature = "esp32") {
@@ -100,6 +94,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Value::Bool(false),
                 None
             ),
+            #[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
+            (
+                "flip-link",
+                "Move the stack to start of RAM to get zero-cost stack overflow protection.",
+                Value::Bool(false),
+                None
+            ),
         ],
         true,
     );
@@ -109,8 +110,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     #[allow(unused_mut)]
     let mut config_symbols = config.all().collect::<Vec<_>>();
-    #[cfg(feature = "flip-link")]
-    config_symbols.push("flip-link");
 
     for (key, value) in &cfg {
         if let Value::Bool(true) = value {

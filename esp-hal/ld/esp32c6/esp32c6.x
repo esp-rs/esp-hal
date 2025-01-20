@@ -82,3 +82,5 @@ INCLUDE "dram2.x"
 /* End of Shared sections */
 
 INCLUDE "debug.x"
+
+_dram_origin = ORIGIN( RAM );

@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 
+- `flip-link` feature is now a config option
+
 ### Fixed
 
 - `DmaDescriptor` is now `#[repr(C)]` (#2988)

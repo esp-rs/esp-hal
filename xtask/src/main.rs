@@ -708,9 +708,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         // TODO this doesn't test octal psram as it would require a separate build
                         features.push_str(",quad-psram")
                     }
-                    if matches!(chip, Chip::Esp32c6 | Chip::Esp32h2) {
-                        features.push_str(",flip-link")
-                    }
 
                     lint_package(
                         chip,
