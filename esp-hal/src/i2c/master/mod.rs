@@ -4,7 +4,7 @@
 //!
 //! In this mode, the I2C acts as master and initiates the I2C communication by
 //! generating a START condition. Note that only one master is allowed to occupy
-//! the bus to access one salve at the same time.
+//! the bus to access one slave at the same time.
 //!
 //! ## Configuration
 //!
