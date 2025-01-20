@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `{Uart, UartTx}::with_rs485` to enable RS485 mode (#2994)
+- Add `{Uart, UartTx}::with_dtr` to configure DTR pin (#2994)
+
 ### Changed
 
 ### Fixed
