@@ -13,22 +13,22 @@ impl Aes<'_> {
     }
 
     pub(super) fn write_key(&mut self, key: &[u8]) {
-        let key_len = self.aes.key_iter().count();
+        let key_len = self.regs().key_iter().count();
         debug_assert!(key.len() <= key_len * ALIGN_SIZE);
         debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
         self.alignment_helper
-            .volatile_write_regset(self.aes.key(0).as_ptr(), key, key_len);
+            .volatile_write_regset(self.regs().key(0).as_ptr(), key, key_len);
     }
 
     pub(super) fn write_block(&mut self, block: &[u8]) {
-        let text_len = self.aes.text_iter().count();
+        let text_len = self.regs().text_iter().count();
         debug_assert_eq!(block.len(), text_len * ALIGN_SIZE);
         self.alignment_helper
-            .volatile_write_regset(self.aes.text(0).as_ptr(), block, text_len);
+            .volatile_write_regset(self.regs().text(0).as_ptr(), block, text_len);
     }
 
     pub(super) fn write_mode(&self, mode: Mode) {
-        self.aes.mode().write(|w| unsafe { w.bits(mode as _) });
+        self.regs().mode().write(|w| unsafe { w.bits(mode as _) });
     }
 
     /// Configures how the state matrix would be laid out
@@ -48,22 +48,22 @@ impl Aes<'_> {
         to_write |= (input_text_word_endianess as u32) << 3;
         to_write |= (output_text_byte_endianess as u32) << 4;
         to_write |= (output_text_word_endianess as u32) << 5;
-        self.aes.endian().write(|w| unsafe { w.bits(to_write) });
+        self.regs().endian().write(|w| unsafe { w.bits(to_write) });
     }
 
     pub(super) fn write_start(&self) {
-        self.aes.start().write(|w| w.start().set_bit());
+        self.regs().start().write(|w| w.start().set_bit());
     }
 
     pub(super) fn read_idle(&mut self) -> bool {
-        self.aes.idle().read().idle().bit_is_set()
+        self.regs().idle().read().idle().bit_is_set()
     }
 
     pub(super) fn read_block(&self, block: &mut [u8]) {
-        let text_len = self.aes.text_iter().count();
+        let text_len = self.regs().text_iter().count();
         debug_assert_eq!(block.len(), text_len * ALIGN_SIZE);
         self.alignment_helper
-            .volatile_read_regset(self.aes.text(0).as_ptr(), block, text_len);
+            .volatile_read_regset(self.regs().text(0).as_ptr(), block, text_len);
     }
 }
 

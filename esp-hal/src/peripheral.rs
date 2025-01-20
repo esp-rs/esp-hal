@@ -471,13 +471,11 @@ mod peripheral_macros {
                 pub const fn regs<'a>() -> &'a <pac::$base as core::ops::Deref>::Target {
                     unsafe { &*Self::PTR }
                 }
-            }
 
-            #[doc(hidden)]
-            impl core::ops::Deref for $name {
-                type Target = <pac::$base as core::ops::Deref>::Target;
-
-                fn deref(&self) -> &Self::Target {
+                #[doc = r"Return a reference to the register block"]
+                #[inline(always)]
+                #[instability::unstable]
+                pub fn register_block(&self) -> &<pac::$base as core::ops::Deref>::Target {
                     unsafe { &*Self::PTR }
                 }
             }

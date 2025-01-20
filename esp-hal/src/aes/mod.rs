@@ -56,6 +56,7 @@
 //! * AES-DMA Initialization Vector (IV) is currently not supported
 
 use crate::{
+    pac,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,
     reg_access::{AlignmentHelper, NativeEndianess},
@@ -155,6 +156,10 @@ impl<'d> Aes<'d> {
         ret.init();
 
         ret
+    }
+
+    fn regs(&self) -> &pac::aes::RegisterBlock {
+        self.aes.register_block()
     }
 
     /// Encrypts/Decrypts the given buffer based on `mode` parameter
@@ -314,7 +319,7 @@ pub mod dma {
 
     impl DmaSupport for AesDma<'_> {
         fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-            while self.aes.aes.state().read().state().bits() != 2 // DMA status DONE == 2
+            while self.aes.regs().state().read().state().bits() != 2 // DMA status DONE == 2
             && !self.channel.tx.is_done()
             {
                 // wait until done
@@ -456,10 +461,10 @@ pub mod dma {
 
             SYSTEM::regs()
                 .perip_rst_en1()
-                    .modify(|_, w| w.crypto_aes_rst().set_bit());
+                .modify(|_, w| w.crypto_aes_rst().set_bit());
             SYSTEM::regs()
                 .perip_rst_en1()
-                    .modify(|_, w| w.crypto_aes_rst().clear_bit());
+                .modify(|_, w| w.crypto_aes_rst().clear_bit());
         }
 
         #[cfg(any(esp32c6, esp32h2))]
@@ -480,24 +485,24 @@ pub mod dma {
 
         fn enable_dma(&self, enable: bool) {
             self.aes
-                .aes
+                .regs()
                 .dma_enable()
                 .write(|w| w.dma_enable().bit(enable));
         }
 
         fn enable_interrupt(&self) {
-            self.aes.aes.int_ena().write(|w| w.int_ena().set_bit());
+            self.aes.regs().int_ena().write(|w| w.int_ena().set_bit());
         }
 
         fn set_cipher_mode(&self, mode: CipherMode) {
             self.aes
-                .aes
+                .regs()
                 .block_mode()
                 .modify(|_, w| unsafe { w.block_mode().bits(mode as u8) });
 
             if mode == CipherMode::Ctr {
                 self.aes
-                    .aes
+                    .regs()
                     .inc_sel()
                     .modify(|_, w| w.inc_sel().clear_bit());
             }
@@ -508,14 +513,14 @@ pub mod dma {
         }
 
         fn finish_transform(&self) {
-            self.aes.aes.dma_exit().write(|w| w.dma_exit().set_bit());
+            self.aes.regs().dma_exit().write(|w| w.dma_exit().set_bit());
             self.enable_dma(false);
             self.reset_aes();
         }
 
         fn set_num_block(&self, block: u32) {
             self.aes
-                .aes
+                .regs()
                 .block_num()
                 .modify(|_, w| unsafe { w.block_num().bits(block) });
         }
