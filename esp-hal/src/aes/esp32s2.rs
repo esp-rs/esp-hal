@@ -14,31 +14,31 @@ impl Aes<'_> {
     }
 
     fn write_dma(&mut self, enable_dma: bool) {
-        self.aes
+        self.regs()
             .dma_enable()
             .write(|w| w.dma_enable().bit(enable_dma));
     }
 
     pub(super) fn write_key(&mut self, key: &[u8]) {
-        let key_len = self.aes.key_iter().count();
+        let key_len = self.regs().key_iter().count();
         debug_assert!(key.len() <= key_len * ALIGN_SIZE);
         debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
         self.alignment_helper
-            .volatile_write_regset(self.aes.key(0).as_ptr(), key, key_len);
+            .volatile_write_regset(self.regs().key(0).as_ptr(), key, key_len);
     }
 
     pub(super) fn write_block(&mut self, block: &[u8]) {
-        let text_in_len = self.aes.text_in_iter().count();
+        let text_in_len = self.regs().text_in_iter().count();
         debug_assert_eq!(block.len(), text_in_len * ALIGN_SIZE);
         self.alignment_helper.volatile_write_regset(
-            self.aes.text_in(0).as_ptr(),
+            self.regs().text_in(0).as_ptr(),
             block,
             text_in_len,
         );
     }
 
     pub(super) fn write_mode(&self, mode: Mode) {
-        self.aes.mode().write(|w| unsafe { w.bits(mode as _) });
+        self.regs().mode().write(|w| unsafe { w.bits(mode as _) });
     }
 
     /// Configures how the state matrix would be laid out.
@@ -58,22 +58,22 @@ impl Aes<'_> {
         to_write |= (input_text_word_endianess as u32) << 3;
         to_write |= (output_text_byte_endianess as u32) << 4;
         to_write |= (output_text_word_endianess as u32) << 5;
-        self.aes.endian().write(|w| unsafe { w.bits(to_write) });
+        self.regs().endian().write(|w| unsafe { w.bits(to_write) });
     }
 
     pub(super) fn write_start(&self) {
-        self.aes.trigger().write(|w| w.trigger().set_bit());
+        self.regs().trigger().write(|w| w.trigger().set_bit());
     }
 
     pub(super) fn read_idle(&mut self) -> bool {
-        self.aes.state().read().state().bits() == 0
+        self.regs().state().read().state().bits() == 0
     }
 
     pub(super) fn read_block(&self, block: &mut [u8]) {
-        let text_out_len = self.aes.text_out_iter().count();
+        let text_out_len = self.regs().text_out_iter().count();
         debug_assert_eq!(block.len(), text_out_len * ALIGN_SIZE);
         self.alignment_helper.volatile_read_regset(
-            self.aes.text_out(0).as_ptr(),
+            self.regs().text_out(0).as_ptr(),
             block,
             text_out_len,
         );

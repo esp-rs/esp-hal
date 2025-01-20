@@ -1092,7 +1092,9 @@ pub(crate) mod utils {
 
         unsafe {
             // set to variable dummy mode
-            SPI1::regs().ddr().modify(|_, w| w.spi_fmem_var_dummy().set_bit());
+            SPI1::regs()
+                .ddr()
+                .modify(|_, w| w.spi_fmem_var_dummy().set_bit());
             esp_rom_spi_set_dtr_swap_mode(1, false, false);
         }
 

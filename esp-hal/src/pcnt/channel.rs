@@ -13,8 +13,8 @@ pub use crate::pac::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as Edge
 use crate::{
     gpio::{interconnect::PeripheralInput, InputSignal},
     peripheral::Peripheral,
-    system::GenericPeripheralGuard,
     peripherals::PCNT,
+    system::GenericPeripheralGuard,
 };
 
 /// Represents a channel within a pulse counter unit.

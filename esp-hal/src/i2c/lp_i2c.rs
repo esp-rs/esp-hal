@@ -146,7 +146,10 @@ impl LpI2c {
         }
 
         // Initialize LP I2C HAL */
-        me.i2c.clk_conf().modify(|_, w| w.sclk_active().set_bit());
+        me.i2c
+            .register_block()
+            .clk_conf()
+            .modify(|_, w| w.sclk_active().set_bit());
 
         // Enable LP I2C controller clock
         lp_peri
@@ -166,7 +169,7 @@ impl LpI2c {
             .modify(|_, w| w.lp_i2c_clk_sel().clear_bit());
 
         // Initialize LP I2C Master mode
-        me.i2c.ctr().modify(|_, w| unsafe {
+        me.i2c.register_block().ctr().modify(|_, w| unsafe {
             // Clear register
             w.bits(0);
             // Use open drain output for SDA and SCL
@@ -177,9 +180,12 @@ impl LpI2c {
         });
 
         // First, reset the fifo buffers
-        me.i2c.fifo_conf().modify(|_, w| w.nonfifo_en().clear_bit());
+        me.i2c
+            .register_block()
+            .fifo_conf()
+            .modify(|_, w| w.nonfifo_en().clear_bit());
 
-        me.i2c.ctr().modify(|_, w| {
+        me.i2c.register_block().ctr().modify(|_, w| {
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit()
         });
@@ -245,45 +251,52 @@ impl LpI2c {
 
         // Write data to registers
         unsafe {
-            me.i2c.clk_conf().modify(|_, w| {
+            me.i2c.register_block().clk_conf().modify(|_, w| {
                 w.sclk_sel().clear_bit();
                 w.sclk_div_num().bits((clkm_div - 1) as u8)
             });
 
             // scl period
             me.i2c
+                .register_block()
                 .scl_low_period()
                 .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
-            me.i2c.scl_high_period().write(|w| {
+            me.i2c.register_block().scl_high_period().write(|w| {
                 w.scl_high_period().bits(scl_high_period as u16);
                 w.scl_wait_high_period().bits(scl_wait_high_period as u8)
             });
             // sda sample
             me.i2c
+                .register_block()
                 .sda_hold()
                 .write(|w| w.time().bits(sda_hold_time as u16));
             me.i2c
+                .register_block()
                 .sda_sample()
                 .write(|w| w.time().bits(sda_sample_time as u16));
 
             // setup
             me.i2c
+                .register_block()
                 .scl_rstart_setup()
                 .write(|w| w.time().bits(scl_rstart_setup_time as u16));
             me.i2c
+                .register_block()
                 .scl_stop_setup()
                 .write(|w| w.time().bits(scl_stop_setup_time as u16));
 
             // hold
             me.i2c
+                .register_block()
                 .scl_start_hold()
                 .write(|w| w.time().bits(scl_start_hold_time as u16));
             me.i2c
+                .register_block()
                 .scl_stop_hold()
                 .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
-            me.i2c.to().write(|w| {
+            me.i2c.register_block().to().write(|w| {
                 w.time_out_en().bit(time_out_en);
                 w.time_out_value().bits(time_out_value.try_into().unwrap())
             });
@@ -293,21 +306,28 @@ impl LpI2c {
         // config
 
         me.i2c
+            .register_block()
             .filter_cfg()
             .modify(|_, w| unsafe { w.sda_filter_thres().bits(LP_I2C_FILTER_CYC_NUM_DEF) });
         me.i2c
+            .register_block()
             .filter_cfg()
             .modify(|_, w| unsafe { w.scl_filter_thres().bits(LP_I2C_FILTER_CYC_NUM_DEF) });
 
         me.i2c
+            .register_block()
             .filter_cfg()
             .modify(|_, w| w.sda_filter_en().set_bit());
         me.i2c
+            .register_block()
             .filter_cfg()
             .modify(|_, w| w.scl_filter_en().set_bit());
 
         // Configure the I2C master to send a NACK when the Rx FIFO count is full
-        me.i2c.ctr().modify(|_, w| w.rx_full_ack_level().set_bit());
+        me.i2c
+            .register_block()
+            .ctr()
+            .modify(|_, w| w.rx_full_ack_level().set_bit());
 
         // Synchronize the config register values to the LP I2C peripheral clock
         me.lp_i2c_update();
@@ -317,24 +337,31 @@ impl LpI2c {
 
     /// Update I2C configuration
     fn lp_i2c_update(&self) {
-        self.i2c.ctr().modify(|_, w| w.conf_upgate().set_bit());
+        self.i2c
+            .register_block()
+            .ctr()
+            .modify(|_, w| w.conf_upgate().set_bit());
     }
 
     /// Resets the transmit and receive FIFO buffers.
     fn reset_fifo(&self) {
         self.i2c
+            .register_block()
             .fifo_conf()
             .modify(|_, w| w.tx_fifo_rst().set_bit());
 
         self.i2c
+            .register_block()
             .fifo_conf()
             .modify(|_, w| w.tx_fifo_rst().clear_bit());
 
         self.i2c
+            .register_block()
             .fifo_conf()
             .modify(|_, w| w.rx_fifo_rst().set_bit());
 
         self.i2c
+            .register_block()
             .fifo_conf()
             .modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
