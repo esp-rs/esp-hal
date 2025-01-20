@@ -76,6 +76,10 @@ name    = "i2s"
 harness = false
 
 [[test]]
+name    = "i2s_parallel"
+harness = false
+
+[[test]]
 name    = "lcd_cam"
 harness = false
 

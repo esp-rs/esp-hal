@@ -141,11 +141,11 @@ impl TxRegisterAccess for AnyI2sDmaTxChannel {
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        None
+        Some(self.0.peripheral_interrupt())
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        None
+        Some(self.0.async_handler())
     }
 }
 
