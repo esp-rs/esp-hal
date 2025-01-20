@@ -112,7 +112,7 @@ pub enum Error {
 ///
 /// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin_4 = peripherals.GPIO4;
-/// let pin_4 = Input::new(&mut pin_4, config).unwrap();
+/// let pin_4_input = Input::new(&mut pin_4, config).unwrap();
 ///
 /// let reason =
 ///     reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
