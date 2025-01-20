@@ -250,6 +250,11 @@ mod peripheral_macros {
                     $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
                 ),* $(,)?
             ],
+            unstable_peripherals: [
+                $(
+                    $unstable_name:ident <= $unstable_from_pac:tt $(($($unstable_interrupt:ident),*))?
+                ),* $(,)?
+            ],
             pins: [
                 $( ( $pin:literal, $($pin_tokens:tt)* ) )*
             ],
@@ -259,14 +264,12 @@ mod peripheral_macros {
                 ),* $(,)?
             ]
         ) => {
-
-            /// Contains the generated peripherals which implement [`Peripheral`]
-            mod peripherals {
-                pub use super::pac::*;
-                $(
-                    $crate::create_peripheral!($name <= $from_pac);
-                )*
-            }
+            $(
+                $crate::create_peripheral!($name <= $from_pac);
+            )*
+            $(
+                $crate::create_peripheral!(#[instability::unstable] $unstable_name <= $unstable_from_pac);
+            )*
 
             pub(crate) mod gpio {
                 $crate::gpio! {
@@ -280,7 +283,24 @@ mod peripheral_macros {
                 pub struct Peripherals {
                     $(
                         #[doc = concat!("The ", stringify!($name), " peripheral.")]
-                        pub $name: peripherals::$name,
+                        pub $name: $name,
+                    )*
+                    $(
+                        #[doc = concat!("The ", stringify!($unstable_name), " peripheral.")]
+                        #[doc = "**This API is marked as unstable** and is only available when the `unstable`
+                                crate feature is enabled. This comes with no stability guarantees, and could be changed
+                                or removed at any time."]
+                        #[cfg(any(doc, feature = "unstable"))]
+                        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+                        pub $unstable_name: $unstable_name,
+
+                        #[doc = concat!("The ", stringify!($unstable_name), " peripheral.")]
+                        #[doc = "**This API is marked as unstable** and is only available when the `unstable`
+                                crate feature is enabled. This comes with no stability guarantees, and could be changed
+                                or removed at any time."]
+                        #[cfg(not(any(doc, feature = "unstable")))]
+                        #[allow(unused)]
+                        pub(crate) $unstable_name: $unstable_name,
                     )*
 
                     $(
@@ -319,7 +339,10 @@ mod peripheral_macros {
                     pub unsafe fn steal() -> Self {
                         Self {
                             $(
-                                $name: peripherals::$name::steal(),
+                                $name: $name::steal(),
+                            )*
+                            $(
+                                $unstable_name: $unstable_name::steal(),
                             )*
 
                             $(
@@ -334,19 +357,31 @@ mod peripheral_macros {
                 }
             }
 
-            // expose the new structs
             $(
-                pub use peripherals::$name;
+                $(
+                    impl $name {
+                        $(
+                            paste::paste!{
+                                /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
+                                #[instability::unstable]
+                                pub fn [<bind_ $interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
+                                    unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
+                                }
+                            }
+                        )*
+                    }
+                )*
             )*
 
             $(
                 $(
-                    impl peripherals::$name {
+                    impl $unstable_name {
                         $(
                             paste::paste!{
                                 /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
-                                pub fn [<bind_ $interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
-                                    unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
+                                #[instability::unstable]
+                                pub fn [<bind_ $unstable_interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
+                                    unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$unstable_interrupt, handler); }
                                 }
                             }
                         )*
@@ -382,7 +417,8 @@ mod peripheral_macros {
     #[macro_export]
     /// Macro to create a peripheral structure.
     macro_rules! create_peripheral {
-        ($name:ident <= virtual) => {
+        ($(#[$attr:meta])? $name:ident <= virtual) => {
+            $(#[$attr])?
             #[derive(Debug)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             #[non_exhaustive]
@@ -414,25 +450,32 @@ mod peripheral_macros {
             impl $crate::private::Sealed for $name {}
         };
 
-        ($name:ident <= $base:ident) => {
-            $crate::create_peripheral!($name <= virtual);
+        ($(#[$attr:meta])? $name:ident <= $base:ident) => {
+            $crate::create_peripheral!($(#[$attr])? $name <= virtual);
 
             impl $name {
                 #[doc = r"Pointer to the register block"]
                 #[instability::unstable]
-                pub const PTR: *const <super::pac::$base as core::ops::Deref>::Target = super::pac::$base::PTR;
+                pub const PTR: *const <pac::$base as core::ops::Deref>::Target = pac::$base::PTR;
 
                 #[doc = r"Return the pointer to the register block"]
                 #[inline(always)]
                 #[instability::unstable]
-                pub const fn ptr() -> *const <super::pac::$base as core::ops::Deref>::Target {
-                    super::pac::$base::PTR
+                pub const fn ptr() -> *const <pac::$base as core::ops::Deref>::Target {
+                    pac::$base::PTR
+                }
+
+                #[doc = r"Return a reference to the register block"]
+                #[inline(always)]
+                #[instability::unstable]
+                pub const fn regs<'a>() -> &'a <pac::$base as core::ops::Deref>::Target {
+                    unsafe { &*Self::PTR }
                 }
             }
 
             #[doc(hidden)]
             impl core::ops::Deref for $name {
-                type Target = <super::pac::$base as core::ops::Deref>::Target;
+                type Target = <pac::$base as core::ops::Deref>::Target;
 
                 fn deref(&self) -> &Self::Target {
                     unsafe { &*Self::PTR }

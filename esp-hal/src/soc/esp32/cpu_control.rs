@@ -59,7 +59,7 @@ use core::{
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::CPU_CTRL,
+    peripherals::{CPU_CTRL, DPORT, LPWR, SPI0},
     Cpu,
 };
 
@@ -149,23 +149,20 @@ pub struct CpuControl<'d> {
 }
 
 unsafe fn internal_park_core(core: Cpu) {
-    let rtc_control = crate::peripherals::RTC_CNTL::PTR;
-    let rtc_control = &*rtc_control;
-
     match core {
         Cpu::ProCpu => {
-            rtc_control
+            LPWR::regs()
                 .sw_cpu_stall()
                 .modify(|_, w| w.sw_stall_procpu_c1().bits(0x21));
-            rtc_control
+            LPWR::regs()
                 .options0()
                 .modify(|_, w| w.sw_stall_procpu_c0().bits(0x02));
         }
         Cpu::AppCpu => {
-            rtc_control
+            LPWR::regs()
                 .sw_cpu_stall()
                 .modify(|_, w| w.sw_stall_appcpu_c1().bits(0x21));
-            rtc_control
+            LPWR::regs()
                 .options0()
                 .modify(|_, w| w.sw_stall_appcpu_c0().bits(0x02));
         }
@@ -174,6 +171,7 @@ unsafe fn internal_park_core(core: Cpu) {
 
 impl<'d> CpuControl<'d> {
     /// Creates a new instance of `CpuControl`.
+    #[instability::unstable]
     pub fn new(cpu_control: impl Peripheral<P = CPU_CTRL> + 'd) -> CpuControl<'d> {
         crate::into_ref!(cpu_control);
 
@@ -194,23 +192,20 @@ impl<'d> CpuControl<'d> {
 
     /// Unpark the given core
     pub fn unpark_core(&mut self, core: Cpu) {
-        let rtc_control = crate::peripherals::RTC_CNTL::PTR;
-        let rtc_control = unsafe { &*rtc_control };
-
         match core {
             Cpu::ProCpu => {
-                rtc_control
+                LPWR::regs()
                     .sw_cpu_stall()
                     .modify(|_, w| unsafe { w.sw_stall_procpu_c1().bits(0) });
-                rtc_control
+                LPWR::regs()
                     .options0()
                     .modify(|_, w| unsafe { w.sw_stall_procpu_c0().bits(0) });
             }
             Cpu::AppCpu => {
-                rtc_control
+                LPWR::regs()
                     .sw_cpu_stall()
                     .modify(|_, w| unsafe { w.sw_stall_appcpu_c1().bits(0) });
-                rtc_control
+                LPWR::regs()
                     .options0()
                     .modify(|_, w| unsafe { w.sw_stall_appcpu_c0().bits(0) });
             }
@@ -218,8 +213,7 @@ impl<'d> CpuControl<'d> {
     }
 
     fn flush_cache(&mut self, core: Cpu) {
-        let dport_control = crate::peripherals::DPORT::PTR;
-        let dport_control = unsafe { &*dport_control };
+        let dport_control = DPORT::regs();
 
         match core {
             Cpu::ProCpu => {
@@ -261,8 +255,8 @@ impl<'d> CpuControl<'d> {
     }
 
     fn enable_cache(&mut self, core: Cpu) {
-        let spi0 = unsafe { &*crate::peripherals::SPI0::ptr() };
-        let dport_control = unsafe { &*crate::peripherals::DPORT::ptr() };
+        let spi0 = SPI0::regs();
+        let dport_control = DPORT::regs();
 
         match core {
             Cpu::ProCpu => {
@@ -351,8 +345,7 @@ impl<'d> CpuControl<'d> {
         F: FnOnce(),
         F: Send + 'a,
     {
-        let dport_control = crate::peripherals::DPORT::PTR;
-        let dport_control = unsafe { &*dport_control };
+        let dport_control = DPORT::regs();
 
         if !xtensa_lx::is_debugger_attached()
             && dport_control

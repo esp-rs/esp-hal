@@ -2,7 +2,7 @@ use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{asynch::AtomicWaker, dma::*, peripheral::Peripheral, peripherals::Interrupt};
 
-pub(super) type SpiRegisterBlock = crate::peripherals::spi2::RegisterBlock;
+pub(super) type SpiRegisterBlock = crate::pac::spi2::RegisterBlock;
 
 /// The RX half of an arbitrary SPI DMA channel.
 #[derive(Debug)]

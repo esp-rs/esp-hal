@@ -39,7 +39,7 @@ const I2C_MST_BBPLL_STOP_FORCE_HIGH: u32 = 1 << 3;
 const I2C_MST_BBPLL_STOP_FORCE_LOW: u32 = 1 << 2;
 
 pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
-    let system = unsafe { &*crate::peripherals::SYSTEM::ptr() };
+    let system = crate::peripherals::SYSTEM::regs();
 
     let div_ref: u32;
     let div7_0: u32;
@@ -166,7 +166,7 @@ pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
 }
 
 pub(crate) fn esp32c3_rtc_bbpll_enable() {
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = crate::peripherals::LPWR::regs();
 
     rtc_cntl.options0().modify(|_, w| {
         w.bb_i2c_force_pd()
@@ -181,7 +181,7 @@ pub(crate) fn esp32c3_rtc_bbpll_enable() {
 pub(crate) fn esp32c3_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
     crate::rom::ets_update_cpu_frequency_rom(freq.mhz());
 
-    let system_control = unsafe { &*crate::peripherals::SYSTEM::ptr() };
+    let system_control = crate::peripherals::SYSTEM::regs();
     unsafe {
         // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
         // first.
@@ -202,7 +202,7 @@ pub(crate) fn esp32c3_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
 }
 
 pub(crate) fn esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
-    let system_control = unsafe { &*crate::peripherals::SYSTEM::ptr() };
+    let system_control = crate::peripherals::SYSTEM::regs();
 
     unsafe {
         system_control
@@ -220,7 +220,7 @@ pub(crate) fn esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
 }
 
 pub(crate) fn esp32c3_rtc_apb_freq_update(apb_freq: ApbClock) {
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let rtc_cntl = crate::peripherals::LPWR::regs();
     let value = ((apb_freq.hz() >> 12) & u16::MAX as u32)
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);
 

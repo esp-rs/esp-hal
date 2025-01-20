@@ -73,9 +73,9 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     pub fn raise(&self) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
-                let system = unsafe { &*crate::peripherals::INTPRI::PTR };
+                let system = crate::peripherals::INTPRI::regs();
             } else {
-                let system = unsafe { &*crate::peripherals::SYSTEM::PTR };
+                let system = crate::peripherals::SYSTEM::regs();
             }
         }
 
@@ -100,9 +100,9 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     pub fn reset(&self) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
-                let system = unsafe { &*crate::peripherals::INTPRI::PTR };
+                let system = crate::peripherals::INTPRI::regs();
             } else {
-                let system = unsafe { &*crate::peripherals::SYSTEM::PTR };
+                let system = crate::peripherals::SYSTEM::regs();
             }
         }
 

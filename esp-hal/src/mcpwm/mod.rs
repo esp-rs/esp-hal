@@ -93,6 +93,7 @@ use timer::Timer;
 use crate::{
     clock::Clocks,
     gpio::OutputSignal,
+    pac,
     peripheral::{Peripheral, PeripheralRef},
     system::{self, PeripheralGuard},
 };
@@ -102,7 +103,7 @@ pub mod operator;
 /// MCPWM timers
 pub mod timer;
 
-type RegisterBlock = crate::peripherals::mcpwm0::RegisterBlock;
+type RegisterBlock = pac::mcpwm0::RegisterBlock;
 
 /// The MCPWM peripheral
 #[non_exhaustive]
@@ -147,7 +148,7 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
 
         #[cfg(esp32c6)]
         {
-            unsafe { &*crate::peripherals::PCR::PTR }
+            crate::peripherals::PCR::regs()
                 .pwm_clk_conf()
                 .modify(|_, w| unsafe {
                     w.pwm_div_num()
@@ -161,7 +162,7 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
 
         #[cfg(esp32h2)]
         {
-            unsafe { &*crate::peripherals::PCR::PTR }
+            crate::peripherals::PCR::regs()
                 .pwm_clk_conf()
                 .modify(|_, w| unsafe {
                     w.pwm_div_num()

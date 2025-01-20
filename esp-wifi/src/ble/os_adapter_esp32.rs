@@ -1,16 +1,19 @@
 use core::ptr::addr_of_mut;
 
 use super::*;
-use crate::binary::{
-    c_types,
-    include::{
-        esp_bt_controller_config_t,
-        esp_bt_mode_t,
-        esp_bt_mode_t_ESP_BT_MODE_BLE,
-        esp_bt_mode_t_ESP_BT_MODE_BTDM,
-        esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
-        esp_bt_mode_t_ESP_BT_MODE_IDLE,
+use crate::{
+    binary::{
+        c_types,
+        include::{
+            esp_bt_controller_config_t,
+            esp_bt_mode_t,
+            esp_bt_mode_t_ESP_BT_MODE_BLE,
+            esp_bt_mode_t_ESP_BT_MODE_BTDM,
+            esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
+            esp_bt_mode_t_ESP_BT_MODE_IDLE,
+        },
     },
+    hal::{interrupt, peripherals::Interrupt},
 };
 
 pub static mut ISR_INTERRUPT_5: (
@@ -547,12 +550,20 @@ pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: 
     match n {
         5 => {
             ISR_INTERRUPT_5 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+            unwrap!(interrupt::enable(
+                Interrupt::RWBT,
+                interrupt::Priority::Priority1
+            ));
         }
         7 => {
             ISR_INTERRUPT_7 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
         }
         8 => {
             ISR_INTERRUPT_8 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+            unwrap!(interrupt::enable(
+                Interrupt::BT_BB,
+                interrupt::Priority::Priority1,
+            ));
         }
         _ => panic!("set_isr - unsupported interrupt number {}", n),
     }

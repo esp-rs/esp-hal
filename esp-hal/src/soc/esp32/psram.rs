@@ -138,18 +138,16 @@ pub(crate) mod utils {
     use procmacros::ram;
 
     use super::*;
+    use crate::peripherals::{DPORT, SPI0, SPI1};
 
     #[ram]
     pub(crate) fn s_mapping(v_start: u32, size: u32) {
         // Enable external RAM in MMU
         cache_sram_mmu_set(0, 0, v_start, 0, 32, size / 1024 / 32);
         // Flush and enable icache for APP CPU
-        unsafe {
-            let dport = &*esp32::DPORT::PTR;
-            dport
-                .app_cache_ctrl1()
-                .modify(|_, w| w.app_cache_mask_dram1().clear_bit());
-        }
+        DPORT::regs()
+            .app_cache_ctrl1()
+            .modify(|_, w| w.app_cache_mask_dram1().clear_bit());
 
         cache_sram_mmu_set(1, 0, v_start, 0, 32, size / 1024 / 32);
     }
@@ -433,11 +431,10 @@ pub(crate) mod utils {
         info!("PS-RAM pins {:?}", &psram_io);
 
         unsafe {
-            let spi0 = &*crate::peripherals::SPI0::PTR;
-            let spi1 = &*crate::peripherals::SPI1::PTR;
-
-            spi0.ext3().modify(|_, w| w.bits(0x1));
-            spi1.user().modify(|_, w| w.usr_prep_hold().clear_bit());
+            SPI0::regs().ext3().modify(|_, w| w.bits(0x1));
+            SPI1::regs()
+                .user()
+                .modify(|_, w| w.usr_prep_hold().clear_bit());
         }
 
         psram_spi_init(mode, clk_mode);
@@ -540,7 +537,7 @@ pub(crate) mod utils {
         extra_dummy: u32,
     ) {
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
+            let spi = SPI0::regs();
             info!(
                 "PS-RAM cache_init, psram_cache_mode={:?}, extra_dummy={}, clk_mode={:?}",
                 psram_cache_mode, extra_dummy, clk_mode
@@ -639,7 +636,7 @@ pub(crate) mod utils {
                 }
             }
 
-            let dport = &*esp32::DPORT::PTR;
+            let dport = DPORT::regs();
 
             dport
                 .pro_cache_ctrl()
@@ -700,7 +697,7 @@ pub(crate) mod utils {
         clk_mode: PsramClkMode,
     ) {
         unsafe {
-            let spi = &*crate::peripherals::SPI1::PTR;
+            let spi = SPI1::regs();
             // We need to clear last bit of INT_EN field here.
             spi.slave().modify(|_, w| w.trans_inten().clear_bit());
             // SPI_CPOL & SPI_CPHA
@@ -727,7 +724,7 @@ pub(crate) mod utils {
 
     fn psram_set_cs_timing_spi1(psram_cache_mode: PsramCacheSpeed, clk_mode: PsramClkMode) {
         unsafe {
-            let spi = &*crate::peripherals::SPI1::PTR;
+            let spi = SPI1::regs();
             if clk_mode == PsramClkMode::PsramClkModeNorm {
                 spi.user().modify(|_, w| w.cs_hold().set_bit());
                 spi.user().modify(|_, w| w.cs_setup().set_bit());
@@ -748,7 +745,7 @@ pub(crate) mod utils {
 
     fn psram_set_cs_timing_spi0(psram_cache_mode: PsramCacheSpeed, clk_mode: PsramClkMode) {
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
+            let spi = SPI0::regs();
             if clk_mode == PsramClkMode::PsramClkModeNorm {
                 spi.user().modify(|_, w| w.cs_hold().set_bit());
                 spi.user().modify(|_, w| w.cs_setup().set_bit());
@@ -829,7 +826,7 @@ pub(crate) mod utils {
     #[ram]
     fn psram_cmd_end_spi1(backup_usr: u32, backup_usr1: u32, backup_usr2: u32) {
         unsafe {
-            let spi = &*crate::peripherals::SPI1::PTR;
+            let spi = SPI1::regs();
             loop {
                 if spi.cmd().read().bits() & SPI_USR == 0 {
                     break;
@@ -846,7 +843,7 @@ pub(crate) mod utils {
     #[ram]
     fn psram_cmd_config_spi1(p_in_data: &PsramCmd) -> (u32, u32, u32) {
         unsafe {
-            let spi = &*crate::peripherals::SPI1::PTR;
+            let spi = SPI1::regs();
             loop {
                 if spi.cmd().read().bits() & SPI_USR == 0 {
                     break;
@@ -950,7 +947,7 @@ pub(crate) mod utils {
         cmd_mode: PsramCmdMode,
     ) {
         unsafe {
-            let spi = &*crate::peripherals::SPI1::PTR;
+            let spi = SPI1::regs();
             // get cs1
             spi.pin().modify(|_, w| w.cs1_dis().clear_bit());
             spi.pin().modify(|_, w| w.cs0_dis().clear_bit());
@@ -975,8 +972,7 @@ pub(crate) mod utils {
             }
 
             // DPORT_SET_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
-            let dport = &*esp32::DPORT::PTR;
-            dport
+            DPORT::regs()
                 .host_inf_sel()
                 .modify(|r, w| w.bits(r.bits() | 1 << 14));
 
@@ -989,8 +985,7 @@ pub(crate) mod utils {
             }
 
             // DPORT_CLEAR_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
-            let dport = &*esp32::DPORT::PTR;
-            dport
+            DPORT::regs()
                 .host_inf_sel()
                 .modify(|r, w| w.bits(r.bits() & !(1 << 14)));
 
@@ -1029,53 +1024,48 @@ pub(crate) mod utils {
 
     // set basic SPI write mode
     fn psram_set_basic_write_mode_spi1() {
-        unsafe {
-            let spi = &*crate::peripherals::SPI1::PTR;
-
-            spi.user().modify(|_, w| w.fwrite_qio().clear_bit());
-            spi.user().modify(|_, w| w.fwrite_dio().clear_bit());
-            spi.user().modify(|_, w| w.fwrite_quad().clear_bit());
-            spi.user().modify(|_, w| w.fwrite_dual().clear_bit());
-        }
+        SPI1::regs().user().modify(|_, w| {
+            w.fwrite_qio().clear_bit();
+            w.fwrite_dio().clear_bit();
+            w.fwrite_quad().clear_bit();
+            w.fwrite_dual().clear_bit()
+        });
     }
+
     // set QPI write mode
     fn psram_set_qio_write_mode_spi1() {
-        unsafe {
-            let spi = &*crate::peripherals::SPI1::PTR;
-
-            spi.user().modify(|_, w| w.fwrite_qio().set_bit());
-            spi.user().modify(|_, w| w.fwrite_dio().clear_bit());
-            spi.user().modify(|_, w| w.fwrite_quad().clear_bit());
-            spi.user().modify(|_, w| w.fwrite_dual().clear_bit());
-        }
+        SPI1::regs().user().modify(|_, w| {
+            w.fwrite_qio().set_bit();
+            w.fwrite_dio().clear_bit();
+            w.fwrite_quad().clear_bit();
+            w.fwrite_dual().clear_bit()
+        });
     }
+
     // set QPI read mode
     fn psram_set_qio_read_mode_spi1() {
-        unsafe {
-            let spi = &*crate::peripherals::SPI1::PTR;
-
-            spi.ctrl().modify(|_, w| w.fread_qio().set_bit());
-            spi.ctrl().modify(|_, w| w.fread_quad().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_dual().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_dio().clear_bit());
-        }
+        SPI1::regs().ctrl().modify(|_, w| {
+            w.fread_qio().set_bit();
+            w.fread_quad().clear_bit();
+            w.fread_dual().clear_bit();
+            w.fread_dio().clear_bit()
+        });
     }
+
     // set SPI read mode
     fn psram_set_basic_read_mode_spi1() {
-        unsafe {
-            let spi = &*crate::peripherals::SPI1::PTR;
-
-            spi.ctrl().modify(|_, w| w.fread_qio().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_quad().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_dual().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_dio().clear_bit());
-        }
+        SPI1::regs().ctrl().modify(|_, w| {
+            w.fread_qio().clear_bit();
+            w.fread_quad().clear_bit();
+            w.fread_dual().clear_bit();
+            w.fread_dio().clear_bit()
+        });
     }
 
     // psram gpio init , different working frequency we have different solutions
     fn psram_gpio_config(psram_io: &PsramIo, mode: PsramCacheSpeed) -> u32 {
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
+            let spi = SPI0::regs();
             let g_rom_spiflash_dummy_len_plus_ptr = addr_of_mut!(g_rom_spiflash_dummy_len_plus);
 
             #[derive(Debug, Clone, Copy)]

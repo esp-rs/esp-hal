@@ -61,7 +61,7 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     }
 
     fn output_enable(&self, enable: bool) {
-        let rtc_io = unsafe { RTC_IO::steal() };
+        let rtc_io = RTC_IO::regs();
 
         if enable {
             rtc_io
@@ -100,21 +100,21 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     }
 
     fn input_enable(&self, enable: bool) {
-        unsafe { RTC_IO::steal() }
+        RTC_IO::regs()
             .touch_pad(PIN as usize)
             .modify(|_, w| w.fun_ie().bit(enable));
     }
 
     /// Sets pull-up enable for the pin
     pub fn pullup_enable(&self, enable: bool) {
-        unsafe { RTC_IO::steal() }
+        RTC_IO::regs()
             .touch_pad(PIN as usize)
             .modify(|_, w| w.rue().bit(enable));
     }
 
     /// Sets pull-down enable for the pin
     pub fn pulldown_enable(&self, enable: bool) {
-        unsafe { RTC_IO::steal() }
+        RTC_IO::regs()
             .touch_pad(PIN as usize)
             .modify(|_, w| w.rde().bit(enable));
     }
@@ -148,7 +148,7 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 
     fn output_enable(&self, enable: bool) {
-        let rtc_io = unsafe { RTC_IO::steal() };
+        let rtc_io = RTC_IO::regs();
 
         if enable {
             rtc_io
@@ -162,27 +162,27 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 
     fn input_enable(&self, enable: bool) {
-        unsafe { RTC_IO::steal() }
+        RTC_IO::regs()
             .touch_pad(PIN as usize)
             .modify(|_, w| w.fun_ie().bit(enable));
     }
 
     /// Sets pull-up enable for the pin
     pub fn pullup_enable(&self, enable: bool) {
-        unsafe { RTC_IO::steal() }
+        RTC_IO::regs()
             .touch_pad(PIN as usize)
             .modify(|_, w| w.rue().bit(enable));
     }
 
     /// Sets pull-down enable for the pin
     pub fn pulldown_enable(&self, enable: bool) {
-        unsafe { RTC_IO::steal() }
+        RTC_IO::regs()
             .touch_pad(PIN as usize)
             .modify(|_, w| w.rde().bit(enable));
     }
 
     fn set_open_drain_output(&self, enable: bool) {
-        unsafe { GPIO::steal() }
+        GPIO::regs()
             .pin(PIN as usize)
             .modify(|_, w| w.pad_driver().bit(enable));
     }

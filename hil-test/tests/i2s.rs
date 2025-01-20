@@ -79,19 +79,17 @@ async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, Async>) {
 }
 
 fn enable_loopback() {
-    unsafe {
-        let i2s = esp_hal::peripherals::I2S0::steal();
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
-                i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
-            } else {
-                i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
-                i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
+    let i2s = esp_hal::peripherals::I2S0::regs();
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32, esp32s2))] {
+            i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
+            i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
+        } else {
+            i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
+            i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
 
-                i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
-                i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
-            }
+            i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
+            i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
         }
     }
 }

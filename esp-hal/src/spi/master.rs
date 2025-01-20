@@ -79,10 +79,9 @@ use crate::{
         OutputSignal,
     },
     interrupt::{InterruptConfigurable, InterruptHandler},
+    pac::spi2::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::spi2::RegisterBlock,
-    private,
-    private::Sealed,
+    private::{self, Sealed},
     spi::AnySpi,
     system::PeripheralGuard,
     Async,
@@ -216,7 +215,7 @@ impl Command {
 
     fn mode(&self) -> DataMode {
         match self {
-            Command::None => DataMode::Single,
+            Command::None => DataMode::SingleTwoDataLines,
             Command::_1Bit(_, mode)
             | Command::_2Bit(_, mode)
             | Command::_3Bit(_, mode)
@@ -401,7 +400,7 @@ impl Address {
 
     fn mode(&self) -> DataMode {
         match self {
-            Address::None => DataMode::Single,
+            Address::None => DataMode::SingleTwoDataLines,
             Address::_1Bit(_, mode)
             | Address::_2Bit(_, mode)
             | Address::_3Bit(_, mode)
@@ -546,8 +545,8 @@ impl<'d> Spi<'d, Blocking> {
         this.apply_config(&config)?;
 
         let this = this
-            .with_mosi(NoPin)
-            .with_miso(NoPin)
+            .with_sio0(NoPin)
+            .with_sio1(NoPin)
             .with_sck(NoPin)
             .with_cs(NoPin);
 
@@ -639,9 +638,31 @@ where
 {
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
+    /// Enables output functionality for the pin, and connects it to the MOSI.
+    ///
+    /// You want to use this for full-duplex SPI or
+    /// [DataMode::SingleTwoDataLines]
+    pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
+        crate::into_mapped_ref!(mosi);
+        mosi.enable_output(false);
+
+        self.driver().info.mosi.connect_to(&mut mosi);
+
+        self
+    }
+
+    /// Assign the SIO0 pin for the SPI instance.
+    ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI signal and SIO0 input signal.
-    pub fn with_mosi<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
+    ///
+    /// Use this if any of the devices on the bus use half-duplex SPI.
+    ///
+    /// The pin is configured to open-drain mode.
+    ///
+    /// Note: You do not need to call [Self::with_mosi] when this is used.
+    #[instability::unstable]
+    pub fn with_sio0<MOSI: PeripheralOutput>(self, mosi: impl Peripheral<P = MOSI> + 'd) -> Self {
         crate::into_mapped_ref!(mosi);
         mosi.enable_output(true);
         mosi.enable_input(true);
@@ -656,6 +677,9 @@ where
     ///
     /// Enables input functionality for the pin, and connects it to the MISO
     /// signal.
+    ///
+    /// You want to use this for full-duplex SPI or
+    /// [DataMode::SingleTwoDataLines]
     pub fn with_miso<MISO: PeripheralInput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
         miso.enable_input(true);
@@ -670,7 +694,12 @@ where
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO signal and SIO1 input signal.
     ///
+    /// Use this if any of the devices on the bus use half-duplex SPI.
+    ///
+    /// The pin is configured to open-drain mode.
+    ///
     /// Note: You do not need to call [Self::with_miso] when this is used.
+    #[instability::unstable]
     pub fn with_sio1<SIO1: PeripheralOutput>(self, miso: impl Peripheral<P = SIO1> + 'd) -> Self {
         crate::into_mapped_ref!(miso);
         miso.enable_input(true);
@@ -1525,7 +1554,7 @@ mod dma {
             {
                 // On the ESP32, if we don't have data, the address is always sent
                 // on a single line, regardless of its data mode.
-                if bytes_to_write == 0 && address.mode() != DataMode::Single {
+                if bytes_to_write == 0 && address.mode() != DataMode::SingleTwoDataLines {
                     return self.set_up_address_workaround(cmd, address, dummy);
                 }
             }
@@ -2137,28 +2166,11 @@ mod dma {
 mod ehal1 {
     use embedded_hal::spi::SpiBus;
     use embedded_hal_async::spi::SpiBus as SpiBusAsync;
-    use embedded_hal_nb::spi::FullDuplex;
 
     use super::*;
 
     impl<Dm> embedded_hal::spi::ErrorType for Spi<'_, Dm> {
         type Error = Error;
-    }
-
-    impl<Dm> FullDuplex for Spi<'_, Dm>
-    where
-        Dm: DriverMode,
-    {
-        fn read(&mut self) -> nb::Result<u8, Self::Error> {
-            let mut buffer = [0u8; 1];
-            self.driver().read_bytes(&mut buffer)?;
-            Ok(buffer[0])
-        }
-
-        fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-            self.driver().write_bytes(&[word])?;
-            Ok(())
-        }
     }
 
     impl<Dm> SpiBus for Spi<'_, Dm>
@@ -2531,7 +2543,7 @@ impl Driver {
         unsafe {
             // use default clock source PLL_F80M_CLK (ESP32-C6) and
             // PLL_F48M_CLK (ESP32-H2)
-            crate::peripherals::PCR::steal()
+            crate::peripherals::PCR::regs()
                 .spi2_clkm_conf()
                 .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
@@ -2592,12 +2604,13 @@ impl Driver {
         let reg_block = self.register_block();
         match cmd_mode {
             DataMode::Single => (),
+            DataMode::SingleTwoDataLines => (),
             // FIXME: more detailed error - Only 1-bit commands are supported.
             _ => return Err(Error::Unsupported),
         }
 
         match address_mode {
-            DataMode::Single => {
+            DataMode::Single | DataMode::SingleTwoDataLines => {
                 reg_block.ctrl().modify(|_, w| {
                     w.fread_dio().clear_bit();
                     w.fread_qio().clear_bit();
@@ -3115,12 +3128,25 @@ impl Driver {
         no_mosi_miso: bool,
         data_mode: DataMode,
     ) -> Result<(), Error> {
+        let three_wire = cmd.mode() == DataMode::Single
+            || address.mode() == DataMode::Single
+            || data_mode == DataMode::Single;
+
+        if three_wire
+            && ((cmd != Command::None && cmd.mode() != DataMode::Single)
+                || (address != Address::None && address.mode() != DataMode::Single)
+                || data_mode != DataMode::Single)
+        {
+            return Err(Error::Unsupported);
+        }
+
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
 
         let reg_block = self.register_block();
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
             w.usr_mosi_highpart().clear_bit();
+            w.sio().bit(three_wire);
             w.doutdin().clear_bit();
             w.usr_miso().bit(!is_write && !no_mosi_miso);
             w.usr_mosi().bit(is_write && !no_mosi_miso);
@@ -3139,13 +3165,10 @@ impl Driver {
         });
 
         #[cfg(any(esp32c6, esp32h2))]
-        unsafe {
-            let pcr = crate::peripherals::PCR::steal();
-
-            // use default clock source PLL_F80M_CLK
-            pcr.spi2_clkm_conf()
-                .modify(|_, w| w.spi2_clkm_sel().bits(1));
-        }
+        // use default clock source PLL_F80M_CLK
+        crate::peripherals::PCR::regs()
+            .spi2_clkm_conf()
+            .modify(|_, w| unsafe { w.spi2_clkm_sel().bits(1) });
 
         #[cfg(not(esp32))]
         reg_block.misc().write(|w| unsafe { w.bits(0) });

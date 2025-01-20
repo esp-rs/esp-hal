@@ -95,7 +95,10 @@ async fn main(spawner: Spawner) {
             }
 
             let count = WIDTH / (total / entry.length1() as usize);
-            let c = if entry.level1() { '-' } else { '_' };
+            let c = match entry.level1() {
+                Level::High => '-',
+                Level::Low => '_',
+            };
             for _ in 0..count + 1 {
                 print!("{}", c);
             }
@@ -105,7 +108,10 @@ async fn main(spawner: Spawner) {
             }
 
             let count = WIDTH / (total / entry.length2() as usize);
-            let c = if entry.level2() { '-' } else { '_' };
+            let c = match entry.level2() {
+                Level::High => '-',
+                Level::Low => '_',
+            };
             for _ in 0..count + 1 {
                 print!("{}", c);
             }

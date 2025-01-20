@@ -33,7 +33,7 @@ pub enum Error {
     /// communication.
     FifoSizeExeeded,
     /// Error indicating that the operation is unsupported by the current
-    /// implementation.
+    /// implementation or for the given arguments.
     Unsupported,
     /// An unknown error occurred during SPI communication.
     Unknown,
@@ -98,14 +98,16 @@ pub enum BitOrder {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum DataMode {
-    /// `Single` Data Mode - 1 bit, 2 wires.
+    /// 1 bit, two data lines. (MOSI, MISO)
+    SingleTwoDataLines,
+    /// 1 bit, 1 data line (SIO0)
     Single,
-    /// `Dual` Data Mode - 2 bit, 2 wires
+    /// 2 bits, two data lines. (SIO0, SIO1)
     Dual,
-    /// `Quad` Data Mode - 4 bit, 4 wires
+    /// 4 bit, 4 data lines. (SIO0 .. SIO3)
     Quad,
     #[cfg(spi_octal)]
-    /// `Octal` Data Mode - 8 bit, 8 wires
+    /// 8 bit, 8 data lines. (SIO0 .. SIO7)
     Octal,
 }
 

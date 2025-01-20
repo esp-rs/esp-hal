@@ -78,7 +78,7 @@ where
         pin.set_analog(crate::private::Internal);
 
         #[cfg(esp32s2)]
-        unsafe { &*crate::peripherals::SENS::PTR }
+        crate::peripherals::SENS::regs()
             .sar_dac_ctrl1()
             .modify(|_, w| w.dac_clkgate_en().set_bit());
 
@@ -104,19 +104,19 @@ pub trait Instance: crate::private::Sealed {
     type Pin;
 
     fn enable_xpd() {
-        unsafe { &*crate::peripherals::RTC_IO::PTR }
+        crate::peripherals::RTC_IO::regs()
             .pad_dac(Self::INDEX)
             .modify(|_, w| w.dac_xpd_force().set_bit().xpd_dac().set_bit());
     }
 
     fn set_pad_source() {
-        unsafe { &*crate::peripherals::SENS::PTR }
+        crate::peripherals::SENS::regs()
             .sar_dac_ctrl2()
             .modify(|_, w| w.dac_cw_en(Self::INDEX as u8).clear_bit());
     }
 
     fn write_byte(value: u8) {
-        unsafe { &*crate::peripherals::RTC_IO::PTR }
+        crate::peripherals::RTC_IO::regs()
             .pad_dac(Self::INDEX)
             .modify(|_, w| unsafe { w.dac().bits(value) });
     }

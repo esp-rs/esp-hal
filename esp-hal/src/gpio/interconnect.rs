@@ -138,7 +138,7 @@ pub(crate) fn connect_input_signal(
         "{:?} cannot be routed through the GPIO matrix",
         signal
     );
-    unsafe { GPIO::steal() }
+    GPIO::regs()
         .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
         .write(|w| unsafe {
             w.sel().bit(use_gpio_matrix);
@@ -196,7 +196,7 @@ fn connect_peripheral_to_output(
 
     // Inlined because output signals can only be connected to pins or nothing, so
     // there is no other user.
-    unsafe { GPIO::steal() }
+    GPIO::regs()
         .func_out_sel_cfg(pin.number() as usize)
         .write(|w| unsafe {
             if af == GPIO_FUNCTION {
@@ -213,7 +213,7 @@ fn connect_peripheral_to_output(
 fn disconnect_peripheral_output_from_pin(pin: &mut AnyPin, signal: gpio::OutputSignal) {
     pin.set_alternate_function(GPIO_FUNCTION);
 
-    unsafe { GPIO::steal() }
+    GPIO::regs()
         .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
         .write(|w| w.sel().clear_bit());
 }
@@ -238,7 +238,7 @@ where
 
 impl From<Flex<'static>> for InputSignal {
     fn from(input: Flex<'static>) -> Self {
-        Self::new(input.degrade())
+        Self::new(unsafe { AnyPin::steal(input.pin.number()) })
     }
 }
 
@@ -367,14 +367,14 @@ impl<P> From<P> for OutputSignal
 where
     P: OutputPin,
 {
-    fn from(input: P) -> Self {
-        Self::new(input.degrade())
+    fn from(output: P) -> Self {
+        Self::new(output.degrade())
     }
 }
 
 impl From<Flex<'static>> for OutputSignal {
-    fn from(input: Flex<'static>) -> Self {
-        Self::new(input.degrade())
+    fn from(output: Flex<'static>) -> Self {
+        Self::new(unsafe { AnyPin::steal(output.pin.number()) })
     }
 }
 

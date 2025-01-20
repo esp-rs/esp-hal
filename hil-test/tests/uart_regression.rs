@@ -25,9 +25,6 @@ mod tests {
             .unwrap()
             .with_rx(rx);
 
-        // start reception
-        let mut buf = [0u8; 1];
-
         // Start from a low level to verify that UartTx sets the level high initially,
         // but don't enable output otherwise we actually pull down against RX's
         // pullup resistor.
@@ -39,10 +36,11 @@ mod tests {
             .unwrap()
             .with_tx(tx);
 
-        tx.flush().unwrap();
+        tx.flush();
         tx.write_bytes(&[0x42]).unwrap();
-        rx.read_bytes(&mut buf).unwrap();
+        let mut byte = [0u8; 1];
+        rx.read_bytes(&mut byte).unwrap();
 
-        assert_eq!(buf[0], 0x42);
+        assert_eq!(byte[0], 0x42);
     }
 }

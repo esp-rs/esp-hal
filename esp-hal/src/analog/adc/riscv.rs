@@ -181,9 +181,7 @@ pub trait RegisterAccess {
 
 impl RegisterAccess for crate::peripherals::ADC1 {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
-        sar_adc.onetime_sample().modify(|_, w| unsafe {
+        APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
             w.saradc1_onetime_sample().set_bit();
             w.onetime_channel().bits(channel);
             w.onetime_atten().bits(attenuation)
@@ -191,35 +189,32 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     }
 
     fn start_onetime_sample() {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
-        sar_adc
+        APB_SARADC::regs()
             .onetime_sample()
             .modify(|_, w| w.onetime_start().set_bit());
     }
 
     fn is_done() -> bool {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
-        sar_adc.int_raw().read().adc1_done().bit()
+        APB_SARADC::regs().int_raw().read().adc1_done().bit()
     }
 
     fn read_data() -> u16 {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
-        (sar_adc.sar1data_status().read().saradc1_data().bits() as u16) & 0xfff
+        APB_SARADC::regs()
+            .sar1data_status()
+            .read()
+            .saradc1_data()
+            .bits() as u16
+            & 0xfff
     }
 
     fn reset() {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
         // Clear ADC1 sampling done interrupt bit
-        sar_adc
+        APB_SARADC::regs()
             .int_clr()
             .write(|w| w.adc1_done().clear_bit_by_one());
 
         // Disable ADC sampling
-        sar_adc
+        APB_SARADC::regs()
             .onetime_sample()
             .modify(|_, w| w.onetime_start().clear_bit());
     }
@@ -289,9 +284,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
 #[cfg(esp32c3)]
 impl RegisterAccess for crate::peripherals::ADC2 {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
-        sar_adc.onetime_sample().modify(|_, w| unsafe {
+        APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
             w.saradc2_onetime_sample().set_bit();
             w.onetime_channel().bits(channel);
             w.onetime_atten().bits(attenuation)
@@ -299,33 +292,30 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     }
 
     fn start_onetime_sample() {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
-        sar_adc
+        APB_SARADC::regs()
             .onetime_sample()
             .modify(|_, w| w.onetime_start().set_bit());
     }
 
     fn is_done() -> bool {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
-        sar_adc.int_raw().read().adc2_done().bit()
+        APB_SARADC::regs().int_raw().read().adc2_done().bit()
     }
 
     fn read_data() -> u16 {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
-        (sar_adc.sar2data_status().read().saradc2_data().bits() as u16) & 0xfff
+        APB_SARADC::regs()
+            .sar2data_status()
+            .read()
+            .saradc2_data()
+            .bits() as u16
+            & 0xfff
     }
 
     fn reset() {
-        let sar_adc = unsafe { &*APB_SARADC::PTR };
-
-        sar_adc
+        APB_SARADC::regs()
             .int_clr()
             .write(|w| w.adc2_done().clear_bit_by_one());
 
-        sar_adc
+        APB_SARADC::regs()
             .onetime_sample()
             .modify(|_, w| w.onetime_start().clear_bit());
     }
@@ -413,7 +403,7 @@ where
     ) -> Self {
         let guard = GenericPeripheralGuard::new();
 
-        unsafe { &*APB_SARADC::PTR }.ctrl().modify(|_, w| unsafe {
+        APB_SARADC::regs().ctrl().modify(|_, w| unsafe {
             w.start_force().set_bit();
             w.start().set_bit();
             w.sar_clk_gated().set_bit();

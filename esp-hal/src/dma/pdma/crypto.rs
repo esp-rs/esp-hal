@@ -5,10 +5,10 @@ use crate::{
     dma::*,
     interrupt::Priority,
     peripheral::Peripheral,
-    peripherals::Interrupt,
+    peripherals::{Interrupt, CRYPTO_DMA},
 };
 
-pub(super) type CryptoRegisterBlock = crate::peripherals::crypto_dma::RegisterBlock;
+pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;
 
 /// The RX half of a Crypto DMA channel.
 #[derive(Debug)]
@@ -481,7 +481,7 @@ impl DmaChannelExt for CryptoDmaChannel {
 impl PdmaChannel for CryptoDmaChannel {
     type RegisterBlock = CryptoRegisterBlock;
     fn register_block(&self) -> &Self::RegisterBlock {
-        unsafe { &*crate::peripherals::CRYPTO_DMA::PTR }
+        CRYPTO_DMA::regs()
     }
     fn tx_waker(&self) -> &'static AtomicWaker {
         static WAKER: AtomicWaker = AtomicWaker::new();

@@ -338,7 +338,7 @@ impl crate::etm::EtmTask for Task<'_> {
 }
 
 fn enable_task_channel(channel: u8, pin: u8) {
-    let gpio_sd = unsafe { GPIO_SD::steal() };
+    let gpio_sd = GPIO_SD::regs();
     let ptr = unsafe { gpio_sd.etm_task_p0_cfg().as_ptr().add(pin as usize / 4) };
     let shift = 8 * (pin as usize % 4);
     // bit 0 = en, bit 1-3 = channel
@@ -352,7 +352,7 @@ fn enable_task_channel(channel: u8, pin: u8) {
 }
 
 fn enable_event_channel(channel: u8, pin: u8) {
-    let gpio_sd = unsafe { GPIO_SD::steal() };
+    let gpio_sd = GPIO_SD::regs();
     gpio_sd
         .etm_event_ch_cfg(channel as usize)
         .modify(|_, w| w.event_en().clear_bit());

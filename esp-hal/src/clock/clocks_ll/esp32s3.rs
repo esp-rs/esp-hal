@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
-    let system_control = unsafe { &*crate::peripherals::SYSTEM::PTR };
+    let system_control = crate::peripherals::SYSTEM::regs();
 
     unsafe {
         system_control

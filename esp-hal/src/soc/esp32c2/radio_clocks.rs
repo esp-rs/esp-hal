@@ -11,7 +11,10 @@
 //! `RadioClockControl` struct. This trait provides methods to enable, disable,
 //! reset the MAC, initialize clocks and perform other related operations.
 
-use crate::system::{RadioClockController, RadioPeripherals};
+use crate::{
+    peripherals::{APB_CTRL, MODEM_CLKRST},
+    system::{RadioClockController, RadioPeripherals},
+};
 
 // Mask for clock bits used by both WIFI and Bluetooth, 0, 1, 2, 3, 7, 8, 9, 10,
 // 19, 20, 21, 22, 23
@@ -55,16 +58,14 @@ impl RadioClockController for crate::peripherals::RADIO_CLK {
 
 fn enable_phy() {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
-    let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
-    syscon
+    APB_CTRL::regs()
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
 fn disable_phy() {
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
-    let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
-    syscon
+    APB_CTRL::regs()
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
@@ -79,11 +80,10 @@ fn common_wifi_bt_clock_disable() {
 
 fn reset_mac() {
     const SYSTEM_MAC_RST: u32 = 1 << 2;
-    let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
-    syscon
+    APB_CTRL::regs()
         .wifi_rst_en()
         .modify(|r, w| unsafe { w.wifi_rst().bits(r.wifi_rst().bits() | SYSTEM_MAC_RST) });
-    syscon
+    APB_CTRL::regs()
         .wifi_rst_en()
         .modify(|r, w| unsafe { w.wifi_rst().bits(r.wifi_rst().bits() & !SYSTEM_MAC_RST) });
 }
@@ -94,14 +94,13 @@ fn init_clocks() {
     const SYSTEM_WIFI_CLK_UNUSED_BIT12: u32 = 1 << 12;
     const WIFI_BT_SDIO_CLK: u32 = SYSTEM_WIFI_CLK_UNUSED_BIT5 | SYSTEM_WIFI_CLK_UNUSED_BIT12;
 
-    let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
-    syscon
+    APB_CTRL::regs()
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }
 
 fn ble_rtc_clk_init() {
-    let modem_clkrst = unsafe { &*esp32c2::MODEM_CLKRST::PTR };
+    let modem_clkrst = MODEM_CLKRST::regs();
     modem_clkrst
         .modem_lp_timer_conf()
         .modify(|_, w| w.lp_timer_sel_xtal32k().clear_bit());
@@ -130,11 +129,10 @@ fn ble_rtc_clk_init() {
 
 fn reset_rpa() {
     const BLE_RPA_REST_BIT: u32 = 1 << 27;
-    let syscon = unsafe { &*esp32c2::APB_CTRL::PTR };
-    syscon
+    APB_CTRL::regs()
         .wifi_rst_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | BLE_RPA_REST_BIT) });
-    syscon
+    APB_CTRL::regs()
         .wifi_rst_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !BLE_RPA_REST_BIT) });
 }

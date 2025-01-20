@@ -11,24 +11,28 @@
 //! `RadioClockControl` struct. This trait provides methods to enable, disable,
 //! reset the MAC, initialize clocks and perform other related operations.
 
-use crate::system::{RadioClockController, RadioPeripherals};
+use super::peripherals::MODEM_SYSCON;
+use crate::{
+    peripherals::{MODEM_LPCON, PMU},
+    system::{RadioClockController, RadioPeripherals},
+};
 
 impl RadioClockController for crate::peripherals::RADIO_CLK {
     fn enable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
-            RadioPeripherals::Phy => enable_phy(),
-            RadioPeripherals::Wifi => wifi_clock_enable(),
-            RadioPeripherals::Bt => ble_clock_enable(),
-            RadioPeripherals::Ieee802154 => ieee802154_clock_enable(),
+            RadioPeripherals::Phy => enable_phy(true),
+            RadioPeripherals::Wifi => wifi_clock_enable(true),
+            RadioPeripherals::Bt => ble_clock_enable(true),
+            RadioPeripherals::Ieee802154 => ieee802154_clock_enable(true),
         }
     }
 
     fn disable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
-            RadioPeripherals::Phy => disable_phy(),
-            RadioPeripherals::Wifi => wifi_clock_disable(),
-            RadioPeripherals::Bt => ble_clock_disable(),
-            RadioPeripherals::Ieee802154 => ieee802154_clock_disable(),
+            RadioPeripherals::Phy => enable_phy(false),
+            RadioPeripherals::Wifi => wifi_clock_enable(false),
+            RadioPeripherals::Bt => ble_clock_enable(false),
+            RadioPeripherals::Ieee802154 => ieee802154_clock_enable(false),
         }
     }
 
@@ -49,282 +53,92 @@ impl RadioClockController for crate::peripherals::RADIO_CLK {
     }
 }
 
-fn enable_phy() {
-    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
-    modem_lpcon
+fn enable_phy(en: bool) {
+    MODEM_LPCON::regs()
         .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
-    modem_lpcon
+        .modify(|_, w| w.clk_i2c_mst_en().bit(en));
+    MODEM_LPCON::regs()
         .i2c_mst_clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+        .modify(|_, w| w.clk_i2c_mst_sel_160m().bit(en));
 }
 
-fn disable_phy() {
-    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
-    modem_lpcon
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().clear_bit());
-    modem_lpcon
-        .i2c_mst_clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_sel_160m().clear_bit());
-}
-
-fn wifi_clock_enable() {
-    let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
-    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
-
-    modem_syscon.clk_conf1().modify(|_, w| {
-        w.clk_wifi_apb_en()
-            .set_bit()
-            .clk_wifimac_en()
-            .set_bit()
-            .clk_fe_apb_en()
-            .set_bit()
-            .clk_fe_cal_160m_en()
-            .set_bit()
-            .clk_fe_160m_en()
-            .set_bit()
-            .clk_fe_80m_en()
-            .set_bit()
-            .clk_wifibb_160x1_en()
-            .set_bit()
-            .clk_wifibb_80x1_en()
-            .set_bit()
-            .clk_wifibb_40x1_en()
-            .set_bit()
-            .clk_wifibb_80x_en()
-            .set_bit()
-            .clk_wifibb_40x_en()
-            .set_bit()
-            .clk_wifibb_80m_en()
-            .set_bit()
-            .clk_wifibb_44m_en()
-            .set_bit()
-            .clk_wifibb_40m_en()
-            .set_bit()
-            .clk_wifibb_22m_en()
-            .set_bit()
+fn wifi_clock_enable(en: bool) {
+    MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
+        w.clk_wifi_apb_en().bit(en);
+        w.clk_wifimac_en().bit(en);
+        w.clk_fe_apb_en().bit(en);
+        w.clk_fe_cal_160m_en().bit(en);
+        w.clk_fe_160m_en().bit(en);
+        w.clk_fe_80m_en().bit(en);
+        w.clk_wifibb_160x1_en().bit(en);
+        w.clk_wifibb_80x1_en().bit(en);
+        w.clk_wifibb_40x1_en().bit(en);
+        w.clk_wifibb_80x_en().bit(en);
+        w.clk_wifibb_40x_en().bit(en);
+        w.clk_wifibb_80m_en().bit(en);
+        w.clk_wifibb_44m_en().bit(en);
+        w.clk_wifibb_40m_en().bit(en);
+        w.clk_wifibb_22m_en().bit(en)
     });
 
-    modem_lpcon
-        .clk_conf()
-        .modify(|_, w| w.clk_wifipwr_en().set_bit().clk_coex_en().set_bit());
+    MODEM_LPCON::regs().clk_conf().modify(|_, w| {
+        w.clk_wifipwr_en().bit(en);
+        w.clk_coex_en().bit(en)
+    });
 }
 
-fn wifi_clock_disable() {
-    let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
-    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
-
-    modem_syscon.clk_conf1().modify(|_, w| {
-        w.clk_wifi_apb_en()
-            .clear_bit()
-            .clk_wifimac_en()
-            .clear_bit()
-            .clk_fe_apb_en()
-            .clear_bit()
-            .clk_fe_cal_160m_en()
-            .clear_bit()
-            .clk_fe_160m_en()
-            .clear_bit()
-            .clk_fe_80m_en()
-            .clear_bit()
-            .clk_wifibb_160x1_en()
-            .clear_bit()
-            .clk_wifibb_80x1_en()
-            .clear_bit()
-            .clk_wifibb_40x1_en()
-            .clear_bit()
-            .clk_wifibb_80x_en()
-            .clear_bit()
-            .clk_wifibb_40x_en()
-            .clear_bit()
-            .clk_wifibb_80m_en()
-            .clear_bit()
-            .clk_wifibb_44m_en()
-            .clear_bit()
-            .clk_wifibb_40m_en()
-            .clear_bit()
-            .clk_wifibb_22m_en()
-            .clear_bit()
+fn ieee802154_clock_enable(en: bool) {
+    MODEM_SYSCON::regs().clk_conf().modify(|_, w| {
+        w.clk_zb_apb_en().bit(en);
+        w.clk_zb_mac_en().bit(en)
     });
 
-    modem_lpcon
-        .clk_conf()
-        .modify(|_, w| w.clk_wifipwr_en().clear_bit().clk_coex_en().clear_bit());
-}
-
-fn ieee802154_clock_enable() {
-    let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
-    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
-
-    modem_syscon
-        .clk_conf()
-        .modify(|_, w| w.clk_zb_apb_en().set_bit().clk_zb_mac_en().set_bit());
-
-    modem_syscon.clk_conf1().modify(|_, w| {
-        w.clk_fe_apb_en()
-            .set_bit()
-            .clk_fe_cal_160m_en()
-            .set_bit()
-            .clk_fe_160m_en()
-            .set_bit()
-            .clk_fe_80m_en()
-            .set_bit()
-            .clk_bt_apb_en()
-            .set_bit()
-            .clk_bt_en()
-            .set_bit()
-            .clk_wifibb_160x1_en()
-            .set_bit()
-            .clk_wifibb_80x1_en()
-            .set_bit()
-            .clk_wifibb_40x1_en()
-            .set_bit()
-            .clk_wifibb_80x_en()
-            .set_bit()
-            .clk_wifibb_40x_en()
-            .set_bit()
-            .clk_wifibb_80m_en()
-            .set_bit()
-            .clk_wifibb_44m_en()
-            .set_bit()
-            .clk_wifibb_40m_en()
-            .set_bit()
-            .clk_wifibb_22m_en()
-            .set_bit()
+    MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
+        w.clk_fe_apb_en().bit(en);
+        w.clk_fe_cal_160m_en().bit(en);
+        w.clk_fe_160m_en().bit(en);
+        w.clk_fe_80m_en().bit(en);
+        w.clk_bt_apb_en().bit(en);
+        w.clk_bt_en().bit(en);
+        w.clk_wifibb_160x1_en().bit(en);
+        w.clk_wifibb_80x1_en().bit(en);
+        w.clk_wifibb_40x1_en().bit(en);
+        w.clk_wifibb_80x_en().bit(en);
+        w.clk_wifibb_40x_en().bit(en);
+        w.clk_wifibb_80m_en().bit(en);
+        w.clk_wifibb_44m_en().bit(en);
+        w.clk_wifibb_40m_en().bit(en);
+        w.clk_wifibb_22m_en().bit(en)
     });
 
-    modem_lpcon
+    MODEM_LPCON::regs()
         .clk_conf()
         .modify(|_, w| w.clk_coex_en().set_bit());
 }
 
-fn ieee802154_clock_disable() {
-    let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
-    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
+fn ble_clock_enable(en: bool) {
+    MODEM_SYSCON::regs().clk_conf().modify(|_, w| {
+        w.clk_etm_en().bit(en);
+        w.clk_modem_sec_en().bit(en);
+        w.clk_modem_sec_ecb_en().bit(en);
+        w.clk_modem_sec_ccm_en().bit(en);
+        w.clk_modem_sec_bah_en().bit(en);
+        w.clk_modem_sec_apb_en().bit(en);
+        w.clk_ble_timer_en().bit(en)
+    });
 
-    modem_syscon
+    MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
+        w.clk_fe_apb_en().bit(en);
+        w.clk_fe_cal_160m_en().bit(en);
+        w.clk_fe_160m_en().bit(en);
+        w.clk_fe_80m_en().bit(en);
+        w.clk_bt_apb_en().bit(en);
+        w.clk_bt_en().bit(en)
+    });
+
+    MODEM_LPCON::regs()
         .clk_conf()
-        .modify(|_, w| w.clk_zb_apb_en().clear_bit().clk_zb_mac_en().clear_bit());
-
-    modem_syscon.clk_conf1().modify(|_, w| {
-        w.clk_fe_apb_en()
-            .clear_bit()
-            .clk_fe_cal_160m_en()
-            .clear_bit()
-            .clk_fe_160m_en()
-            .clear_bit()
-            .clk_fe_80m_en()
-            .clear_bit()
-            .clk_bt_apb_en()
-            .clear_bit()
-            .clk_bt_en()
-            .clear_bit()
-            .clk_wifibb_160x1_en()
-            .clear_bit()
-            .clk_wifibb_80x1_en()
-            .clear_bit()
-            .clk_wifibb_40x1_en()
-            .clear_bit()
-            .clk_wifibb_80x_en()
-            .clear_bit()
-            .clk_wifibb_40x_en()
-            .clear_bit()
-            .clk_wifibb_80m_en()
-            .clear_bit()
-            .clk_wifibb_44m_en()
-            .clear_bit()
-            .clk_wifibb_40m_en()
-            .clear_bit()
-            .clk_wifibb_22m_en()
-            .clear_bit()
-    });
-
-    modem_lpcon
-        .clk_conf()
-        .modify(|_, w| w.clk_coex_en().clear_bit());
-}
-
-fn ble_clock_enable() {
-    let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
-    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
-
-    modem_syscon.clk_conf().modify(|_, w| {
-        w.clk_etm_en()
-            .set_bit()
-            .clk_modem_sec_en()
-            .set_bit()
-            .clk_modem_sec_ecb_en()
-            .set_bit()
-            .clk_modem_sec_ccm_en()
-            .set_bit()
-            .clk_modem_sec_bah_en()
-            .set_bit()
-            .clk_modem_sec_apb_en()
-            .set_bit()
-            .clk_ble_timer_en()
-            .set_bit()
-    });
-
-    modem_syscon.clk_conf1().modify(|_, w| {
-        w.clk_fe_apb_en()
-            .set_bit()
-            .clk_fe_cal_160m_en()
-            .set_bit()
-            .clk_fe_160m_en()
-            .set_bit()
-            .clk_fe_80m_en()
-            .set_bit()
-            .clk_bt_apb_en()
-            .set_bit()
-            .clk_bt_en()
-            .set_bit()
-    });
-
-    modem_lpcon
-        .clk_conf()
-        .modify(|_, w| w.clk_coex_en().set_bit());
-}
-
-fn ble_clock_disable() {
-    let modem_syscon = unsafe { &*esp32c6::MODEM_SYSCON::PTR };
-    let modem_lpcon = unsafe { &*esp32c6::MODEM_LPCON::PTR };
-
-    modem_syscon.clk_conf().modify(|_, w| {
-        w.clk_etm_en()
-            .clear_bit()
-            .clk_modem_sec_en()
-            .clear_bit()
-            .clk_modem_sec_ecb_en()
-            .clear_bit()
-            .clk_modem_sec_ccm_en()
-            .clear_bit()
-            .clk_modem_sec_bah_en()
-            .clear_bit()
-            .clk_modem_sec_apb_en()
-            .clear_bit()
-            .clk_ble_timer_en()
-            .clear_bit()
-    });
-
-    modem_syscon.clk_conf1().modify(|_, w| {
-        w.clk_fe_apb_en()
-            .clear_bit()
-            .clk_fe_cal_160m_en()
-            .clear_bit()
-            .clk_fe_160m_en()
-            .clear_bit()
-            .clk_fe_80m_en()
-            .clear_bit()
-            .clk_bt_apb_en()
-            .clear_bit()
-            .clk_bt_en()
-            .clear_bit()
-    });
-
-    modem_lpcon
-        .clk_conf()
-        .modify(|_, w| w.clk_coex_en().set_bit());
+        .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
 fn reset_mac() {
@@ -333,7 +147,7 @@ fn reset_mac() {
 
 fn init_clocks() {
     unsafe {
-        let pmu = &*esp32c6::PMU::PTR;
+        let pmu = PMU::regs();
 
         pmu.hp_sleep_icg_modem()
             .modify(|_, w| w.hp_sleep_dig_icg_modem_code().bits(0));
@@ -346,8 +160,7 @@ fn init_clocks() {
         pmu.imm_sleep_sysclk()
             .write(|w| w.update_dig_icg_switch().set_bit());
 
-        let modem_syscon = &*esp32c6::MODEM_SYSCON::PTR;
-        modem_syscon.clk_conf_power_st().modify(|_, w| {
+        MODEM_SYSCON::regs().clk_conf_power_st().modify(|_, w| {
             w.clk_modem_apb_st_map()
                 .bits(6)
                 .clk_modem_peri_st_map()
@@ -362,8 +175,7 @@ fn init_clocks() {
                 .bits(6)
         });
 
-        let modem_lpcon = &*esp32c6::MODEM_LPCON::PTR;
-        modem_lpcon.clk_conf_power_st().modify(|_, w| {
+        MODEM_LPCON::regs().clk_conf_power_st().modify(|_, w| {
             w.clk_lp_apb_st_map()
                 .bits(6)
                 .clk_i2c_mst_st_map()
@@ -374,7 +186,7 @@ fn init_clocks() {
                 .bits(6)
         });
 
-        modem_lpcon.wifi_lp_clk_conf().modify(|_, w| {
+        MODEM_LPCON::regs().wifi_lp_clk_conf().modify(|_, w| {
             w.clk_wifipwr_lp_sel_osc_slow()
                 .set_bit()
                 .clk_wifipwr_lp_sel_osc_fast()
@@ -385,11 +197,11 @@ fn init_clocks() {
                 .set_bit()
         });
 
-        modem_lpcon
+        MODEM_LPCON::regs()
             .wifi_lp_clk_conf()
             .modify(|_, w| w.clk_wifipwr_lp_div_num().bits(0));
 
-        modem_lpcon
+        MODEM_LPCON::regs()
             .clk_conf()
             .modify(|_, w| w.clk_wifipwr_en().set_bit());
     }
