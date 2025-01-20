@@ -180,14 +180,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
 
-    match &cfg["ESP_HAL_CONFIG_PSRAM_MODE"] {
-        Value::String(s) if s.as_str() == "quad" => {
-            println!("cargo:rustc-cfg=option_psram_quad");
+    if config.contains(&String::from("psram")) || config.contains(&String::from("octal_psram")) {
+        match &cfg["ESP_HAL_CONFIG_PSRAM_MODE"] {
+            Value::String(s) if s.as_str() == "quad" => {
+                println!("cargo:rustc-cfg=option_psram_quad");
+            }
+            Value::String(s) if s.as_str() == "octal" => {
+                println!("cargo:rustc-cfg=option_psram_octal");
+            }
+            _ => unreachable!(),
         }
-        Value::String(s) if s.as_str() == "octal" => {
-            println!("cargo:rustc-cfg=option_psram_octal");
-        }
-        _ => unreachable!(),
     }
 
     Ok(())
