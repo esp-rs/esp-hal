@@ -15,7 +15,7 @@ mod implementation;
 
 mod efuse_field;
 
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+#[cfg(feature = "psram")]
 mod psram_common;
 
 // Using static mut should be fine since we are only writing to it once during
@@ -24,12 +24,12 @@ mod psram_common;
 // the HAL. This will access the PSRAM range, returning an empty range - which
 // is, at that point, true. The user has no (safe) means to allocate in PSRAM
 // before initializing the HAL.
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+#[cfg(feature = "psram")]
 static mut MAPPED_PSRAM: MappedPsram = MappedPsram { memory_range: 0..0 };
 
 pub(crate) fn psram_range() -> Range<usize> {
     cfg_if::cfg_if! {
-        if #[cfg(any(feature = "quad-psram", feature = "octal-psram"))] {
+        if #[cfg(feature = "psram")] {
             #[allow(static_mut_refs)]
             unsafe { MAPPED_PSRAM.memory_range.clone() }
         } else {
@@ -40,7 +40,7 @@ pub(crate) fn psram_range() -> Range<usize> {
 
 const DRAM: Range<usize> = self::constants::SOC_DRAM_LOW..self::constants::SOC_DRAM_HIGH;
 
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+#[cfg(feature = "psram")]
 pub struct MappedPsram {
     memory_range: Range<usize>,
 }

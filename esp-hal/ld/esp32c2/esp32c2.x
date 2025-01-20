@@ -90,3 +90,4 @@ INCLUDE "dram2.x"
 
 INCLUDE "debug.x"
 
+_dram_origin = ORIGIN( DRAM );

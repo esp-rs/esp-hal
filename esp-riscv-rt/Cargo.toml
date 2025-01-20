@@ -15,9 +15,6 @@ riscv             = "0.12.1"
 riscv-rt-macros   = "0.2.2"
 
 [features]
-## Move the stack to the start of RAM to get zero-cost stack overflow
-## protection (ESP32-C6 and ESP32-H2 only!)
-fix-sp = []
 ## Indicate that the device supports `mie` and `mip` instructions.
 has-mie-mip = []
 ## Indicate that the device has RTC RAM.
@@ -25,7 +22,6 @@ rtc-ram = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = [
-    "fix-sp",
     "has-mie-mip",
     "rtc-ram",
 ]
