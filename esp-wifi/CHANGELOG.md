@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `esp_wifi::init` now takes an `impl Peripheral` for RNG source (#2992)
+
 ### Fixed
 
 - Fixed a problem using BLE on ESP32-C6 when connected via Serial-JTAG (#2981)

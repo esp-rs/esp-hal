@@ -92,6 +92,7 @@ use core::marker::PhantomData;
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{ADC1, RNG},
+    private::Sealed,
 };
 
 /// Random number generator driver
@@ -130,6 +131,17 @@ impl Rng {
             let bytes = self.random().to_le_bytes();
             chunk.copy_from_slice(&bytes[..chunk.len()]);
         }
+    }
+}
+
+impl Sealed for Rng {}
+
+impl Peripheral for Rng {
+    type P = Self;
+
+    #[inline]
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        *self
     }
 }
 
@@ -236,3 +248,17 @@ impl rand_core::RngCore for Trng<'_> {
 /// Implementing a CryptoRng marker trait that indicates that the generator is
 /// cryptographically secure.
 impl rand_core::CryptoRng for Trng<'_> {}
+
+impl Sealed for Trng<'_> {}
+
+impl Peripheral for Trng<'_> {
+    type P = Self;
+
+    #[inline]
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self {
+            rng: self.rng.clone_unchecked(),
+            _adc: self._adc.clone_unchecked(),
+        }
+    }
+}
