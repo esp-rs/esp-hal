@@ -92,34 +92,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         ),
     ];
 
-    if config.contains(&String::from("psram")) {
-        println!("cargo:rustc-check-cfg=cfg(option_psram_quad)");
-    }
-
-    if config.contains(&String::from("octal_psram")) {
-        println!("cargo:rustc-check-cfg=cfg(option_psram_octal)");
-    }
-
     if config.contains(&String::from("psram")) || config.contains(&String::from("octal_psram")) {
         cfg.push((
             "psram-mode",
-            "SPIRAM chip: `quad` = Quad-SPI (default), `octal` = Octal-SPI",
+            "SPIRAM chip mode",
             Value::String(String::from("quad")),
-            Some(Validator::Custom(Box::new(|value| {
-                let Value::String(string) = value else {
-                    return Err(esp_config::Error::Validation(String::from(
-                        "Expected a string",
-                    )));
-                };
-
-                match string.as_str() {
-                    "quad" => Ok(()),
-                    "octal" => Ok(()),
-                    _ => Err(esp_config::Error::Validation(format!(
-                        "Expected 'quad' or 'octal', found {string}"
-                    ))),
-                }
-            }))),
+            Some(Validator::Enumeration(
+                if config.contains(&String::from("octal_psram")) {
+                    vec![String::from("quad"), String::from("octal")]
+                } else {
+                    vec![String::from("quad")]
+                },
+            )),
         ));
     }
 
@@ -179,18 +163,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
-
-    if config.contains(&String::from("psram")) || config.contains(&String::from("octal_psram")) {
-        match &cfg["ESP_HAL_CONFIG_PSRAM_MODE"] {
-            Value::String(s) if s.as_str() == "quad" => {
-                println!("cargo:rustc-cfg=option_psram_quad");
-            }
-            Value::String(s) if s.as_str() == "octal" => {
-                println!("cargo:rustc-cfg=option_psram_octal");
-            }
-            _ => unreachable!(),
-        }
-    }
 
     Ok(())
 }
