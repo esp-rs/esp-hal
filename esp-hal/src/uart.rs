@@ -46,37 +46,13 @@
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::uart::{AtCmdConfig, Config, Uart, UartInterrupt};
 //! # let delay = Delay::new();
-#![cfg_attr(
-    esp32,
-    doc = "# let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);"
-)]
-#![cfg_attr(
-    esp32c2,
-    doc = "# let (tx_pin, rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);"
-)]
-#![cfg_attr(
-    esp32c3,
-    doc = "# let (tx_pin, rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);"
-)]
-#![cfg_attr(
-    esp32c6,
-    doc = "# let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);"
-)]
-#![cfg_attr(
-    esp32h2,
-    doc = "# let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);"
-)]
-#![cfg_attr(
-    any(esp32s2, esp32s3),
-    doc = "# let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);"
-)]
 //! # let config = Config::default().with_rx_fifo_full_threshold(30);
 //! # let mut uart0 = Uart::new(
 //! #    peripherals.UART0,
 //! #    config)
-//! #    .unwrap()
-//! #    .with_rx(rx_pin)
-//! #    .with_tx(tx_pin);
+//! # .unwrap()
+//! # .with_rx(esp_hal::gpio::NoPin)
+//! # .with_tx(esp_hal::gpio::NoPin);
 //! uart0.set_interrupt_handler(interrupt_handler);
 //!
 //! critical_section::with(|cs| {
@@ -628,8 +604,8 @@ impl<'d> UartTx<'d, Blocking> {
     /// let tx = UartTx::new(
     ///     peripherals.UART0,
     ///     Config::default())
-    ///     .unwrap()
-    ///     .with_tx(peripherals.GPIO1);
+    /// .unwrap()
+    /// .with_tx(peripherals.GPIO1);
     /// # }
     /// ```
     pub fn new(
@@ -896,8 +872,8 @@ impl<'d> UartRx<'d, Blocking> {
     /// let rx = UartRx::new(
     ///     peripherals.UART1,
     ///     Config::default())
-    ///     .unwrap()
-    ///     .with_rx(peripherals.GPIO2);
+    /// .unwrap()
+    /// .with_rx(peripherals.GPIO2);
     /// # }
     /// ```
     pub fn new(
@@ -953,9 +929,9 @@ impl<'d> Uart<'d, Blocking> {
     /// let mut uart1 = Uart::new(
     ///     peripherals.UART1,
     ///     Config::default())
-    ///     .unwrap()
-    ///     .with_rx(peripherals.GPIO1)
-    ///     .with_tx(peripherals.GPIO2);
+    /// .unwrap()
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2);
     /// # }
     /// ```
     pub fn new(
@@ -1087,9 +1063,7 @@ where
     /// # let mut uart1 = Uart::new(
     /// #     peripherals.UART1,
     /// #     Config::default(),
-    /// # ).unwrap()
-    /// # .with_rx(peripherals.GPIO1)
-    /// # .with_tx(peripherals.GPIO2);
+    /// # ).unwrap();
     /// // Write bytes out over the UART:
     /// uart1.write_bytes(b"Hello, world!").expect("write error!");
     /// # }
