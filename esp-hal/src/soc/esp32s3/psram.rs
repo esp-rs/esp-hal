@@ -234,7 +234,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     }
 }
 
-#[cfg(option_psram_quad)]
+#[cfg(psram_mode_quad)]
 pub(crate) mod utils {
     use procmacros::ram;
 
@@ -789,7 +789,7 @@ pub(crate) mod utils {
     }
 }
 
-#[cfg(option_psram_octal)]
+#[cfg(psram_mode_octal)]
 pub(crate) mod utils {
     use procmacros::ram;
 
