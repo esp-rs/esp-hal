@@ -1203,6 +1203,12 @@ impl<'d> Output<'d> {
         self.pin.into_peripheral_output()
     }
 
+    /// Change the configuration.
+    pub fn apply_config(&mut self, config: &OutputConfig) -> Result<(), ConfigError> {
+        self.set_level(config.level);
+        Ok(())
+    }
+
     /// Set the output as high.
     #[inline]
     pub fn set_high(&mut self) {
@@ -1360,6 +1366,12 @@ impl<'d> Input<'d> {
     #[inline]
     pub fn level(&self) -> Level {
         self.pin.level()
+    }
+
+    /// Change the configuration.
+    pub fn apply_config(&mut self, config: &InputConfig) -> Result<(), ConfigError> {
+        self.pin.set_as_input(config.pull);
+        Ok(())
     }
 
     /// Listen for interrupts.
@@ -1577,6 +1589,13 @@ impl<'d> OutputOpenDrain<'d> {
         pin.set_as_open_drain(config.pull);
 
         Ok(Self { pin })
+    }
+
+    /// Change the configuration.
+    pub fn apply_config(&mut self, config: &OutputOpenDrainConfig) -> Result<(), ConfigError> {
+        self.set_level(config.level);
+        self.pin.set_as_open_drain(config.pull);
+        Ok(())
     }
 
     /// Split the pin into an input and output signal.
