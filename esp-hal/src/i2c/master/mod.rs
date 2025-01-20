@@ -1,9 +1,16 @@
 //! # Inter-Integrated Circuit (I2C) - Master mode
 //!
+//! ## Overview
+//!
+//! In this mode, the I2C acts as master and initiates the I2C communication by
+//! generating a START condition. Note that only one master is allowed to occupy
+//! the bus to access one slave at the same time.
+//!
 //! ## Configuration
 //!
-//! Each I2C controller is individually configurable, and the usual setting
-//! such as frequency, timeout, and SDA/SCL pins can easily be configured.
+//! Each I2C Master controller is individually configurable, and the usual
+//! setting such as frequency, timeout, and SDA/SCL pins can easily be
+//! configured.
 //!
 //! ## Usage
 //!
@@ -35,7 +42,8 @@
 //! }
 //! # }
 //! ```
-//! [`embedded-hal`]: https://docs.rs/embedded-hal/latest/embedded_hal/index.html
+//! 
+//! [`embedded-hal`]:embedded_hal
 
 use core::marker::PhantomData;
 #[cfg(not(esp32))]
