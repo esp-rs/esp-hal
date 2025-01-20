@@ -235,7 +235,7 @@ impl PeripheralClockControl {
     fn enable_internal(peripheral: Peripheral, enable: bool, _cs: CriticalSection<'_>) {
         debug!("Enable {:?} {}", peripheral, enable);
 
-        let system = unsafe { &*SYSTEM::PTR };
+        let system = SYSTEM::regs();
 
         #[cfg(esp32)]
         let (perip_clk_en0, peri_clk_en) = { (&system.perip_clk_en(), &system.peri_clk_en()) };
@@ -411,7 +411,7 @@ impl PeripheralClockControl {
     /// Resets the given peripheral
     pub(crate) fn reset(peripheral: Peripheral) {
         debug!("Reset {:?}", peripheral);
-        let system = unsafe { SYSTEM::steal() };
+        let system = SYSTEM::regs();
 
         #[cfg(esp32)]
         let (perip_rst_en0, peri_rst_en) = (system.perip_rst_en(), system.peri_rst_en());
@@ -635,7 +635,7 @@ impl PeripheralClockControl {
 impl PeripheralClockControl {
     fn enable_internal(peripheral: Peripheral, enable: bool, _cs: CriticalSection<'_>) {
         debug!("Enable {:?} {}", peripheral, enable);
-        let system = unsafe { &*SYSTEM::PTR };
+        let system = SYSTEM::regs();
 
         match peripheral {
             #[cfg(spi2)]
@@ -812,7 +812,7 @@ impl PeripheralClockControl {
     pub(crate) fn reset(peripheral: Peripheral) {
         debug!("Reset {:?}", peripheral);
 
-        let system = unsafe { &*SYSTEM::PTR };
+        let system = SYSTEM::regs();
 
         match peripheral {
             #[cfg(spi2)]

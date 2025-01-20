@@ -36,7 +36,11 @@
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 
-use crate::{gpio::AlternateFunction, peripherals::GPIO};
+use crate::{
+    gpio::AlternateFunction,
+    pac::io_mux,
+    peripherals::{GPIO, IO_MUX},
+};
 
 // https://github.com/espressif/esp-idf/blob/df9310a/components/soc/esp32h2/gpio_periph.c#L42
 /// The total number of GPIO pins available.
@@ -54,8 +58,8 @@ pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_1;
 
-pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
-    unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
+pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
+    IO_MUX::regs().gpio(gpio_num as usize)
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
@@ -256,6 +260,6 @@ pub(crate) enum InterruptStatusRegisterAccess {
 
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
+        GPIO::regs().pcpu_int().read().bits()
     }
 }

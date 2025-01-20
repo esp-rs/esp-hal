@@ -119,8 +119,6 @@ use crate::clock::XtalClock;
 use crate::efuse::Efuse;
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::peripherals::{LPWR, TIMG0};
-#[cfg(any(esp32c6, esp32h2))]
-use crate::peripherals::{LP_AON, LP_TIMER, LP_WDT};
 #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
@@ -144,34 +142,16 @@ pub mod sleep;
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
 pub(crate) mod rtc;
 
-#[cfg(any(esp32c6, esp32h2))]
-unsafe fn lp_aon<'a>() -> &'a <LP_AON as core::ops::Deref>::Target {
-    &*LP_AON::PTR
-}
-
-#[cfg(not(any(esp32c6, esp32h2)))]
-unsafe fn lp_aon<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
-    &*LPWR::PTR
-}
-
-#[cfg(any(esp32c6, esp32h2))]
-unsafe fn lp_timer<'a>() -> &'a <LP_TIMER as core::ops::Deref>::Target {
-    &*LP_TIMER::PTR
-}
-
-#[cfg(not(any(esp32c6, esp32h2)))]
-unsafe fn lp_timer<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
-    &*LPWR::PTR
-}
-
-#[cfg(any(esp32c6, esp32h2))]
-unsafe fn lp_wdt<'a>() -> &'a <LP_WDT as core::ops::Deref>::Target {
-    &*LP_WDT::PTR
-}
-
-#[cfg(not(any(esp32c6, esp32h2)))]
-unsafe fn lp_wdt<'a>() -> &'a <LPWR as core::ops::Deref>::Target {
-    &*LPWR::PTR
+cfg_if::cfg_if! {
+    if #[cfg(any(esp32c6, esp32h2))] {
+        use crate::peripherals::LP_WDT;
+        use crate::peripherals::LP_TIMER;
+        use crate::peripherals::LP_AON;
+    } else {
+        use crate::peripherals::LPWR as LP_WDT;
+        use crate::peripherals::LPWR as LP_TIMER;
+        use crate::peripherals::LPWR as LP_AON;
+    }
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
@@ -290,7 +270,7 @@ impl<'d> Rtc<'d> {
 
     /// Get the time since boot in the raw register units.
     fn time_since_boot_raw(&self) -> u64 {
-        let rtc_cntl = unsafe { lp_timer() };
+        let rtc_cntl = LP_TIMER::regs();
 
         #[cfg(esp32)]
         let (l, h) = {
@@ -349,7 +329,7 @@ impl<'d> Rtc<'d> {
 
         // For registers and peripherals used in esp-idf, see https://github.com/search?q=repo%3Aespressif%2Fesp-idf+RTC_BOOT_TIME_LOW_REG+RTC_BOOT_TIME_HIGH_REG+path%3A**%2Frtc.h&type=code
 
-        let rtc_cntl = unsafe { lp_aon() };
+        let rtc_cntl = LP_AON::regs();
 
         let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
 
@@ -365,7 +345,7 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
-        let rtc_cntl = unsafe { lp_aon() };
+        let rtc_cntl = LP_AON::regs();
 
         let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
 
@@ -469,7 +449,7 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
-        let rtc_cntl = unsafe { lp_aon() };
+        let rtc_cntl = LP_AON::regs();
         rtc_cntl
             .store4()
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
@@ -515,7 +495,7 @@ impl RtcClock {
     /// disabled to reduce power consumption.
     #[cfg(not(any(esp32c6, esp32h2)))]
     fn enable_8m(clk_8m_en: bool, d256_en: bool) {
-        let rtc_cntl = unsafe { &*LPWR::PTR };
+        let rtc_cntl = LPWR::regs();
 
         if clk_8m_en {
             rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
@@ -542,7 +522,7 @@ impl RtcClock {
     }
 
     pub(crate) fn read_xtal_freq_mhz() -> Option<u32> {
-        let xtal_freq_reg = unsafe { lp_aon() }.store4().read().bits();
+        let xtal_freq_reg = LP_AON::regs().store4().read().bits();
 
         // RTC_XTAL_FREQ is stored as two copies in lower and upper 16-bit halves
         // need to mask out the RTC_DISABLE_ROM_LOG bit which is also stored in the same
@@ -575,7 +555,7 @@ impl RtcClock {
     /// Get the RTC_SLOW_CLK source.
     #[cfg(not(any(esp32c6, esp32h2)))]
     pub fn slow_freq() -> RtcSlowClock {
-        let rtc_cntl = unsafe { &*LPWR::PTR };
+        let rtc_cntl = LPWR::regs();
         let slow_freq = rtc_cntl.clk_conf().read().ana_clk_rtc_sel().bits();
         match slow_freq {
             0 => RtcSlowClock::RtcSlowClockRtc,
@@ -589,7 +569,7 @@ impl RtcClock {
     #[cfg(not(any(esp32c6, esp32h2)))]
     fn set_slow_freq(slow_freq: RtcSlowClock) {
         unsafe {
-            let rtc_cntl = &*LPWR::PTR;
+            let rtc_cntl = LPWR::regs();
             rtc_cntl.clk_conf().modify(|_, w| {
                 w.ana_clk_rtc_sel()
                     .bits(slow_freq as u8)
@@ -611,15 +591,13 @@ impl RtcClock {
     /// Select source for RTC_FAST_CLK.
     #[cfg(not(any(esp32c6, esp32h2)))]
     fn set_fast_freq(fast_freq: RtcFastClock) {
-        unsafe {
-            let rtc_cntl = &*LPWR::PTR;
-            rtc_cntl.clk_conf().modify(|_, w| {
-                w.fast_clk_rtc_sel().bit(match fast_freq {
-                    RtcFastClock::RtcFastClock8m => true,
-                    RtcFastClock::RtcFastClockXtalD4 => false,
-                })
-            });
-        };
+        let rtc_cntl = LPWR::regs();
+        rtc_cntl.clk_conf().modify(|_, w| {
+            w.fast_clk_rtc_sel().bit(match fast_freq {
+                RtcFastClock::RtcFastClock8m => true,
+                RtcFastClock::RtcFastClockXtalD4 => false,
+            })
+        });
 
         crate::rom::ets_delay_us(3u32);
     }
@@ -643,8 +621,8 @@ impl RtcClock {
             RtcCalSel::RtcCalInternalOsc => RtcCalSel::RtcCalRtcMux,
             _ => cal_clk,
         };
-        let rtc_cntl = unsafe { &*LPWR::PTR };
-        let timg0 = unsafe { &*TIMG0::PTR };
+        let rtc_cntl = LPWR::regs();
+        let timg0 = TIMG0::regs();
 
         // Enable requested clock (150k clock is always on)
         let dig_32k_xtal_enabled = rtc_cntl.clk_conf().read().dig_xtal32k_en().bit_is_set();
@@ -819,7 +797,7 @@ impl RtcClock {
         // Number of 8M/256 clock cycles to use for XTAL frequency estimation.
         const XTAL_FREQ_EST_CYCLES: u32 = 10;
 
-        let rtc_cntl = unsafe { &*LPWR::PTR };
+        let rtc_cntl = LPWR::regs();
         let clk_8m_enabled = rtc_cntl.clk_conf().read().enb_ck8m().bit_is_clear();
         let clk_8md256_enabled = rtc_cntl.clk_conf().read().enb_ck8m_div().bit_is_clear();
 
@@ -901,7 +879,7 @@ impl Rwdt {
 
     /// Listen for interrupts on stage 0.
     pub fn listen(&mut self) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         self.set_write_protection(false);
 
@@ -917,7 +895,7 @@ impl Rwdt {
 
     /// Stop listening for interrupts on stage 0.
     pub fn unlisten(&mut self) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         self.set_write_protection(false);
 
@@ -933,7 +911,7 @@ impl Rwdt {
 
     /// Clear interrupt.
     pub fn clear_interrupt(&mut self) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         self.set_write_protection(false);
 
@@ -944,14 +922,14 @@ impl Rwdt {
 
     /// Check if the interrupt is set.
     pub fn is_interrupt_set(&self) -> bool {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         rtc_cntl.int_st().read().wdt().bit_is_set()
     }
 
     /// Feed the watchdog timer.
     pub fn feed(&mut self) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         self.set_write_protection(false);
         rtc_cntl.wdtfeed().write(|w| w.wdt_feed().set_bit());
@@ -959,7 +937,7 @@ impl Rwdt {
     }
 
     fn set_write_protection(&mut self, enable: bool) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
@@ -967,7 +945,7 @@ impl Rwdt {
     }
 
     fn set_enabled(&mut self, enable: bool) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         self.set_write_protection(false);
 
@@ -1008,7 +986,7 @@ impl Rwdt {
 
     /// Configure timeout value in ms for the selected stage.
     pub fn set_timeout(&mut self, stage: RwdtStage, timeout: MicrosDurationU64) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         let timeout_raw = (timeout.to_millis() * (RtcClock::cycles_to_1ms() as u64)) as u32;
         self.set_write_protection(false);
@@ -1076,7 +1054,7 @@ impl Rwdt {
 
     /// Set the action for a specific stage.
     pub fn set_stage_action(&mut self, stage: RwdtStage, action: RwdtStageAction) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         self.set_write_protection(false);
 
@@ -1123,7 +1101,7 @@ impl Swd {
 
     /// Enable/disable write protection for WDT registers
     fn set_write_protection(&mut self, enable: bool) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         #[cfg(not(any(esp32c6, esp32h2)))]
         let wkey = if enable { 0u32 } else { 0x8F1D_312A };
@@ -1136,7 +1114,7 @@ impl Swd {
     }
 
     fn set_enabled(&mut self, enable: bool) {
-        let rtc_cntl = unsafe { lp_wdt() };
+        let rtc_cntl = LP_WDT::regs();
 
         self.set_write_protection(false);
         rtc_cntl
@@ -1167,21 +1145,21 @@ pub fn wakeup_cause() -> SleepSource {
     }
 
     #[cfg(any(esp32c6, esp32h2))]
-    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (*crate::peripherals::PMU::PTR)
+    let wakeup_cause = WakeupReason::from_bits_retain(
+        crate::peripherals::PMU::regs()
             .slp_wakeup_status0()
             .read()
             .wakeup_cause()
-            .bits()
-    });
+            .bits(),
+    );
     #[cfg(not(any(esp32, esp32c6, esp32h2)))]
-    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (*LPWR::PTR).slp_wakeup_cause().read().wakeup_cause().bits()
-    });
+    let wakeup_cause = WakeupReason::from_bits_retain(
+        LPWR::regs().slp_wakeup_cause().read().wakeup_cause().bits(),
+    );
     #[cfg(esp32)]
-    let wakeup_cause = WakeupReason::from_bits_retain(unsafe {
-        (*LPWR::PTR).wakeup_state().read().wakeup_cause().bits() as u32
-    });
+    let wakeup_cause = WakeupReason::from_bits_retain(
+        LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32,
+    );
 
     if wakeup_cause.contains(WakeupReason::TimerTrigEn) {
         return SleepSource::Timer;

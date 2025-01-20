@@ -1,4 +1,7 @@
-use crate::clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock};
+use crate::{
+    clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
+    peripherals::{LP_AON, PCR, PMU},
+};
 
 const I2C_BBPLL: u8 = 0x66;
 const I2C_BBPLL_HOSTID: u8 = 0;
@@ -137,36 +140,34 @@ pub(crate) fn esp32h2_rtc_bbpll_configure(_xtal_freq: XtalClock, _pll_freq: PllC
 }
 
 pub(crate) fn esp32h2_rtc_bbpll_enable() {
-    let pmu = unsafe { &*crate::peripherals::PMU::PTR };
-
-    pmu.imm_hp_ck_power().modify(|_, w| {
-        w.tie_high_xpd_bb_i2c()
-            .set_bit()
-            .tie_high_xpd_bbpll()
-            .set_bit()
-            .tie_high_xpd_bbpll_i2c()
-            .set_bit()
+    PMU::regs().imm_hp_ck_power().modify(|_, w| {
+        w.tie_high_xpd_bb_i2c().set_bit();
+        w.tie_high_xpd_bbpll().set_bit();
+        w.tie_high_xpd_bbpll_i2c().set_bit()
     });
 
-    pmu.imm_hp_ck_power()
+    PMU::regs()
+        .imm_hp_ck_power()
         .modify(|_, w| w.tie_high_global_bbpll_icg().set_bit());
 }
 
 pub(crate) fn esp32h2_rtc_update_to_xtal(freq: XtalClock, _div: u8) {
-    unsafe {
-        let pcr = &*crate::peripherals::PCR::PTR;
-        crate::rom::ets_update_cpu_frequency_rom(freq.mhz());
-        // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
-        // first.
-        clk_ll_ahb_set_divider(_div as u32);
+    crate::rom::ets_update_cpu_frequency_rom(freq.mhz());
+    // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
+    // first.
+    clk_ll_ahb_set_divider(_div as u32);
 
-        pcr.cpu_freq_conf()
+    unsafe {
+        PCR::regs()
+            .cpu_freq_conf()
             .modify(|_, w| w.cpu_div_num().bits(_div - 1));
         // Switch clock source
-        pcr.sysclk_conf().modify(|_, w| w.soc_clk_sel().bits(0));
-
-        clk_ll_bus_update();
+        PCR::regs()
+            .sysclk_conf()
+            .modify(|_, w| w.soc_clk_sel().bits(0));
     }
+
+    clk_ll_bus_update();
 }
 
 pub(crate) fn esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
@@ -180,7 +181,7 @@ pub(crate) fn esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
     clk_ll_ahb_set_divider(ahb_divider);
 
     unsafe {
-        (*crate::peripherals::PCR::PTR)
+        PCR::regs()
             .sysclk_conf()
             .modify(|_, w| w.soc_clk_sel().bits(1));
 
@@ -191,11 +192,10 @@ pub(crate) fn esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed: CpuClock) {
 }
 
 pub(crate) fn esp32h2_rtc_apb_freq_update(apb_freq: ApbClock) {
-    let lp_aon = unsafe { &*crate::peripherals::LP_AON::ptr() };
     let value = ((apb_freq.hz() >> 12) & u16::MAX as u32)
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);
 
-    lp_aon
+    LP_AON::regs()
         .store5()
         .modify(|_, w| unsafe { w.lp_aon_store5().bits(value) });
 }
@@ -204,8 +204,8 @@ fn clk_ll_cpu_set_divider(divider: u32) {
     assert!(divider >= 1);
 
     unsafe {
-        let pcr = &*crate::peripherals::PCR::PTR;
-        pcr.cpu_freq_conf()
+        PCR::regs()
+            .cpu_freq_conf()
             .modify(|_, w| w.cpu_div_num().bits((divider - 1) as u8));
     }
 }
@@ -214,28 +214,28 @@ fn clk_ll_ahb_set_divider(divider: u32) {
     assert!(divider >= 1);
 
     unsafe {
-        let pcr = &*crate::peripherals::PCR::PTR;
-        pcr.ahb_freq_conf()
+        PCR::regs()
+            .ahb_freq_conf()
             .modify(|_, w| w.ahb_div_num().bits((divider - 1) as u8));
     }
 }
 
 fn clk_ll_bus_update() {
-    unsafe {
-        let pcr = &*crate::peripherals::PCR::PTR;
+    PCR::regs()
+        .bus_clk_update()
+        .modify(|_, w| w.bus_clock_update().bit(true));
 
-        pcr.bus_clk_update()
-            .modify(|_, w| w.bus_clock_update().bit(true));
-
-        // reg_get_bit
-        while pcr.bus_clk_update().read().bus_clock_update().bit_is_set() {}
-    }
+    // reg_get_bit
+    while PCR::regs()
+        .bus_clk_update()
+        .read()
+        .bus_clock_update()
+        .bit_is_set()
+    {}
 }
 
 fn regi2c_enable_block(block: u8) {
-    let modem_lpcon = unsafe { &*crate::peripherals::MODEM_LPCON::ptr() };
-
-    modem_lpcon
+    crate::peripherals::MODEM_LPCON::regs()
         .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_en().set_bit());
 

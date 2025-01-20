@@ -128,8 +128,8 @@ use crate::{
         Pull,
     },
     interrupt::{InterruptConfigurable, InterruptHandler},
+    pac::twai0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::twai0::RegisterBlock,
     system::PeripheralGuard,
     twai::filter::SingleStandardFilter,
     Async,
@@ -1544,7 +1544,7 @@ impl Instance for crate::peripherals::TWAI0 {
 
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
-        unsafe { &*crate::peripherals::TWAI0::PTR }
+        crate::peripherals::TWAI0::regs()
     }
 
     fn async_state(&self) -> &asynch::TwaiAsyncState {
@@ -1581,7 +1581,7 @@ impl Instance for crate::peripherals::TWAI1 {
 
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
-        unsafe { &*crate::peripherals::TWAI1::PTR }
+        crate::peripherals::TWAI1::regs()
     }
 
     fn async_state(&self) -> &asynch::TwaiAsyncState {

@@ -70,12 +70,10 @@ extern "C" fn handler(trap_frame: &mut TrapFrame) {
 
 #[no_mangle]
 extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
-    unsafe {
-        // clear FROM_CPU_INTR3
-        (*SystemPeripheral::PTR)
-            .cpu_intr_from_cpu_3()
-            .modify(|_, w| w.cpu_intr_from_cpu_3().clear_bit());
-    }
+    // clear FROM_CPU_INTR3
+    SystemPeripheral::regs()
+        .cpu_intr_from_cpu_3()
+        .modify(|_, w| w.cpu_intr_from_cpu_3().clear_bit());
 
     TIMER.with(|alarm0| {
         let alarm0 = unwrap!(alarm0.as_mut());
@@ -86,11 +84,9 @@ extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
 }
 
 pub(crate) fn yield_task() {
-    unsafe {
-        (*SystemPeripheral::PTR)
-            .cpu_intr_from_cpu_3()
-            .modify(|_, w| w.cpu_intr_from_cpu_3().set_bit());
-    }
+    SystemPeripheral::regs()
+        .cpu_intr_from_cpu_3()
+        .modify(|_, w| w.cpu_intr_from_cpu_3().set_bit());
 }
 
 /// Current systimer count value

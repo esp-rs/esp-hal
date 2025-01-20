@@ -669,11 +669,7 @@ mod private {
 
     use super::*;
     #[cfg(not(i2s1))]
-    use crate::peripherals::i2s0::RegisterBlock;
-    // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
-    // by accident
-    #[cfg(i2s1)]
-    use crate::peripherals::{i2s1::RegisterBlock, I2S1};
+    use crate::pac::i2s0::RegisterBlock;
     use crate::{
         dma::{ChannelRx, ChannelTx, DescriptorChain, DmaDescriptor, DmaEligible},
         gpio::{
@@ -686,6 +682,10 @@ mod private {
         peripherals::{Interrupt, I2S0},
         DriverMode,
     };
+    // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
+    // by accident
+    #[cfg(i2s1)]
+    use crate::{pac::i2s1::RegisterBlock, peripherals::I2S1};
 
     pub struct TxCreator<'d, Dm>
     where
@@ -1217,7 +1217,7 @@ mod private {
         #[cfg(any(esp32c6, esp32h2))]
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             let i2s = self.register_block();
-            let pcr = unsafe { &*crate::peripherals::PCR::PTR }; // I2S clocks are configured via PCR
+            let pcr = crate::peripherals::PCR::regs(); // I2S clocks are configured via PCR
 
             let clkm_div_x: u32;
             let clkm_div_y: u32;

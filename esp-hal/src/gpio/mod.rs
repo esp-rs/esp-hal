@@ -552,45 +552,41 @@ struct Bank0GpioRegisterAccess;
 
 impl Bank0GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
-        unsafe { GPIO::steal() }
+        GPIO::regs()
             .enable_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_out_en_set(word: u32) {
-        unsafe { GPIO::steal() }
+        GPIO::regs()
             .enable_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn read_input() -> u32 {
-        unsafe { GPIO::steal() }.in_().read().bits()
+        GPIO::regs().in_().read().bits()
     }
 
     fn read_output() -> u32 {
-        unsafe { GPIO::steal() }.out().read().bits()
+        GPIO::regs().out().read().bits()
     }
 
     fn read_interrupt_status() -> u32 {
-        unsafe { GPIO::steal() }.status().read().bits()
+        GPIO::regs().status().read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
-        unsafe { GPIO::steal() }
+        GPIO::regs()
             .status_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_set(word: u32) {
-        unsafe { GPIO::steal() }
-            .out_w1ts()
-            .write(|w| unsafe { w.bits(word) });
+        GPIO::regs().out_w1ts().write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_clear(word: u32) {
-        unsafe { GPIO::steal() }
-            .out_w1tc()
-            .write(|w| unsafe { w.bits(word) });
+        GPIO::regs().out_w1tc().write(|w| unsafe { w.bits(word) });
     }
 }
 
@@ -600,45 +596,41 @@ struct Bank1GpioRegisterAccess;
 #[cfg(gpio_bank_1)]
 impl Bank1GpioRegisterAccess {
     fn write_out_en_clear(word: u32) {
-        unsafe { GPIO::steal() }
+        GPIO::regs()
             .enable1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_out_en_set(word: u32) {
-        unsafe { GPIO::steal() }
+        GPIO::regs()
             .enable1_w1ts()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn read_input() -> u32 {
-        unsafe { GPIO::steal() }.in1().read().bits()
+        GPIO::regs().in1().read().bits()
     }
 
     fn read_output() -> u32 {
-        unsafe { GPIO::steal() }.out1().read().bits()
+        GPIO::regs().out1().read().bits()
     }
 
     fn read_interrupt_status() -> u32 {
-        unsafe { GPIO::steal() }.status1().read().bits()
+        GPIO::regs().status1().read().bits()
     }
 
     fn write_interrupt_status_clear(word: u32) {
-        unsafe { GPIO::steal() }
+        GPIO::regs()
             .status1_w1tc()
             .write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_set(word: u32) {
-        unsafe { GPIO::steal() }
-            .out1_w1ts()
-            .write(|w| unsafe { w.bits(word) });
+        GPIO::regs().out1_w1ts().write(|w| unsafe { w.bits(word) });
     }
 
     fn write_output_clear(word: u32) {
-        unsafe { GPIO::steal() }
-            .out1_w1tc()
-            .write(|w| unsafe { w.bits(word) });
+        GPIO::regs().out1_w1tc().write(|w| unsafe { w.bits(word) });
     }
 }
 
@@ -698,7 +690,7 @@ fn disable_usb_pads(gpionum: u8) {
     }
 
     if pins.contains(&gpionum) {
-        unsafe { crate::peripherals::USB_DEVICE::steal() }
+        crate::peripherals::USB_DEVICE::regs()
             .conf0()
             .modify(|_, w| {
                 w.usb_pad_enable().clear_bit();
@@ -891,7 +883,7 @@ macro_rules! io_type {
                     w.fun_wpd().clear_bit()
                 });
 
-                unsafe { GPIO::steal() }
+                GPIO::regs()
                     .enable_w1tc()
                     .write(|w| unsafe { w.bits(1 << $gpionum) });
             }
@@ -1967,7 +1959,7 @@ impl AnyPin {
     ) {
         self.enable_output(true);
 
-        let gpio = unsafe { GPIO::steal() };
+        let gpio = GPIO::regs();
 
         gpio.pin(self.number() as usize)
             .modify(|_, w| w.pad_driver().bit(open_drain));
@@ -2015,7 +2007,7 @@ impl AnyPin {
     /// Enable/disable open-drain mode
     #[inline]
     pub(crate) fn enable_open_drain(&mut self, on: bool) {
-        unsafe { GPIO::steal() }
+        GPIO::regs()
             .pin(self.number() as usize)
             .modify(|_, w| w.pad_driver().bit(on));
     }
@@ -2101,24 +2093,17 @@ impl RtcPinWithResistors for AnyPin {
 /// - `int_type`: interrupt type, see [Event] (or 0 to disable)
 /// - `wake_up_from_light_sleep`: whether to wake up from light sleep
 fn set_int_enable(gpio_num: u8, int_ena: Option<u8>, int_type: u8, wake_up_from_light_sleep: bool) {
-    unsafe { GPIO::steal() }
-        .pin(gpio_num as usize)
-        .modify(|_, w| unsafe {
-            if let Some(int_ena) = int_ena {
-                w.int_ena().bits(int_ena);
-            }
-            w.int_type().bits(int_type);
-            w.wakeup_enable().bit(wake_up_from_light_sleep)
-        });
+    GPIO::regs().pin(gpio_num as usize).modify(|_, w| unsafe {
+        if let Some(int_ena) = int_ena {
+            w.int_ena().bits(int_ena);
+        }
+        w.int_type().bits(int_type);
+        w.wakeup_enable().bit(wake_up_from_light_sleep)
+    });
 }
 
 fn is_int_enabled(gpio_num: u8) -> bool {
-    unsafe { GPIO::steal() }
-        .pin(gpio_num as usize)
-        .read()
-        .int_ena()
-        .bits()
-        != 0
+    GPIO::regs().pin(gpio_num as usize).read().int_ena().bits() != 0
 }
 
 mod asynch {

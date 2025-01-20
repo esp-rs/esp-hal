@@ -17,8 +17,8 @@ use portable_atomic::AtomicBool;
 use crate::{
     asynch::AtomicWaker,
     dma::*,
-    interrupt::Priority,
     handler,
+    interrupt::Priority,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
 };
@@ -100,7 +100,7 @@ macro_rules! impl_pdma_channel {
                 type RegisterBlock = $register_block;
 
                 fn register_block(&self) -> &Self::RegisterBlock {
-                    unsafe { &*crate::peripherals::[< $instance:upper >]::PTR }
+                    crate::peripherals::[< $instance:upper >]::regs()
                 }
                 fn tx_waker(&self) -> &'static AtomicWaker {
                     static WAKER: AtomicWaker = AtomicWaker::new();
@@ -187,8 +187,9 @@ pub(super) fn init_dma(_cs: CriticalSection<'_>) {
         // restrictive than necessary but we currently support the same
         // number of SPI peripherals as SPI DMA channels so it's not a big
         // deal.
-        let dport = unsafe { crate::peripherals::DPORT::steal() };
-        dport
+        use crate::peripherals::DPORT;
+
+        DPORT::regs()
             .spi_dma_chan_sel()
             .modify(|_, w| unsafe { w.spi2_dma_chan_sel().bits(1).spi3_dma_chan_sel().bits(2) });
     }

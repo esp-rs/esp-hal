@@ -104,6 +104,7 @@
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
+    peripherals::SOC_ETM,
     system::GenericPeripheralGuard,
 };
 
@@ -120,7 +121,7 @@ impl<const C: u8> EtmChannel<C> {
         E: EtmEvent,
         T: EtmTask,
     {
-        let etm = unsafe { crate::peripherals::SOC_ETM::steal() };
+        let etm = SOC_ETM::regs();
         let guard = GenericPeripheralGuard::new();
 
         etm.ch(C as usize)
@@ -144,7 +145,7 @@ impl<const C: u8> EtmChannel<C> {
 }
 
 fn disable_channel(channel: u8) {
-    let etm = unsafe { crate::peripherals::SOC_ETM::steal() };
+    let etm = SOC_ETM::regs();
     if channel < 32 {
         etm.ch_ena_ad0_clr().write(|w| w.ch_clr(channel).set_bit());
     } else {

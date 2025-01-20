@@ -1,3 +1,5 @@
+use crate::peripherals::{APB_SARADC, PCR, PMU};
+
 const I2C_SAR_ADC: u8 = 0x69;
 const I2C_SAR_ADC_HOSTID: u8 = 0;
 
@@ -59,9 +61,9 @@ const REGI2C_RTC_DATA_S: u8 = 16;
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
-    let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
-    let pmu = unsafe { &*crate::peripherals::PMU::ptr() };
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
+    let pcr = PCR::regs();
+    let pmu = PMU::regs();
+    let apb_saradc = APB_SARADC::regs();
 
     unsafe {
         // Pull SAR ADC out of reset
@@ -181,13 +183,14 @@ pub(crate) fn ensure_randomness() {
 
 /// Disable true randomness. Unlocks `ADC` peripheral.
 pub(crate) fn revert_trng() {
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
-    let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
-
     unsafe {
-        apb_saradc.ctrl2().modify(|_, w| w.timer_en().clear_bit());
+        APB_SARADC::regs()
+            .ctrl2()
+            .modify(|_, w| w.timer_en().clear_bit());
 
-        apb_saradc.sar_patt_tab1().modify(|_, w| w.bits(0xFFFFFF));
+        APB_SARADC::regs()
+            .sar_patt_tab1()
+            .modify(|_, w| w.bits(0xFFFFFF));
 
         // Revert ADC I2C configuration and initial voltage source setting
         regi2c_write_mask(
@@ -254,15 +257,17 @@ pub(crate) fn revert_trng() {
         );
 
         // disable ADC_CTRL_CLK (SAR ADC function clock)
-        pcr.saradc_clkm_conf().modify(|_, w| w.bits(0x00404000));
+        PCR::regs()
+            .saradc_clkm_conf()
+            .modify(|_, w| w.bits(0x00404000));
 
         // Set PCR_SARADC_CONF_REG to initial state
-        pcr.saradc_conf().modify(|_, w| w.bits(0x5));
+        PCR::regs().saradc_conf().modify(|_, w| w.bits(0x5));
     }
 }
 
 fn regi2c_enable_block(block: u8) {
-    let modem_lpcon = unsafe { &*crate::peripherals::MODEM_LPCON::ptr() };
+    let modem_lpcon = crate::peripherals::MODEM_LPCON::regs();
 
     modem_lpcon
         .clk_conf()

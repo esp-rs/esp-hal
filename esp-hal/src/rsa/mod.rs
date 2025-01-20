@@ -386,6 +386,7 @@ pub(crate) mod asynch {
 
     use crate::{
         asynch::AtomicWaker,
+        peripherals::RSA,
         rsa::{
             Multi,
             Rsa,
@@ -520,7 +521,7 @@ pub(crate) mod asynch {
     #[handler]
     /// Interrupt handler for RSA.
     pub(super) fn rsa_interrupt_handler() {
-        let rsa = unsafe { &*crate::peripherals::RSA::ptr() };
+        let rsa = RSA::regs();
         SIGNALED.store(true, Ordering::Release);
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {

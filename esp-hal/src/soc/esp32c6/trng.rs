@@ -1,3 +1,5 @@
+use crate::peripherals::{APB_SARADC, PCR, PMU};
+
 const I2C_SAR_ADC: u8 = 0x69;
 const I2C_SAR_ADC_HOSTID: u8 = 0;
 
@@ -63,9 +65,9 @@ const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 6;
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
-    let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
-    let pmu = unsafe { &*crate::peripherals::PMU::ptr() };
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
+    let pcr = PCR::regs();
+    let pmu = PMU::regs();
+    let apb_saradc = APB_SARADC::regs();
 
     unsafe {
         // Pull SAR ADC out of reset
@@ -194,13 +196,14 @@ pub(crate) fn ensure_randomness() {
 
 /// Disable true randomness. Unlocks `ADC` peripheral.
 pub(crate) fn revert_trng() {
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
-    let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
-
     unsafe {
-        apb_saradc.ctrl2().modify(|_, w| w.timer_en().clear_bit());
+        APB_SARADC::regs()
+            .ctrl2()
+            .modify(|_, w| w.timer_en().clear_bit());
 
-        apb_saradc.sar_patt_tab1().modify(|_, w| w.bits(0xFFFFFF));
+        APB_SARADC::regs()
+            .sar_patt_tab1()
+            .modify(|_, w| w.bits(0xFFFFFF));
 
         regi2c_write_mask(
             I2C_SAR_ADC,
@@ -274,15 +277,17 @@ pub(crate) fn revert_trng() {
             0,
         );
 
-        pcr.saradc_clkm_conf().modify(|_, w| w.bits(0x00404000));
+        PCR::regs()
+            .saradc_clkm_conf()
+            .modify(|_, w| w.bits(0x00404000));
 
-        pcr.saradc_conf().modify(|_, w| w.bits(0x5));
+        PCR::regs().saradc_conf().modify(|_, w| w.bits(0x5));
     }
 }
 
 fn regi2c_enable_block(block: u8) {
-    let modem_lpcon = unsafe { &*crate::peripherals::MODEM_LPCON::ptr() };
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    let modem_lpcon = crate::peripherals::MODEM_LPCON::regs();
+    let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
 
     unsafe {
         modem_lpcon
@@ -334,7 +339,7 @@ fn regi2c_enable_block(block: u8) {
 }
 
 fn regi2c_disable_block(block: u8) {
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
 
     unsafe {
         match block {
@@ -375,7 +380,7 @@ fn regi2c_disable_block(block: u8) {
 
 pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
     assert!(msb - lsb < 8);
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
 
     unsafe {
         regi2c_enable_block(block);

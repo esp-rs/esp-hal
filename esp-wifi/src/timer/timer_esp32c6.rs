@@ -1,20 +1,21 @@
-use crate::hal::peripherals;
 #[cfg(any(feature = "wifi", feature = "ble"))]
 #[allow(unused_imports)]
 use crate::{
     binary,
-    hal::{interrupt, peripherals::Interrupt},
+    hal::{
+        interrupt,
+        peripherals::{Interrupt, INTERRUPT_CORE0},
+    },
 };
 
 pub(crate) fn setup_radio_isr() {
     // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU
     // interrupt 31 which is masked by default for some reason for this
     // interrupt, mapping it to 0 doesn't deactivate it
-    let interrupt_core0 = unsafe { &*peripherals::INTERRUPT_CORE0::PTR };
-    interrupt_core0
+    INTERRUPT_CORE0::regs()
         .wifi_bb_intr_map()
         .write(|w| unsafe { w.wifi_bb_intr_map().bits(31) });
-    interrupt_core0
+    INTERRUPT_CORE0::regs()
         .modem_peri_timeout_intr_map()
         .write(|w| unsafe { w.modem_peri_timeout_intr_map().bits(31) });
 }

@@ -1,7 +1,7 @@
 use strum::FromRepr;
 
 use crate::{
-    peripherals::RTC_CNTL,
+    peripherals::LPWR,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };
 
@@ -19,10 +19,7 @@ pub(crate) fn configure_clock() {
         }
     };
 
-    unsafe {
-        let rtc_cntl = &*RTC_CNTL::ptr();
-        rtc_cntl.store1().write(|w| w.bits(cal_val));
-    }
+    LPWR::regs().store1().write(|w| unsafe { w.bits(cal_val) });
 }
 
 // Terminology:

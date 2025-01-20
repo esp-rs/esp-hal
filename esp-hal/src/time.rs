@@ -4,6 +4,9 @@
 
 pub use fugit::{ExtU64, RateExtU32};
 
+#[cfg(esp32)]
+use crate::peripherals::TIMG0;
+
 /// Represents a duration of time.
 ///
 /// The resolution is 1 microsecond, represented as a 64-bit unsigned integer.
@@ -26,7 +29,7 @@ pub fn now() -> Instant {
     #[cfg(esp32)]
     let (ticks, div) = {
         // on ESP32 use LACT
-        let tg0 = unsafe { crate::peripherals::TIMG0::steal() };
+        let tg0 = TIMG0::regs();
         tg0.lactupdate().write(|w| unsafe { w.update().bits(1) });
 
         // The peripheral doesn't have a bit to indicate that the update is done, so we
@@ -65,7 +68,7 @@ pub(crate) fn time_init() {
     // different way currently
     assert_eq!(apb, 80_000_000u32);
 
-    let tg0 = unsafe { crate::peripherals::TIMG0::steal() };
+    let tg0 = TIMG0::regs();
 
     tg0.lactconfig().write(|w| unsafe { w.bits(0) });
     tg0.lactalarmhi().write(|w| unsafe { w.bits(u32::MAX) });

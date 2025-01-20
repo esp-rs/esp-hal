@@ -38,7 +38,8 @@
 
 use crate::{
     gpio::{AlternateFunction, GpioPin},
-    peripherals::GPIO,
+    pac::io_mux,
+    peripherals::{GPIO, IO_MUX},
 };
 
 /// The total number of GPIO pins available.
@@ -56,8 +57,8 @@ pub(crate) const ZERO_INPUT: u8 = 0x3c;
 
 pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_1;
 
-pub(crate) const fn io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO {
-    unsafe { (*crate::peripherals::IO_MUX::PTR).gpio(gpio_num as usize) }
+pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
+    IO_MUX::regs().gpio(gpio_num as usize)
 }
 
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
@@ -305,6 +306,6 @@ pub(crate) enum InterruptStatusRegisterAccess {
 
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
-        unsafe { &*GPIO::PTR }.pcpu_int().read().bits()
+        GPIO::regs().pcpu_int().read().bits()
     }
 }

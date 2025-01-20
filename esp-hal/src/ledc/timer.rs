@@ -16,7 +16,7 @@ use fugit::HertzU32;
 #[cfg(esp32)]
 use super::HighSpeed;
 use super::{LowSpeed, Speed};
-use crate::{clock::Clocks, peripherals::ledc};
+use crate::{clock::Clocks, pac};
 
 const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
 
@@ -220,7 +220,7 @@ pub trait TimerHW<S: TimerSpeed> {
 
 /// Timer struct
 pub struct Timer<'a, S: TimerSpeed> {
-    ledc: &'a crate::peripherals::ledc::RegisterBlock,
+    ledc: &'a pac::ledc::RegisterBlock,
     number: Number,
     duty: Option<config::Duty>,
     frequency: u32,
@@ -293,7 +293,7 @@ where
 
 impl<'a, S: TimerSpeed> Timer<'a, S> {
     /// Create a new instance of a timer
-    pub fn new(ledc: &'a ledc::RegisterBlock, number: Number) -> Self {
+    pub fn new(ledc: &'a pac::ledc::RegisterBlock, number: Number) -> Self {
         Timer {
             ledc,
             number,
