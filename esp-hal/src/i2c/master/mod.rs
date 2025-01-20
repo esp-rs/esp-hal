@@ -609,6 +609,25 @@ impl<'d> I2c<'d, Blocking> {
         Ok(i2c)
     }
 
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for the peripheral."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for the peripheral on the current core."
+    )]
+    #[doc = ""]
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    ///
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [crate::DEFAULT_INTERRUPT_HANDLER]
+    #[instability::unstable]
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.i2c.info().set_interrupt_handler(handler);
+    }
+
     /// Listen for the given interrupts
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<Event>>) {
@@ -715,7 +734,7 @@ impl<'d> I2c<'d, Blocking> {
 impl private::Sealed for I2c<'_, Blocking> {}
 
 impl InterruptConfigurable for I2c<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.i2c.info().set_interrupt_handler(handler);
     }
 }

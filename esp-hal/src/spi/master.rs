@@ -583,12 +583,22 @@ impl<'d> Spi<'d, Blocking> {
     {
         SpiDma::new(self.spi, channel.map(|ch| ch.degrade()).into_ref())
     }
-}
 
-impl InterruptConfigurable for Spi<'_, Blocking> {
-    /// Sets the interrupt handler
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for the peripheral."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for the peripheral on the current core."
+    )]
+    #[doc = ""]
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
     ///
-    /// Interrupts are not enabled at the peripheral level here.
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+    #[instability::unstable]
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         let interrupt = self.driver().info.interrupt;
         for core in Cpu::other() {
@@ -596,6 +606,15 @@ impl InterruptConfigurable for Spi<'_, Blocking> {
         }
         unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
         unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+    }
+}
+
+impl InterruptConfigurable for Spi<'_, Blocking> {
+    /// Sets the interrupt handler
+    ///
+    /// Interrupts are not enabled at the peripheral level here.
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        Spi::set_interrupt_handler(self, handler);
     }
 }
 
