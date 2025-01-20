@@ -1,21 +1,4 @@
 //! Peripheral signal interconnect using IOMUX or GPIOMUX.
-//! 
-//! ## Examples
-//! ### Inverting pins (by example UART RX and TX pins)
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{Config, Uart};
-//!
-//! let (rx, _) = peripherals.GPIO2.split();
-//! let (_, tx) = peripherals.GPIO1.split();
-//! let mut uart1 = Uart::new(
-//!     peripherals.UART1,
-//!     Config::default())
-//!     .unwrap()
-//!     .with_rx(rx.inverted())
-//!     .with_tx(tx.inverted());
-//! # }
-//! ```
 
 use crate::{
     gpio::{
@@ -307,6 +290,21 @@ impl InputSignal {
     /// input signal.
     ///
     /// Calling this function multiple times toggles the setting.
+    /// 
+    /// ### Inverting pins (by example UART RX and TX pins)
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// let (rx, _) = peripherals.GPIO2.split();
+    /// let (_, tx) = peripherals.GPIO1.split();
+    /// let mut uart1 = Uart::new(
+    ///     peripherals.UART1,
+    ///     Config::default())
+    /// .unwrap()
+    /// .with_rx(rx.inverted())
+    /// .with_tx(tx.inverted());
+    /// # }
+    /// ```
     pub fn inverted(mut self) -> Self {
         self.invert();
         self
@@ -432,6 +430,21 @@ impl OutputSignal {
     /// output signal.
     ///
     /// Calling this function multiple times toggles the setting.
+    /// 
+    /// ### Inverting pins (by example UART RX and TX pins)
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// let (rx, _) = peripherals.GPIO2.split();
+    /// let (_, tx) = peripherals.GPIO1.split();
+    /// let mut uart1 = Uart::new(
+    ///     peripherals.UART1,
+    ///     Config::default())
+    /// .unwrap()
+    /// .with_rx(rx.inverted())
+    /// .with_tx(tx.inverted());
+    /// # }
+    /// ```
     pub fn inverted(mut self) -> Self {
         self.invert();
         self
