@@ -50,9 +50,7 @@
 //! # let mut uart0 = Uart::new(
 //! #    peripherals.UART0,
 //! #    config)
-//! # .unwrap()
-//! # .with_rx(esp_hal::gpio::NoPin)
-//! # .with_tx(esp_hal::gpio::NoPin);
+//! # .unwrap();
 //! uart0.set_interrupt_handler(interrupt_handler);
 //!
 //! critical_section::with(|cs| {
@@ -1039,8 +1037,8 @@ where
     /// # use esp_hal::uart::{Config, Uart};
     /// # let mut uart1 = Uart::new(
     /// #     peripherals.UART1,
-    /// #     Config::default(),
-    /// # ).unwrap()
+    /// #     Config::default())
+    /// # .unwrap()
     /// # .with_rx(peripherals.GPIO1)
     /// # .with_tx(peripherals.GPIO2);
     /// // The UART can be split into separate Transmit and Receive components:
@@ -1062,8 +1060,8 @@ where
     /// # use esp_hal::uart::{Config, Uart};
     /// # let mut uart1 = Uart::new(
     /// #     peripherals.UART1,
-    /// #     Config::default(),
-    /// # ).unwrap();
+    /// #     Config::default())
+    /// # .unwrap();
     /// // Write bytes out over the UART:
     /// uart1.write_bytes(b"Hello, world!").expect("write error!");
     /// # }
