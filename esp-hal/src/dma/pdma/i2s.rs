@@ -2,7 +2,7 @@ use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{asynch::AtomicWaker, dma::*, peripheral::Peripheral, peripherals::Interrupt};
 
-pub(super) type I2sRegisterBlock = crate::peripherals::i2s0::RegisterBlock;
+pub(super) type I2sRegisterBlock = crate::pac::i2s0::RegisterBlock;
 
 /// The RX half of an arbitrary I2S DMA channel.
 #[derive(Debug)]

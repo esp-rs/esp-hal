@@ -13,14 +13,17 @@ const ADC_SARADC_ENT_TSENS_ADDR: u8 = 0x07;
 const ADC_SARADC_ENT_TSENS_ADDR_MSB: u8 = 2;
 const ADC_SARADC_ENT_TSENS_ADDR_LSB: u8 = 2;
 
-use crate::rom::regi2c_write_mask;
+use crate::{
+    peripherals::{APB_SARADC, LPWR, SYSTEM},
+    rom::regi2c_write_mask,
+};
 
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
-    let system = unsafe { &*crate::peripherals::SYSTEM::ptr() };
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
+    let rtc_cntl = LPWR::regs();
+    let system = SYSTEM::regs();
+    let apb_saradc = APB_SARADC::regs();
 
     unsafe {
         // RNG module is always clock enabled
@@ -104,8 +107,8 @@ pub(crate) fn ensure_randomness() {
 
 /// Disable true randomness. Unlocks `ADC` peripheral.
 pub(crate) fn revert_trng() {
-    let apb_saradc = unsafe { &*crate::peripherals::APB_SARADC::ptr() };
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let apb_saradc = APB_SARADC::regs();
+    let rtc_cntl = LPWR::regs();
 
     unsafe {
         regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC2_ENCAL_REF_ADDR, 0);

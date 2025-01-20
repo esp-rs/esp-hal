@@ -1616,7 +1616,7 @@ impl RtcClock {
 
         // Check if there is already running calibration process
         // TODO: &mut TIMG0 for calibration
-        let timg0 = unsafe { &*TIMG0::ptr() };
+        let timg0 = TIMG0::regs();
 
         if timg0
             .rtccalicfg()
@@ -1791,7 +1791,7 @@ impl RtcClock {
     }
 
     pub(crate) fn estimate_xtal_frequency() -> u32 {
-        let timg0 = unsafe { crate::peripherals::TIMG0::steal() };
+        let timg0 = TIMG0::regs();
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
         timg0.rtccalicfg().modify(|_, w| unsafe {

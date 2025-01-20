@@ -121,8 +121,9 @@ use crate::{
         interconnect::{OutputConnection, PeripheralOutput},
         OutputSignal,
     },
+    pac::i2s0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{i2s0::RegisterBlock, I2S0, I2S1},
+    peripherals::{I2S0, I2S1},
     system::PeripheralGuard,
     Async,
     Blocking,
@@ -736,9 +737,10 @@ impl Instance for I2S1 {
             bits
         );
 
-        // signals for 8bit and 16bit both start at an offset of 8 for I2S1
-        // https://github.com/espressif/esp-idf/blob/9106c43accd9f5e75379f62f12597677213f5023/components/esp_lcd/i80/esp_lcd_panel_io_i2s.c#L701
-        match i + 8 {
+        // signals for 8bit  start at an offset of  8 for 16bit on I2S1
+        let pin_offset = if bits == 16 { 8 } else { 0 };
+
+        match i + pin_offset {
             0 => OutputSignal::I2S1O_DATA_0,
             1 => OutputSignal::I2S1O_DATA_1,
             2 => OutputSignal::I2S1O_DATA_2,

@@ -240,8 +240,9 @@ use crate::{
         Pull,
     },
     interrupt::{InterruptConfigurable, InterruptHandler},
+    pac::uart0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{uart0::RegisterBlock, Interrupt},
+    peripherals::Interrupt,
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
@@ -291,12 +292,6 @@ impl core::fmt::Display for Error {
             Error::FrameFormatViolated => write!(f, "A framing error was detected on the RX line"),
             Error::ParityMismatch => write!(f, "A parity error was detected on the RX line"),
         }
-    }
-}
-
-impl embedded_hal_nb::serial::Error for Error {
-    fn kind(&self) -> embedded_hal_nb::serial::ErrorKind {
-        embedded_hal_nb::serial::ErrorKind::Other
     }
 }
 
@@ -645,22 +640,18 @@ where
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         let count = data.len();
 
-        data.iter()
-            .try_for_each(|c| nb::block!(self.write_byte(*c)))?;
+        for &byte in data {
+            self.write_byte(byte);
+        }
 
         Ok(count)
     }
 
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        if self.tx_fifo_count() < UART_FIFO_SIZE {
-            self.register_block()
-                .fifo()
-                .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
-
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
+    fn write_byte(&mut self, word: u8) {
+        while self.tx_fifo_count() >= UART_FIFO_SIZE {}
+        self.register_block()
+            .fifo()
+            .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
     }
 
     #[allow(clippy::useless_conversion)]
@@ -676,12 +667,8 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> nb::Result<(), Error> {
-        if self.is_tx_idle() {
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
+    pub fn flush(&mut self) {
+        while !self.is_tx_idle() {}
     }
 
     /// Checks if the TX line is idle for this UART instance.
@@ -849,7 +836,7 @@ where
                 // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
                 let fifo = unsafe {
                     &*((self.register_block().fifo().as_ptr() as *mut u8).add(0x20C00000)
-                        as *mut crate::peripherals::uart0::FIFO)
+                        as *mut crate::pac::uart0::FIFO)
                 };
             } else {
                 let fifo = self.register_block().fifo();
@@ -1202,19 +1189,9 @@ where
         sync_regs(register_block);
     }
 
-    // Write a byte out over the UART
-    fn write_byte(&mut self, word: u8) -> nb::Result<(), Error> {
-        self.tx.write_byte(word)
-    }
-
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> nb::Result<(), Error> {
+    pub fn flush(&mut self) {
         self.tx.flush()
-    }
-
-    // Read a byte from the UART
-    fn read_byte(&mut self) -> nb::Result<u8, Error> {
-        embedded_hal_nb::serial::Read::read(&mut self.rx)
     }
 
     /// Change the configuration.
@@ -1229,7 +1206,7 @@ where
             if #[cfg(any(esp32, esp32s2))] {
                 // Nothing to do
             } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                unsafe { crate::peripherals::SYSTEM::steal() }
+                crate::peripherals::SYSTEM::regs()
                     .perip_clk_en0()
                     .modify(|_, w| w.uart_mem_clk_en().set_bit());
             } else {
@@ -1383,65 +1360,6 @@ where
     }
 }
 
-impl<Dm> embedded_hal_nb::serial::ErrorType for Uart<'_, Dm> {
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UartTx<'_, Dm> {
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UartRx<'_, Dm> {
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for Uart<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for UartRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        match self.read_byte() {
-            Some(b) => Ok(b),
-            None => Err(nb::Error::WouldBlock),
-        }
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for Uart<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush()
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for UartTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush()
-    }
-}
-
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::ErrorType for Uart<'_, Dm> {
@@ -1538,14 +1456,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        loop {
-            match self.flush() {
-                Ok(_) => break,
-                Err(nb::Error::WouldBlock) => { /* Wait */ }
-                Err(nb::Error::Other(e)) => return Err(e),
-            }
-        }
-
+        self.flush();
         Ok(())
     }
 }
@@ -1745,7 +1656,7 @@ impl UartTx<'_, Async> {
             }
 
             for byte in &words[offset..next_offset] {
-                self.write_byte(*byte).unwrap(); // should never fail
+                self.write_byte(*byte);
                 count += 1;
             }
 
@@ -1926,7 +1837,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
-        peripherals::{LP_CLKRST, LP_UART},
+        peripherals::{LPWR, LP_AON, LP_IO, LP_UART},
         uart::{Config, DataBits, Parity, StopBits},
     };
     /// LP-UART driver
@@ -1945,16 +1856,17 @@ pub mod lp_uart {
             _tx: LowPowerOutput<'_, 5>,
             _rx: LowPowerInput<'_, 4>,
         ) -> Self {
-            let lp_io = unsafe { crate::peripherals::LP_IO::steal() };
-            let lp_aon = unsafe { crate::peripherals::LP_AON::steal() };
-
             // FIXME: use GPIO APIs to configure pins
-            lp_aon
+            LP_AON::regs()
                 .gpio_mux()
                 .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | (1 << 4) | (1 << 5)) });
 
-            lp_io.gpio(4).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
-            lp_io.gpio(5).modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+            LP_IO::regs()
+                .gpio(4)
+                .modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+            LP_IO::regs()
+                .gpio(5)
+                .modify(|_, w| unsafe { w.mcu_sel().bits(1) });
 
             let mut me = Self { uart };
 
@@ -1981,8 +1893,8 @@ pub mod lp_uart {
             // Get source clock frequency
             // default == SOC_MOD_CLK_RTC_FAST == 2
 
-            // LP_CLKRST.lpperi.lp_uart_clk_sel = 0;
-            unsafe { LP_CLKRST::steal() }
+            // LPWR.lpperi.lp_uart_clk_sel = 0;
+            LPWR::regs()
                 .lpperi()
                 .modify(|_, w| w.lp_uart_clk_sel().clear_bit());
 
@@ -2442,6 +2354,8 @@ impl Info {
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
     fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+        use crate::peripherals::LPWR;
+
         let clocks = Clocks::get();
         let clk = match clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
@@ -2450,7 +2364,7 @@ impl Info {
         };
 
         if clock_source == ClockSource::RcFast {
-            unsafe { crate::peripherals::RTC_CNTL::steal() }
+            LPWR::regs()
                 .clk_conf()
                 .modify(|_, w| w.dig_clk8m_en().variant(true));
             // esp_rom_delay_us(SOC_DELAY_RC_FAST_DIGI_SWITCH);
@@ -2501,7 +2415,7 @@ impl Info {
         let clk_div = clk.div_ceil(max_div * baudrate);
 
         // UART clocks are configured via PCR
-        let pcr = unsafe { crate::peripherals::PCR::steal() };
+        let pcr = crate::peripherals::PCR::regs();
 
         if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
             pcr.uart0_conf()

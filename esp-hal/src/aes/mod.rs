@@ -274,6 +274,7 @@ pub mod dma {
     }
 
     /// A DMA capable AES instance.
+    #[instability::unstable]
     pub struct AesDma<'d> {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
@@ -451,22 +452,26 @@ pub mod dma {
 
         #[cfg(any(esp32c3, esp32s2, esp32s3))]
         fn reset_aes(&self) {
-            unsafe {
-                let s = crate::peripherals::SYSTEM::steal();
-                s.perip_rst_en1()
+            use crate::peripherals::SYSTEM;
+
+            SYSTEM::regs()
+                .perip_rst_en1()
                     .modify(|_, w| w.crypto_aes_rst().set_bit());
-                s.perip_rst_en1()
+            SYSTEM::regs()
+                .perip_rst_en1()
                     .modify(|_, w| w.crypto_aes_rst().clear_bit());
-            }
         }
 
         #[cfg(any(esp32c6, esp32h2))]
         fn reset_aes(&self) {
-            unsafe {
-                let s = crate::peripherals::PCR::steal();
-                s.aes_conf().modify(|_, w| w.aes_rst_en().set_bit());
-                s.aes_conf().modify(|_, w| w.aes_rst_en().clear_bit());
-            }
+            use crate::peripherals::PCR;
+
+            PCR::regs()
+                .aes_conf()
+                .modify(|_, w| w.aes_rst_en().set_bit());
+            PCR::regs()
+                .aes_conf()
+                .modify(|_, w| w.aes_rst_en().clear_bit());
         }
 
         fn dma_peripheral(&self) -> DmaPeripheral {

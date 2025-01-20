@@ -29,10 +29,7 @@ by `esp_hal::init()`. The channels themselves have been renamed to match other p
 - GDMA devices provide `set_priority` to change DMA in/out channel priority
 
 ```diff
- let mut spi = Spi::new_with_config(
-     peripherals.SPI2,
-     Config::default(),
- )
+ let mut spi = spi
  // other setup
 -.with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 +.with_dma(dma_channel);
@@ -40,10 +37,7 @@ by `esp_hal::init()`. The channels themselves have been renamed to match other p
 
 ```diff
 +dma_channel.set_priority(DmaPriority::Priority1);
- let mut spi = Spi::new_with_config(
-     peripherals.SPI2,
-     Config::default(),
- )
+ let mut spi = spi
  // other setup
 -.with_dma(dma_channel.configure(false, DmaPriority::Priority1));
 +.with_dma(dma_channel);
@@ -235,7 +229,7 @@ https://github.com/rust-embedded/embedded-hal/blob/master/docs/migrating-from-0.
 
 ## Driver constructors now take a configuration and are fallible
 
-The old `new_with_config` constructor have been removed, and `new` constructors now always take
+The old `new_with_config` constructors have been removed, and `new` constructors now always take
 a configuration structure. They have also been updated to return a `ConfigError` if the configuration
 is not compatible with the hardware.
 
@@ -243,11 +237,7 @@ is not compatible with the hardware.
 -let mut spi = Spi::new_with_config(
 +let mut spi = Spi::new(
      peripherals.SPI2,
-     Config {
-         frequency: 100.kHz(),
-         mode: SpiMode::_0,
-         ..Config::default()
-     },
+     config,
 -);
 +)
 +.unwrap();
@@ -260,6 +250,17 @@ is not compatible with the hardware.
 -);
 +)
 +.unwrap();
+```
+
+Additionally, the configuration structs now implement the Builder Lite pattern.
+
+```diff
+-let config = Config {
+-    frequency: 100.kHz(),
+-    mode: Mode::_0,
+-    ..Config::default()
+-}
++let config = Config::default().with_frequency(100.kHz()).with_mode(Mode::_0);
 ```
 
 ## Peripheral instance type parameters and `new_typed` constructors have been removed
@@ -453,13 +454,15 @@ e.g.
 
 e.g.
 
-```dif
+```diff
 - while let nb::Result::Ok(_c) = serial.read_byte() {
 -     cnt += 1;
 - }
 + let mut buff = [0u8; 64];
 + let cnt = serial.read_bytes(&mut buff);
 ```
+
+
 
 ## Spi `with_miso` has been split
 
@@ -482,10 +485,11 @@ Additionally the enum is marked as non-exhaustive.
 
 ## SPI Changes
 
-The SPI mode variants are renamed from e.g. `Mode0` to `_0`.
+A number of enums have had their `Spi` prefix dropped and the SPI mode variants
+are renamed from e.g. `Mode0` to `_0`.
 
 ```diff
-- Mode::Mode0
+- SpiMode::Mode0
 + Mode::_0
 ```
 

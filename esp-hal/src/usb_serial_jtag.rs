@@ -136,8 +136,9 @@ use procmacros::handler;
 use crate::{
     asynch::AtomicWaker,
     interrupt::InterruptConfigurable,
+    pac::usb_device::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{usb_device::RegisterBlock, Interrupt, USB_DEVICE},
+    peripherals::{Interrupt, USB_DEVICE},
     system::PeripheralClockControl,
     Async,
     Blocking,
@@ -543,71 +544,6 @@ where
     }
 }
 
-impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::ErrorType for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        embedded_hal_nb::serial::Read::read(&mut self.rx)
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Read for UsbSerialJtagRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.read_byte()
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtag<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        embedded_hal_nb::serial::Write::write(&mut self.tx, word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        embedded_hal_nb::serial::Write::flush(&mut self.tx)
-    }
-}
-
-impl<Dm> embedded_hal_nb::serial::Write for UsbSerialJtagTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.write_byte_nb(word)
-    }
-
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
-        self.flush_tx_nb()
-    }
-}
-
 #[cfg(any(doc, feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl<Dm> embedded_io::ErrorType for UsbSerialJtag<'_, Dm>
@@ -910,7 +846,7 @@ impl embedded_io_async::Read for UsbSerialJtagRx<'_, Async> {
 
 #[handler]
 fn async_interrupt_handler() {
-    let usb = USB_DEVICE::register_block();
+    let usb = USB_DEVICE::regs();
     let interrupts = usb.int_st().read();
 
     let tx = interrupts.serial_in_empty().bit_is_set();

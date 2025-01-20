@@ -76,7 +76,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                DataMode::Single,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -94,7 +94,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                DataMode::Single,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -125,7 +125,7 @@ mod tests {
 
         let mut buffer = [0xAA; DMA_BUFFER_SIZE];
         spi.half_duplex_read(
-            DataMode::Single,
+            DataMode::SingleTwoDataLines,
             Command::None,
             Address::None,
             0,
@@ -139,7 +139,7 @@ mod tests {
         ctx.miso_mirror.set_high();
 
         spi.half_duplex_read(
-            DataMode::Single,
+            DataMode::SingleTwoDataLines,
             Command::None,
             Address::None,
             0,

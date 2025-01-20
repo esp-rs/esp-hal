@@ -1,6 +1,10 @@
 use crate::{
     binary::include::esp_bt_controller_config_t,
-    hal::system::{RadioClockController, RadioPeripherals},
+    hal::{
+        interrupt,
+        peripherals::Interrupt,
+        system::{RadioClockController, RadioPeripherals},
+    },
 };
 
 pub(crate) static mut ISR_INTERRUPT_15: (
@@ -92,8 +96,20 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
     );
 
     match source {
-        3 => ISR_INTERRUPT_3 = (handler, arg),
-        15 => ISR_INTERRUPT_15 = (handler, arg),
+        3 => {
+            ISR_INTERRUPT_3 = (handler, arg);
+            unwrap!(interrupt::enable(
+                Interrupt::LP_BLE_TIMER,
+                interrupt::Priority::Priority1
+            ));
+        }
+        15 => {
+            ISR_INTERRUPT_15 = (handler, arg);
+            unwrap!(interrupt::enable(
+                Interrupt::BT_MAC,
+                interrupt::Priority::Priority1
+            ));
+        }
         _ => panic!("Unexpected interrupt source {}", source),
     }
 

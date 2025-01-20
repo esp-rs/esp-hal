@@ -45,10 +45,10 @@ embedded-time       = "=0.12.1"
 static_cell         = { version = "2.1.0", features = ["nightly"] }
 usb-device          = "0.3.2"
 usbd-serial         = "0.2.2"
-edge-dhcp = { version = "0.5.0", git = "https://github.com/bugadani/edge-net", rev = "b72678e15bb7c6e72809df235778bb7b48ac146d" }
-edge-raw = { version = "0.5.0", git = "https://github.com/bugadani/edge-net", rev = "b72678e15bb7c6e72809df235778bb7b48ac146d" }
-edge-nal = { version = "0.5.0", git = "https://github.com/bugadani/edge-net", rev = "b72678e15bb7c6e72809df235778bb7b48ac146d" }
-edge-nal-embassy = { version = "0.5.0", git = "https://github.com/bugadani/edge-net", rev = "b72678e15bb7c6e72809df235778bb7b48ac146d" }
+edge-dhcp = { version = "0.5.0" }
+edge-raw = { version = "0.5.0" }
+edge-nal = { version = "0.5.0" }
+edge-nal-embassy = { version = "0.5.0" }
 
 [features]
 esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-wifi?/esp32"]

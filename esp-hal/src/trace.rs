@@ -34,8 +34,8 @@
 //! ```
 
 use crate::{
+    pac::trace::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::trace::RegisterBlock,
     system::PeripheralGuard,
 };
 

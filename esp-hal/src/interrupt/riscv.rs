@@ -23,7 +23,8 @@ pub use self::plic::*;
 pub use self::vectored::*;
 use super::InterruptStatus;
 use crate::{
-    peripherals::{self, Interrupt},
+    pac,
+    peripherals::{Interrupt, INTERRUPT_CORE0},
     Cpu,
 };
 
@@ -227,7 +228,7 @@ pub fn _setup_interrupts() {
         // at least after the 2nd stage bootloader there are some interrupts enabled
         // (e.g. UART)
         for peripheral_interrupt in 0..255 {
-            crate::soc::peripherals::Interrupt::try_from(peripheral_interrupt)
+            Interrupt::try_from(peripheral_interrupt)
                 .map(|intr| {
                     #[cfg(multi_core)]
                     disable(Cpu::AppCpu, intr);
@@ -290,58 +291,26 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
 /// Get status of peripheral interrupts
 #[inline]
 pub fn status(_core: Cpu) -> InterruptStatus {
-    #[cfg(large_intr_status)]
-    unsafe {
-        InterruptStatus::from(
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_0()
-                .read()
-                .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_1()
-                .read()
-                .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .int_status_reg_2()
-                .read()
-                .bits(),
-        )
-    }
-
-    #[cfg(very_large_intr_status)]
-    unsafe {
-        InterruptStatus::from(
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_0()
-                .read()
-                .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_1()
-                .read()
-                .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_2()
-                .read()
-                .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_3()
-                .read()
-                .bits(),
-        )
-    }
-
-    #[cfg(not(any(large_intr_status, very_large_intr_status)))]
-    unsafe {
-        InterruptStatus::from(
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_0()
-                .read()
-                .bits(),
-            (*crate::peripherals::INTERRUPT_CORE0::PTR)
-                .intr_status_reg_1()
-                .read()
-                .bits(),
-        )
+    cfg_if::cfg_if! {
+        if #[cfg(large_intr_status)] {
+            InterruptStatus::from(
+                INTERRUPT_CORE0::regs().intr_status_reg_0().read().bits(),
+                INTERRUPT_CORE0::regs().intr_status_reg_1().read().bits(),
+                INTERRUPT_CORE0::regs().int_status_reg_2().read().bits(),
+            )
+        } else if #[cfg(very_large_intr_status)] {
+            InterruptStatus::from(
+                INTERRUPT_CORE0::regs().intr_status_reg_0().read().bits(),
+                INTERRUPT_CORE0::regs().intr_status_reg_1().read().bits(),
+                INTERRUPT_CORE0::regs().intr_status_reg_2().read().bits(),
+                INTERRUPT_CORE0::regs().intr_status_reg_3().read().bits(),
+            )
+        } else {
+            InterruptStatus::from(
+                INTERRUPT_CORE0::regs().intr_status_reg_0().read().bits(),
+                INTERRUPT_CORE0::regs().intr_status_reg_1().read().bits(),
+            )
+        }
     }
 }
 
@@ -460,7 +429,7 @@ mod vectored {
     ///
     /// This will replace any previously bound interrupt handler
     pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
-        let ptr = &peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
+        let ptr = &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
             as *mut unsafe extern "C" fn();
         ptr.write_volatile(handler);
     }
@@ -468,7 +437,7 @@ mod vectored {
     /// Returns the currently bound interrupt handler.
     pub fn bound_handler(interrupt: Interrupt) -> Option<unsafe extern "C" fn()> {
         unsafe {
-            let addr = peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
+            let addr = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
             if addr as usize == 0 {
                 return None;
             }
@@ -504,7 +473,7 @@ mod vectored {
             fn EspDefaultHandler(interrupt: Interrupt);
         }
 
-        let handler = peripherals::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
+        let handler = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
 
         if core::ptr::eq(
             handler as *const _,
@@ -591,7 +560,7 @@ mod vectored {
 #[cfg(not(plic))]
 mod classic {
     use super::{CpuInterrupt, InterruptKind, Priority};
-    use crate::Cpu;
+    use crate::{peripherals::INTERRUPT_CORE0, Cpu};
 
     #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
@@ -614,7 +583,7 @@ mod classic {
     /// Make sure there is an interrupt handler registered.
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         let cpu_interrupt_number = which as isize;
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = INTERRUPT_CORE0::regs();
         intr.cpu_int_enable()
             .modify(|r, w| w.bits((1 << cpu_interrupt_number) | r.bits()));
     }
@@ -625,7 +594,7 @@ mod classic {
     /// bits.
     pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
         unsafe {
-            let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+            let intr = INTERRUPT_CORE0::regs();
             let cpu_interrupt_number = which as isize;
 
             let interrupt_type = match kind {
@@ -648,7 +617,7 @@ mod classic {
     /// Great care must be taken when using this function; avoid changing the
     /// priority of interrupts 1 - 15.
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = INTERRUPT_CORE0::regs();
         intr.cpu_int_pri(which as usize)
             .write(|w| w.map().bits(priority as u8));
     }
@@ -658,7 +627,7 @@ mod classic {
     pub fn clear(_core: Cpu, which: CpuInterrupt) {
         unsafe {
             let cpu_interrupt_number = which as isize;
-            let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+            let intr = INTERRUPT_CORE0::regs();
             intr.cpu_int_clear()
                 .write(|w| w.bits(1 << cpu_interrupt_number));
         }
@@ -673,7 +642,7 @@ mod classic {
     /// Get interrupt priority - called by assembly code
     #[inline]
     pub(super) unsafe extern "C" fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = INTERRUPT_CORE0::regs();
         core::mem::transmute::<u8, Priority>(
             intr.cpu_int_pri(cpu_interrupt as usize).read().map().bits(),
         )
@@ -683,7 +652,7 @@ mod classic {
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         use super::mcause;
         let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = INTERRUPT_CORE0::regs();
         let interrupt_priority = intr
             .cpu_int_pri(0)
             .as_ptr()
@@ -705,13 +674,13 @@ mod classic {
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
         riscv::interrupt::disable();
-        let intr = &*crate::peripherals::INTERRUPT_CORE0::PTR;
+        let intr = INTERRUPT_CORE0::regs();
         intr.cpu_int_thresh().write(|w| w.bits(stored_prio));
     }
 
     /// Get the current run level (the level below which interrupts are masked).
     pub(crate) fn current_runlevel() -> Priority {
-        let intr = unsafe { crate::peripherals::INTERRUPT_CORE0::steal() };
+        let intr = INTERRUPT_CORE0::regs();
         let prev_interrupt_priority = intr.cpu_int_thresh().read().bits().saturating_sub(1) as u8;
 
         unwrap!(Priority::try_from(prev_interrupt_priority))
@@ -730,7 +699,7 @@ mod classic {
 
         // The CPU responds to interrupts `>= level`, but we want to also disable
         // interrupts at `level` so we set the threshold to `level + 1`.
-        crate::peripherals::INTERRUPT_CORE0::steal()
+        INTERRUPT_CORE0::regs()
             .cpu_int_thresh()
             .write(|w| w.bits(level as u32 + 1));
 
@@ -741,7 +710,7 @@ mod classic {
 #[cfg(plic)]
 mod plic {
     use super::{CpuInterrupt, InterruptKind, Priority};
-    use crate::Cpu;
+    use crate::{peripherals::PLIC_MX, Cpu};
 
     #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 31;
@@ -768,8 +737,7 @@ mod plic {
     /// Make sure there is an interrupt handler registered.
     pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
         unsafe {
-            let plic = &*crate::peripherals::PLIC_MX::PTR;
-            plic.mxint_enable().modify(|r, w| {
+            PLIC_MX::regs().mxint_enable().modify(|r, w| {
                 let old = r.cpu_mxint_enable().bits();
                 let new = old | (1 << (which as isize));
                 w.cpu_mxint_enable().bits(new)
@@ -782,14 +750,13 @@ mod plic {
     /// The vectored interrupt handler will take care of clearing edge interrupt
     /// bits.
     pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
-        unsafe {
-            let plic = &*crate::peripherals::PLIC_MX::PTR;
-            let interrupt_type = match kind {
-                InterruptKind::Level => 0,
-                InterruptKind::Edge => 1,
-            };
+        let interrupt_type = match kind {
+            InterruptKind::Level => 0,
+            InterruptKind::Edge => 1,
+        };
 
-            plic.mxint_type().modify(|r, w| {
+        unsafe {
+            PLIC_MX::regs().mxint_type().modify(|r, w| {
                 let old = r.cpu_mxint_type().bits();
                 let new = old & !(1 << (which as isize)) | (interrupt_type << (which as isize));
                 w.cpu_mxint_type().bits(new)
@@ -805,8 +772,8 @@ mod plic {
     /// priority of interrupts 1 - 15.
     pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
         unsafe {
-            let plic = &*crate::peripherals::PLIC_MX::PTR;
-            plic.mxint_pri(which as usize)
+            PLIC_MX::regs()
+                .mxint_pri(which as usize)
                 .modify(|_, w| w.cpu_mxint_pri().bits(priority as u8));
         }
     }
@@ -815,8 +782,7 @@ mod plic {
     #[inline]
     pub fn clear(_core: Cpu, which: CpuInterrupt) {
         unsafe {
-            let plic = &*crate::peripherals::PLIC_MX::PTR;
-            plic.mxint_clear().modify(|r, w| {
+            PLIC_MX::regs().mxint_clear().modify(|r, w| {
                 let old = r.cpu_mxint_clear().bits();
                 let new = old | (1 << (which as isize));
                 w.cpu_mxint_clear().bits(new)
@@ -836,8 +802,7 @@ mod plic {
     /// Get interrupt priority - called by assembly code
     #[inline]
     pub(super) unsafe extern "C" fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
-        let plic = &*crate::peripherals::PLIC_MX::PTR;
-        let prio = plic
+        let prio = PLIC_MX::regs()
             .mxint_pri(cpu_interrupt as usize)
             .read()
             .cpu_mxint_pri()
@@ -847,16 +812,22 @@ mod plic {
     #[no_mangle]
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
-        use super::mcause;
-        let plic = &*crate::peripherals::PLIC_MX::PTR;
+        let interrupt_id: usize = super::mcause::read().code(); // MSB is whether its exception or interrupt.
+        let interrupt_priority = PLIC_MX::regs()
+            .mxint_pri(interrupt_id)
+            .read()
+            .cpu_mxint_pri()
+            .bits();
 
-        let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
-        let interrupt_priority = plic.mxint_pri(interrupt_id).read().cpu_mxint_pri().bits();
-
-        let prev_interrupt_priority = plic.mxint_thresh().read().cpu_mxint_thresh().bits();
+        let prev_interrupt_priority = PLIC_MX::regs()
+            .mxint_thresh()
+            .read()
+            .cpu_mxint_thresh()
+            .bits();
         if interrupt_priority < 15 {
             // leave interrupts disabled if interrupt is of max priority.
-            plic.mxint_thresh()
+            PLIC_MX::regs()
+                .mxint_thresh()
                 .write(|w| w.cpu_mxint_thresh().bits(interrupt_priority + 1));
             unsafe {
                 riscv::interrupt::enable();
@@ -868,14 +839,14 @@ mod plic {
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
         riscv::interrupt::disable();
-        let plic = &*crate::peripherals::PLIC_MX::PTR;
-        plic.mxint_thresh()
+        PLIC_MX::regs()
+            .mxint_thresh()
             .write(|w| w.cpu_mxint_thresh().bits(stored_prio as u8));
     }
 
     /// Get the current run level (the level below which interrupts are masked).
     pub(crate) fn current_runlevel() -> Priority {
-        let prev_interrupt_priority = unsafe { crate::peripherals::PLIC_MX::steal() }
+        let prev_interrupt_priority = PLIC_MX::regs()
             .mxint_thresh()
             .read()
             .cpu_mxint_thresh()
@@ -898,7 +869,7 @@ mod plic {
 
         // The CPU responds to interrupts `>= level`, but we want to also disable
         // interrupts at `level` so we set the threshold to `level + 1`.
-        crate::peripherals::PLIC_MX::steal()
+        PLIC_MX::regs()
             .mxint_thresh()
             .write(|w| w.cpu_mxint_thresh().bits(level as u8 + 1));
 

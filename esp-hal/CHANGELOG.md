@@ -8,10 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- SPI: Added support for 3-wire SPI (#2919)
 
 ### Changed
 
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
+- RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
+- RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
+- Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read (#2882)
+- Uart `read_bytes` is now blocking  returns the number of bytes read (#2882)
+- Uart `flush` is now blocking (#2882)
+- Removed `embedded-hal-nb` traits (#2882)
+- `timer::wait` is now blocking (#2882)
 - GPIO drivers now take configuration structs, and their constructors are fallible (#2990)
 
 ### Fixed
@@ -19,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DmaDescriptor` is now `#[repr(C)]` (#2988)
 
 ### Removed
+
+- Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
 
 ## [0.23.1] - 2025-01-15
 
@@ -141,6 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - It is no longer possible to safely conjure `GpioPin` instances (#2688)
 - UART: Public API follows `C-WORD_ORDER` Rust API standard (`VerbObject` order) (#2851)
 - `DmaRxStreamBuf` now correctly resets the descriptors the next time it's used (#2890)
+- i2s: fix pin offset logic for parallel output on i2s1 (#2886)
 
 ### Removed
 
