@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump MSRV to 1.84 (#2951)
 
-- Removed the `fix-sp` feature (check is always enabled)
+- Removed the `fix-sp` feature (check is always enabled) (#3001)
 
 ### Fixed
 
