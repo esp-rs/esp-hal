@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `DmaDescriptor` is now `#[repr(C)]` (#2988)
 - Fixed an issue that caused LCD_CAM drivers to turn off their clocks unexpectedly (#3007)
+- Fixed an issue where DMA-driver peripherals started transferring before the data was ready (#3003)
 
 ### Removed
 
