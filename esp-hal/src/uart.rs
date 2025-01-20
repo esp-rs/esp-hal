@@ -302,9 +302,9 @@ pub struct Config {
 #[non_exhaustive]
 pub struct RxConfig {
     /// Threshold level at which the RX FIFO is considered full.
-    pub rx_fifo_full_threshold: u16,
+    pub fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
-    pub rx_timeout: Option<u8>,
+    pub timeout: Option<u8>,
 }
 
 /// UART Transmit part configuration.
@@ -316,8 +316,8 @@ pub struct TxConfig {}
 impl Default for RxConfig {
     fn default() -> RxConfig {
         RxConfig {
-            rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-            rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
+            fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
+            timeout: Some(UART_TOUT_THRESH_DEFAULT),
         }
     }
 }
@@ -740,10 +740,10 @@ where
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
             .info()
-            .set_rx_fifo_full_threshold(config.rx.rx_fifo_full_threshold)?;
+            .set_rx_fifo_full_threshold(config.rx.fifo_full_threshold)?;
         self.uart
             .info()
-            .set_rx_timeout(config.rx.rx_timeout, config.symbol_length())?;
+            .set_rx_timeout(config.rx.timeout, config.symbol_length())?;
 
         self.uart.info().rxfifo_reset();
         Ok(())
@@ -1040,7 +1040,7 @@ pub enum UartInterrupt {
     TxDone,
 
     /// The receiver has received more data than what
-    /// [`RxConfig::rx_fifo_full_threshold`] specifies.
+    /// [`RxConfig::fifo_full_threshold`] specifies.
     RxFifoFull,
 }
 
