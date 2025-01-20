@@ -394,21 +394,19 @@ where
         frequency: HertzU32,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
+        me.configure_clock(frequency)?;
+        Ok(me)
+    }
 
-        #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32s2))]
+    fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
         if frequency != HertzU32::MHz(80) {
             return Err(Error::UnreachableTargetFrequency);
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                self::chip_specific::configure_clock();
-            } else {
-                me.configure_clock(frequency)?;
-            }
-        }
+        self::chip_specific::configure_clock();
 
-        Ok(me)
+        Ok(())
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
@@ -459,7 +457,7 @@ impl InterruptConfigurable for Rmt<'_, Blocking> {
     }
 }
 
-fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal<Dm>, Dm: crate::DriverMode>(
+fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
     pin: impl Peripheral<P = P> + 'd,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
@@ -499,8 +497,7 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal<Dm>, Dm: cr
 fn configure_tx_channel<
     'd,
     P: PeripheralOutput,
-    T: TxChannelInternal<Dm>,
-    Dm: crate::DriverMode,
+    T: TxChannelInternal,
 >(
     pin: impl Peripheral<P = P> + 'd,
     config: TxChannelConfig,
@@ -614,7 +611,7 @@ where
     /// Wait for the transaction to complete
     pub fn wait(mut self) -> Result<C, (Error, C)> {
         loop {
-            if <C as TxChannelInternal<Blocking>>::is_error() {
+            if <C as TxChannelInternal>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
@@ -623,8 +620,8 @@ where
             }
 
             // wait for TX-THR
-            while !<C as TxChannelInternal<Blocking>>::is_threshold_set() {}
-            <C as TxChannelInternal<Blocking>>::reset_threshold_set();
+            while !<C as TxChannelInternal>::is_threshold_set() {}
+            <C as TxChannelInternal>::reset_threshold_set();
 
             // re-fill TX RAM
             let ram_index = (((self.index - constants::RMT_CHANNEL_RAM_SIZE)
@@ -649,11 +646,11 @@ where
         }
 
         loop {
-            if <C as TxChannelInternal<Blocking>>::is_error() {
+            if <C as TxChannelInternal>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
-            if <C as TxChannelInternal<Blocking>>::is_done() {
+            if <C as TxChannelInternal>::is_done() {
                 break;
             }
         }
@@ -676,15 +673,15 @@ where
 {
     /// Stop transaction when the current iteration ends.
     pub fn stop_next(self) -> Result<C, (Error, C)> {
-        <C as TxChannelInternal<Blocking>>::set_continuous(false);
-        <C as TxChannelInternal<Blocking>>::update();
+        <C as TxChannelInternal>::set_continuous(false);
+        <C as TxChannelInternal>::update();
 
         loop {
-            if <C as TxChannelInternal<Blocking>>::is_error() {
+            if <C as TxChannelInternal>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
-            if <C as TxChannelInternal<Blocking>>::is_done() {
+            if <C as TxChannelInternal>::is_done() {
                 break;
             }
         }
@@ -694,8 +691,8 @@ where
 
     /// Stop transaction as soon as possible.
     pub fn stop(self) -> Result<C, (Error, C)> {
-        <C as TxChannelInternal<Blocking>>::set_continuous(false);
-        <C as TxChannelInternal<Blocking>>::update();
+        <C as TxChannelInternal>::set_continuous(false);
+        <C as TxChannelInternal>::update();
 
         let ptr = (constants::RMT_RAM_START
             + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
@@ -707,11 +704,11 @@ where
         }
 
         loop {
-            if <C as TxChannelInternal<Blocking>>::is_error() {
+            if <C as TxChannelInternal>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
-            if <C as TxChannelInternal<Blocking>>::is_done() {
+            if <C as TxChannelInternal>::is_done() {
                 break;
             }
         }
@@ -721,7 +718,7 @@ where
 
     /// Check if the `loopcount` interrupt bit is set
     pub fn is_loopcount_interrupt_set(&self) -> bool {
-        <C as TxChannelInternal<Blocking>>::is_loopcount_interrupt_set()
+        <C as TxChannelInternal>::is_loopcount_interrupt_set()
     }
 }
 
@@ -1189,7 +1186,7 @@ where
 }
 
 /// Channel in TX mode
-pub trait TxChannel: TxChannelInternal<Blocking> {
+pub trait TxChannel: TxChannelInternal {
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
@@ -1253,18 +1250,18 @@ where
     /// Wait for the transaction to complete
     pub fn wait(self) -> Result<C, (Error, C)> {
         loop {
-            if <C as RxChannelInternal<Blocking>>::is_error() {
+            if <C as RxChannelInternal>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
-            if <C as RxChannelInternal<Blocking>>::is_done() {
+            if <C as RxChannelInternal>::is_done() {
                 break;
             }
         }
 
-        <C as RxChannelInternal<Blocking>>::stop();
-        <C as RxChannelInternal<Blocking>>::clear_interrupts();
-        <C as RxChannelInternal<Blocking>>::update();
+        <C as RxChannelInternal>::stop();
+        <C as RxChannelInternal>::clear_interrupts();
+        <C as RxChannelInternal>::update();
 
         let ptr = (constants::RMT_RAM_START
             + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
@@ -1279,7 +1276,7 @@ where
 }
 
 /// Channel is RX mode
-pub trait RxChannel: RxChannelInternal<Blocking> {
+pub trait RxChannel: RxChannelInternal {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
@@ -1345,7 +1342,7 @@ where
 }
 
 /// TX channel in async mode
-pub trait TxChannelAsync: TxChannelInternal<Async> {
+pub trait TxChannelAsync: TxChannelInternal {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
@@ -1407,7 +1404,7 @@ where
 }
 
 /// RX channel in async mode
-pub trait RxChannelAsync: RxChannelInternal<Async> {
+pub trait RxChannelAsync: RxChannelInternal {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
@@ -1480,70 +1477,70 @@ fn async_interrupt_handler() {
     };
     match channel {
         0 => {
-            <Channel<Async, 0> as TxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 0> as TxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
-            <Channel<Async, 0> as RxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 0> as RxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
         }
         1 => {
-            <Channel<Async, 1> as TxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 1> as TxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
-            <Channel<Async, 1> as RxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 1> as RxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
         }
         2 => {
-            <Channel<Async, 2> as TxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 2> as TxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
-            <Channel<Async, 2> as RxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 2> as RxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
         }
         3 => {
-            <Channel<Async, 3> as TxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 3> as TxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
-            <Channel<Async, 3> as RxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 3> as RxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
         }
         #[cfg(esp32)]
         4 => {
-            <Channel<Async, 4> as TxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 4> as TxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
-            <Channel<Async, 4> as RxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 4> as RxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
         }
         #[cfg(any(esp32, esp32s3))]
         5 => {
-            <Channel<Async, 5> as TxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 5> as TxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
-            <Channel<Async, 5> as RxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 5> as RxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
         }
         #[cfg(any(esp32, esp32s3))]
         6 => {
-            <Channel<Async, 6> as TxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 6> as TxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
-            <Channel<Async, 6> as RxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 6> as RxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
         }
         #[cfg(any(esp32, esp32s3))]
         7 => {
-            <Channel<Async, 7> as TxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 7> as TxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
-            <Channel<Async, 7> as RxChannelInternal<Async>>::unlisten_interrupt(
+            <Channel<Async, 7> as RxChannelInternal>::unlisten_interrupt(
                 Event::End | Event::Error,
             );
         }
@@ -1564,10 +1561,7 @@ pub enum Event {
 }
 
 #[doc(hidden)]
-pub trait TxChannelInternal<Dm>
-where
-    Dm: crate::DriverMode,
-{
+pub trait TxChannelInternal {
     const CHANNEL: u8;
 
     fn new() -> Self;
@@ -1660,10 +1654,7 @@ where
 }
 
 #[doc(hidden)]
-pub trait RxChannelInternal<Dm>
-where
-    Dm: crate::DriverMode,
-{
+pub trait RxChannelInternal {
     const CHANNEL: u8;
 
     fn new() -> Self;
@@ -1800,10 +1791,7 @@ mod chip_specific {
 
     macro_rules! impl_tx_channel {
         ($signal:ident, $ch_num:literal) => {
-            impl<Dm> $crate::rmt::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num>
-            where
-                Dm: $crate::DriverMode,
-            {
+            impl<Dm> $crate::rmt::TxChannelInternal for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -1978,10 +1966,7 @@ mod chip_specific {
 
     macro_rules! impl_rx_channel {
         ($signal:ident, $ch_num:literal, $ch_index:literal) => {
-            impl<Dm> $crate::rmt::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num>
-            where
-                Dm: $crate::DriverMode,
-            {
+            impl<Dm> $crate::rmt::RxChannelInternal for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -2187,10 +2172,7 @@ mod chip_specific {
 
     macro_rules! impl_tx_channel {
         ($signal:ident, $ch_num:literal) => {
-            impl<Dm> super::TxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num>
-            where
-                Dm: $crate::DriverMode,
-            {
+            impl<Dm> super::TxChannelInternal for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -2356,10 +2338,7 @@ mod chip_specific {
 
     macro_rules! impl_rx_channel {
         ($signal:ident, $ch_num:literal) => {
-            impl<Dm> super::RxChannelInternal<Dm> for $crate::rmt::Channel<Dm, $ch_num>
-            where
-                Dm: $crate::DriverMode,
-            {
+            impl<Dm> super::RxChannelInternal for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
