@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 - `Async` drivers are no longer `Send` (#2980)
 - GPIO drivers now take configuration structs, and their constructors are fallible (#2990)
+- `flip-link` feature is now a config option
 
 ### Fixed
 
