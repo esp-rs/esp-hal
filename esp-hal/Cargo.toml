@@ -140,11 +140,8 @@ defmt = [
 ]
 
 #! ### PSRAM Feature Flags
-## Use externally connected Quad PSRAM
-quad-psram = []
-
-## Use externally connected Octal RAM
-octal-psram = []
+## Use externally connected PSRAM (`quad` by default, can be configured to `octal` via ESP_HAL_CONFIG_PSRAM_MODE)
+psram = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["defmt", "bluetooth"]

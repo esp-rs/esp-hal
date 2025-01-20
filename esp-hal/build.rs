@@ -8,7 +8,7 @@ use std::{
 };
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, Value};
+use esp_config::{generate_config, Validator, Value};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -49,15 +49,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let chip = Chip::from_str(device_name)?;
     let config = Config::for_chip(&chip);
 
-    // Check PSRAM features are only given if the target supports PSRAM:
-    if !config.contains(&String::from("psram")) && cfg!(feature = "quad-psram") {
-        panic!("The target does not support PSRAM");
-    }
-
-    if !config.contains(&String::from("octal_psram")) && cfg!(feature = "octal-psram") {
-        panic!("The target does not support Octal PSRAM");
-    }
-
     // Define all necessary configuration symbols for the configured device:
     config.define_symbols();
 
@@ -67,43 +58,72 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     // emit config
-    let cfg = generate_config(
-        "esp_hal",
-        &[
-            (
-                "place-spi-driver-in-ram",
-                "Places the SPI driver in RAM for better performance",
-                Value::Bool(false),
-                None
-            ),
-            (
-                "spi-address-workaround",
-                "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
-                Value::Bool(true),
-                None
-            ),
-            (
-                "place-switch-tables-in-ram",
-                "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
-                Value::Bool(true),
-                None
-            ),
-            (
-                "place-anon-in-ram",
-                "Places anonymous symbols into RAM - resulting in better performance at the cost of significant more RAM consumption. Best to be combined with `place-switch-tables-in-ram`.",
-                Value::Bool(false),
-                None
-            ),
-            #[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
-            (
-                "flip-link",
-                "Move the stack to start of RAM to get zero-cost stack overflow protection.",
-                Value::Bool(false),
-                None
-            ),
-        ],
-        true,
-    );
+    let mut cfg = vec![
+        (
+            "place-spi-driver-in-ram",
+            "Places the SPI driver in RAM for better performance",
+            Value::Bool(false),
+            None
+        ),
+        (
+            "spi-address-workaround",
+            "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
+            Value::Bool(true),
+            None
+        ),
+        (
+            "place-switch-tables-in-ram",
+            "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
+            Value::Bool(true),
+            None
+        ),
+        (
+            "place-anon-in-ram",
+            "Places anonymous symbols into RAM - resulting in better performance at the cost of significant more RAM consumption. Best to be combined with `place-switch-tables-in-ram`.",
+            Value::Bool(false),
+            None
+        ),
+        #[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
+        (
+            "flip-link",
+            "Move the stack to start of RAM to get zero-cost stack overflow protection.",
+            Value::Bool(false),
+            None
+        ),
+    ];
+
+    if config.contains(&String::from("psram")) {
+        println!("cargo:rustc-check-cfg=cfg(option_psram_quad)");
+    }
+
+    if config.contains(&String::from("octal_psram")) {
+        println!("cargo:rustc-check-cfg=cfg(option_psram_octal)");
+    }
+
+    if config.contains(&String::from("psram")) || config.contains(&String::from("octal_psram")) {
+        cfg.push((
+            "psram-mode",
+            "SPIRAM chip: `quad` = Quad-SPI (default), `octal` = Octal-SPI",
+            Value::String(String::from("quad")),
+            Some(Validator::Custom(Box::new(|value| {
+                let Value::String(string) = value else {
+                    return Err(esp_config::Error::Validation(String::from(
+                        "Expected a string",
+                    )));
+                };
+
+                match string.as_str() {
+                    "quad" => Ok(()),
+                    "octal" => Ok(()),
+                    _ => Err(esp_config::Error::Validation(format!(
+                        "Expected 'quad' or 'octal', found {string}"
+                    ))),
+                }
+            }))),
+        ));
+    }
+
+    let cfg = generate_config("esp_hal", &cfg, true);
 
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
@@ -159,6 +179,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
+
+    match &cfg["ESP_HAL_CONFIG_PSRAM_MODE"] {
+        Value::String(s) if s.as_str() == "quad" => {
+            println!("cargo:rustc-cfg=option_psram_quad");
+        }
+        Value::String(s) if s.as_str() == "octal" => {
+            println!("cargo:rustc-cfg=option_psram_octal");
+        }
+        _ => unreachable!(),
+    }
 
     Ok(())
 }
@@ -252,7 +282,7 @@ fn generate_memory_extras() -> Vec<u8> {
 
 #[cfg(feature = "esp32s2")]
 fn generate_memory_extras() -> Vec<u8> {
-    let reserved_cache = if cfg!(feature = "quad-psram") {
+    let reserved_cache = if cfg!(feature = "psram") {
         "0x4000"
     } else {
         "0x2000"

@@ -22,7 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 
-- `flip-link` feature is now a config option
+- `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`)
+
+- Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`)
 
 ### Fixed
 
