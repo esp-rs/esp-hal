@@ -705,8 +705,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         features.push_str(",bluetooth")
                     }
                     if device.contains("psram") {
-                        // TODO this doesn't test octal psram as it would require a separate build
-                        features.push_str(",quad-psram")
+                        // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
+                        // defaults to `quad`) as it would require a separate build
+                        features.push_str(",psram")
                     }
 
                     lint_package(
