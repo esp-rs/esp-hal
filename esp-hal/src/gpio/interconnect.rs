@@ -24,6 +24,8 @@ use crate::{
     private::{self, Sealed},
 };
 
+use super::PinGuard;
+
 /// A signal that can be connected to a peripheral input.
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
@@ -717,5 +719,9 @@ impl OutputConnection {
             fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal);
             fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal);
         }
+    }
+
+    fn connect_with_guard(self, signal: crate::gpio::OutputSignal) -> PinGuard {
+        PinGuard { pin: gpio::AnyPin(signal.number()), signal }
     }
 }

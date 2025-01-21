@@ -117,6 +117,60 @@ impl CFnPtr {
     }
 }
 
+/*
+pub(crate) struct PinGuard {
+pin: u8,
+}
+
+impl PinGuard {
+pub(crate) fn new(pin: u8) -> Self {
+Self { pin }
+}
+
+pub(crate) fn connect(&self, mut pin: AnyPin, signal: OutputSignal) {
+//already connected pin need to be disconnected first
+//ME TODO: Not sure about this condition?
+//ME TODO: How it will work when called in driver?
+if self.pin != u8::MAX {
+signal.disconnect_from(&mut pin);
+}
+signal.connect_to(pin);
+}
+}
+
+impl Drop for PinGuard {
+fn drop(&mut self) {
+//ME TODO: How to get OutputSignal here for proper disconnection?
+todo!();
+//disconnect here
+
+}
+}
+*/
+
+pub(crate) struct PinGuard {
+    pin: AnyPin,
+    signal: OutputSignal,
+}
+
+impl PinGuard {
+    pub(crate) fn new(mut pin: AnyPin, signal: OutputSignal) -> Self {
+        signal.connect_to(&mut pin);
+        Self { pin, signal }
+    }
+
+    // fn with_pin(&mut self, pin: impl Into<OutputConnection> + GPIO::Pin) {
+    //     self.signal = PinGuard::new(pin.number(), || self.uart.info().some_signal);
+    // }
+        
+}
+
+impl Drop for PinGuard {
+    fn drop(&mut self) {
+        self.signal.disconnect_from(&mut self.pin);
+    }
+}
+
 /// Event used to trigger interrupts.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
