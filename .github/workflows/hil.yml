@@ -118,7 +118,13 @@ jobs:
           ldproxy: false
           version: 1.84.0.0
 
+      # remove once we have a proper solution for target specific configs
+      - name: Build tests ESP32S3
+        if: ${{ matrix.target.soc == 'esp32s3'}}
+        run: ESP_HAL_CONFIG_PSRAM_MODE="octal" cargo xtask build-tests ${{ matrix.target.soc }}
+
       - name: Build tests
+        if: ${{ matrix.target.soc != 'esp32s3'}}
         run: cargo xtask build-tests ${{ matrix.target.soc }}
 
       - uses: actions/upload-artifact@v4
