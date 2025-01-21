@@ -117,57 +117,51 @@ impl CFnPtr {
     }
 }
 
-/*
+/// Represents a pin-peripheral connection that, when dropped, disconnects the
+/// peripheral from the pin.
+///
+/// This only needs to be applied to output signals, as it's not possible to
+/// connect multiple inputs to the same peripheral signal.
 pub(crate) struct PinGuard {
-pin: u8,
-}
-
-impl PinGuard {
-pub(crate) fn new(pin: u8) -> Self {
-Self { pin }
-}
-
-pub(crate) fn connect(&self, mut pin: AnyPin, signal: OutputSignal) {
-//already connected pin need to be disconnected first
-//ME TODO: Not sure about this condition?
-//ME TODO: How it will work when called in driver?
-if self.pin != u8::MAX {
-signal.disconnect_from(&mut pin);
-}
-signal.connect_to(pin);
-}
-}
-
-impl Drop for PinGuard {
-fn drop(&mut self) {
-//ME TODO: How to get OutputSignal here for proper disconnection?
-todo!();
-//disconnect here
-
-}
-}
-*/
-
-pub(crate) struct PinGuard {
-    pin: AnyPin,
+    pin: u8,
     signal: OutputSignal,
+}
+
+impl crate::private::Sealed for PinGuard {}
+impl Peripheral for PinGuard {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self {
+            pin: self.pin,
+            signal: self.signal,
+        }
+    }
 }
 
 impl PinGuard {
     pub(crate) fn new(mut pin: AnyPin, signal: OutputSignal) -> Self {
         signal.connect_to(&mut pin);
-        Self { pin, signal }
+        Self {
+            pin: pin.number(),
+            signal,
+        }
     }
 
-    // fn with_pin(&mut self, pin: impl Into<OutputConnection> + GPIO::Pin) {
-    //     self.signal = PinGuard::new(pin.number(), || self.uart.info().some_signal);
-    // }
-        
+    pub(crate) fn new_unconnected(signal: OutputSignal) -> Self {
+        Self {
+            pin: u8::MAX,
+            signal,
+        }
+    }
 }
 
 impl Drop for PinGuard {
     fn drop(&mut self) {
-        self.signal.disconnect_from(&mut self.pin);
+        if self.pin != u8::MAX {
+            let mut pin = unsafe { AnyPin::steal(self.pin) };
+            self.signal.disconnect_from(&mut pin);
+        }
     }
 }
 
