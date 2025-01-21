@@ -95,6 +95,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None
             ),
         );
+    } else {
+        // even if !ESP32 we need to allow the `cfg`
+        println!("cargo:rustc-check-cfg=cfg(spi_address_workaround)");
     }
 
     if config.contains(&String::from("psram")) || config.contains(&String::from("octal_psram")) {
