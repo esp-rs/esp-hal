@@ -123,6 +123,7 @@ impl CFnPtr {
 /// This only needs to be applied to output signals, as it's not possible to
 /// connect multiple inputs to the same peripheral signal.
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct PinGuard {
     pin: u8,
     signal: OutputSignal,
