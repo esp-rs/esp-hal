@@ -70,7 +70,7 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    // Default pins for Uart/Serial communication
+    // Default pins for Uart communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
             let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);

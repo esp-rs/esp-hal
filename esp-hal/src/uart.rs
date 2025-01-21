@@ -20,19 +20,6 @@
 //! configured. Additionally, the receive (RX) and transmit (TX) pins need to
 //! be specified.
 //!
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{Config, Uart};
-//!
-//! let mut uart1 = Uart::new(
-//!     peripherals.UART1,
-//!     Config::default())
-//!     .unwrap()
-//!     .with_rx(peripherals.GPIO1)
-//!     .with_tx(peripherals.GPIO2);
-//! # }
-//! ```
-//! 
 //! The UART controller can be configured to invert the polarity of the pins.
 //! This is achieved by inverting the desired pins, and then constructing the
 //! UART instance using the inverted pins.
@@ -49,119 +36,21 @@
 //! available. See the examples below for more information on how to interact
 //! with this driver.
 //!
-//! ## Examples
-//! ### Sending and Receiving Data
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{Config, Uart};
-//! # let mut uart1 = Uart::new(
-//! #     peripherals.UART1,
-//! #     Config::default(),
-//! # ).unwrap()
-//! # .with_rx(peripherals.GPIO1)
-//! # .with_tx(peripherals.GPIO2);
-//! // Write bytes out over the UART:
-//! uart1.write_bytes(b"Hello, world!").expect("write error!");
-//! # }
-//! ```
-//! 
-//! ### Splitting the UART into RX and TX Components
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{Config, Uart};
-//! # let mut uart1 = Uart::new(
-//! #     peripherals.UART1,
-//! #     Config::default(),
-//! # ).unwrap()
-//! # .with_rx(peripherals.GPIO1)
-//! # .with_tx(peripherals.GPIO2);
-//! // The UART can be split into separate Transmit and Receive components:
-//! let (mut rx, mut tx) = uart1.split();
+//! ## Example
 //!
-//! // Each component can be used individually to interact with the UART:
-//! tx.write_bytes(&[42u8]).expect("write error!");
-//! let mut byte = [0u8; 1];
-//! rx.read_bytes(&mut byte);
-//! # }
-//! ```
-//! 
-//! ### Inverting RX and TX Pins
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{Config, Uart};
-//!
-//! let (rx, _) = peripherals.GPIO2.split();
-//! let (_, tx) = peripherals.GPIO1.split();
-//! let mut uart1 = Uart::new(
-//!     peripherals.UART1,
-//!     Config::default())
-//!     .unwrap()
-//!     .with_rx(rx.inverted())
-//!     .with_tx(tx.inverted());
-//! # }
-//! ```
-//! 
-//! ### Constructing RX and TX Components
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::uart::{Config, UartTx, UartRx};
-//!
-//! let tx = UartTx::new(
-//!     peripherals.UART0,
-//!     Config::default())
-//!     .unwrap()
-//!     .with_tx(peripherals.GPIO1);
-//! let rx = UartRx::new(
-//!     peripherals.UART1,
-//!     Config::default())
-//!     .unwrap()
-//!     .with_rx(peripherals.GPIO2);
-//! # }
-//! ```
-//! 
-//! ### Operation with interrupts that by UART/Serial
+//! ### Handling UART Interrupts
 //! Notice, that in practice a proper serial terminal should be used
 //! to connect to the board (espmonitor and espflash won't work)
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::uart::{AtCmdConfig, Config, Uart, UartInterrupt};
-//! let delay = Delay::new();
-//!
-//! // Default pins for UART/Serial communication
-#![cfg_attr(
-    esp32,
-    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);"
-)]
-#![cfg_attr(
-    esp32c2,
-    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);"
-)]
-#![cfg_attr(
-    esp32c3,
-    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);"
-)]
-#![cfg_attr(
-    esp32c6,
-    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);"
-)]
-#![cfg_attr(
-    esp32h2,
-    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);"
-)]
-#![cfg_attr(
-    any(esp32s2, esp32s3),
-    doc = "let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);"
-)]
-//! let config = Config::default().with_rx_fifo_full_threshold(30);
-//!
-//! let mut uart0 = Uart::new(
-//!     peripherals.UART0,
-//!     config)
-//!     .unwrap()
-//!     .with_rx(rx_pin)
-//!     .with_tx(tx_pin);
-//!
+//! # let delay = Delay::new();
+//! # let config = Config::default().with_rx_fifo_full_threshold(30);
+//! # let mut uart0 = Uart::new(
+//! #    peripherals.UART0,
+//! #    config)
+//! # .unwrap();
 //! uart0.set_interrupt_handler(interrupt_handler);
 //!
 //! critical_section::with(|cs| {
@@ -218,10 +107,10 @@
 //! }
 //! ```
 //! 
-//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
-//! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
-//! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
-//! [embedded-io-async]: https://docs.rs/embedded-io-async/latest/embedded_io_async/
+//! [embedded-hal]: embedded_hal
+//! [embedded-io]: embedded_io
+//! [embedded-hal-async]: embedded_hal_async
+//! [embedded-io-async]: embedded_io_async
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
@@ -707,6 +596,16 @@ where
 
 impl<'d> UartTx<'d, Blocking> {
     /// Create a new UART TX instance in [`Blocking`] mode.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, UartTx};
+    /// let tx = UartTx::new(
+    ///     peripherals.UART0,
+    ///     Config::default())
+    /// .unwrap()
+    /// .with_tx(peripherals.GPIO1);
+    /// # }
+    /// ```
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -965,6 +864,16 @@ where
 
 impl<'d> UartRx<'d, Blocking> {
     /// Create a new UART RX instance in [`Blocking`] mode.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, UartRx};
+    /// let rx = UartRx::new(
+    ///     peripherals.UART1,
+    ///     Config::default())
+    /// .unwrap()
+    /// .with_rx(peripherals.GPIO2);
+    /// # }
+    /// ```
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -1012,6 +921,17 @@ impl<'d> UartRx<'d, Async> {
 
 impl<'d> Uart<'d, Blocking> {
     /// Create a new UART instance in [`Blocking`] mode.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// let mut uart1 = Uart::new(
+    ///     peripherals.UART1,
+    ///     Config::default())
+    /// .unwrap()
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2);
+    /// # }
+    /// ```
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -1111,11 +1031,41 @@ where
     ///
     /// This is particularly useful when having two tasks correlating to
     /// transmitting and receiving.
+    /// ## Example
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// # let mut uart1 = Uart::new(
+    /// #     peripherals.UART1,
+    /// #     Config::default())
+    /// # .unwrap()
+    /// # .with_rx(peripherals.GPIO1)
+    /// # .with_tx(peripherals.GPIO2);
+    /// // The UART can be split into separate Transmit and Receive components:
+    /// let (mut rx, mut tx) = uart1.split();
+    ///
+    /// // Each component can be used individually to interact with the UART:
+    /// tx.write_bytes(&[42u8]).expect("write error!");
+    /// let mut byte = [0u8; 1];
+    /// rx.read_bytes(&mut byte);
+    /// # }
+    /// ```
     pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
         (self.rx, self.tx)
     }
 
     /// Write bytes out over the UART
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// # let mut uart1 = Uart::new(
+    /// #     peripherals.UART1,
+    /// #     Config::default())
+    /// # .unwrap();
+    /// // Write bytes out over the UART:
+    /// uart1.write_bytes(b"Hello, world!").expect("write error!");
+    /// # }
+    /// ```
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
         self.tx.write_bytes(data)
     }
