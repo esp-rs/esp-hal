@@ -2397,6 +2397,10 @@ impl DmaDriver {
         self.driver.update();
     }
 
+    fn regs(&self) -> &RegisterBlock {
+        self.driver.regs()
+    }
+
     #[allow(clippy::too_many_arguments)]
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
@@ -2409,19 +2413,17 @@ impl DmaDriver {
         rx: &mut RX,
         tx: &mut TX,
     ) -> Result<(), Error> {
-        let reg_block = self.driver.register_block();
-
         #[cfg(esp32s2)]
         {
             // without this a transfer after a write will fail
-            reg_block.dma_out_link().write(|w| w.bits(0));
-            reg_block.dma_in_link().write(|w| w.bits(0));
+            self.regs().dma_out_link().write(|w| w.bits(0));
+            self.regs().dma_in_link().write(|w| w.bits(0));
         }
 
         self.driver.configure_datalen(rx_len, tx_len);
 
         // enable the MISO and MOSI if needed
-        reg_block
+        self.regs()
             .user()
             .modify(|_, w| w.usr_miso().bit(rx_len > 0).usr_mosi().bit(tx_len > 0));
 
@@ -2436,10 +2438,10 @@ impl DmaDriver {
                 // see https://github.com/espressif/esp-idf/commit/366e4397e9dae9d93fe69ea9d389b5743295886f
                 // see https://github.com/espressif/esp-idf/commit/0c3653b1fd7151001143451d4aa95dbf15ee8506
                 if _full_duplex {
-                    reg_block
+                    self.regs()
                         .dma_in_link()
                         .modify(|_, w| unsafe { w.inlink_addr().bits(0) });
-                    reg_block
+                    self.regs()
                         .dma_in_link()
                         .modify(|_, w| w.inlink_start().set_bit());
                 }
@@ -2460,14 +2462,12 @@ impl DmaDriver {
 
     fn enable_dma(&self) {
         #[cfg(gdma)]
-        {
-            // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
-            let reg_block = self.driver.register_block();
-            reg_block.dma_conf().modify(|_, w| {
-                w.dma_tx_ena().set_bit();
-                w.dma_rx_ena().set_bit()
-            });
-        }
+        // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
+        self.regs().dma_conf().modify(|_, w| {
+            w.dma_tx_ena().set_bit();
+            w.dma_rx_ena().set_bit()
+        });
+
         #[cfg(pdma)]
         self.reset_dma();
     }
@@ -2488,16 +2488,15 @@ impl DmaDriver {
                 w.dma_afifo_rst().bit(bit)
             });
         }
-        let reg_block = self.driver.register_block();
-        set_reset_bit(reg_block, true);
-        set_reset_bit(reg_block, false);
+
+        set_reset_bit(self.regs(), true);
+        set_reset_bit(self.regs(), false);
         self.clear_dma_interrupts();
     }
 
     #[cfg(gdma)]
     fn clear_dma_interrupts(&self) {
-        let reg_block = self.driver.register_block();
-        reg_block.dma_int_clr().write(|w| {
+        self.regs().dma_int_clr().write(|w| {
             w.dma_infifo_full_err().clear_bit_by_one();
             w.dma_outfifo_empty_err().clear_bit_by_one();
             w.trans_done().clear_bit_by_one();
@@ -2508,8 +2507,7 @@ impl DmaDriver {
 
     #[cfg(pdma)]
     fn clear_dma_interrupts(&self) {
-        let reg_block = self.driver.register_block();
-        reg_block.dma_int_clr().write(|w| {
+        self.regs().dma_int_clr().write(|w| {
             w.inlink_dscr_empty().clear_bit_by_one();
             w.outlink_dscr_error().clear_bit_by_one();
             w.inlink_dscr_error().clear_bit_by_one();
@@ -2532,14 +2530,13 @@ struct Driver {
 // FIXME: split this up into peripheral versions
 impl Driver {
     /// Returns the register block for this SPI instance.
-    pub fn register_block(&self) -> &RegisterBlock {
+    pub fn regs(&self) -> &RegisterBlock {
         unsafe { &*self.info.register_block }
     }
 
     /// Initialize for full-duplex 1 bit mode
     fn init(&self) {
-        let reg_block = self.register_block();
-        reg_block.user().modify(|_, w| {
+        self.regs().user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
             w.usr_mosi_highpart().clear_bit();
             w.doutdin().set_bit();
@@ -2552,7 +2549,7 @@ impl Driver {
         });
 
         #[cfg(gdma)]
-        reg_block.clk_gate().modify(|_, w| {
+        self.regs().clk_gate().modify(|_, w| {
             w.clk_en().set_bit();
             w.mst_clk_active().set_bit();
             w.mst_clk_sel().set_bit()
@@ -2568,26 +2565,26 @@ impl Driver {
         }
 
         #[cfg(gdma)]
-        reg_block.ctrl().modify(|_, w| {
+        self.regs().ctrl().modify(|_, w| {
             w.q_pol().clear_bit();
             w.d_pol().clear_bit();
             w.hold_pol().clear_bit()
         });
 
         #[cfg(esp32s2)]
-        reg_block.ctrl().modify(|_, w| {
+        self.regs().ctrl().modify(|_, w| {
             w.q_pol().clear_bit();
             w.d_pol().clear_bit();
             w.wp().clear_bit()
         });
 
         #[cfg(esp32)]
-        reg_block.ctrl().modify(|_, w| w.wp().clear_bit());
+        self.regs().ctrl().modify(|_, w| w.wp().clear_bit());
 
         #[cfg(not(esp32))]
-        reg_block.misc().write(|w| unsafe { w.bits(0) });
+        self.regs().misc().write(|w| unsafe { w.bits(0) });
 
-        reg_block.slave().write(|w| unsafe { w.bits(0) });
+        self.regs().slave().write(|w| unsafe { w.bits(0) });
     }
 
     #[cfg(not(esp32))]
@@ -2597,8 +2594,7 @@ impl Driver {
         address_mode: DataMode,
         data_mode: DataMode,
     ) -> Result<(), Error> {
-        let reg_block = self.register_block();
-        reg_block.ctrl().modify(|_, w| {
+        self.regs().ctrl().modify(|_, w| {
             w.fcmd_dual().bit(cmd_mode == DataMode::Dual);
             w.fcmd_quad().bit(cmd_mode == DataMode::Quad);
             w.faddr_dual().bit(address_mode == DataMode::Dual);
@@ -2606,7 +2602,7 @@ impl Driver {
             w.fread_dual().bit(data_mode == DataMode::Dual);
             w.fread_quad().bit(data_mode == DataMode::Quad)
         });
-        reg_block.user().modify(|_, w| {
+        self.regs().user().modify(|_, w| {
             w.fwrite_dual().bit(data_mode == DataMode::Dual);
             w.fwrite_quad().bit(data_mode == DataMode::Quad)
         });
@@ -2620,7 +2616,6 @@ impl Driver {
         address_mode: DataMode,
         data_mode: DataMode,
     ) -> Result<(), Error> {
-        let reg_block = self.register_block();
         match cmd_mode {
             DataMode::Single => (),
             DataMode::SingleTwoDataLines => (),
@@ -2630,14 +2625,14 @@ impl Driver {
 
         match address_mode {
             DataMode::Single | DataMode::SingleTwoDataLines => {
-                reg_block.ctrl().modify(|_, w| {
+                self.regs().ctrl().modify(|_, w| {
                     w.fread_dio().clear_bit();
                     w.fread_qio().clear_bit();
                     w.fread_dual().bit(data_mode == DataMode::Dual);
                     w.fread_quad().bit(data_mode == DataMode::Quad)
                 });
 
-                reg_block.user().modify(|_, w| {
+                self.regs().user().modify(|_, w| {
                     w.fwrite_dio().clear_bit();
                     w.fwrite_qio().clear_bit();
                     w.fwrite_dual().bit(data_mode == DataMode::Dual);
@@ -2645,7 +2640,7 @@ impl Driver {
                 });
             }
             address_mode if address_mode == data_mode => {
-                reg_block.ctrl().modify(|_, w| {
+                self.regs().ctrl().modify(|_, w| {
                     w.fastrd_mode().set_bit();
                     w.fread_dio().bit(address_mode == DataMode::Dual);
                     w.fread_qio().bit(address_mode == DataMode::Quad);
@@ -2653,7 +2648,7 @@ impl Driver {
                     w.fread_quad().clear_bit()
                 });
 
-                reg_block.user().modify(|_, w| {
+                self.regs().user().modify(|_, w| {
                     w.fwrite_dio().bit(address_mode == DataMode::Dual);
                     w.fwrite_qio().bit(address_mode == DataMode::Quad);
                     w.fwrite_dual().clear_bit();
@@ -2746,19 +2741,15 @@ impl Driver {
                 | ((pre as u32 - 1) << 18);
         }
 
-        self.register_block()
-            .clock()
-            .write(|w| unsafe { w.bits(reg_val) });
+        self.regs().clock().write(|w| unsafe { w.bits(reg_val) });
     }
 
     /// Enable or disable listening for the given interrupts.
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn enable_listen(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
-        let reg_block = self.register_block();
-
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                reg_block.slave().modify(|_, w| {
+                self.regs().slave().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
                             SpiInterrupt::TransferDone => w.trans_inten().bit(enable),
@@ -2767,7 +2758,7 @@ impl Driver {
                     w
                 });
             } else if #[cfg(esp32s2)] {
-                reg_block.slave().modify(|_, w| {
+                self.regs().slave().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
                             SpiInterrupt::TransferDone => w.int_trans_done_en().bit(enable),
@@ -2777,7 +2768,7 @@ impl Driver {
                     w
                 });
             } else {
-                reg_block.dma_int_ena().modify(|_, w| {
+                self.regs().dma_int_ena().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
                             SpiInterrupt::TransferDone => w.trans_done().bit(enable),
@@ -2796,22 +2787,21 @@ impl Driver {
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn interrupts(&self) -> EnumSet<SpiInterrupt> {
         let mut res = EnumSet::new();
-        let reg_block = self.register_block();
 
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                if reg_block.slave().read().trans_done().bit() {
+                if self.regs().slave().read().trans_done().bit() {
                     res.insert(SpiInterrupt::TransferDone);
                 }
             } else if #[cfg(esp32s2)] {
-                if reg_block.slave().read().trans_done().bit() {
+                if self.regs().slave().read().trans_done().bit() {
                     res.insert(SpiInterrupt::TransferDone);
                 }
-                if reg_block.hold().read().dma_seg_trans_done().bit() {
+                if self.regs().hold().read().dma_seg_trans_done().bit() {
                     res.insert(SpiInterrupt::DmaSegmentedTransferDone);
                 }
             } else {
-                let ints = reg_block.dma_int_raw().read();
+                let ints = self.regs().dma_int_raw().read();
 
                 if ints.trans_done().bit() {
                     res.insert(SpiInterrupt::TransferDone);
@@ -2834,13 +2824,12 @@ impl Driver {
     /// Resets asserted interrupts
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
-        let reg_block = self.register_block();
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 for interrupt in interrupts {
                     match interrupt {
                         SpiInterrupt::TransferDone => {
-                            reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
+                            self.regs().slave().modify(|_, w| w.trans_done().clear_bit());
                         }
                     }
                 }
@@ -2848,18 +2837,18 @@ impl Driver {
                 for interrupt in interrupts {
                     match interrupt {
                         SpiInterrupt::TransferDone => {
-                            reg_block.slave().modify(|_, w| w.trans_done().clear_bit());
+                            self.regs().slave().modify(|_, w| w.trans_done().clear_bit());
                         }
 
                         SpiInterrupt::DmaSegmentedTransferDone => {
-                            reg_block
+                            self.regs()
                                 .hold()
                                 .modify(|_, w| w.dma_seg_trans_done().clear_bit());
                         }
                     }
                 }
             } else {
-                reg_block.dma_int_clr().write(|w| {
+                self.regs().dma_int_clr().write(|w| {
                     for interrupt in interrupts {
                         match interrupt {
                             SpiInterrupt::TransferDone => w.trans_done().clear_bit_by_one(),
@@ -2882,13 +2871,11 @@ impl Driver {
     }
 
     fn set_data_mode(&self, data_mode: Mode) {
-        let reg_block = self.register_block();
-
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                let pin_reg = reg_block.pin();
+                let pin_reg = self.regs().pin();
             } else {
-                let pin_reg = reg_block.misc();
+                let pin_reg = self.regs().misc();
             }
         };
 
@@ -2896,7 +2883,7 @@ impl Driver {
             w.ck_idle_edge()
                 .bit(matches!(data_mode, Mode::_2 | Mode::_3))
         });
-        reg_block.user().modify(|_, w| {
+        self.regs().user().modify(|_, w| {
             w.ck_out_edge()
                 .bit(matches!(data_mode, Mode::_1 | Mode::_2))
         });
@@ -2912,18 +2899,16 @@ impl Driver {
             });
         }
 
-        enable_clocks(self.register_block(), false);
+        enable_clocks(self.regs(), false);
 
         // Change clock frequency
         self.setup(frequency);
 
-        enable_clocks(self.register_block(), true);
+        enable_clocks(self.regs(), true);
     }
 
     #[cfg(not(any(esp32, esp32c3, esp32s2)))]
     fn set_bit_order(&self, read_order: BitOrder, write_order: BitOrder) {
-        let reg_block = self.register_block();
-
         let read_value = match read_order {
             BitOrder::MsbFirst => 0,
             BitOrder::LsbFirst => 1,
@@ -2932,7 +2917,7 @@ impl Driver {
             BitOrder::MsbFirst => 0,
             BitOrder::LsbFirst => 1,
         };
-        reg_block.ctrl().modify(|_, w| unsafe {
+        self.regs().ctrl().modify(|_, w| unsafe {
             w.rd_bit_order().bits(read_value);
             w.wr_bit_order().bits(write_value);
             w
@@ -2941,8 +2926,6 @@ impl Driver {
 
     #[cfg(any(esp32, esp32c3, esp32s2))]
     fn set_bit_order(&self, read_order: BitOrder, write_order: BitOrder) {
-        let reg_block = self.register_block();
-
         let read_value = match read_order {
             BitOrder::MsbFirst => false,
             BitOrder::LsbFirst => true,
@@ -2951,7 +2934,7 @@ impl Driver {
             BitOrder::MsbFirst => false,
             BitOrder::LsbFirst => true,
         };
-        reg_block.ctrl().modify(|_, w| {
+        self.regs().ctrl().modify(|_, w| {
             w.rd_bit_order().bit(read_value);
             w.wr_bit_order().bit(write_value);
             w
@@ -2962,7 +2945,7 @@ impl Driver {
     fn fill_fifo(&self, chunk: &[u8]) {
         // TODO: replace with `array_chunks` and `from_le_bytes`
         let mut c_iter = chunk.chunks_exact(4);
-        let mut w_iter = self.register_block().w_iter();
+        let mut w_iter = self.regs().w_iter();
         for c in c_iter.by_ref() {
             if let Some(w_reg) = w_iter.next() {
                 let word = (c[0] as u32)
@@ -3071,7 +3054,7 @@ impl Driver {
     /// instead.
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn read_bytes_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {
-        let reg_block = self.register_block();
+        let reg_block = self.regs();
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.configure_datalen(chunk.len(), 0);
@@ -3089,7 +3072,7 @@ impl Driver {
     }
 
     fn busy(&self) -> bool {
-        let reg_block = self.register_block();
+        let reg_block = self.regs();
         reg_block.cmd().read().usr().bit_is_set()
     }
 
@@ -3123,9 +3106,8 @@ impl Driver {
     }
 
     fn start_operation(&self) {
-        let reg_block = self.register_block();
         self.update();
-        reg_block.cmd().modify(|_, w| w.usr().set_bit());
+        self.regs().cmd().modify(|_, w| w.usr().set_bit());
     }
 
     /// Starts the operation and waits for it to complete.
@@ -3161,7 +3143,7 @@ impl Driver {
 
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
 
-        let reg_block = self.register_block();
+        let reg_block = self.regs();
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
             w.usr_mosi_highpart().clear_bit();
@@ -3203,7 +3185,7 @@ impl Driver {
     }
 
     fn set_up_common_phases(&self, cmd: Command, address: Address, dummy: u8) {
-        let reg_block = self.register_block();
+        let reg_block = self.regs();
         if !cmd.is_none() {
             reg_block.user2().modify(|_, w| unsafe {
                 w.usr_command_bitlen().bits((cmd.width() - 1) as u8);
@@ -3235,7 +3217,7 @@ impl Driver {
     fn update(&self) {
         cfg_if::cfg_if! {
             if #[cfg(gdma)] {
-                let reg_block = self.register_block();
+                let reg_block = self.regs();
 
                 reg_block.cmd().modify(|_, w| w.update().set_bit());
 
@@ -3251,7 +3233,7 @@ impl Driver {
     }
 
     fn configure_datalen(&self, rx_len_bytes: usize, tx_len_bytes: usize) {
-        let reg_block = self.register_block();
+        let reg_block = self.regs();
 
         let rx_len = rx_len_bytes as u32 * 8;
         let tx_len = tx_len_bytes as u32 * 8;
@@ -3305,7 +3287,7 @@ macro_rules! spi_instance {
                 #[inline(always)]
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
-                        register_block: crate::peripherals::[<SPI $num>]::PTR,
+                        register_block: crate::peripherals::[<SPI $num>]::regs(),
                         peripheral: crate::system::Peripheral::[<Spi $num>],
                         interrupt: crate::peripherals::Interrupt::[<SPI $num>],
                         sclk: OutputSignal::$sclk,
