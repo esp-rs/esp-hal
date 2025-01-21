@@ -136,6 +136,6 @@ Use `DataMode::SingleTwoDataLines` to get the previous behavior.
 - let config = Config::default().with_rx_fifo_full_threshold(30);
 + let config = Config::default()
 +     .with_rx(RxConfig::default()
-+       .with_rx_fifo_full_threshold(30)
++       .with_fifo_full_threshold(30)
 + );
 ```
