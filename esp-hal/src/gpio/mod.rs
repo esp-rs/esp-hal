@@ -44,13 +44,8 @@
 //! an input and output signal. You can then pass these signals to the
 //! peripheral drivers similar to how you would pass a pin.
 //!
-//! ### GPIO interconnect example
-//!
-//! See the [Inverting TX and RX Pins] example of the UART documentation.
-//!
-//! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
-//! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/index.html
-//! [Inverting TX and RX Pins]: crate::uart#inverting-rx-and-tx-pins
+//! [embedded-hal]: embedded_hal
+//! [embedded-hal-async]: embedded_hal_async
 
 use core::fmt::Display;
 
@@ -674,6 +669,12 @@ where
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # }
+    /// ```
     #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
         // FIXME: we should implement this in the gpio macro for output pins, but we
@@ -761,6 +762,12 @@ pub struct Io {
 
 impl Io {
     /// Initialize the I/O driver.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::Io;
+    /// let mut io = Io::new(peripherals.IO_MUX);
+    /// # }
+    /// ```
     pub fn new(_io_mux: IO_MUX) -> Self {
         Io { _io_mux }
     }
@@ -1168,6 +1175,11 @@ impl<'d> Output<'d> {
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
@@ -1178,6 +1190,14 @@ impl<'d> Output<'d> {
     /// this pin.
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::{Output, Level};
+    /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High);
+    /// // Can be passed as an input.
+    /// let pin1 = pin1_gpio.peripheral_input();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
@@ -1189,6 +1209,13 @@ impl<'d> Output<'d> {
     ///
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::{Output, Level};
+    /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High);
+    /// let pin1 = pin1_gpio.into_peripheral_output();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
@@ -1336,6 +1363,13 @@ impl<'d> Input<'d> {
     /// this pin.
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::{Input, Pull};
+    /// let pin1_gpio = Input::new(peripherals.GPIO1, Pull::Up);
+    /// let pin1 = pin1_gpio.peripheral_input();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
@@ -1378,8 +1412,9 @@ impl<'d> Input<'d> {
     /// otherwise your program will be stuck in a loop as long as the pin is
     /// reading the corresponding level.
     ///
-    /// ## Example: print something when a button is pressed.
+    /// ## Example
     ///
+    /// ### Print something when a button is pressed.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// use esp_hal::gpio::{Event, Input, InputConfig, Pull, Io};
@@ -1475,6 +1510,11 @@ impl<'d> Input<'d> {
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
@@ -1486,6 +1526,14 @@ impl<'d> Input<'d> {
     ///
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::{Input, Pull};
+    /// let pin1_gpio = Input::new(peripherals.GPIO1, Pull::Up);
+    /// // Can be passed as an output.
+    /// let pin1 = pin1_gpio.into_peripheral_output();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
@@ -1594,6 +1642,11 @@ impl<'d> OutputOpenDrain<'d> {
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
@@ -1604,6 +1657,18 @@ impl<'d> OutputOpenDrain<'d> {
     /// this pin.
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::{OutputOpenDrain, Level, Pull};
+    /// let pin1_gpio = OutputOpenDrain::new(
+    ///     peripherals.GPIO1,
+    ///     Level::High,
+    ///     Pull::Up
+    /// );
+    /// // Can be passed as an input.
+    /// let pin1 = pin1_gpio.peripheral_input();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
@@ -1615,6 +1680,18 @@ impl<'d> OutputOpenDrain<'d> {
     ///
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::{OutputOpenDrain, Level, Pull};
+    /// let pin1_gpio = OutputOpenDrain::new(
+    ///     peripherals.GPIO1,
+    ///     Level::High,
+    ///     Pull::Up
+    /// );
+    /// // Can be passed as an input.
+    /// let pin1 = pin1_gpio.into_peripheral_output();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
@@ -1748,6 +1825,14 @@ impl<'d> Flex<'d> {
     /// this pin.
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::Flex;
+    /// let pin1_gpio = Flex::new(peripherals.GPIO1);
+    /// // Can be passed as an input.
+    /// let pin1 = pin1_gpio.peripheral_input();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal {
@@ -1936,6 +2021,11 @@ impl<'d> Flex<'d> {
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
@@ -1948,6 +2038,14 @@ impl<'d> Flex<'d> {
     ///
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::Flex;
+    /// let pin1_gpio = Flex::new(peripherals.GPIO1);
+    /// // Can be passed as an output.
+    /// let pin1 = pin1_gpio.into_peripheral_output();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
@@ -1977,6 +2075,11 @@ impl AnyPin {
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
     pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {

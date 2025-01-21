@@ -16,34 +16,9 @@
 //!
 //! The I2C driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
-//! from the community, including the [`embedded-hal`].
+//! from the community, including the [embedded-hal].
 //!
-//! ## Examples
-//!
-//! ### Read Data from a BMP180 Sensor
-//!
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::i2c::master::{Config, I2c};
-//!
-//! // Create a new peripheral object with the described wiring
-//! // and standard I2C clock speed.
-//! let mut i2c = I2c::new(
-//!     peripherals.I2C0,
-//!     Config::default(),
-//! )
-//! .unwrap()
-//! .with_sda(peripherals.GPIO1)
-//! .with_scl(peripherals.GPIO2);
-//!
-//! loop {
-//!     let mut data = [0u8; 22];
-//!     i2c.write_read(0x77, &[0xaa], &mut data).ok();
-//! }
-//! # }
-//! ```
-//! 
-//! [`embedded-hal`]:embedded_hal
+//! [embedded-hal]: embedded_hal
 
 use core::marker::PhantomData;
 #[cfg(not(esp32))]
@@ -589,6 +564,19 @@ impl<'d> I2c<'d, Blocking> {
     /// Create a new I2C instance
     /// This will enable the peripheral but the peripheral won't get
     /// automatically disabled when this gets dropped.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// let mut i2c = I2c::new(
+    ///     peripherals.I2C0,
+    ///     Config::default(),
+    /// )
+    /// .unwrap()
+    /// .with_sda(peripherals.GPIO1)
+    /// .with_scl(peripherals.GPIO2);
+    /// # }
+    /// ```
     pub fn new(
         i2c: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -665,6 +653,18 @@ impl<'d> I2c<'d, Blocking> {
     }
 
     /// Writes bytes to slave with address `address`
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// # let mut i2c = I2c::new(
+    /// #   peripherals.I2C0,
+    /// #   Config::default(),
+    /// # )
+    /// # .unwrap();
+    /// # const DEVICE_ADDR: u8 = 0x77;
+    /// i2c.write(DEVICE_ADDR, &[0xaa]).ok();
+    /// # }
+    /// ```
     pub fn write<A: Into<I2cAddress>>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
             .write_blocking(address.into(), buffer, true, true)
@@ -672,6 +672,19 @@ impl<'d> I2c<'d, Blocking> {
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// # let mut i2c = I2c::new(
+    /// #   peripherals.I2C0,
+    /// #   Config::default(),
+    /// # )
+    /// # .unwrap();
+    /// # const DEVICE_ADDR: u8 = 0x77;
+    /// let mut data = [0u8; 22];
+    /// i2c.read(DEVICE_ADDR, &mut data).ok();
+    /// # }
+    /// ```
     pub fn read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -684,6 +697,19 @@ impl<'d> I2c<'d, Blocking> {
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// # let mut i2c = I2c::new(
+    /// #   peripherals.I2C0,
+    /// #   Config::default(),
+    /// # )
+    /// # .unwrap();
+    /// # const DEVICE_ADDR: u8 = 0x77;
+    /// let mut data = [0u8; 22];
+    /// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data).ok();
+    /// # }
+    /// ```
     pub fn write_read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -721,6 +747,23 @@ impl<'d> I2c<'d, Blocking> {
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c, Operation};
+    /// # let mut i2c = I2c::new(
+    /// #   peripherals.I2C0,
+    /// #   Config::default(),
+    /// # )
+    /// # .unwrap();
+    /// # const DEVICE_ADDR: u8 = 0x77;
+    /// let mut data = [0u8; 22];
+    /// i2c.transaction(
+    ///     DEVICE_ADDR,
+    ///     &mut [Operation::Write(&[0xaa]), Operation::Read(&mut data)]
+    /// ).ok();
+    /// # }
+    /// ```
     pub fn transaction<'a, A: Into<I2cAddress>>(
         &mut self,
         address: A,
