@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - SPI: Added support for 3-wire SPI (#2919)
 
+- `spi::master::BusClockConfig` (#2897)
+
 ### Changed
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
 - RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
@@ -23,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 
 - `Async` drivers are no longer `Send` (#2980)
+
+- SPI `Config::frequency` has been replaced by `clock`. (#2897)
+- SPI `Config::with_frequency` has been renamed to `with_clock`. (#2897)
 
 ### Fixed
 

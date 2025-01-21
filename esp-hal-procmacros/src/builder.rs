@@ -37,11 +37,21 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
                     _ => None,
                 });
 
-            let (field_type, field_assigns) = if let Some(inner_type) = maybe_path_type {
-                (inner_type, quote! { Some(#field_ident) })
+            let (mut field_type, mut field_assigns) = if let Some(inner_type) = maybe_path_type {
+                (quote! { #inner_type }, quote! { Some(#field_ident) })
             } else {
-                (field_type, quote! { #field_ident })
+                (quote! { #field_type }, quote! { #field_ident })
             };
+
+            // Wrap type and assignment with `Into` if needed.
+            if field
+                .attrs
+                .iter()
+                .any(|attr| attr.path().is_ident("builder_lite_into"))
+            {
+                field_type = quote! { impl Into<#field_type> };
+                field_assigns = quote! { #field_ident .into() };
+            }
 
             fns.push(quote! {
                 #[doc = concat!(" Assign the given value to the `", stringify!(#field_ident) ,"` field.")]
