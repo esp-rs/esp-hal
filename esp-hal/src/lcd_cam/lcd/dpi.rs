@@ -113,6 +113,7 @@ use crate::{
         ByteOrder,
         ClockError,
     },
+    pac,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
@@ -163,6 +164,10 @@ where
         Ok(this)
     }
 
+    fn regs(&self) -> &pac::lcd_cam::RegisterBlock {
+        self.lcd_cam.register_block()
+    }
+
     /// Applies the configuration to the peripheral.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
@@ -179,7 +184,7 @@ where
         )
         .map_err(ConfigError::Clock)?;
 
-        self.lcd_cam.lcd_clock().write(|w| unsafe {
+        self.regs().lcd_clock().write(|w| unsafe {
             // Force enable the clock for all configuration registers.
             w.clk_en().set_bit();
             w.lcd_clk_sel().bits((i + 1) as _);
@@ -193,15 +198,15 @@ where
             w.lcd_ck_out_edge()
                 .bit(config.clock_mode.phase == Phase::ShiftHigh)
         });
-        self.lcd_cam
+        self.regs()
             .lcd_user()
             .modify(|_, w| w.lcd_reset().set_bit());
 
-        self.lcd_cam
+        self.regs()
             .lcd_rgb_yuv()
             .write(|w| w.lcd_conv_bypass().clear_bit());
 
-        self.lcd_cam.lcd_user().modify(|_, w| {
+        self.regs().lcd_user().modify(|_, w| {
             if config.format.enable_2byte_mode {
                 w.lcd_8bits_order().bit(false);
                 w.lcd_byte_order()
@@ -224,7 +229,7 @@ where
         });
 
         let timing = &config.timing;
-        self.lcd_cam.lcd_ctrl().modify(|_, w| unsafe {
+        self.regs().lcd_ctrl().modify(|_, w| unsafe {
             // Enable RGB mode, and input VSYNC, HSYNC, and DE signals.
             w.lcd_rgb_mode_en().set_bit();
 
@@ -235,7 +240,7 @@ where
             w.lcd_vt_height()
                 .bits((timing.vertical_total_height as u16).saturating_sub(1))
         });
-        self.lcd_cam.lcd_ctrl1().modify(|_, w| unsafe {
+        self.regs().lcd_ctrl1().modify(|_, w| unsafe {
             w.lcd_vb_front()
                 .bits((timing.vertical_blank_front_porch as u8).saturating_sub(1));
             w.lcd_ha_width()
@@ -243,7 +248,7 @@ where
             w.lcd_ht_width()
                 .bits((timing.horizontal_total_width as u16).saturating_sub(1))
         });
-        self.lcd_cam.lcd_ctrl2().modify(|_, w| unsafe {
+        self.regs().lcd_ctrl2().modify(|_, w| unsafe {
             w.lcd_vsync_width()
                 .bits((timing.vsync_width as u8).saturating_sub(1));
             w.lcd_vsync_idle_pol().bit(config.vsync_idle_level.into());
@@ -255,7 +260,7 @@ where
             w.lcd_hsync_position().bits(timing.hsync_position as u8)
         });
 
-        self.lcd_cam.lcd_misc().modify(|_, w| unsafe {
+        self.regs().lcd_misc().modify(|_, w| unsafe {
             // TODO: Find out what this field actually does.
             // Set the threshold for Async Tx FIFO full event. (5 bits)
             w.lcd_afifo_threshold_num().bits((1 << 5) - 1);
@@ -271,13 +276,13 @@ where
             // Enable blank region when LCD sends data out.
             w.lcd_bk_en().bit(!config.disable_black_region)
         });
-        self.lcd_cam.lcd_dly_mode().modify(|_, w| unsafe {
+        self.regs().lcd_dly_mode().modify(|_, w| unsafe {
             w.lcd_de_mode().bits(config.de_mode as u8);
             w.lcd_hsync_mode().bits(config.hsync_mode as u8);
             w.lcd_vsync_mode().bits(config.vsync_mode as u8);
             w
         });
-        self.lcd_cam.lcd_data_dout_mode().modify(|_, w| unsafe {
+        self.regs().lcd_data_dout_mode().modify(|_, w| unsafe {
             w.dout0_mode().bits(config.output_bit_mode as u8);
             w.dout1_mode().bits(config.output_bit_mode as u8);
             w.dout2_mode().bits(config.output_bit_mode as u8);
@@ -296,7 +301,7 @@ where
             w.dout15_mode().bits(config.output_bit_mode as u8)
         });
 
-        self.lcd_cam
+        self.regs()
             .lcd_user()
             .modify(|_, w| w.lcd_update().set_bit());
 
@@ -562,21 +567,21 @@ where
         }
 
         // Reset LCD control unit and Async Tx FIFO
-        self.lcd_cam
+        self.regs()
             .lcd_user()
             .modify(|_, w| w.lcd_reset().set_bit());
-        self.lcd_cam
+        self.regs()
             .lcd_misc()
             .modify(|_, w| w.lcd_afifo_reset().set_bit());
 
-        self.lcd_cam.lcd_misc().modify(|_, w| {
+        self.regs().lcd_misc().modify(|_, w| {
             // 1: Send the next frame data when the current frame is sent out.
             // 0: LCD stops when the current frame is sent out.
             w.lcd_next_frame_en().bit(next_frame_en)
         });
 
         // Start the transfer.
-        self.lcd_cam.lcd_user().modify(|_, w| {
+        self.regs().lcd_user().modify(|_, w| {
             w.lcd_update().set_bit();
             w.lcd_start().set_bit()
         });
@@ -598,12 +603,7 @@ pub struct DpiTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.dpi
-            .lcd_cam
-            .lcd_user()
-            .read()
-            .lcd_start()
-            .bit_is_clear()
+        self.dpi.regs().lcd_user().read().lcd_start().bit_is_clear()
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
@@ -655,7 +655,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
     fn stop_peripherals(&mut self) {
         // Stop the LCD_CAM peripheral.
         self.dpi
-            .lcd_cam
+            .regs()
             .lcd_user()
             .modify(|_, w| w.lcd_start().clear_bit());
 

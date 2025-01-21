@@ -218,7 +218,7 @@ pub trait Instance: crate::private::Sealed {
 
 impl Instance for crate::peripherals::TRACE0 {
     fn register_block(&self) -> &RegisterBlock {
-        self
+        self.register_block()
     }
 
     fn peripheral(&self) -> crate::system::Peripheral {

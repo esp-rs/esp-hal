@@ -228,7 +228,7 @@ pub fn _setup_interrupts() {
         // at least after the 2nd stage bootloader there are some interrupts enabled
         // (e.g. UART)
         for peripheral_interrupt in 0..255 {
-            Interrupt::try_from(peripheral_interrupt)
+            crate::peripherals::Interrupt::try_from(peripheral_interrupt)
                 .map(|intr| {
                     #[cfg(multi_core)]
                     disable(Cpu::AppCpu, intr);
