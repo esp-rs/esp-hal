@@ -105,13 +105,14 @@ pub enum Error {
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::Cpu;
-/// # use esp_hal::gpio::{Input, Pull};
+/// # use esp_hal::gpio::{Input, InputConfig, Pull};
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
+/// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin_4 = peripherals.GPIO4;
-/// let pin_4_input = Input::new(&mut pin_4, Pull::None);
+/// let pin_4_input = Input::new(&mut pin_4, config).unwrap();
 ///
 /// let reason =
 ///     reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -157,15 +158,16 @@ impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::Cpu;
-/// # use esp_hal::gpio::{Input, Pull, RtcPin};
+/// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPin};
 /// # use esp_hal::peripheral::Peripheral;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
+/// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin_2 = peripherals.GPIO2;
 /// let mut pin_4 = peripherals.GPIO4;
-/// let pin_4_driver = Input::new(&mut pin_4, Pull::None);
+/// let pin_4_driver = Input::new(&mut pin_4, config).unwrap();
 ///
 /// let reason = reset_reason(Cpu::ProCpu)
 ///     .unwrap_or(SocResetReason::ChipPowerOn);
@@ -213,15 +215,16 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::Cpu;
-/// # use esp_hal::gpio::{Input, Pull, RtcPinWithResistors};
+/// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPinWithResistors};
 /// # use esp_hal::peripheral::Peripheral;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
+/// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin2 = peripherals.GPIO2;
 /// let mut pin3 = peripherals.GPIO3;
-/// let mut pin2_input = Input::new(&mut pin2, Pull::None);
+/// let mut pin2_input = Input::new(&mut pin2, config).unwrap();
 ///
 /// let reason =
 /// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -271,7 +274,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 #[doc = crate::before_snippet!()]
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
-/// # use esp_hal::gpio::{self, Input, Pull};
+/// # use esp_hal::gpio::{self, Input, InputConfig, Pull};
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::Cpu;
 /// # use esp_hal::peripheral::Peripheral;

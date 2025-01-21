@@ -19,7 +19,7 @@ use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
-    gpio::{Level, Output},
+    gpio::{Level, Output, OutputConfig},
     interrupt::{software::SoftwareInterruptControl, Priority},
     main,
     timer::{timg::TimerGroup, AnyTimer},
@@ -85,7 +85,8 @@ fn main() -> ! {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = Output::new(peripherals.GPIO0, Level::Low);
+    let config = OutputConfig::default().with_level(Level::Low);
+    let led = Output::new(peripherals.GPIO0, config).unwrap();
 
     static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
     let executor_core1 = InterruptExecutor::new(sw_ints.software_interrupt1);

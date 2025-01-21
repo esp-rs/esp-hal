@@ -13,7 +13,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Level, Output},
+    gpio::{Level, Output, OutputConfig},
     rmt::{PulseCode, Rmt, RxChannelAsync, RxChannelConfig, RxChannelCreatorAsync},
     time::RateExtU32,
     timer::timg::TimerGroup,
@@ -68,7 +68,13 @@ async fn main(spawner: Spawner) {
     }
 
     spawner
-        .spawn(signal_task(Output::new(peripherals.GPIO5, Level::Low)))
+        .spawn(signal_task(
+            Output::new(
+                peripherals.GPIO5,
+                OutputConfig::default().with_level(Level::Low),
+            )
+            .unwrap(),
+        ))
         .unwrap();
 
     let mut data: [u32; 48] = [PulseCode::empty(); 48];

@@ -35,7 +35,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma_loop_buffer,
-    gpio::{Level, Output},
+    gpio::{Level, Output, OutputConfig},
     i2c::{self, master::I2c},
     lcd_cam::{
         lcd::{
@@ -116,7 +116,11 @@ fn main() -> ! {
 
     let mut vsync_pin = peripherals.GPIO3;
 
-    let vsync_must_be_high_during_setup = Output::new(&mut vsync_pin, Level::High);
+    let vsync_must_be_high_during_setup = Output::new(
+        &mut vsync_pin,
+        OutputConfig::default().with_level(Level::High),
+    )
+    .unwrap();
     for &init in INIT_CMDS.iter() {
         match init {
             InitCmd::Cmd(cmd, args) => {
