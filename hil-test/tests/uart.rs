@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_hal::{
-    uart::{self, ClockSource, Uart},
+    uart::{self, BaudRateConfig, ClockSource, Uart},
     Blocking,
 };
 use hil_test as _;
@@ -78,9 +78,11 @@ mod tests {
         for (baudrate, clock_source) in configs {
             ctx.uart
                 .apply_config(
-                    &uart::Config::default()
-                        .with_baudrate(baudrate)
-                        .with_clock_source(clock_source),
+                    &uart::Config::default().with_baudrate(
+                        BaudRateConfig::default()
+                            .with_baudrate(baudrate)
+                            .with_clock_source(clock_source),
+                    ),
                 )
                 .unwrap();
             ctx.uart.write_bytes(&[byte_to_write]).unwrap();

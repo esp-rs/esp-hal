@@ -120,6 +120,7 @@ use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 use embassy_embedded_hal::SetConfig;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
+use procmacros::BuilderLite;
 
 use crate::{
     asynch::AtomicWaker,
@@ -195,11 +196,11 @@ impl embedded_io::Error for Error {
     }
 }
 
-// (outside of `config` module in order not to "use" it an extra time)
 /// UART clock source
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
+#[instability::unstable]
 pub enum ClockSource {
     /// APB_CLK clock source
     #[cfg_attr(not(any(esp32c6, esp32h2, lp_uart)), default)]
@@ -277,22 +278,67 @@ pub enum StopBits {
     _2   = 3,
 }
 
+/// UART baud rate configuration.
+///
+/// This struct holds information necessary to configure the baud rate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct BaudRateConfig {
+    /// The desired baud rate.
+    baudrate: u32,
+
+    /// Clock source used by the UART peripheral.
+    #[cfg(feature = "unstable")]
+    clock_source: ClockSource,
+}
+
+impl Default for BaudRateConfig {
+    fn default() -> Self {
+        Self {
+            baudrate: 115_200,
+            #[cfg(feature = "unstable")]
+            clock_source: ClockSource::default(),
+        }
+    }
+}
+
+impl From<u32> for BaudRateConfig {
+    fn from(baudrate: u32) -> Self {
+        Self {
+            baudrate,
+            #[cfg(feature = "unstable")]
+            clock_source: ClockSource::default(),
+        }
+    }
+}
+
+impl BaudRateConfig {
+    #[cfg(feature = "unstable")]
+    fn clock_source(&self) -> ClockSource {
+        self.clock_source
+    }
+
+    #[cfg(not(feature = "unstable"))]
+    fn clock_source(&self) -> ClockSource {
+        ClockSource::default()
+    }
+}
+
 /// UART Configuration
-#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[derive(Debug, Default, Clone, Copy, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
     /// The baud rate (speed) of the UART communication in bits per second
     /// (bps).
-    pub baudrate: u32,
+    #[builder_lite_into]
+    pub baudrate: BaudRateConfig,
     /// Number of data bits in each frame (5, 6, 7, or 8 bits).
     pub data_bits: DataBits,
     /// Parity setting (None, Even, or Odd).
     pub parity: Parity,
     /// Number of stop bits in each frame (1, 1.5, or 2 bits).
     pub stop_bits: StopBits,
-    /// Clock source used by the UART peripheral.
-    pub clock_source: ClockSource,
     /// UART Receive part configuration.
     pub rx: RxConfig,
     /// UART Transmit part configuration.
@@ -321,20 +367,6 @@ impl Default for RxConfig {
         RxConfig {
             fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
             timeout: Some(UART_TOUT_THRESH_DEFAULT),
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            rx: RxConfig::default(),
-            tx: TxConfig::default(),
-            baudrate: 115_200,
-            data_bits: Default::default(),
-            parity: Default::default(),
-            stop_bits: Default::default(),
-            clock_source: Default::default(),
         }
     }
 }
@@ -1846,7 +1878,7 @@ pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
         peripherals::{LPWR, LP_AON, LP_IO, LP_UART},
-        uart::{Config, DataBits, Parity, StopBits},
+        uart::{BaudRateConfig, Config, DataBits, Parity, StopBits},
     };
     /// LP-UART driver
     ///
@@ -1912,7 +1944,7 @@ pub mod lp_uart {
 
             // Override protocol parameters from the configuration
             // uart_hal_set_baudrate(&hal, cfg->uart_proto_cfg.baud_rate, sclk_freq);
-            me.change_baud_internal(config.baudrate, config.clock_source);
+            me.change_baud_internal(&config.baudrate);
             // uart_hal_set_parity(&hal, cfg->uart_proto_cfg.parity);
             me.change_parity(config.parity);
             // uart_hal_set_data_bit_num(&hal, cfg->uart_proto_cfg.data_bits);
@@ -1967,17 +1999,17 @@ pub mod lp_uart {
             }
         }
 
-        fn change_baud_internal(&mut self, baudrate: u32, clock_source: super::ClockSource) {
+        fn change_baud_internal(&mut self, config: &BaudRateConfig) {
             // TODO: Currently it's not possible to use XtalD2Clk
             let clk = 16_000_000_u32;
             let max_div = 0b1111_1111_1111 - 1;
-            let clk_div = clk.div_ceil(max_div * baudrate);
+            let clk_div = clk.div_ceil(max_div * config.baudrate);
 
             self.uart.register_block().clk_conf().modify(|_, w| unsafe {
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0);
                 w.sclk_div_num().bits(clk_div as u8 - 1);
-                w.sclk_sel().bits(match clock_source {
+                w.sclk_sel().bits(match config.clock_source() {
                     super::ClockSource::Xtal => 3,
                     super::ClockSource::RcFast => 2,
                     super::ClockSource::Apb => panic!("Wrong clock source for LP_UART"),
@@ -1986,7 +2018,7 @@ pub mod lp_uart {
             });
 
             let clk = clk / clk_div;
-            let divider = clk / baudrate;
+            let divider = clk / config.baudrate;
             let divider = divider as u16;
 
             self.uart
@@ -2004,8 +2036,8 @@ pub mod lp_uart {
         /// [`Apb`] is a wrong clock source for LP_UART
         ///
         /// [`Apb`]: super::ClockSource::Apb
-        pub fn change_baud(&mut self, baudrate: u32, clock_source: super::ClockSource) {
-            self.change_baud_internal(baudrate, clock_source);
+        pub fn change_baud(&mut self, config: &Config) {
+            self.change_baud_internal(&config.baudrate);
             self.txfifo_reset();
             self.rxfifo_reset();
         }
@@ -2201,7 +2233,7 @@ impl Info {
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
-        self.change_baud(config.baudrate, config.clock_source);
+        self.change_baud(&config.baudrate);
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
@@ -2390,17 +2422,17 @@ impl Info {
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+    fn change_baud(&self, config: &BaudRateConfig) {
         use crate::peripherals::LPWR;
 
         let clocks = Clocks::get();
-        let clk = match clock_source {
+        let clk = match config.clock_source() {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
             ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
         };
 
-        if clock_source == ClockSource::RcFast {
+        if config.clock_source() == ClockSource::RcFast {
             LPWR::regs()
                 .clk_conf()
                 .modify(|_, w| w.dig_clk8m_en().variant(true));
@@ -2409,9 +2441,9 @@ impl Info {
         }
 
         let max_div = 0b1111_1111_1111 - 1;
-        let clk_div = clk.div_ceil(max_div * baudrate);
+        let clk_div = clk.div_ceil(max_div * config.baudrate);
         self.regs().clk_conf().write(|w| unsafe {
-            w.sclk_sel().bits(match clock_source {
+            w.sclk_sel().bits(match config.clock_source() {
                 ClockSource::Apb => 1,
                 ClockSource::RcFast => 2,
                 ClockSource::Xtal => 3,
@@ -2423,7 +2455,7 @@ impl Info {
             w.tx_sclk_en().bit(true)
         });
 
-        let divider = (clk << 4) / (baudrate * clk_div);
+        let divider = (clk << 4) / (config.baudrate * clk_div);
         let divider_integer = (divider >> 4) as u16;
         let divider_frag = (divider & 0xf) as u8;
         self.regs()
@@ -2440,16 +2472,16 @@ impl Info {
     }
 
     #[cfg(any(esp32c6, esp32h2))]
-    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+    fn change_baud(&self, config: &BaudRateConfig) {
         let clocks = Clocks::get();
-        let clk = match clock_source {
+        let clk = match config.clock_source() {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
             ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
         };
 
         let max_div = 0b1111_1111_1111 - 1;
-        let clk_div = clk.div_ceil(max_div * baudrate);
+        let clk_div = clk.div_ceil(max_div * config.baudrate);
 
         // UART clocks are configured via PCR
         let pcr = crate::peripherals::PCR::regs();
@@ -2462,7 +2494,7 @@ impl Info {
                 w.uart0_sclk_div_a().bits(0);
                 w.uart0_sclk_div_b().bits(0);
                 w.uart0_sclk_div_num().bits(clk_div as u8 - 1);
-                w.uart0_sclk_sel().bits(match clock_source {
+                w.uart0_sclk_sel().bits(match config.clock_source() {
                     ClockSource::Apb => 1,
                     ClockSource::RcFast => 2,
                     ClockSource::Xtal => 3,
@@ -2477,7 +2509,7 @@ impl Info {
                 w.uart1_sclk_div_a().bits(0);
                 w.uart1_sclk_div_b().bits(0);
                 w.uart1_sclk_div_num().bits(clk_div as u8 - 1);
-                w.uart1_sclk_sel().bits(match clock_source {
+                w.uart1_sclk_sel().bits(match config.clock_source() {
                     ClockSource::Apb => 1,
                     ClockSource::RcFast => 2,
                     ClockSource::Xtal => 3,
@@ -2487,7 +2519,7 @@ impl Info {
         }
 
         let clk = clk / clk_div;
-        let divider = clk / baudrate;
+        let divider = clk / config.baudrate;
         let divider = divider as u16;
 
         self.regs()
@@ -2498,18 +2530,19 @@ impl Info {
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
-        let clk = match clock_source {
+    fn change_baud(&self, config: &BaudRateConfig) {
+        let clk = match config.clock_source() {
             ClockSource::Apb => Clocks::get().apb_clock.to_Hz(),
             // ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
             ClockSource::RefTick => crate::soc::constants::REF_TICK.to_Hz(),
         };
 
-        self.regs()
-            .conf0()
-            .modify(|_, w| w.tick_ref_always_on().bit(clock_source == ClockSource::Apb));
+        self.regs().conf0().modify(|_, w| {
+            w.tick_ref_always_on()
+                .bit(config.clock_source() == ClockSource::Apb)
+        });
 
-        let divider = clk / baudrate;
+        let divider = clk / config.baudrate;
 
         self.regs()
             .clkdiv()
