@@ -541,6 +541,8 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the UART
     /// TX signal.
+    ///
+    /// Calling this will replace previous pin assignments for this signal.
     pub fn with_tx(mut self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(tx);
         // Make sure we don't cause an unexpected low pulse on the pin.

@@ -61,7 +61,13 @@ use fugit::HertzU32;
 use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
-    gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
+    gpio::{
+        interconnect::{OutputConnection, PeripheralOutput},
+        InputSignal,
+        OutputSignal,
+        PinGuard,
+        Pull,
+    },
     interrupt::{InterruptConfigurable, InterruptHandler},
     pac::i2c0::{RegisterBlock, COMD},
     peripheral::{Peripheral, PeripheralRef},
@@ -446,6 +452,8 @@ pub struct I2c<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     config: Config,
     guard: PeripheralGuard,
+    sda_pin: PinGuard,
+    scl_pin: PinGuard,
 }
 
 #[cfg(any(doc, feature = "unstable"))]
@@ -549,26 +557,31 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     }
 
     /// Connect a pin to the I2C SDA signal.
+    ///
+    /// This will replace previous pin assignments for this signal.
     pub fn with_sda(self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
-        self.with_pin(sda, input, output)
+        self.with_pin(sda, input, output, true)
     }
 
     /// Connect a pin to the I2C SCL signal.
+    ///
+    /// This will replace previous pin assignments for this signal.
     pub fn with_scl(self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
-        self.with_pin(scl, input, output)
+        self.with_pin(scl, input, output, false)
     }
 
     fn with_pin(
-        self,
+        mut self,
         pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         input: InputSignal,
         output: OutputSignal,
+        is_sda: bool,
     ) -> Self {
         crate::into_mapped_ref!(pin);
         // avoid the pin going low during configuration
@@ -580,6 +593,12 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
 
         input.connect_to(&mut pin);
         output.connect_to(&mut pin);
+
+        if is_sda {
+            self.sda_pin = OutputConnection::connect_with_guard(pin, output);
+        } else {
+            self.scl_pin = OutputConnection::connect_with_guard(pin, output);
+        }
 
         self
     }
@@ -597,11 +616,16 @@ impl<'d> I2c<'d, Blocking> {
 
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
+        let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
+        let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
+
         let i2c = I2c {
             i2c,
             phantom: PhantomData,
             config,
             guard,
+            sda_pin,
+            scl_pin,
         };
 
         i2c.driver().setup(&i2c.config)?;
@@ -661,6 +685,8 @@ impl<'d> I2c<'d, Blocking> {
             phantom: PhantomData,
             config: self.config,
             guard: self.guard,
+            sda_pin: self.sda_pin,
+            scl_pin: self.scl_pin,
         }
     }
 
@@ -858,6 +884,8 @@ impl<'d> I2c<'d, Async> {
             phantom: PhantomData,
             config: self.config,
             guard: self.guard,
+            sda_pin: self.sda_pin,
+            scl_pin: self.scl_pin,
         }
     }
 
