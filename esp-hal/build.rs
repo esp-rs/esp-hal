@@ -66,12 +66,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             None
         ),
         (
-            "spi-address-workaround",
-            "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
-            Value::Bool(true),
-            None
-        ),
-        (
             "place-switch-tables-in-ram",
             "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
             Value::Bool(true),
@@ -91,6 +85,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             None
         ),
     ];
+
+    if cfg!(feature = "esp32") {
+        cfg.push(
+            (
+                "spi-address-workaround",
+                "Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
+                Value::Bool(true),
+                None
+            ),
+        );
+    }
 
     if config.contains(&String::from("psram")) || config.contains(&String::from("octal_psram")) {
         cfg.push((
