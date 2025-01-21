@@ -204,6 +204,16 @@ impl RegisterAccess for AnyGdmaTxChannel {
 }
 
 impl TxRegisterAccess for AnyGdmaTxChannel {
+    fn is_fifo_empty(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s3)] {
+                 self.ch().outfifo_status().read().outfifo_empty_l3().bit_is_set()
+            } else {
+                 self.ch().outfifo_status().read().outfifo_empty().bit_is_set()
+            }
+        }
+    }
+
     fn set_auto_write_back(&self, enable: bool) {
         self.ch()
             .out_conf0()

@@ -66,7 +66,9 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
 
         let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
@@ -292,7 +294,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(esp32))] // https://github.com/esp-rs/esp-hal/issues/2909
     async fn test_async_symmetric_transfer_huge_buffer(ctx: Context) {
         let write = &mut ctx.tx_buffer[0..4096];
         for byte in 0..write.len() {
@@ -325,7 +326,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(esp32))] // https://github.com/esp-rs/esp-hal/issues/2909
     async fn test_async_symmetric_transfer_huge_buffer_in_place(ctx: Context) {
         let write = &mut ctx.tx_buffer[0..4096];
         for byte in 0..write.len() {

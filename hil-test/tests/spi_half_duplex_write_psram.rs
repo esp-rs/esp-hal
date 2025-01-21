@@ -51,7 +51,9 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
         let sclk = peripherals.GPIO0;
