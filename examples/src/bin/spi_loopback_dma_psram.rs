@@ -13,10 +13,9 @@
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
 //!
-//! If your module is quad PSRAM then you need to change the `psram` feature in the
-//! in the features line below to `quad-psram`.
+//! If your module is octal PSRAM then you need to set `ESP_HAL_CONFIG_PSRAM_MODE` to `octal`.
 
-//% FEATURES: esp-hal/log esp-hal/octal-psram esp-hal/unstable
+//% FEATURES: esp-hal/log esp-hal/psram esp-hal/unstable
 //% CHIPS: esp32s3
 
 #![no_std]
