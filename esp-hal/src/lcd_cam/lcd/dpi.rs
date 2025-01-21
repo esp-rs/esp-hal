@@ -115,6 +115,7 @@ use crate::{
     },
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
+    system::{self, GenericPeripheralGuard},
     Blocking,
     DriverMode,
 };
@@ -131,6 +132,7 @@ pub enum ConfigError {
 pub struct Dpi<'d, Dm: DriverMode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
+    _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
 
@@ -152,6 +154,7 @@ where
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,
             tx_channel,
+            _guard: lcd._guard,
             _mode: PhantomData,
         };
 
