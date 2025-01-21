@@ -2308,6 +2308,7 @@ where
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         self.tx_impl.start();
+        while self.tx_impl.is_fifo_empty() && self.pending_out_interrupts().is_empty() {}
 
         if self
             .pending_out_interrupts()
@@ -2414,6 +2415,9 @@ pub trait RxRegisterAccess: RegisterAccess {
 
 #[doc(hidden)]
 pub trait TxRegisterAccess: RegisterAccess {
+    /// Returns whether the DMA's FIFO is empty.
+    fn is_fifo_empty(&self) -> bool;
+
     /// Enable/disable outlink-writeback
     fn set_auto_write_back(&self, enable: bool);
 

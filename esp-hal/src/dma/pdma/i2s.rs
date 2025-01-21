@@ -71,15 +71,6 @@ impl RegisterAccess for AnyI2sDmaTxChannel {
         reg_block
             .out_link()
             .modify(|_, w| w.outlink_start().set_bit());
-
-        // Delay until there is data in the DMA's out buffer (presumably)
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                while reg_block.lc_state0().read().bits() & 0x80000000 != 0 {}
-            } else {
-                while reg_block.lc_state0().read().out_empty().bit_is_set() {}
-            }
-        }
     }
 
     fn stop(&self) {
@@ -121,6 +112,17 @@ impl RegisterAccess for AnyI2sDmaTxChannel {
 }
 
 impl TxRegisterAccess for AnyI2sDmaTxChannel {
+    fn is_fifo_empty(&self) -> bool {
+        let reg_block = self.0.register_block();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                reg_block.lc_state0().read().bits() & 0x80000000 != 0
+            } else {
+                reg_block.lc_state0().read().out_empty().bit_is_set()
+            }
+        }
+    }
+
     fn set_auto_write_back(&self, enable: bool) {
         let reg_block = self.0.register_block();
         reg_block

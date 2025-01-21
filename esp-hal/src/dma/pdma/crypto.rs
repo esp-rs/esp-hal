@@ -135,6 +135,11 @@ impl RegisterAccess for CryptoDmaTxChannel {
 }
 
 impl TxRegisterAccess for CryptoDmaTxChannel {
+    fn is_fifo_empty(&self) -> bool {
+        let register_block = self.0.register_block();
+        register_block.state1().read().outfifo_cnt_debug().bits() == 0
+    }
+
     fn set_auto_write_back(&self, enable: bool) {
         // there is no `auto_wrback` for SPI
         assert!(!enable);

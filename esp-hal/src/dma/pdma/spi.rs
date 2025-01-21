@@ -67,15 +67,6 @@ impl RegisterAccess for AnySpiDmaTxChannel {
         let spi = self.0.register_block();
         spi.dma_out_link()
             .modify(|_, w| w.outlink_start().set_bit());
-
-        // Delay until there is data in the DMA's out buffer
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                while spi.dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0 {}
-            } else {
-                while spi.dma_outstatus().read().dma_outfifo_empty().bit_is_set() {}
-            }
-        }
     }
 
     fn stop(&self) {
@@ -113,6 +104,17 @@ impl RegisterAccess for AnySpiDmaTxChannel {
 }
 
 impl TxRegisterAccess for AnySpiDmaTxChannel {
+    fn is_fifo_empty(&self) -> bool {
+        let spi = self.0.register_block();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                spi.dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0
+            } else {
+                spi.dma_outstatus().read().dma_outfifo_empty().bit_is_set()
+            }
+        }
+    }
+
     fn set_auto_write_back(&self, enable: bool) {
         // there is no `auto_wrback` for SPI
         assert!(!enable);

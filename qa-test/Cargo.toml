@@ -15,7 +15,7 @@ embedded-graphics  = "0.8.1"
 embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc" }
 esp-backtrace      = { path = "../esp-backtrace", features = ["exception-handler", "panic-handler", "println"] }
-esp-hal            = { path = "../esp-hal", features = ["unstable"] }
+esp-hal            = { path = "../esp-hal", features = ["unstable", "log"] }
 esp-hal-embassy    = { path = "../esp-hal-embassy" }
 esp-println        = { path = "../esp-println", features = ["log"] }
 lis3dh-async       = "0.9.3"
