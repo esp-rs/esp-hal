@@ -118,6 +118,16 @@ impl RegisterAccess for AnySpiDmaTxChannel {
 }
 
 impl TxRegisterAccess for AnySpiDmaTxChannel {
+    fn is_fifo_empty(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0
+            } else {
+                self.regs().dma_outstatus().read().dma_outfifo_empty().bit_is_set()
+            }
+        }
+    }
+
     fn set_auto_write_back(&self, enable: bool) {
         // there is no `auto_wrback` for SPI
         assert!(!enable);

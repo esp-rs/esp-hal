@@ -3224,10 +3224,8 @@ impl Driver {
                 while reg_block.cmd().read().update().bit_is_set() {
                     // wait
                 }
-            } else if #[cfg(esp32)] {
-                xtensa_lx::timer::delay(2); // ☠️
             } else {
-                // Doesn't seem to be needed for ESP32-S2
+                // Doesn't seem to be needed for ESP32 and ESP32-S2
             }
         }
     }

@@ -116,6 +116,16 @@ impl RegisterAccess for AnyI2sDmaTxChannel {
 }
 
 impl TxRegisterAccess for AnyI2sDmaTxChannel {
+    fn is_fifo_empty(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().lc_state0().read().bits() & 0x80000000 != 0
+            } else {
+                self.regs().lc_state0().read().out_empty().bit_is_set()
+            }
+        }
+    }
+
     fn set_auto_write_back(&self, enable: bool) {
         self.regs()
             .lc_conf()
@@ -131,11 +141,11 @@ impl TxRegisterAccess for AnyI2sDmaTxChannel {
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        None
+        Some(self.0.peripheral_interrupt())
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        None
+        Some(self.0.async_handler())
     }
 }
 

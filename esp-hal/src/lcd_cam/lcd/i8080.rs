@@ -387,10 +387,6 @@ where
             .lc_dma_int_clr()
             .write(|w| w.lcd_trans_done_int_clr().set_bit());
 
-        // Before issuing lcd_start need to wait shortly for fifo to get data
-        // Otherwise, some garbage data will be sent out
-        crate::rom::ets_delay_us(1);
-
         self.regs().lcd_user().modify(|_, w| {
             w.lcd_update().set_bit();
             w.lcd_start().set_bit()
