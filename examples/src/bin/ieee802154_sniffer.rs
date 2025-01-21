@@ -21,7 +21,7 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    // Default pins for Uart/Serial communication
+    // Default pins for Uart communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32c6")] {
             let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);

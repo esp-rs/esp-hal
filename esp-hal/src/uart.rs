@@ -38,7 +38,7 @@
 //!
 //! ## Example
 //!
-//! ### Handling UART/Serial Interrupts
+//! ### Handling UART Interrupts
 //! Notice, that in practice a proper serial terminal should be used
 //! to connect to the board (espmonitor and espflash won't work)
 //! ```rust, no_run
