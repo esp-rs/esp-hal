@@ -44,9 +44,11 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::uart::{AtCmdConfig, Config, Uart, UartInterrupt};
+//! # use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
 //! # let delay = Delay::new();
-//! # let config = Config::default().with_rx_fifo_full_threshold(30);
+//! # let config = Config::default().with_rx(
+//!     RxConfig::default().with_fifo_full_threshold(30)
+//! );
 //! # let mut uart0 = Uart::new(
 //! #    peripherals.UART0,
 //! #    config)
@@ -290,13 +292,13 @@ pub struct Config {
     pub stop_bits: StopBits,
     /// Clock source used by the UART peripheral.
     pub clock_source: ClockSource,
-    /// UART Recieve part configuration.
+    /// UART Receive part configuration.
     pub rx: RxConfig,
     /// UART Transmit part configuration.
     pub tx: TxConfig,
 }
 
-/// UART Recieve part configuration.
+/// UART Receive part configuration.
 #[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
