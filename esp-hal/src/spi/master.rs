@@ -477,6 +477,17 @@ impl Default for Config {
     }
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct SpiPinGuard {
+    mosi_pin: PinGuard,
+    sclk_pin: PinGuard,
+    cs_pin: PinGuard,
+    sio1_pin: PinGuard,
+    sio2_pin: Option<PinGuard>,
+    sio3_pin: Option<PinGuard>,
+}
+
 /// Configuration errors.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -490,12 +501,7 @@ pub struct Spi<'d, Dm> {
     spi: PeripheralRef<'d, AnySpi>,
     _mode: PhantomData<Dm>,
     guard: PeripheralGuard,
-    mosi_pin: PinGuard,
-    sclk_pin: PinGuard,
-    cs_pin: PinGuard,
-    sio1_pin: PinGuard,
-    sio2_pin: Option<PinGuard>,
-    sio3_pin: Option<PinGuard>,
+    pins: SpiPinGuard,
 }
 
 impl<Dm: DriverMode> Sealed for Spi<'_, Dm> {}
@@ -553,12 +559,14 @@ impl<'d> Spi<'d, Blocking> {
             spi,
             _mode: PhantomData,
             guard,
-            mosi_pin,
-            sclk_pin,
-            cs_pin,
-            sio1_pin,
-            sio2_pin,
-            sio3_pin,
+            pins: SpiPinGuard {
+                mosi_pin,
+                sclk_pin,
+                cs_pin,
+                sio1_pin,
+                sio2_pin,
+                sio3_pin,
+            },
         };
 
         this.driver().init();
@@ -588,12 +596,7 @@ impl<'d> Spi<'d, Blocking> {
             spi: self.spi,
             _mode: PhantomData,
             guard: self.guard,
-            mosi_pin: self.mosi_pin,
-            sclk_pin: self.sclk_pin,
-            cs_pin: self.cs_pin,
-            sio1_pin: self.sio1_pin,
-            sio2_pin: self.sio2_pin,
-            sio3_pin: self.sio3_pin,
+            pins: self.pins,
         }
     }
 
@@ -607,7 +610,11 @@ impl<'d> Spi<'d, Blocking> {
     where
         CH: DmaChannelFor<AnySpi>,
     {
-        SpiDma::new(self.spi, channel.map(|ch| ch.degrade()).into_ref())
+        SpiDma::new(
+            self.spi,
+            self.pins,
+            channel.map(|ch| ch.degrade()).into_ref(),
+        )
     }
 
     #[cfg_attr(
@@ -652,12 +659,7 @@ impl<'d> Spi<'d, Async> {
             spi: self.spi,
             _mode: PhantomData,
             guard: self.guard,
-            mosi_pin: self.mosi_pin,
-            sclk_pin: self.sclk_pin,
-            cs_pin: self.cs_pin,
-            sio1_pin: self.sio1_pin,
-            sio2_pin: self.sio2_pin,
-            sio3_pin: self.sio3_pin,
+            pins: self.pins,
         }
     }
 
@@ -701,7 +703,7 @@ where
         crate::into_mapped_ref!(mosi);
         mosi.enable_output(false);
 
-        self.mosi_pin = OutputConnection::connect_with_guard(mosi, self.driver().info.mosi);
+        self.pins.mosi_pin = OutputConnection::connect_with_guard(mosi, self.driver().info.mosi);
 
         self
     }
@@ -728,7 +730,7 @@ where
         mosi.enable_input(true);
 
         self.driver().info.sio0_input.connect_to(&mut mosi);
-        self.mosi_pin = OutputConnection::connect_with_guard(mosi, self.driver().info.mosi);
+        self.pins.mosi_pin = OutputConnection::connect_with_guard(mosi, self.driver().info.mosi);
 
         self
     }
@@ -772,7 +774,8 @@ where
 
         self.driver().info.miso.connect_to(&mut miso);
         // self.driver().info.sio1_output.connect_to(&mut miso);
-        self.sio1_pin = OutputConnection::connect_with_guard(miso, self.driver().info.sio1_output);
+        self.pins.sio1_pin =
+            OutputConnection::connect_with_guard(miso, self.driver().info.sio1_output);
 
         self
     }
@@ -786,7 +789,7 @@ where
     pub fn with_sck<SCK: PeripheralOutput>(mut self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_mapped_ref!(sclk);
         sclk.set_to_push_pull_output();
-        self.sclk_pin = OutputConnection::connect_with_guard(sclk, self.driver().info.sclk);
+        self.pins.sclk_pin = OutputConnection::connect_with_guard(sclk, self.driver().info.sclk);
 
         self
     }
@@ -806,7 +809,7 @@ where
     pub fn with_cs<CS: PeripheralOutput>(mut self, cs: impl Peripheral<P = CS> + 'd) -> Self {
         crate::into_mapped_ref!(cs);
         cs.set_to_push_pull_output();
-        self.cs_pin = OutputConnection::connect_with_guard(cs, self.driver().info.cs);
+        self.pins.cs_pin = OutputConnection::connect_with_guard(cs, self.driver().info.cs);
 
         self
     }
@@ -854,7 +857,7 @@ where
         sio2.enable_output(true);
 
         unwrap!(self.driver().info.sio2_input).connect_to(&mut sio2);
-        self.sio2_pin = self
+        self.pins.sio2_pin = self
             .driver()
             .info
             .sio2_output
@@ -882,7 +885,7 @@ where
         sio3.enable_output(true);
 
         unwrap!(self.driver().info.sio3_input).connect_to(&mut sio3);
-        self.sio3_pin = self
+        self.pins.sio3_pin = self
             .driver()
             .info
             .sio3_output
@@ -1030,6 +1033,7 @@ mod dma {
         #[cfg(all(esp32, spi_address_workaround))]
         address_buffer: DmaTxBuf,
         guard: PeripheralGuard,
+        pins: SpiPinGuard,
     }
 
     impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
@@ -1046,6 +1050,7 @@ mod dma {
                 #[cfg(all(esp32, spi_address_workaround))]
                 address_buffer: self.address_buffer,
                 guard: self.guard,
+                pins: self.pins,
             }
         }
     }
@@ -1062,6 +1067,7 @@ mod dma {
                 #[cfg(all(esp32, spi_address_workaround))]
                 address_buffer: self.address_buffer,
                 guard: self.guard,
+                pins: self.pins,
             }
         }
     }
@@ -1122,6 +1128,7 @@ mod dma {
     impl<'d> SpiDma<'d, Blocking> {
         pub(super) fn new(
             spi: PeripheralRef<'d, AnySpi>,
+            pins: SpiPinGuard,
             channel: PeripheralRef<'d, PeripheralDmaChannel<AnySpi>>,
         ) -> Self {
             let channel = Channel::new(channel);
@@ -1156,6 +1163,7 @@ mod dma {
                 tx_transfer_in_progress: false,
                 rx_transfer_in_progress: false,
                 guard,
+                pins,
             }
         }
     }
