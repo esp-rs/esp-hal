@@ -30,7 +30,7 @@
 //!
 //! The module implements several third-party traits from embedded-hal@1.x.x
 //! and [`embassy-embedded-hal`].
-//! 
+//!
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: embassy_embedded_hal::shared_bus
 
@@ -575,18 +575,24 @@ impl<'d> Spi<'d, Blocking> {
     /// # use esp_hal::spi::master::{Config, Spi};
     /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
     /// # use esp_hal::dma_buffers;
-    #[cfg_attr(
-        any(esp32, esp32s2),
-        doc = "let dma_channel = peripherals.DMA_SPI2;"
-    )]
+    #[cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = peripherals.DMA_SPI2;")]
     #[cfg_attr(
         not(any(esp32, esp32s2)),
         doc = "let dma_channel = peripherals.DMA_CH0;"
     )]
-    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-    /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-    /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-    /// 
+    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
+    ///     dma_buffers!(32000);
+    ///
+    /// let dma_rx_buf = DmaRxBuf::new(
+    ///     rx_descriptors,
+    ///     rx_buffer
+    /// ).unwrap();
+    ///
+    /// let dma_tx_buf = DmaTxBuf::new(
+    ///     tx_descriptors,
+    ///     tx_buffer
+    /// ).unwrap();
+    ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
     ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
@@ -978,18 +984,25 @@ mod dma {
     /// # use esp_hal::spi::master::{Config, Spi};
     /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
     /// # use esp_hal::dma_buffers;
-    #[cfg_attr(
-        any(esp32, esp32s2),
-        doc = "let dma_channel = peripherals.DMA_SPI2;"
-    )]
+    #[cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = peripherals.DMA_SPI2;")]
     #[cfg_attr(
         not(any(esp32, esp32s2)),
         doc = "let dma_channel = peripherals.DMA_CH0;"
     )]
-    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-    /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-    /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-    /// 
+    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
+    ///     dma_buffers!(32000);
+    ///
+    /// let dma_rx_buf = DmaRxBuf::new(
+    ///     rx_descriptors,
+    ///     rx_buffer
+    /// ).unwrap();
+    ///
+    /// let dma_tx_buf = DmaTxBuf::new(
+    ///     tx_descriptors,
+    ///     tx_buffer
+    /// ).unwrap();
+    ///
+    ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
     ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
