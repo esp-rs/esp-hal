@@ -127,3 +127,15 @@ Use `DataMode::SingleTwoDataLines` to get the previous behavior.
 ```
 
 `Spi` now offers both, `with_mosi` and `with_sio0`. Consider using `with_sio` for half-duplex SPI except for [DataMode::SingleTwoDataLines] or for a mixed-bus.
+
+## UART halves have their configuration split too
+
+`Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
+
+```diff
+- let config = Config::default().with_rx_fifo_full_threshold(30);
++ let config = Config::default()
++     .with_rx(RxConfig::default()
++       .with_fifo_full_threshold(30)
++ );
+```
