@@ -29,32 +29,10 @@
 //! ## Usage
 //!
 //! The module implements several third-party traits from embedded-hal@1.x.x
-//! and embassy-embedded-hal.
-//!
-//! ## Examples
-//!
-//! ### SPI Initialization
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::spi::Mode;
-//! # use esp_hal::spi::master::{Config, Spi};
-//! let sclk = peripherals.GPIO0;
-//! let miso = peripherals.GPIO2;
-//! let mosi = peripherals.GPIO1;
-//!
-//! let mut spi = Spi::new(
-//!     peripherals.SPI2,
-//!     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-//! )
-//! .unwrap()
-//! .with_sck(sclk)
-//! .with_mosi(mosi)
-//! .with_miso(miso);
-//! # }
-//! ```
+//! and [`embassy-embedded-hal`].
 //! 
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
-//! [`embassy-embedded-hal`]: https://docs.embassy.dev/embassy-embedded-hal/git/default/shared_bus/index.html
+//! [`embassy-embedded-hal`]: embassy_embedded_hal::shared_bus
 
 use core::marker::PhantomData;
 
@@ -527,6 +505,21 @@ where
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
+    /// ### SPI Initialization
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(
+    ///     peripherals.SPI2,
+    ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
+    /// )
+    /// .unwrap()
+    /// .with_sck(peripherals.GPIO0)
+    /// .with_mosi(peripherals.GPIO1)
+    /// .with_miso(peripherals.GPIO2);
+    /// # }
+    /// ```
     pub fn new(
         spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
         config: Config,
@@ -576,6 +569,33 @@ impl<'d> Spi<'d, Blocking> {
     /// This method prepares the SPI instance for DMA transfers using SPI
     /// and returns an instance of `SpiDma` that supports DMA
     /// operations.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
+    /// # use esp_hal::dma_buffers;
+    #[cfg_attr(
+        any(esp32, esp32s2),
+        doc = "let dma_channel = peripherals.DMA_SPI2;"
+    )]
+    #[cfg_attr(
+        not(any(esp32, esp32s2)),
+        doc = "let dma_channel = peripherals.DMA_CH0;"
+    )]
+    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+    /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    /// 
+    /// let mut spi = Spi::new(
+    ///     peripherals.SPI2,
+    ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
+    /// )
+    /// .unwrap()
+    /// .with_dma(dma_channel)
+    /// .with_buffers(dma_rx_buf, dma_tx_buf);
+    /// # }
+    /// ```
     #[instability::unstable]
     pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking>
     where
@@ -952,6 +972,33 @@ mod dma {
     /// [`SpiDmaBus`] via `with_buffers` to get access
     /// to a DMA capable SPI bus that implements the
     /// embedded-hal traits.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
+    /// # use esp_hal::dma_buffers;
+    #[cfg_attr(
+        any(esp32, esp32s2),
+        doc = "let dma_channel = peripherals.DMA_SPI2;"
+    )]
+    #[cfg_attr(
+        not(any(esp32, esp32s2)),
+        doc = "let dma_channel = peripherals.DMA_CH0;"
+    )]
+    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+    /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    /// 
+    /// let mut spi = Spi::new(
+    ///     peripherals.SPI2,
+    ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
+    /// )
+    /// .unwrap()
+    /// .with_dma(dma_channel)
+    /// .with_buffers(dma_rx_buf, dma_tx_buf);
+    /// # }
+    /// ```
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[instability::unstable]
     pub struct SpiDma<'d, Dm>
