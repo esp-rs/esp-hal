@@ -1541,6 +1541,7 @@ unsafe extern "C" fn recv_cb_sta(
             queue.push_back(packet);
             true
         } else {
+            mem::forget(packet);
             false
         }
     }) {
@@ -1548,6 +1549,7 @@ unsafe extern "C" fn recv_cb_sta(
         include::ESP_OK as esp_err_t
     } else {
         debug!("RX QUEUE FULL");
+        unsafe { esp_wifi_internal_free_rx_buffer(eb) };
         include::ESP_ERR_NO_MEM as esp_err_t
     }
 }
@@ -1569,6 +1571,7 @@ unsafe extern "C" fn recv_cb_ap(
             queue.push_back(packet);
             true
         } else {
+            mem::forget(packet);
             false
         }
     }) {
@@ -1576,6 +1579,7 @@ unsafe extern "C" fn recv_cb_ap(
         include::ESP_OK as esp_err_t
     } else {
         debug!("RX QUEUE FULL");
+        unsafe { esp_wifi_internal_free_rx_buffer(eb) };
         include::ESP_ERR_NO_MEM as esp_err_t
     }
 }
