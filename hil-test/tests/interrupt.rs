@@ -77,7 +77,7 @@ mod tests {
             }
         }
 
-        let sw0_trigger_addr = cpu_intr.cpu_intr_from_cpu_0() as *const _ as u32;
+        let sw0_trigger_addr = cpu_intr.register_block().cpu_intr_from_cpu_0() as *const _ as u32;
 
         critical_section::with(|cs| {
             SWINT0

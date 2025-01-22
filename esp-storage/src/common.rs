@@ -79,6 +79,7 @@ impl FlashStorage {
             0x20 => 4,
             0x30 => 8,
             0x40 => 16,
+            0x50 => 32,
             _ => 0,
         };
         storage.capacity = mb * 1024 * 1024;

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - SPI: Added support for 3-wire SPI (#2919)
+- Add separate config for Rx and Tx (UART) #2965
 
 ### Changed
 
@@ -20,11 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uart `flush` is now blocking (#2882)
 - Removed `embedded-hal-nb` traits (#2882)
 - `timer::wait` is now blocking (#2882)
+- By default, set `tx_idle_num` to 0 so that bytes written to TX FIFO are always immediately transmitted. (#2859)
+- `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
+- `Async` drivers are no longer `Send` (#2980)
 - GPIO drivers now take configuration structs, and their constructors are fallible (#2990)
 
 ### Fixed
 
 - `DmaDescriptor` is now `#[repr(C)]` (#2988)
+- Fixed an issue that caused LCD_CAM drivers to turn off their clocks unexpectedly (#3007)
+- Fixed an issue where DMA-driver peripherals started transferring before the data was ready (#3003)
 
 ### Removed
 
@@ -244,7 +250,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix conflict between `RtcClock::get_xtal_freq` and `Rtc::disable_rom_message_printing` (#2360)
 - Fixed an issue where interrupts enabled before `esp_hal::init` were disabled. This issue caused the executor created by `#[esp_hal_embassy::main]` to behave incorrectly in multi-core applications. (#2377)
 - Fixed `TWAI::transmit_async`: bus-off state is not reached when CANH and CANL are shorted. (#2421)
-- ESP32: added UART-specific workaround for https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html (#2441)
+- ESP32: added UART-specific workaround for <https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html> (#2441)
 - Fixed some SysTimer race conditions and panics (#2451)
 - TWAI: accept all messages by default (#2467)
 - I8080: `set_byte_order()` now works correctly in 16-bit mode (#2487)

@@ -701,19 +701,13 @@ where
         );
 
         // Set RESET bit to 1
-        this.twai
-            .register_block()
-            .mode()
-            .write(|w| w.reset_mode().set_bit());
+        this.regs().mode().write(|w| w.reset_mode().set_bit());
 
+        // Enable extended register layout
         #[cfg(esp32)]
-        {
-            // Enable extended register layout
-            this.twai
-                .register_block()
-                .clock_divider()
-                .modify(|_, w| w.ext_mode().set_bit());
-        }
+        this.regs()
+            .clock_divider()
+            .modify(|_, w| w.ext_mode().set_bit());
 
         // Set up the GPIO pins.
         let rx_pull = if no_transceiver {
@@ -736,25 +730,26 @@ where
         this.set_mode(TwaiMode::ListenOnly);
 
         // Set TEC to 0
-        this.twai
-            .register_block()
+        this.regs()
             .tx_err_cnt()
             .write(|w| unsafe { w.tx_err_cnt().bits(0) });
 
         // Set REC to 0
-        this.twai
-            .register_block()
+        this.regs()
             .rx_err_cnt()
             .write(|w| unsafe { w.rx_err_cnt().bits(0) });
 
         // Set EWL to 96
-        this.twai
-            .register_block()
+        this.regs()
             .err_warning_limit()
             .write(|w| unsafe { w.err_warning_limit().bits(96) });
 
         this.set_baud_rate(baud_rate);
         this
+    }
+
+    fn regs(&self) -> &RegisterBlock {
+        self.twai.register_block()
     }
 
     fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -798,17 +793,11 @@ where
                 // Enable /2 baudrate divider by setting `brp_div`.
                 // `brp_div` is not an interrupt, it will prescale BRP by 2. Only available on
                 // ESP32 Revision 2 or later. Reserved otherwise.
-                self.twai
-                    .register_block()
-                    .int_ena()
-                    .modify(|_, w| w.brp_div().set_bit());
+                self.regs().int_ena().modify(|_, w| w.brp_div().set_bit());
                 prescaler = timing.baud_rate_prescaler / 2;
             } else {
                 // Disable /2 baudrate divider by clearing brp_div.
-                self.twai
-                    .register_block()
-                    .int_ena()
-                    .modify(|_, w| w.brp_div().clear_bit());
+                self.regs().int_ena().modify(|_, w| w.brp_div().clear_bit());
             }
         }
 
@@ -819,27 +808,20 @@ where
         let triple_sample = timing.triple_sample;
 
         // Set up the prescaler and sync jump width.
-        self.twai
-            .register_block()
-            .bus_timing_0()
-            .modify(|_, w| unsafe {
-                w.baud_presc().bits(prescale as _);
-                w.sync_jump_width().bits(sjw)
-            });
+        self.regs().bus_timing_0().modify(|_, w| unsafe {
+            w.baud_presc().bits(prescale as _);
+            w.sync_jump_width().bits(sjw)
+        });
 
         // Set up the time segment 1, time segment 2, and triple sample.
-        self.twai
-            .register_block()
-            .bus_timing_1()
-            .modify(|_, w| unsafe {
-                w.time_seg1().bits(tseg_1);
-                w.time_seg2().bits(tseg_2);
-                w.time_samp().bit(triple_sample)
-            });
+        self.regs().bus_timing_1().modify(|_, w| unsafe {
+            w.time_seg1().bits(tseg_1);
+            w.time_seg2().bits(tseg_2);
+            w.time_samp().bit(triple_sample)
+        });
 
         // disable CLKOUT
-        self.twai
-            .register_block()
+        self.regs()
             .clock_divider()
             .modify(|_, w| w.clock_off().set_bit());
     }
@@ -869,15 +851,14 @@ where
             return;
         };
 
-        let register_block = self.twai.register_block();
         // Set or clear the rx filter mode bit depending on the filter type.
-        register_block
+        self.regs()
             .mode()
             .modify(|_, w| w.rx_filter_mode().bit(*filter_type == FilterType::Single));
 
         // Copy the filter to the peripheral.
         unsafe {
-            copy_to_data_register(register_block.data_0().as_ptr(), registers);
+            copy_to_data_register(self.regs().data_0().as_ptr(), registers);
         }
     }
 
@@ -888,15 +869,14 @@ where
     /// warning interrupt will be triggered (given the enable signal is
     /// valid).
     pub fn set_error_warning_limit(&mut self, limit: u8) {
-        self.twai
-            .register_block()
+        self.regs()
             .err_warning_limit()
             .write(|w| unsafe { w.err_warning_limit().bits(limit) });
     }
 
     /// Set the operating mode based on provided option
     fn set_mode(&self, mode: TwaiMode) {
-        self.twai.register_block().mode().modify(|_, w| {
+        self.regs().mode().modify(|_, w| {
             // self-test mode turns off acknowledgement requirement
             w.self_test_mode().bit(mode == TwaiMode::SelfTest);
             w.listen_only_mode().bit(mode == TwaiMode::ListenOnly)
@@ -910,8 +890,7 @@ where
         self.set_mode(self.mode);
 
         // Clear the TEC and REC
-        self.twai
-            .register_block()
+        self.regs()
             .tx_err_cnt()
             .write(|w| unsafe { w.tx_err_cnt().bits(0) });
 
@@ -926,25 +905,21 @@ where
             } else {
                 0
             };
-        self.twai
-            .register_block()
+        self.regs()
             .rx_err_cnt()
             .write(|w| unsafe { w.rx_err_cnt().bits(rec) });
 
         // Clear any interrupts by reading the status register
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                let _ = self.twai.register_block().int_raw().read();
+                let _ = self.regs().int_raw().read();
             } else {
-                let _ = self.twai.register_block().interrupt().read();
+                let _ = self.regs().interrupt().read();
             }
         }
 
         // Put the peripheral into operation mode by clearing the reset mode bit.
-        self.twai
-            .register_block()
-            .mode()
-            .modify(|_, w| w.reset_mode().clear_bit());
+        self.regs().mode().modify(|_, w| w.reset_mode().clear_bit());
 
         Twai {
             rx: TwaiRx {
@@ -1048,8 +1023,12 @@ impl<'d, Dm> Twai<'d, Dm>
 where
     Dm: DriverMode,
 {
+    fn regs(&self) -> &RegisterBlock {
+        self.twai.register_block()
+    }
+
     fn mode(&self) -> TwaiMode {
-        let mode = self.twai.register_block().mode().read();
+        let mode = self.regs().mode().read();
 
         if mode.self_test_mode().bit_is_set() {
             TwaiMode::SelfTest
@@ -1065,10 +1044,7 @@ where
     pub fn stop(self) -> TwaiConfiguration<'d, Dm> {
         // Put the peripheral into reset/configuration mode by setting the reset mode
         // bit.
-        self.twai
-            .register_block()
-            .mode()
-            .modify(|_, w| w.reset_mode().set_bit());
+        self.regs().mode().modify(|_, w| w.reset_mode().set_bit());
 
         let mode = self.mode();
 
@@ -1084,32 +1060,17 @@ where
 
     /// Returns the value of the receive error counter.
     pub fn receive_error_count(&self) -> u8 {
-        self.twai
-            .register_block()
-            .rx_err_cnt()
-            .read()
-            .rx_err_cnt()
-            .bits()
+        self.regs().rx_err_cnt().read().rx_err_cnt().bits()
     }
 
     /// Returns the value of the transmit error counter.
     pub fn transmit_error_count(&self) -> u8 {
-        self.twai
-            .register_block()
-            .tx_err_cnt()
-            .read()
-            .tx_err_cnt()
-            .bits()
+        self.regs().tx_err_cnt().read().tx_err_cnt().bits()
     }
 
     /// Check if the controller is in a bus off state.
     pub fn is_bus_off(&self) -> bool {
-        self.twai
-            .register_block()
-            .status()
-            .read()
-            .bus_off_st()
-            .bit_is_set()
+        self.regs().status().read().bus_off_st().bit_is_set()
     }
 
     /// Get the number of messages that the peripheral has available in the
@@ -1118,8 +1079,7 @@ where
     /// Note that this may not be the number of valid messages in the receive
     /// FIFO due to fifo overflow/overrun.
     pub fn num_available_messages(&self) -> u8 {
-        self.twai
-            .register_block()
+        self.regs()
             .rx_message_cnt()
             .read()
             .rx_message_counter()
@@ -1135,7 +1095,7 @@ where
     /// error states.
     pub fn clear_receive_fifo(&self) {
         while self.num_available_messages() > 0 {
-            release_receive_fifo(self.twai.register_block());
+            release_receive_fifo(self.regs());
         }
     }
 
@@ -1167,6 +1127,10 @@ impl<Dm> TwaiTx<'_, Dm>
 where
     Dm: DriverMode,
 {
+    fn regs(&self) -> &RegisterBlock {
+        self.twai.register_block()
+    }
+
     /// Transmit a frame.
     ///
     /// Because of how the TWAI registers are set up, we have to do some
@@ -1180,8 +1144,7 @@ where
     /// functionality. See notes 1 and 2 in the "Frame Identifier" section
     /// of the reference manual.
     pub fn transmit(&mut self, frame: &EspTwaiFrame) -> nb::Result<(), EspTwaiError> {
-        let register_block = self.twai.register_block();
-        let status = register_block.status().read();
+        let status = self.regs().status().read();
 
         // Check that the peripheral is not in a bus off state.
         if status.bus_off_st().bit_is_set() {
@@ -1192,7 +1155,7 @@ where
             return nb::Result::Err(nb::Error::WouldBlock);
         }
 
-        write_frame(register_block, frame);
+        write_frame(self.regs(), frame);
 
         Ok(())
     }
@@ -1209,10 +1172,13 @@ impl<Dm> TwaiRx<'_, Dm>
 where
     Dm: DriverMode,
 {
+    fn regs(&self) -> &RegisterBlock {
+        self.twai.register_block()
+    }
+
     /// Receive a frame
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
-        let register_block = self.twai.register_block();
-        let status = register_block.status().read();
+        let status = self.regs().status().read();
 
         // Check that the peripheral is not in a bus off state.
         if status.bus_off_st().bit_is_set() {
@@ -1231,7 +1197,7 @@ where
             )));
         }
 
-        Ok(read_frame(register_block)?)
+        Ok(read_frame(self.regs())?)
     }
 }
 
@@ -1341,11 +1307,9 @@ pub trait Instance: Peripheral<P = Self> + Into<AnyTwai> + 'static {
 
     /// Enables interrupts for the TWAI peripheral.
     fn enable_interrupts(&self) {
-        let register_block = self.register_block();
-
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                register_block.int_ena().modify(|_, w| {
+                self.register_block().int_ena().modify(|_, w| {
                     w.rx_int_ena().set_bit();
                     w.tx_int_ena().set_bit();
                     w.bus_err_int_ena().set_bit();
@@ -1353,7 +1317,7 @@ pub trait Instance: Peripheral<P = Self> + Into<AnyTwai> + 'static {
                     w.err_passive_int_ena().set_bit()
                 });
             } else {
-                register_block.interrupt_enable().modify(|_, w| {
+                self.register_block().interrupt_enable().modify(|_, w| {
                     w.ext_receive_int_ena().set_bit();
                     w.ext_transmit_int_ena().set_bit();
                     w.bus_err_int_ena().set_bit();
@@ -1675,8 +1639,7 @@ mod asynch {
             poll_fn(|cx| {
                 self.twai.async_state().tx_waker.register(cx.waker());
 
-                let register_block = self.twai.register_block();
-                let status = register_block.status().read();
+                let status = self.regs().status().read();
 
                 // Check that the peripheral is not in a bus off state.
                 if status.bus_off_st().bit_is_set() {
@@ -1687,7 +1650,7 @@ mod asynch {
                     return Poll::Pending;
                 }
 
-                write_frame(register_block, frame);
+                write_frame(self.regs(), frame);
 
                 Poll::Ready(Ok(()))
             })
@@ -1706,8 +1669,7 @@ mod asynch {
                     return Poll::Ready(result);
                 }
 
-                let register_block = self.twai.register_block();
-                let status = register_block.status().read();
+                let status = self.regs().status().read();
 
                 // Check that the peripheral is not in a bus off state.
                 if status.bus_off_st().bit_is_set() {
@@ -1796,17 +1758,13 @@ mod asynch {
     #[handler]
     pub(super) fn twai0() {
         let twai = unsafe { TWAI0::steal() };
-        let register_block = twai.register_block();
-        let async_state = twai.async_state();
-        handle_interrupt(register_block, async_state);
+        handle_interrupt(twai.register_block(), twai.async_state());
     }
 
     #[cfg(twai1)]
     #[handler]
     pub(super) fn twai1() {
         let twai = unsafe { TWAI1::steal() };
-        let register_block = twai.register_block();
-        let async_state = twai.async_state();
-        handle_interrupt(register_block, async_state);
+        handle_interrupt(twai.register_block(), twai.async_state());
     }
 }

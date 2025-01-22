@@ -1066,12 +1066,14 @@ impl PeripheralClockControl {
             if enable {
                 let prev = *ref_count;
                 *ref_count += 1;
+                trace!("Enable {:?} {} -> {}", peripheral, prev, *ref_count);
                 if prev > 0 {
                     return false;
                 }
             } else {
                 let prev = *ref_count;
                 *ref_count -= 1;
+                trace!("Disable {:?} {} -> {}", peripheral, prev, *ref_count);
                 if prev > 1 {
                     return false;
                 }

@@ -1,4 +1,25 @@
-# Migration Guide from v0.23.x to v?.??.?
+# Migration Guide from v0.23.x to v1.0.0-beta.0
+
+## `Async` drivers can no longer be sent between cores and executors
+
+To work around this limitation, send the blocking driver, and configure it into `Async` mode
+in the target context.
+
+```diff
+ #[embassy_executor::task]
+-async fn interrupt_driven_task(mut spi: Spi<'static, Async>) {
++async fn interrupt_driven_task(spi: Spi<'static, Blocking>) {
++    let mut spi = spi.into_async();
+     ...
+ }
+
+ let spi = Spi::new(...)
+     .unwrap()
+     // ...
+-    .into_async();
+
+ send_spawner.spawn(interrupt_driven_task(spi)).unwrap();
+```
 
 ## RMT changes
 
@@ -107,6 +128,18 @@ Use `DataMode::SingleTwoDataLines` to get the previous behavior.
 
 `Spi` now offers both, `with_mosi` and `with_sio0`. Consider using `with_sio` for half-duplex SPI except for [DataMode::SingleTwoDataLines] or for a mixed-bus.
 
+## UART halves have their configuration split too
+
+`Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
+
+```diff
+- let config = Config::default().with_rx_fifo_full_threshold(30);
++ let config = Config::default()
++     .with_rx(RxConfig::default()
++       .with_fifo_full_threshold(30)
++ );
+```
+
 ## GPIO changes
 
 GPIO drivers now take configuration structs, and their constructors are fallible.
@@ -121,4 +154,3 @@ GPIO drivers now take configuration structs, and their constructors are fallible
 +     peripherals.GPIO0,
 +     OutputOpenDrainConfig::default().with_level(Level::Low).with_pull(Pull::Up)
 + ).unwrap();
-```

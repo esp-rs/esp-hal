@@ -9,6 +9,12 @@ pub(super) type SpiRegisterBlock = crate::pac::spi2::RegisterBlock;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnySpiDmaRxChannel(pub(crate) AnySpiDmaChannel);
 
+impl AnySpiDmaRxChannel {
+    fn regs(&self) -> &SpiRegisterBlock {
+        self.0.register_block()
+    }
+}
+
 impl crate::private::Sealed for AnySpiDmaRxChannel {}
 impl DmaRxChannel for AnySpiDmaRxChannel {}
 impl Peripheral for AnySpiDmaRxChannel {
@@ -24,6 +30,12 @@ impl Peripheral for AnySpiDmaRxChannel {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnySpiDmaTxChannel(pub(crate) AnySpiDmaChannel);
 
+impl AnySpiDmaTxChannel {
+    fn regs(&self) -> &SpiRegisterBlock {
+        self.0.register_block()
+    }
+}
+
 impl crate::private::Sealed for AnySpiDmaTxChannel {}
 impl DmaTxChannel for AnySpiDmaTxChannel {}
 impl Peripheral for AnySpiDmaTxChannel {
@@ -36,20 +48,21 @@ impl Peripheral for AnySpiDmaTxChannel {
 
 impl RegisterAccess for AnySpiDmaTxChannel {
     fn reset(&self) {
-        let spi = self.0.register_block();
-        spi.dma_conf().modify(|_, w| w.out_rst().set_bit());
-        spi.dma_conf().modify(|_, w| w.out_rst().clear_bit());
+        self.regs().dma_conf().modify(|_, w| w.out_rst().set_bit());
+        self.regs()
+            .dma_conf()
+            .modify(|_, w| w.out_rst().clear_bit());
     }
 
     fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        let spi = self.0.register_block();
-        spi.dma_conf()
+        self.regs()
+            .dma_conf()
             .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
-        let spi = self.0.register_block();
-        spi.dma_conf()
+        self.regs()
+            .dma_conf()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
@@ -58,25 +71,26 @@ impl RegisterAccess for AnySpiDmaTxChannel {
     }
 
     fn set_link_addr(&self, address: u32) {
-        let spi = self.0.register_block();
-        spi.dma_out_link()
+        self.regs()
+            .dma_out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
     }
 
     fn start(&self) {
-        let spi = self.0.register_block();
-        spi.dma_out_link()
+        self.regs()
+            .dma_out_link()
             .modify(|_, w| w.outlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let spi = self.0.register_block();
-        spi.dma_out_link().modify(|_, w| w.outlink_stop().set_bit());
+        self.regs()
+            .dma_out_link()
+            .modify(|_, w| w.outlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let spi = self.0.register_block();
-        spi.dma_out_link()
+        self.regs()
+            .dma_out_link()
             .modify(|_, w| w.outlink_restart().set_bit());
     }
 
@@ -92,8 +106,8 @@ impl RegisterAccess for AnySpiDmaTxChannel {
 
     #[cfg(psram_dma)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        let spi = self.0.register_block();
-        spi.dma_conf()
+        self.regs()
+            .dma_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
@@ -104,14 +118,27 @@ impl RegisterAccess for AnySpiDmaTxChannel {
 }
 
 impl TxRegisterAccess for AnySpiDmaTxChannel {
+    fn is_fifo_empty(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0
+            } else {
+                self.regs().dma_outstatus().read().dma_outfifo_empty().bit_is_set()
+            }
+        }
+    }
+
     fn set_auto_write_back(&self, enable: bool) {
         // there is no `auto_wrback` for SPI
         assert!(!enable);
     }
 
     fn last_dscr_address(&self) -> usize {
-        let spi = self.0.register_block();
-        spi.out_eof_des_addr().read().dma_out_eof_des_addr().bits() as usize
+        self.regs()
+            .out_eof_des_addr()
+            .read()
+            .dma_out_eof_des_addr()
+            .bits() as usize
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
@@ -125,8 +152,7 @@ impl TxRegisterAccess for AnySpiDmaTxChannel {
 
 impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
-        let reg_block = self.0.register_block();
-        reg_block.dma_int_ena().modify(|_, w| {
+        self.regs().dma_int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().bit(enable),
@@ -142,8 +168,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel {
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let spi = self.0.register_block();
-        let int_ena = spi.dma_int_ena().read();
+        let int_ena = self.regs().dma_int_ena().read();
         if int_ena.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
         }
@@ -161,8 +186,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel {
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
-        let spi = self.0.register_block();
-        spi.dma_int_clr().write(|w| {
+        self.regs().dma_int_clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
@@ -178,8 +202,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel {
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let spi = self.0.register_block();
-        let int_raw = spi.dma_int_raw().read();
+        let int_raw = self.regs().dma_int_raw().read();
         if int_raw.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
         }
@@ -211,16 +234,15 @@ impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel {
 
 impl RegisterAccess for AnySpiDmaRxChannel {
     fn reset(&self) {
-        let spi = self.0.register_block();
-        spi.dma_conf().modify(|_, w| w.in_rst().set_bit());
-        spi.dma_conf().modify(|_, w| w.in_rst().clear_bit());
+        self.regs().dma_conf().modify(|_, w| w.in_rst().set_bit());
+        self.regs().dma_conf().modify(|_, w| w.in_rst().clear_bit());
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
-        let spi = self.0.register_block();
-        spi.dma_conf()
+        self.regs()
+            .dma_conf()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
@@ -229,24 +251,26 @@ impl RegisterAccess for AnySpiDmaRxChannel {
     }
 
     fn set_link_addr(&self, address: u32) {
-        let spi = self.0.register_block();
-        spi.dma_in_link()
+        self.regs()
+            .dma_in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
     fn start(&self) {
-        let spi = self.0.register_block();
-        spi.dma_in_link().modify(|_, w| w.inlink_start().set_bit());
+        self.regs()
+            .dma_in_link()
+            .modify(|_, w| w.inlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let spi = self.0.register_block();
-        spi.dma_in_link().modify(|_, w| w.inlink_stop().set_bit());
+        self.regs()
+            .dma_in_link()
+            .modify(|_, w| w.inlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let spi = self.0.register_block();
-        spi.dma_in_link()
+        self.regs()
+            .dma_in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
     }
 
@@ -262,8 +286,8 @@ impl RegisterAccess for AnySpiDmaRxChannel {
 
     #[cfg(psram_dma)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        let spi = self.0.register_block();
-        spi.dma_conf()
+        self.regs()
+            .dma_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
@@ -285,8 +309,7 @@ impl RxRegisterAccess for AnySpiDmaRxChannel {
 
 impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
-        let reg_block = self.0.register_block();
-        reg_block.dma_int_ena().modify(|_, w| {
+        self.regs().dma_int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().bit(enable),
@@ -303,8 +326,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel {
     fn is_listening(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let spi = self.0.register_block();
-        let int_ena = spi.dma_int_ena().read();
+        let int_ena = self.regs().dma_int_ena().read();
         if int_ena.inlink_dscr_error().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
         }
@@ -325,8 +347,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel {
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
-        let spi = self.0.register_block();
-        spi.dma_int_clr().modify(|_, w| {
+        self.regs().dma_int_clr().modify(|_, w| {
             for interrupt in interrupts.into() {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
@@ -343,8 +364,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel {
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let spi = self.0.register_block();
-        let int_raw = spi.dma_int_raw().read();
+        let int_raw = self.regs().dma_int_raw().read();
         if int_raw.inlink_dscr_error().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
         }

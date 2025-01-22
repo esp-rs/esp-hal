@@ -147,6 +147,10 @@ mod tests {
         .with_cs(cs_signal)
         .with_ctrl_pins(NoPin, NoPin);
 
+        // explicitly drop the camera half to see if it disables clocks (unexpectedly,
+        // I8080 should keep it alive)
+        core::mem::drop(ctx.lcd_cam.cam);
+
         // This is to make the test values look more intuitive.
         i8080.set_bit_order(BitOrder::Inverted);
 

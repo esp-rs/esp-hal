@@ -40,6 +40,7 @@ use esp_println::println;
 
 #[main]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let lcd_backlight = peripherals.GPIO45;

@@ -97,6 +97,11 @@ impl<'d> Sha<'d> {
     pub fn start_owned<A: ShaAlgorithm>(self) -> ShaDigest<'d, A, Self> {
         ShaDigest::new(self)
     }
+
+    #[cfg(not(esp32))]
+    fn regs(&self) -> &crate::pac::sha::RegisterBlock {
+        self.sha.register_block()
+    }
 }
 
 impl crate::private::Sealed for Sha<'_> {}
@@ -147,7 +152,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         #[cfg(not(esp32))]
         // Setup SHA Mode.
         sha.borrow_mut()
-            .sha
+            .regs()
             .mode()
             .write(|w| unsafe { w.mode().bits(A::MODE_AS_BITS) });
 
@@ -167,7 +172,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     pub fn restore(mut sha: S, ctx: &mut Context<A>) -> Self {
         // Setup SHA Mode.
         sha.borrow_mut()
-            .sha
+            .regs()
             .mode()
             .write(|w| unsafe { w.mode().bits(A::MODE_AS_BITS) });
 
@@ -202,7 +207,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
             if #[cfg(esp32)] {
                 A::is_busy(&self.sha.borrow().sha)
             } else {
-                self.sha.borrow().sha.busy().read().state().bit_is_set()
+                self.sha.borrow().regs().busy().read().state().bit_is_set()
             }
         }
     }
@@ -353,30 +358,28 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     /// This method is platform-specific and differs for ESP32 and non-ESP32
     /// platforms.
     fn process_buffer(&mut self) {
-        #[cfg(not(esp32))]
-        if self.first_run {
-            // Set SHA_START_REG
-            self.sha
-                .borrow_mut()
-                .sha
-                .start()
-                .write(|w| unsafe { w.bits(1) });
-            self.first_run = false;
-        } else {
-            // SET SHA_CONTINUE_REG
-            self.sha
-                .borrow_mut()
-                .sha
-                .continue_()
-                .write(|w| unsafe { w.bits(1) });
-        }
+        let sha = self.sha.borrow_mut();
 
-        #[cfg(esp32)]
-        if self.first_run {
-            A::start(&mut self.sha.borrow_mut().sha);
-            self.first_run = false;
-        } else {
-            A::r#continue(&mut self.sha.borrow_mut().sha);
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                if self.first_run {
+                    A::start(&mut sha.sha);
+                    self.first_run = false;
+                } else {
+                    A::r#continue(&mut sha.sha);
+                }
+            } else {
+                if self.first_run {
+                    // Set SHA_START_REG
+                    // FIXME: raw register access
+                    sha.regs().start().write(|w| unsafe { w.bits(1) });
+                    self.first_run = false;
+                } else {
+                    // SET SHA_CONTINUE_REG
+                    // FIXME: raw register access
+                    sha.regs().continue_().write(|w| unsafe { w.bits(1) });
+                }
+            }
         }
     }
 
@@ -586,28 +589,28 @@ macro_rules! impl_sha {
             #[cfg(esp32)]
             fn start(sha: &mut crate::peripherals::SHA) {
                 paste::paste! {
-                    sha.[< $name:lower _start >]().write(|w| w.[< $name:lower _start >]().set_bit());
+                    sha.register_block().[< $name:lower _start >]().write(|w| w.[< $name:lower _start >]().set_bit());
                 }
             }
 
             #[cfg(esp32)]
             fn r#continue(sha: &mut crate::peripherals::SHA) {
                 paste::paste! {
-                    sha.[< $name:lower _continue >]().write(|w| w.[< $name:lower _continue >]().set_bit());
+                    sha.register_block().[< $name:lower _continue >]().write(|w| w.[< $name:lower _continue >]().set_bit());
                 }
             }
 
             #[cfg(esp32)]
             fn load(sha: &mut crate::peripherals::SHA) {
                 paste::paste! {
-                    sha.[< $name:lower _load >]().write(|w| w.[< $name:lower _load >]().set_bit());
+                    sha.register_block().[< $name:lower _load >]().write(|w| w.[< $name:lower _load >]().set_bit());
                 }
             }
 
             #[cfg(esp32)]
             fn is_busy(sha: &crate::peripherals::SHA) -> bool {
                 paste::paste! {
-                    sha.[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
+                    sha.register_block().[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
                 }
             }
         }
@@ -642,6 +645,7 @@ impl_sha!(Sha512_224, 5, 28, 128);
 impl_sha!(Sha512_256, 6, 32, 128);
 
 fn h_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+    let sha = sha.register_block();
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             sha.text(index).as_ptr()
@@ -652,6 +656,7 @@ fn h_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
 }
 
 fn m_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+    let sha = sha.register_block();
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             sha.text(index).as_ptr()

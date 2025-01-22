@@ -1,9 +1,16 @@
 //! # Inter-Integrated Circuit (I2C) - Master mode
 //!
+//! ## Overview
+//!
+//! In this mode, the I2C acts as master and initiates the I2C communication by
+//! generating a START condition. Note that only one master is allowed to occupy
+//! the bus to access one slave at the same time.
+//!
 //! ## Configuration
 //!
-//! Each I2C controller is individually configurable, and the usual setting
-//! such as frequency, timeout, and SDA/SCL pins can easily be configured.
+//! Each I2C Master controller is individually configurable, and the usual
+//! setting such as frequency, timeout, and SDA/SCL pins can easily be
+//! configured.
 //!
 //! ## Usage
 //!
@@ -35,7 +42,8 @@
 //! }
 //! # }
 //! ```
-//! [`embedded-hal`]: https://docs.rs/embedded-hal/latest/embedded_hal/index.html
+//! 
+//! [`embedded-hal`]:embedded_hal
 
 use core::marker::PhantomData;
 #[cfg(not(esp32))]
@@ -601,6 +609,25 @@ impl<'d> I2c<'d, Blocking> {
         Ok(i2c)
     }
 
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for the peripheral."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for the peripheral on the current core."
+    )]
+    #[doc = ""]
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    ///
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [crate::DEFAULT_INTERRUPT_HANDLER]
+    #[instability::unstable]
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.i2c.info().set_interrupt_handler(handler);
+    }
+
     /// Listen for the given interrupts
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<Event>>) {
@@ -707,7 +734,7 @@ impl<'d> I2c<'d, Blocking> {
 impl private::Sealed for I2c<'_, Blocking> {}
 
 impl InterruptConfigurable for I2c<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.i2c.info().set_interrupt_handler(handler);
     }
 }
@@ -742,7 +769,7 @@ struct I2cFuture<'a> {
 #[cfg(not(esp32))]
 impl<'a> I2cFuture<'a> {
     pub fn new(event: Event, info: &'a Info, state: &'a State) -> Self {
-        info.register_block().int_ena().modify(|_, w| {
+        info.regs().int_ena().modify(|_, w| {
             let w = match event {
                 Event::EndDetect => w.end_detect().set_bit(),
                 Event::TxComplete => w.trans_complete().set_bit(),
@@ -761,7 +788,7 @@ impl<'a> I2cFuture<'a> {
     }
 
     fn event_bit_is_clear(&self) -> bool {
-        let r = self.info.register_block().int_ena().read();
+        let r = self.info.regs().int_ena().read();
 
         match self.event {
             Event::EndDetect => r.end_detect().bit_is_clear(),
@@ -772,7 +799,7 @@ impl<'a> I2cFuture<'a> {
     }
 
     fn check_error(&self) -> Result<(), Error> {
-        let r = self.info.register_block().int_raw().read();
+        let r = self.info.regs().int_raw().read();
 
         if r.arbitration_lost().bit_is_set() {
             return Err(Error::ArbitrationLost);
@@ -784,19 +811,12 @@ impl<'a> I2cFuture<'a> {
 
         if r.nack().bit_is_set() {
             return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
-                self.info.register_block(),
+                self.info.regs(),
             )));
         }
 
         #[cfg(not(esp32))]
-        if r.trans_complete().bit_is_set()
-            && self
-                .info
-                .register_block()
-                .sr()
-                .read()
-                .resp_rec()
-                .bit_is_clear()
+        if r.trans_complete().bit_is_set() && self.info.regs().sr().read().resp_rec().bit_is_clear()
         {
             return Err(Error::AcknowledgeCheckFailed(
                 AcknowledgeCheckFailedReason::Data,
@@ -982,7 +1002,7 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
 }
 
 fn async_handler(info: &Info, state: &State) {
-    let regs = info.register_block();
+    let regs = info.regs();
     regs.int_ena().modify(|_, w| {
         w.end_detect().clear_bit();
         w.trans_complete().clear_bit();
@@ -1152,13 +1172,13 @@ pub struct Info {
 
 impl Info {
     /// Returns the register block for this I2C instance.
-    pub fn register_block(&self) -> &RegisterBlock {
+    pub fn regs(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
     }
 
     /// Listen for the given interrupts
     fn enable_listen(&self, interrupts: EnumSet<Event>, enable: bool) {
-        let reg_block = self.register_block();
+        let reg_block = self.regs();
 
         reg_block.int_ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -1175,7 +1195,7 @@ impl Info {
 
     fn interrupts(&self) -> EnumSet<Event> {
         let mut res = EnumSet::new();
-        let reg_block = self.register_block();
+        let reg_block = self.regs();
 
         let ints = reg_block.int_raw().read();
 
@@ -1194,7 +1214,7 @@ impl Info {
     }
 
     fn clear_interrupts(&self, interrupts: EnumSet<Event>) {
-        let reg_block = self.register_block();
+        let reg_block = self.regs();
 
         reg_block.int_clr().write(|w| {
             for interrupt in interrupts {
@@ -1239,14 +1259,14 @@ struct Driver<'a> {
 }
 
 impl Driver<'_> {
-    fn register_block(&self) -> &RegisterBlock {
-        self.info.register_block()
+    fn regs(&self) -> &RegisterBlock {
+        self.info.regs()
     }
 
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
     fn setup(&self, config: &Config) -> Result<(), ConfigError> {
-        self.register_block().ctr().write(|w| {
+        self.regs().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
             // Use open drain output for SDA and SCL
@@ -1260,13 +1280,11 @@ impl Driver<'_> {
         });
 
         #[cfg(esp32s2)]
-        self.register_block()
-            .ctr()
-            .modify(|_, w| w.ref_always_on().set_bit());
+        self.regs().ctr().modify(|_, w| w.ref_always_on().set_bit());
 
         // Configure filter
         // FIXME if we ever change this we need to adapt `set_frequency` for ESP32
-        set_filter(self.register_block(), Some(7), Some(7));
+        set_filter(self.regs(), Some(7), Some(7));
 
         // Configure frequency
         let clocks = Clocks::get();
@@ -1295,12 +1313,10 @@ impl Driver<'_> {
         // (the option to reset the FSM is not available
         // for the ESP32)
         #[cfg(not(esp32))]
-        self.register_block()
-            .ctr()
-            .modify(|_, w| w.fsm_rst().set_bit());
+        self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
 
         // Clear all I2C interrupts
-        self.register_block()
+        self.regs()
             .int_clr()
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
 
@@ -1314,7 +1330,7 @@ impl Driver<'_> {
     /// Resets the I2C peripheral's command registers
     fn reset_command_list(&self) {
         // Confirm that all commands that were configured were actually executed
-        for cmd in self.register_block().comd_iter() {
+        for cmd in self.regs().comd_iter() {
             cmd.reset();
         }
     }
@@ -1384,7 +1400,7 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold;
 
         configure_clock(
-            self.register_block(),
+            self.regs(),
             0,
             scl_low_period,
             scl_high_period,
@@ -1446,7 +1462,7 @@ impl Driver<'_> {
         });
 
         configure_clock(
-            self.register_block(),
+            self.regs(),
             0,
             scl_low_period,
             scl_high_period,
@@ -1529,7 +1545,7 @@ impl Driver<'_> {
         };
 
         configure_clock(
-            self.register_block(),
+            self.regs(),
             clkm_div,
             scl_low_period,
             scl_high_period,
@@ -1555,7 +1571,7 @@ impl Driver<'_> {
         self.wait_for_completion(false).await?;
 
         for byte in buffer.iter_mut() {
-            *byte = read_fifo(self.register_block());
+            *byte = read_fifo(self.regs());
         }
 
         Ok(())
@@ -1610,10 +1626,7 @@ impl Driver<'_> {
             // Load address and R/W bit into FIFO
             match addr {
                 I2cAddress::SevenBit(addr) => {
-                    write_fifo(
-                        self.register_block(),
-                        (addr << 1) | OperationType::Write as u8,
-                    );
+                    write_fifo(self.regs(), (addr << 1) | OperationType::Write as u8);
                 }
             }
         }
@@ -1693,10 +1706,7 @@ impl Driver<'_> {
             // Load address and R/W bit into FIFO
             match addr {
                 I2cAddress::SevenBit(addr) => {
-                    write_fifo(
-                        self.register_block(),
-                        (addr << 1) | OperationType::Read as u8,
-                    );
+                    write_fifo(self.regs(), (addr << 1) | OperationType::Read as u8);
                 }
             }
         }
@@ -1713,13 +1723,13 @@ impl Driver<'_> {
             loop {
                 self.check_errors()?;
 
-                let reg = self.register_block().fifo_st().read();
+                let reg = self.regs().fifo_st().read();
                 if reg.rxfifo_raddr().bits() != reg.rxfifo_waddr().bits() {
                     break;
                 }
             }
 
-            *byte = read_fifo(self.register_block());
+            *byte = read_fifo(self.regs());
         }
 
         Ok(())
@@ -1745,7 +1755,7 @@ impl Driver<'_> {
         // FIXME: Handle case where less data has been provided by the slave than
         // requested? Or is this prevented from a protocol perspective?
         for byte in buffer.iter_mut() {
-            *byte = read_fifo(self.register_block());
+            *byte = read_fifo(self.regs());
         }
 
         Ok(())
@@ -1753,7 +1763,7 @@ impl Driver<'_> {
 
     /// Clears all pending interrupts for the I2C peripheral.
     fn clear_all_interrupts(&self) {
-        self.register_block()
+        self.regs()
             .int_clr()
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
     }
@@ -1765,7 +1775,7 @@ impl Driver<'_> {
         }
 
         for b in bytes {
-            write_fifo(self.register_block(), *b);
+            write_fifo(self.regs(), *b);
             self.check_errors()?;
         }
 
@@ -1780,7 +1790,7 @@ impl Driver<'_> {
 
             I2cFuture::new(Event::TxFifoWatermark, self.info, self.state).await?;
 
-            self.register_block()
+            self.regs()
                 .int_clr()
                 .write(|w| w.txfifo_wm().clear_bit_by_one());
 
@@ -1790,7 +1800,7 @@ impl Driver<'_> {
                 break Ok(());
             }
 
-            write_fifo(self.register_block(), bytes[index]);
+            write_fifo(self.regs(), bytes[index]);
             index += 1;
         }
     }
@@ -1825,7 +1835,7 @@ impl Driver<'_> {
 
         let mut tout = MAX_ITERATIONS / 10; // adjust the timeout because we are yielding in the loop
         loop {
-            let interrupts = self.register_block().int_raw().read();
+            let interrupts = self.regs().int_raw().read();
 
             self.check_errors()?;
 
@@ -1853,7 +1863,7 @@ impl Driver<'_> {
     fn wait_for_completion_blocking(&self, end_only: bool) -> Result<(), Error> {
         let mut tout = MAX_ITERATIONS;
         loop {
-            let interrupts = self.register_block().int_raw().read();
+            let interrupts = self.regs().int_raw().read();
 
             self.check_errors()?;
 
@@ -1880,7 +1890,7 @@ impl Driver<'_> {
         // NOTE: on esp32 executing the end command generates the end_detect interrupt
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
-        for cmd_reg in self.register_block().comd_iter() {
+        for cmd_reg in self.regs().comd_iter() {
             let cmd = cmd_reg.read();
 
             if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
@@ -1899,7 +1909,7 @@ impl Driver<'_> {
     /// by resetting the I2C peripheral to clear the error condition and then
     /// returns an appropriate error.
     fn check_errors(&self) -> Result<(), Error> {
-        let interrupts = self.register_block().int_raw().read();
+        let interrupts = self.regs().int_raw().read();
 
         // The ESP32 variant has a slightly different interrupt naming
         // scheme!
@@ -1909,7 +1919,7 @@ impl Driver<'_> {
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.register_block())))
+                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.regs())))
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)
                 } else {
@@ -1920,10 +1930,10 @@ impl Driver<'_> {
                 let retval = if interrupts.time_out().bit_is_set() {
                     Err(Error::Timeout)
                 } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.register_block())))
+                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.regs())))
                 } else if interrupts.arbitration_lost().bit_is_set() {
                     Err(Error::ArbitrationLost)
-                } else if interrupts.trans_complete().bit_is_set() && self.register_block().sr().read().resp_rec().bit_is_clear() {
+                } else if interrupts.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
                     Err(Error::AcknowledgeCheckFailed(AcknowledgeCheckFailedReason::Data))
                 } else {
                     Ok(())
@@ -1951,43 +1961,26 @@ impl Driver<'_> {
         // Ensure that the configuration of the peripheral is correctly propagated
         // (only necessary for C2, C3, C6, H2 and S3 variant)
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-        self.register_block()
-            .ctr()
-            .modify(|_, w| w.conf_upgate().set_bit());
+        self.regs().ctr().modify(|_, w| w.conf_upgate().set_bit());
     }
 
     /// Starts an I2C transmission.
     fn start_transmission(&self) {
         // Start transmission
-        self.register_block()
-            .ctr()
-            .modify(|_, w| w.trans_start().set_bit());
+        self.regs().ctr().modify(|_, w| w.trans_start().set_bit());
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
     /// Fills the TX FIFO with data from the provided slice.
     fn fill_tx_fifo(&self, bytes: &[u8]) -> Result<usize, Error> {
         let mut index = 0;
-        while index < bytes.len()
-            && !self
-                .register_block()
-                .int_raw()
-                .read()
-                .txfifo_ovf()
-                .bit_is_set()
-        {
-            write_fifo(self.register_block(), bytes[index]);
+        while index < bytes.len() && !self.regs().int_raw().read().txfifo_ovf().bit_is_set() {
+            write_fifo(self.regs(), bytes[index]);
             index += 1;
         }
-        if self
-            .register_block()
-            .int_raw()
-            .read()
-            .txfifo_ovf()
-            .bit_is_set()
-        {
+        if self.regs().int_raw().read().txfifo_ovf().bit_is_set() {
             index -= 1;
-            self.register_block()
+            self.regs()
                 .int_clr()
                 .write(|w| w.txfifo_ovf().clear_bit_by_one());
         }
@@ -2006,27 +1999,15 @@ impl Driver<'_> {
         loop {
             self.check_errors()?;
 
-            while !self
-                .register_block()
-                .int_raw()
-                .read()
-                .txfifo_wm()
-                .bit_is_set()
-            {
+            while !self.regs().int_raw().read().txfifo_wm().bit_is_set() {
                 self.check_errors()?;
             }
 
-            self.register_block()
+            self.regs()
                 .int_clr()
                 .write(|w| w.txfifo_wm().clear_bit_by_one());
 
-            while !self
-                .register_block()
-                .int_raw()
-                .read()
-                .txfifo_wm()
-                .bit_is_set()
-            {
+            while !self.regs().int_raw().read().txfifo_wm().bit_is_set() {
                 self.check_errors()?;
             }
 
@@ -2034,7 +2015,7 @@ impl Driver<'_> {
                 break Ok(());
             }
 
-            write_fifo(self.register_block(), bytes[index]);
+            write_fifo(self.regs(), bytes[index]);
             index += 1;
         }
     }
@@ -2051,7 +2032,7 @@ impl Driver<'_> {
         }
 
         for b in bytes {
-            write_fifo(self.register_block(), *b);
+            write_fifo(self.regs(), *b);
         }
 
         Ok(bytes.len())
@@ -2076,7 +2057,7 @@ impl Driver<'_> {
         // this is only possible when writing the I2C address in release mode
         // from [perform_write_read]
         for b in bytes {
-            write_fifo(self.register_block(), *b);
+            write_fifo(self.regs(), *b);
             self.check_errors()?;
         }
 
@@ -2087,7 +2068,7 @@ impl Driver<'_> {
     #[cfg(not(esp32))]
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
-        self.register_block().fifo_conf().modify(|_, w| unsafe {
+        self.regs().fifo_conf().modify(|_, w| unsafe {
             w.tx_fifo_rst().set_bit();
             w.rx_fifo_rst().set_bit();
             w.nonfifo_en().clear_bit();
@@ -2096,12 +2077,12 @@ impl Driver<'_> {
             w.txfifo_wm_thrhd().bits(8)
         });
 
-        self.register_block().fifo_conf().modify(|_, w| {
+        self.regs().fifo_conf().modify(|_, w| {
             w.tx_fifo_rst().clear_bit();
             w.rx_fifo_rst().clear_bit()
         });
 
-        self.register_block().int_clr().write(|w| {
+        self.regs().int_clr().write(|w| {
             w.rxfifo_wm().clear_bit_by_one();
             w.txfifo_wm().clear_bit_by_one()
         });
@@ -2113,7 +2094,7 @@ impl Driver<'_> {
     #[cfg(esp32)]
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
-        self.register_block().fifo_conf().modify(|_, w| unsafe {
+        self.regs().fifo_conf().modify(|_, w| unsafe {
             w.tx_fifo_rst().set_bit();
             w.rx_fifo_rst().set_bit();
             w.nonfifo_en().clear_bit();
@@ -2121,12 +2102,12 @@ impl Driver<'_> {
             w.nonfifo_tx_thres().bits(32)
         });
 
-        self.register_block().fifo_conf().modify(|_, w| {
+        self.regs().fifo_conf().modify(|_, w| {
             w.tx_fifo_rst().clear_bit();
             w.rx_fifo_rst().clear_bit()
         });
 
-        self.register_block()
+        self.regs()
             .int_clr()
             .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
@@ -2140,7 +2121,7 @@ impl Driver<'_> {
     ) -> Result<usize, Error> {
         self.reset_fifo();
         self.reset_command_list();
-        let cmd_iterator = &mut self.register_block().comd_iter();
+        let cmd_iterator = &mut self.regs().comd_iter();
 
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
@@ -2179,7 +2160,7 @@ impl Driver<'_> {
         self.reset_fifo();
         self.reset_command_list();
 
-        let cmd_iterator = &mut self.register_block().comd_iter();
+        let cmd_iterator = &mut self.regs().comd_iter();
 
         if start {
             add_cmd(cmd_iterator, Command::Start)?;

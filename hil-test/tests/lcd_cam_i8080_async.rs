@@ -58,6 +58,10 @@ mod tests {
         })
         .unwrap();
 
+        // explicitly drop the camera half to see if it disables clocks (unexpectedly,
+        // I8080 should keep it alive)
+        core::mem::drop(ctx.lcd_cam.cam);
+
         let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
 
         transfer.wait_for_done().await;

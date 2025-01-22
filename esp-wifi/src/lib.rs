@@ -364,9 +364,9 @@ impl private::Sealed for Trng<'_> {}
 /// .unwrap();
 /// # }
 /// ```
-pub fn init<'d, T: EspWifiTimerSource>(
+pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     timer: impl Peripheral<P = T> + 'd,
-    _rng: impl EspWifiRngSource,
+    _rng: impl Peripheral<P = R> + 'd,
     _radio_clocks: impl Peripheral<P = hal::peripherals::RADIO_CLK> + 'd,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.

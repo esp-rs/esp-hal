@@ -123,7 +123,7 @@ impl TimerGroupInstance for TIMG0 {
 
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
-        Self::PTR
+        Self::regs()
     }
 
     fn configure_src_clk() {
@@ -132,7 +132,7 @@ impl TimerGroupInstance for TIMG0 {
                 // ESP32 has only APB clock source, do nothing
             } else if #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))] {
                 unsafe {
-                    (*Self::register_block())
+                    (*<Self as TimerGroupInstance>::register_block())
                         .t(0)
                         .config()
                         .modify(|_, w| w.use_xtal().clear_bit());
@@ -160,7 +160,7 @@ impl TimerGroupInstance for TIMG0 {
                 // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
             } else if #[cfg(any(esp32c2, esp32c3))] {
                 unsafe {
-                    (*Self::register_block())
+                    (*<Self as TimerGroupInstance>::register_block())
                         .wdtconfig0()
                         .modify(|_, w| w.wdt_use_xtal().clear_bit());
                 }
@@ -185,7 +185,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
 
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
-        Self::PTR
+        Self::regs()
     }
 
     fn configure_src_clk() {
@@ -199,7 +199,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
                     .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             } else if #[cfg(any(esp32s2, esp32s3))] {
                 unsafe {
-                    (*Self::register_block())
+                    (*<Self as TimerGroupInstance>::register_block())
                         .t(1)
                         .config()
                         .modify(|_, w| w.use_xtal().clear_bit());
