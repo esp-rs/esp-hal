@@ -1177,7 +1177,9 @@ impl<'d> Output<'d> {
     /// external hardware.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # use esp_hal::gpio::{Output, Level};
+    /// let pin1 = Output::new(peripherals.GPIO1, Level::High);
+    /// let (input, output) = pin1.split();
     /// # }
     /// ```
     #[inline]
@@ -1512,7 +1514,9 @@ impl<'d> Input<'d> {
     /// external hardware.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # use esp_hal::gpio::{Input, Pull};
+    /// let pin1 = Input::new(peripherals.GPIO1, Pull::Up);
+    /// let (input, output) = pin1.split();
     /// # }
     /// ```
     #[inline]
@@ -1644,7 +1648,13 @@ impl<'d> OutputOpenDrain<'d> {
     /// external hardware.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # use esp_hal::gpio::{OutputOpenDrain, Level, Pull};
+    /// let pin1 = OutputOpenDrain::new(
+    ///     peripherals.GPIO1,
+    ///     Level::High,
+    ///     Pull::Up
+    /// );
+    /// let (input, output) = pin1.split();
     /// # }
     /// ```
     #[inline]
@@ -2023,7 +2033,9 @@ impl<'d> Flex<'d> {
     /// external hardware.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # use esp_hal::gpio::Flex;
+    /// let pin1 = Flex::new(peripherals.GPIO1);
+    /// let (input, output) = pin1.split();
     /// # }
     /// ```
     #[inline]
@@ -2077,7 +2089,9 @@ impl AnyPin {
     /// using external hardware.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # use esp_hal::gpio::{AnyPin, Pin};
+    /// let pin1 = peripherals.GPIO1.degrade();
+    /// let (input, output) = pin1.split();
     /// # }
     /// ```
     #[inline]

@@ -1002,7 +1002,6 @@ mod dma {
     ///     tx_buffer
     /// ).unwrap();
     ///
-    ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
     ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
