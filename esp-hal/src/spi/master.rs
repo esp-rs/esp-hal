@@ -691,11 +691,12 @@ where
 {
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
-    /// Enables output functionality for the pin, and connects it to the MOSI.
-    /// Calling this will replace previous pin assignments for this signal.
+    /// Enables output functionality for the pin, and connects it as the MOSI
+    /// signal. You want to use this for full-duplex SPI or
+    /// if you intend to use [DataMode::SingleTwoDataLines].
     ///
-    /// You want to use this for full-duplex SPI or
-    /// [DataMode::SingleTwoDataLines]
+    /// Disconnects the previous pin that was assigned with `with_mosi` or
+    /// `with_sio0`.
     pub fn with_mosi<MOSI: PeripheralOutput>(
         mut self,
         mosi: impl Peripheral<P = MOSI> + 'd,
@@ -713,7 +714,8 @@ where
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI signal and SIO0 input signal.
     ///
-    /// Calling this will replace previous pin assignments for the MOSI signal.
+    /// Disconnects the previous pin that was assigned with `with_sio0` or
+    /// `with_mosi`.
     ///
     /// Use this if any of the devices on the bus use half-duplex SPI.
     ///
@@ -756,7 +758,7 @@ where
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO signal and SIO1 input signal.
     ///
-    /// Calling this will replace previous pin assignments for the SIO1 signal.
+    /// Disconnects the previous pin that was assigned with `with_sio1`.
     ///
     /// Use this if any of the devices on the bus use half-duplex SPI.
     ///
@@ -773,7 +775,6 @@ where
         miso.enable_output(true);
 
         self.driver().info.miso.connect_to(&mut miso);
-        // self.driver().info.sio1_output.connect_to(&mut miso);
         self.pins.sio1_pin =
             OutputConnection::connect_with_guard(miso, self.driver().info.sio1_output);
 
@@ -782,10 +783,10 @@ where
 
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
     ///
-    /// Calling this will replace previous pin assignments for this signal.
+    /// Configures the specified pin to push-pull output and connects it to the
+    /// SPI clock signal.
     ///
-    /// Sets the specified pin to push-pull output and connects it to the SPI
-    /// clock signal.
+    /// Disconnects the previous pin that was assigned with `with_sck`.
     pub fn with_sck<SCK: PeripheralOutput>(mut self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
         crate::into_mapped_ref!(sclk);
         sclk.set_to_push_pull_output();
@@ -796,10 +797,10 @@ where
 
     /// Assign the CS (Chip Select) pin for the SPI instance.
     ///
-    /// Sets the specified pin to push-pull output and connects it to the SPI CS
-    /// signal.
+    /// Configures the specified pin to push-pull output and connects it to the
+    /// SPI CS signal.
     ///
-    /// Calling this will replace previous pin assignments for this signal.
+    /// Disconnects the previous pin that was assigned with `with_cs`.
     ///
     /// # Current Stability Limitations
     /// The hardware chip select functionality is limited; only one CS line can
