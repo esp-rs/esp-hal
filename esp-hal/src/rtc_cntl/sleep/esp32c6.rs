@@ -74,7 +74,7 @@ impl Ext1WakeupSource<'_, '_> {
     fn wake_io_reset() {
         use crate::gpio::{GpioPin, RtcPin};
 
-        fn uninit_pin(mut pin: impl RtcPin, wakeup_pins: u8) {
+        fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
             if wakeup_pins & (1 << pin.number()) != 0 {
                 pin.rtcio_pad_hold(false);
                 pin.rtc_set_config(false, false, RtcFunction::Rtc);

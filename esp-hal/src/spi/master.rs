@@ -775,7 +775,7 @@ where
         crate::into_mapped_ref!(miso);
         miso.enable_input(true);
 
-        self.driver().info.miso.connect_to(&mut miso);
+        self.driver().info.miso.connect_to(miso);
 
         self
     }

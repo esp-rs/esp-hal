@@ -587,7 +587,7 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
         pin.enable_input(true);
         pin.pull_direction(Pull::Up);
 
-        input.connect_to(&mut pin);
+        input.connect_to(pin.reborrow());
 
         *guard = OutputConnection::connect_with_guard(pin, output);
     }

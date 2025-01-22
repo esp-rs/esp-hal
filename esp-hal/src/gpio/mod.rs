@@ -376,17 +376,20 @@ pub trait RtcPin: Pin {
 
     /// Configure the pin
     #[cfg(any(xtensa, esp32c6))]
-    fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction);
+    #[doc(hidden)]
+    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction);
 
     /// Enable or disable PAD_HOLD
-    fn rtcio_pad_hold(&mut self, enable: bool);
+    #[doc(hidden)]
+    fn rtcio_pad_hold(&self, enable: bool);
 
     /// # Safety
     ///
     /// The `level` argument needs to be a valid setting for the
     /// `rtc_cntl.gpio_wakeup.gpio_pinX_int_type`.
     #[cfg(any(esp32c3, esp32c2, esp32c6))]
-    unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8);
+    #[doc(hidden)]
+    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8);
 }
 
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
@@ -395,9 +398,11 @@ pub trait RtcPin: Pin {
 #[cfg(any(lp_io, rtc_cntl))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
-    fn rtcio_pullup(&mut self, enable: bool);
+    #[doc(hidden)]
+    fn rtcio_pullup(&self, enable: bool);
     /// Enable/disable the internal pull-down resistor
-    fn rtcio_pulldown(&mut self, enable: bool);
+    #[doc(hidden)]
+    fn rtcio_pulldown(&self, enable: bool);
 }
 
 /// Common trait implemented by pins
@@ -1800,7 +1805,7 @@ impl Peripheral for Flex<'_> {
     type P = Self;
     unsafe fn clone_unchecked(&self) -> Self::P {
         Self {
-            pin: PeripheralRef::new(core::ptr::read(&*self.pin as *const AnyPin)),
+            pin: PeripheralRef::new(AnyPin(self.pin.number())),
         }
     }
 }
@@ -2152,7 +2157,7 @@ impl AnyPin {
     /// Set up as output
     #[inline]
     pub(crate) fn init_output(
-        &mut self,
+        &self,
         alternate: AlternateFunction,
         open_drain: bool,
         input_enable: Option<bool>,
@@ -2182,31 +2187,31 @@ impl AnyPin {
 
     /// Configure open-drain mode
     #[inline]
-    pub(crate) fn set_to_open_drain_output(&mut self) {
+    pub(crate) fn set_to_open_drain_output(&self) {
         self.init_output(GPIO_FUNCTION, true, Some(true));
     }
 
     /// Configure output mode
     #[inline]
-    pub(crate) fn set_to_push_pull_output(&mut self) {
+    pub(crate) fn set_to_push_pull_output(&self) {
         self.init_output(GPIO_FUNCTION, false, None);
     }
 
     /// Set the pin's level to high or low
     #[inline]
-    pub(crate) fn set_output_high(&mut self, high: bool) {
+    pub(crate) fn set_output_high(&self, high: bool) {
         self.bank().write_output(self.mask(), high);
     }
 
     /// Configure the [DriveStrength] of the pin
     #[inline]
-    pub(crate) fn set_drive_strength(&mut self, strength: DriveStrength) {
+    pub(crate) fn set_drive_strength(&self, strength: DriveStrength) {
         io_mux_reg(self.number()).modify(|_, w| unsafe { w.fun_drv().bits(strength as u8) });
     }
 
     /// Enable/disable open-drain mode
     #[inline]
-    pub(crate) fn enable_open_drain(&mut self, on: bool) {
+    pub(crate) fn enable_open_drain(&self, on: bool) {
         GPIO::regs()
             .pin(self.number() as usize)
             .modify(|_, w| w.pad_driver().bit(on));
@@ -2244,43 +2249,42 @@ impl OutputPin for AnyPin {}
 #[cfg(any(lp_io, rtc_cntl))]
 impl RtcPin for AnyPin {
     #[cfg(xtensa)]
-    #[allow(unused_braces)] // False positive :/
+    #[allow(unused_braces, reason = "False positive")]
     fn rtc_number(&self) -> u8 {
         handle_rtcio!(self, target, { RtcPin::rtc_number(&target) })
     }
 
     #[cfg(any(xtensa, esp32c6))]
-    fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: RtcFunction) {
+    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
         handle_rtcio!(self, target, {
-            RtcPin::rtc_set_config(&mut target, input_enable, mux, func)
+            RtcPin::rtc_set_config(&target, input_enable, mux, func)
         })
     }
 
-    fn rtcio_pad_hold(&mut self, enable: bool) {
-        handle_rtcio!(self, target, {
-            RtcPin::rtcio_pad_hold(&mut target, enable)
-        })
+    #[allow(unused_braces, reason = "False positive")]
+    fn rtcio_pad_hold(&self, enable: bool) {
+        handle_rtcio!(self, target, { RtcPin::rtcio_pad_hold(&target, enable) })
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32c6))]
-    unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
+    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
         handle_rtcio!(self, target, {
-            RtcPin::apply_wakeup(&mut target, wakeup, level)
+            RtcPin::apply_wakeup(&target, wakeup, level)
         })
     }
 }
 
 #[cfg(any(lp_io, rtc_cntl))]
 impl RtcPinWithResistors for AnyPin {
-    fn rtcio_pullup(&mut self, enable: bool) {
+    fn rtcio_pullup(&self, enable: bool) {
         handle_rtcio_with_resistors!(self, target, {
-            RtcPinWithResistors::rtcio_pullup(&mut target, enable)
+            RtcPinWithResistors::rtcio_pullup(&target, enable)
         })
     }
 
-    fn rtcio_pulldown(&mut self, enable: bool) {
+    fn rtcio_pulldown(&self, enable: bool) {
         handle_rtcio_with_resistors!(self, target, {
-            RtcPinWithResistors::rtcio_pulldown(&mut target, enable)
+            RtcPinWithResistors::rtcio_pulldown(&target, enable)
         })
     }
 }
@@ -2333,7 +2337,7 @@ mod asynch {
             // We construct the Future first, because its `Drop` implementation
             // is load-bearing if `wait_for` is dropped during the initialization.
             let mut future = PinFuture {
-                pin: unsafe { self.clone_unchecked() },
+                pin: Flex::new(unsafe { self.pin.clone_unchecked() }),
             };
 
             // Make sure this pin is not being processed by an interrupt handler.

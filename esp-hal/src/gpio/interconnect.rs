@@ -155,7 +155,7 @@ pub(crate) fn connect_input_signal(
 }
 
 fn connect_pin_to_input_signal(
-    pin: &mut AnyPin,
+    pin: &AnyPin,
     signal: gpio::InputSignal,
     is_inverted: bool,
     force_gpio: bool,
@@ -176,7 +176,7 @@ fn connect_pin_to_input_signal(
 }
 
 fn connect_peripheral_to_output(
-    pin: &mut AnyPin,
+    pin: &AnyPin,
     signal: gpio::OutputSignal,
     is_inverted: bool,
     force_gpio: bool,
@@ -217,7 +217,7 @@ fn connect_peripheral_to_output(
         });
 }
 
-fn disconnect_peripheral_output_from_pin(pin: &mut AnyPin, signal: gpio::OutputSignal) {
+fn disconnect_peripheral_output_from_pin(pin: &AnyPin, signal: gpio::OutputSignal) {
     pin.set_alternate_function(GPIO_FUNCTION);
 
     GPIO::regs()
@@ -307,8 +307,8 @@ impl InputSignal {
     /// Since there can only be one input signal connected to a peripheral at a
     /// time, this function will disconnect any previously connected input
     /// signals.
-    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal) {
-        connect_pin_to_input_signal(&mut self.pin, signal, self.is_inverted, true);
+    fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
+        connect_pin_to_input_signal(&self.pin, signal, self.is_inverted, true);
     }
 
     delegate::delegate! {
@@ -318,7 +318,7 @@ impl InputSignal {
             pub fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::InputSignal)];
             pub fn init_input(&self, pull: Pull);
             pub fn is_input_high(&self) -> bool;
-            pub fn enable_input(&mut self, on: bool);
+            pub fn enable_input(&self, on: bool);
         }
     }
 }
@@ -346,8 +346,8 @@ impl DirectInputSignal {
     /// Since there can only be one input signal connected to a peripheral at a
     /// time, this function will disconnect any previously connected input
     /// signals.
-    fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal) {
-        connect_pin_to_input_signal(&mut self.pin, signal, false, false);
+    fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
+        connect_pin_to_input_signal(&self.pin, signal, false, false);
     }
 
     delegate::delegate! {
@@ -356,7 +356,7 @@ impl DirectInputSignal {
             fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::InputSignal)];
             fn init_input(&self, pull: Pull);
             fn is_input_high(&self) -> bool;
-            fn enable_input(&mut self, on: bool);
+            fn enable_input(&self, on: bool);
         }
     }
 }
@@ -428,8 +428,8 @@ impl OutputSignal {
     }
 
     /// Connect the pin to a peripheral output signal.
-    fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal) {
-        connect_peripheral_to_output(&mut self.pin, signal, self.is_inverted, true, true, false);
+    fn connect_peripheral_to_output(&self, signal: gpio::OutputSignal) {
+        connect_peripheral_to_output(&self.pin, signal, self.is_inverted, true, true, false);
     }
 
     /// Remove this output pin from a connected [signal](`gpio::OutputSignal`).
@@ -437,8 +437,8 @@ impl OutputSignal {
     /// Clears the entry in the GPIO matrix / Io mux that associates this output
     /// pin with a previously connected [signal](`gpio::OutputSignal`). Any
     /// other outputs connected to the peripheral remain intact.
-    fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal) {
-        disconnect_peripheral_output_from_pin(&mut self.pin, signal);
+    fn disconnect_from_peripheral_output(&self, signal: gpio::OutputSignal) {
+        disconnect_peripheral_output_from_pin(&self.pin, signal);
     }
 
     delegate::delegate! {
@@ -448,15 +448,15 @@ impl OutputSignal {
             pub fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::InputSignal)];
             pub fn init_input(&self, pull: Pull);
             pub fn is_input_high(&self) -> bool;
-            pub fn enable_input(&mut self, on: bool);
+            pub fn enable_input(&self, on: bool);
 
             pub fn output_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::OutputSignal)];
-            pub fn set_to_open_drain_output(&mut self);
-            pub fn set_to_push_pull_output(&mut self);
-            pub fn enable_output(&mut self, on: bool);
-            pub fn set_output_high(&mut self, on: bool);
-            pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength);
-            pub fn enable_open_drain(&mut self, on: bool);
+            pub fn set_to_open_drain_output(&self);
+            pub fn set_to_push_pull_output(&self);
+            pub fn enable_output(&self, on: bool);
+            pub fn set_output_high(&self, on: bool);
+            pub fn set_drive_strength(&self, strength: gpio::DriveStrength);
+            pub fn enable_open_drain(&self, on: bool);
             pub fn is_set_high(&self) -> bool;
         }
     }
@@ -475,8 +475,8 @@ impl DirectOutputSignal {
     }
 
     /// Connect the pin to a peripheral output signal.
-    fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal) {
-        connect_peripheral_to_output(&mut self.pin, signal, false, false, true, false);
+    fn connect_peripheral_to_output(&self, signal: gpio::OutputSignal) {
+        connect_peripheral_to_output(&self.pin, signal, false, false, true, false);
     }
 
     /// Remove this output pin from a connected [signal](`gpio::OutputSignal`).
@@ -484,8 +484,8 @@ impl DirectOutputSignal {
     /// Clears the entry in the GPIO matrix / Io mux that associates this output
     /// pin with a previously connected [signal](`gpio::OutputSignal`). Any
     /// other outputs connected to the peripheral remain intact.
-    fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal) {
-        disconnect_peripheral_output_from_pin(&mut self.pin, signal);
+    fn disconnect_from_peripheral_output(&self, signal: gpio::OutputSignal) {
+        disconnect_peripheral_output_from_pin(&self.pin, signal);
     }
 
     delegate::delegate! {
@@ -494,15 +494,15 @@ impl DirectOutputSignal {
             fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::InputSignal)];
             fn init_input(&self, pull: Pull);
             fn is_input_high(&self) -> bool;
-            fn enable_input(&mut self, on: bool);
+            fn enable_input(&self, on: bool);
 
             fn output_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::OutputSignal)];
-            fn set_to_open_drain_output(&mut self);
-            fn set_to_push_pull_output(&mut self);
-            fn enable_output(&mut self, on: bool);
-            fn set_output_high(&mut self, on: bool);
-            fn set_drive_strength(&mut self, strength: gpio::DriveStrength);
-            fn enable_open_drain(&mut self, on: bool);
+            fn set_to_open_drain_output(&self);
+            fn set_to_push_pull_output(&self);
+            fn enable_output(&self, on: bool);
+            fn set_output_high(&self, on: bool);
+            fn set_drive_strength(&self, strength: gpio::DriveStrength);
+            fn enable_open_drain(&self, on: bool);
             fn is_set_high(&self) -> bool;
         }
     }
@@ -605,18 +605,10 @@ impl InputConnection {
             pub fn init_input(&self, pull: Pull);
             pub fn is_input_high(&self) -> bool;
             pub fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::InputSignal)];
-        }
-
-        #[instability::unstable]
-        to match &mut self.0 {
-            InputConnectionInner::Input(pin) => pin,
-            InputConnectionInner::DirectInput(pin) => pin,
-            InputConnectionInner::Constant(level) => level,
-        } {
-            pub fn enable_input(&mut self, on: bool);
+            pub fn enable_input(&self, on: bool);
 
             // This doesn't need to be public, the intended way is `connect_to` and `disconnect_from`
-            fn connect_input_to_peripheral(&mut self, signal: gpio::InputSignal);
+            fn connect_input_to_peripheral(&self, signal: gpio::InputSignal);
         }
     }
 }
@@ -702,27 +694,20 @@ impl OutputConnection {
 
             pub fn is_set_high(&self) -> bool;
             pub fn output_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::OutputSignal)];
-        }
-        #[instability::unstable]
-        to match &mut self.0 {
-            OutputConnectionInner::Output(pin) => pin,
-            OutputConnectionInner::DirectOutput(pin) => pin,
-            OutputConnectionInner::Constant(level) => level,
-        } {
-            pub fn pull_direction(&mut self, pull: Pull);
-            pub fn init_input(&mut self, pull: Pull);
-            pub fn enable_input(&mut self, on: bool);
+            pub fn pull_direction(&self, pull: Pull);
+            pub fn init_input(&self, pull: Pull);
+            pub fn enable_input(&self, on: bool);
 
-            pub fn set_to_open_drain_output(&mut self);
-            pub fn set_to_push_pull_output(&mut self);
-            pub fn enable_output(&mut self, on: bool);
-            pub fn set_output_high(&mut self, on: bool);
-            pub fn set_drive_strength(&mut self, strength: gpio::DriveStrength);
-            pub fn enable_open_drain(&mut self, on: bool);
+            pub fn set_to_open_drain_output(&self);
+            pub fn set_to_push_pull_output(&self);
+            pub fn enable_output(&self, on: bool);
+            pub fn set_output_high(&self, on: bool);
+            pub fn set_drive_strength(&self, strength: gpio::DriveStrength);
+            pub fn enable_open_drain(&self, on: bool);
 
             // These don't need to be public, the intended way is `connect_to` and `disconnect_from`
-            fn connect_peripheral_to_output(&mut self, signal: gpio::OutputSignal);
-            fn disconnect_from_peripheral_output(&mut self, signal: gpio::OutputSignal);
+            fn connect_peripheral_to_output(&self, signal: gpio::OutputSignal);
+            fn disconnect_from_peripheral_output(&self, signal: gpio::OutputSignal);
         }
     }
 
