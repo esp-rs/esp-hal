@@ -139,3 +139,18 @@ Use `DataMode::SingleTwoDataLines` to get the previous behavior.
 +       .with_fifo_full_threshold(30)
 + );
 ```
+
+## GPIO changes
+
+GPIO drivers now take configuration structs, and their constructors are fallible.
+
+```diff
+- Input::new(peripherals.GPIO0, Pull::Up);
++ Input::new(peripherals.GPIO0, InputConfig::default().with_pull(Pull::Up)).unwrap();
+- Output::new(peripherals.GPIO0, Level::Low);
++ Output::new(peripherals.GPIO0, OutputConfig::default().with_level(Level::Low)).unwrap();
+- OutputOpenDrain::new(peripherals.GPIO0, Level::Low, Pull::Up);
++ OutputOpenDrain::new(
++     peripherals.GPIO0,
++     OutputOpenDrainConfig::default().with_level(Level::Low).with_pull(Pull::Up)
++ ).unwrap();

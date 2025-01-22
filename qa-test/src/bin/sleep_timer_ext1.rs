@@ -13,7 +13,7 @@ use core::time::Duration;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{Input, Pull, RtcPin},
+    gpio::{Input, InputConfig, Pull, RtcPin},
     main,
     rtc_cntl::{
         reset_reason,
@@ -34,7 +34,7 @@ fn main() -> ! {
 
     let mut pin_2 = peripherals.GPIO2;
     let mut pin_4 = peripherals.GPIO4;
-    let input = Input::new(&mut pin_4, Pull::None);
+    let input = Input::new(&mut pin_4, InputConfig::default().with_pull(Pull::None)).unwrap();
 
     println!("up and runnning!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);

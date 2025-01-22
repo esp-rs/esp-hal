@@ -114,11 +114,12 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator};
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::gpio::{Level, Output};
+//! # use esp_hal::gpio::{Level, Output, OutputConfig};
 //!
 //! const WIDTH: usize = 80;
 //!
-//! let mut out = Output::new(peripherals.GPIO5, Level::Low);
+//! let config = OutputConfig::default().with_level(Level::Low);
+//! let mut out = Output::new(peripherals.GPIO5, config).unwrap();
 //!
 //! // Configure frequency based on chip type
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]

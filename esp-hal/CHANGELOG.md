@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add separate config for Rx and Tx (UART) #2965
 
 ### Changed
+
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
 - RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
 - RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
@@ -21,10 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `embedded-hal-nb` traits (#2882)
 - `timer::wait` is now blocking (#2882)
 - By default, set `tx_idle_num` to 0 so that bytes written to TX FIFO are always immediately transmitted. (#2859)
-
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
-
 - `Async` drivers are no longer `Send` (#2980)
+- GPIO drivers now take configuration structs, and their constructors are fallible (#2990)
 
 ### Fixed
 

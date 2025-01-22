@@ -26,7 +26,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    gpio::{Input, Pull},
+    gpio::{Input, InputConfig, Pull},
     main,
     rng::Rng,
     time,
@@ -52,11 +52,12 @@ fn main() -> ! {
     )
     .unwrap();
 
+    let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = Input::new(peripherals.GPIO0, Pull::Down);
+            let button = Input::new(peripherals.GPIO0, config).unwrap();
         } else {
-            let button = Input::new(peripherals.GPIO9, Pull::Down);
+            let button = Input::new(peripherals.GPIO9, config).unwrap();
         }
     }
 
