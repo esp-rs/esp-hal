@@ -559,30 +559,33 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     /// Connect a pin to the I2C SDA signal.
     ///
     /// This will replace previous pin assignments for this signal.
-    pub fn with_sda(self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    pub fn with_sda(mut self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
-        self.with_pin(sda, input, output, true)
+        Self::connect_pin(sda, input, output, &mut self.sda_pin);
+
+        self
     }
 
     /// Connect a pin to the I2C SCL signal.
     ///
     /// This will replace previous pin assignments for this signal.
-    pub fn with_scl(self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    pub fn with_scl(mut self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
-        self.with_pin(scl, input, output, false)
+        Self::connect_pin(scl, input, output, &mut self.scl_pin);
+
+        self
     }
 
-    fn with_pin(
-        mut self,
+    fn connect_pin(
         pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         input: InputSignal,
         output: OutputSignal,
-        is_sda: bool,
-    ) -> Self {
+        guard: &mut PinGuard,
+    ) {
         crate::into_mapped_ref!(pin);
         // avoid the pin going low during configuration
         pin.set_output_high(true);
@@ -592,15 +595,8 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
         pin.pull_direction(Pull::Up);
 
         input.connect_to(&mut pin);
-        output.connect_to(&mut pin);
 
-        if is_sda {
-            self.sda_pin = OutputConnection::connect_with_guard(pin, output);
-        } else {
-            self.scl_pin = OutputConnection::connect_with_guard(pin, output);
-        }
-
-        self
+        *guard = OutputConnection::connect_with_guard(pin, output);
     }
 }
 
