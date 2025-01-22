@@ -20,7 +20,7 @@ use crate::{
         INPUT_SIGNAL_MAX,
         OUTPUT_SIGNAL_MAX,
     },
-    peripheral::{Peripheral, PeripheralRef},
+    peripheral::Peripheral,
     peripherals::GPIO,
     private::{self, Sealed},
 };
@@ -720,9 +720,10 @@ impl OutputConnection {
     }
 
     pub(crate) fn connect_with_guard(
-        this: PeripheralRef<'_, Self>,
+        this: impl Peripheral<P = impl PeripheralOutput>,
         signal: crate::gpio::OutputSignal,
     ) -> PinGuard {
+        crate::into_mapped_ref!(this);
         match &this.0 {
             OutputConnectionInner::Output(pin) => {
                 PinGuard::new(unsafe { pin.pin.clone_unchecked() }, signal)
