@@ -15,7 +15,7 @@ use crate::rtc_cntl::SocResetReason;
 
 crate::unstable_module! {
     pub mod efuse;
-    #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+    #[cfg(feature = "psram")]
     pub mod psram;
     pub mod radio_clocks;
     pub mod trng;

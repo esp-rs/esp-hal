@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Async` drivers are no longer `Send` (#2980)
 - GPIO drivers now take configuration structs, and their constructors are fallible (#2990)
+- `flip-link` feature is now a config option
+- `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`)
+
+- `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`) (#3001)
+
+- Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
 
 ### Fixed
 

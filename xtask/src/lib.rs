@@ -187,9 +187,9 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             features.push("unstable".to_owned());
             features.push("ci".to_owned());
             match chip_name.as_str() {
-                "esp32" => features.push("quad-psram".to_owned()),
-                "esp32s2" => features.push("quad-psram".to_owned()),
-                "esp32s3" => features.push("quad-psram".to_owned()),
+                "esp32" => features.push("psram".to_owned()),
+                "esp32s2" => features.push("psram".to_owned()),
+                "esp32s3" => features.push("psram".to_owned()),
                 _ => {}
             };
         }
