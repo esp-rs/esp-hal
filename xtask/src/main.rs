@@ -12,8 +12,8 @@ use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
+    firmware::Metadata,
     target_triple,
-    Metadata,
     Package,
     Version,
 };
@@ -235,7 +235,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     };
 
     // Load all examples which support the specified chip and parse their metadata:
-    let mut examples = xtask::load_examples(&example_path)?
+    let mut examples = xtask::firmware::load(&example_path)?
         .iter()
         .filter_map(|example| {
             if example.supports_chip(args.chip) {
@@ -413,7 +413,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let target = target_triple(Package::HilTest, &args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = xtask::load_examples(&package_path.join("tests"))?
+    let mut tests = xtask::firmware::load(&package_path.join("tests"))?
         .into_iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();

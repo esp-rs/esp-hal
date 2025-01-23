@@ -1,7 +1,7 @@
 //! GPIO Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable embassy
+//% FEATURES(unstable): unstable embassy
 //% FEATURES(stable):
 
 #![no_std]
