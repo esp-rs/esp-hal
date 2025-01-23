@@ -280,27 +280,6 @@ pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
                 }
 
                 feature_sets.push((feature_set_name, values));
-            } else if key.starts_with("CHIP-FEATURES(") {
-                // Additional features required for specific chips.
-                // These are appended to the base feature set(s).
-                // If multiple are specified, the last entry wins.
-                let chips = key
-                    .trim_start_matches("CHIP-FEATURES(")
-                    .trim_end_matches(')');
-
-                let chips = chips
-                    .split_ascii_whitespace()
-                    .map(|s| Chip::from_str(s, false).unwrap())
-                    .collect::<Vec<_>>();
-
-                let values = value
-                    .split_ascii_whitespace()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>();
-
-                for chip in chips {
-                    chip_features.insert(chip, values.clone());
-                }
             } else if key.starts_with("TAG") {
                 tag = Some(value.to_string());
             } else {
