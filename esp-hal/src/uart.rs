@@ -416,6 +416,7 @@ where
         let rx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
         let tx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
 
+        let rts_pin = PinGuard::new_unconnected(self.uart.info().rts_signal);
         let tx_pin = PinGuard::new_unconnected(self.uart.info().tx_signal);
 
         let mut serial = Uart {
@@ -428,6 +429,7 @@ where
                 uart: self.uart,
                 phantom: PhantomData,
                 guard: tx_guard,
+                rts_pin,
                 tx_pin,
             },
         };
@@ -448,6 +450,7 @@ pub struct UartTx<'d, Dm> {
     uart: PeripheralRef<'d, AnyUart>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
+    rts_pin: PinGuard,
     tx_pin: PinGuard,
 }
 
@@ -529,10 +532,10 @@ where
     Dm: DriverMode,
 {
     /// Configure RTS pin
-    pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    pub fn with_rts(mut self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(rts);
         rts.set_to_push_pull_output();
-        self.uart.info().rts_signal.connect_to(rts);
+        self.rts_pin = OutputConnection::connect_with_guard(rts, self.uart.info().rts_signal);
 
         self
     }
@@ -666,6 +669,7 @@ impl<'d> UartTx<'d, Blocking> {
             uart: self.uart,
             phantom: PhantomData,
             guard: self.guard,
+            rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
         }
     }
@@ -686,6 +690,7 @@ impl<'d> UartTx<'d, Async> {
             uart: self.uart,
             phantom: PhantomData,
             guard: self.guard,
+            rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
         }
     }
