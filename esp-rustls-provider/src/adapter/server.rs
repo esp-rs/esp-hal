@@ -65,11 +65,11 @@ where
         let mut done = false;
         loop {
             if done {
-                log::debug!("Done work for now");
+                debug!("Done work for now");
                 break;
             }
 
-            log::debug!(
+            debug!(
                 "Incoming used {}, outgoing used {}, plaintext_in used {}, plaintext_out used {}",
                 self.incoming_used,
                 self.outgoing_used,
@@ -81,7 +81,7 @@ where
                 .conn
                 .process_tls_records(&mut self.incoming_tls[..self.incoming_used]);
 
-            log::debug!("State {:?}", state);
+            debug!("State {:?}", state);
 
             match state.map_err(ConnectionError::Rustls)? {
                 ConnectionState::ReadTraffic(mut state) => {
@@ -112,7 +112,7 @@ where
                 }
 
                 ConnectionState::TransmitTlsData(state) => {
-                    log::debug!("Send tls");
+                    debug!("Send tls");
                     self.socket
                         .write_all(&self.outgoing_tls[..self.outgoing_used])?;
                     self.socket.flush()?;
@@ -121,12 +121,12 @@ where
                 }
 
                 ConnectionState::BlockedHandshake { .. } => {
-                    log::debug!("Receive tls");
+                    debug!("Receive tls");
 
                     let read = self
                         .socket
                         .read(&mut self.incoming_tls[self.incoming_used..])?;
-                    log::debug!("Received {read}B of data");
+                    debug!("Received {read}B of data");
                     self.incoming_used += read;
 
                     if read == 0 {
@@ -145,7 +145,7 @@ where
                         self.outgoing_used += written;
                         self.plaintext_out_used = 0;
 
-                        log::debug!("Send tls");
+                        debug!("Send tls");
                         self.socket
                             .write_all(&self.outgoing_tls[..self.outgoing_used])?;
                         self.socket.flush()?;
@@ -155,7 +155,9 @@ where
                 }
 
                 ConnectionState::Closed => {
-                    // handle this state
+                    // connection has been cleanly closed - these might be still plaintext data to
+                    // be consumed
+                    done = true;
                 }
 
                 // other states are not expected here
@@ -169,7 +171,7 @@ where
                     .copy_within(discard..self.incoming_used, 0);
                 self.incoming_used -= discard;
 
-                log::debug!("Discarded {discard}B from `incoming_tls`");
+                debug!("Discarded {discard}B from `incoming_tls`");
             }
         }
 

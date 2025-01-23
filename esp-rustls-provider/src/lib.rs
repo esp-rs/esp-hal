@@ -4,6 +4,9 @@
 
 extern crate alloc;
 
+// MUST be the first module
+mod fmt;
+
 use alloc::sync::Arc;
 
 use rand_core::RngCore;
@@ -102,13 +105,13 @@ impl rustls::crypto::KeyProvider for Provider {
     }
 }
 
-static ALL_CIPHER_SUITES: &[rustls::SupportedCipherSuite] = &[
+/// All supported cipher suites
+pub static ALL_CIPHER_SUITES: &[rustls::SupportedCipherSuite] = &[
     TLS13_CHACHA20_POLY1305_SHA256,
     TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 ];
 
-#[doc(hidden)]
-pub static TLS13_CHACHA20_POLY1305_SHA256: rustls::SupportedCipherSuite =
+static TLS13_CHACHA20_POLY1305_SHA256: rustls::SupportedCipherSuite =
     rustls::SupportedCipherSuite::Tls13(&rustls::Tls13CipherSuite {
         common: rustls::crypto::CipherSuiteCommon {
             suite: rustls::CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
@@ -120,8 +123,7 @@ pub static TLS13_CHACHA20_POLY1305_SHA256: rustls::SupportedCipherSuite =
         quic: None,
     });
 
-#[doc(hidden)]
-pub static TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256: rustls::SupportedCipherSuite =
+static TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256: rustls::SupportedCipherSuite =
     rustls::SupportedCipherSuite::Tls12(&rustls::Tls12CipherSuite {
         common: rustls::crypto::CipherSuiteCommon {
             suite: rustls::CipherSuite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,

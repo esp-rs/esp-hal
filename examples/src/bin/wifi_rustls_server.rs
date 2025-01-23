@@ -1,5 +1,7 @@
 //! Example using Rustls as a server
 //!
+//! This needs `alloc`
+//!
 //! Set SSID and PASSWORD env variable before running this example.
 //!
 //! This gets an ip address via DHCP then runs an HTTPS server on port 4443

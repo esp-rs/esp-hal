@@ -1,7 +1,8 @@
 //! Example using Rustls
 //!
 //! In general, if you can get away with < https://crates.io/crates/embedded-tls > you should prefer that.
-//! While Rustls can do more it's more of a heavy-weight dependency.
+//!
+//! While Rustls can do more it's more of a heavy-weight dependency. This needs `alloc`
 //!
 //!
 //! Set SSID and PASSWORD env variable before running this example.
