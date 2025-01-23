@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `timer::wait` is now blocking (#2882)
 - By default, set `tx_idle_num` to 0 so that bytes written to TX FIFO are always immediately transmitted. (#2859)
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
+- SPI, UART, I2C: `with_<pin>` functions of peripheral drivers now disconnect the previously assigned pins from the peripheral. (#3012)
+- SPI, UART, I2C: Dropping a driver now disconnects pins from their peripherals. (#3012)
+
 - `Async` drivers are no longer `Send` (#2980)
 - GPIO drivers now take configuration structs, and their constructors are fallible (#2990)
 

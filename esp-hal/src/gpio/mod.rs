@@ -112,6 +112,56 @@ impl CFnPtr {
     }
 }
 
+/// Represents a pin-peripheral connection that, when dropped, disconnects the
+/// peripheral from the pin.
+///
+/// This only needs to be applied to output signals, as it's not possible to
+/// connect multiple inputs to the same peripheral signal.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct PinGuard {
+    pin: u8,
+    signal: OutputSignal,
+}
+
+impl crate::private::Sealed for PinGuard {}
+impl Peripheral for PinGuard {
+    type P = Self;
+
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self {
+            pin: self.pin,
+            signal: self.signal,
+        }
+    }
+}
+
+impl PinGuard {
+    pub(crate) fn new(mut pin: AnyPin, signal: OutputSignal) -> Self {
+        signal.connect_to(&mut pin);
+        Self {
+            pin: pin.number(),
+            signal,
+        }
+    }
+
+    pub(crate) fn new_unconnected(signal: OutputSignal) -> Self {
+        Self {
+            pin: u8::MAX,
+            signal,
+        }
+    }
+}
+
+impl Drop for PinGuard {
+    fn drop(&mut self) {
+        if self.pin != u8::MAX {
+            let mut pin = unsafe { AnyPin::steal(self.pin) };
+            self.signal.disconnect_from(&mut pin);
+        }
+    }
+}
+
 /// Event used to trigger interrupts.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
