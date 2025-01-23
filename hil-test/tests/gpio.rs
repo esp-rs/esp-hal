@@ -21,7 +21,6 @@ use esp_hal::{
     delay::Delay,
     gpio::{Event, Flex, Io, OutputOpenDrain, OutputOpenDrainConfig},
     handler,
-    interrupt::InterruptConfigurable,
     timer::timg::TimerGroup,
 };
 use hil_test as _;

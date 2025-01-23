@@ -1,5 +1,12 @@
 //! Peripheral signal interconnect using IOMUX or GPIOMUX.
 
+// FIXME: https://github.com/esp-rs/esp-hal/issues/2954 The GPIO implementation does not contain any
+// locking. This is okay there, because the implementation uses either W1TS/W1TC
+// registers to set certain bits, or separate registers for each pin - and there
+// can only be one instance of every GPIO struct in safe code. However, with the
+// interconnect module we allow multiple handles, which means possible RMW
+// operations on the pin registers cause data races.
+
 use crate::{
     gpio::{
         self,

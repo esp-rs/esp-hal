@@ -635,7 +635,7 @@ impl<'d> I2c<'d, Blocking> {
     /// You can restore the default/unhandled interrupt handler by using
     /// [crate::DEFAULT_INTERRUPT_HANDLER]
     #[instability::unstable]
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.i2c.info().set_interrupt_handler(handler);
     }
 

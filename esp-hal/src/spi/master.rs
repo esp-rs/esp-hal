@@ -659,7 +659,7 @@ impl<'d> Spi<'d, Blocking> {
     /// You can restore the default/unhandled interrupt handler by using
     /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
     #[instability::unstable]
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         let interrupt = self.driver().info.interrupt;
         for core in Cpu::other() {
             crate::interrupt::disable(core, interrupt);

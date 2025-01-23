@@ -49,21 +49,17 @@
 
 use core::fmt::Display;
 
-use portable_atomic::{AtomicPtr, AtomicU32, Ordering};
+use portable_atomic::{AtomicU32, Ordering};
 use procmacros::ram;
 use strum::EnumCount;
 
+#[cfg(feature = "unstable")]
+use crate::interrupt::InterruptConfigurable;
 #[cfg(any(lp_io, rtc_cntl))]
 use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
-    interrupt::{
-        self,
-        InterruptConfigurable,
-        InterruptHandler,
-        Priority,
-        DEFAULT_INTERRUPT_HANDLER,
-    },
+    interrupt::{self, InterruptHandler, Priority, DEFAULT_INTERRUPT_HANDLER},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{
         gpio::{handle_gpio_input, handle_gpio_output},
@@ -91,24 +87,34 @@ crate::unstable_module! {
     pub mod rtc_io;
 }
 
-/// Convenience constant for `Option::None` pin
-static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
+mod user_irq {
+    use portable_atomic::{AtomicPtr, Ordering};
+    use procmacros::ram;
 
-struct CFnPtr(AtomicPtr<()>);
-impl CFnPtr {
-    pub const fn new() -> Self {
-        Self(AtomicPtr::new(core::ptr::null_mut()))
-    }
+    /// Convenience constant for `Option::None` pin
+    pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
 
-    pub fn store(&self, f: extern "C" fn()) {
-        self.0.store(f as *mut (), Ordering::Relaxed);
-    }
-
-    pub fn call(&self) {
-        let ptr = self.0.load(Ordering::Relaxed);
-        if !ptr.is_null() {
-            unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
+    pub(super) struct CFnPtr(AtomicPtr<()>);
+    impl CFnPtr {
+        pub const fn new() -> Self {
+            Self(AtomicPtr::new(core::ptr::null_mut()))
         }
+
+        pub fn store(&self, f: extern "C" fn()) {
+            self.0.store(f as *mut (), Ordering::Relaxed);
+        }
+
+        pub fn call(&self) {
+            let ptr = self.0.load(Ordering::Relaxed);
+            if !ptr.is_null() {
+                unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
+            }
+        }
+    }
+
+    #[ram]
+    pub(super) extern "C" fn user_gpio_interrupt_handler() {
+        super::handle_pin_interrupts(|| USER_INTERRUPT_HANDLER.call());
     }
 }
 
@@ -491,36 +497,24 @@ pub trait TouchPin: Pin {
 #[doc(hidden)]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, EnumCount)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum GpioRegisterAccess {
-    Bank0,
+pub enum GpioBank {
+    _0,
     #[cfg(gpio_bank_1)]
-    Bank1,
+    _1,
 }
 
-impl From<usize> for GpioRegisterAccess {
-    fn from(_gpio_num: usize) -> Self {
-        #[cfg(gpio_bank_1)]
-        if _gpio_num >= 32 {
-            return GpioRegisterAccess::Bank1;
-        }
-
-        GpioRegisterAccess::Bank0
-    }
-}
-
-impl GpioRegisterAccess {
+impl GpioBank {
     fn async_operations(self) -> &'static AtomicU32 {
-        static FLAGS: [AtomicU32; GpioRegisterAccess::COUNT] =
-            [const { AtomicU32::new(0) }; GpioRegisterAccess::COUNT];
+        static FLAGS: [AtomicU32; GpioBank::COUNT] = [const { AtomicU32::new(0) }; GpioBank::COUNT];
 
         &FLAGS[self as usize]
     }
 
     fn offset(self) -> u8 {
         match self {
-            Self::Bank0 => 0,
+            Self::_0 => 0,
             #[cfg(gpio_bank_1)]
-            Self::Bank1 => 32,
+            Self::_1 => 32,
         }
     }
 
@@ -534,50 +528,62 @@ impl GpioRegisterAccess {
 
     fn write_out_en_clear(self, word: u32) {
         match self {
-            Self::Bank0 => Bank0GpioRegisterAccess::write_out_en_clear(word),
+            Self::_0 => GPIO::regs()
+                .enable_w1tc()
+                .write(|w| unsafe { w.bits(word) }),
             #[cfg(gpio_bank_1)]
-            Self::Bank1 => Bank1GpioRegisterAccess::write_out_en_clear(word),
-        }
+            Self::_1 => GPIO::regs()
+                .enable1_w1tc()
+                .write(|w| unsafe { w.bits(word) }),
+        };
     }
 
     fn write_out_en_set(self, word: u32) {
         match self {
-            Self::Bank0 => Bank0GpioRegisterAccess::write_out_en_set(word),
+            Self::_0 => GPIO::regs()
+                .enable_w1ts()
+                .write(|w| unsafe { w.bits(word) }),
             #[cfg(gpio_bank_1)]
-            Self::Bank1 => Bank1GpioRegisterAccess::write_out_en_set(word),
-        }
+            Self::_1 => GPIO::regs()
+                .enable1_w1ts()
+                .write(|w| unsafe { w.bits(word) }),
+        };
     }
 
     fn read_input(self) -> u32 {
         match self {
-            Self::Bank0 => Bank0GpioRegisterAccess::read_input(),
+            Self::_0 => GPIO::regs().in_().read().bits(),
             #[cfg(gpio_bank_1)]
-            Self::Bank1 => Bank1GpioRegisterAccess::read_input(),
+            Self::_1 => GPIO::regs().in1().read().bits(),
         }
     }
 
     fn read_output(self) -> u32 {
         match self {
-            Self::Bank0 => Bank0GpioRegisterAccess::read_output(),
+            Self::_0 => GPIO::regs().out().read().bits(),
             #[cfg(gpio_bank_1)]
-            Self::Bank1 => Bank1GpioRegisterAccess::read_output(),
+            Self::_1 => GPIO::regs().out1().read().bits(),
         }
     }
 
     fn read_interrupt_status(self) -> u32 {
         match self {
-            Self::Bank0 => Bank0GpioRegisterAccess::read_interrupt_status(),
+            Self::_0 => GPIO::regs().status().read().bits(),
             #[cfg(gpio_bank_1)]
-            Self::Bank1 => Bank1GpioRegisterAccess::read_interrupt_status(),
+            Self::_1 => GPIO::regs().status1().read().bits(),
         }
     }
 
     fn write_interrupt_status_clear(self, word: u32) {
         match self {
-            Self::Bank0 => Bank0GpioRegisterAccess::write_interrupt_status_clear(word),
+            Self::_0 => GPIO::regs()
+                .status_w1tc()
+                .write(|w| unsafe { w.bits(word) }),
             #[cfg(gpio_bank_1)]
-            Self::Bank1 => Bank1GpioRegisterAccess::write_interrupt_status_clear(word),
-        }
+            Self::_1 => GPIO::regs()
+                .status1_w1tc()
+                .write(|w| unsafe { w.bits(word) }),
+        };
     }
 
     fn write_output(self, word: u32, set: bool) {
@@ -590,104 +596,18 @@ impl GpioRegisterAccess {
 
     fn write_output_set(self, word: u32) {
         match self {
-            Self::Bank0 => Bank0GpioRegisterAccess::write_output_set(word),
+            Self::_0 => GPIO::regs().out_w1ts().write(|w| unsafe { w.bits(word) }),
             #[cfg(gpio_bank_1)]
-            Self::Bank1 => Bank1GpioRegisterAccess::write_output_set(word),
-        }
+            Self::_1 => GPIO::regs().out1_w1ts().write(|w| unsafe { w.bits(word) }),
+        };
     }
 
     fn write_output_clear(self, word: u32) {
         match self {
-            Self::Bank0 => Bank0GpioRegisterAccess::write_output_clear(word),
+            Self::_0 => GPIO::regs().out_w1tc().write(|w| unsafe { w.bits(word) }),
             #[cfg(gpio_bank_1)]
-            Self::Bank1 => Bank1GpioRegisterAccess::write_output_clear(word),
-        }
-    }
-}
-
-struct Bank0GpioRegisterAccess;
-
-impl Bank0GpioRegisterAccess {
-    fn write_out_en_clear(word: u32) {
-        GPIO::regs()
-            .enable_w1tc()
-            .write(|w| unsafe { w.bits(word) });
-    }
-
-    fn write_out_en_set(word: u32) {
-        GPIO::regs()
-            .enable_w1ts()
-            .write(|w| unsafe { w.bits(word) });
-    }
-
-    fn read_input() -> u32 {
-        GPIO::regs().in_().read().bits()
-    }
-
-    fn read_output() -> u32 {
-        GPIO::regs().out().read().bits()
-    }
-
-    fn read_interrupt_status() -> u32 {
-        GPIO::regs().status().read().bits()
-    }
-
-    fn write_interrupt_status_clear(word: u32) {
-        GPIO::regs()
-            .status_w1tc()
-            .write(|w| unsafe { w.bits(word) });
-    }
-
-    fn write_output_set(word: u32) {
-        GPIO::regs().out_w1ts().write(|w| unsafe { w.bits(word) });
-    }
-
-    fn write_output_clear(word: u32) {
-        GPIO::regs().out_w1tc().write(|w| unsafe { w.bits(word) });
-    }
-}
-
-#[cfg(gpio_bank_1)]
-struct Bank1GpioRegisterAccess;
-
-#[cfg(gpio_bank_1)]
-impl Bank1GpioRegisterAccess {
-    fn write_out_en_clear(word: u32) {
-        GPIO::regs()
-            .enable1_w1tc()
-            .write(|w| unsafe { w.bits(word) });
-    }
-
-    fn write_out_en_set(word: u32) {
-        GPIO::regs()
-            .enable1_w1ts()
-            .write(|w| unsafe { w.bits(word) });
-    }
-
-    fn read_input() -> u32 {
-        GPIO::regs().in1().read().bits()
-    }
-
-    fn read_output() -> u32 {
-        GPIO::regs().out1().read().bits()
-    }
-
-    fn read_interrupt_status() -> u32 {
-        GPIO::regs().status1().read().bits()
-    }
-
-    fn write_interrupt_status_clear(word: u32) {
-        GPIO::regs()
-            .status1_w1tc()
-            .write(|w| unsafe { w.bits(word) });
-    }
-
-    fn write_output_set(word: u32) {
-        GPIO::regs().out1_w1ts().write(|w| unsafe { w.bits(word) });
-    }
-
-    fn write_output_clear(word: u32) {
-        GPIO::regs().out1_w1tc().write(|w| unsafe { w.bits(word) });
+            Self::_1 => GPIO::regs().out1_w1tc().write(|w| unsafe { w.bits(word) }),
+        };
     }
 }
 
@@ -806,45 +726,57 @@ pub(crate) fn bind_default_interrupt_handler() {
 /// General Purpose Input/Output driver
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct Io {
     _io_mux: IO_MUX,
 }
 
 impl Io {
     /// Initialize the I/O driver.
+    #[instability::unstable]
     pub fn new(_io_mux: IO_MUX) -> Self {
         Io { _io_mux }
     }
 
     /// Set the interrupt priority for GPIO interrupts.
+    #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
         unwrap!(interrupt::enable(Interrupt::GPIO, prio));
+    }
+
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for all GPIO pins."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for all GPIO pins on the current core."
+    )]
+    #[doc = ""]
+    /// Note that when using interrupt handlers registered by this function,
+    /// we clear the interrupt status register for you. This is NOT the case
+    /// if you register the interrupt handler directly, by defining a
+    /// `#[no_mangle] unsafe extern "C" fn GPIO()` function.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::GPIO);
+        }
+        self.set_interrupt_priority(handler.priority());
+        unsafe {
+            interrupt::bind_interrupt(Interrupt::GPIO, user_irq::user_gpio_interrupt_handler)
+        };
+        user_irq::USER_INTERRUPT_HANDLER.store(handler.handler());
     }
 }
 
 impl crate::private::Sealed for Io {}
 
+#[instability::unstable]
 impl InterruptConfigurable for Io {
-    /// Install the given interrupt handler replacing any previously set
-    /// handler.
-    ///
-    /// Note that when using interrupt handlers registered by this function,
-    /// we clear the interrupt status register for you. This is NOT the case
-    /// if you register the interrupt handler directly, by defining a
-    /// `#[no_mangle] unsafe extern "C" fn GPIO()` function.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::GPIO);
-        }
-        self.set_interrupt_priority(handler.priority());
-        unsafe { interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler) };
-        USER_INTERRUPT_HANDLER.store(handler.handler());
+        self.set_interrupt_handler(handler);
     }
-}
-
-#[ram]
-extern "C" fn user_gpio_interrupt_handler() {
-    handle_pin_interrupts(|| USER_INTERRUPT_HANDLER.call());
 }
 
 #[ram]
@@ -862,9 +794,9 @@ fn handle_pin_interrupts(user_handler: fn()) {
     user_handler();
 
     let banks = [
-        (GpioRegisterAccess::Bank0, intrs_bank0),
+        (GpioBank::_0, intrs_bank0),
         #[cfg(gpio_bank_1)]
-        (GpioRegisterAccess::Bank1, intrs_bank1),
+        (GpioBank::_1, intrs_bank1),
     ];
 
     for (bank, intrs) in banks {
@@ -1989,17 +1921,16 @@ impl<'d> Flex<'d> {
     #[inline]
     #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
-        GpioRegisterAccess::from(self.pin.number() as usize)
-            .write_interrupt_status_clear(1 << (self.pin.number() % 32));
+        self.pin
+            .bank()
+            .write_interrupt_status_clear(self.pin.mask());
     }
 
     /// Checks if the interrupt status bit for this Pin is set
     #[inline]
     #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
-        GpioRegisterAccess::from(self.pin.number() as usize).read_interrupt_status()
-            & (1 << (self.pin.number() % 32))
-            != 0
+        self.pin.bank().read_interrupt_status() & self.pin.mask() != 0
     }
 
     /// Enable as a wake-up source.
@@ -2124,6 +2055,15 @@ impl<'d> Flex<'d> {
 impl private::Sealed for AnyPin {}
 
 impl AnyPin {
+    fn bank(&self) -> GpioBank {
+        #[cfg(gpio_bank_1)]
+        if self.number() >= 32 {
+            return GpioBank::_1;
+        }
+
+        GpioBank::_0
+    }
+
     /// Init as input with the given pull-up/pull-down
     #[inline]
     pub(crate) fn init_input(&self, pull: Pull) {
@@ -2175,7 +2115,7 @@ impl AnyPin {
     #[inline]
     pub(crate) fn enable_output(&self, enable: bool) {
         assert!(self.is_output() || !enable);
-        GpioRegisterAccess::from(self.number() as usize).write_out_en(self.mask(), enable);
+        self.bank().write_out_en(self.mask(), enable);
     }
 
     /// Enable input for the pin
@@ -2206,7 +2146,7 @@ impl AnyPin {
     /// The current state of the input
     #[inline]
     pub(crate) fn is_input_high(&self) -> bool {
-        GpioRegisterAccess::from(self.number() as usize).read_input() & self.mask() != 0
+        self.bank().read_input() & self.mask() != 0
     }
 
     /// Set up as output
@@ -2255,7 +2195,7 @@ impl AnyPin {
     /// Set the pin's level to high or low
     #[inline]
     pub(crate) fn set_output_high(&mut self, high: bool) {
-        GpioRegisterAccess::from(self.number() as usize).write_output(self.mask(), high);
+        self.bank().write_output(self.mask(), high);
     }
 
     /// Configure the [DriveStrength] of the pin
@@ -2275,7 +2215,7 @@ impl AnyPin {
     /// Is the output set to high
     #[inline]
     pub(crate) fn is_set_high(&self) -> bool {
-        GpioRegisterAccess::from(self.number() as usize).read_output() & self.mask() != 0
+        self.bank().read_output() & self.mask() != 0
     }
 }
 
@@ -2390,6 +2330,8 @@ mod asynch {
         #[inline]
         #[instability::unstable]
         pub async fn wait_for(&mut self, event: Event) {
+            // We construct the Future first, because its `Drop` implementation
+            // is load-bearing if `wait_for` is dropped during the initialization.
             let mut future = PinFuture {
                 pin: unsafe { self.clone_unchecked() },
             };
@@ -2417,9 +2359,10 @@ mod asynch {
             // do our setup.
 
             // Mark pin as async.
-            GpioRegisterAccess::from(future.pin.number() as usize)
+            future
+                .bank()
                 .async_operations()
-                .fetch_or(future.pin_mask(), Ordering::Relaxed);
+                .fetch_or(future.mask(), Ordering::Relaxed);
 
             future.pin.listen(event);
 
@@ -2534,19 +2477,22 @@ mod asynch {
     }
 
     impl PinFuture<'_> {
-        fn pin_mask(&self) -> u32 {
-            let bank = GpioRegisterAccess::from(self.pin.number() as usize);
-            1 << (self.pin.number() - bank.offset())
+        fn number(&self) -> u8 {
+            self.pin.number()
+        }
+
+        fn bank(&self) -> GpioBank {
+            self.pin.pin.bank()
+        }
+
+        fn mask(&self) -> u32 {
+            self.pin.pin.mask()
         }
 
         fn is_done(&self) -> bool {
             // Only the interrupt handler should clear the async bit, and only if the
             // specific pin is handling an interrupt.
-            GpioRegisterAccess::from(self.pin.number() as usize)
-                .async_operations()
-                .load(Ordering::Acquire)
-                & self.pin_mask()
-                == 0
+            self.bank().async_operations().load(Ordering::Acquire) & self.mask() == 0
         }
     }
 
@@ -2554,7 +2500,7 @@ mod asynch {
         type Output = ();
 
         fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            PIN_WAKERS[self.pin.number() as usize].register(cx.waker());
+            PIN_WAKERS[self.number() as usize].register(cx.waker());
 
             if self.is_done() {
                 Poll::Ready(())
@@ -2573,7 +2519,7 @@ mod asynch {
                 // This prevents tricky drop-and-relisten scenarios.
 
                 set_int_enable(
-                    self.pin.number(),
+                    self.number(),
                     None, // Do not disable handling pending interrupts.
                     0,    // Disable generating new events
                     false,
@@ -2582,9 +2528,9 @@ mod asynch {
                 while self.pin.is_interrupt_set() {}
 
                 // Unmark pin as async
-                GpioRegisterAccess::from(self.pin.number() as usize)
+                self.bank()
                     .async_operations()
-                    .fetch_and(!self.pin_mask(), Ordering::Relaxed);
+                    .fetch_and(!self.mask(), Ordering::Relaxed);
             }
         }
     }
