@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     // emit config
-    let mut cfg = vec![
+    let cfg = generate_config("esp_hal", &[
         (
             "place-spi-driver-in-ram",
             "Places the SPI driver in RAM for better performance",
@@ -77,45 +77,31 @@ fn main() -> Result<(), Box<dyn Error>> {
             Value::Bool(false),
             None
         ),
-        #[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
+        // ideally we should only offer this for ESP32 but the config system doesn't
+        // support per target configs, yet
+        (
+            "spi-address-workaround",
+            "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
+            Value::Bool(true),
+            None
+        ),
+        // ideally we should only offer this for ESP32-C6/ESP32-H2 but the config system doesn't support per target configs, yet
         (
             "flip-link",
-            "Move the stack to start of RAM to get zero-cost stack overflow protection.",
+            "(ESP32-C6/ESP32-H2 only): Move the stack to start of RAM to get zero-cost stack overflow protection.",
             Value::Bool(false),
             None
         ),
-    ];
-
-    if cfg!(feature = "esp32") {
-        cfg.push(
-            (
-                "spi-address-workaround",
-                "Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
-                Value::Bool(true),
-                None
-            ),
-        );
-    } else {
-        // even if !ESP32 we need to allow the `cfg`
-        println!("cargo:rustc-check-cfg=cfg(spi_address_workaround)");
-    }
-
-    if config.contains(&String::from("psram")) || config.contains(&String::from("octal_psram")) {
-        cfg.push((
+        // ideally we should only offer this for ESP32, ESP32-S2 and `octal` only for ESP32-S3 but the config system doesn't support per target configs, yet
+        (
             "psram-mode",
-            "SPIRAM chip mode",
+            "(ESP32, ESP32-S2 and ESP32-S3 only, `octal` is only supported for ESP32-S3) SPIRAM chip mode",
             Value::String(String::from("quad")),
             Some(Validator::Enumeration(
-                if config.contains(&String::from("octal_psram")) {
                     vec![String::from("quad"), String::from("octal")]
-                } else {
-                    vec![String::from("quad")]
-                },
             )),
-        ));
-    }
-
-    let cfg = generate_config("esp_hal", &cfg, true);
+        )
+    ], true);
 
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
