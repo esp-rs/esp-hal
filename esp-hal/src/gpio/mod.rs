@@ -1171,8 +1171,9 @@ impl<'d> Output<'d> {
     /// external hardware.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Output, Level};
-    /// let pin1 = Output::new(peripherals.GPIO1, Level::High);
+    /// # use esp_hal::gpio::{Output, OutputConfig, Level};
+    /// let config = OutputConfig::default().with_level(Level::High);
+    /// let pin1 = Output::new(peripherals.GPIO1, config).unwrap();
     /// let (input, output) = pin1.split();
     /// # }
     /// ```
@@ -1188,8 +1189,9 @@ impl<'d> Output<'d> {
     /// The input signal can be passed to peripherals in place of an input pin.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Output, Level};
-    /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High);
+    /// # use esp_hal::gpio::{Output, OutputConfig, Level};
+    /// let config = OutputConfig::default().with_level(Level::High);
+    /// let pin1_gpio = Output::new(peripherals.GPIO1, config).unwrap();
     /// // Can be passed as an input.
     /// let pin1 = pin1_gpio.peripheral_input();
     /// # }
@@ -1207,8 +1209,9 @@ impl<'d> Output<'d> {
     /// pin.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Output, Level};
-    /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High);
+    /// # use esp_hal::gpio::{Output, OutputConfig, Level};
+    /// let config = OutputConfig::default().with_level(Level::High);
+    /// let pin1_gpio = Output::new(peripherals.GPIO1, config).unwrap();
     /// let pin1 = pin1_gpio.into_peripheral_output();
     /// # }
     /// ```
@@ -1361,8 +1364,9 @@ impl<'d> Input<'d> {
     /// The input signal can be passed to peripherals in place of an input pin.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, Pull};
-    /// let pin1_gpio = Input::new(peripherals.GPIO1, Pull::Up);
+    /// # use esp_hal::gpio::{Input, InputConfig, Pull};
+    /// let config = InputConfig::default().with_pull(Pull::Up);
+    /// let pin1_gpio = Input::new(peripherals.GPIO1, config).unwrap();
     /// let pin1 = pin1_gpio.peripheral_input();
     /// # }
     /// ```
@@ -1508,8 +1512,9 @@ impl<'d> Input<'d> {
     /// external hardware.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, Pull};
-    /// let pin1 = Input::new(peripherals.GPIO1, Pull::Up);
+    /// # use esp_hal::gpio::{Input, InputConfig, Pull};
+    /// let config = InputConfig::default().with_pull(Pull::Up);
+    /// let pin1 = Input::new(peripherals.GPIO1, config).unwrap();
     /// let (input, output) = pin1.split();
     /// # }
     /// ```
@@ -1526,8 +1531,9 @@ impl<'d> Input<'d> {
     /// pin.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, Pull};
-    /// let pin1_gpio = Input::new(peripherals.GPIO1, Pull::Up);
+    /// # use esp_hal::gpio::{Input, InputConfig, Pull};
+    /// let config = InputConfig::default().with_pull(Pull::Up);
+    /// let pin1_gpio = Input::new(peripherals.GPIO1, config).unwrap();
     /// // Can be passed as an output.
     /// let pin1 = pin1_gpio.into_peripheral_output();
     /// # }
@@ -1642,12 +1648,14 @@ impl<'d> OutputOpenDrain<'d> {
     /// external hardware.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{OutputOpenDrain, Level, Pull};
+    /// # use esp_hal::gpio::{OutputOpenDrain, OutputOpenDrainConfig, Level, Pull};
+    /// let config = OutputOpenDrainConfig::default()
+    ///     .with_level(Level::High)
+    ///     .with_pull(Pull::Up);
     /// let pin1 = OutputOpenDrain::new(
     ///     peripherals.GPIO1,
-    ///     Level::High,
-    ///     Pull::Up
-    /// );
+    ///     config,
+    /// ).unwrap();
     /// let (input, output) = pin1.split();
     /// # }
     /// ```
@@ -1663,12 +1671,14 @@ impl<'d> OutputOpenDrain<'d> {
     /// The input signal can be passed to peripherals in place of an input pin.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{OutputOpenDrain, Level, Pull};
+    /// # use esp_hal::gpio::{OutputOpenDrain, OutputOpenDrainConfig, Level, Pull};
+    /// let config = OutputOpenDrainConfig::default()
+    ///     .with_level(Level::High)
+    ///     .with_pull(Pull::Up);
     /// let pin1_gpio = OutputOpenDrain::new(
     ///     peripherals.GPIO1,
-    ///     Level::High,
-    ///     Pull::Up
-    /// );
+    ///     config,
+    /// ).unwrap();
     /// // Can be passed as an input.
     /// let pin1 = pin1_gpio.peripheral_input();
     /// # }
@@ -1686,12 +1696,14 @@ impl<'d> OutputOpenDrain<'d> {
     /// pin.
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{OutputOpenDrain, Level, Pull};
+    /// # use esp_hal::gpio::{OutputOpenDrain, OutputOpenDrainConfig, Level, Pull};
+    /// let config = OutputOpenDrainConfig::default()
+    ///     .with_level(Level::High)
+    ///     .with_pull(Pull::Up);
     /// let pin1_gpio = OutputOpenDrain::new(
     ///     peripherals.GPIO1,
-    ///     Level::High,
-    ///     Pull::Up
-    /// );
+    ///     config,
+    /// ).unwrap();
     /// // Can be passed as an input.
     /// let pin1 = pin1_gpio.into_peripheral_output();
     /// # }
