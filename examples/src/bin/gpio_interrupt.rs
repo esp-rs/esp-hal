@@ -21,7 +21,6 @@ use esp_hal::{
     delay::Delay,
     gpio::{Event, Input, InputConfig, Io, Level, Output, OutputConfig, Pull},
     handler,
-    interrupt::InterruptConfigurable,
     main,
     ram,
 };

@@ -54,21 +54,17 @@
 
 use core::fmt::Display;
 
-use portable_atomic::{AtomicPtr, AtomicU32, Ordering};
+use portable_atomic::{AtomicU32, Ordering};
 use procmacros::ram;
 use strum::EnumCount;
 
+#[cfg(feature = "unstable")]
+use crate::interrupt::{InterruptConfigurable, InterruptHandler};
 #[cfg(any(lp_io, rtc_cntl))]
 use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
-    interrupt::{
-        self,
-        InterruptConfigurable,
-        InterruptHandler,
-        Priority,
-        DEFAULT_INTERRUPT_HANDLER,
-    },
+    interrupt::{self, Priority, DEFAULT_INTERRUPT_HANDLER},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{
         gpio::{handle_gpio_input, handle_gpio_output},
@@ -96,24 +92,35 @@ crate::unstable_module! {
     pub mod rtc_io;
 }
 
-/// Convenience constant for `Option::None` pin
-static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
+#[cfg(feature = "unstable")]
+mod user_irq {
+    use portable_atomic::{AtomicPtr, Ordering};
+    use procmacros::ram;
 
-struct CFnPtr(AtomicPtr<()>);
-impl CFnPtr {
-    pub const fn new() -> Self {
-        Self(AtomicPtr::new(core::ptr::null_mut()))
-    }
+    /// Convenience constant for `Option::None` pin
+    pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
 
-    pub fn store(&self, f: extern "C" fn()) {
-        self.0.store(f as *mut (), Ordering::Relaxed);
-    }
-
-    pub fn call(&self) {
-        let ptr = self.0.load(Ordering::Relaxed);
-        if !ptr.is_null() {
-            unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
+    pub(super) struct CFnPtr(AtomicPtr<()>);
+    impl CFnPtr {
+        pub const fn new() -> Self {
+            Self(AtomicPtr::new(core::ptr::null_mut()))
         }
+
+        pub fn store(&self, f: extern "C" fn()) {
+            self.0.store(f as *mut (), Ordering::Relaxed);
+        }
+
+        pub fn call(&self) {
+            let ptr = self.0.load(Ordering::Relaxed);
+            if !ptr.is_null() {
+                unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
+            }
+        }
+    }
+
+    #[ram]
+    pub(super) extern "C" fn user_gpio_interrupt_handler() {
+        super::handle_pin_interrupts(|| USER_INTERRUPT_HANDLER.call());
     }
 }
 
@@ -669,10 +676,12 @@ pub(crate) fn bind_default_interrupt_handler() {
 /// General Purpose Input/Output driver
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct Io {
     _io_mux: IO_MUX,
 }
 
+#[instability::unstable]
 impl Io {
     /// Initialize the I/O driver.
     pub fn new(_io_mux: IO_MUX) -> Self {
@@ -683,31 +692,39 @@ impl Io {
     pub fn set_interrupt_priority(&self, prio: Priority) {
         unwrap!(interrupt::enable(Interrupt::GPIO, prio));
     }
-}
 
-impl crate::private::Sealed for Io {}
-
-impl InterruptConfigurable for Io {
-    /// Install the given interrupt handler replacing any previously set
-    /// handler.
-    ///
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for all GPIO pins."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for all GPIO pins on the current core."
+    )]
+    #[doc = ""]
     /// Note that when using interrupt handlers registered by this function,
     /// we clear the interrupt status register for you. This is NOT the case
     /// if you register the interrupt handler directly, by defining a
     /// `#[no_mangle] unsafe extern "C" fn GPIO()` function.
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::GPIO);
         }
         self.set_interrupt_priority(handler.priority());
-        unsafe { interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler) };
-        USER_INTERRUPT_HANDLER.store(handler.handler());
+        unsafe {
+            interrupt::bind_interrupt(Interrupt::GPIO, user_irq::user_gpio_interrupt_handler)
+        };
+        user_irq::USER_INTERRUPT_HANDLER.store(handler.handler());
     }
 }
 
-#[ram]
-extern "C" fn user_gpio_interrupt_handler() {
-    handle_pin_interrupts(|| USER_INTERRUPT_HANDLER.call());
+impl crate::private::Sealed for Io {}
+
+#[instability::unstable]
+impl InterruptConfigurable for Io {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
+    }
 }
 
 #[ram]
