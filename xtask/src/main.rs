@@ -247,7 +247,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
         .collect::<Vec<_>>();
 
     // Sort all examples by name:
-    examples.sort_by_key(|a| a.name());
+    examples.sort_by_key(|a| a.binary_name());
 
     // Execute the specified action:
     match action {
@@ -268,11 +268,11 @@ fn build_examples(
 
     if examples
         .iter()
-        .find(|ex| Some(ex.name()) == args.example)
+        .find(|ex| ex.matches(&args.example))
         .is_some()
     {
         // Attempt to build only the specified example:
-        for example in examples.iter().filter(|ex| Some(ex.name()) == args.example) {
+        for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
             xtask::execute_app(
                 package_path,
                 args.chip,
@@ -310,7 +310,7 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
     // Filter the examples down to only the binary we're interested in, assuming it
     // actually supports the specified chip:
     let mut found_one = false;
-    for example in examples.iter().filter(|ex| Some(ex.name()) == args.example) {
+    for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
         found_one = true;
         xtask::execute_app(
             package_path,
@@ -349,7 +349,7 @@ fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path)
     for example in examples {
         let mut skip = false;
 
-        log::info!("Running example '{}'", example.name());
+        log::info!("Running example '{}'", example.output_file_name());
         if let Some(description) = example.description() {
             log::info!(
                 "\n\n{}\n\nPress ENTER to run example, `s` to skip",
@@ -419,15 +419,11 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
         .collect::<Vec<_>>();
 
     // Sort all tests by name:
-    tests.sort_by_key(|a| a.name());
+    tests.sort_by_key(|a| a.binary_name());
 
     // Execute the specified action:
-    if tests
-        .iter()
-        .find(|test| Some(test.name()) == args.test)
-        .is_some()
-    {
-        for test in tests.iter().filter(|test| Some(test.name()) == args.test) {
+    if tests.iter().find(|test| test.matches(&args.test)).is_some() {
+        for test in tests.iter().filter(|test| test.matches(&args.test)) {
             xtask::execute_app(
                 &package_path,
                 args.chip,
@@ -455,12 +451,12 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
             )
             .is_err()
             {
-                failed.push(test.name());
+                failed.push(test.name_with_configuration());
             }
         }
 
         if !failed.is_empty() {
-            bail!("Failed tests: {:?}", failed);
+            bail!("Failed tests: {:#?}", failed);
         }
 
         Ok(())

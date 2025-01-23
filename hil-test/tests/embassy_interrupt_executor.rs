@@ -3,6 +3,12 @@
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable embassy
+//% ENV(single_integrated):   ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = single-integrated
+//% ENV(multiple_integrated): ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = multiple-integrated
+//% ENV(generic_queue):       ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = generic
+//% ENV(generic_queue):       ESP_HAL_EMBASSY_CONFIG_GENERIC_QUEUE_SIZE = 16
+//% ENV(default_with_waiti):  ESP_HAL_EMBASSY_CONFIG_LOW_POWER_WAIT = true
+//% ENV(default_no_waiti):    ESP_HAL_EMBASSY_CONFIG_LOW_POWER_WAIT = false
 
 #![no_std]
 #![no_main]
@@ -50,7 +56,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod test {
     use super::*;
 

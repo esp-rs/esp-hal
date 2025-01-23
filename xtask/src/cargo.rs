@@ -29,11 +29,6 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
 }
 
 /// Execute cargo with the given arguments and from the specified directory.
-pub fn run_and_capture(args: &[String], cwd: &Path) -> Result<String> {
-    run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [], true)
-}
-
-/// Execute cargo with the given arguments and from the specified directory.
 pub fn run_with_env<I, K, V>(args: &[String], cwd: &Path, envs: I, capture: bool) -> Result<String>
 where
     I: IntoIterator<Item = (K, V)>,

@@ -165,31 +165,34 @@ pub fn execute_app(
     repeat: usize,
     debug: bool,
 ) -> Result<()> {
-    log::info!(
-        "Building example '{}' for '{}'",
-        app.example_path().display(),
-        chip
-    );
+    let package = app.example_path().strip_prefix(package_path)?;
+    log::info!("Building example '{}' for '{}'", package.display(), chip);
+
+    if !app.configuration().is_empty() {
+        log::info!("  Configuration: {}", app.configuration());
+    }
 
     let mut features = app.feature_set().to_vec();
     if !features.is_empty() {
-        log::info!("Features: {}", features.join(","));
+        log::info!("  Features:      {}", features.join(", "));
     }
     features.push(chip.to_string());
 
-    let package = app.example_path().strip_prefix(package_path)?;
-    log::info!("Package: {}", package.display());
+    let env_vars = app.env_vars();
+    for (key, value) in env_vars {
+        log::info!("  esp-config:    {} = {}", key, value);
+    }
 
     let mut builder = CargoArgsBuilder::default()
         .target(target)
         .features(&features);
 
     let bin_arg = if package.starts_with("src/bin") {
-        format!("--bin={}", app.name())
+        format!("--bin={}", app.binary_name())
     } else if package.starts_with("tests") {
-        format!("--test={}", app.name())
+        format!("--test={}", app.binary_name())
     } else {
-        format!("--example={}", app.name())
+        format!("--example={}", app.binary_name())
     };
     builder.add_arg(bin_arg);
 
@@ -220,20 +223,20 @@ pub fn execute_app(
     log::debug!("{args:#?}");
 
     if let CargoAction::Build(out_dir) = action {
-        cargo::run(&args, package_path)?;
+        cargo::run_with_env(&args, package_path, env_vars, false)?;
 
         // Now that the build has succeeded and we printed the output, we can
         // rerun the build again quickly enough to capture JSON. We'll use this to
         // copy the binary to the output directory.
         builder.add_arg("--message-format=json");
         let args = builder.build();
-        let output = cargo::run_and_capture(&args, package_path)?;
+        let output = cargo::run_with_env(&args, package_path, env_vars, true)?;
         for line in output.lines() {
             if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
                 let out_dir = out_dir.join(&chip.to_string());
                 std::fs::create_dir_all(&out_dir)?;
 
-                let output_file = out_dir.join(app.name());
+                let output_file = out_dir.join(app.output_file_name());
                 std::fs::copy(artifact.executable, &output_file)?;
                 log::info!("Output ready: {}", output_file.display());
             }
@@ -243,7 +246,7 @@ pub fn execute_app(
             if repeat != 1 {
                 log::info!("Run {}/{}", i + 1, repeat);
             }
-            cargo::run(&args, package_path)?;
+            cargo::run_with_env(&args, package_path, env_vars.clone(), false)?;
         }
     }
 
