@@ -108,6 +108,13 @@ pub struct PsramConfig {
     pub flash_frequency: FlashFreq,
     /// Frequency of PSRAM memory
     pub ram_frequency: SpiRamFreq,
+    /// Copy code and read-only data from flash to PSRAM and remap the
+    /// respective pages to point to PSRAM
+    ///
+    /// Refer to
+    /// https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/external-ram.html#execute-in-place-xip-from-psram
+    /// for more information.
+    pub execute_from_psram: bool,
 }
 
 /// Initialize PSRAM to be used for data.
@@ -124,7 +131,9 @@ pub(crate) fn init_psram(config: PsramConfig) {
     const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = 0x8000;
     const CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS: u8 = 8;
     const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = 32;
-    const START_PAGE: u32 = 0;
+
+    let mut free_page = 0;
+    let mut psram_size = config.size.get();
 
     extern "C" {
         fn rom_config_instruction_cache_mode(
@@ -144,8 +153,23 @@ pub(crate) fn init_psram(config: PsramConfig) {
         fn Cache_Resume_DCache(param: u32);
     }
 
-    let start = unsafe {
+    // Vaguely based off of the ESP-IDF equivalent code:
+    // https://github.com/espressif/esp-idf/blob/3c99557eeea4e0945e77aabac672fbef52294d54/components/esp_psram/mmu_psram_flash.c#L46-L134
+    if config.execute_from_psram {
+        let flash_pages = mmu::count_effective_flash_pages();
+        let psram_pages = psram_size / mmu::PAGE_SIZE;
 
+        if flash_pages > psram_pages {
+            panic!("Cannot execute from PSRAM: The number of PSRAM pages ({}) is too small to fit {} flash pages", psram_pages, flash_pages);
+        }
+
+        let psram_pages_used = unsafe { mmu::copy_flash_to_psram_and_remap(free_page) };
+
+        free_page += psram_pages_used;
+        psram_size -= psram_pages_used * mmu::PAGE_SIZE;
+    }
+
+    let start = unsafe {
         // calculate the PSRAM start address to map
         // the linker scripts can produce a gap between mapped IROM and DROM segments
         // bigger than a flash page - i.e. we will see an unmapped memory slot
@@ -177,9 +201,9 @@ pub(crate) fn init_psram(config: PsramConfig) {
         if mmu::cache_dbus_mmu_set(
             mmu::ENTRY_ACCESS_SPIRAM,
             start,
-            START_PAGE << 16,
+            (free_page as u32) << 16,
             64,
-            config.size.get() as u32 / 1024 / 64, // number of pages to map
+            (psram_size / mmu::PAGE_SIZE) as u32, // number of pages to map
             0,
         ) != 0
         {
