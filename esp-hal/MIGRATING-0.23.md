@@ -107,6 +107,18 @@ e.g.
 + uart.read_bytes(&mut byte);
 ```
 
+### UART halves have their configuration split too
+
+`Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
+
+```diff
+- let config = Config::default().with_rx_fifo_full_threshold(30);
++ let config = Config::default()
++     .with_rx(RxConfig::default()
++       .with_fifo_full_threshold(30)
++ );
+```
+
 ## `timer::wait` is now blocking
 
 ```diff
@@ -160,19 +172,6 @@ config/config.toml
 ```diff
 [env]
 + ESP_HAL_CONFIG_PSRAM_MODE = "octal"
-```
-
-
-## UART halves have their configuration split too
-
-`Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
-
-```diff
-- let config = Config::default().with_rx_fifo_full_threshold(30);
-+ let config = Config::default()
-+     .with_rx(RxConfig::default()
-+       .with_fifo_full_threshold(30)
-+ );
 ```
 
 ## GPIO changes
