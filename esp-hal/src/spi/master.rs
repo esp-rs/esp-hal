@@ -461,6 +461,22 @@ impl Default for Config {
 pub enum ConfigError {}
 
 /// SPI peripheral driver
+///
+/// ### SPI Initialization
+/// ```rust, no_run
+#[doc = crate::before_snippet!()]
+/// # use esp_hal::spi::Mode;
+/// # use esp_hal::spi::master::{Config, Spi};
+/// let mut spi = Spi::new(
+///     peripherals.SPI2,
+///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
+/// )
+/// .unwrap()
+/// .with_sck(peripherals.GPIO0)
+/// .with_mosi(peripherals.GPIO1)
+/// .with_miso(peripherals.GPIO2);
+/// # }
+/// ```
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Spi<'d, Dm> {
@@ -505,21 +521,6 @@ where
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    /// ### SPI Initialization
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
-    /// let mut spi = Spi::new(
-    ///     peripherals.SPI2,
-    ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-    /// )
-    /// .unwrap()
-    /// .with_sck(peripherals.GPIO0)
-    /// .with_mosi(peripherals.GPIO1)
-    /// .with_miso(peripherals.GPIO2);
-    /// # }
-    /// ```
     pub fn new(
         spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
         config: Config,

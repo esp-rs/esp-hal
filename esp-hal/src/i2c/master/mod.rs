@@ -414,6 +414,24 @@ impl Default for Config {
 }
 
 /// I2C driver
+///
+/// ### I2C initialization and communication with the device
+/// ```rust, no_run
+#[doc = crate::before_snippet!()]
+/// # use esp_hal::i2c::master::{Config, I2c};
+/// # const DEVICE_ADDR: u8 = 0x77;
+/// let mut i2c = I2c::new(
+///     peripherals.I2C0,
+///     Config::default(),
+/// )
+/// .unwrap()
+/// .with_sda(peripherals.GPIO1)
+/// .with_scl(peripherals.GPIO2);
+///
+/// let mut data = [0u8; 22];
+/// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data).ok();
+/// # }
+/// ```
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct I2c<'d, Dm: DriverMode> {
@@ -561,22 +579,7 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
 }
 
 impl<'d> I2c<'d, Blocking> {
-    /// Create a new I2C instance
-    /// This will enable the peripheral but the peripheral won't get
-    /// automatically disabled when this gets dropped.
-    ///
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
-    /// let mut i2c = I2c::new(
-    ///     peripherals.I2C0,
-    ///     Config::default(),
-    /// )
-    /// .unwrap()
-    /// .with_sda(peripherals.GPIO1)
-    /// .with_scl(peripherals.GPIO2);
-    /// # }
-    /// ```
+    /// Create a new I2C instance.
     pub fn new(
         i2c: impl Peripheral<P = impl Instance> + 'd,
         config: Config,

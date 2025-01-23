@@ -762,12 +762,6 @@ pub struct Io {
 
 impl Io {
     /// Initialize the I/O driver.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::Io;
-    /// let mut io = Io::new(peripherals.IO_MUX);
-    /// # }
-    /// ```
     pub fn new(_io_mux: IO_MUX) -> Self {
         Io { _io_mux }
     }
@@ -1414,7 +1408,7 @@ impl<'d> Input<'d> {
     /// otherwise your program will be stuck in a loop as long as the pin is
     /// reading the corresponding level.
     ///
-    /// ## Example
+    /// ## Examples
     ///
     /// ### Print something when a button is pressed.
     /// ```rust, no_run
