@@ -59,12 +59,12 @@ use procmacros::ram;
 use strum::EnumCount;
 
 #[cfg(feature = "unstable")]
-use crate::interrupt::{InterruptConfigurable, InterruptHandler};
+use crate::interrupt::InterruptConfigurable;
 #[cfg(any(lp_io, rtc_cntl))]
 use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
-    interrupt::{self, Priority, DEFAULT_INTERRUPT_HANDLER},
+    interrupt::{self, InterruptHandler, Priority, DEFAULT_INTERRUPT_HANDLER},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{
         gpio::{handle_gpio_input, handle_gpio_output},
@@ -92,7 +92,6 @@ crate::unstable_module! {
     pub mod rtc_io;
 }
 
-#[cfg(feature = "unstable")]
 mod user_irq {
     use portable_atomic::{AtomicPtr, Ordering};
     use procmacros::ram;
@@ -681,14 +680,15 @@ pub struct Io {
     _io_mux: IO_MUX,
 }
 
-#[instability::unstable]
 impl Io {
     /// Initialize the I/O driver.
+    #[instability::unstable]
     pub fn new(_io_mux: IO_MUX) -> Self {
         Io { _io_mux }
     }
 
     /// Set the interrupt priority for GPIO interrupts.
+    #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
         unwrap!(interrupt::enable(Interrupt::GPIO, prio));
     }
@@ -706,6 +706,7 @@ impl Io {
     /// we clear the interrupt status register for you. This is NOT the case
     /// if you register the interrupt handler directly, by defining a
     /// `#[no_mangle] unsafe extern "C" fn GPIO()` function.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::GPIO);
