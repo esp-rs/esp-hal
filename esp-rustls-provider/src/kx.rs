@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
 use crypto::SupportedKxGroup;
-use rustls::crypto;
+use rustls::{crypto, ffdhe_groups::FfdheGroup};
 
 pub struct KeyExchange {
     priv_key: x25519_dalek::EphemeralSecret,
@@ -25,6 +25,10 @@ impl crypto::ActiveKeyExchange for KeyExchange {
         self.pub_key.as_bytes()
     }
 
+    fn ffdhe_group(&self) -> Option<FfdheGroup<'static>> {
+        None
+    }
+
     fn group(&self) -> rustls::NamedGroup {
         X25519.name()
     }
@@ -42,6 +46,10 @@ impl crypto::SupportedKxGroup for X25519 {
             pub_key: (&priv_key).into(),
             priv_key,
         }))
+    }
+
+    fn ffdhe_group(&self) -> Option<FfdheGroup<'static>> {
+        None
     }
 
     fn name(&self) -> rustls::NamedGroup {
