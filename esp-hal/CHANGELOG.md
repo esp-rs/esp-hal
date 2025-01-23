@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: Added support for 3-wire SPI (#2919)
 - UART: Add separate config for Rx and Tx (#2965)
 
+- `i2c::master::BusClockConfig` (#3011)
+- `spi::master::BusClockConfig` (#3011)
+- `uart::BaudRateConfig` (#3011)
+
 ### Changed
 
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
@@ -30,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`) (#3001)
 
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
+
+- SPI and I2C `Config::frequency` has been replaced by `clock`. (#3011)
+- SPI `Config::with_frequency` has been renamed to `with_clock`. (#3011)
 
 ### Fixed
 

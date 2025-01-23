@@ -32,6 +32,7 @@ use embassy_embedded_hal::SetConfig;
 use embedded_hal::i2c::Operation as EhalOperation;
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
+use procmacros::BuilderLite;
 
 use crate::{
     asynch::AtomicWaker,
@@ -390,30 +391,57 @@ impl From<Ack> for u32 {
     }
 }
 
+/// Bus clock configuration.
+///
+/// This struct holds information necessary to configure the SPI bus clock.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct BusClockConfig {
+    /// The target SCL frequency
+    frequency: HertzU32,
+}
+
+impl Default for BusClockConfig {
+    fn default() -> Self {
+        Self::new(HertzU32::kHz(100))
+    }
+}
+
+impl BusClockConfig {
+    fn new(frequency: HertzU32) -> Self {
+        Self { frequency }
+    }
+}
+
+impl From<HertzU32> for BusClockConfig {
+    fn from(frequency: HertzU32) -> Self {
+        Self::new(frequency)
+    }
+}
+
+impl core::hash::Hash for BusClockConfig {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.frequency.to_Hz().hash(state); // HertzU32 doesn't implement Hash
+    }
+}
+
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BuilderLite, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
-    pub frequency: HertzU32,
+    #[builder_lite_into]
+    pub clock: BusClockConfig,
 
     /// I2C SCL timeout period.
     pub timeout: BusTimeout,
 }
 
-impl core::hash::Hash for Config {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.frequency.to_Hz().hash(state); // `HertzU32` doesn't implement `Hash`
-        self.timeout.hash(state);
-    }
-}
-
 impl Default for Config {
     fn default() -> Self {
-        use fugit::RateExtU32;
         Config {
-            frequency: 100.kHz(),
+            clock: BusClockConfig::default(),
             timeout: BusTimeout::BusCycles(10),
         }
     }
@@ -1399,17 +1427,7 @@ impl Driver<'_> {
         set_filter(self.regs(), Some(7), Some(7));
 
         // Configure frequency
-        let clocks = Clocks::get();
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                let clock = clocks.i2c_clock.convert();
-            } else if #[cfg(esp32s2)] {
-                let clock = clocks.apb_clock.convert();
-            } else {
-                let clock = clocks.xtal_clock.convert();
-            }
-        }
-        self.set_frequency(clock, config.frequency, config.timeout)?;
+        self.set_frequency(&config.clock, config.timeout)?;
 
         self.update_config();
 
@@ -1453,12 +1471,12 @@ impl Driver<'_> {
     /// i2c_ll_set_bus_timing in ESP-IDF
     fn set_frequency(
         &self,
-        source_clk: HertzU32,
-        bus_freq: HertzU32,
+        clock_config: &BusClockConfig,
         timeout: BusTimeout,
     ) -> Result<(), ConfigError> {
-        let source_clk = source_clk.raw();
-        let bus_freq = bus_freq.raw();
+        let clocks = Clocks::get();
+        let source_clk = clocks.i2c_clock.raw();
+        let bus_freq = clock_config.frequency.raw();
 
         let half_cycle: u32 = source_clk / bus_freq / 2;
         let scl_low = half_cycle;
@@ -1535,12 +1553,12 @@ impl Driver<'_> {
     /// i2c_ll_set_bus_timing in ESP-IDF
     fn set_frequency(
         &self,
-        source_clk: HertzU32,
-        bus_freq: HertzU32,
+        clock_config: &BusClockConfig,
         timeout: BusTimeout,
     ) -> Result<(), ConfigError> {
-        let source_clk = source_clk.raw();
-        let bus_freq = bus_freq.raw();
+        let clocks = Clocks::get();
+        let source_clk = clocks.apb_clock.raw();
+        let bus_freq = clock_config.frequency.raw();
 
         let half_cycle: u32 = source_clk / bus_freq / 2;
         // SCL
@@ -1597,12 +1615,12 @@ impl Driver<'_> {
     /// i2c_ll_set_bus_timing in ESP-IDF
     fn set_frequency(
         &self,
-        source_clk: HertzU32,
-        bus_freq: HertzU32,
+        clock_config: &BusClockConfig,
         timeout: BusTimeout,
     ) -> Result<(), ConfigError> {
-        let source_clk = source_clk.raw();
-        let bus_freq = bus_freq.raw();
+        let clocks = Clocks::get();
+        let source_clk = clocks.xtal_clock.raw();
+        let bus_freq = clock_config.frequency.raw();
 
         let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
         let sclk_freq: u32 = source_clk / clkm_div;

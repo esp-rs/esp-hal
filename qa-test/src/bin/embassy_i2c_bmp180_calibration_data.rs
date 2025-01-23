@@ -32,15 +32,11 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    let mut i2c = I2c::new(peripherals.I2C0, {
-        let mut config = Config::default();
-        config.frequency = 400.kHz();
-        config
-    })
-    .unwrap()
-    .with_sda(peripherals.GPIO4)
-    .with_scl(peripherals.GPIO5)
-    .into_async();
+    let mut i2c = I2c::new(peripherals.I2C0, Config::default().with_clock(400.kHz()))
+        .unwrap()
+        .with_sda(peripherals.GPIO4)
+        .with_scl(peripherals.GPIO5)
+        .into_async();
 
     loop {
         let mut data = [0u8; 22];

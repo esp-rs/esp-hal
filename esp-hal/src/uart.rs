@@ -2037,7 +2037,7 @@ pub mod lp_uart {
         ///
         /// [`Apb`]: super::ClockSource::Apb
         pub fn change_baud(&mut self, config: &Config) {
-            self.change_baud_internal(&config.baudrate);
+            self.change_baud_internal(config);
             self.txfifo_reset();
             self.rxfifo_reset();
         }
