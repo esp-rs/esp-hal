@@ -29,26 +29,30 @@ where
         outgoing_tls: &'s mut [u8],
         plaintext_in: &'s mut [u8],
         plaintext_out: &'s mut [u8],
-    ) -> Result<Self, rustls::Error> {
-        let conn = rustls::server::UnbufferedServerConnection::new(config)?;
+    ) -> Result<Self, (S, ConnectionError<S::Error>)> {
+        match rustls::server::UnbufferedServerConnection::new(config) {
+            Ok(conn) => {
+                let mut this = Self {
+                    socket,
+                    conn,
+                    incoming_tls,
+                    outgoing_tls,
+                    incoming_used: 0,
+                    outgoing_used: 0,
 
-        let mut this = Self {
-            socket,
-            conn,
-            incoming_tls,
-            outgoing_tls,
-            incoming_used: 0,
-            outgoing_used: 0,
+                    plaintext_in,
+                    plaintext_in_used: 0,
+                    plaintext_out,
+                    plaintext_out_used: 0,
+                };
 
-            plaintext_in,
-            plaintext_in_used: 0,
-            plaintext_out,
-            plaintext_out_used: 0,
-        };
-
-        this.work().ok();
-
-        Ok(this)
+                match this.work() {
+                    Ok(_) => Ok(this),
+                    Err(err) => Err((this.socket, err)),
+                }
+            }
+            Err(err) => Err((socket, ConnectionError::Rustls(err))),
+        }
     }
 
     pub fn free(self) -> S {
@@ -173,21 +177,24 @@ where
     }
 }
 
-impl<'s, S> embedded_io::ErrorType for ServerConnection<'s, S>
+impl<S> embedded_io::ErrorType for ServerConnection<'_, S>
 where
     S: embedded_io::Read + embedded_io::Write,
 {
     type Error = ConnectionError<S::Error>;
 }
 
-impl<'s, S> embedded_io::Read for ServerConnection<'s, S>
+impl<S> embedded_io::Read for ServerConnection<'_, S>
 where
-    S: embedded_io::Read + embedded_io::Write,
+    S: embedded_io::Read + embedded_io::Write + embedded_io::ReadReady,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        let tls_read_res = self
-            .socket
-            .read(&mut self.incoming_tls[self.incoming_used..]);
+        let tls_read_res = if let Ok(true) = self.socket.read_ready() {
+            self.socket
+                .read(&mut self.incoming_tls[self.incoming_used..])
+        } else {
+            Ok(0)
+        };
 
         let tls_read = if let Err(err) = tls_read_res {
             if self.plaintext_in_used == 0 {
@@ -212,7 +219,7 @@ where
     }
 }
 
-impl<'s, S> embedded_io::Write for ServerConnection<'s, S>
+impl<S> embedded_io::Write for ServerConnection<'_, S>
 where
     S: embedded_io::Read + embedded_io::Write,
 {

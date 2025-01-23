@@ -204,7 +204,7 @@ fn main() -> ! {
             .unwrap();
 
         let server_name = "google.com".try_into().unwrap();
-        let mut tls = ClientConnection::new(
+        let tls = ClientConnection::new(
             config.clone(),
             server_name,
             socket,
@@ -212,34 +212,41 @@ fn main() -> ! {
             &mut outgoing_tls,
             &mut plaintext_in,
             &mut plaintext_out,
-        )
-        .unwrap();
+        );
 
-        tls.write(b"GET / HTTP/1.0\r\nHost: google.com\r\n\r\n")
-            .unwrap();
-        tls.flush().unwrap();
+        match tls {
+            Ok(mut tls) => {
+                tls.write(b"GET / HTTP/1.0\r\nHost: google.com\r\n\r\n")
+                    .unwrap();
+                tls.flush().unwrap();
 
-        let deadline = esp_hal::time::now() + Duration::secs(20);
-        loop {
-            let mut buffer = [0u8; 512];
+                let deadline = esp_hal::time::now() + Duration::secs(20);
+                loop {
+                    let mut buffer = [0u8; 512];
 
-            let res = tls.read(&mut buffer);
-            if let Ok(len) = res {
-                let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
-                print!("{}", to_print);
-            } else {
-                println!("{:?}", res);
-                break;
+                    let res = tls.read(&mut buffer);
+                    if let Ok(len) = res {
+                        let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
+                        print!("{}", to_print);
+                    } else {
+                        println!("{:?}", res);
+                        break;
+                    }
+
+                    if esp_hal::time::now() > deadline {
+                        println!("Timeout");
+                        break;
+                    }
+                }
+                println!();
+
+                socket = tls.free();
             }
-
-            if esp_hal::time::now() > deadline {
-                println!("Timeout");
-                break;
+            Err((s, _)) => {
+                socket = s;
             }
         }
-        println!();
 
-        socket = tls.free();
         socket.disconnect();
 
         let deadline = esp_hal::time::now() + Duration::secs(5);

@@ -19,12 +19,7 @@ use embedded_io::*;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, main, rng::Rng, time::Duration, timer::timg::TimerGroup};
 use esp_println::{print, println};
-use esp_rustls_provider::{
-    adapter::server::ServerConnection,
-    rustls,
-    
-    EspTimeProvider,
-};
+use esp_rustls_provider::{adapter::server::ServerConnection, rustls, EspTimeProvider};
 use esp_wifi::{
     config::PowerSaveMode,
     wifi::{
@@ -190,7 +185,7 @@ fn main() -> ! {
 
     let server_config = alloc::sync::Arc::new(server_config);
 
-    println!("Start busy loop on main");
+    println!("Open https://{}:4443/", stack.get_ip_info().unwrap().ip);
 
     socket.listen(4443).unwrap();
 
@@ -204,72 +199,78 @@ fn main() -> ! {
         if socket.is_connected() {
             println!("Connected");
 
-            let mut tls = ServerConnection::new(
+            let tls = ServerConnection::new(
                 server_config.clone(),
                 socket,
                 &mut incoming_tls,
                 &mut outgoing_tls,
                 &mut plaintext_in,
                 &mut plaintext_out,
-            )
-            .unwrap();
+            );
 
-            let mut time_out = false;
-            let mut err = false;
-            let mut got_data = false;
-            let deadline = esp_hal::time::now() + Duration::secs(2);
-            let mut buffer = [0u8; 1024];
-            let mut pos = 0;
-            loop {
-                let r = tls.read(&mut buffer[pos..]);
-                if let Ok(len) = r {
-                    if len > 0 {
-                        got_data = true;
+            match tls {
+                Ok(mut tls) => {
+                    let mut time_out = false;
+                    let mut err = false;
+                    let mut got_data = false;
+                    let deadline = esp_hal::time::now() + Duration::secs(4);
+                    let mut buffer = [0u8; 1024];
+                    let mut pos = 0;
+                    loop {
+                        let r = tls.read(&mut buffer[pos..]);
+                        if let Ok(len) = r {
+                            if len > 0 {
+                                got_data = true;
+                            }
+
+                            let to_print =
+                                unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
+
+                            if to_print.contains("\r\n\r\n") {
+                                print!("{}", to_print);
+                                println!();
+                                break;
+                            }
+
+                            pos += len;
+
+                            if len == 0 && got_data {
+                                break;
+                            }
+                        } else {
+                            println!("{:?}", r);
+                            err = true;
+                            break;
+                        }
+
+                        if esp_hal::time::now() > deadline {
+                            println!("Timeout");
+                            time_out = true;
+                            break;
+                        }
                     }
 
-                    let to_print =
-                        unsafe { core::str::from_utf8_unchecked(&buffer[..(pos + len)]) };
+                    if !time_out && !err {
+                        tls.write_all(
+                            b"HTTP/1.0 200 OK\r\n\r\n\
+                            <html>\
+                                <body>\
+                                    <h1>Hello Rust! Hello Rustls!</h1>\
+                                    <img src=\"https://rustacean.net/more-crabby-things/dancing-ferris.gif\"/>
+                                </body>\
+                            </html>\r\n\
+                            "
+                        ).ok();
 
-                    if to_print.contains("\r\n\r\n") {
-                        print!("{}", to_print);
-                        println!();
-                        break;
+                        tls.flush().ok();
                     }
 
-                    pos += len;
-
-                    if len == 0 && got_data {
-                        break;
-                    }
-                } else {
-                    println!("{:?}", r);
-                    err = true;
-                    break;
+                    socket = tls.free();
                 }
-
-                if esp_hal::time::now() > deadline {
-                    println!("Timeout");
-                    time_out = true;
-                    break;
+                Err((s, _)) => {
+                    socket = s;
                 }
             }
-
-            if !time_out && !err {
-                tls.write_all(
-                    b"HTTP/1.0 200 OK\r\n\r\n\
-                    <html>\
-                        <body>\
-                            <h1>Hello Rust! Hello Rustls!</h1>\
-                            <img src=\"https://rustacean.net/more-crabby-things/dancing-ferris.gif\"/>
-                        </body>\
-                    </html>\r\n\
-                    "
-                ).ok();
-
-                tls.flush().ok();
-            }
-
-            socket = tls.free();
 
             let deadline = esp_hal::time::now() + Duration::secs(1);
             while esp_hal::time::now() < deadline {

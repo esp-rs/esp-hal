@@ -32,22 +32,23 @@ where
         outgoing_tls: &'s mut [u8],
         plaintext_in: &'s mut [u8],
         plaintext_out: &'s mut [u8],
-    ) -> Result<Self, rustls::Error> {
-        let conn = rustls::client::UnbufferedClientConnection::new(config, server)?;
+    ) -> Result<Self, (S, ConnectionError<S::Error>)> {
+        match rustls::client::UnbufferedClientConnection::new(config, server) {
+            Ok(conn) => Ok(Self {
+                socket,
+                conn,
+                incoming_tls,
+                outgoing_tls,
+                incoming_used: 0,
+                outgoing_used: 0,
 
-        Ok(Self {
-            socket,
-            conn,
-            incoming_tls,
-            outgoing_tls,
-            incoming_used: 0,
-            outgoing_used: 0,
-
-            plaintext_in,
-            plaintext_in_used: 0,
-            plaintext_out,
-            plaintext_out_used: 0,
-        })
+                plaintext_in,
+                plaintext_in_used: 0,
+                plaintext_out,
+                plaintext_out_used: 0,
+            }),
+            Err(err) => Err((socket, ConnectionError::Rustls(err))),
+        }
     }
 
     pub fn free(self) -> S {
@@ -172,14 +173,14 @@ where
     }
 }
 
-impl<'s, S> embedded_io::ErrorType for ClientConnection<'s, S>
+impl<S> embedded_io::ErrorType for ClientConnection<'_, S>
 where
     S: embedded_io::Read + embedded_io::Write,
 {
     type Error = ConnectionError<S::Error>;
 }
 
-impl<'s, S> embedded_io::Read for ClientConnection<'s, S>
+impl<S> embedded_io::Read for ClientConnection<'_, S>
 where
     S: embedded_io::Read + embedded_io::Write,
 {
@@ -211,7 +212,7 @@ where
     }
 }
 
-impl<'s, S> embedded_io::Write for ClientConnection<'s, S>
+impl<S> embedded_io::Write for ClientConnection<'_, S>
 where
     S: embedded_io::Read + embedded_io::Write,
 {

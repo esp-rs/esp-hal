@@ -72,9 +72,7 @@ impl EspTimeProvider {
 
 impl rustls::time_provider::TimeProvider for EspTimeProvider {
     fn current_time(&self) -> Option<rustls::pki_types::UnixTime> {
-        let now = esp_hal::time::now()
-            .duration_since_epoch()
-            .to_secs();
+        let now = esp_hal::time::now().duration_since_epoch().to_secs();
         Some(rustls::pki_types::UnixTime::since_unix_epoch(
             core::time::Duration::from_secs(self.offset as u64 + now),
         ))
