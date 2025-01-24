@@ -8,7 +8,7 @@
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -30,10 +30,8 @@ use esp_wifi::{
     init,
     wifi::{
         event::{self, EventExt},
-        utils::create_network_interface,
         AccessPointConfiguration,
         Configuration,
-        WifiApDevice,
     },
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
@@ -68,11 +66,14 @@ fn main() -> ! {
 
     let mut rng = Rng::new(peripherals.RNG);
 
-    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
-    let mut wifi = peripherals.WIFI;
-    let (iface, device, mut controller) =
-        create_network_interface(&init, &mut wifi, WifiApDevice).unwrap();
+    let (mut controller, interfaces) =
+        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+
+    let mut device = interfaces.ap;
+    let iface = device.interface();
+
     let now = || time::now().duration_since_epoch().to_millis();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();

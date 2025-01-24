@@ -9,7 +9,7 @@
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -31,12 +31,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_wifi::{
     init,
-    wifi::{
-        utils::{create_ap_sta_network_interface, ApStaInterface},
-        AccessPointConfiguration,
-        ClientConfiguration,
-        Configuration,
-    },
+    wifi::{AccessPointConfiguration, ClientConfiguration, Configuration},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
@@ -58,17 +53,16 @@ fn main() -> ! {
 
     let mut rng = Rng::new(peripherals.RNG);
 
-    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
-    let wifi = peripherals.WIFI;
+    let (mut controller, interfaces) =
+        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
-    let ApStaInterface {
-        ap_interface,
-        sta_interface,
-        ap_device,
-        sta_device,
-        mut controller,
-    } = create_ap_sta_network_interface(&init, wifi).unwrap();
+    let mut ap_device = interfaces.ap;
+    let ap_interface = ap_device.interface();
+
+    let mut sta_device = interfaces.sta;
+    let sta_interface = sta_device.interface();
 
     let now = || time::now().duration_since_epoch().to_millis();
     let mut ap_socket_set_entries: [SocketStorage; 3] = Default::default();
