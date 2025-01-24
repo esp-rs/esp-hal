@@ -542,7 +542,7 @@ macro_rules! rtcio_analog {
 
             /// Set the RTC properties of the pin. If `mux` is true then then pin is
             /// routed to RTC, when false it is routed to IO_MUX.
-            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
                 // disable input
                 paste::paste!{
                     $crate::peripherals::RTC_IO::regs()
@@ -554,7 +554,7 @@ macro_rules! rtcio_analog {
                 }
             }
 
-            fn rtcio_pad_hold(&mut self, enable: bool) {
+            fn rtcio_pad_hold(&self, enable: bool) {
                 $crate::peripherals::LPWR::regs()
                     .hold_force()
                     .modify(|_, w| w.$hold().bit(enable));
@@ -565,14 +565,14 @@ macro_rules! rtcio_analog {
             // FIXME: replace with $(ignore($rue)) once stable
             $crate::ignore!($rue);
             impl $crate::gpio::RtcPinWithResistors for $crate::gpio::GpioPin<$pin_num> {
-                fn rtcio_pullup(&mut self, enable: bool) {
+                fn rtcio_pullup(&self, enable: bool) {
                     paste::paste! {
                         $crate::peripherals::RTC_IO::regs()
                             .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
                     }
                 }
 
-                fn rtcio_pulldown(&mut self, enable: bool) {
+                fn rtcio_pulldown(&self, enable: bool) {
                     paste::paste! {
                         $crate::peripherals::RTC_IO::regs()
                             .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
@@ -628,7 +628,7 @@ macro_rules! rtcio_analog {
             rtcio_analog!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue )?);
         )+
 
-        pub(crate) fn errata36(mut pin: $crate::gpio::AnyPin, pull_up: bool, pull_down: bool) {
+        pub(crate) fn errata36(pin: $crate::gpio::AnyPin, pull_up: bool, pull_down: bool) {
             use $crate::gpio::{Pin, RtcPinWithResistors};
 
             let has_pullups = match pin.number() {

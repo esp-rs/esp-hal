@@ -328,7 +328,7 @@ macro_rules! rtcio_analog {
 
             /// Set the RTC properties of the pin. If `mux` is true then then pin is
             /// routed to RTC, when false it is routed to IO_MUX.
-            fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
                 enable_iomux_clk_gate();
 
                 // disable input
@@ -342,7 +342,7 @@ macro_rules! rtcio_analog {
                 }
             }
 
-            fn rtcio_pad_hold(&mut self, enable: bool) {
+            fn rtcio_pad_hold(&self, enable: bool) {
                 $crate::peripherals::LPWR::regs()
                     .pad_hold()
                     .modify(|_, w| w.$hold().bit(enable));
@@ -351,14 +351,14 @@ macro_rules! rtcio_analog {
 
         impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
         {
-            fn rtcio_pullup(&mut self, enable: bool) {
+            fn rtcio_pullup(&self, enable: bool) {
                 paste::paste! {
                     $crate::peripherals::RTC_IO::regs()
                         .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
                 }
             }
 
-            fn rtcio_pulldown(&mut self, enable: bool) {
+            fn rtcio_pulldown(&self, enable: bool) {
                 paste::paste! {
                     $crate::peripherals::RTC_IO::regs()
                         .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));

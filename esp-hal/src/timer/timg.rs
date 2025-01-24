@@ -351,10 +351,8 @@ impl super::Timer for Timer {
             _ => unreachable!(),
         }
     }
-}
 
-impl InterruptConfigurable for Timer {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler)
     }
 }
@@ -382,7 +380,7 @@ unsafe impl Send for Timer {}
 
 /// Timer peripheral instance
 impl Timer {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    pub(crate) fn set_interrupt_handler(&self, handler: InterruptHandler) {
         let interrupt = match (self.timer_group(), self.timer_number()) {
             (0, 0) => Interrupt::TG0_T0_LEVEL,
             #[cfg(timg_timer1)]
