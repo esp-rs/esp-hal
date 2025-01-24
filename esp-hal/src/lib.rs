@@ -80,8 +80,7 @@
 //!     let peripherals = esp_hal::init(config);
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let config = OutputConfig::default().with_level(Level::High);
-//!     let mut led = Output::new(peripherals.GPIO0, config).unwrap();
+//!     let mut led = Output::new(peripherals.GPIO0, Level::High, OutputConfig::default());
 //!
 //!     let delay = Delay::new();
 //!

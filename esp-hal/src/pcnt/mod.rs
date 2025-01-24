@@ -39,8 +39,8 @@
 //! // Set up channels with control and edge signals
 //! let ch0 = &u0.channel0;
 //! let config = InputConfig::default().with_pull(Pull::Up);
-//! let pin_a = Input::new(peripherals.GPIO4, config).unwrap();
-//! let pin_b = Input::new(peripherals.GPIO5, config).unwrap();
+//! let pin_a = Input::new(peripherals.GPIO4, config);
+//! let pin_b = Input::new(peripherals.GPIO5, config);
 //! let (input_a, _) = pin_a.split();
 //! let (input_b, _) = pin_b.split();
 //! ch0.set_ctrl_signal(input_a.clone());

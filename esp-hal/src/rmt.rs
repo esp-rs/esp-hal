@@ -118,8 +118,11 @@
 //!
 //! const WIDTH: usize = 80;
 //!
-//! let config = OutputConfig::default().with_level(Level::Low);
-//! let mut out = Output::new(peripherals.GPIO5, config).unwrap();
+//! let mut out = Output::new(
+//!     peripherals.GPIO5,
+//!     Level::Low,
+//!     OutputConfig::default(),
+//! );
 //!
 //! // Configure frequency based on chip type
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]

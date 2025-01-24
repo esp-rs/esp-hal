@@ -35,8 +35,7 @@ fn main() -> ! {
     let mut io = Io::new(peripherals.IO_MUX);
     io.set_interrupt_handler(handler);
 
-    let config = OutputConfig::default().with_level(Level::Low);
-    let mut led = Output::new(peripherals.GPIO2, config).unwrap();
+    let mut led = Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default());
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
@@ -47,7 +46,7 @@ fn main() -> ! {
     }
 
     let config = InputConfig::default().with_pull(Pull::Up);
-    let mut button = Input::new(button, config).unwrap();
+    let mut button = Input::new(button, config);
 
     critical_section::with(|cs| {
         button.listen(Event::FallingEdge);

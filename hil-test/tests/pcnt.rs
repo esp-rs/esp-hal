@@ -47,14 +47,14 @@ mod tests {
         let unit = ctx.pcnt.unit0;
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
-        unit.channel0.set_edge_signal(
-            Input::new(ctx.input, InputConfig::default().with_pull(Pull::Down)).unwrap(),
-        );
+        unit.channel0.set_edge_signal(Input::new(
+            ctx.input,
+            InputConfig::default().with_pull(Pull::Down),
+        ));
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let mut output =
-            Output::new(ctx.output, OutputConfig::default().with_level(Level::Low)).unwrap();
+        let mut output = Output::new(ctx.output, Level::Low, OutputConfig::default());
 
         unit.resume();
 
@@ -86,14 +86,14 @@ mod tests {
         let unit = ctx.pcnt.unit1;
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
-        unit.channel0.set_edge_signal(
-            Input::new(ctx.input, InputConfig::default().with_pull(Pull::Up)).unwrap(),
-        );
+        unit.channel0.set_edge_signal(Input::new(
+            ctx.input,
+            InputConfig::default().with_pull(Pull::Up),
+        ));
         unit.channel0
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output =
-            Output::new(ctx.output, OutputConfig::default().with_level(Level::High)).unwrap();
+        let mut output = Output::new(ctx.output, Level::High, OutputConfig::default());
 
         unit.resume();
 
@@ -127,14 +127,14 @@ mod tests {
         unit.set_high_limit(Some(3)).unwrap();
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
-        unit.channel0.set_edge_signal(
-            Input::new(ctx.input, InputConfig::default().with_pull(Pull::Up)).unwrap(),
-        );
+        unit.channel0.set_edge_signal(Input::new(
+            ctx.input,
+            InputConfig::default().with_pull(Pull::Up),
+        ));
         unit.channel0
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output =
-            Output::new(ctx.output, OutputConfig::default().with_level(Level::High)).unwrap();
+        let mut output = Output::new(ctx.output, Level::High, OutputConfig::default());
 
         unit.resume();
 
@@ -190,14 +190,14 @@ mod tests {
         unit.clear();
 
         // Setup channel 0 to increment the count when gpio2 does LOW -> HIGH
-        unit.channel0.set_edge_signal(
-            Input::new(ctx.input, InputConfig::default().with_pull(Pull::Up)).unwrap(),
-        );
+        unit.channel0.set_edge_signal(Input::new(
+            ctx.input,
+            InputConfig::default().with_pull(Pull::Up),
+        ));
         unit.channel0
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output =
-            Output::new(ctx.output, OutputConfig::default().with_level(Level::High)).unwrap();
+        let mut output = Output::new(ctx.output, Level::High, OutputConfig::default());
 
         unit.resume();
 
@@ -257,14 +257,14 @@ mod tests {
         unit.clear();
 
         // Setup channel 0 to decrement the count when gpio2 does LOW -> HIGH
-        unit.channel0.set_edge_signal(
-            Input::new(ctx.input, InputConfig::default().with_pull(Pull::Up)).unwrap(),
-        );
+        unit.channel0.set_edge_signal(Input::new(
+            ctx.input,
+            InputConfig::default().with_pull(Pull::Up),
+        ));
         unit.channel0
             .set_input_mode(EdgeMode::Decrement, EdgeMode::Hold);
 
-        let mut output =
-            Output::new(ctx.output, OutputConfig::default().with_level(Level::High)).unwrap();
+        let mut output = Output::new(ctx.output, Level::High, OutputConfig::default());
 
         unit.resume();
 
@@ -315,14 +315,14 @@ mod tests {
         let unit = ctx.pcnt.unit2;
 
         // Setup channel 1 to increment the count when gpio2 does LOW -> HIGH
-        unit.channel1.set_edge_signal(
-            Input::new(ctx.input, InputConfig::default().with_pull(Pull::Up)).unwrap(),
-        );
+        unit.channel1.set_edge_signal(Input::new(
+            ctx.input,
+            InputConfig::default().with_pull(Pull::Up),
+        ));
         unit.channel1
             .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
 
-        let mut output =
-            Output::new(ctx.output, OutputConfig::default().with_level(Level::High)).unwrap();
+        let mut output = Output::new(ctx.output, Level::High, OutputConfig::default());
 
         unit.resume();
 

@@ -116,11 +116,8 @@ fn main() -> ! {
 
     let mut vsync_pin = peripherals.GPIO3;
 
-    let vsync_must_be_high_during_setup = Output::new(
-        &mut vsync_pin,
-        OutputConfig::default().with_level(Level::High),
-    )
-    .unwrap();
+    let vsync_must_be_high_during_setup =
+        Output::new(&mut vsync_pin, Level::High, OutputConfig::default());
     for &init in INIT_CMDS.iter() {
         match init {
             InitCmd::Cmd(cmd, args) => {

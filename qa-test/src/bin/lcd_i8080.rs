@@ -53,10 +53,9 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let config = OutputConfig::default().with_level(Level::Low);
-    let mut backlight = Output::new(lcd_backlight, config).unwrap();
-    let mut reset = Output::new(lcd_reset, config).unwrap();
-    let tear_effect = Input::new(lcd_te, InputConfig::default().with_pull(Pull::None)).unwrap();
+    let mut backlight = Output::new(lcd_backlight, Level::Low, OutputConfig::default());
+    let mut reset = Output::new(lcd_reset, Level::Low, OutputConfig::default());
+    let tear_effect = Input::new(lcd_te, InputConfig::default().with_pull(Pull::None));
 
     let tx_pins = TxEightBits::new(
         peripherals.GPIO9,

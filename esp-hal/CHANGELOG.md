@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - SPI: Added support for 3-wire SPI (#2919)
-- Add separate config for Rx and Tx (UART) #2965
+- UART: Add separate config for Rx and Tx (#2965)
 
 ### Changed
 
@@ -25,12 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 - SPI, UART, I2C: `with_<pin>` functions of peripheral drivers now disconnect the previously assigned pins from the peripheral. (#3012)
 - SPI, UART, I2C: Dropping a driver now disconnects pins from their peripherals. (#3012)
-
 - `Async` drivers are no longer `Send` (#2980)
-- GPIO drivers now take configuration structs, and their constructors are fallible (#2990)
-- `flip-link` feature is now a config option
-- `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`)
-
+- GPIO drivers now take configuration structs (#2990, #3029)
 - `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`) (#3001)
 
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
@@ -44,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
+- OutputOpenDrain has been removed (#3029)
 
 ## [0.23.1] - 2025-01-15
 
