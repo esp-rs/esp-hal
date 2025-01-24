@@ -73,7 +73,7 @@ use crate::{
     EspWifiController,
 };
 
-const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
+const ETHERNET_FRAME_HEADER_SIZE: usize = 14;
 
 const MTU: usize = crate::CONFIG.mtu;
 
