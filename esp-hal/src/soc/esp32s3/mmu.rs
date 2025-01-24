@@ -7,10 +7,10 @@ const DBUS_VADDR_BASE: u32 = 0x3C000000;
 const DR_REG_MMU_TABLE: u32 = 0x600C5000;
 const ENTRY_INVALID: u32 = 1 << 14;
 const ICACHE_MMU_SIZE: usize = 0x800;
-const TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
 
 pub(super) const ENTRY_ACCESS_SPIRAM: u32 = 1 << 15;
 pub(super) const PAGE_SIZE: usize = 0x10000;
+pub(super) const TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
 
 extern "C" {
     /// Set DCache mmu mapping.

@@ -151,6 +151,9 @@ pub(crate) fn init_psram(config: PsramConfig) {
         // bigger than a flash page - i.e. we will see an unmapped memory slot
         // start from the end and find the last mapped flash page
         let psram_start_index = mmu::last_mapped_index().map(|e| e + 1).unwrap_or(0);
+        if psram_start_index >= mmu::TABLE_SIZE {
+            panic!("PSRAM cannot be mapped as MMU table has no empty trailing entries");
+        }
         let start = mmu::index_to_data_address(psram_start_index);
         debug!("PSRAM start address = {:x}", start);
 
