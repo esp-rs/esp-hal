@@ -55,6 +55,33 @@ pub enum Package {
     XtensaLxRt,
 }
 
+impl Package {
+    /// Does the package have chip-specific cargo features?
+    pub fn has_chip_features(&self) -> bool {
+        use Package::*;
+
+        matches!(
+            self,
+            EspBacktrace
+                | EspHal
+                | EspHalEmbassy
+                | EspIeee802154
+                | EspLpHal
+                | EspPrintln
+                | EspStorage
+                | EspWifi
+                | XtensaLxRt
+        )
+    }
+
+    /// Do the package's chip-specific cargo features affect the public API?
+    pub fn chip_features_matter(&self) -> bool {
+        use Package::*;
+
+        matches!(self, EspHal | EspLpHal | EspWifi)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Display, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 pub enum Version {
@@ -63,35 +90,61 @@ pub enum Version {
     Patch,
 }
 
-/// Build the documentation for the specified package and device.
-pub fn build_documentation(workspace: &Path, package: Package, chip: Chip) -> Result<PathBuf> {
+/// Build the documentation for the specified package and, optionally, a
+/// specific chip.
+pub fn build_documentation(
+    workspace: &Path,
+    package: Package,
+    chip: Option<Chip>,
+) -> Result<PathBuf> {
     let package_name = package.to_string();
     let package_path = windows_safe_path(&workspace.join(&package_name));
 
-    log::info!("Building '{package_name}' documentation targeting '{chip}'");
+    if let Some(chip) = chip {
+        log::info!("Building '{package_name}' documentation targeting '{chip}'");
+    } else {
+        log::info!("Building '{package_name}' documentation");
+    }
 
-    // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(package, &chip)?;
+    // We require some nightly features to build the documentation:
+    let toolchain = if chip.is_some_and(|chip| chip.is_xtensa()) {
+        "esp"
+    } else {
+        "nightly"
+    };
 
-    // We need `nightly` for building the docs, unfortunately:
-    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
+    // Determine the appropriate build target for the given package and chip,
+    // if we're able to:
+    let target = if let Some(ref chip) = chip {
+        Some(target_triple(package, chip)?)
+    } else {
+        None
+    };
 
-    let mut features = vec![chip.to_string()];
-
-    let chip = Config::for_chip(&chip);
-
-    features.extend(apply_feature_rules(&package, chip));
+    let mut features = vec![];
+    if let Some(chip) = chip {
+        features.push(chip.to_string());
+        features.extend(apply_feature_rules(&package, Config::for_chip(&chip)));
+    }
 
     // Build up an array of command-line arguments to pass to `cargo`:
-    let builder = CargoArgsBuilder::default()
+    let mut builder = CargoArgsBuilder::default()
         .toolchain(toolchain)
         .subcommand("doc")
-        .target(target)
         .features(&features)
-        .arg("-Zbuild-std=alloc,core")
         .arg("-Zrustdoc-map")
         .arg("--lib")
         .arg("--no-deps");
+
+    if let Some(target) = target {
+        builder = builder.target(target);
+    }
+
+    // Special case: `esp-metadata` requires `std`, and we get some really confusing
+    // errors if we try to pass `-Zbuild-std=core`:
+    if package != Package::EspMetadata {
+        builder = builder.arg("-Zbuild-std=alloc,core");
+    }
 
     let args = builder.build();
     log::debug!("{args:#?}");
@@ -104,15 +157,14 @@ pub fn build_documentation(workspace: &Path, package: Package, chip: Chip) -> Re
         false,
     )?;
 
-    let docs_path = windows_safe_path(
-        &workspace
-            .join(package.to_string())
-            .join("target")
-            .join(target)
-            .join("doc"),
-    );
+    // Build up the path at which the built documentation can be found:
+    let mut docs_path = workspace.join(package.to_string()).join("target");
+    if let Some(target) = target {
+        docs_path = docs_path.join(target);
+    }
+    docs_path = docs_path.join("doc");
 
-    Ok(docs_path)
+    Ok(windows_safe_path(&docs_path))
 }
 
 fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
@@ -120,6 +172,8 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
 
     let mut features = vec![];
     match package {
+        Package::EspBacktrace => features.push("defmt".to_owned()),
+        Package::EspConfig => features.push("build".to_owned()),
         Package::EspHal => {
             features.push("unstable".to_owned());
             features.push("ci".to_owned());
@@ -152,6 +206,7 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
         }
         _ => {}
     }
+
     features
 }
 

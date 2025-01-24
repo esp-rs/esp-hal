@@ -93,23 +93,21 @@
   <div class="content">
     <div class="logo">
       <img src="esp-rs.svg" alt="esp-rs logo" />
-      <div>esp-rs docs</div>
+      <div>{{ metadata[0].package }} Documentation</div>
     </div>
 
-    {%- for (package, metadata) in packages|items %}
-    <h2>{{ package }}</h2>
+    <h2>{{ metadata[0].package }}</h2>
 
     {%- for meta in metadata %}
     <div class="crate">
       <span class="crate-name">
-        <a href="{{ meta.name }}/{{ meta.version }}/{{ meta.chip }}/{{ meta.package }}">
+        <a href="{{ meta.chip }}/{{ meta.package }}/index.html">
           {{ meta.chip_pretty }}
         </a>
       </span>
       <span class="crate-description">{{ meta.name }} (targeting {{ meta.chip_pretty }})</span>
       <span class="crate-version">{{ meta.version }}</span>
     </div>
-    {%- endfor %}
     {%- endfor %}
   </div>
 </body>
