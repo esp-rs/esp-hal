@@ -149,13 +149,14 @@ pub fn build_documentation(
     let args = builder.build();
     log::debug!("{args:#?}");
 
+    let mut envs = vec![("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs")];
+    // Special case: `esp-storage` requires the optimization level to be 2 or 3:
+    if package == Package::EspStorage {
+        envs.push(("CARGO_PROFILE_DEBUG_OPT_LEVEL", "3"));
+    }
+
     // Execute `cargo doc` from the package root:
-    cargo::run_with_env(
-        &args,
-        &package_path,
-        [("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs")],
-        false,
-    )?;
+    cargo::run_with_env(&args, &package_path, envs, false)?;
 
     // Build up the path at which the built documentation can be found:
     let mut docs_path = workspace.join(package.to_string()).join("target");
