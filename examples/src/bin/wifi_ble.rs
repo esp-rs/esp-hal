@@ -45,7 +45,7 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
+    let esp_wifi_ctrl = init(
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
@@ -67,7 +67,7 @@ fn main() -> ! {
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     loop {
-        let connector = BleConnector::new(&init, &mut bluetooth);
+        let connector = BleConnector::new(&esp_wifi_ctrl, &mut bluetooth);
         let hci = HciConnector::new(connector, now);
         let mut ble = Ble::new(&hci);
 

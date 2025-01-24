@@ -7,7 +7,7 @@
 //! - responds with some HTML content when connecting to port 8080
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -27,14 +27,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_wifi::{
     init,
-    wifi::{
-        utils::create_network_interface,
-        AccessPointInfo,
-        ClientConfiguration,
-        Configuration,
-        WifiError,
-        WifiStaDevice,
-    },
+    wifi::{AccessPointInfo, ClientConfiguration, Configuration, WifiError},
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
 
@@ -55,11 +48,17 @@ fn main() -> ! {
 
     let mut rng = Rng::new(peripherals.RNG);
 
-    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
-    let mut wifi = peripherals.WIFI;
-    let (iface, device, mut controller) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+    let (mut controller, interfaces) =
+        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+
+    let mut device = interfaces.sta;
+    let iface = create_interface(&mut device);
+
+    controller
+        .set_power_saving(esp_wifi::config::PowerSaveMode::None)
+        .unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
@@ -198,4 +197,25 @@ fn parse_ip(ip: &str) -> [u8; 4] {
         result[idx] = u8::from_str_radix(octet, 10).unwrap();
     }
     result
+}
+
+// some smoltcp boilerplate
+fn timestamp() -> smoltcp::time::Instant {
+    smoltcp::time::Instant::from_micros(
+        esp_hal::time::Instant::now()
+            .duration_since_epoch()
+            .as_micros() as i64,
+    )
+}
+
+pub fn create_interface(device: &mut esp_wifi::wifi::WifiDevice) -> smoltcp::iface::Interface {
+    // users could create multiple instances but since they only have one WifiDevice
+    // they probably can't do anything bad with that
+    smoltcp::iface::Interface::new(
+        smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(
+            smoltcp::wire::EthernetAddress::from_bytes(&device.mac_address()),
+        )),
+        device,
+        timestamp(),
+    )
 }

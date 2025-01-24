@@ -1,4 +1,4 @@
-use esp_wifi_sys::include::timeval;
+use esp_wifi_sys::{c_types::c_char, include::timeval};
 use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
@@ -193,7 +193,7 @@ pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *cons
 
 // other functions
 #[no_mangle]
-pub unsafe extern "C" fn puts(s: *const u8) {
+pub unsafe extern "C" fn puts(s: *const c_char) {
     let cstr = str_from_c(s);
     info!("{}", cstr);
 }
@@ -205,10 +205,10 @@ static mut WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 // stuff needed by wpa-supplicant
 #[no_mangle]
 pub unsafe extern "C" fn __assert_func(
-    file: *const u8,
+    file: *const c_char,
     line: u32,
-    func: *const u8,
-    failed_expr: *const u8,
+    func: *const c_char,
+    failed_expr: *const c_char,
 ) {
     let file = str_from_c(file);
     let (func_pre, func) = if func.is_null() {

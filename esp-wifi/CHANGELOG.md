@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `set_power_saving` is now also available when the `coex` feature is activated (#3081)
 
+- Network interfaces and the controller are now more separated (#3027)
+
 ### Fixed
 
 - Fixed a problem using BLE on ESP32-C6 when connected via Serial-JTAG (#2981)
