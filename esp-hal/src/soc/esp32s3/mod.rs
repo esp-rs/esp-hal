@@ -23,6 +23,7 @@ crate::unstable_module! {
 }
 pub mod cpu_control;
 pub mod gpio;
+mod mmu;
 pub mod peripherals;
 
 /// The name of the chip ("esp32s3") as `&str`
