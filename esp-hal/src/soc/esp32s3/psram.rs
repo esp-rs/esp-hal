@@ -112,7 +112,7 @@ pub struct PsramConfig {
     /// respective pages to point to PSRAM
     ///
     /// Refer to
-    /// https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/external-ram.html#execute-in-place-xip-from-psram
+    /// <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/external-ram.html#execute-in-place-xip-from-psram>
     /// for more information.
     pub execute_from_psram: bool,
 }
