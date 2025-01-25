@@ -1,7 +1,7 @@
 //! Thin MMU bindings
 //!
 //! More general information about the MMU can be found here:
-//! https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction
+//! <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction>
 
 const DBUS_VADDR_BASE: u32 = 0x3C000000;
 const DR_REG_MMU_TABLE: u32 = 0x600C5000;
