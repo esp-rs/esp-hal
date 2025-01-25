@@ -23,6 +23,7 @@ crate::unstable_module! {
 }
 pub mod cpu_control;
 pub mod gpio;
+#[cfg(feature = "psram")]
 mod mmu;
 pub mod peripherals;
 
