@@ -15,7 +15,6 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     handler,
-    interrupt::InterruptConfigurable,
     main,
     ram,
     uart::{Config as UartConfig, DataBits, Parity, RxConfig, StopBits, Uart, UartInterrupt},
