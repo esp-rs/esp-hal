@@ -15,7 +15,7 @@ mod implementation;
 
 mod efuse_field;
 
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+#[cfg(feature = "psram")]
 mod psram_common;
 
 // Using static mut should be fine since we are only writing to it once during
@@ -24,12 +24,12 @@ mod psram_common;
 // the HAL. This will access the PSRAM range, returning an empty range - which
 // is, at that point, true. The user has no (safe) means to allocate in PSRAM
 // before initializing the HAL.
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+#[cfg(feature = "psram")]
 static mut MAPPED_PSRAM: MappedPsram = MappedPsram { memory_range: 0..0 };
 
 pub(crate) fn psram_range() -> Range<usize> {
     cfg_if::cfg_if! {
-        if #[cfg(any(feature = "quad-psram", feature = "octal-psram"))] {
+        if #[cfg(feature = "psram")] {
             #[allow(static_mut_refs)]
             unsafe { MAPPED_PSRAM.memory_range.clone() }
         } else {
@@ -40,7 +40,7 @@ pub(crate) fn psram_range() -> Range<usize> {
 
 const DRAM: Range<usize> = self::constants::SOC_DRAM_LOW..self::constants::SOC_DRAM_HIGH;
 
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+#[cfg(feature = "psram")]
 pub struct MappedPsram {
     memory_range: Range<usize>,
 }
@@ -53,16 +53,20 @@ pub struct MappedPsram {
 // Values other than 0 indicate that we cannot attempt setting the mac address
 // again, and values other than 2 indicate that we should read the mac address
 // from eFuse.
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 static MAC_OVERRIDE_STATE: AtomicU8 = AtomicU8::new(0);
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 static mut MAC_OVERRIDE: [u8; 6] = [0; 6];
 
 /// Error indicating issues with setting the MAC address.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub enum SetMacError {
     /// The MAC address has already been set and cannot be changed.
     AlreadySet,
 }
 
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 impl self::efuse::Efuse {
     /// Set the base mac address
     ///

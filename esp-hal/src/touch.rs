@@ -31,7 +31,7 @@ use crate::{
     gpio::TouchPin,
     interrupt::InterruptConfigurable,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{RTC_CNTL, SENS, TOUCH},
+    peripherals::{LPWR, SENS, TOUCH},
     private::{Internal, Sealed},
     rtc_cntl::Rtc,
     Async,
@@ -93,8 +93,8 @@ pub struct Touch<'d, Tm: TouchMode, Dm: DriverMode> {
 impl<Tm: TouchMode, Dm: DriverMode> Touch<'_, Tm, Dm> {
     /// Common initialization of the touch peripheral.
     fn initialize_common(config: Option<TouchConfig>) {
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        let sens = unsafe { &*SENS::ptr() };
+        let rtccntl = LPWR::regs();
+        let sens = SENS::regs();
 
         let mut threshold_mode = false;
         let mut meas_dur = 0x7fff;
@@ -147,8 +147,8 @@ impl<Tm: TouchMode, Dm: DriverMode> Touch<'_, Tm, Dm> {
 
     /// Common parts of the continuous mode initialization.
     fn initialize_common_continuous(config: Option<TouchConfig>) {
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        let sens = unsafe { &*SENS::ptr() };
+        let rtccntl = LPWR::regs();
+        let sens = SENS::regs();
 
         // Default nr of sleep cycles from IDF
         let mut sleep_cyc = 0x1000;
@@ -200,8 +200,8 @@ impl<'d> Touch<'d, OneShot, Blocking> {
         config: Option<TouchConfig>,
     ) -> Self {
         crate::into_ref!(touch_peripheral);
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        let sens = unsafe { &*SENS::ptr() };
+        let rtccntl = LPWR::regs();
+        let sens = SENS::regs();
 
         // Default nr of sleep cycles from IDF
         let mut sleep_cyc = 0x1000;
@@ -327,37 +327,28 @@ impl<P: TouchPin> TouchPad<P, OneShot, Blocking> {
     /// (Re-)Start a touch measurement on the pin. You can get the result by
     /// calling [`read`](Self::read) once it is finished.
     pub fn start_measurement(&mut self) {
-        unsafe { &*crate::peripherals::RTC_IO::ptr() }
+        crate::peripherals::RTC_IO::regs()
             .touch_pad2()
             .write(|w| unsafe {
-                w.start()
-                    .set_bit()
-                    .xpd()
-                    .set_bit()
-                    // clear input_enable
-                    .fun_ie()
-                    .clear_bit()
-                    // Connect pin to analog / RTC module instead of standard GPIO
-                    .mux_sel()
-                    .set_bit()
-                    // Disable pull-up and pull-down resistors on the pin
-                    .rue()
-                    .clear_bit()
-                    .rde()
-                    .clear_bit()
-                    .tie_opt()
-                    .clear_bit()
-                    .to_gpio()
-                    .set_bit()
-                    // Select function "RTC function 1" (GPIO) for analog use
-                    .fun_sel()
-                    .bits(0b00)
+                w.start().set_bit();
+                w.xpd().set_bit();
+                // clear input_enable
+                w.fun_ie().clear_bit();
+                // Connect pin to analog / RTC module instead of standard GPIO
+                w.mux_sel().set_bit();
+                // Disable pull-up and pull-down resistors on the pin
+                w.rue().clear_bit();
+                w.rde().clear_bit();
+                w.tie_opt().clear_bit();
+                w.to_gpio().set_bit();
+                // Select function "RTC function 1" (GPIO) for analog use
+                w.fun_sel().bits(0b00)
             });
 
-        unsafe { &*crate::peripherals::SENS::PTR }
+        crate::peripherals::SENS::regs()
             .sar_touch_ctrl2()
             .modify(|_, w| w.touch_start_en().clear_bit());
-        unsafe { &*crate::peripherals::SENS::PTR }
+        crate::peripherals::SENS::regs()
             .sar_touch_ctrl2()
             .modify(|_, w| w.touch_start_en().set_bit());
     }
@@ -469,52 +460,59 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
 }
 
 fn internal_enable_interrupt(touch_nr: u8) {
-    let rtccntl = unsafe { &*RTC_CNTL::ptr() };
     // enable touch interrupts
-    rtccntl.int_ena().write(|w| w.touch().set_bit());
+    LPWR::regs().int_ena().write(|w| w.touch().set_bit());
 
-    let sens = unsafe { &*SENS::ptr() };
-    sens.sar_touch_enable().modify(|r, w| unsafe {
+    SENS::regs().sar_touch_enable().modify(|r, w| unsafe {
         w.touch_pad_outen1()
             .bits(r.touch_pad_outen1().bits() | 1 << touch_nr)
     });
 }
 
 fn internal_disable_interrupt(touch_nr: u8) {
-    let sens = unsafe { &*SENS::ptr() };
-    sens.sar_touch_enable().modify(|r, w| unsafe {
+    SENS::regs().sar_touch_enable().modify(|r, w| unsafe {
         w.touch_pad_outen1()
             .bits(r.touch_pad_outen1().bits() & !(1 << touch_nr))
     });
-    if sens.sar_touch_enable().read().touch_pad_outen1().bits() == 0 {
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        rtccntl.int_ena().write(|w| w.touch().clear_bit());
+    if SENS::regs()
+        .sar_touch_enable()
+        .read()
+        .touch_pad_outen1()
+        .bits()
+        == 0
+    {
+        LPWR::regs().int_ena().write(|w| w.touch().clear_bit());
     }
 }
 
 fn internal_disable_interrupts() {
-    let sens = unsafe { &*SENS::ptr() };
-    sens.sar_touch_enable()
+    SENS::regs()
+        .sar_touch_enable()
         .write(|w| unsafe { w.touch_pad_outen1().bits(0) });
-    if sens.sar_touch_enable().read().touch_pad_outen1().bits() == 0 {
-        let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-        rtccntl.int_ena().write(|w| w.touch().clear_bit());
+    if SENS::regs()
+        .sar_touch_enable()
+        .read()
+        .touch_pad_outen1()
+        .bits()
+        == 0
+    {
+        LPWR::regs().int_ena().write(|w| w.touch().clear_bit());
     }
 }
 
 fn internal_clear_interrupt() {
-    let rtccntl = unsafe { &*RTC_CNTL::ptr() };
-    rtccntl.int_clr().write(|w| w.touch().clear_bit_by_one());
-    let sens = unsafe { &*SENS::ptr() };
-    sens.sar_touch_ctrl2()
+    LPWR::regs()
+        .int_clr()
+        .write(|w| w.touch().clear_bit_by_one());
+    SENS::regs()
+        .sar_touch_ctrl2()
         .write(|w| w.touch_meas_en_clr().set_bit());
 }
 
 fn internal_pins_touched() -> u16 {
-    let sens = unsafe { &*SENS::ptr() };
     // Only god knows, why the "interrupt flag" register is called "meas_en" on this
     // chip...
-    sens.sar_touch_ctrl2().read().touch_meas_en().bits()
+    SENS::regs().sar_touch_ctrl2().read().touch_meas_en().bits()
 }
 
 fn internal_is_interrupt_set(touch_nr: u8) -> bool {
@@ -528,11 +526,7 @@ mod asynch {
     };
 
     use super::*;
-    use crate::{
-        asynch::AtomicWaker,
-        macros::{handler, ram},
-        Async,
-    };
+    use crate::{asynch::AtomicWaker, handler, ram, Async};
 
     const NUM_TOUCH_PINS: usize = 10;
 

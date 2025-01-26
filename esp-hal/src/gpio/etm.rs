@@ -181,7 +181,7 @@ impl<const C: u8> EventChannel<C> {
     ) -> Event<'d> {
         crate::into_mapped_ref!(pin);
 
-        pin.init_input(pin_config.pull, private::Internal);
+        pin.init_input(pin_config.pull);
 
         enable_event_channel(C, pin.number());
         Event {
@@ -289,12 +289,12 @@ impl<const C: u8> TaskChannel<C> {
     ) -> Task<'d> {
         crate::into_mapped_ref!(pin);
 
-        pin.set_output_high(pin_config.initial_state.into(), private::Internal);
+        pin.set_output_high(pin_config.initial_state.into());
         if pin_config.open_drain {
-            pin.pull_direction(pin_config.pull, private::Internal);
-            pin.set_to_open_drain_output(private::Internal);
+            pin.pull_direction(pin_config.pull);
+            pin.set_to_open_drain_output();
         } else {
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
         }
 
         enable_task_channel(C, pin.number());
@@ -338,19 +338,21 @@ impl crate::etm::EtmTask for Task<'_> {
 }
 
 fn enable_task_channel(channel: u8, pin: u8) {
-    let gpio_sd = unsafe { GPIO_SD::steal() };
+    let gpio_sd = GPIO_SD::regs();
     let ptr = unsafe { gpio_sd.etm_task_p0_cfg().as_ptr().add(pin as usize / 4) };
     let shift = 8 * (pin as usize % 4);
     // bit 0 = en, bit 1-3 = channel
     unsafe {
         ptr.write_volatile(
-            ptr.read_volatile() & !(0xf << shift) | 1 << shift | (channel as u32) << (shift + 1),
+            ptr.read_volatile() & !(0xf << shift)
+                | (1 << shift)
+                | ((channel as u32) << (shift + 1)),
         );
     }
 }
 
 fn enable_event_channel(channel: u8, pin: u8) {
-    let gpio_sd = unsafe { GPIO_SD::steal() };
+    let gpio_sd = GPIO_SD::regs();
     gpio_sd
         .etm_event_ch_cfg(channel as usize)
         .modify(|_, w| w.event_en().clear_bit());

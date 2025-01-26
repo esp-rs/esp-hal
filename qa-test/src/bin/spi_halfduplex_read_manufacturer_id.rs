@@ -23,6 +23,7 @@
 //! register is set.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% TAG: flashchip
 
 #![no_std]
 #![no_main]
@@ -30,7 +31,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    entry,
+    main,
     spi::{
         master::{Address, Command, Config, Spi},
         DataMode,
@@ -40,7 +41,7 @@ use esp_hal::{
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
@@ -66,12 +67,12 @@ fn main() -> ! {
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
-            .with_mode(Mode::Mode0),
+            .with_mode(Mode::_0),
     )
     .unwrap()
     .with_sck(sclk)
-    .with_mosi(mosi)
-    .with_miso(miso)
+    .with_sio0(mosi)
+    .with_sio1(miso)
     .with_sio2(sio2)
     .with_sio3(sio3)
     .with_cs(cs);
@@ -82,9 +83,9 @@ fn main() -> ! {
         // READ MANUFACTURER ID FROM FLASH CHIP
         let mut data = [0u8; 2];
         spi.half_duplex_read(
-            DataMode::Single,
-            Command::Command8(0x90, DataMode::Single),
-            Address::Address24(0x000000, DataMode::Single),
+            DataMode::SingleTwoDataLines,
+            Command::_8Bit(0x90, DataMode::SingleTwoDataLines),
+            Address::_24Bit(0x000000, DataMode::SingleTwoDataLines),
             0,
             &mut data,
         )
@@ -96,8 +97,8 @@ fn main() -> ! {
         let mut data = [0u8; 2];
         spi.half_duplex_read(
             DataMode::Dual,
-            Command::Command8(0x92, DataMode::Single),
-            Address::Address32(0x000000_00, DataMode::Dual),
+            Command::_8Bit(0x92, DataMode::SingleTwoDataLines),
+            Address::_32Bit(0x000000_00, DataMode::Dual),
             0,
             &mut data,
         )
@@ -109,8 +110,8 @@ fn main() -> ! {
         let mut data = [0u8; 2];
         spi.half_duplex_read(
             DataMode::Quad,
-            Command::Command8(0x94, DataMode::Single),
-            Address::Address32(0x000000_00, DataMode::Quad),
+            Command::_8Bit(0x94, DataMode::SingleTwoDataLines),
+            Address::_32Bit(0x000000_00, DataMode::Quad),
             4,
             &mut data,
         )

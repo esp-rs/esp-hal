@@ -146,22 +146,22 @@ mod impls {
         /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32c3/curve_fitting_coefficients.c>
         #[cfg(esp32c3)]
         CURVES_COEFFS1 [
-            Attenuation0dB => [
+            _0dB => [
                 -0.225966470500043,
                 -0.0007265418501948,
                 0.0000109410402681,
             ],
-            Attenuation2p5dB => [
+            _2p5dB => [
                 0.4229623392600516,
                 -0.0000731527490903,
                 0.0000088166562521,
             ],
-            Attenuation6dB => [
+            _6dB => [
                 -1.017859239236435,
                 -0.0097159265299153,
                 0.0000149794028038,
             ],
-            Attenuation11dB => [
+            _11dB => [
                 -1.4912262772850453,
                 -0.0228549975564099,
                 0.0000356391935717,
@@ -173,22 +173,22 @@ mod impls {
         /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32c6/curve_fitting_coefficients.c>
         #[cfg(esp32c6)]
         CURVES_COEFFS1 [
-            Attenuation0dB => [
+            _0dB => [
                 -0.0487166399931449,
                 0.0006436483033201,
                 0.0000030410131806,
             ],
-            Attenuation2p5dB => [
+            _2p5dB => [
                 -0.8665498165817785,
                 0.0015239070452946,
                 0.0000013818878844,
             ],
-            Attenuation6dB => [
+            _6dB => [
                 -1.2277821756674387,
                 0.0022275554717885,
                 0.0000005924302667,
             ],
-            Attenuation11dB => [
+            _11dB => [
                 -0.3801417550380255,
                 -0.0006020352420772,
                 0.0000012442478488,
@@ -198,22 +198,22 @@ mod impls {
         /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32s3/curve_fitting_coefficients.c>
         #[cfg(esp32s3)]
         CURVES_COEFFS1 [
-            Attenuation0dB => [
+            _0dB => [
                 -2.7856531419538344,
                 -0.0050871540569528,
                 0.0000097982495890,
             ],
-            Attenuation2p5dB => [
+            _2p5dB => [
                 -2.9831022915028695,
                 -0.0049393185868806,
                 0.0000101379430548,
             ],
-            Attenuation6dB => [
+            _6dB => [
                 -2.3285545746296417,
                 -0.0147640181047414,
                 0.0000208385525314,
             ],
-            Attenuation11dB => [
+            _11dB => [
                 -0.644403418269478,
                 -0.0644334888647536,
                 0.0001297891447611,
@@ -225,22 +225,22 @@ mod impls {
         /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32s3/curve_fitting_coefficients.c>
         #[cfg(esp32s3)]
         CURVES_COEFFS2 [
-            Attenuation0dB => [
+            _0dB => [
                 -2.5668651654328927,
                 0.0001353548869615,
                 0.0000036615265189,
             ],
-            Attenuation2p5dB => [
+            _2p5dB => [
                 -2.3690184690298404,
                 -0.0066319894226185,
                 0.0000118964995959,
             ],
-            Attenuation6dB => [
+            _6dB => [
                 -0.9452499397020617,
                 -0.0200996773954387,
                 0.00000259011467956,
             ],
-            Attenuation11dB => [
+            _11dB => [
                 1.2247719764336924,
                 -0.0755717904943462,
                 0.0001478791187119,

@@ -12,9 +12,9 @@ use core::marker::PhantomData;
 
 use crate::{
     asynch::AtomicWaker,
+    handler,
     interrupt::{InterruptConfigurable, InterruptHandler},
     lcd_cam::{cam::Cam, lcd::Lcd},
-    macros::handler,
     peripheral::Peripheral,
     peripherals::{Interrupt, LCD_CAM},
     system::GenericPeripheralGuard,
@@ -136,23 +136,22 @@ pub(crate) struct Instance;
 // this is only implemented for the LCD side, when the Camera is implemented a
 // CriticalSection will be needed to protect these shared registers.
 impl Instance {
-    pub(crate) fn listen_lcd_done() {
-        let lcd_cam = unsafe { LCD_CAM::steal() };
-        lcd_cam
+    fn enable_listenlcd_done(en: bool) {
+        LCD_CAM::regs()
             .lc_dma_int_ena()
-            .modify(|_, w| w.lcd_trans_done_int_ena().set_bit());
+            .modify(|_, w| w.lcd_trans_done_int_ena().bit(en));
+    }
+
+    pub(crate) fn listen_lcd_done() {
+        Self::enable_listenlcd_done(true);
     }
 
     pub(crate) fn unlisten_lcd_done() {
-        let lcd_cam = unsafe { LCD_CAM::steal() };
-        lcd_cam
-            .lc_dma_int_ena()
-            .modify(|_, w| w.lcd_trans_done_int_ena().clear_bit());
+        Self::enable_listenlcd_done(false);
     }
 
     pub(crate) fn is_lcd_done_set() -> bool {
-        let lcd_cam = unsafe { LCD_CAM::steal() };
-        lcd_cam
+        LCD_CAM::regs()
             .lc_dma_int_raw()
             .read()
             .lcd_trans_done_int_raw()

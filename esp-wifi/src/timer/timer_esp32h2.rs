@@ -5,17 +5,7 @@ use crate::{
 };
 
 pub(crate) fn setup_radio_isr() {
-    #[cfg(feature = "ble")]
-    {
-        unwrap!(interrupt::enable(
-            Interrupt::LP_BLE_TIMER,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
-            Interrupt::BT_MAC,
-            interrupt::Priority::Priority1
-        ));
-    }
+    // no-op
 }
 
 pub(crate) fn shutdown_radio_isr() {

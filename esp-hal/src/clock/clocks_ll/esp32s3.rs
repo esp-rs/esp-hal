@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
-    let system_control = unsafe { &*crate::peripherals::SYSTEM::PTR };
+    let system_control = crate::peripherals::SYSTEM::regs();
 
     unsafe {
         system_control
@@ -17,9 +17,9 @@ pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
                 .set_bit()
                 .cpuperiod_sel()
                 .bits(match cpu_clock_speed {
-                    CpuClock::Clock80MHz => 0,
-                    CpuClock::Clock160MHz => 1,
-                    CpuClock::Clock240MHz => 2,
+                    CpuClock::_80MHz => 0,
+                    CpuClock::_160MHz => 1,
+                    CpuClock::_240MHz => 2,
                 })
         });
     }

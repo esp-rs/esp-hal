@@ -58,40 +58,41 @@
 //! ```
 //! 
 //! ### TRNG operation
-/// ```rust, no_run
-#[doc = crate::before_snippet!()]
-/// # use esp_hal::rng::Trng;
-/// # use esp_hal::peripherals::Peripherals;
-/// # use esp_hal::peripherals::ADC1;
-/// # use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
-///
-/// let mut buf = [0u8; 16];
-///
-/// // ADC is not available from now
-/// let mut trng = Trng::new(peripherals.RNG, &mut peripherals.ADC1);
-/// trng.read(&mut buf);
-/// let mut true_rand = trng.random();
-/// let mut rng = trng.downgrade();
-/// // ADC is available now
-#[cfg_attr(esp32, doc = "let analog_pin = peripherals.GPIO32;")]
-#[cfg_attr(not(esp32), doc = "let analog_pin = peripherals.GPIO3;")]
-/// let mut adc1_config = AdcConfig::new();
-/// let mut adc1_pin = adc1_config.enable_pin(
-///     analog_pin,
-///     Attenuation::Attenuation11dB
-/// );
-/// let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
-/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-/// rng.read(&mut buf);
-/// true_rand = rng.random();
-/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
-/// # }
-/// ```
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::rng::Trng;
+//! # use esp_hal::peripherals::Peripherals;
+//! # use esp_hal::peripherals::ADC1;
+//! # use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
+//!
+//! let mut buf = [0u8; 16];
+//!
+//! // ADC is not available from now
+//! let mut trng = Trng::new(peripherals.RNG, &mut peripherals.ADC1);
+//! trng.read(&mut buf);
+//! let mut true_rand = trng.random();
+//! let mut rng = trng.downgrade();
+//! // ADC is available now
+#![cfg_attr(esp32, doc = "let analog_pin = peripherals.GPIO32;")]
+#![cfg_attr(not(esp32), doc = "let analog_pin = peripherals.GPIO3;")]
+//! let mut adc1_config = AdcConfig::new();
+//! let mut adc1_pin = adc1_config.enable_pin(
+//!     analog_pin,
+//!     Attenuation::_11dB
+//! );
+//! let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
+//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+//! rng.read(&mut buf);
+//! true_rand = rng.random();
+//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+//! # }
+//! ```
 use core::marker::PhantomData;
 
 use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{ADC1, RNG},
+    private::Sealed,
 };
 
 /// Random number generator driver
@@ -112,10 +113,7 @@ impl Rng {
     /// Reads currently available `u32` integer from `RNG`
     pub fn random(&mut self) -> u32 {
         // SAFETY: read-only register access
-        unsafe { &*crate::peripherals::RNG::PTR }
-            .data()
-            .read()
-            .bits()
+        RNG::regs().data().read().bits()
     }
 
     #[inline]
@@ -133,6 +131,17 @@ impl Rng {
             let bytes = self.random().to_le_bytes();
             chunk.copy_from_slice(&bytes[..chunk.len()]);
         }
+    }
+}
+
+impl Sealed for Rng {}
+
+impl Peripheral for Rng {
+    type P = Self;
+
+    #[inline]
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        *self
     }
 }
 
@@ -239,3 +248,17 @@ impl rand_core::RngCore for Trng<'_> {
 /// Implementing a CryptoRng marker trait that indicates that the generator is
 /// cryptographically secure.
 impl rand_core::CryptoRng for Trng<'_> {}
+
+impl Sealed for Trng<'_> {}
+
+impl Peripheral for Trng<'_> {
+    type P = Self;
+
+    #[inline]
+    unsafe fn clone_unchecked(&self) -> Self::P {
+        Self {
+            rng: self.rng.clone_unchecked(),
+            _adc: self._adc.clone_unchecked(),
+        }
+    }
+}

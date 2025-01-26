@@ -3,7 +3,7 @@
 //! Uses flash address 0x9000 (default NVS)
 //! See https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/partition-tables.html#built-in-partition-tables
 
-//% FEATURES: esp-storage
+//% FEATURES: esp-storage esp-hal/unstable
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
@@ -11,11 +11,11 @@
 
 use embedded_storage::{ReadStorage, Storage};
 use esp_backtrace as _;
-use esp_hal::entry;
+use esp_hal::main;
 use esp_println::println;
 use esp_storage::FlashStorage;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let mut bytes = [0u8; 32];
 

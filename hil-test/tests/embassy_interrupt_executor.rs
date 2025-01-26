@@ -2,8 +2,7 @@
 //! code.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: integrated-timers
-//% FEATURES: generic-queue
+//% FEATURES: unstable embassy
 
 #![no_std]
 #![no_main]
@@ -18,6 +17,8 @@ use esp_hal::{
     },
     timer::AnyTimer,
 };
+#[cfg(multi_core)]
+use esp_hal_embassy::Executor;
 use esp_hal_embassy::InterruptExecutor;
 use hil_test as _;
 
@@ -31,10 +32,11 @@ macro_rules! mk_static {
 }
 
 #[embassy_executor::task]
-async fn interrupt_driven_task(
+async fn responder_task(
     signal: &'static Signal<CriticalSectionRawMutex, ()>,
     response: &'static Signal<CriticalSectionRawMutex, ()>,
 ) {
+    response.signal(());
     loop {
         signal.wait().await;
         response.signal(());
@@ -48,7 +50,7 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod test {
     use super::*;
 
@@ -99,10 +101,9 @@ mod test {
 
         let spawner = interrupt_executor.start(Priority::Priority3);
 
-        spawner
-            .spawn(interrupt_driven_task(signal, response))
-            .unwrap();
+        spawner.spawn(responder_task(signal, response)).unwrap();
 
+        response.wait().await;
         for _ in 0..3 {
             signal.signal(());
             response.wait().await;
@@ -123,20 +124,44 @@ mod test {
 
                 let spawner = interrupt_executor.start(Priority::Priority3);
 
-                spawner
-                    .spawn(interrupt_driven_task(signal, response))
-                    .unwrap();
+                spawner.spawn(responder_task(signal, response)).unwrap();
 
                 loop {}
             }
         };
 
-        #[allow(static_mut_refs)]
         let _guard = ctx
             .cpu_control
             .start_app_core(app_core_stack, cpu1_fnctn)
             .unwrap();
 
+        response.wait().await;
+        for _ in 0..3 {
+            signal.signal(());
+            response.wait().await;
+        }
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    async fn run_thread_executor_test_on_core_1(mut ctx: Context) {
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+        let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
+        let response = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
+
+        let cpu1_fnctn = || {
+            let executor = mk_static!(Executor, Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(responder_task(signal, response)).ok();
+            });
+        };
+
+        let _guard = ctx
+            .cpu_control
+            .start_app_core(app_core_stack, cpu1_fnctn)
+            .unwrap();
+
+        response.wait().await;
         for _ in 0..3 {
             signal.signal(());
             response.wait().await;

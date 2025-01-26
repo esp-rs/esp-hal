@@ -4,7 +4,7 @@
 //! with loopback mode enabled).
 
 //% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: generic-queue
+//% FEATURES: unstable
 // FIXME: re-enable on ESP32 when it no longer fails spuriously
 
 #![no_std]
@@ -79,25 +79,23 @@ async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, Async>) {
 }
 
 fn enable_loopback() {
-    unsafe {
-        let i2s = esp_hal::peripherals::I2S0::steal();
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
-                i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
-            } else {
-                i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
-                i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
+    let i2s = esp_hal::peripherals::I2S0::regs();
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32, esp32s2))] {
+            i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
+            i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
+        } else {
+            i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
+            i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
 
-                i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
-                i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
-            }
+            i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
+            i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
         }
     }
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
@@ -109,7 +107,9 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {

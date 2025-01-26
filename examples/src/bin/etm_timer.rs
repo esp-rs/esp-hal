@@ -11,14 +11,15 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    entry,
     etm::Etm,
     gpio::{
-        etm::{Channels, OutputConfig},
+        etm::{Channels, OutputConfig as EtmOutputConfig},
         Level,
         Output,
+        OutputConfig,
         Pull,
     },
+    main,
     time::ExtU64,
     timer::{
         systimer::{etm::Event, SystemTimer},
@@ -26,11 +27,12 @@ use esp_hal::{
     },
 };
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut led = Output::new(peripherals.GPIO2, Level::Low);
+    let config = OutputConfig::default().with_level(Level::Low);
+    let mut led = Output::new(peripherals.GPIO2, config).unwrap();
     led.set_high();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
@@ -42,7 +44,7 @@ fn main() -> ! {
     let gpio_ext = Channels::new(peripherals.GPIO_SD);
     let led_task = gpio_ext.channel0_task.toggle(
         led,
-        OutputConfig {
+        EtmOutputConfig {
             open_drain: false,
             pull: Pull::None,
             initial_state: Level::Low,

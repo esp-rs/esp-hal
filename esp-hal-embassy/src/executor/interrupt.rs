@@ -2,12 +2,14 @@
 
 use core::{cell::UnsafeCell, mem::MaybeUninit};
 
-use embassy_executor::{raw, SendSpawner};
+use embassy_executor::SendSpawner;
 use esp_hal::{
     interrupt::{self, software::SoftwareInterrupt, InterruptHandler},
     Cpu,
 };
 use portable_atomic::{AtomicUsize, Ordering};
+
+use super::InnerExecutor;
 
 const COUNT: usize = 3 + cfg!(not(multi_core)) as usize;
 static mut EXECUTORS: [CallbackContext; COUNT] = [const { CallbackContext::new() }; COUNT];
@@ -19,7 +21,7 @@ static mut EXECUTORS: [CallbackContext; COUNT] = [const { CallbackContext::new()
 /// software.
 pub struct InterruptExecutor<const SWI: u8> {
     core: AtomicUsize,
-    executor: UnsafeCell<MaybeUninit<raw::Executor>>,
+    executor: UnsafeCell<MaybeUninit<InnerExecutor>>,
     interrupt: SoftwareInterrupt<SWI>,
 }
 
@@ -27,7 +29,7 @@ unsafe impl<const SWI: u8> Send for InterruptExecutor<SWI> {}
 unsafe impl<const SWI: u8> Sync for InterruptExecutor<SWI> {}
 
 struct CallbackContext {
-    raw_executor: UnsafeCell<*mut raw::Executor>,
+    raw_executor: UnsafeCell<*mut InnerExecutor>,
 }
 
 impl CallbackContext {
@@ -37,11 +39,14 @@ impl CallbackContext {
         }
     }
 
-    fn get(&self) -> *mut raw::Executor {
-        unsafe { *self.raw_executor.get() }
+    /// # Safety:
+    ///
+    /// The caller must ensure `set` has been called before.
+    unsafe fn get(&self) -> &InnerExecutor {
+        unsafe { &**self.raw_executor.get() }
     }
 
-    fn set(&self, executor: *mut raw::Executor) {
+    fn set(&self, executor: *mut InnerExecutor) {
         unsafe { self.raw_executor.get().write(executor) };
     }
 }
@@ -51,8 +56,9 @@ extern "C" fn handle_interrupt<const NUM: u8>() {
     swi.reset();
 
     unsafe {
-        let executor = unwrap!(EXECUTORS[NUM as usize].get().as_mut());
-        executor.poll();
+        // SAFETY: The executor is always initialized before the interrupt is enabled.
+        let executor = EXECUTORS[NUM as usize].get();
+        executor.inner.poll();
     }
 }
 
@@ -99,7 +105,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
         unsafe {
             (*self.executor.get())
                 .as_mut_ptr()
-                .write(raw::Executor::new((SWI as usize) as *mut ()));
+                .write(InnerExecutor::new(priority, (SWI as usize) as *mut ()));
 
             EXECUTORS[SWI as usize].set((*self.executor.get()).as_mut_ptr());
         }
@@ -117,7 +123,8 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
             .set_interrupt_handler(InterruptHandler::new(swi_handler, priority));
 
         let executor = unsafe { (*self.executor.get()).assume_init_ref() };
-        executor.spawner().make_send()
+        executor.init();
+        executor.inner.spawner().make_send()
     }
 
     /// Get a SendSpawner for this executor
@@ -132,6 +139,6 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
             panic!("InterruptExecutor::spawner() called on uninitialized executor.");
         }
         let executor = unsafe { (*self.executor.get()).assume_init_ref() };
-        executor.spawner().make_send()
+        executor.inner.spawner().make_send()
     }
 }

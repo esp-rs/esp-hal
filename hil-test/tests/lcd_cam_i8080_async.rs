@@ -1,7 +1,7 @@
 //! lcd_cam i8080 tests
 
 //% CHIPS: esp32s3
-//% FEATURES: generic-queue
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -28,7 +28,7 @@ struct Context<'d> {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
@@ -57,6 +57,10 @@ mod tests {
             config
         })
         .unwrap();
+
+        // explicitly drop the camera half to see if it disables clocks (unexpectedly,
+        // I8080 should keep it alive)
+        core::mem::drop(ctx.lcd_cam.cam);
 
         let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
 

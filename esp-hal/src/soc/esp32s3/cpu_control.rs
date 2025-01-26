@@ -149,8 +149,7 @@ pub struct CpuControl<'d> {
 }
 
 unsafe fn internal_park_core(core: Cpu) {
-    let rtc_control = crate::peripherals::RTC_CNTL::PTR;
-    let rtc_control = &*rtc_control;
+    let rtc_control = crate::peripherals::LPWR::regs();
 
     match core {
         Cpu::ProCpu => {
@@ -174,6 +173,7 @@ unsafe fn internal_park_core(core: Cpu) {
 
 impl<'d> CpuControl<'d> {
     /// Creates a new instance of `CpuControl`.
+    #[instability::unstable]
     pub fn new(cpu_control: impl Peripheral<P = CPU_CTRL> + 'd) -> CpuControl<'d> {
         crate::into_ref!(cpu_control);
 
@@ -194,7 +194,7 @@ impl<'d> CpuControl<'d> {
 
     /// Unpark the given core
     pub fn unpark_core(&mut self, core: Cpu) {
-        let rtc_control = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+        let rtc_control = crate::peripherals::LPWR::regs();
 
         match core {
             Cpu::ProCpu => {
@@ -287,8 +287,7 @@ impl<'d> CpuControl<'d> {
         F: FnOnce(),
         F: Send + 'a,
     {
-        let system_control = crate::peripherals::SYSTEM::PTR;
-        let system_control = unsafe { &*system_control };
+        let system_control = crate::peripherals::SYSTEM::regs();
 
         if !xtensa_lx::is_debugger_attached()
             && system_control

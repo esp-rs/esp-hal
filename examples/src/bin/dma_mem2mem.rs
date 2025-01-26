@@ -7,12 +7,12 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, dma::Mem2Mem, dma_buffers, entry, time::ExtU64};
+use esp_hal::{delay::Delay, dma::Mem2Mem, dma_buffers, main, time::ExtU64};
 use log::{error, info};
 
 const DATA_SIZE: usize = 1024 * 10;
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 

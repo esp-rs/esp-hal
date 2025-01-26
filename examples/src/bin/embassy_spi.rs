@@ -13,7 +13,7 @@
 //! CS   => GPIO5
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy embassy-generic-timers esp-hal/unstable
+//% FEATURES: embassy esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -61,7 +61,7 @@ async fn main(_spawner: Spawner) {
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
-            .with_mode(Mode::Mode0),
+            .with_mode(Mode::_0),
     )
     .unwrap()
     .with_sck(sclk)

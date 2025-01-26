@@ -56,7 +56,7 @@
 //! ## Implementation State
 //! - DMA-SHA Mode is not supported.
 
-use core::{borrow::BorrowMut, convert::Infallible, marker::PhantomData, mem::size_of};
+use core::{borrow::Borrow, convert::Infallible, marker::PhantomData, mem::size_of};
 
 /// Re-export digest for convenience
 #[cfg(feature = "digest")]
@@ -97,6 +97,11 @@ impl<'d> Sha<'d> {
     pub fn start_owned<A: ShaAlgorithm>(self) -> ShaDigest<'d, A, Self> {
         ShaDigest::new(self)
     }
+
+    #[cfg(not(esp32))]
+    fn regs(&self) -> &crate::pac::sha::RegisterBlock {
+        self.sha.register_block()
+    }
 }
 
 impl crate::private::Sealed for Sha<'_> {}
@@ -130,7 +135,7 @@ impl crate::interrupt::InterruptConfigurable for Sha<'_> {
 ///
 /// This implementation might fail after u32::MAX/8 bytes, to increase please
 /// see ::finish() length/self.cursor usage
-pub struct ShaDigest<'d, A, S: BorrowMut<Sha<'d>>> {
+pub struct ShaDigest<'d, A, S: Borrow<Sha<'d>>> {
     sha: S,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     cursor: usize,
@@ -140,14 +145,14 @@ pub struct ShaDigest<'d, A, S: BorrowMut<Sha<'d>>> {
     phantom: PhantomData<(&'d (), A)>,
 }
 
-impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
+impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
     /// Creates a new digest
     #[allow(unused_mut)]
     pub fn new(mut sha: S) -> Self {
         #[cfg(not(esp32))]
         // Setup SHA Mode.
-        sha.borrow_mut()
-            .sha
+        sha.borrow()
+            .regs()
             .mode()
             .write(|w| unsafe { w.mode().bits(A::MODE_AS_BITS) });
 
@@ -164,26 +169,22 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
 
     /// Restores a previously saved digest.
     #[cfg(not(esp32))]
-    pub fn restore(mut sha: S, ctx: &mut Context<A>) -> Self {
+    pub fn restore(sha: S, ctx: &mut Context<A>) -> Self {
         // Setup SHA Mode.
-        sha.borrow_mut()
-            .sha
+        sha.borrow()
+            .regs()
             .mode()
             .write(|w| unsafe { w.mode().bits(A::MODE_AS_BITS) });
 
         // Restore the message buffer
         unsafe {
-            core::ptr::copy_nonoverlapping(
-                ctx.buffer.as_ptr(),
-                m_mem(&sha.borrow_mut().sha, 0),
-                32,
-            );
+            core::ptr::copy_nonoverlapping(ctx.buffer.as_ptr(), m_mem(&sha.borrow().sha, 0), 32);
         }
 
         let mut ah = ctx.alignment_helper.clone();
 
         // Restore previously saved hash
-        ah.volatile_write_regset(h_mem(&sha.borrow_mut().sha, 0), &ctx.saved_digest, 64);
+        ah.volatile_write_regset(h_mem(&sha.borrow().sha, 0), &ctx.saved_digest, 64);
 
         Self {
             sha,
@@ -202,7 +203,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
             if #[cfg(esp32)] {
                 A::is_busy(&self.sha.borrow().sha)
             } else {
-                self.sha.borrow().sha.busy().read().state().bit_is_set()
+                self.sha.borrow().regs().busy().read().state().bit_is_set()
             }
         }
     }
@@ -236,7 +237,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
             }
 
             let flushed = self.alignment_helper.flush_to(
-                m_mem(&self.sha.borrow_mut().sha, 0),
+                m_mem(&self.sha.borrow().sha, 0),
                 (self.cursor % A::CHUNK_LENGTH) / self.alignment_helper.align_size(),
             );
             self.cursor = self.cursor.wrapping_add(flushed);
@@ -254,7 +255,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
             // buffer
             let pad_len = A::CHUNK_LENGTH - mod_cursor;
             self.alignment_helper.volatile_write_bytes(
-                m_mem(&self.sha.borrow_mut().sha, 0),
+                m_mem(&self.sha.borrow().sha, 0),
                 0_u8,
                 pad_len / self.alignment_helper.align_size(),
                 mod_cursor / self.alignment_helper.align_size(),
@@ -272,14 +273,14 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         let pad_len = A::CHUNK_LENGTH - mod_cursor - size_of::<u64>();
 
         self.alignment_helper.volatile_write_bytes(
-            m_mem(&self.sha.borrow_mut().sha, 0),
+            m_mem(&self.sha.borrow().sha, 0),
             0,
             pad_len / self.alignment_helper.align_size(),
             mod_cursor / self.alignment_helper.align_size(),
         );
 
         self.alignment_helper.aligned_volatile_copy(
-            m_mem(&self.sha.borrow_mut().sha, 0),
+            m_mem(&self.sha.borrow().sha, 0),
             &length,
             A::CHUNK_LENGTH / self.alignment_helper.align_size(),
             (A::CHUNK_LENGTH - size_of::<u64>()) / self.alignment_helper.align_size(),
@@ -292,14 +293,14 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         // ESP32 requires additional load to retrieve output
         #[cfg(esp32)]
         {
-            A::load(&mut self.sha.borrow_mut().sha);
+            A::load(&self.sha.borrow().sha);
 
             // Spin wait for result, 8-20 clock cycles according to manual
             while self.is_busy() {}
         }
 
         self.alignment_helper.volatile_read_regset(
-            h_mem(&self.sha.borrow_mut().sha, 0),
+            h_mem(&self.sha.borrow().sha, 0),
             output,
             core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
         );
@@ -326,7 +327,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
 
         // Save the content of the current hash.
         self.alignment_helper.volatile_read_regset(
-            h_mem(&self.sha.borrow_mut().sha, 0),
+            h_mem(&self.sha.borrow().sha, 0),
             &mut context.saved_digest,
             64 / self.alignment_helper.align_size(),
         );
@@ -334,7 +335,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         // Save the content of the current (probably partially written) message.
         unsafe {
             core::ptr::copy_nonoverlapping(
-                m_mem(&self.sha.borrow_mut().sha, 0),
+                m_mem(&self.sha.borrow().sha, 0),
                 context.buffer.as_mut_ptr(),
                 32,
             );
@@ -353,30 +354,28 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     /// This method is platform-specific and differs for ESP32 and non-ESP32
     /// platforms.
     fn process_buffer(&mut self) {
-        #[cfg(not(esp32))]
-        if self.first_run {
-            // Set SHA_START_REG
-            self.sha
-                .borrow_mut()
-                .sha
-                .start()
-                .write(|w| unsafe { w.bits(1) });
-            self.first_run = false;
-        } else {
-            // SET SHA_CONTINUE_REG
-            self.sha
-                .borrow_mut()
-                .sha
-                .continue_()
-                .write(|w| unsafe { w.bits(1) });
-        }
+        let sha = self.sha.borrow();
 
-        #[cfg(esp32)]
-        if self.first_run {
-            A::start(&mut self.sha.borrow_mut().sha);
-            self.first_run = false;
-        } else {
-            A::r#continue(&mut self.sha.borrow_mut().sha);
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                if self.first_run {
+                    A::start(&sha.sha);
+                    self.first_run = false;
+                } else {
+                    A::r#continue(&sha.sha);
+                }
+            } else {
+                if self.first_run {
+                    // Set SHA_START_REG
+                    // FIXME: raw register access
+                    sha.regs().start().write(|w| unsafe { w.bits(1) });
+                    self.first_run = false;
+                } else {
+                    // SET SHA_CONTINUE_REG
+                    // FIXME: raw register access
+                    sha.regs().continue_().write(|w| unsafe { w.bits(1) });
+                }
+            }
         }
     }
 
@@ -504,17 +503,17 @@ pub trait ShaAlgorithm: crate::private::Sealed {
     #[cfg(esp32)]
     #[doc(hidden)]
     // Initiate the operation
-    fn start(sha: &mut crate::peripherals::SHA);
+    fn start(sha: &crate::peripherals::SHA);
 
     #[cfg(esp32)]
     #[doc(hidden)]
     // Continue the operation
-    fn r#continue(sha: &mut crate::peripherals::SHA);
+    fn r#continue(sha: &crate::peripherals::SHA);
 
     #[cfg(esp32)]
     #[doc(hidden)]
     // Calculate the final hash
-    fn load(sha: &mut crate::peripherals::SHA);
+    fn load(sha: &crate::peripherals::SHA);
 
     #[cfg(esp32)]
     #[doc(hidden)]
@@ -526,15 +525,15 @@ pub trait ShaAlgorithm: crate::private::Sealed {
 /// Note: digest has a blanket trait implementation for [digest::Digest] for any
 /// element that implements FixedOutput + Default + Update + HashMarker
 #[cfg(feature = "digest")]
-impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::HashMarker for ShaDigest<'d, A, S> {}
+impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::HashMarker for ShaDigest<'d, A, S> {}
 
 #[cfg(feature = "digest")]
-impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::OutputSizeUser for ShaDigest<'d, A, S> {
+impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::OutputSizeUser for ShaDigest<'d, A, S> {
     type OutputSize = A::DigestOutputSize;
 }
 
 #[cfg(feature = "digest")]
-impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::Update for ShaDigest<'d, A, S> {
+impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::Update for ShaDigest<'d, A, S> {
     fn update(&mut self, data: &[u8]) {
         let mut remaining = data.as_ref();
         while !remaining.is_empty() {
@@ -544,7 +543,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::Update for ShaDigest<'d
 }
 
 #[cfg(feature = "digest")]
-impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::FixedOutput for ShaDigest<'d, A, S> {
+impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::FixedOutput for ShaDigest<'d, A, S> {
     fn finalize_into(mut self, out: &mut digest::Output<Self>) {
         nb::block!(self.finish(out)).unwrap();
     }
@@ -584,30 +583,30 @@ macro_rules! impl_sha {
             type DigestOutputSize = paste::paste!(digest::consts::[< U $digest_length >]);
 
             #[cfg(esp32)]
-            fn start(sha: &mut crate::peripherals::SHA) {
+            fn start(sha: &crate::peripherals::SHA) {
                 paste::paste! {
-                    sha.[< $name:lower _start >]().write(|w| w.[< $name:lower _start >]().set_bit());
+                    sha.register_block().[< $name:lower _start >]().write(|w| w.[< $name:lower _start >]().set_bit());
                 }
             }
 
             #[cfg(esp32)]
-            fn r#continue(sha: &mut crate::peripherals::SHA) {
+            fn r#continue(sha: &crate::peripherals::SHA) {
                 paste::paste! {
-                    sha.[< $name:lower _continue >]().write(|w| w.[< $name:lower _continue >]().set_bit());
+                    sha.register_block().[< $name:lower _continue >]().write(|w| w.[< $name:lower _continue >]().set_bit());
                 }
             }
 
             #[cfg(esp32)]
-            fn load(sha: &mut crate::peripherals::SHA) {
+            fn load(sha: &crate::peripherals::SHA) {
                 paste::paste! {
-                    sha.[< $name:lower _load >]().write(|w| w.[< $name:lower _load >]().set_bit());
+                    sha.register_block().[< $name:lower _load >]().write(|w| w.[< $name:lower _load >]().set_bit());
                 }
             }
 
             #[cfg(esp32)]
             fn is_busy(sha: &crate::peripherals::SHA) -> bool {
                 paste::paste! {
-                    sha.[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
+                    sha.register_block().[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
                 }
             }
         }
@@ -642,6 +641,7 @@ impl_sha!(Sha512_224, 5, 28, 128);
 impl_sha!(Sha512_256, 6, 32, 128);
 
 fn h_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+    let sha = sha.register_block();
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             sha.text(index).as_ptr()
@@ -652,6 +652,7 @@ fn h_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
 }
 
 fn m_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+    let sha = sha.register_block();
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             sha.text(index).as_ptr()

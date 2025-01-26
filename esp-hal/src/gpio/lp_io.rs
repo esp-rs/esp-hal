@@ -42,6 +42,7 @@ pub struct LowPowerOutput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     /// Create a new output pin for use by the low-power core
+    #[instability::unstable]
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: OutputPin + RtcPin,
@@ -57,7 +58,7 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     }
 
     fn output_enable(&self, enable: bool) {
-        let lp_io = unsafe { LP_IO::steal() };
+        let lp_io = LP_IO::regs();
         if enable {
             lp_io
                 .out_enable_w1ts()
@@ -77,6 +78,7 @@ pub struct LowPowerInput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     /// Create a new input pin for use by the low-power core
+    #[instability::unstable]
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: InputPin + RtcPin,
@@ -94,21 +96,21 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     }
 
     fn input_enable(&self, enable: bool) {
-        unsafe { LP_IO::steal() }
+        LP_IO::regs()
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_ie().bit(enable));
     }
 
     /// Sets pull-up enable for the pin
     pub fn pullup_enable(&self, enable: bool) {
-        unsafe { LP_IO::steal() }
+        LP_IO::regs()
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_wpu().bit(enable));
     }
 
     /// Sets pull-down enable for the pin
     pub fn pulldown_enable(&self, enable: bool) {
-        unsafe { LP_IO::steal() }
+        LP_IO::regs()
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_wpd().bit(enable));
     }
@@ -121,6 +123,7 @@ pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     /// Create a new output pin for use by the low-power core
+    #[instability::unstable]
     pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
     where
         P: InputPin + OutputPin + RtcPin,
@@ -141,7 +144,7 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 
     fn output_enable(&self, enable: bool) {
-        let lp_io = unsafe { LP_IO::steal() };
+        let lp_io = LP_IO::regs();
         if enable {
             lp_io
                 .out_enable_w1ts()
@@ -154,61 +157,60 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     }
 
     fn input_enable(&self, enable: bool) {
-        unsafe { LP_IO::steal() }
+        LP_IO::regs()
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_ie().bit(enable));
     }
 
     /// Sets pull-up enable for the pin
     pub fn pullup_enable(&self, enable: bool) {
-        unsafe { LP_IO::steal() }
+        LP_IO::regs()
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_wpu().bit(enable));
     }
 
     /// Sets pull-down enable for the pin
     pub fn pulldown_enable(&self, enable: bool) {
-        unsafe { LP_IO::steal() }
+        LP_IO::regs()
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_wpd().bit(enable));
     }
 
     fn set_open_drain_output(&self, enable: bool) {
-        unsafe { GPIO::steal() }
+        GPIO::regs()
             .pin(PIN as usize)
             .modify(|_, w| w.pad_driver().bit(enable));
     }
 }
 
 pub(crate) fn init_low_power_pin(pin: u8) {
-    unsafe { LP_AON::steal() }
+    LP_AON::regs()
         .gpio_mux()
-        .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | 1 << pin) });
+        .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | (1 << pin)) });
 
-    unsafe { LP_IO::steal() }
+    LP_IO::regs()
         .gpio(pin as usize)
         .modify(|_, w| unsafe { w.mcu_sel().bits(0) });
 }
 
 #[doc(hidden)]
-#[macro_export]
 macro_rules! lp_gpio {
     (
         $($gpionum:literal)+
     ) => {
         $(
             impl $crate::gpio::RtcPin for GpioPin<$gpionum> {
-                unsafe fn apply_wakeup(&mut self, wakeup: bool, level: u8) {
-                    let lp_io = $crate::peripherals::LP_IO::steal();
+                unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
+                    let lp_io = $crate::peripherals::LP_IO::regs();
                     lp_io.pin($gpionum).modify(|_, w| {
                         w.wakeup_enable().bit(wakeup).int_type().bits(level)
                     });
                 }
 
-                fn rtcio_pad_hold(&mut self, enable: bool) {
+                fn rtcio_pad_hold(&self, enable: bool) {
                     let mask = 1 << $gpionum;
                     unsafe {
-                        let lp_aon = $crate::peripherals::LP_AON::steal();
+                        let lp_aon = $crate::peripherals::LP_AON::regs();
 
                         lp_aon.gpio_hold0().modify(|r, w| {
                             if enable {
@@ -222,11 +224,11 @@ macro_rules! lp_gpio {
 
                 /// Set the LP properties of the pin. If `mux` is true then then pin is
                 /// routed to LP_IO, when false it is routed to IO_MUX.
-                fn rtc_set_config(&mut self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+                fn rtc_set_config(&self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
                     let mask = 1 << $gpionum;
                     unsafe {
+                        let lp_aon = $crate::peripherals::LP_AON::regs();
                         // Select LP_IO
-                        let lp_aon = $crate::peripherals::LP_AON::steal();
                         lp_aon
                             .gpio_mux()
                             .modify(|r, w| {
@@ -238,7 +240,7 @@ macro_rules! lp_gpio {
                             });
 
                         // Configure input, function and select normal operation registers
-                        let lp_io = $crate::peripherals::LP_IO::steal();
+                        let lp_io = $crate::peripherals::LP_IO::regs();
                         lp_io.gpio($gpionum).modify(|_, w| {
                             w.slp_sel().bit(false);
                             w.fun_ie().bit(input_enable);
@@ -249,16 +251,18 @@ macro_rules! lp_gpio {
             }
 
             impl $crate::gpio::RtcPinWithResistors for GpioPin<$gpionum> {
-                fn rtcio_pullup(&mut self, enable: bool) {
-                    let lp_io = unsafe { $crate::peripherals::LP_IO::steal() };
+                fn rtcio_pullup(&self, enable: bool) {
+                    let lp_io = $crate::peripherals::LP_IO::regs();
                     lp_io.gpio($gpionum).modify(|_, w| w.fun_wpu().bit(enable));
                 }
 
-                fn rtcio_pulldown(&mut self, enable: bool) {
-                    let lp_io = unsafe { $crate::peripherals::LP_IO::steal() };
+                fn rtcio_pulldown(&self, enable: bool) {
+                    let lp_io = $crate::peripherals::LP_IO::regs();
                     lp_io.gpio($gpionum).modify(|_, w| w.fun_wpd().bit(enable));
                 }
             }
         )+
     }
 }
+
+pub(crate) use lp_gpio;

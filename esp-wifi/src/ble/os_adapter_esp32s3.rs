@@ -370,13 +370,21 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
             ISR_INTERRUPT_5 = (
                 func as *mut crate::binary::c_types::c_void,
                 arg as *mut crate::binary::c_types::c_void,
-            )
+            );
+            unwrap!(interrupt::enable(
+                Interrupt::BT_BB,
+                interrupt::Priority::Priority1,
+            ));
         }
         8 => {
             ISR_INTERRUPT_8 = (
                 func as *mut crate::binary::c_types::c_void,
                 arg as *mut crate::binary::c_types::c_void,
-            )
+            );
+            unwrap!(interrupt::enable(
+                Interrupt::RWBLE,
+                interrupt::Priority::Priority1,
+            ));
         }
         _ => panic!("Unsupported interrupt number {}", interrupt_no),
     }

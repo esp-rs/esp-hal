@@ -3,13 +3,14 @@ use std::{
     env,
     fmt::{self, Write as _},
     fs,
+    io::Write,
     ops::Range,
     path::PathBuf,
 };
 
 const DOC_TABLE_HEADER: &str = r#"
-| Name | Description | Default value |
-|------|-------------|---------------|
+| Name | Description | Default value | Allowed value |
+|------|-------------|---------------|---------------|
 "#;
 
 const SELECTED_TABLE_HEADER: &str = r#"
@@ -155,6 +156,8 @@ pub enum Validator {
     PositiveInteger,
     /// Ensure that an integer value falls within the specified range.
     IntegerInRange(Range<i128>),
+    /// String-Enumeration. Only allows one of the given Strings.
+    Enumeration(Vec<String>),
     /// A custom validation function to run against any supported value type.
     Custom(Box<dyn Fn(&Value) -> Result<(), Error>>),
 }
@@ -166,10 +169,58 @@ impl Validator {
             Validator::NonNegativeInteger => non_negative_integer(value)?,
             Validator::PositiveInteger => positive_integer(value)?,
             Validator::IntegerInRange(range) => integer_in_range(range, value)?,
+            Validator::Enumeration(values) => enumeration(values, value)?,
             Validator::Custom(validator_fn) => validator_fn(value)?,
         }
 
         Ok(())
+    }
+
+    fn description(&self) -> Option<String> {
+        match self {
+            Validator::NegativeInteger => Some(String::from("Negative integer")),
+            Validator::NonNegativeInteger => Some(String::from("Positive integer or 0")),
+            Validator::PositiveInteger => Some(String::from("Positive integer")),
+            Validator::IntegerInRange(range) => {
+                Some(format!("Integer in range {}..{}", range.start, range.end))
+            }
+            Validator::Enumeration(values) => Some(format!("Any of {:?}", values)),
+            Validator::Custom(_) => None,
+        }
+    }
+
+    fn emit_cargo_extras<W: Write>(&self, stdout: &mut W, config_key: &str) {
+        match self {
+            Validator::Enumeration(values) => {
+                let config_key = snake_case(config_key);
+                for value in values {
+                    writeln!(
+                        stdout,
+                        "cargo:rustc-check-cfg=cfg({config_key}_{})",
+                        snake_case(value)
+                    )
+                    .ok();
+                }
+            }
+            _ => (),
+        }
+    }
+}
+
+fn enumeration(values: &Vec<String>, value: &Value) -> Result<(), Error> {
+    if let Value::String(value) = value {
+        if !values.contains(value) {
+            return Err(Error::validation(format!(
+                "Expected one of {:?}, found '{}'",
+                values, value
+            )));
+        }
+
+        Ok(())
+    } else {
+        return Err(Error::parse(
+            "Validator::Enumeration can only be used with string values",
+        ));
     }
 }
 
@@ -249,22 +300,31 @@ fn integer_in_range(range: &Range<i128>, value: &Value) -> Result<(), Error> {
 ///
 /// Unknown keys with the supplied prefix will cause this function to panic.
 pub fn generate_config(
-    prefix: &str,
+    crate_name: &str,
+    config: &[(&str, &str, Value, Option<Validator>)],
+    emit_md_tables: bool,
+) -> HashMap<String, Value> {
+    generate_config_internal(&mut std::io::stdout(), crate_name, config, emit_md_tables)
+}
+
+pub fn generate_config_internal<W: Write>(
+    stdout: &mut W,
+    crate_name: &str,
     config: &[(&str, &str, Value, Option<Validator>)],
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
     // Only rebuild if `build.rs` changed. Otherwise, Cargo will rebuild if any
     // other file changed.
-    println!("cargo:rerun-if-changed=build.rs");
+    writeln!(stdout, "cargo:rerun-if-changed=build.rs").ok();
 
     #[cfg(not(test))]
-    env_change_work_around();
+    env_change_work_around(stdout);
 
     let mut doc_table = String::from(DOC_TABLE_HEADER);
     let mut selected_config = String::from(SELECTED_TABLE_HEADER);
 
     // Ensure that the prefix is `SCREAMING_SNAKE_CASE`:
-    let prefix = screaming_snake_case(prefix);
+    let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
 
     // Build a lookup table for any provided validators; we must prefix the
     // name of the config and transform it to SCREAMING_SNAKE_CASE so that
@@ -273,7 +333,7 @@ pub fn generate_config(
         .iter()
         .flat_map(|(name, _description, _default, validator)| {
             if let Some(validator) = validator {
-                let name = format!("{prefix}_{}", screaming_snake_case(name));
+                let name = format!("{prefix}{}", screaming_snake_case(name));
                 Some((name, validator))
             } else {
                 None
@@ -281,7 +341,7 @@ pub fn generate_config(
         })
         .collect::<HashMap<_, _>>();
 
-    let mut configs = create_config(&prefix, config, &mut doc_table);
+    let mut configs = create_config(stdout, &prefix, config, &mut doc_table);
     capture_from_env(&prefix, &mut configs);
 
     for (name, value) in configs.iter() {
@@ -290,10 +350,21 @@ pub fn generate_config(
         }
     }
 
-    emit_configuration(&prefix, &configs, &mut selected_config);
+    let validators: HashMap<String, &Validator> = config
+        .iter()
+        .filter_map(|(name, _, _, validator)| {
+            if validator.is_some() {
+                Some((snake_case(name), validator.as_ref().unwrap()))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    emit_configuration(stdout, &prefix, &configs, &validators, &mut selected_config);
 
     if emit_md_tables {
-        let file_name = snake_case(&prefix);
+        let file_name = snake_case(crate_name);
         write_config_tables(&file_name, doc_table, selected_config);
     }
 
@@ -304,7 +375,7 @@ pub fn generate_config(
 // This can be removed when https://github.com/rust-lang/cargo/pull/14058 is merged.
 // Unlikely to work on projects in workspaces
 #[cfg(not(test))]
-fn env_change_work_around() {
+fn env_change_work_around<W: Write>(stdout: &mut W) {
     let mut out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
     // We clean out_dir by removing all trailing directories, until it ends with
@@ -319,37 +390,53 @@ fn env_change_work_around() {
     let dotcargo = out_dir.join(".cargo/");
     if dotcargo.exists() {
         if dotcargo.join("config.toml").exists() {
-            println!(
+            writeln!(
+                stdout,
                 "cargo:rerun-if-changed={}",
                 dotcargo.join("config.toml").display()
-            );
+            )
+            .ok();
         }
         if dotcargo.join("config").exists() {
-            println!(
+            writeln!(
+                stdout,
                 "cargo:rerun-if-changed={}",
                 dotcargo.join("config").display()
-            );
+            )
+            .ok();
         }
     }
 }
 
-fn create_config(
+fn create_config<W: Write>(
+    stdout: &mut W,
     prefix: &str,
     config: &[(&str, &str, Value, Option<Validator>)],
     doc_table: &mut String,
 ) -> HashMap<String, Value> {
     let mut configs = HashMap::new();
 
-    for (name, description, default, _validator) in config {
-        let name = format!("{prefix}_{}", screaming_snake_case(name));
+    for (name, description, default, validator) in config {
+        let name = format!("{prefix}{}", screaming_snake_case(name));
+        let allowed_values = if let Some(validator) = validator {
+            validator.description()
+        } else {
+            None
+        }
+        .unwrap_or(String::from("-"));
+
         configs.insert(name.clone(), default.clone());
 
         // Write documentation table line:
         let default = default.to_string();
-        writeln!(doc_table, "|**{name}**|{description}|{default}|").unwrap();
+        writeln!(
+            doc_table,
+            "|**{name}**|{description}|{default}|{allowed_values}"
+        )
+        .unwrap();
 
         // Rebuild if config environment variable changed:
-        println!("cargo:rerun-if-env-changed={name}");
+        writeln!(stdout, "cargo:rerun-if-env-changed={name}").ok();
     }
 
     configs
@@ -361,7 +448,7 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
 
     // Try and capture input from the environment:
     for (var, value) in env::vars() {
-        if var.strip_prefix(prefix).is_some() {
+        if var.starts_with(prefix) {
             let Some(cfg) = configs.get_mut(&var) else {
                 unknown.push(var);
                 continue;
@@ -382,24 +469,37 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
     }
 }
 
-fn emit_configuration(
+fn emit_configuration<W: Write>(
+    stdout: &mut W,
     prefix: &str,
     configs: &HashMap<String, Value>,
+    validators: &HashMap<String, &Validator>,
     selected_config: &mut String,
 ) {
     for (name, value) in configs.iter() {
-        let cfg_name = snake_case(name.trim_start_matches(&format!("{prefix}_")));
-        println!("cargo:rustc-check-cfg=cfg({cfg_name})");
+        let cfg_name = snake_case(name.trim_start_matches(prefix));
+        writeln!(stdout, "cargo:rustc-check-cfg=cfg({cfg_name})").ok();
 
         if let Value::Bool(true) = value {
-            println!("cargo:rustc-cfg={cfg_name}");
+            writeln!(stdout, "cargo:rustc-cfg={cfg_name}").ok();
+        }
+
+        if let Value::String(value) = value {
+            if let Some(Validator::Enumeration(_)) = validators.get(&cfg_name) {
+                let value = format!("{}_{}", cfg_name, snake_case(value));
+                writeln!(stdout, "cargo:rustc-cfg={value}").ok();
+            }
         }
 
         let value = value.to_string();
 
         // Values that haven't been seen will be output here with the default value:
-        println!("cargo:rustc-env={}={}", name, value);
+        writeln!(stdout, "cargo:rustc-env={}={}", name, value).ok();
         writeln!(selected_config, "|**{name}**|{value}|").unwrap();
+    }
+
+    for (name, validator) in validators {
+        validator.emit_cargo_extras(stdout, &name);
     }
 }
 
@@ -464,10 +564,10 @@ mod test {
     fn env_override() {
         temp_env::with_vars(
             [
-                ("ESP_TEST_NUMBER", Some("0xaa")),
-                ("ESP_TEST_NUMBER_SIGNED", Some("-999")),
-                ("ESP_TEST_STRING", Some("Hello world!")),
-                ("ESP_TEST_BOOL", Some("true")),
+                ("ESP_TEST_CONFIG_NUMBER", Some("0xaa")),
+                ("ESP_TEST_CONFIG_NUMBER_SIGNED", Some("-999")),
+                ("ESP_TEST_CONFIG_STRING", Some("Hello world!")),
+                ("ESP_TEST_CONFIG_BOOL", Some("true")),
             ],
             || {
                 let configs = generate_config(
@@ -491,28 +591,28 @@ mod test {
 
                 // some values have changed
                 assert_eq!(
-                    match configs.get("ESP_TEST_NUMBER").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_NUMBER").unwrap() {
                         Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     0xaa
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST_NUMBER_SIGNED").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_NUMBER_SIGNED").unwrap() {
                         Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     -999
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST_STRING").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_STRING").unwrap() {
                         Value::String(val) => val,
                         _ => unreachable!(),
                     },
                     "Hello world!"
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST_BOOL").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_BOOL").unwrap() {
                         Value::Bool(val) => *val,
                         _ => unreachable!(),
                     },
@@ -521,21 +621,21 @@ mod test {
 
                 // the rest are the defaults
                 assert_eq!(
-                    match configs.get("ESP_TEST_NUMBER_DEFAULT").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_NUMBER_DEFAULT").unwrap() {
                         Value::Integer(num) => *num,
                         _ => unreachable!(),
                     },
                     999
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST_STRING_DEFAULT").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_STRING_DEFAULT").unwrap() {
                         Value::String(val) => val,
                         _ => unreachable!(),
                     },
                     "Demo"
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST_BOOL_DEFAULT").unwrap() {
+                    match configs.get("ESP_TEST_CONFIG_BOOL_DEFAULT").unwrap() {
                         Value::Bool(val) => *val,
                         _ => unreachable!(),
                     },
@@ -549,10 +649,10 @@ mod test {
     fn builtin_validation_passes() {
         temp_env::with_vars(
             [
-                ("ESP_TEST_POSITIVE_NUMBER", Some("7")),
-                ("ESP_TEST_NEGATIVE_NUMBER", Some("-1")),
-                ("ESP_TEST_NON_NEGATIVE_NUMBER", Some("0")),
-                ("ESP_TEST_RANGE", Some("9")),
+                ("ESP_TEST_CONFIG_POSITIVE_NUMBER", Some("7")),
+                ("ESP_TEST_CONFIG_NEGATIVE_NUMBER", Some("-1")),
+                ("ESP_TEST_CONFIG_NON_NEGATIVE_NUMBER", Some("0")),
+                ("ESP_TEST_CONFIG_RANGE", Some("9")),
             ],
             || {
                 generate_config(
@@ -591,7 +691,7 @@ mod test {
 
     #[test]
     fn custom_validation_passes() {
-        temp_env::with_vars([("ESP_TEST_NUMBER", Some("13"))], || {
+        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("13"))], || {
             generate_config(
                 "esp-test",
                 &[(
@@ -615,7 +715,7 @@ mod test {
     #[test]
     #[should_panic]
     fn builtin_validation_bails() {
-        temp_env::with_vars([("ESP_TEST_POSITIVE_NUMBER", Some("-99"))], || {
+        temp_env::with_vars([("ESP_TEST_CONFIG_POSITIVE_NUMBER", Some("-99"))], || {
             generate_config(
                 "esp-test",
                 &[(
@@ -632,7 +732,7 @@ mod test {
     #[test]
     #[should_panic]
     fn custom_validation_bails() {
-        temp_env::with_vars([("ESP_TEST_NUMBER", Some("37"))], || {
+        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("37"))], || {
             generate_config(
                 "esp-test",
                 &[(
@@ -658,8 +758,8 @@ mod test {
     fn env_unknown_bails() {
         temp_env::with_vars(
             [
-                ("ESP_TEST_NUMBER", Some("0xaa")),
-                ("ESP_TEST_RANDOM_VARIABLE", Some("")),
+                ("ESP_TEST_CONFIG_NUMBER", Some("0xaa")),
+                ("ESP_TEST_CONFIG_RANDOM_VARIABLE", Some("")),
             ],
             || {
                 generate_config(
@@ -674,12 +774,55 @@ mod test {
     #[test]
     #[should_panic]
     fn env_invalid_values_bails() {
-        temp_env::with_vars([("ESP_TEST_NUMBER", Some("Hello world"))], || {
+        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("Hello world"))], || {
             generate_config(
                 "esp-test",
                 &[("number", "NA", Value::Integer(999), None)],
                 false,
             );
         });
+    }
+
+    #[test]
+    fn env_unknown_prefix_is_ignored() {
+        temp_env::with_vars(
+            [("ESP_TEST_OTHER_CONFIG_NUMBER", Some("Hello world"))],
+            || {
+                generate_config(
+                    "esp-test",
+                    &[("number", "NA", Value::Integer(999), None)],
+                    false,
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn enumeration_validator() {
+        let mut stdout = Vec::new();
+        temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
+            generate_config_internal(
+                &mut stdout,
+                "esp-test",
+                &[(
+                    "some-key",
+                    "NA",
+                    Value::String("variant-0".to_string()),
+                    Some(Validator::Enumeration(vec![
+                        "variant-0".to_string(),
+                        "variant-1".to_string(),
+                    ])),
+                )],
+                false,
+            );
+        });
+
+        let cargo_lines: Vec<&str> = std::str::from_utf8(&stdout).unwrap().lines().collect();
+        println!("{:#?}", cargo_lines);
+        assert!(cargo_lines.contains(&"cargo:rustc-check-cfg=cfg(some_key)"));
+        assert!(cargo_lines.contains(&"cargo:rustc-env=ESP_TEST_CONFIG_SOME_KEY=variant-0"));
+        assert!(cargo_lines.contains(&"cargo:rustc-check-cfg=cfg(some_key_variant_0)"));
+        assert!(cargo_lines.contains(&"cargo:rustc-check-cfg=cfg(some_key_variant_1)"));
+        assert!(cargo_lines.contains(&"cargo:rustc-cfg=some_key_variant_0"));
     }
 }

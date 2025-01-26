@@ -4,7 +4,7 @@
 //! writing to and reading from UART.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy embassy-generic-timers esp-hal/unstable
+//% FEATURES: embassy esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -14,12 +14,12 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
     timer::timg::TimerGroup,
-    uart::{AtCmdConfig, Config, Uart, UartRx, UartTx},
+    uart::{AtCmdConfig, Config, RxConfig, Uart, UartRx, UartTx},
     Async,
 };
 use static_cell::StaticCell;
 
-// rx_fifo_full_threshold
+// fifo_full_threshold (RX)
 const READ_BUF_SIZE: usize = 64;
 // EOT (CTRL-D)
 const AT_CMD: u8 = 0x04;
@@ -70,7 +70,7 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    // Default pins for Uart/Serial communication
+    // Default pins for Uart communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
             let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);
@@ -87,10 +87,13 @@ async fn main(spawner: Spawner) {
         }
     }
 
-    let config = Config::default().rx_fifo_full_threshold(READ_BUF_SIZE as u16);
+    let config = Config::default()
+        .with_rx(RxConfig::default().with_fifo_full_threshold(READ_BUF_SIZE as u16));
 
-    let mut uart0 = Uart::new(peripherals.UART0, config, rx_pin, tx_pin)
+    let mut uart0 = Uart::new(peripherals.UART0, config)
         .unwrap()
+        .with_tx(tx_pin)
+        .with_rx(rx_pin)
         .into_async();
     uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(AT_CMD));
 

@@ -4,6 +4,7 @@
 //! `embedded_hal_async::delay::DelayNs` trait.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -69,7 +70,7 @@ async fn test_async_delay_ms(mut timer: impl DelayNs, duration: u32) {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 2, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 2, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 

@@ -3,6 +3,7 @@
 //! "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -76,7 +77,7 @@ mod tests {
             }
         }
 
-        let sw0_trigger_addr = cpu_intr.cpu_intr_from_cpu_0() as *const _ as u32;
+        let sw0_trigger_addr = cpu_intr.register_block().cpu_intr_from_cpu_0() as *const _ as u32;
 
         critical_section::with(|cs| {
             SWINT0

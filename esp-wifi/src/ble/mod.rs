@@ -112,7 +112,7 @@ pub struct ReceivedPacket {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for ReceivedPacket {
-    fn format(&self, fmt: defmt::Formatter) {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(fmt, "ReceivedPacket {}", &self.data[..])
     }
 }

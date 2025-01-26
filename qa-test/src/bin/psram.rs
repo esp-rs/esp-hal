@@ -1,9 +1,12 @@
 //! This shows how to use PSRAM as heap-memory via esp-alloc
 //!
-//! You need an ESP32-S3 with at least 2 MB of PSRAM memory.
+//! You need an ESP32, ESP32-S2 or ESP32-S3 with at least 2 MB of PSRAM memory.
+//!
+//! On ESP32-S3 you might want to set `ESP_HAL_CONFIG_PSRAM_MODE` to `octal` if
+//! the device comes with octal-SPIRAM
 
-//% CHIPS: esp32s3
-//% FEATURES: esp-hal/octal-psram
+//% CHIPS: esp32 esp32s2 esp32s3
+//% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats esp-hal/log
 
 #![no_std]
 #![no_main]
@@ -14,7 +17,7 @@ use alloc::{string::String, vec::Vec};
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{entry, psram};
+use esp_hal::{main, psram};
 use esp_println::println;
 
 fn init_psram_heap(start: *mut u8, size: usize) {
@@ -30,7 +33,7 @@ fn init_psram_heap(start: *mut u8, size: usize) {
 #[cfg(is_not_release)]
 compile_error!("PSRAM example must be built in release mode!");
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -39,7 +42,7 @@ fn main() -> ! {
     init_psram_heap(start, size);
 
     println!("Going to access PSRAM");
-    let mut large_vec: Vec<u32> = Vec::with_capacity(500 * 1024 / 4);
+    let mut large_vec = Vec::<u32>::with_capacity(500 * 1024 / 4);
 
     for i in 0..(500 * 1024 / 4) {
         large_vec.push((i & 0xff) as u32);
@@ -51,6 +54,8 @@ fn main() -> ! {
 
     let string = String::from("A string allocated in PSRAM");
     println!("'{}' allocated at {:p}", &string, string.as_ptr());
+
+    println!("{}", esp_alloc::HEAP.stats());
 
     println!("done");
 

@@ -9,16 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
 ### Fixed
+
+### Removed
+
+## 0.2.0 - 2025-01-15
 
 ### Changed
 
 - Use `panic` instead of `process::exit` in esp-build (#2402 )
-
-### Removed
+- Bump MSRV to 1.84 (#2951)
 
 ## [0.1.0] - 2024-04-17
 
 - Initial release
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-build?since=2024-04-17
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-build?since=2025-01-15

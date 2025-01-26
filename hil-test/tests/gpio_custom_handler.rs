@@ -6,16 +6,16 @@
 //! async API works for user handlers automatically.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: integrated-timers
+//% FEATURES: unstable embassy
 
 #![no_std]
 #![no_main]
 
 use embassy_time::{Duration, Timer};
 use esp_hal::{
-    gpio::{AnyPin, Flex, Input, Io, Level, Output, Pull},
+    gpio::{AnyPin, Flex, Input, InputConfig, Io, Level, Output, OutputConfig, Pull},
+    handler,
     interrupt::InterruptConfigurable,
-    macros::handler,
     timer::timg::TimerGroup,
 };
 use hil_test as _;
@@ -42,8 +42,10 @@ pub fn interrupt_handler() {
 
 async fn drive_pins(gpio1: impl Into<AnyPin>, gpio2: impl Into<AnyPin>) -> usize {
     let counter = AtomicUsize::new(0);
-    let mut test_gpio1 = Input::new(gpio1.into(), Pull::Down);
-    let mut test_gpio2 = Output::new(gpio2.into(), Level::Low);
+    let mut test_gpio1 =
+        Input::new(gpio1.into(), InputConfig::default().with_pull(Pull::Down)).unwrap();
+    let mut test_gpio2 =
+        Output::new(gpio2.into(), OutputConfig::default().with_level(Level::Low)).unwrap();
     embassy_futures::select::select(
         async {
             loop {
@@ -66,7 +68,7 @@ async fn drive_pins(gpio1: impl Into<AnyPin>, gpio2: impl Into<AnyPin>) -> usize
 }
 
 #[cfg(test)]
-#[embedded_test::tests(executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(executor = hil_test::Executor::new())]
 mod tests {
 
     use super::*;

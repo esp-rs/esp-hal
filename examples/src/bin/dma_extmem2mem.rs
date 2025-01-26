@@ -1,6 +1,8 @@
 //! Uses DMA to copy psram to internal memory.
+//!
+//! If your module is octal PSRAM then you need to set `ESP_HAL_CONFIG_PSRAM_MODE` to `octal`.
 
-//% FEATURES: esp-hal/log esp-hal/octal-psram aligned esp-hal/unstable
+//% FEATURES: esp-hal/log esp-hal/psram aligned esp-hal/unstable
 //% CHIPS: esp32s3
 
 #![no_std]
@@ -9,7 +11,7 @@
 use aligned::{Aligned, A64};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, dma::Mem2Mem, dma_descriptors_chunk_size, entry, time::ExtU64};
+use esp_hal::{delay::Delay, dma::Mem2Mem, dma_descriptors_chunk_size, main, time::ExtU64};
 use log::{error, info};
 extern crate alloc;
 
@@ -49,7 +51,7 @@ fn init_heap(psram: &esp_hal::peripherals::PSRAM) {
     }
 }
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 

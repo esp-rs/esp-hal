@@ -42,9 +42,11 @@
 //! }
 //! # }
 //! ```
-use esp32s2 as pac;
 
-use crate::peripheral::{Peripheral, PeripheralRef};
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    peripherals::LPWR,
+};
 
 /// Enum representing the possible wakeup sources for the ULP core.
 #[derive(Debug, Clone, Copy)]
@@ -55,12 +57,12 @@ pub enum UlpCoreWakeupSource {
 
 /// Structure representing the ULP (Ultra-Low Power) core.
 pub struct UlpCore<'d> {
-    _lp_core: PeripheralRef<'d, crate::soc::peripherals::ULP_RISCV_CORE>,
+    _lp_core: PeripheralRef<'d, crate::peripherals::ULP_RISCV_CORE>,
 }
 
 impl<'d> UlpCore<'d> {
     /// Creates a new instance of the `UlpCore` struct.
-    pub fn new(lp_core: impl Peripheral<P = crate::soc::peripherals::ULP_RISCV_CORE> + 'd) -> Self {
+    pub fn new(lp_core: impl Peripheral<P = crate::peripherals::ULP_RISCV_CORE> + 'd) -> Self {
         crate::into_ref!(lp_core);
 
         // clear all of RTC_SLOW_RAM - this makes sure .bss is cleared without relying
@@ -86,24 +88,23 @@ impl<'d> UlpCore<'d> {
 
 #[allow(unused)] // TODO: remove cfg when implementation is corrected
 fn ulp_stop() {
-    let rtc_cntl = unsafe { &*pac::RTC_CNTL::PTR };
-    rtc_cntl
+    LPWR::regs()
         .ulp_cp_timer()
         .modify(|_, w| w.ulp_cp_slp_timer_en().clear_bit());
 
     // suspends the ulp operation
-    rtc_cntl
+    LPWR::regs()
         .cocpu_ctrl()
         .modify(|_, w| w.cocpu_done().set_bit());
 
     // Resets the processor
-    rtc_cntl
+    LPWR::regs()
         .cocpu_ctrl()
         .modify(|_, w| w.cocpu_shut_reset_en().set_bit());
 }
 
 fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
-    let rtc_cntl = unsafe { &*pac::RTC_CNTL::PTR };
+    let rtc_cntl = LPWR::regs();
 
     // Reset COCPU when power on
     rtc_cntl
@@ -147,11 +148,10 @@ fn ulp_config_wakeup_source(wakeup_src: UlpCoreWakeupSource) {
     match wakeup_src {
         UlpCoreWakeupSource::HpCpu => {
             // use timer to wake up
-            let rtc_cntl = unsafe { &*pac::RTC_CNTL::PTR };
-            rtc_cntl
+            LPWR::regs()
                 .ulp_cp_ctrl()
                 .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());
-            rtc_cntl
+            LPWR::regs()
                 .ulp_cp_timer()
                 .modify(|_, w| w.ulp_cp_slp_timer_en().set_bit());
         }

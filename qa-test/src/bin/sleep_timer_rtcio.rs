@@ -17,10 +17,9 @@ use core::time::Duration;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    entry,
     gpio,
-    gpio::{Input, Pull},
-    peripheral::Peripheral,
+    gpio::{Input, InputConfig, Pull},
+    main,
     rtc_cntl::{
         reset_reason,
         sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel},
@@ -32,7 +31,7 @@ use esp_hal::{
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
@@ -47,21 +46,24 @@ fn main() -> ! {
     let delay = Delay::new();
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
+    let config = InputConfig::default().with_pull(Pull::None);
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32c3", feature = "esp32c2"))] {
-            let pin2 = Input::new(peripherals.GPIO2, Pull::None);
+            let mut pin2 = peripherals.GPIO2;
             let mut pin3 = peripherals.GPIO3;
+            let _pin2_input = Input::new(&mut pin2, config).unwrap();
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
-                (&mut *pin2.into_ref(), WakeupLevel::Low),
+                (&mut pin2, WakeupLevel::Low),
                 (&mut pin3, WakeupLevel::High),
             ];
         } else if #[cfg(feature = "esp32s3")] {
-            let pin17 = Input::new(peripherals.GPIO17, Pull::None);
+            let mut pin17 = peripherals.GPIO17;
             let mut pin18 = peripherals.GPIO18;
+            let _pin17_input = Input::new(&mut pin17, config).unwrap();
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut [
-                (&mut *pin17.into_ref(), WakeupLevel::Low),
+                (&mut pin17, WakeupLevel::Low),
                 (&mut pin18, WakeupLevel::High),
             ];
         }

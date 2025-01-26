@@ -1,4 +1,5 @@
 use super::*;
+use crate::hal::{interrupt, peripherals::Interrupt};
 
 pub(crate) static mut BT_INTERRUPT_FUNCTION5: (
     *mut crate::binary::c_types::c_void,
@@ -357,13 +358,25 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
             BT_INTERRUPT_FUNCTION5 = (
                 func as *mut crate::binary::c_types::c_void,
                 arg as *mut crate::binary::c_types::c_void,
-            )
+            );
+            unwrap!(interrupt::enable(
+                Interrupt::RWBT,
+                interrupt::Priority::Priority1
+            ));
+            unwrap!(interrupt::enable(
+                Interrupt::BT_BB,
+                interrupt::Priority::Priority1
+            ));
         }
         8 => {
             BT_INTERRUPT_FUNCTION8 = (
                 func as *mut crate::binary::c_types::c_void,
                 arg as *mut crate::binary::c_types::c_void,
-            )
+            );
+            unwrap!(interrupt::enable(
+                Interrupt::RWBLE,
+                interrupt::Priority::Priority1
+            ));
         }
         _ => panic!("Unsupported interrupt number {}", interrupt_no),
     }

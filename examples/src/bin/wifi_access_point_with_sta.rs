@@ -15,13 +15,15 @@
 #![no_std]
 #![no_main]
 
+use core::net::Ipv4Addr;
+
 use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    entry,
+    main,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -38,13 +40,13 @@ use esp_wifi::{
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
-    wire::{IpAddress, Ipv4Address},
+    wire::IpAddress,
 };
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -183,7 +185,7 @@ fn main() -> ! {
                 sta_socket.work();
 
                 sta_socket
-                    .open(IpAddress::Ipv4(Ipv4Address::new(142, 250, 185, 115)), 80)
+                    .open(IpAddress::Ipv4(Ipv4Addr::new(142, 250, 185, 115)), 80)
                     .unwrap();
 
                 sta_socket

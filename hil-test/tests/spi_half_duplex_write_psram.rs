@@ -1,6 +1,7 @@
 //! SPI Half Duplex Write Test
-//% FEATURES: octal-psram
+
 //% CHIPS: esp32s3
+//% FEATURES: unstable psram
 
 #![no_std]
 #![no_main]
@@ -50,7 +51,9 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
         let sclk = peripherals.GPIO0;
@@ -66,11 +69,11 @@ mod tests {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap()
         .with_sck(sclk)
-        .with_mosi(mosi)
+        .with_sio0(mosi)
         .with_dma(dma_channel);
 
         Context {
@@ -101,7 +104,7 @@ mod tests {
         dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
         let transfer = spi
             .half_duplex_write(
-                DataMode::Single,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -116,7 +119,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_write(
-                DataMode::Single,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -152,13 +155,25 @@ mod tests {
 
         let buffer = [0b0110_1010; DMA_BUFFER_SIZE];
         // Write the buffer where each byte has 3 pos edges.
-        spi.half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
-            .unwrap();
+        spi.half_duplex_write(
+            DataMode::SingleTwoDataLines,
+            Command::None,
+            Address::None,
+            0,
+            &buffer,
+        )
+        .unwrap();
 
         assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
-        spi.half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
-            .unwrap();
+        spi.half_duplex_write(
+            DataMode::SingleTwoDataLines,
+            Command::None,
+            Address::None,
+            0,
+            &buffer,
+        )
+        .unwrap();
 
         assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }

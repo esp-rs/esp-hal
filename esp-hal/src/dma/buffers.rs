@@ -1137,13 +1137,6 @@ impl DmaRxStreamBuf {
             return Err(DmaBufError::InsufficientDescriptors);
         }
 
-        // Link up all the descriptors (but not in a circle).
-        let mut next = null_mut();
-        for desc in descriptors.iter_mut().rev() {
-            desc.next = next;
-            next = desc;
-        }
-
         let mut chunks = buffer.chunks_exact_mut(chunk_size);
         for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
             desc.buffer = chunk.as_mut_ptr();
@@ -1176,7 +1169,12 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
     type View = DmaRxStreamBufView;
 
     fn prepare(&mut self) -> Preparation {
-        for desc in self.descriptors.iter_mut() {
+        // Link up all the descriptors (but not in a circle).
+        let mut next = null_mut();
+        for desc in self.descriptors.iter_mut().rev() {
+            desc.next = next;
+            next = desc;
+
             desc.reset_for_rx();
         }
         Preparation {

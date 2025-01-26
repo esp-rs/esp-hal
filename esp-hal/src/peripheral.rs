@@ -7,17 +7,19 @@ use core::{
 
 /// An exclusive reference to a peripheral.
 ///
-/// This is functionally the same as a `&'a mut T`. The reason for having a
-/// dedicated struct is memory efficiency:
+/// This is functionally the same as a `&'a mut T`. There's a few advantages in
+/// having a dedicated struct instead:
 ///
-/// Peripheral singletons are typically either zero-sized (for concrete
-/// peripherals like `SPI2` or `UART0`) or very small (for example `AnyPin`
-/// which is 1 byte). However `&mut T` is always 4 bytes for 32-bit targets,
-/// even if T is zero-sized. PeripheralRef stores a copy of `T` instead, so it's
-/// the same size.
-///
-/// but it is the size of `T` not the size
-/// of a pointer. This is useful if T is a zero sized type.
+/// - Memory efficiency: Peripheral singletons are typically either zero-sized
+///   (for concrete peripherals like `GpioPin<5>` or `SPI2`) or very small (for
+///   example `AnyPin`, which is 1 byte). However `&mut T` is always 4 bytes for
+///   32-bit targets, even if T is zero-sized. PeripheralRef stores a copy of
+///   `T` instead, so it's the same size.
+/// - Code size efficiency. If the user uses the same driver with both `SPI2`
+///   and `&mut SPI2`, the driver code would be monomorphized two times. With
+///   PeripheralRef, the driver is generic over a lifetime only. `SPI2` becomes
+///   `PeripheralRef<'static, SPI2>`, and `&mut SPI2` becomes `PeripheralRef<'a,
+///   SPI2>`. Lifetimes don't cause monomorphization.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeripheralRef<'a, T> {
@@ -83,7 +85,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     /// using an `Into` impl to convert from `T` to `U`.
     ///
     /// For example, this can be useful to degrade GPIO pins: converting from
-    /// PeripheralRef<'a, GpioPin<11>>` to `PeripheralRef<'a, AnyPin>`.
+    /// `PeripheralRef<'a, GpioPin<11>>` to `PeripheralRef<'a, AnyPin>`.
     #[inline]
     pub fn map_into<U>(self) -> PeripheralRef<'a, U>
     where
@@ -99,13 +101,6 @@ impl<T> Deref for PeripheralRef<'_, T> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.inner
-    }
-}
-
-impl<T> DerefMut for PeripheralRef<'_, T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
     }
 }
 
@@ -151,7 +146,7 @@ impl<T> DerefMut for PeripheralRef<'_, T> {
 ///
 /// `.into_ref()` on an owned `T` yields a `PeripheralRef<'static, T>`.
 /// `.into_ref()` on an `&'a mut T` yields a `PeripheralRef<'a, T>`.
-pub trait Peripheral: Sized + crate::private::Sealed {
+pub trait Peripheral: Sized {
     /// Peripheral singleton type
     type P;
 
@@ -206,19 +201,17 @@ pub trait Peripheral: Sized + crate::private::Sealed {
     }
 }
 
-impl<T, P> Peripheral for &mut T
+impl<T: DerefMut> Peripheral for T
 where
-    T: Peripheral<P = P>,
+    T::Target: Peripheral,
 {
-    type P = P;
+    type P = <T::Target as Peripheral>::P;
 
+    #[inline]
     unsafe fn clone_unchecked(&self) -> Self::P {
-        T::clone_unchecked(self)
+        T::Target::clone_unchecked(self)
     }
 }
-
-impl<T> crate::private::Sealed for &mut T where T: crate::private::Sealed {}
-impl<T> crate::private::Sealed for PeripheralRef<'_, T> where T: crate::private::Sealed {}
 
 impl<T: Peripheral> Peripheral for PeripheralRef<'_, T> {
     type P = T::P;
@@ -250,6 +243,11 @@ mod peripheral_macros {
                     $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
                 ),* $(,)?
             ],
+            unstable_peripherals: [
+                $(
+                    $unstable_name:ident <= $unstable_from_pac:tt $(($($unstable_interrupt:ident),*))?
+                ),* $(,)?
+            ],
             pins: [
                 $( ( $pin:literal, $($pin_tokens:tt)* ) )*
             ],
@@ -259,14 +257,12 @@ mod peripheral_macros {
                 ),* $(,)?
             ]
         ) => {
-
-            /// Contains the generated peripherals which implement [`Peripheral`]
-            mod peripherals {
-                pub use super::pac::*;
-                $(
-                    $crate::create_peripheral!($name <= $from_pac);
-                )*
-            }
+            $(
+                $crate::create_peripheral!($name <= $from_pac);
+            )*
+            $(
+                $crate::create_peripheral!(#[instability::unstable] $unstable_name <= $unstable_from_pac);
+            )*
 
             pub(crate) mod gpio {
                 $crate::gpio! {
@@ -280,7 +276,24 @@ mod peripheral_macros {
                 pub struct Peripherals {
                     $(
                         #[doc = concat!("The ", stringify!($name), " peripheral.")]
-                        pub $name: peripherals::$name,
+                        pub $name: $name,
+                    )*
+                    $(
+                        #[doc = concat!("The ", stringify!($unstable_name), " peripheral.")]
+                        #[doc = "**This API is marked as unstable** and is only available when the `unstable`
+                                crate feature is enabled. This comes with no stability guarantees, and could be changed
+                                or removed at any time."]
+                        #[cfg(any(doc, feature = "unstable"))]
+                        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+                        pub $unstable_name: $unstable_name,
+
+                        #[doc = concat!("The ", stringify!($unstable_name), " peripheral.")]
+                        #[doc = "**This API is marked as unstable** and is only available when the `unstable`
+                                crate feature is enabled. This comes with no stability guarantees, and could be changed
+                                or removed at any time."]
+                        #[cfg(not(any(doc, feature = "unstable")))]
+                        #[allow(unused)]
+                        pub(crate) $unstable_name: $unstable_name,
                     )*
 
                     $(
@@ -319,7 +332,10 @@ mod peripheral_macros {
                     pub unsafe fn steal() -> Self {
                         Self {
                             $(
-                                $name: peripherals::$name::steal(),
+                                $name: $name::steal(),
+                            )*
+                            $(
+                                $unstable_name: $unstable_name::steal(),
                             )*
 
                             $(
@@ -334,19 +350,31 @@ mod peripheral_macros {
                 }
             }
 
-            // expose the new structs
             $(
-                pub use peripherals::$name;
+                $(
+                    impl $name {
+                        $(
+                            paste::paste!{
+                                /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
+                                #[instability::unstable]
+                                pub fn [<bind_ $interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
+                                    unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
+                                }
+                            }
+                        )*
+                    }
+                )*
             )*
 
             $(
                 $(
-                    impl peripherals::$name {
+                    impl $unstable_name {
                         $(
                             paste::paste!{
                                 /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
-                                pub fn [<bind_ $interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
-                                    unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
+                                #[instability::unstable]
+                                pub fn [<bind_ $unstable_interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
+                                    unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$unstable_interrupt, handler); }
                                 }
                             }
                         )*
@@ -382,15 +410,13 @@ mod peripheral_macros {
     #[macro_export]
     /// Macro to create a peripheral structure.
     macro_rules! create_peripheral {
-        ($name:ident <= virtual) => {
+        ($(#[$attr:meta])? $name:ident <= virtual) => {
+            $(#[$attr])?
             #[derive(Debug)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             #[non_exhaustive]
-            #[allow(non_camel_case_types)]
-            /// Represents a virtual peripheral with no associated hardware.
-            ///
-            /// This struct is generated by the `create_peripheral!` macro when the peripheral
-            /// is defined as virtual.
+            #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+            #[doc = concat!(stringify!($name), " peripheral singleton")]
             pub struct $name;
 
             impl $name {
@@ -417,31 +443,33 @@ mod peripheral_macros {
             impl $crate::private::Sealed for $name {}
         };
 
-        ($([$enum_variant:ident])? $name:ident <= $base:ident) => {
-            $crate::create_peripheral!($([$enum_variant])? $name <= virtual);
+        ($(#[$attr:meta])? $name:ident <= $base:ident) => {
+            $crate::create_peripheral!($(#[$attr])? $name <= virtual);
 
             impl $name {
                 #[doc = r"Pointer to the register block"]
-                pub const PTR: *const <super::pac::$base as core::ops::Deref>::Target = super::pac::$base::PTR;
+                #[instability::unstable]
+                pub const PTR: *const <pac::$base as core::ops::Deref>::Target = pac::$base::PTR;
 
                 #[doc = r"Return the pointer to the register block"]
                 #[inline(always)]
-                pub const fn ptr() -> *const <super::pac::$base as core::ops::Deref>::Target {
-                    super::pac::$base::PTR
+                #[instability::unstable]
+                pub const fn ptr() -> *const <pac::$base as core::ops::Deref>::Target {
+                    pac::$base::PTR
                 }
-            }
 
-            impl core::ops::Deref for $name {
-                type Target = <super::pac::$base as core::ops::Deref>::Target;
-
-                fn deref(&self) -> &Self::Target {
+                #[doc = r"Return a reference to the register block"]
+                #[inline(always)]
+                #[instability::unstable]
+                pub const fn regs<'a>() -> &'a <pac::$base as core::ops::Deref>::Target {
                     unsafe { &*Self::PTR }
                 }
-            }
 
-            impl core::ops::DerefMut for $name {
-                fn deref_mut(&mut self) -> &mut Self::Target {
-                    unsafe { &mut *(Self::PTR as *mut _)  }
+                #[doc = r"Return a reference to the register block"]
+                #[inline(always)]
+                #[instability::unstable]
+                pub fn register_block(&self) -> &<pac::$base as core::ops::Deref>::Target {
+                    unsafe { &*Self::PTR }
                 }
             }
         };

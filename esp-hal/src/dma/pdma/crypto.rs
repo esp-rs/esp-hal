@@ -5,15 +5,21 @@ use crate::{
     dma::*,
     interrupt::Priority,
     peripheral::Peripheral,
-    peripherals::Interrupt,
+    peripherals::{Interrupt, CRYPTO_DMA},
 };
 
-pub(super) type CryptoRegisterBlock = crate::peripherals::crypto_dma::RegisterBlock;
+pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;
 
 /// The RX half of a Crypto DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CryptoDmaRxChannel(pub(crate) CryptoDmaChannel);
+
+impl CryptoDmaRxChannel {
+    fn regs(&self) -> &CryptoRegisterBlock {
+        self.0.register_block()
+    }
+}
 
 impl crate::private::Sealed for CryptoDmaRxChannel {}
 impl DmaRxChannel for CryptoDmaRxChannel {}
@@ -30,6 +36,12 @@ impl Peripheral for CryptoDmaRxChannel {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CryptoDmaTxChannel(pub(crate) CryptoDmaChannel);
 
+impl CryptoDmaTxChannel {
+    fn regs(&self) -> &CryptoRegisterBlock {
+        self.0.register_block()
+    }
+}
+
 impl crate::private::Sealed for CryptoDmaTxChannel {}
 impl DmaTxChannel for CryptoDmaTxChannel {}
 impl Peripheral for CryptoDmaTxChannel {
@@ -42,13 +54,12 @@ impl Peripheral for CryptoDmaTxChannel {
 
 impl RegisterAccess for CryptoDmaTxChannel {
     fn reset(&self) {
-        let register_block = self.0.register_block();
-        register_block.conf().modify(|_, w| {
+        self.regs().conf().modify(|_, w| {
             w.out_rst().set_bit();
             w.ahbm_rst().set_bit();
             w.ahbm_fifo_rst().set_bit()
         });
-        register_block.conf().modify(|_, w| {
+        self.regs().conf().modify(|_, w| {
             w.out_rst().clear_bit();
             w.ahbm_rst().clear_bit();
             w.ahbm_fifo_rst().clear_bit()
@@ -56,15 +67,13 @@ impl RegisterAccess for CryptoDmaTxChannel {
     }
 
     fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .conf()
             .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .conf()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
@@ -76,36 +85,31 @@ impl RegisterAccess for CryptoDmaTxChannel {
             p if p == DmaPeripheral::Sha as u8 => SELECT::Sha,
             _ => unreachable!(),
         };
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .aes_sha_select()
             .modify(|_, w| w.select().variant(peripheral));
     }
 
     fn set_link_addr(&self, address: u32) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
     }
 
     fn start(&self) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .out_link()
             .modify(|_, w| w.outlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .out_link()
             .modify(|_, w| w.outlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .out_link()
             .modify(|_, w| w.outlink_restart().set_bit());
     }
@@ -122,8 +126,7 @@ impl RegisterAccess for CryptoDmaTxChannel {
 
     #[cfg(psram_dma)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .conf1()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
@@ -135,14 +138,17 @@ impl RegisterAccess for CryptoDmaTxChannel {
 }
 
 impl TxRegisterAccess for CryptoDmaTxChannel {
+    fn is_fifo_empty(&self) -> bool {
+        self.regs().state1().read().outfifo_cnt_debug().bits() == 0
+    }
+
     fn set_auto_write_back(&self, enable: bool) {
         // there is no `auto_wrback` for SPI
         assert!(!enable);
     }
 
     fn last_dscr_address(&self) -> usize {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .out_eof_des_addr()
             .read()
             .out_eof_des_addr()
@@ -160,8 +166,7 @@ impl TxRegisterAccess for CryptoDmaTxChannel {
 
 impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
-        let reg_block = self.0.register_block();
-        reg_block.int_ena().modify(|_, w| {
+        self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().bit(enable),
@@ -177,8 +182,7 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel {
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let register_block = self.0.register_block();
-        let int_ena = register_block.int_ena().read();
+        let int_ena = self.regs().int_ena().read();
         if int_ena.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
         }
@@ -196,8 +200,7 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel {
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
-        let register_block = self.0.register_block();
-        register_block.int_clr().write(|w| {
+        self.regs().int_clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
@@ -213,8 +216,7 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel {
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let register_block = self.0.register_block();
-        let int_raw = register_block.int_raw().read();
+        let int_raw = self.regs().int_raw().read();
         if int_raw.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
         }
@@ -246,13 +248,12 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel {
 
 impl RegisterAccess for CryptoDmaRxChannel {
     fn reset(&self) {
-        let register_block = self.0.register_block();
-        register_block.conf().modify(|_, w| {
+        self.regs().conf().modify(|_, w| {
             w.in_rst().set_bit();
             w.ahbm_rst().set_bit();
             w.ahbm_fifo_rst().set_bit()
         });
-        register_block.conf().modify(|_, w| {
+        self.regs().conf().modify(|_, w| {
             w.in_rst().clear_bit();
             w.ahbm_rst().clear_bit();
             w.ahbm_fifo_rst().clear_bit()
@@ -262,8 +263,7 @@ impl RegisterAccess for CryptoDmaRxChannel {
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .conf()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
@@ -275,36 +275,31 @@ impl RegisterAccess for CryptoDmaRxChannel {
             p if p == DmaPeripheral::Sha as u8 => SELECT::Sha,
             _ => unreachable!(),
         };
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .aes_sha_select()
             .modify(|_, w| w.select().variant(peripheral));
     }
 
     fn set_link_addr(&self, address: u32) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
     fn start(&self) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .in_link()
             .modify(|_, w| w.inlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .in_link()
             .modify(|_, w| w.inlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
     }
@@ -321,8 +316,7 @@ impl RegisterAccess for CryptoDmaRxChannel {
 
     #[cfg(psram_dma)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        let register_block = self.0.register_block();
-        register_block
+        self.regs()
             .conf1()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
@@ -347,8 +341,7 @@ impl RxRegisterAccess for CryptoDmaRxChannel {
 
 impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
-        let reg_block = self.0.register_block();
-        reg_block.int_ena().modify(|_, w| {
+        self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().bit(enable),
@@ -365,8 +358,7 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel {
     fn is_listening(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let register_block = self.0.register_block();
-        let int_ena = register_block.int_ena().read();
+        let int_ena = self.regs().int_ena().read();
         if int_ena.in_dscr_err().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
         }
@@ -387,8 +379,7 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel {
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
-        let register_block = self.0.register_block();
-        register_block.int_clr().write(|w| {
+        self.regs().int_clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
@@ -405,8 +396,7 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel {
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let register_block = self.0.register_block();
-        let int_raw = register_block.int_raw().read();
+        let int_raw = self.regs().int_raw().read();
         if int_raw.in_dscr_err().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
         }
@@ -481,7 +471,7 @@ impl DmaChannelExt for CryptoDmaChannel {
 impl PdmaChannel for CryptoDmaChannel {
     type RegisterBlock = CryptoRegisterBlock;
     fn register_block(&self) -> &Self::RegisterBlock {
-        unsafe { &*crate::peripherals::CRYPTO_DMA::PTR }
+        CRYPTO_DMA::regs()
     }
     fn tx_waker(&self) -> &'static AtomicWaker {
         static WAKER: AtomicWaker = AtomicWaker::new();

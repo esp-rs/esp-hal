@@ -158,7 +158,7 @@ use crate::{
     },
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{self, Peripheral},
-    peripherals::{Interrupt, PARL_IO},
+    peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
     Async,
     Blocking,
@@ -185,6 +185,7 @@ pub enum ParlIoInterrupt {
 /// Parallel IO errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Error {
     /// General DMA error
     DmaError(DmaError),
@@ -389,7 +390,7 @@ impl<'d> ClkOutPin<'d> {
 }
 impl TxClkPin for ClkOutPin<'_> {
     fn configure(&mut self) {
-        self.pin.set_to_push_pull_output(crate::private::Internal);
+        self.pin.set_to_push_pull_output();
         crate::gpio::OutputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
     }
 }
@@ -407,12 +408,11 @@ impl<'d> ClkInPin<'d> {
 }
 impl TxClkPin for ClkInPin<'_> {
     fn configure(&mut self) {
-        let pcr = unsafe { &*crate::peripherals::PCR::PTR };
+        let pcr = PCR::regs();
         pcr.parl_clk_tx_conf()
             .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin
-            .init_input(crate::gpio::Pull::None, crate::private::Internal);
+        self.pin.init_input(crate::gpio::Pull::None);
         crate::gpio::InputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
     }
 }
@@ -434,12 +434,11 @@ impl<'d> RxClkInPin<'d> {
 }
 impl RxClkPin for RxClkInPin<'_> {
     fn configure(&mut self) {
-        let pcr = unsafe { &*crate::peripherals::PCR::PTR };
+        let pcr = PCR::regs();
         pcr.parl_clk_rx_conf()
             .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin
-            .init_input(crate::gpio::Pull::None, crate::private::Internal);
+        self.pin.init_input(crate::gpio::Pull::None);
         crate::gpio::InputSignal::PARL_RX_CLK.connect_to(&mut self.pin);
 
         Instance::set_rx_clk_edge_sel(self.sample_edge);
@@ -477,8 +476,7 @@ where
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.tx_pins.configure()?;
-        self.valid_pin
-            .set_to_push_pull_output(crate::private::Internal);
+        self.valid_pin.set_to_push_pull_output();
         Instance::tx_valid_pin_signal().connect_to(&mut self.valid_pin);
         Instance::set_tx_hw_valid_en(true);
         Ok(())
@@ -549,7 +547,7 @@ macro_rules! tx_pins {
             {
                 fn configure(&mut self) -> Result<(), Error>{
                     $(
-                        self.[< pin_ $pin:lower >].set_to_push_pull_output(crate::private::Internal);
+                        self.[< pin_ $pin:lower >].set_to_push_pull_output();
                         crate::gpio::OutputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
@@ -668,8 +666,7 @@ where
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.rx_pins.configure()?;
-        self.valid_pin
-            .init_input(crate::gpio::Pull::None, crate::private::Internal);
+        self.valid_pin.init_input(crate::gpio::Pull::None);
         Instance::rx_valid_pin_signal().connect_to(&mut self.valid_pin);
         Instance::set_rx_sw_en(false);
         if let Some(sel) = self.enable_mode.pulse_submode_sel() {
@@ -768,7 +765,7 @@ macro_rules! rx_pins {
             {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
-                        self.[< pin_ $pin:lower >].init_input(crate::gpio::Pull::None, crate::private::Internal);
+                        self.[< pin_ $pin:lower >].init_input(crate::gpio::Pull::None);
                         crate::gpio::InputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
@@ -909,6 +906,7 @@ where
 }
 
 /// Parallel IO TX channel
+#[instability::unstable]
 pub struct ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
@@ -990,6 +988,7 @@ where
 }
 
 /// Parallel IO RX channel
+#[instability::unstable]
 pub struct ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
@@ -1009,6 +1008,7 @@ where
 }
 
 fn internal_set_interrupt_handler(handler: InterruptHandler) {
+    let mut peri = unsafe { PARL_IO::steal() };
     #[cfg(esp32c6)]
     {
         for core in crate::Cpu::other() {
@@ -1016,7 +1016,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
         }
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
-        unsafe { PARL_IO::steal() }.bind_parl_io_interrupt(handler.handler());
+        peri.bind_parl_io_interrupt(handler.handler());
 
         unwrap!(crate::interrupt::enable(
             Interrupt::PARL_IO,
@@ -1031,8 +1031,8 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
         }
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
-        unsafe { PARL_IO::steal() }.bind_parl_io_tx_interrupt(handler.handler());
-        unsafe { PARL_IO::steal() }.bind_parl_io_rx_interrupt(handler.handler());
+        peri.bind_parl_io_tx_interrupt(handler.handler());
+        peri.bind_parl_io_rx_interrupt(handler.handler());
 
         unwrap!(crate::interrupt::enable(
             Interrupt::PARL_IO_TX,
@@ -1046,8 +1046,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
 }
 
 fn internal_listen(interrupts: EnumSet<ParlIoInterrupt>, enable: bool) {
-    let parl_io = unsafe { PARL_IO::steal() };
-    parl_io.int_ena().write(|w| {
+    PARL_IO::regs().int_ena().write(|w| {
         for interrupt in interrupts {
             match interrupt {
                 ParlIoInterrupt::TxFifoReEmpty => w.tx_fifo_rempty().bit(enable),
@@ -1061,7 +1060,7 @@ fn internal_listen(interrupts: EnumSet<ParlIoInterrupt>, enable: bool) {
 
 fn internal_interrupts() -> EnumSet<ParlIoInterrupt> {
     let mut res = EnumSet::new();
-    let parl_io = unsafe { PARL_IO::steal() };
+    let parl_io = PARL_IO::regs();
     let ints = parl_io.int_st().read();
     if ints.tx_fifo_rempty().bit() {
         res.insert(ParlIoInterrupt::TxFifoReEmpty);
@@ -1077,7 +1076,7 @@ fn internal_interrupts() -> EnumSet<ParlIoInterrupt> {
 }
 
 fn internal_clear_interrupts(interrupts: EnumSet<ParlIoInterrupt>) {
-    let parl_io = unsafe { PARL_IO::steal() };
+    let parl_io = PARL_IO::regs();
     parl_io.int_clr().write(|w| {
         for interrupt in interrupts {
             match interrupt {
@@ -1436,21 +1435,19 @@ fn internal_init(frequency: HertzU32) -> Result<(), Error> {
         return Err(Error::UnreachableClockRate);
     }
 
-    let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-
     let divider = crate::soc::constants::PARL_IO_SCLK / frequency.raw();
     if divider > 0xffff {
         return Err(Error::UnreachableClockRate);
     }
     let divider = divider as u16;
 
-    pcr.parl_clk_tx_conf().modify(|_, w| unsafe {
+    PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
         w.parl_clk_tx_en().set_bit();
         w.parl_clk_tx_sel().bits(1); // PLL
         w.parl_clk_tx_div_num().bits(divider)
     });
 
-    pcr.parl_clk_rx_conf().modify(|_, w| unsafe {
+    PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
         w.parl_clk_rx_en().set_bit();
         w.parl_clk_rx_sel().bits(1); // PLL
         w.parl_clk_rx_div_num().bits(divider)
@@ -1489,8 +1486,8 @@ where
     }
 
     fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), Error> {
-        let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-        pcr.parl_clk_tx_conf()
+        PCR::regs()
+            .parl_clk_tx_conf()
             .modify(|_, w| w.parl_tx_rst_en().set_bit());
 
         Instance::clear_tx_interrupts();
@@ -1509,7 +1506,8 @@ where
 
         Instance::set_tx_start(true);
 
-        pcr.parl_clk_tx_conf()
+        PCR::regs()
+            .parl_clk_tx_conf()
             .modify(|_, w| w.parl_tx_rst_en().clear_bit());
 
         Ok(())
@@ -1582,10 +1580,11 @@ where
         ptr: *mut u8,
         len: usize,
     ) -> Result<(), Error> {
-        let pcr = unsafe { &*crate::peripherals::PCR::PTR };
-        pcr.parl_clk_rx_conf()
+        PCR::regs()
+            .parl_clk_rx_conf()
             .modify(|_, w| w.parl_rx_rst_en().set_bit());
-        pcr.parl_clk_rx_conf()
+        PCR::regs()
+            .parl_clk_rx_conf()
             .modify(|_, w| w.parl_rx_rst_en().clear_bit());
 
         Instance::clear_rx_interrupts();
@@ -1692,7 +1691,7 @@ pub mod asynch {
     use crate::{
         asynch::AtomicWaker,
         dma::{asynch::DmaRxFuture, ReadBuffer, WriteBuffer},
-        peripherals::Interrupt,
+        peripherals::{Interrupt, PARL_IO},
     };
 
     static TX_WAKER: AtomicWaker = AtomicWaker::new();
@@ -1703,7 +1702,7 @@ pub mod asynch {
     impl TxDoneFuture {
         pub fn new() -> Self {
             Instance::listen_tx_done();
-            let mut parl_io = unsafe { crate::peripherals::PARL_IO::steal() };
+            let mut parl_io = unsafe { PARL_IO::steal() };
 
             #[cfg(esp32c6)]
             {
@@ -1801,6 +1800,7 @@ pub mod asynch {
 
 mod private {
     use super::{BitPackOrder, EofMode, Error, SampleEdge};
+    use crate::peripherals::PARL_IO;
 
     pub trait FullDuplex {}
 
@@ -1852,8 +1852,7 @@ mod private {
     #[cfg(esp32c6)]
     impl Instance {
         pub fn set_tx_bit_width(width: WidSel) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .tx_cfg0()
@@ -1861,32 +1860,28 @@ mod private {
         }
 
         pub fn set_tx_idle_value(value: u16) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block
                 .tx_cfg1()
                 .modify(|_, w| unsafe { w.tx_idle_value().bits(value) });
         }
 
         pub fn set_tx_sample_edge(value: SampleEdge) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block
                 .tx_cfg0()
                 .modify(|_, w| w.tx_smp_edge_sel().bit(value as u8 == 1));
         }
 
         pub fn set_tx_bit_order(value: BitPackOrder) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block
                 .tx_cfg0()
                 .modify(|_, w| w.tx_bit_unpack_order().bit(value as u8 == 1));
         }
 
         pub fn clear_tx_interrupts() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_clr().write(|w| {
                 w.tx_fifo_rempty()
@@ -1897,8 +1892,7 @@ mod private {
         }
 
         pub fn set_tx_bytes(len: u16) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .tx_cfg0()
@@ -1906,22 +1900,19 @@ mod private {
         }
 
         pub fn is_tx_ready() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.st().read().tx_ready().bit_is_set()
         }
 
         pub fn set_tx_start(value: bool) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.tx_cfg0().modify(|_, w| w.tx_start().bit(value));
         }
 
         pub fn is_tx_eof() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_raw().read().tx_eof().bit_is_set()
         }
@@ -1931,8 +1922,7 @@ mod private {
         }
 
         pub fn set_tx_hw_valid_en(value: bool) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .tx_cfg0()
@@ -1940,8 +1930,7 @@ mod private {
         }
 
         pub fn set_rx_bit_width(width: WidSel) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_cfg0()
@@ -1953,15 +1942,13 @@ mod private {
         }
 
         pub fn set_rx_sw_en(value: bool) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.rx_cfg0().modify(|_, w| w.rx_sw_en().bit(value));
         }
 
         pub fn clear_rx_interrupts() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .int_clr()
@@ -1969,8 +1956,7 @@ mod private {
         }
 
         pub fn set_rx_bytes(len: u16) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_cfg0()
@@ -1978,8 +1964,7 @@ mod private {
         }
 
         pub fn set_rx_sample_mode(sample_mode: SampleMode) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_cfg0()
@@ -1987,8 +1972,7 @@ mod private {
         }
 
         pub fn set_eof_gen_sel(mode: EofMode) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_cfg0()
@@ -1996,8 +1980,7 @@ mod private {
         }
 
         pub fn set_rx_pulse_submode_sel(sel: u8) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_cfg0()
@@ -2005,8 +1988,7 @@ mod private {
         }
 
         pub fn set_rx_level_submode_sel(sel: u8) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_cfg0()
@@ -2014,8 +1996,7 @@ mod private {
         }
 
         pub fn set_rx_clk_edge_sel(edge: SampleEdge) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_cfg0()
@@ -2023,15 +2004,13 @@ mod private {
         }
 
         pub fn set_rx_start(value: bool) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.rx_cfg0().modify(|_, w| w.rx_start().bit(value));
         }
 
         pub fn set_rx_reg_update() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_cfg1()
@@ -2039,16 +2018,14 @@ mod private {
         }
 
         pub fn set_rx_bit_order(value: BitPackOrder) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block
                 .rx_cfg0()
                 .modify(|_, w| w.rx_bit_pack_order().bit(value as u8 == 1));
         }
 
         pub fn set_rx_timeout_ticks(value: Option<u16>) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block.rx_cfg1().modify(|_, w| unsafe {
                 w.rx_timeout_en()
                     .bit(value.is_some())
@@ -2058,43 +2035,37 @@ mod private {
         }
 
         pub fn is_suc_eof_generated_externally() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.rx_cfg0().read().rx_eof_gen_sel().bit_is_set()
         }
 
         pub fn listen_tx_done() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_ena().modify(|_, w| w.tx_eof().set_bit());
         }
 
         pub fn unlisten_tx_done() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
         }
 
         pub fn is_listening_tx_done() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_ena().read().tx_eof().bit()
         }
 
         pub fn is_tx_done_set() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_raw().read().tx_eof().bit()
         }
 
         pub fn clear_is_tx_done() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_clr().write(|w| w.tx_eof().clear_bit_by_one());
         }
@@ -2103,8 +2074,7 @@ mod private {
     #[cfg(esp32h2)]
     impl Instance {
         pub fn set_tx_bit_width(width: WidSel) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .tx_data_cfg()
@@ -2112,16 +2082,14 @@ mod private {
         }
 
         pub fn set_tx_idle_value(value: u16) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block
                 .tx_genrl_cfg()
                 .modify(|_, w| unsafe { w.tx_idle_value().bits(value) });
         }
 
         pub fn set_tx_sample_edge(value: SampleEdge) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block.tx_clk_cfg().modify(|_, w| {
                 w.tx_clk_i_inv()
                     .bit(value == SampleEdge::Invert)
@@ -2131,16 +2099,14 @@ mod private {
         }
 
         pub fn set_tx_bit_order(value: BitPackOrder) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block
                 .tx_data_cfg()
                 .modify(|_, w| w.tx_data_order_inv().bit(value as u8 == 1));
         }
 
         pub fn clear_tx_interrupts() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_clr().write(|w| {
                 w.tx_fifo_rempty()
@@ -2151,8 +2117,7 @@ mod private {
         }
 
         pub fn set_tx_bytes(len: u16) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .tx_data_cfg()
@@ -2160,15 +2125,13 @@ mod private {
         }
 
         pub fn is_tx_ready() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.st().read().tx_ready().bit_is_set()
         }
 
         pub fn set_tx_start(value: bool) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .tx_start_cfg()
@@ -2176,8 +2139,7 @@ mod private {
         }
 
         pub fn is_tx_eof() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_raw().read().tx_eof().bit_is_set()
         }
@@ -2187,8 +2149,7 @@ mod private {
         }
 
         pub fn set_tx_hw_valid_en(value: bool) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .tx_genrl_cfg()
@@ -2196,8 +2157,7 @@ mod private {
         }
 
         pub fn set_rx_bit_width(width: WidSel) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_data_cfg()
@@ -2209,8 +2169,7 @@ mod private {
         }
 
         pub fn set_rx_sw_en(value: bool) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_mode_cfg()
@@ -2218,8 +2177,7 @@ mod private {
         }
 
         pub fn clear_rx_interrupts() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .int_clr()
@@ -2227,8 +2185,7 @@ mod private {
         }
 
         pub fn set_rx_bytes(len: u16) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_data_cfg()
@@ -2236,8 +2193,7 @@ mod private {
         }
 
         pub fn set_rx_sample_mode(sample_mode: SampleMode) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_mode_cfg()
@@ -2245,8 +2201,7 @@ mod private {
         }
 
         pub fn set_eof_gen_sel(mode: EofMode) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_genrl_cfg()
@@ -2254,8 +2209,7 @@ mod private {
         }
 
         pub fn set_rx_pulse_submode_sel(sel: u8) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_mode_cfg()
@@ -2267,8 +2221,7 @@ mod private {
         }
 
         pub fn set_rx_clk_edge_sel(value: SampleEdge) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.rx_clk_cfg().modify(|_, w| {
                 w.rx_clk_i_inv()
@@ -2279,8 +2232,7 @@ mod private {
         }
 
         pub fn set_rx_start(value: bool) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_start_cfg()
@@ -2288,8 +2240,7 @@ mod private {
         }
 
         pub fn set_rx_reg_update() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .reg_update()
@@ -2297,16 +2248,14 @@ mod private {
         }
 
         pub fn set_rx_bit_order(value: BitPackOrder) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block
                 .rx_data_cfg()
                 .modify(|_, w| w.rx_data_order_inv().bit(value as u8 == 1));
         }
 
         pub fn set_rx_timeout_ticks(value: Option<u16>) {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
             reg_block.rx_genrl_cfg().modify(|_, w| unsafe {
                 w.rx_timeout_en()
                     .bit(value.is_some())
@@ -2316,8 +2265,7 @@ mod private {
         }
 
         pub fn is_suc_eof_generated_externally() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block
                 .rx_genrl_cfg()
@@ -2327,36 +2275,31 @@ mod private {
         }
 
         pub fn listen_tx_done() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_ena().modify(|_, w| w.tx_eof().set_bit());
         }
 
         pub fn unlisten_tx_done() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
         }
 
         pub fn is_listening_tx_done() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_ena().read().tx_eof().bit()
         }
 
         pub fn is_tx_done_set() -> bool {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_raw().read().tx_eof().bit()
         }
 
         pub fn clear_is_tx_done() {
-            let reg_block: crate::peripherals::PARL_IO =
-                unsafe { crate::peripherals::PARL_IO::steal() };
+            let reg_block = PARL_IO::regs();
 
             reg_block.int_clr().write(|w| w.tx_eof().clear_bit_by_one());
         }

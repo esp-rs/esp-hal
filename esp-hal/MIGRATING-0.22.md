@@ -1,4 +1,4 @@
-# Migration Guide from 0.22.x to v1.0.0-beta.0
+# Migration Guide from v0.22.x to v0.23.0
 
 Starting with this release, unstable parts of esp-hal will be gated behind the `unstable` feature.
 The `unstable` feature itself is unstable, we might change the way we hide APIs without notice.
@@ -29,10 +29,7 @@ by `esp_hal::init()`. The channels themselves have been renamed to match other p
 - GDMA devices provide `set_priority` to change DMA in/out channel priority
 
 ```diff
- let mut spi = Spi::new_with_config(
-     peripherals.SPI2,
-     Config::default(),
- )
+ let mut spi = spi
  // other setup
 -.with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 +.with_dma(dma_channel);
@@ -40,10 +37,7 @@ by `esp_hal::init()`. The channels themselves have been renamed to match other p
 
 ```diff
 +dma_channel.set_priority(DmaPriority::Priority1);
- let mut spi = Spi::new_with_config(
-     peripherals.SPI2,
-     Config::default(),
- )
+ let mut spi = spi
  // other setup
 -.with_dma(dma_channel.configure(false, DmaPriority::Priority1));
 +.with_dma(dma_channel);
@@ -199,8 +193,7 @@ is enabled. To retrieve the address and size of the initialized external memory,
 
 The usage of `esp_alloc::psram_allocator!` remains unchanged.
 
-
-## embedded-hal 0.2.* is not supported anymore.
+## embedded-hal 0.2.\* is not supported anymore.
 
 As per https://github.com/rust-embedded/embedded-hal/pull/640, our driver no longer implements traits from `embedded-hal 0.2.x`.
 Analogs of all traits from the above mentioned version are available in `embedded-hal 1.x.x`
@@ -236,7 +229,7 @@ https://github.com/rust-embedded/embedded-hal/blob/master/docs/migrating-from-0.
 
 ## Driver constructors now take a configuration and are fallible
 
-The old `new_with_config` constructor have been removed, and `new` constructors now always take
+The old `new_with_config` constructors have been removed, and `new` constructors now always take
 a configuration structure. They have also been updated to return a `ConfigError` if the configuration
 is not compatible with the hardware.
 
@@ -244,11 +237,7 @@ is not compatible with the hardware.
 -let mut spi = Spi::new_with_config(
 +let mut spi = Spi::new(
      peripherals.SPI2,
-     Config {
-         frequency: 100.kHz(),
-         mode: SpiMode::Mode0,
-         ..Config::default()
-     },
+     config,
 -);
 +)
 +.unwrap();
@@ -263,7 +252,27 @@ is not compatible with the hardware.
 +.unwrap();
 ```
 
-### LCD_CAM configuration changes
+Additionally, the configuration structs now implement the Builder Lite pattern.
+
+```diff
+-let config = Config {
+-    frequency: 100.kHz(),
+-    mode: Mode::_0,
+-    ..Config::default()
+-}
++let config = Config::default().with_frequency(100.kHz()).with_mode(Mode::_0);
+```
+
+## Peripheral instance type parameters and `new_typed` constructors have been removed
+
+Call `new` instead and remove the type parameters if you've used them.
+
+```diff
+-let mut spi: Spi<'lt, SPI2> = Spi::new_typed(..).unwrap();
++let mut spi: Spi<'lt> = Spi::new(..).unwrap();
+```
+
+## LCD_CAM configuration changes
 
 - `cam` now has a `Config` strurct that contains frequency, bit/byte order, VSync filter options.
 - DPI, I8080: `frequency` has been moved into `Config`.
@@ -318,6 +327,33 @@ To avoid abbreviations and contractions (as per the esp-hal guidelines), some er
 + Error::ZeroLengthInvalid
 ```
 
+The `AckCheckFailed` variant changed to `AcknowledgeCheckFailed(AcknowledgeCheckFailedReason)`
+
+```diff
+-            Err(Error::AckCheckFailed)
++            Err(Error::AcknowledgeCheckFailed(reason))
+```
+
+## I2C Configuration changes
+
+The timeout field in `Config` changed from `Option<u32>` to a dedicated `BusTimeout` enum.
+
+```diff
+- timeout: Some(10)
++ timeout: BusTimeout::BusCycles(10)
+```
+
+```diff
+- timeout: None
++ timeout: BusTimeout::Max
+```
+
+(Disabled isn't supported on ESP32 / ESP32-S2)
+```diff
+- timeout: None
++ timeout: BusTimeout::Disabled
+```
+
 ## The crate prelude has been removed
 
 The reexports that were previously part of the prelude are available through other paths:
@@ -326,15 +362,15 @@ The reexports that were previously part of the prelude are available through oth
 - `ExtU64` and `RateExtU32` have been moved to `esp_hal::time`
 - `Clock` and `CpuClock`: `esp_hal::clock::{Clock, CpuClock}`
 - The following traits need to be individually imported when needed:
-    - `esp_hal::analog::dac::Instance`
-    - `esp_hal::gpio::Pin`
-    - `esp_hal::ledc::channel::ChannelHW`
-    - `esp_hal::ledc::channel::ChannelIFace`
-    - `esp_hal::ledc::timer::TimerHW`
-    - `esp_hal::ledc::timer::TimerIFace`
-    - `esp_hal::timer::timg::TimerGroupInstance`
-    - `esp_hal::timer::Timer`
-    - `esp_hal::interrupt::InterruptConfigurable`
+  - `esp_hal::analog::dac::Instance`
+  - `esp_hal::gpio::Pin`
+  - `esp_hal::ledc::channel::ChannelHW`
+  - `esp_hal::ledc::channel::ChannelIFace`
+  - `esp_hal::ledc::timer::TimerHW`
+  - `esp_hal::ledc::timer::TimerIFace`
+  - `esp_hal::timer::timg::TimerGroupInstance`
+  - `esp_hal::timer::Timer`
+  - `esp_hal::interrupt::InterruptConfigurable`
 - The `entry` macro can be imported as `esp_hal::entry`, while other macros are found under `esp_hal::macros`
 
 ## `AtCmdConfig` now uses builder-lite pattern
@@ -342,4 +378,173 @@ The reexports that were previously part of the prelude are available through oth
 ```diff
 - uart0.set_at_cmd(AtCmdConfig::new(None, None, None, b'#', None));
 + uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(b'#'));
+```
+
+## Crate configuration changes
+
+To prevent ambiguity between configurations, we had to change the naming format of configuration
+keys. Before, we used `{prefix}_{key}`, which meant that esp-hal and esp-hal-\* configuration keys
+were impossible to tell apart. To fix this issue, we are changing the separator from one underscore
+character to `_CONFIG_`. This also means that users will have to change their `config.toml`
+configurations to match the new format.
+
+```diff
+ [env]
+-ESP_HAL_PLACE_SPI_DRIVER_IN_RAM="true"
++ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM="true"
+```
+
+## UART changes
+
+The `Config` struct's setters are now prefixed with `with_`. `parity_none`, `parity_even`,
+`parity_odd` have been replaced by `with_parity` that takes a `Parity` parameter.
+
+```diff
+ let config = Config::default()
+-    .rx_fifo_full_threshold(30)
++    .with_rx_fifo_full_threshold(30)
+-    .parity_even();
++    .with_parity(Parity::Even);
+```
+
+The `DataBits`, `Parity`, and `StopBits` enum variants are no longer prefixed with the name of the enum.
+
+e.g.
+
+```diff
+- DataBits::DataBits8
++ DataBits::_8
+- Parity::ParityNone
++ Parity::None
+- StopBits::Stop1
++ StopBits::_1
+```
+
+The previous blocking implementation of `read_bytes` has been removed, and the non-blocking `drain_fifo` has instead been renamed to `read_bytes` in its place.
+
+Any code which was previously using `read_bytes` to fill a buffer in a blocking manner will now need to implement the necessary logic to block until the buffer is filled in their application instead.
+
+The `Error` enum variant uses object+verb naming.
+
+e.g.
+
+```diff
+- RxGlichDetected
++ GlitchOccurred
+```
+
+RX/TX pin assignment moved from constructors to builder functions.
+
+e.g.
+
+```diff
+  let mut uart1 = Uart::new(
+      peripherals.UART1,
+-     Config::default(),
+-     peripherals.GPIO1,
+-     peripherals.GPIO2,
+- ).unwrap();
++     Config::default())
++     .unwrap()
++     .with_rx(peripherals.GPIO1)
++     .with_tx(peripherals.GPIO2);
+```
+
+`write_byte` and `read_byte` have been removed.
+
+e.g.
+
+```diff
+- while let nb::Result::Ok(_c) = serial.read_byte() {
+-     cnt += 1;
+- }
++ let mut buff = [0u8; 64];
++ let cnt = serial.read_bytes(&mut buff);
+```
+
+
+
+## Spi `with_miso` has been split
+
+Previously, `with_miso` set up the provided pin as an input and output, which was necessary for half duplex.
+Full duplex does not require this, and it also creates an artificial restriction.
+
+If you were using half duplex SPI with `with_miso`,
+you should now use `with_sio1` instead to get the previous behavior.
+
+## CPU Clocks
+
+The specific CPU clock variants are renamed from e.g. `Clock80MHz` to `_80MHz`.
+
+```diff
+- CpuClock::Clock80MHz
++ CpuClock::_80MHz
+```
+
+Additionally the enum is marked as non-exhaustive.
+
+## SPI Changes
+
+A number of enums have had their `Spi` prefix dropped and the SPI mode variants
+are renamed from e.g. `Mode0` to `_0`.
+
+```diff
+- SpiMode::Mode0
++ Mode::_0
+```
+
+The Address and Command enums have similarly had their variants changed from e.g. `Address1` to `_1Bit` and `Command1` to `_1Bit` respectively:
+
+```diff
+- Address::Address1
++ Address::_1Bit
+- Command::Command1
++ Command::_1Bit
+```
+
+`write_byte` and `read_byte` were removed and `write_bytes` and `read_bytes` can be used as replacement.
+
+e.g.
+
+```rust
+let mut byte = [0u8; 1];
+spi.read_bytes(&mut byte);
+```
+
+## GPIO Changes
+
+The GPIO drive strength variants are renamed from e.g. `I5mA` to `_5mA`.
+
+```diff
+-DriveStrength::I5mA
++DriveStrength::_5mA
+```
+
+## ADC Changes
+
+The ADC attenuation variants are renamed from e.g. `Attenuation0dB` to `_0dB`.
+
+```diff
+-Attenuation::Attenuation0dB
++Attenuation::_0dB
+```
+
+## `macro` module is private now
+
+Macros from `procmacros` crate (`handler`, `ram`, `load_lp_code`) are now imported via `esp-hal`.
+
+```diff
+- use esp_hal::macros::{handler, ram, load_lp_code};
++ use esp_hal::{handler, ram, load_lp_code};
+```
+
+## `entry` macro is removed, use `main` macro
+
+```diff
+-use esp_hal::entry;
++use esp_hal::main;
+
+-#[entry]
++#[main]
+fn main() {
 ```

@@ -3,9 +3,6 @@
 //! Most of the macros in this module are hidden and intended for internal use
 //! only. For the list of public macros, see the [procmacros](https://docs.rs/esp-hal-procmacros/latest/esp_hal_procmacros/)
 //! documentation.
-
-pub use procmacros::*;
-
 #[doc(hidden)]
 /// Helper macro for checking doctest code snippets
 #[macro_export]

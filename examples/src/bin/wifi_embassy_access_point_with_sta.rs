@@ -12,19 +12,20 @@
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 //!
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
+//% FEATURES: embassy esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
 #![no_main]
 
+use core::net::Ipv4Addr;
+
 use embassy_executor::Spawner;
 use embassy_net::{
     tcp::TcpSocket,
     IpListenEndpoint,
-    Ipv4Address,
     Ipv4Cidr,
-    Stack,
+    Runner,
     StackResources,
     StaticConfigV4,
 };
@@ -94,8 +95,8 @@ async fn main(spawner: Spawner) -> ! {
     }
 
     let ap_config = embassy_net::Config::ipv4_static(StaticConfigV4 {
-        address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
-        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+        address: Ipv4Cidr::new(Ipv4Addr::new(192, 168, 2, 1), 24),
+        gateway: Some(Ipv4Addr::new(192, 168, 2, 1)),
         dns_servers: Default::default(),
     });
     let sta_config = embassy_net::Config::dhcpv4(Default::default());
@@ -103,23 +104,17 @@ async fn main(spawner: Spawner) -> ! {
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     // Init network stacks
-    let ap_stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiApDevice>>,
-        Stack::new(
-            wifi_ap_interface,
-            ap_config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed
-        )
+    let (ap_stack, ap_runner) = embassy_net::new(
+        wifi_ap_interface,
+        ap_config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
     );
-    let sta_stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiStaDevice>>,
-        Stack::new(
-            wifi_sta_interface,
-            sta_config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed
-        )
+    let (sta_stack, sta_runner) = embassy_net::new(
+        wifi_sta_interface,
+        sta_config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
     );
 
     let client_config = Configuration::Mixed(
@@ -136,8 +131,8 @@ async fn main(spawner: Spawner) -> ! {
     controller.set_configuration(&client_config).unwrap();
 
     spawner.spawn(connection(controller)).ok();
-    spawner.spawn(ap_task(&ap_stack)).ok();
-    spawner.spawn(sta_task(&sta_stack)).ok();
+    spawner.spawn(ap_task(ap_runner)).ok();
+    spawner.spawn(sta_task(sta_runner)).ok();
 
     loop {
         if sta_stack.is_link_up() {
@@ -158,13 +153,13 @@ async fn main(spawner: Spawner) -> ! {
     let mut ap_rx_buffer = [0; 1536];
     let mut ap_tx_buffer = [0; 1536];
 
-    let mut ap_socket = TcpSocket::new(&ap_stack, &mut ap_rx_buffer, &mut ap_tx_buffer);
+    let mut ap_socket = TcpSocket::new(ap_stack, &mut ap_rx_buffer, &mut ap_tx_buffer);
     ap_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
     let mut sta_rx_buffer = [0; 1536];
     let mut sta_tx_buffer = [0; 1536];
 
-    let mut sta_socket = TcpSocket::new(&sta_stack, &mut sta_rx_buffer, &mut sta_tx_buffer);
+    let mut sta_socket = TcpSocket::new(sta_stack, &mut sta_rx_buffer, &mut sta_tx_buffer);
     sta_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
     loop {
@@ -212,7 +207,7 @@ async fn main(spawner: Spawner) -> ! {
         }
 
         if sta_stack.is_link_up() {
-            let remote_endpoint = (Ipv4Address::new(142, 250, 185, 115), 80);
+            let remote_endpoint = (Ipv4Addr::new(142, 250, 185, 115), 80);
             println!("connecting...");
             let r = sta_socket.connect(remote_endpoint).await;
             if let Err(e) = r {
@@ -334,11 +329,11 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn ap_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
-    stack.run().await
+async fn ap_task(mut runner: Runner<'static, WifiDevice<'static, WifiApDevice>>) {
+    runner.run().await
 }
 
 #[embassy_executor::task]
-async fn sta_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
-    stack.run().await
+async fn sta_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+    runner.run().await
 }

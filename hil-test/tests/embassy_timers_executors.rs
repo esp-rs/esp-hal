@@ -1,8 +1,7 @@
 //! Embassy timer and executor Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: integrated-timers
-//% FEATURES: generic-queue
+//% FEATURES: unstable embassy
 
 #![no_std]
 #![no_main]
@@ -64,12 +63,13 @@ mod test_cases {
     }
 
     pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
-        let mut periodic = PeriodicTimer::new_typed(timer);
+        let mut periodic = PeriodicTimer::new(timer);
 
         let t1 = esp_hal::time::now();
         periodic.start(100.millis()).unwrap();
 
-        nb::block!(periodic.wait()).unwrap();
+        periodic.wait();
+
         let t2 = esp_hal::time::now();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
@@ -81,7 +81,7 @@ mod test_cases {
     }
 
     pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
-        let mut timer = OneShotTimer::new_typed(timer);
+        let mut timer = OneShotTimer::new(timer);
 
         let t1 = esp_hal::time::now();
         timer.delay_millis(50);
@@ -122,7 +122,7 @@ fn set_up_embassy_with_systimer(peripherals: Peripherals) {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod test {
     use super::*;
     use crate::test_cases::*;

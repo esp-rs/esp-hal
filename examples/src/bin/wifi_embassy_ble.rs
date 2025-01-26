@@ -4,7 +4,7 @@
 //! - offers one service with three characteristics (one is read/write, one is write only, one is read/write/notify)
 //! - pressing the boot-button on a dev-board will send a notification if it is subscribed
 
-//% FEATURES: embassy embassy-generic-timers esp-wifi esp-wifi/ble esp-hal/unstable
+//% FEATURES: embassy esp-wifi esp-wifi/ble esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
@@ -29,7 +29,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    gpio::{Input, Pull},
+    gpio::{Input, InputConfig, Pull},
     rng::Rng,
     time,
     timer::timg::TimerGroup,
@@ -67,11 +67,12 @@ async fn main(_spawner: Spawner) -> ! {
         .unwrap()
     );
 
+    let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = Input::new(peripherals.GPIO0, Pull::Down);
+            let button = Input::new(peripherals.GPIO0, config).unwrap();
         } else {
-            let button = Input::new(peripherals.GPIO9, Pull::Down);
+            let button = Input::new(peripherals.GPIO9, config).unwrap();
         }
     }
 

@@ -13,6 +13,7 @@ name: CI
 
 on:
   pull_request:
+      types: [opened, synchronize, reopened]
   push:
     branches-ignore:
       - "gh-readonly-queue/**"
@@ -23,8 +24,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MSRV: "1.83.0"
-  RUSTDOCFLAGS: -Dwarnings
+  MSRV: "1.84.0"
   DEFMT_LOG: trace
 
 # Cancel any currently running workflows from the same PR, branch, or
@@ -70,7 +70,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           ldproxy: false
-          version: 1.83.0.1
+          version: 1.84.0.0
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:

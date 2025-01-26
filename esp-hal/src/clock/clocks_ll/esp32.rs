@@ -1,6 +1,6 @@
 use crate::{
     clock::{Clock, PllClock, XtalClock},
-    regi2c_write,
+    rom::regi2c_write,
 };
 
 const REF_CLK_FREQ: u32 = 1000000;
@@ -42,8 +42,8 @@ const I2C_BBPLL_OC_DIV_7_0: u32 = 3;
 const I2C_BBPLL_OC_DCUR: u32 = 5;
 
 pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
-    let efuse = unsafe { &*crate::peripherals::EFUSE::ptr() };
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let efuse = crate::peripherals::EFUSE::regs();
+    let rtc_cntl = crate::peripherals::LPWR::regs();
 
     let rtc_cntl_dbias_hp_volt: u32 =
         RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5().read().rd_vol_level_hp_inv().bits() as u32;
@@ -64,7 +64,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 
         // Configure 320M PLL
         match xtal_freq {
-            XtalClock::RtcXtalFreq40M => {
+            XtalClock::_40M => {
                 div_ref = 0;
                 div7_0 = 32;
                 div10_8 = 0;
@@ -73,7 +73,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 bw = 3;
             }
 
-            XtalClock::RtcXtalFreq26M => {
+            XtalClock::_26M => {
                 div_ref = 12;
                 div7_0 = 224;
                 div10_8 = 4;
@@ -82,7 +82,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 bw = 1;
             }
 
-            XtalClock::RtcXtalFreqOther(_) => {
+            XtalClock::Other(_) => {
                 div_ref = 12;
                 div7_0 = 224;
                 div10_8 = 4;
@@ -102,7 +102,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 
         // Configure 480M PLL
         match xtal_freq {
-            XtalClock::RtcXtalFreq40M => {
+            XtalClock::_40M => {
                 div_ref = 0;
                 div7_0 = 28;
                 div10_8 = 0;
@@ -111,7 +111,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 bw = 3;
             }
 
-            XtalClock::RtcXtalFreq26M => {
+            XtalClock::_26M => {
                 div_ref = 12;
                 div7_0 = 144;
                 div10_8 = 4;
@@ -120,7 +120,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 bw = 1;
             }
 
-            XtalClock::RtcXtalFreqOther(_) => {
+            XtalClock::Other(_) => {
                 div_ref = 12;
                 div7_0 = 224;
                 div10_8 = 4;
@@ -144,18 +144,16 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 }
 
 pub(crate) fn esp32_rtc_bbpll_enable() {
-    unsafe { &*crate::peripherals::RTC_CNTL::ptr() }
-        .options0()
-        .modify(|_, w| {
-            w.bias_i2c_force_pd()
-                .clear_bit()
-                .bb_i2c_force_pd()
-                .clear_bit()
-                .bbpll_force_pd()
-                .clear_bit()
-                .bbpll_i2c_force_pd()
-                .clear_bit()
-        });
+    crate::peripherals::LPWR::regs().options0().modify(|_, w| {
+        w.bias_i2c_force_pd()
+            .clear_bit()
+            .bb_i2c_force_pd()
+            .clear_bit()
+            .bbpll_force_pd()
+            .clear_bit()
+            .bbpll_i2c_force_pd()
+            .clear_bit()
+    });
 
     // reset BBPLL configuration
     regi2c_write!(I2C_BBPLL, I2C_BBPLL_IR_CAL_DELAY, BBPLL_IR_CAL_DELAY_VAL);
@@ -170,8 +168,8 @@ pub(crate) fn esp32_rtc_bbpll_enable() {
 }
 
 pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
-    let apb_cntl = unsafe { &*crate::peripherals::APB_CTRL::ptr() };
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let apb_cntl = crate::peripherals::APB_CTRL::regs();
+    let rtc_cntl = crate::peripherals::LPWR::regs();
 
     unsafe {
         let value = (((freq.hz()) >> 12) & UINT16_MAX) | ((((freq.hz()) >> 12) & UINT16_MAX) << 16);
@@ -201,9 +199,9 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
 }
 
 pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
-    let efuse = unsafe { &*crate::peripherals::EFUSE::ptr() };
-    let dport = unsafe { &*crate::peripherals::DPORT::ptr() };
-    let rtc_cntl = unsafe { &*crate::peripherals::RTC_CNTL::ptr() };
+    let efuse = crate::peripherals::EFUSE::regs();
+    let dport = crate::peripherals::DPORT::regs();
+    let rtc_cntl = crate::peripherals::LPWR::regs();
 
     unsafe {
         const RTC_CNTL_DBIAS_1V25: u32 = 7;
@@ -220,14 +218,14 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
         let per_conf;
 
         match cpu_freq_mhz {
-            crate::clock::CpuClock::Clock160MHz => {
+            crate::clock::CpuClock::_160MHz => {
                 per_conf = CPU_160M;
             }
-            crate::clock::CpuClock::Clock240MHz => {
+            crate::clock::CpuClock::_240MHz => {
                 dbias = dig_dbias_240_m;
                 per_conf = CPU_240M;
             }
-            crate::clock::CpuClock::Clock80MHz => {
+            crate::clock::CpuClock::_80MHz => {
                 per_conf = CPU_80M;
             }
         }

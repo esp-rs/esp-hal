@@ -75,8 +75,9 @@ use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     clock::Clocks,
     interrupt::{self, InterruptConfigurable, InterruptHandler},
+    pac::timg0::RegisterBlock,
     peripheral::Peripheral,
-    peripherals::{timg0::RegisterBlock, Interrupt, TIMG0},
+    peripherals::{Interrupt, TIMG0},
     private::Sealed,
     sync::{lock, RawMutex},
     system::PeripheralClockControl,
@@ -122,7 +123,7 @@ impl TimerGroupInstance for TIMG0 {
 
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
-        Self::PTR
+        Self::regs()
     }
 
     fn configure_src_clk() {
@@ -131,13 +132,13 @@ impl TimerGroupInstance for TIMG0 {
                 // ESP32 has only APB clock source, do nothing
             } else if #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))] {
                 unsafe {
-                    (*Self::register_block())
+                    (*<Self as TimerGroupInstance>::register_block())
                         .t(0)
                         .config()
                         .modify(|_, w| w.use_xtal().clear_bit());
                 }
             } else if #[cfg(any(esp32c6, esp32h2))] {
-                unsafe { &*crate::peripherals::PCR::PTR }
+                crate::peripherals::PCR::regs()
                     .timergroup0_timer_clk_conf()
                     .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             }
@@ -159,12 +160,12 @@ impl TimerGroupInstance for TIMG0 {
                 // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
             } else if #[cfg(any(esp32c2, esp32c3))] {
                 unsafe {
-                    (*Self::register_block())
+                    (*<Self as TimerGroupInstance>::register_block())
                         .wdtconfig0()
                         .modify(|_, w| w.wdt_use_xtal().clear_bit());
                 }
             } else if #[cfg(any(esp32c6, esp32h2))] {
-                unsafe { &*crate::peripherals::PCR::PTR }
+                crate::peripherals::PCR::regs()
                     .timergroup0_wdt_clk_conf()
                     .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
             }
@@ -184,7 +185,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
 
     #[inline(always)]
     fn register_block() -> *const RegisterBlock {
-        Self::PTR
+        Self::regs()
     }
 
     fn configure_src_clk() {
@@ -193,12 +194,12 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
                 // ESP32 has only APB clock source, do nothing
                 // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
             } else if #[cfg(any(esp32c6, esp32h2))] {
-                unsafe { &*crate::peripherals::PCR::PTR }
+                crate::peripherals::PCR::regs()
                     .timergroup1_timer_clk_conf()
                     .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             } else if #[cfg(any(esp32s2, esp32s3))] {
                 unsafe {
-                    (*Self::register_block())
+                    (*<Self as TimerGroupInstance>::register_block())
                         .t(1)
                         .config()
                         .modify(|_, w| w.use_xtal().clear_bit());
@@ -221,7 +222,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
                 // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
                 // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
             } else if #[cfg(any(esp32c6, esp32h2))] {
-                unsafe { &*crate::peripherals::PCR::PTR }
+                crate::peripherals::PCR::regs()
                     .timergroup1_wdt_clk_conf()
                     .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             }
@@ -350,10 +351,8 @@ impl super::Timer for Timer {
             _ => unreachable!(),
         }
     }
-}
 
-impl InterruptConfigurable for Timer {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler)
     }
 }
@@ -381,7 +380,7 @@ unsafe impl Send for Timer {}
 
 /// Timer peripheral instance
 impl Timer {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    pub(crate) fn set_interrupt_handler(&self, handler: InterruptHandler) {
         let interrupt = match (self.timer_group(), self.timer_number()) {
             (0, 0) => Interrupt::TG0_T0_LEVEL,
             #[cfg(timg_timer1)]
@@ -412,7 +411,7 @@ impl Timer {
         self.timer
     }
 
-    fn t(&self) -> &crate::peripherals::timg0::T {
+    fn t(&self) -> &crate::pac::timg0::T {
         self.register_block().t(self.timer_number().into())
     }
 
@@ -869,12 +868,12 @@ mod asynch {
     #[handler]
     pub(crate) fn timg0_timer0_handler() {
         lock(&INT_ENA_LOCK[0], || {
-            unsafe { &*crate::peripherals::TIMG0::PTR }
+            crate::peripherals::TIMG0::regs()
                 .int_ena()
                 .modify(|_, w| w.t(0).clear_bit())
         });
 
-        unsafe { &*crate::peripherals::TIMG0::PTR }
+        crate::peripherals::TIMG0::regs()
             .int_clr()
             .write(|w| w.t(0).clear_bit_by_one());
 
@@ -885,11 +884,11 @@ mod asynch {
     #[handler]
     pub(crate) fn timg1_timer0_handler() {
         lock(&INT_ENA_LOCK[1], || {
-            unsafe { &*crate::peripherals::TIMG1::PTR }
+            crate::peripherals::TIMG1::regs()
                 .int_ena()
                 .modify(|_, w| w.t(0).clear_bit())
         });
-        unsafe { &*crate::peripherals::TIMG1::PTR }
+        crate::peripherals::TIMG1::regs()
             .int_clr()
             .write(|w| w.t(0).clear_bit_by_one());
 
@@ -900,11 +899,11 @@ mod asynch {
     #[handler]
     pub(crate) fn timg0_timer1_handler() {
         lock(&INT_ENA_LOCK[0], || {
-            unsafe { &*crate::peripherals::TIMG0::PTR }
+            crate::peripherals::TIMG0::regs()
                 .int_ena()
                 .modify(|_, w| w.t(1).clear_bit())
         });
-        unsafe { &*crate::peripherals::TIMG0::PTR }
+        crate::peripherals::TIMG0::regs()
             .int_clr()
             .write(|w| w.t(1).clear_bit_by_one());
 
@@ -915,12 +914,12 @@ mod asynch {
     #[handler]
     pub(crate) fn timg1_timer1_handler() {
         lock(&INT_ENA_LOCK[1], || {
-            unsafe { &*crate::peripherals::TIMG1::PTR }
+            crate::peripherals::TIMG1::regs()
                 .int_ena()
                 .modify(|_, w| w.t(1).clear_bit())
         });
 
-        unsafe { &*crate::peripherals::TIMG1::PTR }
+        crate::peripherals::TIMG1::regs()
             .int_clr()
             .write(|w| w.t(1).clear_bit_by_one());
 

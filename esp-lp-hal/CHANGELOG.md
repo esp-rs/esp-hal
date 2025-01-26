@@ -11,9 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bump MSRV to 1.84 (#2951)
+
 ### Fixed
 
 ### Removed
+
 - Remove embedded-hal 0.2.x impls and dependency from esp-lp-hal package (#2609)
 
 ## 0.1.0 - 2024-07-15

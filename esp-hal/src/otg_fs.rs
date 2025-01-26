@@ -76,25 +76,19 @@ impl<'d> Usb<'d> {
     }
 
     fn _enable() {
-        unsafe {
-            let usb_wrap = peripherals::USB_WRAP::steal();
-            usb_wrap.otg_conf().modify(|_, w| {
-                w.usb_pad_enable().set_bit();
-                w.phy_sel().clear_bit();
-                w.clk_en().set_bit();
-                w.ahb_clk_force_on().set_bit();
-                w.phy_clk_force_on().set_bit()
-            });
-        }
+        peripherals::USB_WRAP::regs().otg_conf().modify(|_, w| {
+            w.usb_pad_enable().set_bit();
+            w.phy_sel().clear_bit();
+            w.clk_en().set_bit();
+            w.ahb_clk_force_on().set_bit();
+            w.phy_clk_force_on().set_bit()
+        });
 
         #[cfg(esp32s3)]
-        unsafe {
-            let rtc = peripherals::LPWR::steal();
-            rtc.usb_conf().modify(|_, w| {
-                w.sw_hw_usb_phy_sel().set_bit();
-                w.sw_usb_phy_sel().set_bit()
-            });
-        }
+        peripherals::LPWR::regs().usb_conf().modify(|_, w| {
+            w.sw_hw_usb_phy_sel().set_bit();
+            w.sw_usb_phy_sel().set_bit()
+        });
 
         use crate::gpio::Level;
 
@@ -112,7 +106,7 @@ impl<'d> Usb<'d> {
 unsafe impl Sync for Usb<'_> {}
 
 unsafe impl UsbPeripheral for Usb<'_> {
-    const REGISTERS: *const () = peripherals::USB0::ptr() as *const ();
+    const REGISTERS: *const () = peripherals::USB0::PTR.cast();
 
     const HIGH_SPEED: bool = false;
     const FIFO_DEPTH_WORDS: usize = 256;
@@ -298,7 +292,7 @@ pub mod asynch {
         }
     }
 
-    impl<'d> embassy_usb_driver::Bus for Bus<'d> {
+    impl embassy_usb_driver::Bus for Bus<'_> {
         async fn poll(&mut self) -> Event {
             self.inner.poll().await
         }
@@ -336,12 +330,6 @@ pub mod asynch {
 
     #[handler(priority = crate::interrupt::Priority::max())]
     fn interrupt_handler() {
-        unsafe {
-            on_interrupt(
-                Driver::REGISTERS,
-                &STATE,
-                Usb::ENDPOINT_COUNT,
-            )
-        }
+        unsafe { on_interrupt(Driver::REGISTERS, &STATE, Usb::ENDPOINT_COUNT) }
     }
 }

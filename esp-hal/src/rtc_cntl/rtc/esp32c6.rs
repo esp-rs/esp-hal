@@ -1200,7 +1200,7 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(RtcClock::xtal_freq(), XtalClock::RtcXtalFreq40M));
+    assert!(matches!(RtcClock::xtal_freq(), XtalClock::_40M));
 
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
 
@@ -1361,7 +1361,10 @@ pub(crate) enum RtcFastClock {
 impl Clock for RtcFastClock {
     fn frequency(&self) -> HertzU32 {
         match self {
-            RtcFastClock::RtcFastClockXtalD2 => HertzU32::Hz(40_000_000 / 2), // TODO: Is the value correct?
+            RtcFastClock::RtcFastClockXtalD2 => {
+                // TODO: Is the value correct?
+                HertzU32::Hz(40_000_000 / 2)
+            }
             RtcFastClock::RtcFastClockRcFast => HertzU32::Hz(17_500_000),
         }
     }
@@ -1429,8 +1432,8 @@ impl RtcClock {
     /// bootloader, as passed to rtc_clk_init function.
     pub fn xtal_freq() -> XtalClock {
         match Self::xtal_freq_mhz() {
-            40 => XtalClock::RtcXtalFreq40M,
-            other => XtalClock::RtcXtalFreqOther(other),
+            40 => XtalClock::_40M,
+            other => XtalClock::Other(other),
         }
     }
 
@@ -1616,7 +1619,7 @@ impl RtcClock {
 
         // Check if there is already running calibration process
         // TODO: &mut TIMG0 for calibration
-        let timg0 = unsafe { &*TIMG0::ptr() };
+        let timg0 = TIMG0::regs();
 
         if timg0
             .rtccalicfg()
@@ -1791,7 +1794,7 @@ impl RtcClock {
     }
 
     pub(crate) fn estimate_xtal_frequency() -> u32 {
-        let timg0 = unsafe { crate::peripherals::TIMG0::steal() };
+        let timg0 = TIMG0::regs();
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
         timg0.rtccalicfg().modify(|_, w| unsafe {

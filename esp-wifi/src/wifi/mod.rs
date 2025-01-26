@@ -67,8 +67,8 @@ use crate::{
     common_adapter::*,
     esp_wifi_result,
     hal::{
-        macros::ram,
         peripheral::{Peripheral, PeripheralRef},
+        ram,
     },
     EspWifiController,
 };
@@ -83,11 +83,11 @@ pub mod utils;
 #[cfg(coex)]
 use include::{coex_adapter_funcs_t, coex_pre_init, esp_coex_adapter_register};
 
-#[cfg(all(csi_enable, esp32c6))]
+#[cfg(all(feature = "csi", esp32c6))]
 use crate::binary::include::wifi_csi_acquire_config_t;
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 pub use crate::binary::include::wifi_csi_info_t;
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 use crate::binary::include::{
     esp_wifi_set_csi,
     esp_wifi_set_csi_config,
@@ -158,6 +158,7 @@ use crate::binary::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
+#[allow(clippy::upper_case_acronyms)] // FIXME
 pub enum AuthMethod {
     /// No authentication (open network).
     None,
@@ -351,13 +352,13 @@ impl Default for ClientConfiguration {
     }
 }
 
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 pub(crate) trait CsiCallback: FnMut(crate::binary::include::wifi_csi_info_t) {}
 
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 impl<T> CsiCallback for T where T: FnMut(crate::binary::include::wifi_csi_info_t) {}
 
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
@@ -369,7 +370,7 @@ unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
 #[derive(Clone, PartialEq, Eq)]
 // https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
 /// Channel state information(CSI) configuration
-#[cfg(all(not(esp32c6), csi_enable))]
+#[cfg(all(not(esp32c6), feature = "csi"))]
 pub struct CsiConfig {
     /// Enable to receive legacy long training field(lltf) data.
     pub lltf_en: bool,
@@ -396,7 +397,7 @@ pub struct CsiConfig {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-#[cfg(all(esp32c6, csi_enable))]
+#[cfg(all(esp32c6, feature = "csi"))]
 // See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
 pub struct CsiConfig {
     /// Enable to acquire CSI.
@@ -427,7 +428,7 @@ pub struct CsiConfig {
     pub reserved: u32,
 }
 
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 impl Default for CsiConfig {
     #[cfg(not(esp32c6))]
     fn default() -> Self {
@@ -463,7 +464,7 @@ impl Default for CsiConfig {
     }
 }
 
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 impl From<CsiConfig> for wifi_csi_config_t {
     fn from(config: CsiConfig) -> Self {
         #[cfg(not(esp32c6))]
@@ -502,7 +503,7 @@ impl From<CsiConfig> for wifi_csi_config_t {
     }
 }
 
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 impl CsiConfig {
     /// Set CSI data configuration
     pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
@@ -1089,6 +1090,7 @@ pub enum WifiEvent {
 #[repr(i32)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME remove prefix
 pub enum InternalWifiError {
     /// Out of memory
     EspErrNoMem          = 0x101,
@@ -1444,7 +1446,7 @@ static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
     rx_mgmt_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
     rx_mgmt_buf_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
     cache_tx_buf_num: esp_wifi_sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
-    csi_enable: crate::CONFIG.csi_enable as i32,
+    csi_enable: cfg!(feature = "csi") as i32,
     ampdu_rx_enable: crate::CONFIG.ampdu_rx_enable as i32,
     ampdu_tx_enable: crate::CONFIG.ampdu_tx_enable as i32,
     amsdu_tx_enable: crate::CONFIG.amsdu_tx_enable as i32,
@@ -1534,12 +1536,12 @@ unsafe extern "C" fn recv_cb_sta(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    if DATA_QUEUE_RX_STA.with(|queue| {
+    if let Ok(()) = DATA_QUEUE_RX_STA.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
-            true
+            Ok(())
         } else {
-            false
+            Err(packet)
         }
     }) {
         embassy::STA_RECEIVE_WAKER.wake();
@@ -1562,12 +1564,12 @@ unsafe extern "C" fn recv_cb_ap(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    if DATA_QUEUE_RX_AP.with(|queue| {
+    if let Ok(()) = DATA_QUEUE_RX_AP.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
-            true
+            Ok(())
         } else {
-            false
+            Err(packet)
         }
     }) {
         embassy::AP_RECEIVE_WAKER.wake();
@@ -1941,13 +1943,13 @@ mod sealed {
 
         fn interface(self) -> wifi_interface_t;
 
-        fn register_transmit_waker(self, cx: &mut core::task::Context) {
+        fn register_transmit_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::TRANSMIT_WAKER.register(cx.waker())
         }
 
-        fn register_receive_waker(self, cx: &mut core::task::Context);
+        fn register_receive_waker(self, cx: &mut core::task::Context<'_>);
 
-        fn register_link_state_waker(self, cx: &mut core::task::Context);
+        fn register_link_state_waker(self, cx: &mut core::task::Context<'_>);
 
         fn link_state(self) -> embassy_net_driver::LinkState;
     }
@@ -1971,11 +1973,11 @@ mod sealed {
             wifi_interface_t_WIFI_IF_STA
         }
 
-        fn register_receive_waker(self, cx: &mut core::task::Context) {
+        fn register_receive_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::STA_RECEIVE_WAKER.register(cx.waker());
         }
 
-        fn register_link_state_waker(self, cx: &mut core::task::Context) {
+        fn register_link_state_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::STA_LINK_STATE_WAKER.register(cx.waker());
         }
 
@@ -2007,11 +2009,11 @@ mod sealed {
             wifi_interface_t_WIFI_IF_AP
         }
 
-        fn register_receive_waker(self, cx: &mut core::task::Context) {
+        fn register_receive_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::AP_RECEIVE_WAKER.register(cx.waker());
         }
 
-        fn register_link_state_waker(self, cx: &mut core::task::Context) {
+        fn register_link_state_waker(self, cx: &mut core::task::Context<'_>) {
             embassy::AP_LINK_STATE_WAKER.register(cx.waker());
         }
 
@@ -2322,7 +2324,7 @@ impl PromiscuousPkt<'_> {
 }
 
 #[cfg(feature = "sniffer")]
-static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt)>> = Locked::new(None);
+static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt<'_>)>> = Locked::new(None);
 
 #[cfg(feature = "sniffer")]
 unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
@@ -2373,7 +2375,7 @@ impl Sniffer {
         })
     }
     /// Set the callback for receiving a packet.
-    pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt)) {
+    pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt<'_>)) {
         SNIFFER_CB.with(|callback| *callback = Some(cb));
     }
 }
@@ -2445,7 +2447,7 @@ impl<'d> WifiController<'d> {
     }
 
     /// Set CSI configuration and register the receiving callback.
-    #[cfg(csi_enable)]
+    #[cfg(feature = "csi")]
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
@@ -2686,9 +2688,9 @@ impl<Dm: Sealed> WifiRxToken<Dm> {
 impl<Dm: Sealed> RxToken for WifiRxToken<Dm> {
     fn consume<R, F>(self, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> R,
+        F: FnOnce(&[u8]) -> R,
     {
-        self.consume_token(f)
+        self.consume_token(|t| f(t))
     }
 }
 
@@ -3151,19 +3153,22 @@ pub(crate) mod embassy {
 
         fn receive(
             &mut self,
-            cx: &mut core::task::Context,
+            cx: &mut core::task::Context<'_>,
         ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
             self.mode.register_receive_waker(cx);
             self.mode.register_transmit_waker(cx);
             self.mode.rx_token()
         }
 
-        fn transmit(&mut self, cx: &mut core::task::Context) -> Option<Self::TxToken<'_>> {
+        fn transmit(&mut self, cx: &mut core::task::Context<'_>) -> Option<Self::TxToken<'_>> {
             self.mode.register_transmit_waker(cx);
             self.mode.tx_token()
         }
 
-        fn link_state(&mut self, cx: &mut core::task::Context) -> embassy_net_driver::LinkState {
+        fn link_state(
+            &mut self,
+            cx: &mut core::task::Context<'_>,
+        ) -> embassy_net_driver::LinkState {
             self.mode.register_link_state_waker(cx);
             self.mode.link_state()
         }

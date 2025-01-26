@@ -2,12 +2,18 @@ use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{asynch::AtomicWaker, dma::*, peripheral::Peripheral, peripherals::Interrupt};
 
-pub(super) type I2sRegisterBlock = crate::peripherals::i2s0::RegisterBlock;
+pub(super) type I2sRegisterBlock = crate::pac::i2s0::RegisterBlock;
 
 /// The RX half of an arbitrary I2S DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyI2sDmaRxChannel(pub(crate) AnyI2sDmaChannel);
+
+impl AnyI2sDmaRxChannel {
+    fn regs(&self) -> &I2sRegisterBlock {
+        self.0.register_block()
+    }
+}
 
 impl crate::private::Sealed for AnyI2sDmaRxChannel {}
 impl DmaRxChannel for AnyI2sDmaRxChannel {}
@@ -24,6 +30,12 @@ impl Peripheral for AnyI2sDmaRxChannel {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyI2sDmaTxChannel(pub(crate) AnyI2sDmaChannel);
 
+impl AnyI2sDmaTxChannel {
+    fn regs(&self) -> &I2sRegisterBlock {
+        self.0.register_block()
+    }
+}
+
 impl crate::private::Sealed for AnyI2sDmaTxChannel {}
 impl DmaTxChannel for AnyI2sDmaTxChannel {}
 impl Peripheral for AnyI2sDmaTxChannel {
@@ -36,28 +48,24 @@ impl Peripheral for AnyI2sDmaTxChannel {
 
 impl RegisterAccess for AnyI2sDmaTxChannel {
     fn reset(&self) {
-        let reg_block = self.0.register_block();
-        reg_block.lc_conf().modify(|_, w| w.out_rst().set_bit());
-        reg_block.lc_conf().modify(|_, w| w.out_rst().clear_bit());
+        self.regs().lc_conf().modify(|_, w| w.out_rst().set_bit());
+        self.regs().lc_conf().modify(|_, w| w.out_rst().clear_bit());
     }
 
     fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .lc_conf()
             .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .lc_conf()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
     fn set_link_addr(&self, address: u32) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
     }
@@ -67,29 +75,25 @@ impl RegisterAccess for AnyI2sDmaTxChannel {
     }
 
     fn start(&self) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .out_link()
             .modify(|_, w| w.outlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .out_link()
             .modify(|_, w| w.outlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .out_link()
             .modify(|_, w| w.outlink_restart().set_bit());
     }
 
     fn set_check_owner(&self, check_owner: Option<bool>) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .lc_conf()
             .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
     }
@@ -100,8 +104,8 @@ impl RegisterAccess for AnyI2sDmaTxChannel {
 
     #[cfg(psram_dma)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        let spi = self.0.register_block();
-        spi.lc_conf()
+        self.regs()
+            .lc_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
@@ -112,16 +116,24 @@ impl RegisterAccess for AnyI2sDmaTxChannel {
 }
 
 impl TxRegisterAccess for AnyI2sDmaTxChannel {
+    fn is_fifo_empty(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().lc_state0().read().bits() & 0x80000000 != 0
+            } else {
+                self.regs().lc_state0().read().out_empty().bit_is_set()
+            }
+        }
+    }
+
     fn set_auto_write_back(&self, enable: bool) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .lc_conf()
             .modify(|_, w| w.out_auto_wrback().bit(enable));
     }
 
     fn last_dscr_address(&self) -> usize {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .out_eof_des_addr()
             .read()
             .out_eof_des_addr()
@@ -129,18 +141,17 @@ impl TxRegisterAccess for AnyI2sDmaTxChannel {
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        None
+        Some(self.0.peripheral_interrupt())
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        None
+        Some(self.0.async_handler())
     }
 }
 
 impl InterruptAccess<DmaTxInterrupt> for AnyI2sDmaTxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
-        let reg_block = self.0.register_block();
-        reg_block.int_ena().modify(|_, w| {
+        self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().bit(enable),
@@ -156,8 +167,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyI2sDmaTxChannel {
     fn is_listening(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let reg_block = self.0.register_block();
-        let int_ena = reg_block.int_ena().read();
+        let int_ena = self.regs().int_ena().read();
         if int_ena.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
         }
@@ -177,8 +187,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyI2sDmaTxChannel {
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
-        let reg_block = self.0.register_block();
-        let int_raw = reg_block.int_raw().read();
+        let int_raw = self.regs().int_raw().read();
         if int_raw.out_total_eof().bit_is_set() {
             result |= DmaTxInterrupt::TotalEof;
         }
@@ -196,8 +205,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyI2sDmaTxChannel {
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
-        let reg_block = self.0.register_block();
-        reg_block.int_clr().write(|w| {
+        self.regs().int_clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
                     DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
@@ -225,23 +233,20 @@ impl InterruptAccess<DmaTxInterrupt> for AnyI2sDmaTxChannel {
 
 impl RegisterAccess for AnyI2sDmaRxChannel {
     fn reset(&self) {
-        let reg_block = self.0.register_block();
-        reg_block.lc_conf().modify(|_, w| w.in_rst().set_bit());
-        reg_block.lc_conf().modify(|_, w| w.in_rst().clear_bit());
+        self.regs().lc_conf().modify(|_, w| w.in_rst().set_bit());
+        self.regs().lc_conf().modify(|_, w| w.in_rst().clear_bit());
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .lc_conf()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
     fn set_link_addr(&self, address: u32) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
@@ -251,27 +256,25 @@ impl RegisterAccess for AnyI2sDmaRxChannel {
     }
 
     fn start(&self) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .in_link()
             .modify(|_, w| w.inlink_start().set_bit());
     }
 
     fn stop(&self) {
-        let reg_block = self.0.register_block();
-        reg_block.in_link().modify(|_, w| w.inlink_stop().set_bit());
+        self.regs()
+            .in_link()
+            .modify(|_, w| w.inlink_stop().set_bit());
     }
 
     fn restart(&self) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .in_link()
             .modify(|_, w| w.inlink_restart().set_bit());
     }
 
     fn set_check_owner(&self, check_owner: Option<bool>) {
-        let reg_block = self.0.register_block();
-        reg_block
+        self.regs()
             .lc_conf()
             .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
     }
@@ -282,8 +285,8 @@ impl RegisterAccess for AnyI2sDmaRxChannel {
 
     #[cfg(psram_dma)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        let spi = self.0.register_block();
-        spi.lc_conf()
+        self.regs()
+            .lc_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
@@ -305,8 +308,7 @@ impl RxRegisterAccess for AnyI2sDmaRxChannel {
 
 impl InterruptAccess<DmaRxInterrupt> for AnyI2sDmaRxChannel {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
-        let reg_block = self.0.register_block();
-        reg_block.int_ena().modify(|_, w| {
+        self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().bit(enable),
@@ -323,8 +325,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnyI2sDmaRxChannel {
     fn is_listening(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let reg_block = self.0.register_block();
-        let int_ena = reg_block.int_ena().read();
+        let int_ena = self.regs().int_ena().read();
         if int_ena.in_dscr_err().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
         }
@@ -347,8 +348,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnyI2sDmaRxChannel {
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
-        let reg_block = self.0.register_block();
-        let int_raw = reg_block.int_raw().read();
+        let int_raw = self.regs().int_raw().read();
         if int_raw.in_dscr_err().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
         }
@@ -369,8 +369,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnyI2sDmaRxChannel {
     }
 
     fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
-        let reg_block = self.0.register_block();
-        reg_block.int_clr().write(|w| {
+        self.regs().int_clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),

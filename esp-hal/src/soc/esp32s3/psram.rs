@@ -18,8 +18,9 @@
 //! ### Octal/Quad PSRAM
 //! This example shows how to use PSRAM as heap-memory via esp-alloc.
 //! You need an ESP32-S3 with at least 2 MB of PSRAM memory.
-//! Either `Octal` or `Quad` PSRAM will be used, depending on whether
-//! `octal-psram` or `quad-psram` feature is enabled.
+//! Either `Octal` or `Quad` PSRAM will be used, depending on the 
+//! setting of `ESP_HAL_CONFIG_PSRAM_MODE`.
+//! 
 //! Notice that PSRAM example **must** be built in release mode!
 //!
 //! ```rust, no_run
@@ -56,6 +57,7 @@
 //! # }
 //! ```
 
+use crate::peripherals::{EXTMEM, IO_MUX, SPI0, SPI1};
 pub use crate::soc::psram_common::*;
 
 const EXTMEM_ORIGIN: u32 = 0x3C000000;
@@ -169,15 +171,21 @@ pub(crate) fn init_psram(config: PsramConfig) {
         const DR_REG_MMU_TABLE: u32 = 0x600C5000;
 
         // calculate the PSRAM start address to map
-        let mut start = EXTMEM_ORIGIN;
+        // the linker scripts can produce a gap between mapped IROM and DROM segments
+        // bigger than a flash page - i.e. we will see an unmapped memory slot
+        // start from the end and find the last mapped flash page
+        //
+        // More general information about the MMU can be found here:
+        // https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction
         let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
-        for i in 0..FLASH_MMU_TABLE_SIZE {
+        let mut mapped_pages = 0;
+        for i in (0..FLASH_MMU_TABLE_SIZE).rev() {
             if mmu_table_ptr.add(i).read_volatile() != MMU_INVALID {
-                start += MMU_PAGE_SIZE;
-            } else {
+                mapped_pages = (i + 1) as u32;
                 break;
             }
         }
+        let start = EXTMEM_ORIGIN + (MMU_PAGE_SIZE * mapped_pages);
         debug!("PSRAM start address = {:x}", start);
 
         // Configure the mode of instruction cache : cache size, cache line size.
@@ -187,7 +195,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
             CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE,
         );
 
-        // If we need use SPIRAM, we should use data cache.Connfigure the mode of data :
+        // If we need use SPIRAM, we should use data cache.Configure the mode of data :
         // cache size, cache line size.
         Cache_Suspend_DCache();
 
@@ -209,8 +217,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
             panic!("cache_dbus_mmu_set failed");
         }
 
-        let extmem = &*esp32s3::EXTMEM::PTR;
-        extmem.dcache_ctrl1().modify(|_, w| {
+        EXTMEM::regs().dcache_ctrl1().modify(|_, w| {
             w.dcache_shut_core0_bus()
                 .clear_bit()
                 .dcache_shut_core1_bus()
@@ -227,7 +234,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     }
 }
 
-#[cfg(feature = "quad-psram")]
+#[cfg(psram_mode_quad)]
 pub(crate) mod utils {
     use procmacros::ram;
 
@@ -354,7 +361,7 @@ pub(crate) mod utils {
     #[ram]
     fn config_psram_spi_phases() {
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
+            let spi = SPI0::regs();
             // Config CMD phase
             spi.cache_sctrl()
                 .modify(|_, w| w.usr_sram_dio().clear_bit()); // disable dio mode for cache command
@@ -449,8 +456,7 @@ pub(crate) mod utils {
     #[ram]
     fn spi0_timing_config_set_core_clock(core_clock: SpiTimingConfigCoreClock) {
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
-            spi.core_clk_sel().modify(|_, w| {
+            SPI0::regs().core_clk_sel().modify(|_, w| {
                 w.core_clk_sel().bits(match core_clock {
                     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m => 0,
                     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock120m => 1,
@@ -463,45 +469,48 @@ pub(crate) mod utils {
 
     #[ram]
     fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
-        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
+            SPI0::regs()
+                .clock()
+                .modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
             unsafe {
-                spi.clock().modify(|_, w| w.bits(freqbits));
+                SPI0::regs().clock().modify(|_, w| w.bits(freqbits));
             }
         }
     }
 
     #[ram]
     fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
-        let spi = unsafe { &*crate::peripherals::SPI1::PTR };
         if freqdiv == 1 {
-            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
+            SPI1::regs()
+                .clock()
+                .modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
             unsafe {
-                spi.clock().modify(|_, w| w.bits(freqbits));
+                SPI1::regs().clock().modify(|_, w| w.bits(freqbits));
             }
         }
     }
 
     #[ram]
     fn spi0_timing_config_set_psram_clock(freqdiv: u32) {
-        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
+            SPI0::regs()
+                .sram_clk()
+                .modify(|_, w| w.sclk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_SCLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_SCLKCNT_L_S);
             unsafe {
-                spi.sram_clk().modify(|_, w| w.bits(freqbits));
+                SPI0::regs().sram_clk().modify(|_, w| w.bits(freqbits));
             }
         }
     }
@@ -596,7 +605,7 @@ pub(crate) mod utils {
         }
 
         unsafe {
-            let spi1 = &*esp32s3::SPI1::PTR;
+            let spi1 = SPI1::regs();
             let backup_usr = spi1.user().read().bits();
             let backup_usr1 = spi1.user1().read().bits();
             let backup_usr2 = spi1.user2().read().bits();
@@ -691,8 +700,7 @@ pub(crate) mod utils {
             match mode {
                 CommandMode::PsramCmdQpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_QIO_MODE);
-                    let spi1 = &*esp32s3::SPI1::PTR;
-                    spi1.ctrl().modify(|_, w| w.fcmd_quad().set_bit());
+                    SPI1::regs().ctrl().modify(|_, w| w.fcmd_quad().set_bit());
                 }
                 CommandMode::PsramCmdSpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_SLOWRD_MODE);
@@ -726,16 +734,19 @@ pub(crate) mod utils {
     #[ram]
     fn psram_set_cs_timing() {
         unsafe {
-            let spi = crate::peripherals::SPI0::steal();
             // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time registers
             // for PSRAM, so we only need to set SPI0 related registers here
-            spi.spi_smem_ac()
+            SPI0::regs()
+                .spi_smem_ac()
                 .modify(|_, w| w.spi_smem_cs_hold_time().bits(0));
-            spi.spi_smem_ac()
+            SPI0::regs()
+                .spi_smem_ac()
                 .modify(|_, w| w.spi_smem_cs_setup_time().bits(0));
-            spi.spi_smem_ac()
+            SPI0::regs()
+                .spi_smem_ac()
                 .modify(|_, w| w.spi_smem_cs_hold().set_bit());
-            spi.spi_smem_ac()
+            SPI0::regs()
+                .spi_smem_ac()
                 .modify(|_, w| w.spi_smem_cs_setup().set_bit());
         }
     }
@@ -746,7 +757,7 @@ pub(crate) mod utils {
         let cs1_io: u8 = PSRAM_CS_IO;
         if cs1_io == SPI_CS1_GPIO_NUM {
             unsafe {
-                esp32s3::IO_MUX::steal()
+                IO_MUX::regs()
                     .gpio(cs1_io as usize)
                     .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
             }
@@ -754,7 +765,7 @@ pub(crate) mod utils {
             unsafe {
                 esp_rom_gpio_connect_out_signal(cs1_io, SPICS1_OUT_IDX, false, false);
 
-                esp32s3::IO_MUX::steal()
+                IO_MUX::regs()
                     .gpio(cs1_io as usize)
                     .modify(|_, w| w.mcu_sel().bits(PIN_FUNC_GPIO));
             }
@@ -778,7 +789,7 @@ pub(crate) mod utils {
     }
 }
 
-#[cfg(feature = "octal-psram")]
+#[cfg(psram_mode_octal)]
 pub(crate) mod utils {
     use procmacros::ram;
 
@@ -1082,8 +1093,9 @@ pub(crate) mod utils {
 
         unsafe {
             // set to variable dummy mode
-            let spi = &*crate::peripherals::SPI1::PTR;
-            spi.ddr().modify(|_, w| w.spi_fmem_var_dummy().set_bit());
+            SPI1::regs()
+                .ddr()
+                .modify(|_, w| w.spi_fmem_var_dummy().set_bit());
             esp_rom_spi_set_dtr_swap_mode(1, false, false);
         }
 
@@ -1144,7 +1156,7 @@ pub(crate) mod utils {
     // requirement
     fn config_psram_spi_phases() {
         unsafe {
-            let spi = crate::peripherals::SPI0::steal();
+            let spi = SPI0::regs();
             // Config Write CMD phase for SPI0 to access PSRAM
             spi.cache_sctrl()
                 .modify(|_, w| w.cache_sram_usr_wcmd().set_bit());
@@ -1202,8 +1214,9 @@ pub(crate) mod utils {
     #[ram]
     fn spi_flash_set_rom_required_regs() {
         // Disable the variable dummy mode when doing timing tuning
-        let spi = unsafe { crate::peripherals::SPI1::steal() };
-        spi.ddr().modify(|_, w| w.spi_fmem_var_dummy().clear_bit());
+        SPI1::regs()
+            .ddr()
+            .modify(|_, w| w.spi_fmem_var_dummy().clear_bit());
         // STR /DTR mode setting is done every time when
         // `esp_rom_opiflash_exec_cmd` is called
         //
@@ -1223,21 +1236,20 @@ pub(crate) mod utils {
         // For now, set them all to 3. Need to check after QVL test results are out.
         // TODO: IDF-3663 Set default clk
         unsafe {
-            let spi = crate::peripherals::SPI0::steal();
-
-            spi.date()
+            SPI0::regs()
+                .date()
                 .modify(|_, w| w.spi_spiclk_pad_drv_ctl_en().set_bit());
-            spi.date()
+            SPI0::regs()
+                .date()
                 .modify(|_, w| w.spi_smem_spiclk_fun_drv().bits(3));
-            spi.date()
+            SPI0::regs()
+                .date()
                 .modify(|_, w| w.spi_fmem_spiclk_fun_drv().bits(3));
 
             // Set default mspi d0 ~ d7, dqs pin drive strength
             let pins = [27usize, 28, 31, 32, 33, 34, 35, 36, 37];
             for pin in pins {
-                esp32s3::IO_MUX::steal()
-                    .gpio(pin)
-                    .modify(|_, w| w.fun_drv().bits(3));
+                IO_MUX::regs().gpio(pin).modify(|_, w| w.fun_drv().bits(3));
             }
         }
     }
@@ -1298,7 +1310,7 @@ pub(crate) mod utils {
 
     fn set_psram_cs_timing() {
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
+            let spi = SPI0::regs();
             // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time,
             // cs_hold_delay registers for PSRAM, so we only need to set SPI0 related
             // registers here
@@ -1322,22 +1334,22 @@ pub(crate) mod utils {
     fn init_psram_pins() {
         // Set cs1 pin function
         unsafe {
-            esp32s3::IO_MUX::steal()
+            IO_MUX::regs()
                 .gpio(OCT_PSRAM_CS1_IO as usize)
                 .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
         }
 
         // Set mspi cs1 drive strength
         unsafe {
-            esp32s3::IO_MUX::steal()
+            IO_MUX::regs()
                 .gpio(OCT_PSRAM_CS1_IO as usize)
                 .modify(|_, w| w.fun_drv().bits(3));
         }
 
         // Set psram clock pin drive strength
         unsafe {
-            let spi = &*crate::peripherals::SPI0::PTR;
-            spi.date()
+            SPI0::regs()
+                .date()
                 .modify(|_, w| w.spi_smem_spiclk_fun_drv().bits(3));
         }
     }
@@ -1577,10 +1589,8 @@ pub(crate) mod utils {
 
     #[ram]
     fn spi0_timing_config_set_core_clock(core_clock: SpiTimingConfigCoreClock) {
-        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
-
         unsafe {
-            spi.core_clk_sel().modify(|_, w| {
+            SPI0::regs().core_clk_sel().modify(|_, w| {
                 w.core_clk_sel().bits(match core_clock {
                     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m => 0,
                     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock120m => 1,
@@ -1593,45 +1603,48 @@ pub(crate) mod utils {
 
     #[ram]
     fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
-        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
+            SPI0::regs()
+                .clock()
+                .modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
             unsafe {
-                spi.clock().modify(|_, w| w.bits(freqbits));
+                SPI0::regs().clock().modify(|_, w| w.bits(freqbits));
             }
         }
     }
 
     #[ram]
     fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
-        let spi = unsafe { &*crate::peripherals::SPI1::PTR };
         if freqdiv == 1 {
-            spi.clock().modify(|_, w| w.clk_equ_sysclk().set_bit());
+            SPI1::regs()
+                .clock()
+                .modify(|_, w| w.clk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
             unsafe {
-                spi.clock().modify(|_, w| w.bits(freqbits));
+                SPI1::regs().clock().modify(|_, w| w.bits(freqbits));
             }
         }
     }
 
     #[ram]
     fn spi0_timing_config_set_psram_clock(freqdiv: u32) {
-        let spi = unsafe { &*crate::peripherals::SPI0::PTR };
         if freqdiv == 1 {
-            spi.sram_clk().modify(|_, w| w.sclk_equ_sysclk().set_bit());
+            SPI0::regs()
+                .sram_clk()
+                .modify(|_, w| w.sclk_equ_sysclk().set_bit());
         } else {
             let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)
                 | ((freqdiv / 2 - 1) << SPI_MEM_SCLKCNT_H_S)
                 | ((freqdiv - 1) << SPI_MEM_SCLKCNT_L_S);
             unsafe {
-                spi.sram_clk().modify(|_, w| w.bits(freqbits));
+                SPI0::regs().sram_clk().modify(|_, w| w.bits(freqbits));
             }
         }
     }

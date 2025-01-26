@@ -17,7 +17,7 @@
 //!
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::gpio::{Input, Pull};
+//! # use esp_hal::gpio::{Input, InputConfig, Pull};
 //! # use esp_hal::interrupt::Priority;
 //! # use esp_hal::pcnt::{channel, unit, Pcnt};
 //! # use core::{sync::atomic::Ordering, cell::RefCell, cmp::min};
@@ -38,8 +38,9 @@
 //!
 //! // Set up channels with control and edge signals
 //! let ch0 = &u0.channel0;
-//! let pin_a = Input::new(peripherals.GPIO4, Pull::Up);
-//! let pin_b = Input::new(peripherals.GPIO5, Pull::Up);
+//! let config = InputConfig::default().with_pull(Pull::Up);
+//! let pin_a = Input::new(peripherals.GPIO4, config).unwrap();
+//! let pin_b = Input::new(peripherals.GPIO5, config).unwrap();
 //! let (input_a, _) = pin_a.split();
 //! let (input_b, _) = pin_b.split();
 //! ch0.set_ctrl_signal(input_a.clone());
@@ -97,7 +98,7 @@ use self::unit::Unit;
 use crate::{
     interrupt::{self, InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::{self, Interrupt},
+    peripherals::{Interrupt, PCNT},
     system::GenericPeripheralGuard,
 };
 
@@ -106,7 +107,7 @@ pub mod unit;
 
 /// Pulse Counter (PCNT) peripheral driver.
 pub struct Pcnt<'d> {
-    _instance: PeripheralRef<'d, peripherals::PCNT>,
+    _instance: PeripheralRef<'d, PCNT>,
 
     /// Unit 0
     pub unit0: Unit<'d, 0>,
@@ -134,11 +135,11 @@ pub struct Pcnt<'d> {
 
 impl<'d> Pcnt<'d> {
     /// Return a new PCNT
-    pub fn new(_instance: impl Peripheral<P = peripherals::PCNT> + 'd) -> Self {
+    pub fn new(_instance: impl Peripheral<P = PCNT> + 'd) -> Self {
         crate::into_ref!(_instance);
 
         let guard = GenericPeripheralGuard::new();
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
 
         // disable filter, all events, and channel settings
         for unit in pcnt.unit_iter() {

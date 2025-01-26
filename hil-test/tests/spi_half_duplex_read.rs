@@ -1,6 +1,7 @@
 //! SPI Half Duplex Read Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -8,7 +9,7 @@
 use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Level, Output},
+    gpio::{Level, Output, OutputConfig},
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
         DataMode,
@@ -36,7 +37,8 @@ mod tests {
         let sclk = peripherals.GPIO0;
         let (miso, miso_mirror) = hil_test::common_test_pins!(peripherals);
 
-        let miso_mirror = Output::new(miso_mirror, Level::High);
+        let miso_mirror =
+            Output::new(miso_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
@@ -50,7 +52,7 @@ mod tests {
             peripherals.SPI2,
             Config::default()
                 .with_frequency(100.kHz())
-                .with_mode(Mode::Mode0),
+                .with_mode(Mode::_0),
         )
         .unwrap()
         .with_sck(sclk)
@@ -74,7 +76,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                DataMode::Single,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -92,7 +94,7 @@ mod tests {
 
         let transfer = spi
             .half_duplex_read(
-                DataMode::Single,
+                DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
                 0,
@@ -123,7 +125,7 @@ mod tests {
 
         let mut buffer = [0xAA; DMA_BUFFER_SIZE];
         spi.half_duplex_read(
-            DataMode::Single,
+            DataMode::SingleTwoDataLines,
             Command::None,
             Address::None,
             0,
@@ -137,7 +139,7 @@ mod tests {
         ctx.miso_mirror.set_high();
 
         spi.half_duplex_read(
-            DataMode::Single,
+            DataMode::SingleTwoDataLines,
             Command::None,
             Address::None,
             0,

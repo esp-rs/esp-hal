@@ -112,6 +112,11 @@ impl TimerQueue {
             };
 
             if let Some(before) = before {
+                let to_remove = before.next.take().unwrap();
+                let to_remove = Box::into_raw(to_remove);
+                unsafe {
+                    crate::compat::malloc::free(to_remove as *mut _);
+                }
                 before.next = tail;
             }
         }

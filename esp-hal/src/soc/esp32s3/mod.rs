@@ -13,16 +13,17 @@ use core::ptr::addr_of_mut;
 
 use crate::rtc_cntl::SocResetReason;
 
+crate::unstable_module! {
+    pub mod efuse;
+    #[cfg(feature = "psram")]
+    pub mod psram;
+    pub mod radio_clocks;
+    pub mod trng;
+    pub mod ulp_core;
+}
 pub mod cpu_control;
-pub mod efuse;
 pub mod gpio;
 pub mod peripherals;
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
-pub mod psram;
-pub mod radio_clocks;
-pub mod trng;
-
-pub mod ulp_core;
 
 /// The name of the chip ("esp32s3") as `&str`
 #[macro_export]
@@ -49,7 +50,7 @@ pub(crate) mod constants {
 
     /// The starting address of the Remote Control (RMT) module's RAM.
     pub const RMT_RAM_START: usize = 0x60016800;
-    /// The size, in bytes, of each RMT channel's dedicated RAM.
+    /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
     /// RMT Clock source value.
     pub const RMT_CLOCK_SRC: u8 = 1;

@@ -11,20 +11,27 @@
 //! `RadioClockControl` struct. This trait provides methods to enable, disable,
 //! reset the MAC, initialize clocks and perform other related operations.
 
-use crate::system::{RadioClockController, RadioPeripherals};
+use crate::{
+    peripherals::{MODEM_LPCON, MODEM_SYSCON, PMU},
+    system::{RadioClockController, RadioPeripherals},
+};
 
 impl RadioClockController for crate::peripherals::RADIO_CLK {
     fn enable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
-            RadioPeripherals::Phy => enable_phy(),
-            RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => ble_ieee802154_clock_enable(),
+            RadioPeripherals::Phy => enable_phy(true),
+            RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => {
+                ble_ieee802154_clock_enable(true)
+            }
         }
     }
 
     fn disable(&mut self, peripheral: RadioPeripherals) {
         match peripheral {
-            RadioPeripherals::Phy => disable_phy(),
-            RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => ble_ieee802154_clock_disable(),
+            RadioPeripherals::Phy => enable_phy(false),
+            RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => {
+                ble_ieee802154_clock_enable(false)
+            }
         }
     }
 
@@ -45,75 +52,31 @@ impl RadioClockController for crate::peripherals::RADIO_CLK {
     }
 }
 
-fn enable_phy() {
-    unsafe { &*esp32h2::MODEM_LPCON::PTR }
+fn enable_phy(en: bool) {
+    MODEM_LPCON::regs()
         .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
+        .modify(|_, w| w.clk_i2c_mst_en().bit(en));
 }
 
-fn disable_phy() {
-    unsafe { &*esp32h2::MODEM_LPCON::PTR }
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().clear_bit());
-}
-
-fn ble_ieee802154_clock_enable() {
-    let modem_syscon = unsafe { &*esp32h2::MODEM_SYSCON::PTR };
-
-    modem_syscon
-        .clk_conf()
-        .modify(|_, w| w.clk_zb_apb_en().set_bit().clk_zb_mac_en().set_bit());
-
-    modem_syscon.clk_conf1().modify(|_, w| {
-        w.clk_bt_apb_en()
-            .set_bit()
-            .clk_bt_en()
-            .set_bit()
-            .clk_fe_16m_en()
-            .set_bit()
-            .clk_fe_32m_en()
-            .set_bit()
-            .clk_fe_adc_en()
-            .set_bit()
-            .clk_fe_apb_en()
-            .set_bit()
-            .clk_fe_sdm_en()
-            .set_bit()
+fn ble_ieee802154_clock_enable(en: bool) {
+    MODEM_SYSCON::regs().clk_conf().modify(|_, w| {
+        w.clk_zb_apb_en().bit(en);
+        w.clk_zb_mac_en().bit(en)
     });
 
-    unsafe { &*esp32h2::MODEM_LPCON::PTR }
-        .clk_conf()
-        .modify(|_, w| w.clk_coex_en().set_bit());
-}
-
-fn ble_ieee802154_clock_disable() {
-    let modem_lpcon = unsafe { &*esp32h2::MODEM_LPCON::PTR };
-    let modem_syscon = unsafe { &*esp32h2::MODEM_SYSCON::PTR };
-
-    modem_syscon
-        .clk_conf()
-        .modify(|_, w| w.clk_zb_apb_en().clear_bit().clk_zb_mac_en().clear_bit());
-
-    modem_syscon.clk_conf1().modify(|_, w| {
-        w.clk_bt_apb_en()
-            .clear_bit()
-            .clk_bt_en()
-            .clear_bit()
-            .clk_fe_16m_en()
-            .clear_bit()
-            .clk_fe_32m_en()
-            .clear_bit()
-            .clk_fe_adc_en()
-            .clear_bit()
-            .clk_fe_apb_en()
-            .clear_bit()
-            .clk_fe_sdm_en()
-            .clear_bit()
+    MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
+        w.clk_bt_apb_en().bit(en);
+        w.clk_bt_en().bit(en);
+        w.clk_fe_16m_en().bit(en);
+        w.clk_fe_32m_en().bit(en);
+        w.clk_fe_adc_en().bit(en);
+        w.clk_fe_apb_en().bit(en);
+        w.clk_fe_sdm_en().bit(en)
     });
 
-    modem_lpcon
+    MODEM_LPCON::regs()
         .clk_conf()
-        .modify(|_, w| w.clk_coex_en().clear_bit());
+        .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
 fn reset_mac() {
@@ -122,7 +85,7 @@ fn reset_mac() {
 
 fn init_clocks() {
     unsafe {
-        let pmu = &*esp32h2::PMU::PTR;
+        let pmu = PMU::regs();
 
         pmu.hp_sleep_icg_modem()
             .modify(|_, w| w.hp_sleep_dig_icg_modem_code().bits(0));
@@ -135,7 +98,7 @@ fn init_clocks() {
         pmu.imm_sleep_sysclk()
             .write(|w| w.update_dig_icg_switch().set_bit());
 
-        (*esp32h2::MODEM_LPCON::PTR).clk_conf().modify(|_, w| {
+        MODEM_LPCON::regs().clk_conf().modify(|_, w| {
             w.clk_i2c_mst_en()
                 .set_bit()
                 .clk_coex_en()

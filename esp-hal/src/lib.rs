@@ -70,17 +70,18 @@
 //! use esp_hal::{
 //!     clock::CpuClock,
 //!     delay::Delay,
-//!     entry,
-//!     gpio::{Io, Level, Output},
+//!     gpio::{Io, Level, Output, OutputConfig},
+//!     main,
 //! };
 //!
-//! #[entry]
+//! #[main]
 //! fn main() -> ! {
 //!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //!     let peripherals = esp_hal::init(config);
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let mut led = Output::new(peripherals.GPIO0, Level::High);
+//!     let config = OutputConfig::default().with_level(Level::High);
+//!     let mut led = Output::new(peripherals.GPIO0, config).unwrap();
 //!
 //!     let delay = Delay::new();
 //!
@@ -136,48 +137,51 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![deny(missing_docs, rust_2018_idioms)]
+#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
 
 // MUST be the first module
 mod fmt;
 
-pub mod asynch;
+use core::marker::PhantomData;
 
 #[cfg(riscv)]
-pub use esp_riscv_rt::{self, entry, riscv};
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use esp_riscv_rt::{self, riscv};
 #[cfg(xtensa)]
-pub use xtensa_lx;
-#[cfg(xtensa)]
-pub use xtensa_lx_rt::{self, entry};
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use xtensa_lx_rt::{self, xtensa_lx};
 
 // TODO what should we reexport stably?
 #[cfg(any(esp32, esp32s3))]
 pub use self::soc::cpu_control;
 #[cfg(efuse)]
+#[instability::unstable]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::efuse;
 #[cfg(lp_core)]
+#[instability::unstable]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::lp_core;
 pub use self::soc::peripherals;
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+pub(crate) use self::soc::peripherals::pac;
+#[instability::unstable]
+#[cfg(feature = "psram")]
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
+#[instability::unstable]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::ulp_core;
 
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
-
-pub mod config;
-
-#[cfg(any(xtensa, all(riscv, systimer)))]
-pub mod delay;
 #[cfg(gpio)]
 pub mod gpio;
 #[cfg(any(i2c0, i2c1))]
 pub mod i2c;
-#[cfg(any(dport, interrupt_core0, interrupt_core1))]
-pub mod interrupt;
 pub mod peripheral;
 #[cfg(any(hmac, sha))]
 mod reg_access;
@@ -186,13 +190,17 @@ pub mod spi;
 #[cfg(any(uart0, uart1, uart2))]
 pub mod uart;
 
-pub mod macros;
-pub mod rom;
+mod macros;
 
-pub mod debugger;
-#[doc(hidden)]
-pub mod sync;
-pub mod time;
+pub use procmacros::blocking_main as main;
+#[cfg(any(lp_core, ulp_riscv_core))]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use procmacros::load_lp_code;
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
+pub use procmacros::{handler, ram};
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
@@ -223,8 +231,13 @@ unstable_module! {
     pub mod aes;
     #[cfg(any(adc, dac))]
     pub mod analog;
+    pub mod asynch;
     #[cfg(assist_debug)]
     pub mod assist_debug;
+    pub mod config;
+    pub mod debugger;
+    #[cfg(any(xtensa, all(riscv, systimer)))]
+    pub mod delay;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
     #[cfg(ecc)]
@@ -235,6 +248,8 @@ unstable_module! {
     pub mod hmac;
     #[cfg(any(i2s0, i2s1))]
     pub mod i2s;
+    #[cfg(any(dport, interrupt_core0, interrupt_core1))]
+    pub mod interrupt;
     #[cfg(lcd_cam)]
     pub mod lcd_cam;
     #[cfg(ledc)]
@@ -253,20 +268,26 @@ unstable_module! {
     pub mod rmt;
     #[cfg(rng)]
     pub mod rng;
+    pub mod rom;
     #[cfg(rsa)]
     pub mod rsa;
     #[cfg(any(lp_clkrst, rtc_cntl))]
     pub mod rtc_cntl;
     #[cfg(sha)]
     pub mod sha;
+    #[doc(hidden)]
+    pub mod sync;
     #[cfg(any(dport, hp_sys, pcr, system))]
     pub mod system;
+    pub mod time;
     #[cfg(any(systimer, timg0, timg1))]
     pub mod timer;
     #[cfg(touch)]
     pub mod touch;
     #[cfg(trace0)]
     pub mod trace;
+    #[cfg(tsens)]
+    pub mod tsens;
     #[cfg(any(twai0, twai1))]
     pub mod twai;
     #[cfg(usb_device)]
@@ -303,7 +324,9 @@ pub struct Blocking;
 
 /// Driver initialized in async mode.
 #[derive(Debug)]
-pub struct Async;
+pub struct Async(PhantomData<*const ()>);
+
+unsafe impl Sync for Async {}
 
 impl crate::DriverMode for Blocking {}
 impl crate::DriverMode for Async {}
@@ -349,6 +372,7 @@ pub use private::Internal;
 ///   reset occurs during a write or a reset interrupts the zero initialization
 ///   on first boot.
 /// - Structs must contain only `Persistable` fields and padding
+#[instability::unstable]
 pub unsafe trait Persistable: Sized {}
 
 macro_rules! impl_persistable {
@@ -367,10 +391,18 @@ unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}
 
 #[doc(hidden)]
 pub mod __macro_implementation {
-    //! Unstable private implementation details of esp-hal-procmacros.
+    //! Private implementation details of esp-hal-procmacros.
 
+    #[instability::unstable]
     pub const fn assert_is_zeroable<T: bytemuck::Zeroable>() {}
+
+    #[instability::unstable]
     pub const fn assert_is_persistable<T: super::Persistable>() {}
+
+    #[cfg(riscv)]
+    pub use esp_riscv_rt::entry as __entry;
+    #[cfg(xtensa)]
+    pub use xtensa_lx_rt::entry as __entry;
 }
 
 /// Available CPU cores
@@ -491,9 +523,10 @@ unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
 }
 
+#[cfg(feature = "unstable")]
+use crate::config::{WatchdogConfig, WatchdogStatus};
 use crate::{
     clock::{Clocks, CpuClock},
-    config::{WatchdogConfig, WatchdogStatus},
     peripherals::Peripherals,
 };
 
@@ -512,10 +545,14 @@ pub struct Config {
     pub cpu_clock: CpuClock,
 
     /// Enable watchdog timer(s).
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
-    #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    #[cfg(feature = "psram")]
     pub psram: psram::PsramConfig,
 }
 
@@ -531,44 +568,62 @@ pub fn init(config: Config) -> Peripherals {
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
 
-    #[cfg(not(any(esp32, esp32s2)))]
-    if config.watchdog.swd {
-        rtc.swd.enable();
-    } else {
-        rtc.swd.disable();
-    }
+    // Handle watchdog configuration with defaults
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "unstable")]
+        {
+            #[cfg(not(any(esp32, esp32s2)))]
+            if config.watchdog.swd {
+                rtc.swd.enable();
+            } else {
+                rtc.swd.disable();
+            }
 
-    match config.watchdog.rwdt {
-        WatchdogStatus::Enabled(duration) => {
-            rtc.rwdt.enable();
-            rtc.rwdt
-                .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
+            match config.watchdog.rwdt {
+                WatchdogStatus::Enabled(duration) => {
+                    rtc.rwdt.enable();
+                    rtc.rwdt
+                        .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
+                }
+                WatchdogStatus::Disabled => {
+                    rtc.rwdt.disable();
+                }
+            }
+
+            match config.watchdog.timg0 {
+                WatchdogStatus::Enabled(duration) => {
+                    let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new();
+                    timg0_wd.enable();
+                    timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
+                }
+                WatchdogStatus::Disabled => {
+                    crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new().disable();
+                }
+            }
+
+            #[cfg(timg1)]
+            match config.watchdog.timg1 {
+                WatchdogStatus::Enabled(duration) => {
+                    let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new();
+                    timg1_wd.enable();
+                    timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
+                }
+                WatchdogStatus::Disabled => {
+                    crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new().disable();
+                }
+            }
         }
-        WatchdogStatus::Disabled => {
+        else
+        {
+            #[cfg(not(any(esp32, esp32s2)))]
+            rtc.swd.disable();
+
             rtc.rwdt.disable();
-        }
-    }
 
-    match config.watchdog.timg0 {
-        WatchdogStatus::Enabled(duration) => {
-            let mut timg0_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new();
-            timg0_wd.enable();
-            timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
-        }
-        WatchdogStatus::Disabled => {
-            crate::timer::timg::Wdt::<self::peripherals::TIMG0>::new().disable();
-        }
-    }
+            crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new().disable();
 
-    #[cfg(timg1)]
-    match config.watchdog.timg1 {
-        WatchdogStatus::Enabled(duration) => {
-            let mut timg1_wd = crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new();
-            timg1_wd.enable();
-            timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
-        }
-        WatchdogStatus::Disabled => {
-            crate::timer::timg::Wdt::<self::peripherals::TIMG1>::new().disable();
+            #[cfg(timg1)]
+            crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new().disable();
         }
     }
 
@@ -579,7 +634,7 @@ pub fn init(config: Config) -> Peripherals {
 
     crate::gpio::bind_default_interrupt_handler();
 
-    #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+    #[cfg(feature = "psram")]
     crate::psram::init_psram(config.psram);
 
     peripherals

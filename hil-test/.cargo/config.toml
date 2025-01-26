@@ -18,6 +18,7 @@ rustflags = [
 
 [env]
 DEFMT_LOG = "info"
+ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE="multiple-integrated"
 
 [unstable]
 build-std = ["core"]

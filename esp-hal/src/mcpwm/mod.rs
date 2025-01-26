@@ -84,8 +84,6 @@
 //! # }
 //! ```
 
-use core::ops::Deref;
-
 use fugit::HertzU32;
 use operator::Operator;
 use timer::Timer;
@@ -93,6 +91,7 @@ use timer::Timer;
 use crate::{
     clock::Clocks,
     gpio::OutputSignal,
+    pac,
     peripheral::{Peripheral, PeripheralRef},
     system::{self, PeripheralGuard},
 };
@@ -102,7 +101,7 @@ pub mod operator;
 /// MCPWM timers
 pub mod timer;
 
-type RegisterBlock = crate::peripherals::mcpwm0::RegisterBlock;
+type RegisterBlock = pac::mcpwm0::RegisterBlock;
 
 /// The MCPWM peripheral
 #[non_exhaustive]
@@ -136,18 +135,20 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
 
         #[cfg(not(esp32c6))]
         {
+            let register_block = unsafe { &*PWM::block() };
+
             // set prescaler
-            peripheral
+            register_block
                 .clk_cfg()
                 .write(|w| unsafe { w.clk_prescale().bits(peripheral_clock.prescaler) });
 
             // enable clock
-            peripheral.clk().write(|w| w.en().set_bit());
+            register_block.clk().write(|w| w.en().set_bit());
         }
 
         #[cfg(esp32c6)]
         {
-            unsafe { &*crate::peripherals::PCR::PTR }
+            crate::peripherals::PCR::regs()
                 .pwm_clk_conf()
                 .modify(|_, w| unsafe {
                     w.pwm_div_num()
@@ -161,7 +162,7 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
 
         #[cfg(esp32h2)]
         {
-            unsafe { &*crate::peripherals::PCR::PTR }
+            crate::peripherals::PCR::regs()
                 .pwm_clk_conf()
                 .modify(|_, w| unsafe {
                     w.pwm_div_num()
@@ -313,7 +314,7 @@ impl PeripheralClockConfig {
 pub struct FrequencyError;
 
 /// A MCPWM peripheral
-pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed {
+pub trait PwmPeripheral: crate::private::Sealed {
     /// Get a pointer to the peripheral RegisterBlock
     fn block() -> *const RegisterBlock;
     /// Get operator GPIO mux output signal
@@ -325,7 +326,7 @@ pub trait PwmPeripheral: Deref<Target = RegisterBlock> + crate::private::Sealed 
 #[cfg(mcpwm0)]
 impl PwmPeripheral for crate::peripherals::MCPWM0 {
     fn block() -> *const RegisterBlock {
-        Self::PTR
+        Self::regs()
     }
 
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
@@ -348,7 +349,7 @@ impl PwmPeripheral for crate::peripherals::MCPWM0 {
 #[cfg(mcpwm1)]
 impl PwmPeripheral for crate::peripherals::MCPWM1 {
     fn block() -> *const RegisterBlock {
-        Self::PTR
+        Self::regs()
     }
 
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {

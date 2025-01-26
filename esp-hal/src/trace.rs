@@ -34,8 +34,8 @@
 //! ```
 
 use crate::{
+    pac::trace::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    peripherals::trace::RegisterBlock,
     system::PeripheralGuard,
 };
 
@@ -207,6 +207,7 @@ where
 }
 
 /// Trace peripheral instance
+#[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
     /// Get a reference to the peripheral's underlying register block
     fn register_block(&self) -> &RegisterBlock;
@@ -217,7 +218,7 @@ pub trait Instance: crate::private::Sealed {
 
 impl Instance for crate::peripherals::TRACE0 {
     fn register_block(&self) -> &RegisterBlock {
-        self
+        self.register_block()
     }
 
     fn peripheral(&self) -> crate::system::Peripheral {

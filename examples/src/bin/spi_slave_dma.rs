@@ -34,20 +34,36 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     dma_buffers,
-    entry,
-    gpio::{Input, Level, Output, Pull},
+    gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
+    main,
     spi::{slave::Spi, Mode},
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut master_sclk = Output::new(peripherals.GPIO4, Level::Low);
-    let master_miso = Input::new(peripherals.GPIO5, Pull::None);
-    let mut master_mosi = Output::new(peripherals.GPIO8, Level::Low);
-    let mut master_cs = Output::new(peripherals.GPIO9, Level::High);
+    let mut master_sclk = Output::new(
+        peripherals.GPIO4,
+        OutputConfig::default().with_level(Level::Low),
+    )
+    .unwrap();
+    let master_miso = Input::new(
+        peripherals.GPIO5,
+        InputConfig::default().with_pull(Pull::None),
+    )
+    .unwrap();
+    let mut master_mosi = Output::new(
+        peripherals.GPIO8,
+        OutputConfig::default().with_level(Level::Low),
+    )
+    .unwrap();
+    let mut master_cs = Output::new(
+        peripherals.GPIO9,
+        OutputConfig::default().with_level(Level::High),
+    )
+    .unwrap();
 
     let slave_sclk = peripherals.GPIO0;
     let slave_miso = peripherals.GPIO1;
@@ -64,7 +80,7 @@ fn main() -> ! {
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 
-    let mut spi = Spi::new(peripherals.SPI2, Mode::Mode0)
+    let mut spi = Spi::new(peripherals.SPI2, Mode::_0)
         .with_sck(slave_sclk)
         .with_mosi(slave_mosi)
         .with_miso(slave_miso)

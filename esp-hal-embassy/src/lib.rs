@@ -29,10 +29,23 @@
 //! Embassy **must** be initialized by calling the [init] function. This
 //! initialization must be performed *prior* to spawning any tasks.
 //!
+//! Initialization requires a number of timers to be passed in. The number of
+//! timers required depends on the timer queue flavour used, as well as the
+//! number of executors started. If you use the `multiple-integrated` timer
+//! queue flavour, then you need to pass as many timers as you start executors.
+//! In other cases, you can pass a single timer.
+//!
+//! ## Configuration
+//!
+//! You can configure the behaviour of the embassy runtime by using the
+//! following environment variables:
+#![doc = ""]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_hal_embassy_config_table.md"))]
+#![doc = ""]
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
-#![deny(missing_docs)]
+#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![no_std]
 
@@ -42,15 +55,16 @@ mod fmt;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
 use esp_hal::timer::{timg::Timer as TimgTimer, AnyTimer};
-pub use macros::main;
+pub use macros::embassy_main as main;
 
 #[cfg(feature = "executors")]
 pub use self::executor::{Executor, InterruptExecutor};
 use self::time_driver::{EmbassyTimer, Timer};
 
 #[cfg(feature = "executors")]
-mod executor;
+pub(crate) mod executor;
 mod time_driver;
+mod timer_queue;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -142,8 +156,9 @@ impl_array!(4);
 /// - A mutable static array of `OneShotTimer` instances
 /// - A 2, 3, 4 element array of `AnyTimer` instances
 ///
-/// Note that if you use the `integrated-timers` feature,
-/// you need to pass as many timers as you start executors.
+/// Note that if you use the `multiple-integrated` timer-queue flavour, then
+/// you need to pass as many timers as you start executors. In other cases,
+/// you can pass a single timer.
 ///
 /// # Examples
 ///
@@ -158,5 +173,24 @@ impl_array!(4);
 /// # }
 /// ```
 pub fn init(time_driver: impl TimerCollection) {
+    #[cfg(all(feature = "executors", multi_core, low_power_wait))]
+    unsafe {
+        use esp_hal::interrupt::software::SoftwareInterrupt;
+
+        #[esp_hal::ram]
+        extern "C" fn software3_interrupt() {
+            // This interrupt is fired when the thread-mode executor's core needs to be
+            // woken. It doesn't matter which core handles this interrupt first, the
+            // point is just to wake up the core that is currently executing
+            // `waiti`.
+            unsafe { SoftwareInterrupt::<3>::steal().reset() };
+        }
+
+        esp_hal::interrupt::bind_interrupt(
+            esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
+            software3_interrupt,
+        );
+    }
+
     EmbassyTimer::init(time_driver.timers())
 }

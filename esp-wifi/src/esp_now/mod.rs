@@ -18,7 +18,7 @@ use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 #[cfg(not(coex))]
 use crate::config::PowerSaveMode;
-#[cfg(csi_enable)]
+#[cfg(feature = "csi")]
 use crate::wifi::CsiConfig;
 use crate::{
     binary::include::*,
@@ -61,6 +61,7 @@ macro_rules! check_error {
 #[repr(u32)]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names)] // FIXME avoid Error suffix, could use better names
 pub enum Error {
     /// ESP-NOW is not initialized.
     NotInitialized  = 12389,
@@ -262,7 +263,7 @@ impl ReceivedData {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for ReceivedData {
-    fn format(&self, fmt: defmt::Formatter) {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(fmt, "ReceivedData {}, Info {}", &self.data[..], &self.info,)
     }
 }
@@ -372,7 +373,7 @@ impl EspNowManager<'_> {
     }
 
     /// Set CSI configuration and register the receiving callback.
-    #[cfg(csi_enable)]
+    #[cfg(feature = "csi")]
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,

@@ -8,7 +8,8 @@ use super::{
 };
 use crate::{
     gpio::{RtcFunction, RtcPin},
-    regi2c_write_mask,
+    peripherals::{APB_CTRL, EXTMEM, LPWR, RTC_IO, SPI0, SPI1, SYSTEM},
+    rom::regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
 };
 
@@ -115,7 +116,7 @@ impl WakeSource for TimerWakeupSource {
         _sleep_config: &mut RtcSleepConfig,
     ) {
         triggers.set_timer(true);
-        let rtc_cntl = unsafe { &*esp32s3::RTC_CNTL::ptr() };
+        let rtc_cntl = LPWR::regs();
         let clock_freq = RtcClock::slow_freq();
         // TODO: maybe add sleep time adjustlemnt like idf
         // TODO: maybe add check to prevent overflow?
@@ -160,13 +161,13 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
             .rtc_set_config(true, true, RtcFunction::Rtc);
 
         unsafe {
-            let rtc_io = &*esp32s3::RTC_IO::ptr();
+            let rtc_io = RTC_IO::regs();
             // set pin register field
             rtc_io
                 .ext_wakeup0()
                 .modify(|_, w| w.sel().bits(self.pin.borrow().rtc_number()));
             // set level register field
-            let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
+            let rtc_cntl = LPWR::regs();
             rtc_cntl
                 .ext_wakeup_conf()
                 .modify(|_r, w| w.ext_wakeup0_lv().bit(self.level == WakeupLevel::High));
@@ -205,7 +206,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         }
 
         unsafe {
-            let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
+            let rtc_cntl = LPWR::regs();
             // clear previous wakeup status
             rtc_cntl
                 .ext_wakeup1()
@@ -236,7 +237,7 @@ impl Drop for Ext1WakeupSource<'_, '_> {
 
 impl RtcioWakeupSource<'_, '_> {
     fn apply_pin(&self, pin: &mut dyn RtcPin, level: WakeupLevel) {
-        let rtcio = unsafe { &*crate::peripherals::RTC_IO::PTR };
+        let rtcio = RTC_IO::regs();
 
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
@@ -267,7 +268,7 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
         triggers.set_gpio(true);
 
         // Since we only use RTCIO pins, we can keep deep sleep enabled.
-        let sens = unsafe { &*crate::peripherals::SENS::PTR };
+        let sens = crate::peripherals::SENS::regs();
 
         // TODO: disable clock when not in use
         sens.sar_peri_clk_gate_conf()
@@ -359,7 +360,7 @@ const SYSCON_SRAM_POWER_UP: u16 = 0x7FF;
 const SYSCON_ROM_POWER_UP: u8 = 0x7;
 
 fn rtc_sleep_pu(val: bool) {
-    let rtc_cntl = unsafe { &*esp32s3::RTC_CNTL::ptr() };
+    let rtc_cntl = LPWR::regs();
     let syscon = unsafe { &*esp32s3::APB_CTRL::ptr() };
     let bb = unsafe { &*esp32s3::BB::ptr() };
     let nrx = unsafe { &*esp32s3::NRX::ptr() };
@@ -450,10 +451,10 @@ impl RtcSleepConfig {
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
         // settings derived from esp_clk_init -> rtc_init
         unsafe {
-            let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
-            let syscon = &*esp32s3::APB_CTRL::ptr();
-            let extmem = &*esp32s3::EXTMEM::ptr();
-            let system = &*esp32s3::SYSTEM::ptr();
+            let rtc_cntl = LPWR::regs();
+            let syscon = APB_CTRL::regs();
+            let extmem = EXTMEM::regs();
+            let system = SYSTEM::regs();
 
             rtc_cntl
                 .dig_pwc()
@@ -563,10 +564,10 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.icache_tag_mem_force_on().clear_bit());
 
             // clear register clock force on
-            (*esp32s3::SPI0::ptr())
+            SPI0::regs()
                 .clock_gate()
                 .modify(|_, w| w.clk_en().clear_bit());
-            (*esp32s3::SPI1::ptr())
+            SPI1::regs()
                 .clock_gate()
                 .modify(|_, w| w.clk_en().clear_bit());
 
@@ -725,7 +726,7 @@ impl RtcSleepConfig {
 
     pub(crate) fn apply(&self) {
         // like esp-idf rtc_sleep_init()
-        let rtc_cntl = unsafe { &*esp32s3::RTC_CNTL::ptr() };
+        let rtc_cntl = LPWR::regs();
 
         if self.lslp_mem_inf_fpu() {
             rtc_sleep_pu(true);
@@ -782,14 +783,10 @@ impl RtcSleepConfig {
 
         if self.rtc_peri_pd_en() {
             rtc_cntl.pwc().modify(|_, w| {
-                w.force_noiso()
-                    .clear_bit()
-                    .force_iso()
-                    .clear_bit()
-                    .force_pu()
-                    .clear_bit()
-                    .pd_en()
-                    .set_bit()
+                w.force_noiso().clear_bit();
+                w.force_iso().clear_bit();
+                w.force_pu().clear_bit();
+                w.pd_en().set_bit()
             });
         } else {
             rtc_cntl.pwc().modify(|_, w| w.pd_en().clear_bit());
@@ -809,18 +806,13 @@ impl RtcSleepConfig {
             );
 
             rtc_cntl.bias_conf().modify(|_, w| {
-                w.dbg_atten_deep_slp()
-                    .bits(self.dbg_atten_slp())
-                    .bias_sleep_deep_slp()
-                    .bit(self.bias_sleep_slp())
-                    .pd_cur_deep_slp()
-                    .bit(self.pd_cur_slp())
-                    .dbg_atten_monitor()
-                    .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT)
-                    .bias_sleep_monitor()
-                    .bit(self.bias_sleep_monitor())
-                    .pd_cur_monitor()
-                    .bit(self.pd_cur_monitor())
+                w.dbg_atten_deep_slp().bits(self.dbg_atten_slp());
+                w.bias_sleep_deep_slp().bit(self.bias_sleep_slp());
+                w.pd_cur_deep_slp().bit(self.pd_cur_slp());
+                w.dbg_atten_monitor()
+                    .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT);
+                w.bias_sleep_monitor().bit(self.bias_sleep_monitor());
+                w.pd_cur_monitor().bit(self.pd_cur_monitor())
             });
 
             if self.deep_slp() {
@@ -829,14 +821,10 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.dg_wrap_pd_en().set_bit());
 
                 rtc_cntl.ana_conf().modify(|_, w| {
-                    w.ckgen_i2c_pu()
-                        .clear_bit()
-                        .pll_i2c_pu()
-                        .clear_bit()
-                        .rfrx_pbus_pu()
-                        .clear_bit()
-                        .txrf_i2c_pu()
-                        .clear_bit()
+                    w.ckgen_i2c_pu().clear_bit();
+                    w.pll_i2c_pu().clear_bit();
+                    w.rfrx_pbus_pu().clear_bit();
+                    w.txrf_i2c_pu().clear_bit()
                 });
 
                 rtc_cntl
@@ -869,17 +857,13 @@ impl RtcSleepConfig {
             // enable VDDSDIO control by state machine
 
             rtc_cntl.sdio_conf().modify(|_, w| {
-                w.sdio_force()
-                    .clear_bit()
-                    .sdio_reg_pd_en()
-                    .bit(self.vddsdio_pd_en())
+                w.sdio_force().clear_bit();
+                w.sdio_reg_pd_en().bit(self.vddsdio_pd_en())
             });
 
             rtc_cntl.slp_reject_conf().modify(|_, w| {
-                w.deep_slp_reject_en()
-                    .bit(self.deep_slp_reject())
-                    .light_slp_reject_en()
-                    .bit(self.light_slp_reject())
+                w.deep_slp_reject_en().bit(self.deep_slp_reject());
+                w.light_slp_reject_en().bit(self.light_slp_reject())
             });
 
             // Set wait cycle for touch or COCPU after deep sleep and light
@@ -902,18 +886,16 @@ impl RtcSleepConfig {
 
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
         unsafe {
-            let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
-
-            rtc_cntl
+            LPWR::regs()
                 .reset_state()
                 .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
 
             // set bits for what can wake us up
-            rtc_cntl
+            LPWR::regs()
                 .wakeup_state()
                 .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
 
-            rtc_cntl
+            LPWR::regs()
                 .state0()
                 .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
         }
@@ -922,9 +904,7 @@ impl RtcSleepConfig {
     pub(crate) fn finish_sleep(&self) {
         // In deep sleep mode, we never get here
         unsafe {
-            let rtc_cntl = &*esp32s3::RTC_CNTL::ptr();
-
-            rtc_cntl.int_clr().write(|w| {
+            LPWR::regs().int_clr().write(|w| {
                 w.slp_reject()
                     .clear_bit_by_one()
                     .slp_wakeup()
@@ -938,7 +918,7 @@ impl RtcSleepConfig {
 
             // Recover default wait cycle for touch or COCPU after wakeup.
 
-            rtc_cntl.timer2().modify(|_, w| {
+            LPWR::regs().timer2().modify(|_, w| {
                 w.ulpcp_touch_start_wait()
                     .bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT)
             });

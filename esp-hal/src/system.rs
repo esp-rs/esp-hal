@@ -132,6 +132,9 @@ pub enum Peripheral {
     /// Systimer peripheral.
     #[cfg(systimer)]
     Systimer,
+    /// Temperature sensor peripheral.
+    #[cfg(tsens)]
+    Tsens,
 }
 
 impl Peripheral {
@@ -232,7 +235,7 @@ impl PeripheralClockControl {
     fn enable_internal(peripheral: Peripheral, enable: bool, _cs: CriticalSection<'_>) {
         debug!("Enable {:?} {}", peripheral, enable);
 
-        let system = unsafe { &*SYSTEM::PTR };
+        let system = SYSTEM::regs();
 
         #[cfg(esp32)]
         let (perip_clk_en0, peri_clk_en) = { (&system.perip_clk_en(), &system.peri_clk_en()) };
@@ -398,13 +401,17 @@ impl PeripheralClockControl {
             Peripheral::Systimer => {
                 perip_clk_en0.modify(|_, w| w.systimer_clk_en().bit(enable));
             }
+            #[cfg(tsens)]
+            Peripheral::Tsens => {
+                perip_clk_en1.modify(|_, w| w.tsens_clk_en().bit(enable));
+            }
         }
     }
 
     /// Resets the given peripheral
     pub(crate) fn reset(peripheral: Peripheral) {
         debug!("Reset {:?}", peripheral);
-        let system = unsafe { SYSTEM::steal() };
+        let system = SYSTEM::regs();
 
         #[cfg(esp32)]
         let (perip_rst_en0, peri_rst_en) = (system.perip_rst_en(), system.peri_rst_en());
@@ -610,6 +617,16 @@ impl PeripheralClockControl {
                 perip_rst_en0.modify(|_, w| w.systimer_rst().set_bit());
                 perip_rst_en0.modify(|_, w| w.systimer_rst().clear_bit());
             }
+            #[cfg(all(tsens, esp32c6))]
+            Peripheral::Tsens => {
+                perip_rst_en0.modify(|_, w| w.tsens_rst().set_bit());
+                perip_rst_en0.modify(|_, w| w.tsens_rst().clear_bit());
+            }
+            #[cfg(all(tsens, esp32c3))]
+            Peripheral::Tsens => {
+                perip_rst_en1.modify(|_, w| w.tsens_rst().set_bit());
+                perip_rst_en1.modify(|_, w| w.tsens_rst().clear_bit());
+            }
         });
     }
 }
@@ -618,7 +635,7 @@ impl PeripheralClockControl {
 impl PeripheralClockControl {
     fn enable_internal(peripheral: Peripheral, enable: bool, _cs: CriticalSection<'_>) {
         debug!("Enable {:?} {}", peripheral, enable);
-        let system = unsafe { &*SYSTEM::PTR };
+        let system = SYSTEM::regs();
 
         match peripheral {
             #[cfg(spi2)]
@@ -778,6 +795,16 @@ impl PeripheralClockControl {
                     .systimer_conf()
                     .modify(|_, w| w.systimer_clk_en().bit(enable));
             }
+            #[cfg(tsens)]
+            Peripheral::Tsens => {
+                system
+                    .tsens_clk_conf()
+                    .modify(|_, w| w.tsens_clk_en().bit(enable));
+
+                system
+                    .tsens_clk_conf()
+                    .modify(|_, w| w.tsens_clk_sel().bit(enable));
+            }
         }
     }
 
@@ -785,7 +812,7 @@ impl PeripheralClockControl {
     pub(crate) fn reset(peripheral: Peripheral) {
         debug!("Reset {:?}", peripheral);
 
-        let system = unsafe { &*SYSTEM::PTR };
+        let system = SYSTEM::regs();
 
         match peripheral {
             #[cfg(spi2)]
@@ -977,6 +1004,15 @@ impl PeripheralClockControl {
                     .systimer_conf()
                     .modify(|_, w| w.systimer_rst_en().clear_bit());
             }
+            #[cfg(tsens)]
+            Peripheral::Tsens => {
+                system
+                    .tsens_clk_conf()
+                    .modify(|_, w| w.tsens_rst_en().set_bit());
+                system
+                    .tsens_clk_conf()
+                    .modify(|_, w| w.tsens_rst_en().clear_bit());
+            }
         }
     }
 }
@@ -1030,12 +1066,14 @@ impl PeripheralClockControl {
             if enable {
                 let prev = *ref_count;
                 *ref_count += 1;
+                trace!("Enable {:?} {} -> {}", peripheral, prev, *ref_count);
                 if prev > 0 {
                     return false;
                 }
             } else {
                 let prev = *ref_count;
                 *ref_count -= 1;
+                trace!("Disable {:?} {} -> {}", peripheral, prev, *ref_count);
                 if prev > 1 {
                     return false;
                 }

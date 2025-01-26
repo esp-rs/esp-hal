@@ -100,10 +100,10 @@ impl Efuse {
 
         // See <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c6/esp_efuse_table.csv#L147-L152>
         let init_code: u16 = Self::read_field_le(match atten {
-            Attenuation::Attenuation0dB => ADC1_INIT_CODE_ATTEN0,
-            Attenuation::Attenuation2p5dB => ADC1_INIT_CODE_ATTEN1,
-            Attenuation::Attenuation6dB => ADC1_INIT_CODE_ATTEN2,
-            Attenuation::Attenuation11dB => ADC1_INIT_CODE_ATTEN3,
+            Attenuation::_0dB => ADC1_INIT_CODE_ATTEN0,
+            Attenuation::_2p5dB => ADC1_INIT_CODE_ATTEN1,
+            Attenuation::_6dB => ADC1_INIT_CODE_ATTEN2,
+            Attenuation::_11dB => ADC1_INIT_CODE_ATTEN3,
         });
 
         Some(init_code + 1600) // version 1 logic
@@ -114,10 +114,10 @@ impl Efuse {
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c6/esp_efuse_rtc_calib.c#L42>
     pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
         match atten {
-            Attenuation::Attenuation0dB => 400,
-            Attenuation::Attenuation2p5dB => 550,
-            Attenuation::Attenuation6dB => 750,
-            Attenuation::Attenuation11dB => 1370,
+            Attenuation::_0dB => 400,
+            Attenuation::_2p5dB => 550,
+            Attenuation::_6dB => 750,
+            Attenuation::_11dB => 1370,
         }
     }
 
@@ -133,10 +133,10 @@ impl Efuse {
 
         // See <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c6/esp_efuse_table.csv#L153-L156>
         let cal_code: u16 = Self::read_field_le(match atten {
-            Attenuation::Attenuation0dB => ADC1_CAL_VOL_ATTEN0,
-            Attenuation::Attenuation2p5dB => ADC1_CAL_VOL_ATTEN1,
-            Attenuation::Attenuation6dB => ADC1_CAL_VOL_ATTEN2,
-            Attenuation::Attenuation11dB => ADC1_CAL_VOL_ATTEN3,
+            Attenuation::_0dB => ADC1_CAL_VOL_ATTEN0,
+            Attenuation::_2p5dB => ADC1_CAL_VOL_ATTEN1,
+            Attenuation::_6dB => ADC1_CAL_VOL_ATTEN2,
+            Attenuation::_11dB => ADC1_CAL_VOL_ATTEN3,
         });
 
         let cal_code = if cal_code & (1 << 9) != 0 {
@@ -184,20 +184,19 @@ pub(crate) enum EfuseBlock {
 
 impl EfuseBlock {
     pub(crate) fn address(self) -> *const u32 {
-        use EfuseBlock::*;
-        let efuse = unsafe { &*EFUSE::ptr() };
+        let efuse = EFUSE::regs();
         match self {
-            Block0 => efuse.rd_wr_dis().as_ptr(),
-            Block1 => efuse.rd_mac_spi_sys_0().as_ptr(),
-            Block2 => efuse.rd_sys_part1_data0().as_ptr(),
-            Block3 => efuse.rd_usr_data0().as_ptr(),
-            Block4 => efuse.rd_key0_data0().as_ptr(),
-            Block5 => efuse.rd_key1_data0().as_ptr(),
-            Block6 => efuse.rd_key2_data0().as_ptr(),
-            Block7 => efuse.rd_key3_data0().as_ptr(),
-            Block8 => efuse.rd_key4_data0().as_ptr(),
-            Block9 => efuse.rd_key5_data0().as_ptr(),
-            Block10 => efuse.rd_sys_part2_data0().as_ptr(),
+            Self::Block0 => efuse.rd_wr_dis().as_ptr(),
+            Self::Block1 => efuse.rd_mac_spi_sys_0().as_ptr(),
+            Self::Block2 => efuse.rd_sys_part1_data0().as_ptr(),
+            Self::Block3 => efuse.rd_usr_data0().as_ptr(),
+            Self::Block4 => efuse.rd_key0_data0().as_ptr(),
+            Self::Block5 => efuse.rd_key1_data0().as_ptr(),
+            Self::Block6 => efuse.rd_key2_data0().as_ptr(),
+            Self::Block7 => efuse.rd_key3_data0().as_ptr(),
+            Self::Block8 => efuse.rd_key4_data0().as_ptr(),
+            Self::Block9 => efuse.rd_key5_data0().as_ptr(),
+            Self::Block10 => efuse.rd_sys_part2_data0().as_ptr(),
         }
     }
 }

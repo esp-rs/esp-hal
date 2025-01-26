@@ -19,14 +19,14 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{clock::CpuClock, entry, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, main, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{init, wifi};
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
 static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(BTreeSet::new()));
 
-#[entry]
+#[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());

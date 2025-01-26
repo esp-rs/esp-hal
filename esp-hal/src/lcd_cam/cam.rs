@@ -74,6 +74,7 @@ use crate::{
         Pull,
     },
     lcd_cam::{calculate_clkm, BitOrder, ByteOrder, ClockError},
+    pac,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
@@ -154,13 +155,17 @@ impl<'d> Camera<'d> {
             _guard: cam._guard,
         };
 
-        this.lcd_cam
+        this.regs()
             .cam_ctrl1()
             .modify(|_, w| w.cam_2byte_en().bit(P::BUS_WIDTH == 2));
 
         this.apply_config(&config)?;
 
         Ok(this)
+    }
+
+    fn regs(&self) -> &pac::lcd_cam::RegisterBlock {
+        self.lcd_cam.register_block()
     }
 
     /// Applies the configuration to the camera interface.
@@ -176,7 +181,7 @@ impl<'d> Camera<'d> {
         )
         .map_err(ConfigError::Clock)?;
 
-        self.lcd_cam.cam_ctrl().write(|w| {
+        self.regs().cam_ctrl().write(|w| {
             // Force enable the clock for all configuration registers.
             unsafe {
                 w.cam_clk_sel().bits((i + 1) as _);
@@ -195,7 +200,7 @@ impl<'d> Camera<'d> {
                 w.cam_stop_en().clear_bit()
             }
         });
-        self.lcd_cam.cam_ctrl1().modify(|_, w| unsafe {
+        self.regs().cam_ctrl1().modify(|_, w| unsafe {
             w.cam_vh_de_mode_en().set_bit();
             w.cam_rec_data_bytelen().bits(0);
             w.cam_line_int_num().bits(0);
@@ -207,11 +212,11 @@ impl<'d> Camera<'d> {
             w.cam_vsync_inv().clear_bit()
         });
 
-        self.lcd_cam
+        self.regs()
             .cam_rgb_yuv()
             .write(|w| w.cam_conv_bypass().clear_bit());
 
-        self.lcd_cam
+        self.regs()
             .cam_ctrl()
             .modify(|_, w| w.cam_update().set_bit());
 
@@ -227,7 +232,7 @@ impl<'d> Camera<'d> {
     ) -> Self {
         crate::into_mapped_ref!(mclk);
 
-        mclk.set_to_push_pull_output(crate::private::Internal);
+        mclk.set_to_push_pull_output();
         OutputSignal::CAM_CLK.connect_to(mclk);
 
         self
@@ -240,7 +245,7 @@ impl<'d> Camera<'d> {
     ) -> Self {
         crate::into_mapped_ref!(pclk);
 
-        pclk.init_input(Pull::None, crate::private::Internal);
+        pclk.init_input(Pull::None);
         InputSignal::CAM_PCLK.connect_to(pclk);
 
         self
@@ -255,12 +260,12 @@ impl<'d> Camera<'d> {
     ) -> Self {
         crate::into_mapped_ref!(vsync, h_enable);
 
-        vsync.init_input(Pull::None, crate::private::Internal);
+        vsync.init_input(Pull::None);
         InputSignal::CAM_V_SYNC.connect_to(vsync);
-        h_enable.init_input(Pull::None, crate::private::Internal);
+        h_enable.init_input(Pull::None);
         InputSignal::CAM_H_ENABLE.connect_to(h_enable);
 
-        self.lcd_cam
+        self.regs()
             .cam_ctrl1()
             .modify(|_, w| w.cam_vh_de_mode_en().clear_bit());
 
@@ -281,14 +286,14 @@ impl<'d> Camera<'d> {
     ) -> Self {
         crate::into_mapped_ref!(vsync, hsync, h_enable);
 
-        vsync.init_input(Pull::None, crate::private::Internal);
+        vsync.init_input(Pull::None);
         InputSignal::CAM_V_SYNC.connect_to(vsync);
-        hsync.init_input(Pull::None, crate::private::Internal);
+        hsync.init_input(Pull::None);
         InputSignal::CAM_H_SYNC.connect_to(hsync);
-        h_enable.init_input(Pull::None, crate::private::Internal);
+        h_enable.init_input(Pull::None);
         InputSignal::CAM_H_ENABLE.connect_to(h_enable);
 
-        self.lcd_cam
+        self.regs()
             .cam_ctrl1()
             .modify(|_, w| w.cam_vh_de_mode_en().set_bit());
 
@@ -301,16 +306,16 @@ impl<'d> Camera<'d> {
         mut buf: BUF,
     ) -> Result<CameraTransfer<'d, BUF>, (DmaError, Self, BUF)> {
         // Reset Camera control unit and Async Rx FIFO
-        self.lcd_cam
+        self.regs()
             .cam_ctrl1()
             .modify(|_, w| w.cam_reset().set_bit());
-        self.lcd_cam
+        self.regs()
             .cam_ctrl1()
             .modify(|_, w| w.cam_reset().clear_bit());
-        self.lcd_cam
+        self.regs()
             .cam_ctrl1()
             .modify(|_, w| w.cam_afifo_reset().set_bit());
-        self.lcd_cam
+        self.regs()
             .cam_ctrl1()
             .modify(|_, w| w.cam_afifo_reset().clear_bit());
 
@@ -326,13 +331,13 @@ impl<'d> Camera<'d> {
         }
 
         // Start the Camera unit to listen for incoming DVP stream.
-        self.lcd_cam.cam_ctrl().modify(|_, w| {
+        self.regs().cam_ctrl().modify(|_, w| {
             // Automatically stops the camera unit once the GDMA Rx FIFO is full.
             w.cam_stop_en().set_bit();
 
             w.cam_update().set_bit()
         });
-        self.lcd_cam
+        self.regs()
             .cam_ctrl1()
             .modify(|_, w| w.cam_start().set_bit());
 
@@ -370,7 +375,7 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
         // the sake of familiarity and similarity with other drivers.
 
         self.camera
-            .lcd_cam
+            .regs()
             .cam_ctrl1()
             .read()
             .cam_start()
@@ -423,7 +428,7 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
     fn stop_peripherals(&mut self) {
         // Stop the LCD_CAM peripheral.
         self.camera
-            .lcd_cam
+            .regs()
             .cam_ctrl1()
             .modify(|_, w| w.cam_start().clear_bit());
 
@@ -500,7 +505,7 @@ impl RxEightBits {
         ];
 
         for (pin, signal) in pairs.into_iter() {
-            pin.init_input(Pull::None, crate::private::Internal);
+            pin.init_input(Pull::None);
             signal.connect_to(pin);
         }
 
@@ -577,7 +582,7 @@ impl RxSixteenBits {
         ];
 
         for (pin, signal) in pairs.into_iter() {
-            pin.init_input(Pull::None, crate::private::Internal);
+            pin.init_input(Pull::None);
             signal.connect_to(pin);
         }
 

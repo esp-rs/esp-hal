@@ -17,25 +17,24 @@ impl crate::peripheral::Peripheral for Level {
 }
 
 impl Level {
-    pub(crate) fn pull_direction(&self, _pull: Pull, _internal: private::Internal) {}
+    pub(crate) fn pull_direction(&self, _pull: Pull) {}
 
     pub(crate) fn input_signals(
         &self,
         _: private::Internal,
-    ) -> &[(AlternateFunction, InputSignal)] {
+    ) -> &'static [(AlternateFunction, InputSignal)] {
         &[]
     }
 
-    pub(crate) fn init_input(&self, _pull: Pull, _: private::Internal) {}
+    pub(crate) fn init_input(&self, _pull: Pull) {}
 
-    pub(crate) fn enable_input(&mut self, _on: bool, _: private::Internal) {}
+    pub(crate) fn enable_input(&self, _on: bool) {}
 
-    pub(crate) fn is_input_high(&self, _: private::Internal) -> bool {
+    pub(crate) fn is_input_high(&self) -> bool {
         *self == Level::High
     }
 
-    #[doc(hidden)]
-    pub(crate) fn connect_input_to_peripheral(&mut self, signal: InputSignal) {
+    pub(crate) fn connect_input_to_peripheral(&self, signal: InputSignal) {
         let value = match self {
             Level::High => ONE_INPUT,
             Level::Low => ZERO_INPUT,
@@ -44,29 +43,27 @@ impl Level {
         connect_input_signal(signal, value, false, true);
     }
 
-    pub(crate) fn set_to_open_drain_output(&mut self, _: private::Internal) {}
-    pub(crate) fn set_to_push_pull_output(&mut self, _: private::Internal) {}
-    pub(crate) fn enable_output(&mut self, _on: bool, _: private::Internal) {}
-    pub(crate) fn set_output_high(&mut self, _on: bool, _: private::Internal) {}
-    pub(crate) fn set_drive_strength(&mut self, _strength: DriveStrength, _: private::Internal) {}
-    pub(crate) fn enable_open_drain(&mut self, _on: bool, _: private::Internal) {}
-    pub(crate) fn internal_pull_up_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
-    pub(crate) fn internal_pull_down_in_sleep_mode(&mut self, _on: bool, _: private::Internal) {}
+    pub(crate) fn set_to_open_drain_output(&self) {}
+    pub(crate) fn set_to_push_pull_output(&self) {}
+    pub(crate) fn enable_output(&self, _on: bool) {}
+    pub(crate) fn set_output_high(&self, _on: bool) {}
+    pub(crate) fn set_drive_strength(&self, _strength: DriveStrength) {}
+    pub(crate) fn enable_open_drain(&self, _on: bool) {}
 
-    pub(crate) fn is_set_high(&self, _: private::Internal) -> bool {
+    pub(crate) fn is_set_high(&self) -> bool {
         false
     }
 
     pub(crate) fn output_signals(
         &self,
         _: private::Internal,
-    ) -> &[(AlternateFunction, OutputSignal)] {
+    ) -> &'static [(AlternateFunction, OutputSignal)] {
         &[]
     }
 
-    pub(crate) fn connect_peripheral_to_output(&mut self, _signal: OutputSignal) {}
+    pub(crate) fn connect_peripheral_to_output(&self, _signal: OutputSignal) {}
 
-    pub(crate) fn disconnect_from_peripheral_output(&mut self, _signal: OutputSignal) {}
+    pub(crate) fn disconnect_from_peripheral_output(&self, _signal: OutputSignal) {}
 }
 
 /// Placeholder pin, used when no pin is required when using a peripheral.

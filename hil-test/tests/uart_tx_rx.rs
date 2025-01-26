@@ -1,6 +1,7 @@
 //! UART TX/RX Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -10,7 +11,6 @@ use esp_hal::{
     Blocking,
 };
 use hil_test as _;
-use nb::block;
 
 struct Context {
     rx: UartRx<'static, Blocking>,
@@ -28,8 +28,12 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx = UartTx::new(peripherals.UART0, uart::Config::default(), tx).unwrap();
-        let rx = UartRx::new(peripherals.UART1, uart::Config::default(), rx).unwrap();
+        let tx = UartTx::new(peripherals.UART0, uart::Config::default())
+            .unwrap()
+            .with_tx(tx);
+        let rx = UartRx::new(peripherals.UART1, uart::Config::default())
+            .unwrap()
+            .with_rx(rx);
 
         Context { rx, tx }
     }
@@ -38,11 +42,12 @@ mod tests {
     fn test_send_receive(mut ctx: Context) {
         let byte = [0x42];
 
-        ctx.tx.flush().unwrap();
+        ctx.tx.flush();
         ctx.tx.write_bytes(&byte).unwrap();
-        let read = block!(ctx.rx.read_byte());
+        let mut buf = [0u8; 1];
+        ctx.rx.read_bytes(&mut buf).unwrap();
 
-        assert_eq!(read, Ok(0x42));
+        assert_eq!(buf[0], 0x42);
     }
 
     #[test]
@@ -50,7 +55,7 @@ mod tests {
         let bytes = [0x42, 0x43, 0x44];
         let mut buf = [0u8; 3];
 
-        ctx.tx.flush().unwrap();
+        ctx.tx.flush();
         ctx.tx.write_bytes(&bytes).unwrap();
 
         ctx.rx.read_bytes(&mut buf).unwrap();

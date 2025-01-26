@@ -9,13 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `esp_alloc::HEAP.stats()` can now be used to get heap usage informations (#2137)
-
 ### Changed
 
 ### Fixed
 
 ### Removed
+
+## 0.6.0 - 2025-01-15
+
+### Added
+
+- `esp_alloc::HEAP.stats()` can now be used to get heap usage informations (#2137)
+
+### Changed
+
+- Bump MSRV to 1.84 (#2951)
 
 ## 0.5.0 - 2024-10-10
 
@@ -33,4 +41,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.0 - 2022-07-25
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-alloc?since=2024-10-10
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-alloc?since=2025-01-15

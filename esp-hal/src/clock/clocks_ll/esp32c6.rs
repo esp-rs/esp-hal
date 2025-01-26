@@ -151,7 +151,7 @@ pub(crate) fn esp32c6_rtc_bbpll_configure_raw(_xtal_freq: u32, pll_freq: u32) {
 }
 
 pub(crate) fn esp32c6_rtc_bbpll_enable() {
-    let pmu = unsafe { &*crate::peripherals::PMU::PTR };
+    let pmu = crate::peripherals::PMU::regs();
 
     pmu.imm_hp_ck_power().modify(|_, w| {
         w.tie_high_xpd_bb_i2c()
@@ -199,7 +199,7 @@ pub(crate) fn esp32c6_rtc_freq_to_pll_mhz_raw(cpu_clock_speed_mhz: u32) {
     // 80MHz after the switch. PLL = 480MHz, so divider is 6.
     clk_ll_mspi_fast_set_hs_divider(6);
 
-    let pcr = unsafe { &*crate::peripherals::PCR::PTR };
+    let pcr = crate::peripherals::PCR::regs();
     unsafe {
         pcr.cpu_freq_conf().modify(|_, w| {
             w.cpu_hs_div_num()
@@ -218,7 +218,7 @@ pub(crate) fn esp32c6_rtc_freq_to_pll_mhz_raw(cpu_clock_speed_mhz: u32) {
 }
 
 pub(crate) fn esp32c6_rtc_apb_freq_update(apb_freq: ApbClock) {
-    let lp_aon = unsafe { &*crate::peripherals::LP_AON::ptr() };
+    let lp_aon = crate::peripherals::LP_AON::regs();
     let value = ((apb_freq.hz() >> 12) & u16::MAX as u32)
         | (((apb_freq.hz() >> 12) & u16::MAX as u32) << 16);
 
@@ -230,7 +230,7 @@ pub(crate) fn esp32c6_rtc_apb_freq_update(apb_freq: ApbClock) {
 fn clk_ll_mspi_fast_set_hs_divider(divider: u32) {
     // SOC_ROOT_CLK ------> MSPI_FAST_CLK
     // HS divider option: 4, 5, 6 (PCR_MSPI_FAST_HS_DIV_NUM=3, 4, 5)
-    let pcr = unsafe { &*crate::peripherals::PCR::PTR };
+    let pcr = crate::peripherals::PCR::regs();
 
     unsafe {
         match divider {
@@ -257,7 +257,6 @@ const REGI2C_RTC_SLAVE_ID_V: u8 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_S: u8 = 0;
 const REGI2C_RTC_ADDR_V: u8 = 0xFF;
 const REGI2C_RTC_ADDR_S: u8 = 8;
-const REGI2C_RTC_WR_CNTL_V: u8 = 0x1;
 const REGI2C_RTC_WR_CNTL_S: u8 = 24;
 const REGI2C_RTC_DATA_V: u8 = 0xFF;
 const REGI2C_RTC_DATA_S: u8 = 16;
@@ -271,8 +270,8 @@ const REGI2C_ULP_CAL_DEVICE_EN: u16 = 1 << 6;
 const REGI2C_SAR_I2C_DEVICE_EN: u16 = 1 << 7;
 
 fn regi2c_enable_block(block: u8) {
-    let modem_lpcon = unsafe { &*crate::peripherals::MODEM_LPCON::ptr() };
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    let modem_lpcon = crate::peripherals::MODEM_LPCON::regs();
+    let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
 
     modem_lpcon
         .clk_conf()
@@ -287,94 +286,55 @@ fn regi2c_enable_block(block: u8) {
         .modify(|_, w| w.lp_i2c_ana_mast_i2c_mat_clk_en().set_bit());
 
     // Before config I2C register, enable corresponding slave.
+    let en_bit = match block {
+        v if v == REGI2C_BBPLL => REGI2C_BBPLL_DEVICE_EN,
+        v if v == REGI2C_BIAS => REGI2C_BIAS_DEVICE_EN,
+        v if v == REGI2C_DIG_REG => REGI2C_DIG_REG_DEVICE_EN,
+        v if v == REGI2C_ULP_CAL => REGI2C_ULP_CAL_DEVICE_EN,
+        v if v == REGI2C_SAR_I2C => REGI2C_SAR_I2C_DEVICE_EN,
+        _ => return,
+    };
+
     unsafe {
-        match block {
-            REGI2C_BBPLL => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_BBPLL_DEVICE_EN)
-                });
-            }
-            REGI2C_BIAS => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_BIAS_DEVICE_EN)
-                });
-            }
-            REGI2C_DIG_REG => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_DIG_REG_DEVICE_EN)
-                });
-            }
-            REGI2C_ULP_CAL => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_ULP_CAL_DEVICE_EN)
-                });
-            }
-            REGI2C_SAR_I2C => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | REGI2C_SAR_I2C_DEVICE_EN)
-                });
-            }
-            _ => (),
-        }
+        lp_i2c_ana.device_en().modify(|r, w| {
+            w.lp_i2c_ana_mast_i2c_device_en()
+                .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() | en_bit)
+        });
     }
 }
 
 fn regi2c_disable_block(block: u8) {
+    let en_bit = match block {
+        v if v == REGI2C_BBPLL => REGI2C_BBPLL_DEVICE_EN,
+        v if v == REGI2C_BIAS => REGI2C_BIAS_DEVICE_EN,
+        v if v == REGI2C_DIG_REG => REGI2C_DIG_REG_DEVICE_EN,
+        v if v == REGI2C_ULP_CAL => REGI2C_ULP_CAL_DEVICE_EN,
+        v if v == REGI2C_SAR_I2C => REGI2C_SAR_I2C_DEVICE_EN,
+        _ => return,
+    };
+
     unsafe {
-        let lp_i2c_ana = &*crate::peripherals::LP_I2C_ANA_MST::ptr();
-        match block {
-            REGI2C_BBPLL => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_BBPLL_DEVICE_EN)
-                });
-            }
-            REGI2C_BIAS => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_BIAS_DEVICE_EN)
-                });
-            }
-            REGI2C_DIG_REG => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_DIG_REG_DEVICE_EN)
-                });
-            }
-            REGI2C_ULP_CAL => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_ULP_CAL_DEVICE_EN)
-                });
-            }
-            REGI2C_SAR_I2C => {
-                lp_i2c_ana.device_en().modify(|r, w| {
-                    w.lp_i2c_ana_mast_i2c_device_en()
-                        .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !REGI2C_SAR_I2C_DEVICE_EN)
-                });
-            }
-            _ => (),
-        }
+        let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
+        lp_i2c_ana.device_en().modify(|r, w| {
+            w.lp_i2c_ana_mast_i2c_device_en()
+                .bits(r.lp_i2c_ana_mast_i2c_device_en().bits() & !en_bit)
+        });
     }
 }
 
 pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     regi2c_enable_block(block);
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
 
-    let temp: u32 = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S as u32)
-                    | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32)
-                    | ((0x1 & REGI2C_RTC_WR_CNTL_V as u32) << REGI2C_RTC_WR_CNTL_S as u32) // 0: READ I2C register; 1: Write I2C register;
-                    | (((data as u32) & REGI2C_RTC_DATA_V as u32) << REGI2C_RTC_DATA_S as u32);
+    let block_shifted = (block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S;
+    let reg_add_shifted = (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S;
+    let write_bit = 1u32 << REGI2C_RTC_WR_CNTL_S;
 
-    unsafe {
-        lp_i2c_ana.i2c0_ctrl().modify(|_, w| w.bits(temp));
-    }
+    let new_value = (data as u32) << REGI2C_RTC_DATA_S;
+
+    lp_i2c_ana
+        .i2c0_ctrl()
+        .write(|w| unsafe { w.bits(block_shifted | reg_add_shifted | write_bit | new_value) });
 
     while lp_i2c_ana
         .i2c0_ctrl()
@@ -387,20 +347,20 @@ pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
 }
 
 pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
-    assert!(msb - lsb < 8);
-    let lp_i2c_ana = unsafe { &*crate::peripherals::LP_I2C_ANA_MST::ptr() };
+    assert!(msb < 8 + lsb);
+    let lp_i2c_ana = crate::peripherals::LP_I2C_ANA_MST::regs();
+    regi2c_enable_block(block);
+
+    let block_shifted = (block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S;
+    let reg_add_shifted = (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S;
+    let write_bit = 1u32 << REGI2C_RTC_WR_CNTL_S;
 
     unsafe {
-        regi2c_enable_block(block);
-
         // Read the i2c bus register
-        let mut temp: u32 = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32)
-            << REGI2C_RTC_SLAVE_ID_S as u32)
-            | (reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32;
-
-        lp_i2c_ana
-            .i2c0_ctrl()
-            .modify(|_, w| w.lp_i2c_ana_mast_i2c0_ctrl().bits(temp));
+        lp_i2c_ana.i2c0_ctrl().write(|w| {
+            w.lp_i2c_ana_mast_i2c0_ctrl()
+                .bits(block_shifted | reg_add_shifted)
+        });
 
         while lp_i2c_ana
             .i2c0_ctrl()
@@ -409,23 +369,25 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
             .bit()
         {}
 
-        temp = lp_i2c_ana
+        let mut temp = lp_i2c_ana
             .i2c0_data()
             .read()
             .lp_i2c_ana_mast_i2c0_rdata()
             .bits() as u32;
 
-        // Write the i2c bus register
+        // Mask the value field
         temp &= (!(0xFFFFFFFF << lsb)) | (0xFFFFFFFF << (msb + 1));
-        temp |= (data as u32 & (!(0xFFFFFFFF << (msb as u32 - lsb as u32 + 1)))) << (lsb as u32);
-        temp = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S as u32)
-            | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32)
-            | ((0x1 & REGI2C_RTC_WR_CNTL_V as u32) << REGI2C_RTC_WR_CNTL_S as u32)
-            | ((temp & REGI2C_RTC_DATA_V as u32) << REGI2C_RTC_DATA_S as u32);
 
-        lp_i2c_ana
-            .i2c0_ctrl()
-            .modify(|_, w| w.lp_i2c_ana_mast_i2c0_ctrl().bits(temp));
+        // Write the value into the temporary
+        temp |= (data as u32 & (!(0xFFFFFFFF << (msb - lsb + 1)))) << lsb;
+
+        // Write the i2c bus register
+        let new_value = (temp & REGI2C_RTC_DATA_V as u32) << REGI2C_RTC_DATA_S;
+
+        lp_i2c_ana.i2c0_ctrl().write(|w| {
+            w.lp_i2c_ana_mast_i2c0_ctrl()
+                .bits(block_shifted | reg_add_shifted | write_bit | new_value)
+        });
 
         while lp_i2c_ana
             .i2c0_ctrl()

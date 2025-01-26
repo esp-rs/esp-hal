@@ -9,10 +9,11 @@
 
 use core::marker::PhantomData;
 
-pub use crate::peripherals::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as EdgeMode};
+pub use crate::pac::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as EdgeMode};
 use crate::{
     gpio::{interconnect::PeripheralInput, InputSignal},
     peripheral::Peripheral,
+    peripherals::PCNT,
     system::GenericPeripheralGuard,
 };
 
@@ -42,7 +43,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// * `low` - The behaviour of the channel when the control signal is low.
     /// * `high` - The behaviour of the channel when the control signal is high.
     pub fn set_ctrl_mode(&self, low: CtrlMode, high: CtrlMode) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let conf0 = pcnt.unit(UNIT).conf0();
 
         conf0.modify(|_, w| {
@@ -61,7 +62,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// * `pos_edge` - The effect on the counter when the input signal goes 0 ->
     ///   1.
     pub fn set_input_mode(&self, neg_edge: EdgeMode, pos_edge: EdgeMode) {
-        let pcnt = unsafe { &*crate::peripherals::PCNT::ptr() };
+        let pcnt = PCNT::regs();
         let conf0 = pcnt.unit(UNIT).conf0();
 
         conf0.modify(|_, w| {
@@ -122,7 +123,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
             crate::into_mapped_ref!(source);
-            source.enable_input(true, crate::private::Internal);
+            source.enable_input(true);
             signal.connect_to(source);
         }
         self
@@ -180,7 +181,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
             crate::into_mapped_ref!(source);
-            source.enable_input(true, crate::private::Internal);
+            source.enable_input(true);
             signal.connect_to(source);
         }
         self

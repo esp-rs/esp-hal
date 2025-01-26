@@ -147,13 +147,12 @@ pub(crate) enum EfuseBlock {
 
 impl EfuseBlock {
     pub(crate) fn address(self) -> *const u32 {
-        use EfuseBlock::*;
-        let efuse = unsafe { &*EFUSE::ptr() };
+        let efuse = EFUSE::regs();
         match self {
-            Block0 => efuse.blk0_rdata0().as_ptr(),
-            Block1 => efuse.blk1_rdata0().as_ptr(),
-            Block2 => efuse.blk2_rdata0().as_ptr(),
-            Block3 => efuse.blk3_rdata0().as_ptr(),
+            Self::Block0 => efuse.blk0_rdata0().as_ptr(),
+            Self::Block1 => efuse.blk1_rdata0().as_ptr(),
+            Self::Block2 => efuse.blk2_rdata0().as_ptr(),
+            Self::Block3 => efuse.blk3_rdata0().as_ptr(),
         }
     }
 }

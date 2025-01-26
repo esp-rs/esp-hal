@@ -11,7 +11,10 @@
 //! `RadioClockControl` struct. This trait provides methods to enable, disable,
 //! reset the MAC, initialize clocks and perform other related operations.
 
-use crate::system::{RadioClockController, RadioPeripherals};
+use crate::{
+    peripherals::APB_CTRL,
+    system::{RadioClockController, RadioPeripherals},
+};
 
 // Note: this comment has been copied from esp-idf, including the mistake.
 // Mask for clock bits used by both WIFI and Bluetooth, 0, 1, 2, 3, 7,
@@ -57,16 +60,14 @@ impl RadioClockController for crate::peripherals::RADIO_CLK {
 
 fn enable_phy() {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
-    let syscon = unsafe { &*esp32s3::APB_CTRL::PTR };
-    syscon
+    APB_CTRL::regs()
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
 
 fn disable_phy() {
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
-    let syscon = unsafe { &*esp32s3::APB_CTRL::PTR };
-    syscon
+    APB_CTRL::regs()
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
 }
@@ -81,18 +82,15 @@ fn common_wifi_bt_clock_disable() {
 
 fn reset_mac() {
     const SYSTEM_MAC_RST: u32 = 1 << 2;
-    let syscon = unsafe { &*esp32s3::APB_CTRL::PTR };
-    syscon
+    APB_CTRL::regs()
         .wifi_rst_en()
         .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_MAC_RST) });
-    syscon
+    APB_CTRL::regs()
         .wifi_rst_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_MAC_RST) });
 }
 
 fn init_clocks() {
-    let syscon = unsafe { &*esp32s3::APB_CTRL::PTR };
-
     const SYSTEM_WIFI_CLK_I2C_CLK_EN: u32 = 1 << 5;
     const SYSTEM_WIFI_CLK_UNUSED_BIT12: u32 = 1 << 12;
     const SYSTEM_WIFI_CLK_SDIO_HOST_EN: u32 = 1 << 13;
@@ -100,7 +98,7 @@ fn init_clocks() {
     const WIFI_BT_SDIO_CLK: u32 =
         SYSTEM_WIFI_CLK_I2C_CLK_EN | SYSTEM_WIFI_CLK_UNUSED_BIT12 | SYSTEM_WIFI_CLK_SDIO_HOST_EN;
 
-    syscon
+    APB_CTRL::regs()
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }

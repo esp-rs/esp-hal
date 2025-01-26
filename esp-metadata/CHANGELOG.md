@@ -8,14 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Introduced the `wifi6` symbol (#2612)
-- Introduced the `gpio_bank_1` symbol (#2625)
-
-### Fixed
 
 ### Changed
 
+### Fixed
+
 ### Removed
+
+## 0.5.0 - 2025-01-15
+
+### Added
+
+- Introduced the `wifi6` symbol (#2612)
+- Introduced the `gpio_bank_1` symbol (#2625)
+
+### Changed
+
+- Bump MSRV to 1.84 (#2951)
 
 ## [0.4.0] - 2024-10-10
 
@@ -29,4 +38,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-metadata?since=2024-10-10
+[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-metadata?since=2025-01-15

@@ -90,7 +90,6 @@ use crate::{
         DmaTransferRxCircular,
         DmaTransferTx,
         DmaTransferTxCircular,
-        PeripheralDmaChannel,
         PeripheralRxChannel,
         PeripheralTxChannel,
         ReadBuffer,
@@ -143,6 +142,7 @@ impl AcceptedWord for i32 {}
 /// I2S Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Error {
     /// An unspecified or unknown error occurred during an I2S operation.
     Unknown,
@@ -250,112 +250,73 @@ impl DataFormat {
 
 /// Instance of the I2S peripheral driver
 #[non_exhaustive]
-pub struct I2s<'d, Dm, T = AnyI2s>
+pub struct I2s<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     /// Handles the reception (RX) side of the I2S peripheral.
-    pub i2s_rx: RxCreator<'d, Dm, T>,
+    pub i2s_rx: RxCreator<'d, Dm>,
     /// Handles the transmission (TX) side of the I2S peripheral.
-    pub i2s_tx: TxCreator<'d, Dm, T>,
+    pub i2s_tx: TxCreator<'d, Dm>,
 }
 
-impl<'d, T> I2s<'d, Blocking, T>
+impl<Dm> I2s<'_, Dm>
 where
-    T: RegisterAccess,
-{
-    #[allow(clippy::too_many_arguments)]
-    fn new_internal(
-        i2s: PeripheralRef<'d, T>,
-        standard: Standard,
-        data_format: DataFormat,
-        sample_rate: impl Into<fugit::HertzU32>,
-        channel: PeripheralRef<'d, PeripheralDmaChannel<T>>,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self {
-        let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&i2s);
-        // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
-        // could be configured totally independently but for now handle all
-        // the targets the same and force same configuration for both, TX and RX
-
-        // make sure the peripheral is enabled before configuring it
-        let peripheral = i2s.peripheral();
-        let rx_guard = PeripheralGuard::new(peripheral);
-        let tx_guard = PeripheralGuard::new(peripheral);
-
-        i2s.set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));
-        i2s.configure(&standard, &data_format);
-        i2s.set_master();
-        i2s.update();
-
-        Self {
-            i2s_rx: RxCreator {
-                i2s: unsafe { i2s.clone_unchecked() },
-                rx_channel: channel.rx,
-                descriptors: rx_descriptors,
-                guard: rx_guard,
-            },
-            i2s_tx: TxCreator {
-                i2s,
-                tx_channel: channel.tx,
-                descriptors: tx_descriptors,
-                guard: tx_guard,
-            },
-        }
-    }
-}
-
-impl<Dm, T> I2s<'_, Dm, T>
-where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
-    /// Sets the interrupt handler
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for the peripheral."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for the peripheral on the current core."
+    )]
+    #[doc = ""]
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
     ///
-    /// Interrupts are not enabled at the peripheral level here.
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.set_interrupt_handler(handler);
     }
 
     /// Listen for the given interrupts
+    #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.enable_listen(interrupts.into(), true);
     }
 
     /// Unlisten the given interrupts
+    #[instability::unstable]
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.enable_listen(interrupts.into(), false);
     }
 
     /// Gets asserted interrupts
+    #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<I2sInterrupt> {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.interrupts()
     }
 
     /// Resets asserted interrupts
+    #[instability::unstable]
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.clear_interrupts(interrupts.into());
     }
 }
 
-impl<Dm, I> crate::private::Sealed for I2s<'_, Dm, I>
-where
-    I: RegisterAccess,
-    Dm: DriverMode,
-{
-}
+impl<Dm> crate::private::Sealed for I2s<'_, Dm> where Dm: DriverMode {}
 
-impl<Dm, I> InterruptConfigurable for I2s<'_, Dm, I>
+impl<Dm> InterruptConfigurable for I2s<'_, Dm>
 where
-    I: RegisterAccess,
     Dm: DriverMode,
 {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
@@ -379,51 +340,45 @@ impl<'d> I2s<'d, Blocking> {
     where
         CH: DmaChannelFor<AnyI2s>,
     {
-        Self::new_typed(
-            i2s.map_into(),
-            standard,
-            data_format,
-            sample_rate,
-            channel,
-            rx_descriptors,
-            tx_descriptors,
-        )
-    }
-}
-
-impl<'d, T> I2s<'d, Blocking, T>
-where
-    T: RegisterAccess,
-{
-    /// Construct a new I2S peripheral driver instance for the first I2S
-    /// peripheral
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_typed<CH>(
-        i2s: impl Peripheral<P = T> + 'd,
-        standard: Standard,
-        data_format: DataFormat,
-        sample_rate: impl Into<fugit::HertzU32>,
-        channel: impl Peripheral<P = CH> + 'd,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self
-    where
-        CH: DmaChannelFor<T>,
-    {
         crate::into_ref!(i2s);
-        Self::new_internal(
-            i2s,
-            standard,
-            data_format,
-            sample_rate,
-            channel.map(|ch| ch.degrade()).into_ref(),
-            rx_descriptors,
-            tx_descriptors,
-        )
+
+        let channel = Channel::new(channel.map(|ch| ch.degrade()));
+        channel.runtime_ensure_compatible(&i2s);
+
+        // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
+        // could be configured totally independently but for now handle all
+        // the targets the same and force same configuration for both, TX and RX
+
+        // make sure the peripheral is enabled before configuring it
+        let peripheral = i2s.peripheral();
+        let rx_guard = PeripheralGuard::new(peripheral);
+        let tx_guard = PeripheralGuard::new(peripheral);
+
+        i2s.set_clock(calculate_clock(sample_rate, 2, data_format.channel_bits()));
+        i2s.configure(&standard, &data_format);
+        i2s.set_master();
+        i2s.update();
+
+        let i2s = i2s.map_into();
+
+        Self {
+            i2s_rx: RxCreator {
+                i2s: unsafe { i2s.clone_unchecked() },
+                rx_channel: channel.rx,
+                descriptors: rx_descriptors,
+                guard: rx_guard,
+            },
+            i2s_tx: TxCreator {
+                i2s,
+                tx_channel: channel.tx,
+                descriptors: tx_descriptors,
+                guard: tx_guard,
+            },
+        }
     }
 
     /// Converts the I2S instance into async mode.
-    pub fn into_async(self) -> I2s<'d, Async, T> {
+    pub fn into_async(self) -> I2s<'d, Async> {
         I2s {
             i2s_rx: RxCreator {
                 i2s: self.i2s_rx.i2s,
@@ -441,15 +396,14 @@ where
     }
 }
 
-impl<'d, Dm, T> I2s<'d, Dm, T>
+impl<'d, Dm> I2s<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
     pub fn with_mclk<P: PeripheralOutput>(self, pin: impl Peripheral<P = P> + 'd) -> Self {
         crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output(crate::private::Internal);
+        pin.set_to_push_pull_output();
         self.i2s_tx.i2s.mclk_signal().connect_to(pin);
 
         self
@@ -457,20 +411,18 @@ where
 }
 
 /// I2S TX channel
-pub struct I2sTx<'d, Dm, T = AnyI2s>
+pub struct I2sTx<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
-    i2s: PeripheralRef<'d, T>,
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<T>>,
+    i2s: PeripheralRef<'d, AnyI2s>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>,
     tx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
 
-impl<Dm, T> core::fmt::Debug for I2sTx<'_, Dm, T>
+impl<Dm> core::fmt::Debug for I2sTx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -478,9 +430,8 @@ where
     }
 }
 
-impl<Dm, T> DmaSupport for I2sTx<'_, Dm, T>
+impl<Dm> DmaSupport for I2sTx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
@@ -492,12 +443,11 @@ where
     }
 }
 
-impl<'d, Dm, T> DmaSupportTx for I2sTx<'d, Dm, T>
+impl<'d, Dm> DmaSupportTx for I2sTx<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
-    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<T>>;
+    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -508,9 +458,8 @@ where
     }
 }
 
-impl<Dm, T> I2sTx<'_, Dm, T>
+impl<Dm> I2sTx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
@@ -590,20 +539,18 @@ where
 }
 
 /// I2S RX channel
-pub struct I2sRx<'d, Dm, T = AnyI2s>
+pub struct I2sRx<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
-    i2s: PeripheralRef<'d, T>,
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<T>>,
+    i2s: PeripheralRef<'d, AnyI2s>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>,
     rx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
 
-impl<Dm, T> core::fmt::Debug for I2sRx<'_, Dm, T>
+impl<Dm> core::fmt::Debug for I2sRx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -611,9 +558,8 @@ where
     }
 }
 
-impl<Dm, T> DmaSupport for I2sRx<'_, Dm, T>
+impl<Dm> DmaSupport for I2sRx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
@@ -625,12 +571,11 @@ where
     }
 }
 
-impl<'d, Dm, T> DmaSupportRx for I2sRx<'d, Dm, T>
+impl<'d, Dm> DmaSupportRx for I2sRx<'d, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
-    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<T>>;
+    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -641,9 +586,8 @@ where
     }
 }
 
-impl<Dm, T> I2sRx<'_, Dm, T>
+impl<Dm> I2sRx<'_, Dm>
 where
-    T: RegisterAccess,
     Dm: DriverMode,
 {
     fn read_bytes(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
@@ -741,11 +685,7 @@ mod private {
 
     use super::*;
     #[cfg(not(i2s1))]
-    use crate::peripherals::i2s0::RegisterBlock;
-    // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
-    // by accident
-    #[cfg(i2s1)]
-    use crate::peripherals::{i2s1::RegisterBlock, I2S1};
+    use crate::pac::i2s0::RegisterBlock;
     use crate::{
         dma::{ChannelRx, ChannelTx, DescriptorChain, DmaDescriptor, DmaEligible},
         gpio::{
@@ -756,27 +696,28 @@ mod private {
         interrupt::InterruptHandler,
         peripheral::{Peripheral, PeripheralRef},
         peripherals::{Interrupt, I2S0},
-        private,
         DriverMode,
     };
+    // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
+    // by accident
+    #[cfg(i2s1)]
+    use crate::{pac::i2s1::RegisterBlock, peripherals::I2S1};
 
-    pub struct TxCreator<'d, Dm, T>
+    pub struct TxCreator<'d, Dm>
     where
-        T: RegisterAccess,
         Dm: DriverMode,
     {
-        pub i2s: PeripheralRef<'d, T>,
-        pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<T>>,
+        pub i2s: PeripheralRef<'d, AnyI2s>,
+        pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
 
-    impl<'d, Dm, T> TxCreator<'d, Dm, T>
+    impl<'d, Dm> TxCreator<'d, Dm>
     where
         Dm: DriverMode,
-        T: RegisterAccess,
     {
-        pub fn build(self) -> I2sTx<'d, Dm, T> {
+        pub fn build(self) -> I2sTx<'d, Dm> {
             let peripheral = self.i2s.peripheral();
             I2sTx {
                 i2s: self.i2s,
@@ -791,7 +732,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.bclk_signal().connect_to(pin);
 
             self
@@ -802,7 +743,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.ws_signal().connect_to(pin);
 
             self
@@ -813,30 +754,28 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.dout_signal().connect_to(pin);
 
             self
         }
     }
 
-    pub struct RxCreator<'d, Dm, T>
+    pub struct RxCreator<'d, Dm>
     where
-        T: RegisterAccess,
         Dm: DriverMode,
     {
-        pub i2s: PeripheralRef<'d, T>,
-        pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<T>>,
+        pub i2s: PeripheralRef<'d, AnyI2s>,
+        pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
 
-    impl<'d, Dm, T> RxCreator<'d, Dm, T>
+    impl<'d, Dm> RxCreator<'d, Dm>
     where
         Dm: DriverMode,
-        T: RegisterAccess,
     {
-        pub fn build(self) -> I2sRx<'d, Dm, T> {
+        pub fn build(self) -> I2sRx<'d, Dm> {
             let peripheral = self.i2s.peripheral();
             I2sRx {
                 i2s: self.i2s,
@@ -851,7 +790,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.bclk_rx_signal().connect_to(pin);
 
             self
@@ -862,7 +801,7 @@ mod private {
             P: PeripheralOutput,
         {
             crate::into_mapped_ref!(pin);
-            pin.set_to_push_pull_output(private::Internal);
+            pin.set_to_push_pull_output();
             self.i2s.ws_rx_signal().connect_to(pin);
 
             self
@@ -873,7 +812,7 @@ mod private {
             P: PeripheralInput,
         {
             crate::into_mapped_ref!(pin);
-            pin.init_input(crate::gpio::Pull::None, private::Internal);
+            pin.init_input(crate::gpio::Pull::None);
             self.i2s.din_signal().connect_to(pin);
 
             self
@@ -881,7 +820,7 @@ mod private {
     }
 
     pub trait RegBlock: Peripheral<P = Self> + DmaEligible + Into<super::AnyI2s> + 'static {
-        fn register_block(&self) -> &RegisterBlock;
+        fn regs(&self) -> &RegisterBlock;
         fn peripheral(&self) -> crate::system::Peripheral;
     }
 
@@ -900,9 +839,7 @@ mod private {
         fn set_interrupt_handler(&self, handler: InterruptHandler);
 
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
-            let reg_block = self.register_block();
-
-            reg_block.int_ena().modify(|_, w| {
+            self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
                     match interrupt {
                         I2sInterrupt::RxHung => w.rx_hung().bit(enable),
@@ -915,8 +852,7 @@ mod private {
 
         fn interrupts(&self) -> EnumSet<I2sInterrupt> {
             let mut res = EnumSet::new();
-            let reg_block = self.register_block();
-            let ints = reg_block.int_st().read();
+            let ints = self.regs().int_st().read();
 
             if ints.rx_hung().bit() {
                 res.insert(I2sInterrupt::RxHung);
@@ -929,9 +865,7 @@ mod private {
         }
 
         fn clear_interrupts(&self, interrupts: EnumSet<I2sInterrupt>) {
-            let reg_block = self.register_block();
-
-            reg_block.int_clr().write(|w| {
+            self.regs().int_clr().write(|w| {
                 for interrupt in interrupts {
                     match interrupt {
                         I2sInterrupt::RxHung => w.rx_hung().clear_bit_by_one(),
@@ -943,46 +877,41 @@ mod private {
         }
 
         fn set_clock(&self, clock_settings: I2sClockDividers) {
-            let i2s = self.register_block();
-
-            i2s.clkm_conf().modify(|r, w| unsafe {
-                w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21))
+            self.regs().clkm_conf().modify(|r, w| unsafe {
                 // select PLL_160M
+                w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21))
             });
 
             #[cfg(esp32)]
-            i2s.clkm_conf().modify(|_, w| w.clka_ena().clear_bit());
+            self.regs()
+                .clkm_conf()
+                .modify(|_, w| w.clka_ena().clear_bit());
 
-            i2s.clkm_conf().modify(|_, w| unsafe {
+            self.regs().clkm_conf().modify(|_, w| unsafe {
                 w.clk_en().set_bit();
-                w.clkm_div_num().bits(clock_settings.mclk_divider as u8)
-            });
-
-            i2s.clkm_conf().modify(|_, w| unsafe {
+                w.clkm_div_num().bits(clock_settings.mclk_divider as u8);
                 w.clkm_div_a().bits(clock_settings.denominator as u8);
                 w.clkm_div_b().bits(clock_settings.numerator as u8)
             });
 
-            i2s.sample_rate_conf().modify(|_, w| unsafe {
+            self.regs().sample_rate_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num().bits(clock_settings.bclk_divider as u8);
                 w.rx_bck_div_num().bits(clock_settings.bclk_divider as u8)
             });
         }
 
         fn configure(&self, _standard: &Standard, data_format: &DataFormat) {
-            let i2s = self.register_block();
-
             let fifo_mod = match data_format {
                 DataFormat::Data32Channel32 => 2,
                 DataFormat::Data16Channel16 => 0,
             };
 
-            i2s.sample_rate_conf()
-                .modify(|_, w| unsafe { w.tx_bits_mod().bits(data_format.channel_bits()) });
-            i2s.sample_rate_conf()
-                .modify(|_, w| unsafe { w.rx_bits_mod().bits(data_format.channel_bits()) });
+            self.regs().sample_rate_conf().modify(|_, w| unsafe {
+                w.tx_bits_mod().bits(data_format.channel_bits());
+                w.rx_bits_mod().bits(data_format.channel_bits())
+            });
 
-            i2s.conf().modify(|_, w| {
+            self.regs().conf().modify(|_, w| {
                 w.tx_slave_mod().clear_bit();
                 w.rx_slave_mod().clear_bit();
                 // If the I2S_RX_MSB_SHIFT bit and the I2S_TX_MSB_SHIFT bit of register
@@ -1007,7 +936,7 @@ mod private {
                 w.sig_loopback().clear_bit()
             });
 
-            i2s.fifo_conf().modify(|_, w| unsafe {
+            self.regs().fifo_conf().modify(|_, w| unsafe {
                 w.tx_fifo_mod().bits(fifo_mod);
                 w.tx_fifo_mod_force_en().set_bit();
                 w.dscr_en().set_bit();
@@ -1015,32 +944,33 @@ mod private {
                 w.rx_fifo_mod_force_en().set_bit()
             });
 
-            i2s.conf_chan().modify(|_, w| unsafe {
+            self.regs().conf_chan().modify(|_, w| unsafe {
                 // for now only stereo
                 w.tx_chan_mod().bits(0);
                 w.rx_chan_mod().bits(0)
             });
 
-            i2s.conf1().modify(|_, w| {
+            self.regs().conf1().modify(|_, w| {
                 w.tx_pcm_bypass().set_bit();
                 w.rx_pcm_bypass().set_bit()
             });
 
-            i2s.pd_conf().modify(|_, w| {
+            self.regs().pd_conf().modify(|_, w| {
                 w.fifo_force_pu().set_bit();
                 w.fifo_force_pd().clear_bit()
             });
 
-            i2s.conf2().modify(|_, w| {
+            self.regs().conf2().modify(|_, w| {
                 w.camera_en().clear_bit();
                 w.lcd_en().clear_bit()
             });
         }
 
         fn set_master(&self) {
-            let i2s = self.register_block();
-            i2s.conf()
-                .modify(|_, w| w.rx_slave_mod().clear_bit().tx_slave_mod().clear_bit());
+            self.regs().conf().modify(|_, w| {
+                w.rx_slave_mod().clear_bit();
+                w.tx_slave_mod().clear_bit()
+            });
         }
 
         fn update(&self) {
@@ -1048,72 +978,67 @@ mod private {
         }
 
         fn reset_tx(&self) {
-            let i2s = self.register_block();
-            i2s.conf().modify(|_, w| {
+            self.regs().conf().modify(|_, w| {
                 w.tx_reset().set_bit();
                 w.tx_fifo_reset().set_bit()
             });
-            i2s.conf().modify(|_, w| {
+            self.regs().conf().modify(|_, w| {
                 w.tx_reset().clear_bit();
                 w.tx_fifo_reset().clear_bit()
             });
 
-            i2s.lc_conf().modify(|_, w| w.out_rst().set_bit());
-            i2s.lc_conf().modify(|_, w| w.out_rst().clear_bit());
+            self.regs().lc_conf().modify(|_, w| w.out_rst().set_bit());
+            self.regs().lc_conf().modify(|_, w| w.out_rst().clear_bit());
 
-            i2s.int_clr().write(|w| {
+            self.regs().int_clr().write(|w| {
                 w.out_done().clear_bit_by_one();
                 w.out_total_eof().clear_bit_by_one()
             });
         }
 
         fn tx_start(&self) {
-            let i2s = self.register_block();
-            i2s.conf().modify(|_, w| w.tx_start().set_bit());
+            self.regs().conf().modify(|_, w| w.tx_start().set_bit());
 
-            while i2s.state().read().tx_idle().bit_is_set() {
+            while self.regs().state().read().tx_idle().bit_is_set() {
                 // wait
             }
         }
 
         fn tx_stop(&self) {
-            let i2s = self.register_block();
-            i2s.conf().modify(|_, w| w.tx_start().clear_bit());
+            self.regs().conf().modify(|_, w| w.tx_start().clear_bit());
         }
 
         fn wait_for_tx_done(&self) {
-            let i2s = self.register_block();
-            while i2s.state().read().tx_idle().bit_is_clear() {
+            while self.regs().state().read().tx_idle().bit_is_clear() {
                 // wait
             }
 
-            i2s.conf().modify(|_, w| w.tx_start().clear_bit());
+            self.regs().conf().modify(|_, w| w.tx_start().clear_bit());
         }
 
         fn reset_rx(&self) {
-            let i2s = self.register_block();
-            i2s.conf().modify(|_, w| {
+            self.regs().conf().modify(|_, w| {
                 w.rx_reset().set_bit();
                 w.rx_fifo_reset().set_bit()
             });
-            i2s.conf().modify(|_, w| {
+            self.regs().conf().modify(|_, w| {
                 w.rx_reset().clear_bit();
                 w.rx_fifo_reset().clear_bit()
             });
 
-            i2s.lc_conf().modify(|_, w| w.in_rst().set_bit());
-            i2s.lc_conf().modify(|_, w| w.in_rst().clear_bit());
+            self.regs().lc_conf().modify(|_, w| w.in_rst().set_bit());
+            self.regs().lc_conf().modify(|_, w| w.in_rst().clear_bit());
 
-            i2s.int_clr().write(|w| {
+            self.regs().int_clr().write(|w| {
                 w.in_done().clear_bit_by_one();
                 w.in_suc_eof().clear_bit_by_one()
             });
         }
 
         fn rx_start(&self, len: usize) {
-            let i2s = self.register_block();
-
-            i2s.int_clr().write(|w| w.in_suc_eof().clear_bit_by_one());
+            self.regs()
+                .int_clr()
+                .write(|w| w.in_suc_eof().clear_bit_by_one());
 
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
@@ -1124,19 +1049,21 @@ mod private {
                 }
             }
 
-            i2s.rxeof_num()
+            self.regs()
+                .rxeof_num()
                 .modify(|_, w| unsafe { w.rx_eof_num().bits(eof_num as u32) });
 
-            i2s.conf().modify(|_, w| w.rx_start().set_bit());
+            self.regs().conf().modify(|_, w| w.rx_start().set_bit());
         }
 
         fn wait_for_rx_done(&self) {
-            let i2s = self.register_block();
-            while i2s.int_raw().read().in_suc_eof().bit_is_clear() {
+            while self.regs().int_raw().read().in_suc_eof().bit_is_clear() {
                 // wait
             }
 
-            i2s.int_clr().write(|w| w.in_suc_eof().clear_bit_by_one());
+            self.regs()
+                .int_clr()
+                .write(|w| w.in_suc_eof().clear_bit_by_one());
         }
     }
 
@@ -1145,9 +1072,7 @@ mod private {
         fn set_interrupt_handler(&self, handler: InterruptHandler);
 
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
-            let reg_block = self.register_block();
-
-            reg_block.int_ena().modify(|_, w| {
+            self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
                     match interrupt {
                         I2sInterrupt::RxHung => w.rx_hung().bit(enable),
@@ -1170,8 +1095,7 @@ mod private {
 
         fn interrupts(&self) -> EnumSet<I2sInterrupt> {
             let mut res = EnumSet::new();
-            let reg_block = self.register_block();
-            let ints = reg_block.int_st().read();
+            let ints = self.regs().int_st().read();
 
             if ints.rx_hung().bit() {
                 res.insert(I2sInterrupt::RxHung);
@@ -1190,9 +1114,7 @@ mod private {
         }
 
         fn clear_interrupts(&self, interrupts: EnumSet<I2sInterrupt>) {
-            let reg_block = self.register_block();
-
-            reg_block.int_clr().write(|w| {
+            self.regs().int_clr().write(|w| {
                 for interrupt in interrupts {
                     match interrupt {
                         I2sInterrupt::RxHung => w.rx_hung().clear_bit_by_one(),
@@ -1207,8 +1129,6 @@ mod private {
 
         #[cfg(any(esp32c3, esp32s3))]
         fn set_clock(&self, clock_settings: I2sClockDividers) {
-            let i2s = self.register_block();
-
             let clkm_div_x: u32;
             let clkm_div_y: u32;
             let clkm_div_z: u32;
@@ -1248,14 +1168,14 @@ mod private {
                 clkm_div_yn1 = 0;
             }
 
-            i2s.tx_clkm_div_conf().modify(|_, w| unsafe {
+            self.regs().tx_clkm_div_conf().modify(|_, w| unsafe {
                 w.tx_clkm_div_x().bits(clkm_div_x as u16);
                 w.tx_clkm_div_y().bits(clkm_div_y as u16);
                 w.tx_clkm_div_yn1().bit(clkm_div_yn1 != 0);
                 w.tx_clkm_div_z().bits(clkm_div_z as u16)
             });
 
-            i2s.tx_clkm_conf().modify(|_, w| unsafe {
+            self.regs().tx_clkm_conf().modify(|_, w| unsafe {
                 w.clk_en().set_bit();
                 w.tx_clk_active().set_bit();
                 w.tx_clk_sel()
@@ -1264,19 +1184,19 @@ mod private {
                 w.tx_clkm_div_num().bits(clock_settings.mclk_divider as u8)
             });
 
-            i2s.tx_conf1().modify(|_, w| unsafe {
+            self.regs().tx_conf1().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
 
-            i2s.rx_clkm_div_conf().modify(|_, w| unsafe {
+            self.regs().rx_clkm_div_conf().modify(|_, w| unsafe {
                 w.rx_clkm_div_x().bits(clkm_div_x as u16);
                 w.rx_clkm_div_y().bits(clkm_div_y as u16);
                 w.rx_clkm_div_yn1().bit(clkm_div_yn1 != 0);
                 w.rx_clkm_div_z().bits(clkm_div_z as u16)
             });
 
-            i2s.rx_clkm_conf().modify(|_, w| unsafe {
+            self.regs().rx_clkm_conf().modify(|_, w| unsafe {
                 w.rx_clk_active().set_bit();
                 // for now fixed at 160MHz
                 w.rx_clk_sel()
@@ -1285,7 +1205,7 @@ mod private {
                 w.mclk_sel().bit(true)
             });
 
-            i2s.rx_conf1().modify(|_, w| unsafe {
+            self.regs().rx_conf1().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
@@ -1293,8 +1213,8 @@ mod private {
 
         #[cfg(any(esp32c6, esp32h2))]
         fn set_clock(&self, clock_settings: I2sClockDividers) {
-            let i2s = self.register_block();
-            let pcr = unsafe { &*crate::peripherals::PCR::PTR }; // I2S clocks are configured via PCR
+            // I2S clocks are configured via PCR
+            use crate::peripherals::PCR;
 
             let clkm_div_x: u32;
             let clkm_div_y: u32;
@@ -1335,14 +1255,14 @@ mod private {
                 clkm_div_yn1 = 0;
             }
 
-            pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
+            PCR::regs().i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
                 w.i2s_tx_clkm_div_x().bits(clkm_div_x as u16);
                 w.i2s_tx_clkm_div_y().bits(clkm_div_y as u16);
                 w.i2s_tx_clkm_div_yn1().bit(clkm_div_yn1 != 0);
                 w.i2s_tx_clkm_div_z().bits(clkm_div_z as u16)
             });
 
-            pcr.i2s_tx_clkm_conf().modify(|_, w| unsafe {
+            PCR::regs().i2s_tx_clkm_conf().modify(|_, w| unsafe {
                 w.i2s_tx_clkm_en().set_bit();
                 // for now fixed at 160MHz for C6 and 96MHz for H2
                 w.i2s_tx_clkm_sel()
@@ -1352,24 +1272,24 @@ mod private {
             });
 
             #[cfg(not(esp32h2))]
-            i2s.tx_conf1().modify(|_, w| unsafe {
+            self.regs().tx_conf1().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
             #[cfg(esp32h2)]
-            i2s.tx_conf().modify(|_, w| unsafe {
+            self.regs().tx_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
 
-            pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
+            PCR::regs().i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
                 w.i2s_rx_clkm_div_x().bits(clkm_div_x as u16);
                 w.i2s_rx_clkm_div_y().bits(clkm_div_y as u16);
                 w.i2s_rx_clkm_div_yn1().bit(clkm_div_yn1 != 0);
                 w.i2s_rx_clkm_div_z().bits(clkm_div_z as u16)
             });
 
-            pcr.i2s_rx_clkm_conf().modify(|_, w| unsafe {
+            PCR::regs().i2s_rx_clkm_conf().modify(|_, w| unsafe {
                 w.i2s_rx_clkm_en().set_bit();
                 // for now fixed at 160MHz for C6 and 96MHz for H2
                 w.i2s_rx_clkm_sel()
@@ -1379,22 +1299,20 @@ mod private {
                 w.i2s_mclk_sel().bit(true)
             });
             #[cfg(not(esp32h2))]
-            i2s.rx_conf1().modify(|_, w| unsafe {
+            self.regs().rx_conf1().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
             #[cfg(esp32h2)]
-            i2s.rx_conf().modify(|_, w| unsafe {
+            self.regs().rx_conf().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
         }
 
         fn configure(&self, _standard: &Standard, data_format: &DataFormat) {
-            let i2s = self.register_block();
-
             #[allow(clippy::useless_conversion)]
-            i2s.tx_conf1().modify(|_, w| unsafe {
+            self.regs().tx_conf1().modify(|_, w| unsafe {
                 w.tx_tdm_ws_width()
                     .bits((data_format.channel_bits() - 1).into());
                 w.tx_bits_mod().bits(data_format.data_bits() - 1);
@@ -1402,10 +1320,14 @@ mod private {
                 w.tx_half_sample_bits().bits(data_format.channel_bits() - 1)
             });
             #[cfg(not(esp32h2))]
-            i2s.tx_conf1().modify(|_, w| w.tx_msb_shift().set_bit());
+            self.regs()
+                .tx_conf1()
+                .modify(|_, w| w.tx_msb_shift().set_bit());
             #[cfg(esp32h2)]
-            i2s.tx_conf().modify(|_, w| w.tx_msb_shift().set_bit());
-            i2s.tx_conf().modify(|_, w| unsafe {
+            self.regs()
+                .tx_conf()
+                .modify(|_, w| w.tx_msb_shift().set_bit());
+            self.regs().tx_conf().modify(|_, w| unsafe {
                 w.tx_mono().clear_bit();
                 w.tx_mono_fst_vld().set_bit();
                 w.tx_stop_en().set_bit();
@@ -1418,7 +1340,7 @@ mod private {
                 w.tx_chan_mod().bits(0)
             });
 
-            i2s.tx_tdm_ctrl().modify(|_, w| unsafe {
+            self.regs().tx_tdm_ctrl().modify(|_, w| unsafe {
                 w.tx_tdm_tot_chan_num().bits(1);
                 w.tx_tdm_chan0_en().set_bit();
                 w.tx_tdm_chan1_en().set_bit();
@@ -1439,7 +1361,7 @@ mod private {
             });
 
             #[allow(clippy::useless_conversion)]
-            i2s.rx_conf1().modify(|_, w| unsafe {
+            self.regs().rx_conf1().modify(|_, w| unsafe {
                 w.rx_tdm_ws_width()
                     .bits((data_format.channel_bits() - 1).into());
                 w.rx_bits_mod().bits(data_format.data_bits() - 1);
@@ -1447,11 +1369,15 @@ mod private {
                 w.rx_half_sample_bits().bits(data_format.channel_bits() - 1)
             });
             #[cfg(not(esp32h2))]
-            i2s.rx_conf1().modify(|_, w| w.rx_msb_shift().set_bit());
+            self.regs()
+                .rx_conf1()
+                .modify(|_, w| w.rx_msb_shift().set_bit());
             #[cfg(esp32h2)]
-            i2s.rx_conf().modify(|_, w| w.rx_msb_shift().set_bit());
+            self.regs()
+                .rx_conf()
+                .modify(|_, w| w.rx_msb_shift().set_bit());
 
-            i2s.rx_conf().modify(|_, w| unsafe {
+            self.regs().rx_conf().modify(|_, w| unsafe {
                 w.rx_mono().clear_bit();
                 w.rx_mono_fst_vld().set_bit();
                 w.rx_stop_mode().bits(2);
@@ -1462,7 +1388,7 @@ mod private {
                 w.rx_bit_order().clear_bit()
             });
 
-            i2s.rx_tdm_ctrl().modify(|_, w| unsafe {
+            self.regs().rx_tdm_ctrl().modify(|_, w| unsafe {
                 w.rx_tdm_tot_chan_num().bits(1);
                 w.rx_tdm_pdm_chan0_en().set_bit();
                 w.rx_tdm_pdm_chan1_en().set_bit();
@@ -1484,71 +1410,77 @@ mod private {
         }
 
         fn set_master(&self) {
-            let i2s = self.register_block();
-            i2s.tx_conf().modify(|_, w| w.tx_slave_mod().clear_bit());
-            i2s.rx_conf().modify(|_, w| w.rx_slave_mod().clear_bit());
+            self.regs()
+                .tx_conf()
+                .modify(|_, w| w.tx_slave_mod().clear_bit());
+            self.regs()
+                .rx_conf()
+                .modify(|_, w| w.rx_slave_mod().clear_bit());
         }
 
         fn update(&self) {
-            let i2s = self.register_block();
-            i2s.tx_conf().modify(|_, w| w.tx_update().clear_bit());
-            i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
+            self.regs()
+                .tx_conf()
+                .modify(|_, w| w.tx_update().clear_bit());
+            self.regs().tx_conf().modify(|_, w| w.tx_update().set_bit());
 
-            i2s.rx_conf().modify(|_, w| w.rx_update().clear_bit());
-            i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
+            self.regs()
+                .rx_conf()
+                .modify(|_, w| w.rx_update().clear_bit());
+            self.regs().rx_conf().modify(|_, w| w.rx_update().set_bit());
         }
 
         fn reset_tx(&self) {
-            let i2s = self.register_block();
-            i2s.tx_conf().modify(|_, w| {
+            self.regs().tx_conf().modify(|_, w| {
                 w.tx_reset().set_bit();
                 w.tx_fifo_reset().set_bit()
             });
-            i2s.tx_conf().modify(|_, w| {
+            self.regs().tx_conf().modify(|_, w| {
                 w.tx_reset().clear_bit();
                 w.tx_fifo_reset().clear_bit()
             });
 
-            i2s.int_clr().write(|w| {
+            self.regs().int_clr().write(|w| {
                 w.tx_done().clear_bit_by_one();
                 w.tx_hung().clear_bit_by_one()
             });
         }
 
         fn tx_start(&self) {
-            let i2s = self.register_block();
-            i2s.tx_conf().modify(|_, w| w.tx_start().set_bit());
+            self.regs().tx_conf().modify(|_, w| w.tx_start().set_bit());
         }
 
         fn tx_stop(&self) {
-            let i2s = self.register_block();
-            i2s.tx_conf().modify(|_, w| w.tx_start().clear_bit());
+            self.regs()
+                .tx_conf()
+                .modify(|_, w| w.tx_start().clear_bit());
         }
 
         fn wait_for_tx_done(&self) {
-            let i2s = self.register_block();
-            while i2s.state().read().tx_idle().bit_is_clear() {
+            while self.regs().state().read().tx_idle().bit_is_clear() {
                 // wait
             }
 
-            i2s.tx_conf().modify(|_, w| w.tx_start().clear_bit());
+            self.regs()
+                .tx_conf()
+                .modify(|_, w| w.tx_start().clear_bit());
         }
 
         fn reset_rx(&self) {
-            let i2s = self.register_block();
+            self.regs()
+                .rx_conf()
+                .modify(|_, w| w.rx_start().clear_bit());
 
-            i2s.rx_conf().modify(|_, w| w.rx_start().clear_bit());
-
-            i2s.rx_conf().modify(|_, w| {
+            self.regs().rx_conf().modify(|_, w| {
                 w.rx_reset().set_bit();
                 w.rx_fifo_reset().set_bit()
             });
-            i2s.rx_conf().modify(|_, w| {
+            self.regs().rx_conf().modify(|_, w| {
                 w.rx_reset().clear_bit();
                 w.rx_fifo_reset().clear_bit()
             });
 
-            i2s.int_clr().write(|w| {
+            self.regs().int_clr().write(|w| {
                 w.rx_done().clear_bit_by_one();
                 w.rx_hung().clear_bit_by_one()
             });
@@ -1557,24 +1489,25 @@ mod private {
         fn rx_start(&self, len: usize) {
             let len = len - 1;
 
-            let i2s = self.register_block();
-            i2s.rxeof_num()
+            self.regs()
+                .rxeof_num()
                 .write(|w| unsafe { w.rx_eof_num().bits(len as u16) });
-            i2s.rx_conf().modify(|_, w| w.rx_start().set_bit());
+            self.regs().rx_conf().modify(|_, w| w.rx_start().set_bit());
         }
 
         fn wait_for_rx_done(&self) {
-            let i2s = self.register_block();
-            while i2s.int_raw().read().rx_done().bit_is_clear() {
+            while self.regs().int_raw().read().rx_done().bit_is_clear() {
                 // wait
             }
 
-            i2s.int_clr().write(|w| w.rx_done().clear_bit_by_one());
+            self.regs()
+                .int_clr()
+                .write(|w| w.rx_done().clear_bit_by_one());
         }
     }
 
     impl RegBlock for I2S0 {
-        fn register_block(&self) -> &RegisterBlock {
+        fn regs(&self) -> &RegisterBlock {
             unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
         }
 
@@ -1682,7 +1615,7 @@ mod private {
 
     #[cfg(i2s1)]
     impl RegBlock for I2S1 {
-        fn register_block(&self) -> &RegisterBlock {
+        fn regs(&self) -> &RegisterBlock {
             unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
         }
 
@@ -1755,13 +1688,20 @@ mod private {
     }
 
     impl RegBlock for super::AnyI2s {
+        fn regs(&self) -> &RegisterBlock {
+            match &self.0 {
+                super::AnyI2sInner::I2s0(i2s) => RegBlock::regs(i2s),
+                #[cfg(i2s1)]
+                super::AnyI2sInner::I2s1(i2s) => RegBlock::regs(i2s),
+            }
+        }
+
         delegate::delegate! {
             to match &self.0 {
                 super::AnyI2sInner::I2s0(i2s) => i2s,
                 #[cfg(i2s1)]
                 super::AnyI2sInner::I2s1(i2s) => i2s,
             } {
-                fn register_block(&self) -> &RegisterBlock;
                 fn peripheral(&self) -> crate::system::Peripheral;
             }
         }
@@ -1875,10 +1815,11 @@ mod private {
 
 /// Async functionality
 pub mod asynch {
-    use super::{Error, I2sRx, I2sTx, RegisterAccess};
+    use super::{Error, I2sRx, I2sTx, RegisterAccessPrivate};
     use crate::{
         dma::{
             asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
+            DmaEligible,
             ReadBuffer,
             Rx,
             RxCircularState,
@@ -1889,10 +1830,7 @@ pub mod asynch {
         Async,
     };
 
-    impl<'d, T> I2sTx<'d, Async, T>
-    where
-        T: RegisterAccess,
-    {
+    impl<'d> I2sTx<'d, Async> {
         /// One-shot write I2S.
         pub async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_ptr(), words.len());
@@ -1919,7 +1857,7 @@ pub mod asynch {
         pub fn write_dma_circular_async<TXBUF: ReadBuffer>(
             mut self,
             words: TXBUF,
-        ) -> Result<I2sWriteDmaTransferAsync<'d, TXBUF, T>, Error> {
+        ) -> Result<I2sWriteDmaTransferAsync<'d, TXBUF>, Error> {
             let (ptr, len) = unsafe { words.read_buffer() };
 
             // Reset TX unit and TX FIFO
@@ -1950,19 +1888,13 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA write transfer.
-    pub struct I2sWriteDmaTransferAsync<'d, BUFFER, T = super::AnyI2s>
-    where
-        T: RegisterAccess,
-    {
-        i2s_tx: I2sTx<'d, Async, T>,
+    pub struct I2sWriteDmaTransferAsync<'d, BUFFER> {
+        i2s_tx: I2sTx<'d, Async>,
         state: TxCircularState,
         _buffer: BUFFER,
     }
 
-    impl<T, BUFFER> I2sWriteDmaTransferAsync<'_, BUFFER, T>
-    where
-        T: RegisterAccess,
-    {
+    impl<BUFFER> I2sWriteDmaTransferAsync<'_, BUFFER> {
         /// How many bytes can be pushed into the DMA transaction.
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
@@ -1999,10 +1931,7 @@ pub mod asynch {
         }
     }
 
-    impl<'d, T> I2sRx<'d, Async, T>
-    where
-        T: RegisterAccess,
-    {
+    impl<'d> I2sRx<'d, Async> {
         /// One-shot read I2S.
         pub async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_mut_ptr(), words.len());
@@ -2037,7 +1966,7 @@ pub mod asynch {
         pub fn read_dma_circular_async<RXBUF>(
             mut self,
             mut words: RXBUF,
-        ) -> Result<I2sReadDmaTransferAsync<'d, RXBUF, T>, Error>
+        ) -> Result<I2sReadDmaTransferAsync<'d, RXBUF>, Error>
         where
             RXBUF: WriteBuffer,
         {
@@ -2073,19 +2002,13 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA read transfer.
-    pub struct I2sReadDmaTransferAsync<'d, BUFFER, T = super::AnyI2s>
-    where
-        T: RegisterAccess,
-    {
-        i2s_rx: I2sRx<'d, Async, T>,
+    pub struct I2sReadDmaTransferAsync<'d, BUFFER> {
+        i2s_rx: I2sRx<'d, Async>,
         state: RxCircularState,
         _buffer: BUFFER,
     }
 
-    impl<T, BUFFER> I2sReadDmaTransferAsync<'_, BUFFER, T>
-    where
-        T: RegisterAccess,
-    {
+    impl<BUFFER> I2sReadDmaTransferAsync<'_, BUFFER> {
         /// How many bytes can be popped from the DMA transaction.
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {

@@ -28,7 +28,7 @@
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config::default().with_frequency(100.kHz()).with_mode(Mode::Mode0)
+//!     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
 //! )
 //! .unwrap()
 //! .with_sck(sclk)
@@ -274,6 +274,7 @@ impl defmt::Format for DmaDescriptorFlags {
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(C)]
 pub struct DmaDescriptor {
     /// Descriptor flags.
     pub flags: DmaDescriptorFlags,
@@ -1668,18 +1669,18 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 ///
 /// ```rust,no_run
 #[doc = crate::before_snippet!()]
+/// use esp_hal::spi::AnySpi;
 /// use esp_hal::spi::master::{Spi, SpiDma, Config, Instance as SpiInstance};
 /// use esp_hal::dma::DmaChannelFor;
 /// use esp_hal::peripheral::Peripheral;
 /// use esp_hal::Blocking;
 ///
-/// fn configures_spi_dma<'d, S, CH>(
-///     spi: Spi<'d, Blocking, S>,
+/// fn configures_spi_dma<'d, CH>(
+///     spi: Spi<'d, Blocking>,
 ///     channel: impl Peripheral<P = CH> + 'd,
-/// ) -> SpiDma<'d, Blocking, S>
+/// ) -> SpiDma<'d, Blocking>
 /// where
-///     S: SpiInstance,
-///     CH: DmaChannelFor<S> + 'd,
+///     CH: DmaChannelFor<AnySpi> + 'd,
 ///  {
 ///     spi.with_dma(channel)
 /// }
@@ -2307,6 +2308,7 @@ where
 
     fn start_transfer(&mut self) -> Result<(), DmaError> {
         self.tx_impl.start();
+        while self.tx_impl.is_fifo_empty() && self.pending_out_interrupts().is_empty() {}
 
         if self
             .pending_out_interrupts()
@@ -2413,6 +2415,9 @@ pub trait RxRegisterAccess: RegisterAccess {
 
 #[doc(hidden)]
 pub trait TxRegisterAccess: RegisterAccess {
+    /// Returns whether the DMA's FIFO is empty.
+    fn is_fifo_empty(&self) -> bool;
+
     /// Enable/disable outlink-writeback
     fn set_auto_write_back(&self, enable: bool);
 
@@ -2463,7 +2468,9 @@ impl<'d, CH> Channel<'d, Blocking, CH>
 where
     CH: DmaChannel,
 {
-    pub(crate) fn new(channel: impl Peripheral<P = CH>) -> Self {
+    /// Creates a new DMA channel driver.
+    #[instability::unstable]
+    pub fn new(channel: impl Peripheral<P = CH>) -> Self {
         let (rx, tx) = unsafe {
             channel
                 .clone_unchecked()

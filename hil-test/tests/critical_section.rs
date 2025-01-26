@@ -1,6 +1,7 @@
 //! Ensure invariants of locks are upheld.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: unstable
 
 // TODO: add multi-core tests
 
@@ -145,5 +146,37 @@ mod tests {
     #[should_panic]
     fn priority_lock_panics_on_higher_priority_access(peripherals: Peripherals) {
         test_access_at_priority(peripherals, Priority::Priority2);
+    }
+
+    #[test]
+    fn max_priority_lock_is_masking_interrupt(peripherals: Peripherals) {
+        use portable_atomic::{AtomicU32, Ordering};
+
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+        extern "C" fn increment<const INT: u8>() {
+            unsafe { SoftwareInterrupt::<INT>::steal().reset() };
+            COUNTER.fetch_add(1, Ordering::AcqRel);
+        }
+
+        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+
+        let mut interrupt = sw_ints.software_interrupt0;
+        interrupt.set_interrupt_handler(InterruptHandler::new(increment::<0>, Priority::Priority1));
+
+        let lock = RawPriorityLimitedMutex::new(Priority::max());
+
+        let delay = Delay::new();
+
+        // Taking the lock masks the lower priority interrupt
+        lock.lock(|| {
+            interrupt.raise();
+            delay.delay_millis(1);
+            assert_eq!(COUNTER.load(Ordering::Acquire), 0); // not incremented
+        });
+
+        // Releasing the lock unmasks the lower priority interrupt
+        delay.delay_millis(1);
+        assert_eq!(COUNTER.load(Ordering::Acquire), 1);
     }
 }

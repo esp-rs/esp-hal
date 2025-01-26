@@ -45,10 +45,21 @@
 //! a feature flag of the `log` crate. See [documentation](https://docs.rs/log/0.4.19/log/#compile-time-filters).
 //! You should set it to `release_max_level_off`.
 //!
-//! ### Xtensa considerations
+//! ### WiFi performance considerations
 //!
-//! Within this crate, `CCOMPARE0` CPU timer is used for timing, ensure that in
-//! your application you are not using this CPU timer.
+//! The default configuration is quite conservative to reduce power and memory consumption.
+//!
+//! There are a number of settings which influence the general performance. Optimal settings are chip and applications specific.
+//! You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
+//!
+//! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
+//!
+//! By default the power-saving mode is [PowerSaveMode::Minimum](crate::config::PowerSaveMode::Minimum) and `ESP_WIFI_PHY_ENABLE_USB` is enabled by default.
+//!
+//! In addition pay attention to these configuration keys:
+//! - `ESP_WIFI_RX_QUEUE_SIZE`
+//! - `ESP_WIFI_TX_QUEUE_SIZE`
+//! - `ESP_WIFI_MAX_BURST_SIZE`
 //!
 //! # Features flags
 //!
@@ -77,6 +88,7 @@
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(feature = "sys-logs", feature(c_variadic))]
+#![deny(rust_2018_idioms, rustdoc::all)]
 #![allow(rustdoc::bare_urls)]
 // allow until num-derive doesn't generate this warning anymore (unknown_lints because Xtensa
 // toolchain doesn't know about that lint, yet)
@@ -167,7 +179,6 @@ struct Config {
     dynamic_rx_buf_num: usize,
     static_tx_buf_num: usize,
     dynamic_tx_buf_num: usize,
-    csi_enable: bool,
     ampdu_rx_enable: bool,
     ampdu_tx_enable: bool,
     amsdu_tx_enable: bool,
@@ -185,27 +196,29 @@ struct Config {
 }
 
 pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
-    rx_queue_size: esp_config_int!(usize, "ESP_WIFI_RX_QUEUE_SIZE"),
-    tx_queue_size: esp_config_int!(usize, "ESP_WIFI_TX_QUEUE_SIZE"),
-    static_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_RX_BUF_NUM"),
-    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_RX_BUF_NUM"),
-    static_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_STATIC_TX_BUF_NUM"),
-    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_DYNAMIC_TX_BUF_NUM"),
-    csi_enable: esp_config_bool!("ESP_WIFI_CSI_ENABLE"),
-    ampdu_rx_enable: esp_config_bool!("ESP_WIFI_AMPDU_RX_ENABLE"),
-    ampdu_tx_enable: esp_config_bool!("ESP_WIFI_AMPDU_TX_ENABLE"),
-    amsdu_tx_enable: esp_config_bool!("ESP_WIFI_AMSDU_TX_ENABLE"),
-    rx_ba_win: esp_config_int!(usize, "ESP_WIFI_RX_BA_WIN"),
-    max_burst_size: esp_config_int!(usize, "ESP_WIFI_MAX_BURST_SIZE"),
-    country_code: esp_config_str!("ESP_WIFI_COUNTRY_CODE"),
-    country_code_operating_class: esp_config_int!(u8, "ESP_WIFI_COUNTRY_CODE_OPERATING_CLASS"),
-    mtu: esp_config_int!(usize, "ESP_WIFI_MTU"),
-    tick_rate_hz: esp_config_int!(u32, "ESP_WIFI_TICK_RATE_HZ"),
-    listen_interval: esp_config_int!(u16, "ESP_WIFI_LISTEN_INTERVAL"),
-    beacon_timeout: esp_config_int!(u16, "ESP_WIFI_BEACON_TIMEOUT"),
-    ap_beacon_timeout: esp_config_int!(u16, "ESP_WIFI_AP_BEACON_TIMEOUT"),
-    failure_retry_cnt: esp_config_int!(u8, "ESP_WIFI_FAILURE_RETRY_CNT"),
-    scan_method: esp_config_int!(u32, "ESP_WIFI_SCAN_METHOD"),
+    rx_queue_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_RX_QUEUE_SIZE"),
+    tx_queue_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_TX_QUEUE_SIZE"),
+    static_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_STATIC_RX_BUF_NUM"),
+    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_DYNAMIC_RX_BUF_NUM"),
+    static_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_STATIC_TX_BUF_NUM"),
+    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_DYNAMIC_TX_BUF_NUM"),
+    ampdu_rx_enable: esp_config_bool!("ESP_WIFI_CONFIG_AMPDU_RX_ENABLE"),
+    ampdu_tx_enable: esp_config_bool!("ESP_WIFI_CONFIG_AMPDU_TX_ENABLE"),
+    amsdu_tx_enable: esp_config_bool!("ESP_WIFI_CONFIG_AMSDU_TX_ENABLE"),
+    rx_ba_win: esp_config_int!(usize, "ESP_WIFI_CONFIG_RX_BA_WIN"),
+    max_burst_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_MAX_BURST_SIZE"),
+    country_code: esp_config_str!("ESP_WIFI_CONFIG_COUNTRY_CODE"),
+    country_code_operating_class: esp_config_int!(
+        u8,
+        "ESP_WIFI_CONFIG_COUNTRY_CODE_OPERATING_CLASS"
+    ),
+    mtu: esp_config_int!(usize, "ESP_WIFI_CONFIG_MTU"),
+    tick_rate_hz: esp_config_int!(u32, "ESP_WIFI_CONFIG_TICK_RATE_HZ"),
+    listen_interval: esp_config_int!(u16, "ESP_WIFI_CONFIG_LISTEN_INTERVAL"),
+    beacon_timeout: esp_config_int!(u16, "ESP_WIFI_CONFIG_BEACON_TIMEOUT"),
+    ap_beacon_timeout: esp_config_int!(u16, "ESP_WIFI_CONFIG_AP_BEACON_TIMEOUT"),
+    failure_retry_cnt: esp_config_int!(u8, "ESP_WIFI_CONFIG_FAILURE_RETRY_CNT"),
+    scan_method: esp_config_int!(u32, "ESP_WIFI_CONFIG_SCAN_METHOD"),
 };
 
 // Validate the configuration at compile time
@@ -220,7 +233,7 @@ const _: () = {
     core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
 };
 
-type TimeBase = PeriodicTimer<'static, Blocking, AnyTimer>;
+type TimeBase = PeriodicTimer<'static, Blocking>;
 
 pub(crate) mod flags {
     use portable_atomic::{AtomicBool, AtomicUsize};
@@ -351,9 +364,9 @@ impl private::Sealed for Trng<'_> {}
 /// .unwrap();
 /// # }
 /// ```
-pub fn init<'d, T: EspWifiTimerSource>(
+pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     timer: impl Peripheral<P = T> + 'd,
-    _rng: impl EspWifiRngSource,
+    _rng: impl Peripheral<P = R> + 'd,
     _radio_clocks: impl Peripheral<P = hal::peripherals::RADIO_CLK> + 'd,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.

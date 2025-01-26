@@ -19,7 +19,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    entry,
+    main,
     peripheral::Peripheral,
     spi::{
         master::{Config, Spi},
@@ -29,7 +29,7 @@ use esp_hal::{
 };
 use esp_println::println;
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
@@ -43,7 +43,7 @@ fn main() -> ! {
         peripherals.SPI2,
         Config::default()
             .with_frequency(100.kHz())
-            .with_mode(Mode::Mode0),
+            .with_mode(Mode::_0),
     )
     .unwrap()
     .with_sck(sclk)

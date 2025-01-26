@@ -73,7 +73,9 @@ cfg_if::cfg_if! {
 }
 
 /// The sampling/readout resolution of the ADC.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Resolution {
     /// 13-bit resolution
     #[default]
@@ -161,8 +163,7 @@ pub trait RegisterAccess {
 
 impl RegisterAccess for crate::peripherals::ADC1 {
     fn set_attenuation(channel: usize, attenuation: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_atten1().modify(|r, w| {
+        SENS::regs().sar_atten1().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
                 | (((attenuation & 0b11) as u32) << (channel * 2));
 
@@ -171,50 +172,43 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     }
 
     fn clear_dig_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas1_mux()
             .modify(|_, w| w.sar1_dig_force().clear_bit());
     }
 
     fn set_start_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas1_ctrl2()
             .modify(|_, w| w.meas1_start_force().set_bit());
     }
 
     fn set_en_pad_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas1_ctrl2()
             .modify(|_, w| w.sar1_en_pad_force().set_bit());
     }
 
     fn set_en_pad(channel: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas1_ctrl2()
             .modify(|_, w| unsafe { w.sar1_en_pad().bits(1 << channel) });
     }
 
     fn clear_start_sample() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas1_ctrl2()
             .modify(|_, w| w.meas1_start_sar().clear_bit());
     }
 
     fn start_sample() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas1_ctrl2()
             .modify(|_, w| w.meas1_start_sar().set_bit());
     }
 
     fn is_done() -> bool {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas1_ctrl2()
             .read()
             .meas1_done_sar()
@@ -222,7 +216,7 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     }
 
     fn read_data() -> u16 {
-        unsafe { &*SENS::ptr() }
+        SENS::regs()
             .sar_meas1_ctrl2()
             .read()
             .meas1_data_sar()
@@ -232,13 +226,13 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_HIGH_ADDR, msb as u32);
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_LOW_ADDR, lsb as u32);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_HIGH_ADDR, msb as u32);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_LOW_ADDR, lsb as u32);
     }
 
     fn reset() {
-        let adc = unsafe { &*APB_SARADC::ptr() };
-        let sensors = unsafe { &*SENS::ptr() };
+        let adc = APB_SARADC::regs();
+        let sensors = SENS::regs();
 
         adc.int_clr().write(|w| w.adc1_done().clear_bit_by_one());
 
@@ -255,16 +249,20 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_DREF_ADDR, enable as u8);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_DREF_ADDR, enable as u8);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
             AdcCalSource::Gnd => {
-                crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_ENCAL_GND_ADDR, enable as u8);
+                crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_ENCAL_GND_ADDR, enable as u8);
             }
             AdcCalSource::Ref => {
-                crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC1_ENCAL_REF_ADDR, enable as u8);
+                crate::rom::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SARADC1_ENCAL_REF_ADDR,
+                    enable as u8
+                );
             }
         }
     }
@@ -272,8 +270,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
 
 impl RegisterAccess for crate::peripherals::ADC2 {
     fn set_attenuation(channel: usize, attenuation: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors.sar_atten2().modify(|r, w| {
+        SENS::regs().sar_atten2().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
                 | (((attenuation & 0b11) as u32) << (channel * 2));
 
@@ -282,53 +279,47 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     }
 
     fn clear_dig_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas2_mux()
             .modify(|_, w| w.sar2_rtc_force().set_bit());
 
-        let sar_apb = unsafe { &*APB_SARADC::ptr() };
-        sar_apb.arb_ctrl().modify(|_, w| w.rtc_force().set_bit());
+        APB_SARADC::regs()
+            .arb_ctrl()
+            .modify(|_, w| w.rtc_force().set_bit());
     }
 
     fn set_start_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas2_ctrl2()
             .modify(|_, w| w.meas2_start_force().set_bit());
     }
 
     fn set_en_pad_force() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas2_ctrl2()
             .modify(|_, w| w.sar2_en_pad_force().set_bit());
     }
 
     fn set_en_pad(channel: u8) {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas2_ctrl2()
             .modify(|_, w| unsafe { w.sar2_en_pad().bits(1 << channel) });
     }
 
     fn clear_start_sample() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas2_ctrl2()
             .modify(|_, w| w.meas2_start_sar().clear_bit());
     }
 
     fn start_sample() {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas2_ctrl2()
             .modify(|_, w| w.meas2_start_sar().set_bit());
     }
 
     fn is_done() -> bool {
-        let sensors = unsafe { &*SENS::ptr() };
-        sensors
+        SENS::regs()
             .sar_meas2_ctrl2()
             .read()
             .meas2_done_sar()
@@ -336,7 +327,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     }
 
     fn read_data() -> u16 {
-        unsafe { &*SENS::ptr() }
+        SENS::regs()
             .sar_meas2_ctrl2()
             .read()
             .meas2_data_sar()
@@ -346,13 +337,13 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_HIGH_ADDR, msb as u32);
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_LOW_ADDR, lsb as u32);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_HIGH_ADDR, msb as u32);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_LOW_ADDR, lsb as u32);
     }
 
     fn reset() {
-        let adc = unsafe { &*APB_SARADC::ptr() };
-        let sensors = unsafe { &*SENS::ptr() };
+        let adc = APB_SARADC::regs();
+        let sensors = SENS::regs();
 
         adc.int_clr().write(|w| w.adc2_done().clear_bit_by_one());
 
@@ -369,16 +360,20 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_DREF_ADDR, enable as u8);
+        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_DREF_ADDR, enable as u8);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
             AdcCalSource::Gnd => {
-                crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_ENCAL_GND_ADDR, enable as u8);
+                crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_ENCAL_GND_ADDR, enable as u8);
             }
             AdcCalSource::Ref => {
-                crate::regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC2_ENCAL_REF_ADDR, enable as u8);
+                crate::rom::regi2c_write_mask!(
+                    I2C_SAR_ADC,
+                    ADC_SARADC2_ENCAL_REF_ADDR,
+                    enable as u8
+                );
             }
         }
     }
@@ -403,7 +398,7 @@ where
         config: AdcConfig<ADCI>,
     ) -> Self {
         let guard = GenericPeripheralGuard::new();
-        let sensors = unsafe { &*SENS::ptr() };
+        let sensors = SENS::regs();
 
         // Set attenuation for pins
         let attenuations = config.attenuations;

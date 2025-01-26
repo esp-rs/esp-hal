@@ -1,13 +1,8 @@
 [package]
 name = "xtensa-lx-rt-proc-macros"
-authors = [
-    "Jorge Aparicio <jorge@japaric.io>",
-    "Arjan Mels <arjan@mels.email>",
-    "Scott Mabin <scott@mabez.dev>",
-]
 version = "0.2.2"
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.84.0"
 description = "Attributes re-exported in `xtensa-lx-rt`"
 repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
