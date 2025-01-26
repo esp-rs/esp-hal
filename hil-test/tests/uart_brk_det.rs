@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_hal::{
-    uart::{Uart, Config as UartConfig,},
+    uart::{Config as UartConfig, Uart},
     Blocking,
 };
 use hil_test as _;
