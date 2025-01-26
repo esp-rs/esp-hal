@@ -1,12 +1,13 @@
 //! UART Break Detection test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% FEATURES: embassy
 
 #![no_std]
 #![no_main]
 
 use esp_hal::{
-    uart::{self, Uart},
+    uart::{Uart, Config as UartConfig,},
     Blocking,
 };
 use hil_test as _;
@@ -26,7 +27,10 @@ mod tests {
 
         let (_, pin) = hil_test::common_test_pins!(peripherals);
         let (rx, tx) = pin.split();
-        let uart = Uart::new(peripherals.UART1, uart::Config::default(), rx, tx).unwrap();
+        let uart = Uart::new(peripherals.UART1, UartConfig::default())
+            .expect("Failed to initialize UART")
+            .with_rx(rx)
+            .with_tx(tx);
 
         Context { uart }
     }

@@ -852,6 +852,23 @@ where
         Ok(count)
     }
 
+    /// Busy waits for a break condition to be detected on the RX
+    /// line. Condition is met when the receiver detects a NULL character
+    /// (i.e. logic 0 for one NULL character transmission) after stop bits.
+    ///
+    /// Clears the break detection interrupt before returning.
+    pub fn wait_for_break(&mut self) {
+        // Enable the break detection interrupt
+        self.regs().int_ena().write(|w| w.brk_det().bit(true));
+
+        while !self.regs().int_raw().read().brk_det().bit() {
+            // Just busy waiting
+        }
+
+        // Clear the break detection interrupt
+        self.regs().int_clr().write(|w| w.brk_det().bit(true));
+    }
+
     /// Read bytes from the RX FIFO without checking for errors.
     fn flush_buffer(&mut self, buf: &mut [u8]) -> usize {
         let mut count = 0;
@@ -1047,6 +1064,11 @@ pub enum UartInterrupt {
     /// The transmitter has finished sending out all data from the FIFO.
     TxDone,
 
+    /// Break condition has been detected.
+    /// Triggered when the receiver detects a NULL character (i.e. logic 0 for
+    /// one NULL character transmission) after stop bits.
+    RxBreakDetected,
+
     /// The receiver has received more data than what
     /// [`RxConfig::fifo_full_threshold`] specifies.
     RxFifoFull,
@@ -1168,6 +1190,11 @@ where
         self.regs().clk_conf().modify(|_, w| w.sclk_en().set_bit());
 
         sync_regs(self.regs());
+    }
+
+    /// Busy waits for a break condition to be detected on the RX line.
+    pub fn wait_for_break(&mut self) {
+        self.rx.wait_for_break();
     }
 
     /// Flush the transmit buffer of the UART
@@ -1475,6 +1502,7 @@ pub(crate) enum TxEvent {
 #[derive(Debug, EnumSetType)]
 pub(crate) enum RxEvent {
     FifoFull,
+    BreakDetected,
     CmdCharDetected,
     FifoOvf,
     FifoTout,
@@ -1490,7 +1518,10 @@ fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), Error> {
             RxEvent::GlitchDetected => return Err(Error::GlitchOccurred),
             RxEvent::FrameError => return Err(Error::FrameFormatViolated),
             RxEvent::ParityError => return Err(Error::ParityMismatch),
-            RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
+            RxEvent::FifoFull
+            | RxEvent::BreakDetected
+            | RxEvent::CmdCharDetected
+            | RxEvent::FifoTout => continue,
         }
     }
 
@@ -1633,6 +1664,13 @@ impl Uart<'_, Async> {
         self.rx.read_async(buf).await
     }
 
+    /// Asynchronously waits for a break condition on the RX line.
+    /// Condition is met when the receiver detects a NULL character (i.e. logic
+    /// 0 for one NULL character transmission) after stop bits.
+    pub async fn wait_for_break_async(&mut self) {
+        self.rx.wait_for_break_async().await;
+    }
+
     /// Asynchronously writes data to the UART transmit buffer.
     pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
         self.tx.write_async(words).await
@@ -1757,6 +1795,13 @@ impl UartRx<'_, Async> {
             }
         }
     }
+
+    /// Interrupt-driven wait for a break condition on the RX line.
+    /// Condition is met when the receiver detects a NULL character (i.e. logic
+    /// 0 for one NULL character transmission) after stop bits.
+    pub async fn wait_for_break_async(&mut self) {
+        UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
+    }
 }
 
 #[cfg(any(doc, feature = "unstable"))]
@@ -1815,6 +1860,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
     let rx_wake = interrupts.rxfifo_full().bit_is_set()
         || interrupts.rxfifo_ovf().bit_is_set()
         || interrupts.rxfifo_tout().bit_is_set()
+        || interrupts.brk_det().bit_is_set()
         || interrupts.at_cmd_char_det().bit_is_set()
         || interrupts.glitch_det().bit_is_set()
         || interrupts.frm_err().bit_is_set()
@@ -2130,6 +2176,7 @@ impl Info {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().bit(enable),
                     UartInterrupt::TxDone => w.tx_done().bit(enable),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().bit(enable),
+                    UartInterrupt::RxBreakDetected => w.brk_det().bit(enable),
                 };
             }
             w
@@ -2151,6 +2198,9 @@ impl Info {
         if ints.rxfifo_full().bit_is_set() {
             res.insert(UartInterrupt::RxFifoFull);
         }
+        if ints.brk_det().bit_is_set() {
+            res.insert(UartInterrupt::RxBreakDetected);
+        }
 
         res
     }
@@ -2164,6 +2214,7 @@ impl Info {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().clear_bit_by_one(),
                     UartInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().clear_bit_by_one(),
+                    UartInterrupt::RxBreakDetected => w.brk_det().clear_bit_by_one(),
                 };
             }
             w
@@ -2202,6 +2253,7 @@ impl Info {
             for event in events {
                 match event {
                     RxEvent::FifoFull => w.rxfifo_full().bit(enable),
+                    RxEvent::BreakDetected => w.brk_det().bit(enable),
                     RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
 
                     RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
@@ -2222,6 +2274,7 @@ impl Info {
         for event in events {
             let event_triggered = match event {
                 RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
+                RxEvent::BreakDetected => interrupts_enabled.brk_det().bit_is_clear(),
                 RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_clear(),
 
                 RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
@@ -2244,6 +2297,7 @@ impl Info {
         for event in events {
             let event_triggered = match event {
                 RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_set(),
+                RxEvent::BreakDetected => interrupts_enabled.brk_det().bit_is_set(),
                 RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_set(),
 
                 RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_set(),
@@ -2265,6 +2319,7 @@ impl Info {
             for event in events {
                 match event {
                     RxEvent::FifoFull => w.rxfifo_full().clear_bit_by_one(),
+                    RxEvent::BreakDetected => w.brk_det().clear_bit_by_one(),
                     RxEvent::CmdCharDetected => w.at_cmd_char_det().clear_bit_by_one(),
 
                     RxEvent::FifoOvf => w.rxfifo_ovf().clear_bit_by_one(),

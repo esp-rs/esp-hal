@@ -14,31 +14,29 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
-    entry,
+    handler,
     interrupt::InterruptConfigurable,
-    macros::{handler, ram},
-    uart::{Config as UartConfig, DataBits, StopBits, Uart, UartInterrupt},
+    main,
+    ram,
+    uart::{Config as UartConfig, DataBits, Parity, RxConfig, StopBits, Uart, UartInterrupt},
     Blocking,
 };
 
 static SERIAL: Mutex<RefCell<Option<Uart<Blocking>>>> = Mutex::new(RefCell::new(None));
 
-#[entry]
+#[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let uart_config = UartConfig::default()
-        .baudrate(19200)
-        .data_bits(DataBits::DataBits8)
-        .parity_none()
-        .stop_bits(StopBits::Stop1)
-        .rx_fifo_full_threshold(1); // interrupt every time a byte is received
-    let mut uart = Uart::new(
-        peripherals.UART1,
-        uart_config,
-        peripherals.GPIO16, // RX
-        peripherals.GPIO17, // TX
-    )
-    .expect("Failed to initialize UART");
+        .with_baudrate(19200)
+        .with_data_bits(DataBits::_8)
+        .with_parity(Parity::None)
+        .with_stop_bits(StopBits::_1)
+        .with_rx(RxConfig::default().with_fifo_full_threshold(1));
+    let mut uart = Uart::new(peripherals.UART1, uart_config)
+        .expect("Failed to initialize UART")
+        .with_rx(peripherals.GPIO16)
+        .with_tx(peripherals.GPIO17);
 
     uart.set_interrupt_handler(handler);
 
@@ -62,7 +60,9 @@ fn handler() {
             esp_println::print!("\nBREAK");
         }
         if serial.interrupts().contains(UartInterrupt::RxFifoFull) {
-            esp_println::print!(" {:02X}", serial.read_byte().expect("Read byte failed"));
+            let mut byte = [0u8; 1];
+            serial.read_bytes(&mut byte).unwrap();
+            esp_println::print!(" {:02X}", byte[0]);
         }
 
         serial.clear_interrupts(UartInterrupt::RxBreakDetected | UartInterrupt::RxFifoFull);
