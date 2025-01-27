@@ -648,10 +648,26 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     for path in xtask::package_paths(workspace)? {
         log::info!("Formatting package: {}", path.display());
 
+        // we need to list all source files since modules in `unstable_module!` macros
+        // won't get picked up otherwise
+        let source_files: Vec<String> = walkdir::WalkDir::new(path.join("src"))
+            .into_iter()
+            .filter_map(|entry| {
+                let path = entry.unwrap().into_path();
+                if let Some("rs") = path.extension().unwrap_or_default().to_str() {
+                    Some(String::from(path.to_str().unwrap()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         let mut cargo_args = CargoArgsBuilder::default()
             .toolchain("nightly")
             .subcommand("fmt")
             .arg("--all")
+            .arg("--")
+            .args(&source_files)
             .build();
 
         if args.check {
