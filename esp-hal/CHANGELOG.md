@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - SPI: Added support for 3-wire SPI (#2919)
 - Add separate config for Rx and Tx (UART) #2965
+- ESP32-S3: Support execute in place from PSRAM
 
 ### Changed
 
