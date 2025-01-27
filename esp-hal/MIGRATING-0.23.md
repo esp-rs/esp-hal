@@ -177,15 +177,26 @@ config/config.toml
 
 ## GPIO changes
 
-GPIO drivers now take configuration structs, and their constructors are fallible.
+GPIO drivers now take configuration structs.
 
 ```diff
 - Input::new(peripherals.GPIO0, Pull::Up);
-+ Input::new(peripherals.GPIO0, InputConfig::default().with_pull(Pull::Up)).unwrap();
++ Input::new(peripherals.GPIO0, InputConfig::default().with_pull_direction(Pull::Up));
+ 
 - Output::new(peripherals.GPIO0, Level::Low);
-+ Output::new(peripherals.GPIO0, OutputConfig::default().with_level(Level::Low)).unwrap();
-- OutputOpenDrain::new(peripherals.GPIO0, Level::Low, Pull::Up);
-+ OutputOpenDrain::new(
-+     peripherals.GPIO0,
-+     OutputOpenDrainConfig::default().with_level(Level::Low).with_pull(Pull::Up)
-+ ).unwrap();
++ Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
+```
+
+The OutputOpenDrain driver has been removed. You can use `Output` instead with
+`DriveMode::OpenDrain`. The input-related methods of `OutputOpenDrain` (`level`,
+`is_high`, `is_low`) are available through the (unstable) `Flex` driver.
+
+```diff
+- OutputOpenDrain::new(peripherals.GPIO0, Level::Low);
++ Output::new(
+     peripherals.GPIO0,
+     Level::Low,
+     OutputConfig::default()
+         .with_drive_mode(DriveMode::OpenDrain),
+ );
+```

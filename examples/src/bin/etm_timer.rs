@@ -31,8 +31,7 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let config = OutputConfig::default().with_level(Level::Low);
-    let mut led = Output::new(peripherals.GPIO2, config).unwrap();
+    let mut led = Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default());
     led.set_high();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);

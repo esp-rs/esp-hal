@@ -37,8 +37,7 @@ mod tests {
         let sclk = peripherals.GPIO0;
         let (miso, miso_mirror) = hil_test::common_test_pins!(peripherals);
 
-        let miso_mirror =
-            Output::new(miso_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
+        let miso_mirror = Output::new(miso_mirror, Level::High, OutputConfig::default());
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {

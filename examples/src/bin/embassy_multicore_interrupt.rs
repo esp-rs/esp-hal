@@ -85,8 +85,7 @@ fn main() -> ! {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let config = OutputConfig::default().with_level(Level::Low);
-    let led = Output::new(peripherals.GPIO0, config).unwrap();
+    let led = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
 
     static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
     let executor_core1 = InterruptExecutor::new(sw_ints.software_interrupt1);
