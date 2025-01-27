@@ -1,20 +1,21 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     fs::{self, File},
     io::Write as _,
     path::{Path, PathBuf},
     process::Command,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
 use strum::{Display, EnumIter, IntoEnumIterator as _};
 
-use self::cargo::CargoArgsBuilder;
+use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
 
 pub mod cargo;
+pub mod firmware;
 
 #[derive(
     Debug,
@@ -52,70 +53,6 @@ pub enum Package {
     QaTest,
     XtensaLx,
     XtensaLxRt,
-}
-
-#[derive(Debug, Clone)]
-pub struct Metadata {
-    example_path: PathBuf,
-    chip: Chip,
-    feature_set_name: String,
-    feature_set: Vec<String>,
-    tag: Option<String>,
-    description: Option<String>,
-}
-
-impl Metadata {
-    pub fn new(
-        example_path: &Path,
-        chip: Chip,
-        feature_set_name: String,
-        feature_set: Vec<String>,
-        tag: Option<String>,
-        description: Option<String>,
-    ) -> Self {
-        Self {
-            example_path: example_path.to_path_buf(),
-            chip,
-            feature_set_name,
-            feature_set,
-            tag,
-            description,
-        }
-    }
-
-    /// Absolute path to the example.
-    pub fn example_path(&self) -> &Path {
-        &self.example_path
-    }
-
-    /// Name of the example.
-    pub fn name(&self) -> String {
-        self.example_path()
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .replace(".rs", "")
-    }
-
-    /// A list of all features required for building a given example.
-    pub fn feature_set(&self) -> &[String] {
-        &self.feature_set
-    }
-
-    /// If the specified chip is in the list of chips, then it is supported.
-    pub fn supports_chip(&self, chip: Chip) -> bool {
-        self.chip == chip
-    }
-
-    /// Optional tag of the example.
-    pub fn tag(&self) -> Option<String> {
-        self.tag.clone()
-    }
-
-    /// Optional description of the example.
-    pub fn description(&self) -> Option<String> {
-        self.description.clone()
-    }
 }
 
 #[derive(Debug, Clone, Copy, Display, ValueEnum)]
@@ -218,128 +155,6 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
     features
 }
 
-/// Load all examples at the given path, and parse their metadata.
-pub fn load_examples(path: &Path) -> Result<Vec<Metadata>> {
-    let mut examples = Vec::new();
-
-    for entry in fs::read_dir(path)? {
-        let path = windows_safe_path(&entry?.path());
-        let text = fs::read_to_string(&path)
-            .with_context(|| format!("Could not read {}", path.display()))?;
-
-        let mut chips = Chip::iter().collect::<Vec<_>>();
-        let mut feature_sets = Vec::new();
-        let mut chip_features = HashMap::new();
-        let mut tag = None;
-        let mut description = None;
-
-        // collect `//!` as description
-        for line in text.lines().filter(|line| line.starts_with("//!")) {
-            let line = line.trim_start_matches("//!");
-            let mut descr: String = description.unwrap_or_default();
-            descr.push_str(line);
-            descr.push('\n');
-            description = Some(descr);
-        }
-
-        // We will indicate metadata lines using the `//%` prefix:
-        for line in text.lines().filter(|line| line.starts_with("//%")) {
-            let Some((key, value)) = line.trim_start_matches("//%").split_once(':') else {
-                bail!("Metadata line is missing ':': {}", line);
-            };
-
-            let key = key.trim();
-
-            if key == "CHIPS" {
-                chips = value
-                    .split_ascii_whitespace()
-                    .map(|s| Chip::from_str(s, false).unwrap())
-                    .collect::<Vec<_>>();
-            } else if let Some(feature_set_name) = key.strip_prefix("FEATURES") {
-                // Base feature set required to run the example.
-                // If multiple are specified, we compile the same example multiple times.
-                let mut values = value
-                    .split_ascii_whitespace()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>();
-
-                // Sort the features so they are in a deterministic order:
-                values.sort();
-
-                let feature_set_name = feature_set_name.trim_matches(&['(', ')']).to_string();
-
-                if feature_sets
-                    .iter()
-                    .any(|(name, _)| name == &feature_set_name)
-                {
-                    bail!(
-                        "Duplicate feature set name '{}' in {}",
-                        feature_set_name,
-                        path.display()
-                    );
-                }
-
-                feature_sets.push((feature_set_name, values));
-            } else if key.starts_with("CHIP-FEATURES(") {
-                // Additional features required for specific chips.
-                // These are appended to the base feature set(s).
-                // If multiple are specified, the last entry wins.
-                let chips = key
-                    .trim_start_matches("CHIP-FEATURES(")
-                    .trim_end_matches(')');
-
-                let chips = chips
-                    .split_ascii_whitespace()
-                    .map(|s| Chip::from_str(s, false).unwrap())
-                    .collect::<Vec<_>>();
-
-                let values = value
-                    .split_ascii_whitespace()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>();
-
-                for chip in chips {
-                    chip_features.insert(chip, values.clone());
-                }
-            } else if key.starts_with("TAG") {
-                tag = Some(value.to_string());
-            } else {
-                log::warn!("Unrecognized metadata key '{key}', ignoring");
-            }
-        }
-
-        if feature_sets.is_empty() {
-            feature_sets.push((String::new(), Vec::new()));
-        }
-
-        for (feature_set_name, feature_set) in feature_sets {
-            for chip in &chips {
-                let mut feature_set = feature_set.clone();
-                if let Some(chip_features) = chip_features.get(chip) {
-                    feature_set.extend(chip_features.iter().cloned());
-
-                    // Sort the features so they are in a deterministic order:
-                    feature_set.sort();
-                }
-
-                examples.push(Metadata::new(
-                    &path,
-                    *chip,
-                    feature_set_name.clone(),
-                    feature_set.clone(),
-                    tag.clone(),
-                    description.clone(),
-                ));
-            }
-        }
-    }
-
-    // Sort by feature set, to prevent rebuilding packages if not necessary.
-    examples.sort_by_key(|e| e.feature_set().join(","));
-
-    Ok(examples)
-}
-
 /// Run or build the specified test or example for the specified chip.
 pub fn execute_app(
     package_path: &Path,
@@ -350,31 +165,34 @@ pub fn execute_app(
     repeat: usize,
     debug: bool,
 ) -> Result<()> {
-    log::info!(
-        "Building example '{}' for '{}'",
-        app.example_path().display(),
-        chip
-    );
+    let package = app.example_path().strip_prefix(package_path)?;
+    log::info!("Building example '{}' for '{}'", package.display(), chip);
+
+    if !app.configuration().is_empty() {
+        log::info!("  Configuration: {}", app.configuration());
+    }
 
     let mut features = app.feature_set().to_vec();
     if !features.is_empty() {
-        log::info!("Features: {}", features.join(","));
+        log::info!("  Features:      {}", features.join(", "));
     }
     features.push(chip.to_string());
 
-    let package = app.example_path().strip_prefix(package_path)?;
-    log::info!("Package: {}", package.display());
+    let env_vars = app.env_vars();
+    for (key, value) in env_vars {
+        log::info!("  esp-config:    {} = {}", key, value);
+    }
 
     let mut builder = CargoArgsBuilder::default()
         .target(target)
         .features(&features);
 
     let bin_arg = if package.starts_with("src/bin") {
-        format!("--bin={}", app.name())
+        format!("--bin={}", app.binary_name())
     } else if package.starts_with("tests") {
-        format!("--test={}", app.name())
+        format!("--test={}", app.binary_name())
     } else {
-        format!("--example={}", app.name())
+        format!("--example={}", app.binary_name())
     };
     builder.add_arg(bin_arg);
 
@@ -405,27 +223,20 @@ pub fn execute_app(
     log::debug!("{args:#?}");
 
     if let CargoAction::Build(out_dir) = action {
-        cargo::run(&args, package_path)?;
+        cargo::run_with_env(&args, package_path, env_vars, false)?;
 
         // Now that the build has succeeded and we printed the output, we can
         // rerun the build again quickly enough to capture JSON. We'll use this to
         // copy the binary to the output directory.
         builder.add_arg("--message-format=json");
         let args = builder.build();
-        let output = cargo::run_and_capture(&args, package_path)?;
+        let output = cargo::run_with_env(&args, package_path, env_vars, true)?;
         for line in output.lines() {
             if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
                 let out_dir = out_dir.join(&chip.to_string());
                 std::fs::create_dir_all(&out_dir)?;
 
-                let basename = app.name();
-                let name = if app.feature_set_name.is_empty() {
-                    basename
-                } else {
-                    format!("{}_{}", basename, app.feature_set_name)
-                };
-
-                let output_file = out_dir.join(name);
+                let output_file = out_dir.join(app.output_file_name());
                 std::fs::copy(artifact.executable, &output_file)?;
                 log::info!("Output ready: {}", output_file.display());
             }
@@ -435,7 +246,7 @@ pub fn execute_app(
             if repeat != 1 {
                 log::info!("Run {}/{}", i + 1, repeat);
             }
-            cargo::run(&args, package_path)?;
+            cargo::run_with_env(&args, package_path, env_vars.clone(), false)?;
         }
     }
 
