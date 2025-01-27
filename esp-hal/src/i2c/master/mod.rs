@@ -121,6 +121,7 @@ pub enum BusTimeout {
     Disabled,
 
     /// Timeout in bus clock cycles.
+    //#[strum(to_string = "{0} bus clock cycles")] // FIXME uncomment when https://github.com/Peternator7/strum/pull/407 is released
     BusCycles(u32),
 }
 
@@ -1140,6 +1141,24 @@ fn configure_clock(
     scl_stop_hold_time: u32,
     timeout: BusTimeout,
 ) -> Result<(), ConfigError> {
+    debug!(
+        "Configuring I2C clock: sclk_div: {}, scl_low_period: {}, scl_high_period: {}, \
+        scl_wait_high_period: {}, sda_hold_time: {}, sda_sample_time: {}, \
+        scl_rstart_setup_time: {}, scl_stop_setup_time: {}, scl_start_hold_time: {}, \
+        scl_stop_hold_time: {}, timeout: {}",
+        sclk_div,
+        scl_low_period,
+        scl_high_period,
+        scl_wait_high_period,
+        sda_hold_time,
+        sda_sample_time,
+        scl_rstart_setup_time,
+        scl_stop_setup_time,
+        scl_start_hold_time,
+        scl_stop_hold_time,
+        timeout
+    );
+
     unsafe {
         // divider
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
@@ -1578,7 +1597,7 @@ impl Driver<'_> {
         };
         let scl_high = half_cycle - scl_wait_high;
         let sda_hold = half_cycle / 4;
-        let sda_sample = half_cycle / 2 + scl_wait_high;
+        let sda_sample = half_cycle / 2;
         let setup = half_cycle;
         let hold = half_cycle;
 
