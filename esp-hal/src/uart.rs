@@ -1860,7 +1860,7 @@ pub mod lp_uart {
         ///
         /// # Panics
         ///  
-        /// [`Apb`] is a wrong clock sourse for LP_UART
+        /// [`Apb`] is a wrong clock source for LP_UART
         ///
         /// [`Apb`]: super::ClockSource::Apb
         // TODO: CTS and RTS pins
@@ -2001,7 +2001,7 @@ pub mod lp_uart {
         ///
         /// # Panics
         ///
-        /// [`Apb`] is a wrong clock sourse for LP_UART
+        /// [`Apb`] is a wrong clock source for LP_UART
         ///
         /// [`Apb`]: super::ClockSource::Apb
         pub fn change_baud(&mut self, baudrate: u32, clock_source: super::ClockSource) {

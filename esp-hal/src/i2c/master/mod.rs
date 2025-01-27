@@ -647,7 +647,7 @@ impl<'d> I2c<'d, Blocking> {
     ///
     /// # Panics
     ///
-    /// Might panic if passed interrupt handler is invalid (e.g. has priority
+    /// Panics if passed interrupt handler is invalid (e.g. has priority
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {

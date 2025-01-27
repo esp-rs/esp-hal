@@ -662,7 +662,7 @@ impl<'d> Spi<'d, Blocking> {
     ///
     /// # Panics
     ///
-    /// Might panic if passed interrupt handler is invalid (e.g. has priority
+    /// Panics if passed interrupt handler is invalid (e.g. has priority
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -979,10 +979,11 @@ where
     /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if
-    /// passed buffer is bigger than FIFO size. Dummy phase configuration is
-    /// currently not supported, only value `0` is valid (see issue [#2240]).
-    ///
-    /// [#2240]: https://github.com/esp-rs/esp-hal/issues/2240
+    /// passed buffer is bigger than FIFO size.
+    #[cfg_attr(
+        esp32,
+        doc = "Dummy phase configuration is currently not supported, only value `0` is valid (see issue [#2240](https://github.com/esp-rs/esp-hal/issues/2240))."
+    )]
     #[instability::unstable]
     pub fn half_duplex_write(
         &mut self,

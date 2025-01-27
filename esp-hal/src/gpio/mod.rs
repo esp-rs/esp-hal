@@ -746,7 +746,7 @@ impl Io {
     ///
     /// # Panics
     ///
-    /// Might panic if passed interrupt handler is invalid (e.g. has priority
+    /// Panics if passed interrupt handler is invalid (e.g. has priority
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
@@ -769,7 +769,7 @@ impl Io {
     ///
     /// # Panics
     ///
-    /// Might panic if passed interrupt handler is invalid (e.g. has priority
+    /// Panics if passed interrupt handler is invalid (e.g. has priority
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -1552,7 +1552,7 @@ impl<'d> Input<'d> {
     /// This will unlisten for interrupts
     ///
     /// # Error
-    /// Confguring pin to wake up from light sleep on an edge
+    /// Configuring pin to wake up from light sleep on an edge
     /// trigger is currently not supported, corresponding variant of
     /// [`WakeConfigError`] will be returned.
     #[instability::unstable]
@@ -1729,7 +1729,6 @@ impl<'d> Flex<'d> {
     pub fn listen(&mut self, event: Event) {
         // Unwrap can't fail currently as listen_with_options is only supposed to return
         // an error if wake_up_from_light_sleep is true.
-        // FIXME: when the above is changed, add the appropriate `Panic` entry.
         unwrap!(self.listen_with_options(event, true, false, false));
     }
 
@@ -1768,7 +1767,7 @@ impl<'d> Flex<'d> {
     /// This will unlisten for interrupts
     ///
     /// # Error
-    /// Confguring pin to wake up from light sleep on an edge
+    /// Configuring pin to wake up from light sleep on an edge
     /// trigger is currently not supported, corresponding variant of
     /// [`WakeConfigError`] will be returned.
     #[inline]
