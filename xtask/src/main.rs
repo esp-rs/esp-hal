@@ -127,6 +127,10 @@ struct FmtPackagesArgs {
     /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
     #[arg(long)]
     check: bool,
+
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
 }
 
 #[derive(Debug, Args)]
@@ -641,8 +645,26 @@ fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result
 }
 
 fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
-    for path in xtask::package_paths(workspace)? {
-        log::info!("Formatting package: {}", path.display());
+    let mut packages = args.packages;
+    packages.sort();
+
+    for package in packages {
+        log::info!("Formatting package: {}", package);
+        let path = workspace.join(package.to_string());
+
+        // we need to list all source files since modules in `unstable_module!` macros
+        // won't get picked up otherwise
+        let source_files: Vec<String> = walkdir::WalkDir::new(path.join("src"))
+            .into_iter()
+            .filter_map(|entry| {
+                let path = entry.unwrap().into_path();
+                if let Some("rs") = path.extension().unwrap_or_default().to_str() {
+                    Some(String::from(path.to_str().unwrap()))
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let mut cargo_args = CargoArgsBuilder::default()
             .toolchain("nightly")
@@ -654,6 +676,9 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
             cargo_args.push("--".into());
             cargo_args.push("--check".into());
         }
+
+        cargo_args.push("--".into());
+        cargo_args.extend_from_slice(&source_files);
 
         xtask::cargo::run(&cargo_args, &path)?;
     }
