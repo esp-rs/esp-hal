@@ -15,7 +15,6 @@ use embassy_time::{Duration, Timer};
 use esp_hal::{
     gpio::{AnyPin, Flex, Input, InputConfig, Io, Level, Output, OutputConfig, Pull},
     handler,
-    interrupt::InterruptConfigurable,
     timer::timg::TimerGroup,
 };
 use hil_test as _;
