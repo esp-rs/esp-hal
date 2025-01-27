@@ -30,7 +30,8 @@ Options:
 
 Each test and example can specify metadata. This metadata is read, interpreted and used by the
 `xtask`. It affects how a particular test or example is built, but it does not otherwise modify
-the user's system.
+the user's system. A test or example can specify one or more sets of metadata, called
+"configurations".
 
 Metadata lines come in the form of:
 
@@ -98,9 +99,13 @@ same name are merged.
 
 ### Working with multiple metadata configurations
 
-Processing a file will create one configuration, or however many names the xtask encounters.
+Processing a file will create one configuration, or however many names (that is, the list of
+different parenthesized words next to the metadata key) the xtask encounters.
 
-For example, the following list creates two configurations (`single_integrated` and `multiple_integrated`).
+For example, the following list creates two configurations (`single_integrated` and
+`multiple_integrated`). Both configurations will be compiled for all listed chips, with the
+`unstable` and `embassy` features enabled. One will select the `single-integrated` timer queue
+option, while the other will select `multiple-integrated`.
 
 ```
 // This is a hypothetical "embassy_test.rs"
@@ -116,3 +121,6 @@ parameters match multiple files, they will be built or executed in sucession.
 For example, running `cargo xtask run-tests esp32 embassy_test` will run both
 `embassy_test_single_integrated` and `embassy_test_multiple_integrated`, but you can also
 run `cargo xtask run-tests esp32 embassy_test_multiple_integrated` to select only one.
+
+In this example, running the `cargo xtask build-tests esp32 embassy_test` command creates an
+`embassy_test_single_integrated` and an `embassy_test_multiple_integrated` binary.
