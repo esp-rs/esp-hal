@@ -1902,7 +1902,7 @@ impl Driver<'_> {
         Ok(())
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+    #[cfg(not(any(esp32, esp32s2)))]
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
@@ -1929,7 +1929,7 @@ impl Driver<'_> {
         };
         let scl_high = half_cycle - scl_wait_high;
         let sda_hold = half_cycle / 4;
-        let sda_sample = half_cycle / 2 + scl_wait_high;
+        let sda_sample = half_cycle / 2;
         let setup = half_cycle;
         let hold = half_cycle;
 
