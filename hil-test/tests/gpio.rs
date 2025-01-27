@@ -254,52 +254,54 @@ mod tests {
     #[test]
     #[cfg(feature = "unstable")] // delay is unstable
     fn gpio_od(ctx: Context) {
-        let config = OutputConfig::default()
-            .with_drive_mode(DriveMode::OpenDrain)
-            .with_input_enabled(true)
-            .with_pull(Pull::Up);
-        let mut test_gpio1 = Output::new(ctx.test_gpio1, Level::High, config);
-        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::High, config);
+        let input_pull_up = InputConfig::default().with_pull(Pull::Up);
+        let input_pull_down = InputConfig::default().with_pull(Pull::Down);
+        let input_no_pull = InputConfig::default().with_pull(Pull::None);
+
+        let mut output = Output::new(
+            ctx.test_gpio1,
+            Level::High,
+            OutputConfig::default()
+                .with_drive_mode(DriveMode::OpenDrain)
+                .with_pull(Pull::None),
+        );
+        let mut input = Input::new(ctx.test_gpio2, input_pull_up);
 
         ctx.delay.delay_millis(1);
 
-        assert_eq!(test_gpio1.level(), Level::High);
-        assert_eq!(test_gpio2.level(), Level::High);
+        // With pull up resistor
 
-        test_gpio1.set_low();
-        test_gpio2.set_high();
+        assert_eq!(input.level(), Level::High);
+        output.set_low();
         ctx.delay.delay_millis(1);
-
-        assert_eq!(test_gpio1.level(), Level::Low);
-        assert_eq!(test_gpio2.level(), Level::Low);
-
-        test_gpio1.set_high();
-        test_gpio2.set_high();
+        assert_eq!(input.level(), Level::Low);
+        output.set_high();
         ctx.delay.delay_millis(1);
+        assert_eq!(input.level(), Level::High);
 
-        assert_eq!(test_gpio1.level(), Level::High);
-        assert_eq!(test_gpio2.level(), Level::High);
+        // With pull down resistor
+        input.apply_config(&input_pull_down);
 
-        test_gpio1.set_high();
-        test_gpio2.set_low();
+        output.set_high();
         ctx.delay.delay_millis(1);
-
-        assert_eq!(test_gpio1.level(), Level::Low);
-        assert_eq!(test_gpio2.level(), Level::Low);
-
-        test_gpio1.set_high();
-        test_gpio2.set_high();
+        assert_eq!(input.level(), Level::Low);
+        output.set_low();
         ctx.delay.delay_millis(1);
+        assert_eq!(input.level(), Level::Low);
 
-        assert_eq!(test_gpio1.level(), Level::High);
-        assert_eq!(test_gpio2.level(), Level::High);
+        // With pull up on output
+        input.apply_config(&input_no_pull);
+        output.apply_config(
+            &OutputConfig::default()
+                .with_drive_mode(DriveMode::OpenDrain)
+                .with_pull(Pull::Up),
+        );
 
-        test_gpio1.set_low();
-        test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-
-        assert_eq!(test_gpio1.level(), Level::Low);
-        assert_eq!(test_gpio2.level(), Level::Low);
+        assert_eq!(input.level(), Level::Low);
+        output.set_high();
+        ctx.delay.delay_millis(1);
+        assert_eq!(input.level(), Level::High);
     }
 
     #[test]

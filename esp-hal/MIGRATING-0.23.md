@@ -189,8 +189,7 @@ GPIO drivers now take configuration structs.
 
 The OutputOpenDrain driver has been removed. You can use `Output` instead with
 `DriveMode::OpenDrain`. The input-related methods of `OutputOpenDrain` (`level`,
-`is_high`, `is_low`) have been added to `Output`. The GPIO input stage needs to be
-enabled using `OutputConfig::with_input_enabled()`.
+`is_high`, `is_low`) are available through the (unstable) `Flex` driver.
 
 ```diff
 - OutputOpenDrain::new(peripherals.GPIO0, Level::Low);
@@ -198,7 +197,6 @@ enabled using `OutputConfig::with_input_enabled()`.
      peripherals.GPIO0,
      Level::Low,
      OutputConfig::default()
-         .with_drive_mode(DriveMode::OpenDrain)
-         .with_input_enabled(input_enabled),
+         .with_drive_mode(DriveMode::OpenDrain),
  );
 ```

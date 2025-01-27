@@ -1090,9 +1090,6 @@ pub struct OutputConfig {
     /// Output drive mode.
     pub drive_mode: DriveMode,
 
-    /// Whether to enable the input stage.
-    pub input_enabled: bool,
-
     /// Pin drive strength.
     pub drive_strength: DriveStrength,
 
@@ -1104,7 +1101,6 @@ impl Default for OutputConfig {
     fn default() -> Self {
         Self {
             drive_mode: DriveMode::PushPull,
-            input_enabled: false,
             drive_strength: DriveStrength::_20mA,
             pull: Pull::None,
         }
@@ -1293,57 +1289,11 @@ impl<'d> Output<'d> {
         self.pin.toggle();
     }
 
-    /// Return the current pin input level.
-    ///
-    /// This function reads the input level of the pin. The
-    /// [`OutputConfig::input_enabled`] configuration option must be set to
-    /// `true` for this function to work.
-    #[inline]
-    pub fn level(&self) -> Level {
-        self.pin.level()
-    }
-
-    /// Return whether the pin input level is high.
-    ///
-    /// This function reads the input level of the pin. The
-    /// [`OutputConfig::input_enabled`] configuration option must be set to
-    /// `true` for this function to work.
-    #[inline]
-    pub fn is_high(&self) -> bool {
-        self.level() == Level::High
-    }
-
-    /// Return whether the pin input level is low.
-    ///
-    /// This function reads the input level of the pin. The
-    /// [`OutputConfig::input_enabled`] configuration option must be set to
-    /// `true` for this function to work.
-    #[inline]
-    pub fn is_low(&self) -> bool {
-        self.level() == Level::Low
-    }
-
-    /// Listen for interrupts.
-    ///
-    /// See [`Input::listen`] for more information and an example.
+    /// Converts the pin driver into a [`Flex`] driver.
     #[inline]
     #[instability::unstable]
-    pub fn listen(&mut self, event: Event) {
-        self.pin.listen(event);
-    }
-
-    /// Stop listening for interrupts.
-    #[inline]
-    #[instability::unstable]
-    pub fn unlisten(&mut self) {
-        self.pin.unlisten();
-    }
-
-    /// Clear the interrupt status bit for this Pin
-    #[inline]
-    #[instability::unstable]
-    pub fn clear_interrupt(&mut self) {
-        self.pin.clear_interrupt();
+    pub fn into_flex(self) -> Flex<'d> {
+        self.pin
     }
 }
 
@@ -1612,6 +1562,13 @@ impl<'d> Input<'d> {
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
         self.pin.into_peripheral_output()
     }
+
+    /// Converts the pin driver into a [`Flex`] driver.
+    #[inline]
+    #[instability::unstable]
+    pub fn into_flex(self) -> Flex<'d> {
+        self.pin
+    }
 }
 
 /// Flexible pin driver.
@@ -1878,7 +1835,6 @@ impl<'d> Flex<'d> {
             unsafe { w.fun_drv().bits(config.drive_strength as u8) };
             w.fun_wpu().bit(pull_up);
             w.fun_wpd().bit(pull_down);
-            w.fun_ie().bit(config.input_enabled);
             w
         });
 
