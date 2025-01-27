@@ -20,6 +20,9 @@
 //! Pin drivers can be created using [`Flex::new`], [`Input::new`] and
 //! [`Output::new`].
 //!
+//! Output pins can be configured to either push-pull or open-drain (active low)
+//! mode, with configurable drive strength and pull-up/pull-down resistors.
+//!
 //! Each pin is a different type initially. Internally, `esp-hal` will erase
 //! their types automatically, but they can also be converted into [`AnyPin`]
 //! manually by calling [`Pin::degrade`].
@@ -1075,14 +1078,28 @@ macro_rules! gpio {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DriveMode {
-    /// Both the high and low level are actively driven.
+    /// Push-pull output.
+    ///
+    /// The driver actively sets the output voltage level for both high and low
+    /// logical [`Level`]s.
     PushPull,
-    /// The pin is actively driven low, but high level is defined by the
-    /// hardware environment.
+
+    /// Open drain output.
+    ///
+    /// The driver actively pulls the output voltage level low for the low
+    /// logical [`Level`], but leaves the high level floating, which is then
+    /// determined by external hardware, or internal pull-up/pull-down
+    /// resistors.
     OpenDrain,
 }
 
 /// Output pin configuration.
+///
+/// This struct is used to configure the drive mode, drive strength, and pull
+/// direction of an output pin. By default, the configuration is set to:
+/// - Drive mode: [`DriveMode::PushPull`]
+/// - Drive strength: [`DriveStrength::_20mA`]
+/// - Pull direction: [`Pull::None`] (no pull resistors connected)
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
 #[non_exhaustive]
@@ -1109,9 +1126,7 @@ impl Default for OutputConfig {
 
 /// Push-pull digital output.
 ///
-/// This driver configures the GPIO pin to be a push-pull output driver.
-/// Push-pull means that the driver actively sets the output voltage level
-/// for both high and low logical [`Level`]s.
+/// This driver configures the GPIO pin to be an output driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Output<'d> {
@@ -1130,7 +1145,9 @@ impl<'d> Peripheral for Output<'d> {
 impl<'d> Output<'d> {
     /// Creates a new GPIO output driver.
     ///
-    /// The `initial_output` parameter sets the initial output level of the pin.
+    /// The `initial_level` parameter sets the initial output level of the pin.
+    /// The `config` parameter sets the drive mode, drive strength, and pull
+    /// direction of the pin.
     ///
     /// ## Example
     ///
