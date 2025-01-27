@@ -20,9 +20,9 @@
 //! Pin drivers can be created using [`Flex::new`], [`Input::new`] and
 //! [`Output::new`].
 //!
-//! Each pin is a different type initially. Internally, `esp-hal` will often
-//! erase their types automatically, but they can also be converted into
-//! [`AnyPin`] manually by calling [`Pin::degrade`].
+//! Each pin is a different type initially. Internally, `esp-hal` will erase
+//! their types automatically, but they can also be converted into [`AnyPin`]
+//! manually by calling [`Pin::degrade`].
 //!
 //! The [`Io`] struct can also be used to configure the interrupt handler for
 //! GPIO interrupts. For more information, see the
