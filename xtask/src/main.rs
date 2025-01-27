@@ -551,7 +551,7 @@ fn build_documentation_index(
         for path in fs::read_dir(package_docs_path)? {
             let path = path?.path();
             if path.is_file() {
-                log::warn!("Path is not a directory, skipping: '{}'", path.display());
+                log::debug!("Path is not a directory, skipping: '{}'", path.display());
                 continue;
             }
 
@@ -608,8 +608,11 @@ fn generate_index(workspace: &Path, package_version_path: &Path, meta: &[Value])
     let tmpl = env.get_template("index")?;
     let html = tmpl.render(minijinja::context! { metadata => meta })?;
 
-    fs::write(package_version_path.join("index.html"), html)
-        .context("Failed to write index.html")?;
+    let index = package_version_path.join("index.html");
+
+    fs::write(&index, html).context("Failed to write index.html")?;
+
+    log::info!("Created {}", index.display());
 
     Ok(())
 }
