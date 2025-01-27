@@ -743,6 +743,11 @@ impl Io {
     }
 
     /// Set the interrupt priority for GPIO interrupts.
+    ///
+    /// # Panics
+    ///
+    /// Might panic if passed interrupt handler is invalid (e.g. has priority
+    /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
         unwrap!(interrupt::enable(Interrupt::GPIO, prio));
@@ -761,6 +766,11 @@ impl Io {
     /// we clear the interrupt status register for you. This is NOT the case
     /// if you register the interrupt handler directly, by defining a
     /// `#[no_mangle] unsafe extern "C" fn GPIO()` function.
+    ///
+    /// # Panics
+    ///
+    /// Might panic if passed interrupt handler is invalid (e.g. has priority
+    /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
@@ -1173,6 +1183,7 @@ impl<'d> Output<'d> {
     /// blink_once(&mut led, &mut delay);
     /// # }
     /// ```
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
     pub fn new(
         pin: impl Peripheral<P = impl OutputPin> + 'd,
@@ -1247,6 +1258,7 @@ impl<'d> Output<'d> {
     }
 
     /// Change the configuration.
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
     pub fn apply_config(&mut self, config: &OutputConfig) {
         self.pin.apply_output_config(config)
@@ -1384,6 +1396,7 @@ impl<'d> Input<'d> {
     /// print_when_pressed(&mut button, &mut delay);
     /// # }
     /// ```
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
     pub fn new(pin: impl Peripheral<P = impl InputPin> + 'd, config: InputConfig) -> Self {
         let mut pin = Flex::new(pin);
@@ -1432,6 +1445,7 @@ impl<'d> Input<'d> {
     }
 
     /// Change the configuration.
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     pub fn apply_config(&mut self, config: &InputConfig) {
         self.pin.apply_input_config(config)
     }
@@ -1536,6 +1550,11 @@ impl<'d> Input<'d> {
     /// Enable as a wake-up source.
     ///
     /// This will unlisten for interrupts
+    ///
+    /// # Error
+    /// Confguring pin to wake up from light sleep on an edge
+    /// trigger is currently not supported, corresponding variant of
+    /// [`WakeConfigError`] will be returned.
     #[instability::unstable]
     #[inline]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
@@ -1710,6 +1729,7 @@ impl<'d> Flex<'d> {
     pub fn listen(&mut self, event: Event) {
         // Unwrap can't fail currently as listen_with_options is only supposed to return
         // an error if wake_up_from_light_sleep is true.
+        // FIXME: when the above is changed, add the appropriate `Panic` entry.
         unwrap!(self.listen_with_options(event, true, false, false));
     }
 
@@ -1746,6 +1766,11 @@ impl<'d> Flex<'d> {
     /// Enable as a wake-up source.
     ///
     /// This will unlisten for interrupts
+    ///
+    /// # Error
+    /// Confguring pin to wake up from light sleep on an edge
+    /// trigger is currently not supported, corresponding variant of
+    /// [`WakeConfigError`] will be returned.
     #[inline]
     #[instability::unstable]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {

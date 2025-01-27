@@ -496,6 +496,11 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     }
 
     /// Applies a new configuration.
+    ///
+    /// # Errors
+    ///
+    /// A [`ConfigError`] variant will be returned if bus frequency or timeout
+    /// passed in config is invalid.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().setup(config)?;
         self.config = *config;
@@ -595,6 +600,11 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
 
 impl<'d> I2c<'d, Blocking> {
     /// Create a new I2C instance.
+    ///
+    /// # Errors
+    ///
+    /// A [`ConfigError`] variant will be returned if bus frequency or timeout
+    /// passed in config is invalid.
     pub fn new(
         i2c: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -634,6 +644,11 @@ impl<'d> I2c<'d, Blocking> {
     ///
     /// You can restore the default/unhandled interrupt handler by using
     /// [crate::DEFAULT_INTERRUPT_HANDLER]
+    ///
+    /// # Panics
+    ///
+    /// Might panic if passed interrupt handler is invalid (e.g. has priority
+    /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.i2c.info().set_interrupt_handler(handler);
@@ -690,6 +705,10 @@ impl<'d> I2c<'d, Blocking> {
     /// i2c.write(DEVICE_ADDR, &[0xaa]).ok();
     /// # }
     /// ```
+    /// 
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if the FIFO is exceeded.
     pub fn write<A: Into<I2cAddress>>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
             .write_blocking(address.into(), buffer, true, true)
@@ -710,6 +729,10 @@ impl<'d> I2c<'d, Blocking> {
     /// i2c.read(DEVICE_ADDR, &mut data).ok();
     /// # }
     /// ```
+    /// 
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if the FIFO is exceeded or if the passed buffer has zero length.
     pub fn read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -735,6 +758,10 @@ impl<'d> I2c<'d, Blocking> {
     /// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data).ok();
     /// # }
     /// ```
+    /// 
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if the FIFO is exceeded or if the passed buffer has zero length.
     pub fn write_read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -789,6 +816,10 @@ impl<'d> I2c<'d, Blocking> {
     /// ).ok();
     /// # }
     /// ```
+    /// 
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if the FIFO is exceeded or if the buffer passed to an [`Operation`] has zero length.
     pub fn transaction<'a, A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -932,6 +963,11 @@ impl<'d> I2c<'d, Async> {
     }
 
     /// Writes bytes to slave with address `address`
+    ///
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if the
+    /// FIFO is exceeded.
     pub async fn write<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -944,6 +980,12 @@ impl<'d> I2c<'d, Async> {
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
+    ///
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if the
+    /// FIFO is exceeded or if the passed buffer has zero
+    /// length.
     pub async fn read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -957,6 +999,12 @@ impl<'d> I2c<'d, Async> {
 
     /// Writes bytes to slave with address `address` and then reads enough
     /// bytes to fill `buffer` *in a single transaction*
+    ///
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if the
+    /// FIFO is exceeded or if the passed buffer has zero
+    /// length.
     pub async fn write_read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -997,6 +1045,12 @@ impl<'d> I2c<'d, Async> {
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
+    ///
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if the
+    /// FIFO is exceeded or if the buffer passed to an [`Operation`] has zero
+    /// length.
     pub async fn transaction<'a, A: Into<I2cAddress>>(
         &mut self,
         address: A,
