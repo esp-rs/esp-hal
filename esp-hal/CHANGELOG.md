@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - SPI: Added support for 3-wire SPI (#2919)
 - Add separate config for Rx and Tx (UART) #2965
+- Additional interrupt available in `esp_hal::uart::UartInterrupt` - as well as UartRx functions `wait_for_break()` and `wait_for_break_async().await` (#2858)
 
 ### Changed
 
