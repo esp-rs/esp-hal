@@ -1536,12 +1536,12 @@ unsafe extern "C" fn recv_cb_sta(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    if DATA_QUEUE_RX_STA.with(|queue| {
+    if let Ok(()) = DATA_QUEUE_RX_STA.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
-            true
+            Ok(())
         } else {
-            false
+            Err(packet)
         }
     }) {
         embassy::STA_RECEIVE_WAKER.wake();
@@ -1564,12 +1564,12 @@ unsafe extern "C" fn recv_cb_ap(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    if DATA_QUEUE_RX_AP.with(|queue| {
+    if let Ok(()) = DATA_QUEUE_RX_AP.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
-            true
+            Ok(())
         } else {
-            false
+            Err(packet)
         }
     }) {
         embassy::AP_RECEIVE_WAKER.wake();

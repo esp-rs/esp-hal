@@ -7,17 +7,19 @@ use core::{
 
 /// An exclusive reference to a peripheral.
 ///
-/// This is functionally the same as a `&'a mut T`. The reason for having a
-/// dedicated struct is memory efficiency:
+/// This is functionally the same as a `&'a mut T`. There's a few advantages in
+/// having a dedicated struct instead:
 ///
-/// Peripheral singletons are typically either zero-sized (for concrete
-/// peripherals like `SPI2` or `UART0`) or very small (for example `AnyPin`
-/// which is 1 byte). However `&mut T` is always 4 bytes for 32-bit targets,
-/// even if T is zero-sized. PeripheralRef stores a copy of `T` instead, so it's
-/// the same size.
-///
-/// but it is the size of `T` not the size
-/// of a pointer. This is useful if T is a zero sized type.
+/// - Memory efficiency: Peripheral singletons are typically either zero-sized
+///   (for concrete peripherals like `GpioPin<5>` or `SPI2`) or very small (for
+///   example `AnyPin`, which is 1 byte). However `&mut T` is always 4 bytes for
+///   32-bit targets, even if T is zero-sized. PeripheralRef stores a copy of
+///   `T` instead, so it's the same size.
+/// - Code size efficiency. If the user uses the same driver with both `SPI2`
+///   and `&mut SPI2`, the driver code would be monomorphized two times. With
+///   PeripheralRef, the driver is generic over a lifetime only. `SPI2` becomes
+///   `PeripheralRef<'static, SPI2>`, and `&mut SPI2` becomes `PeripheralRef<'a,
+///   SPI2>`. Lifetimes don't cause monomorphization.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeripheralRef<'a, T> {
@@ -102,13 +104,6 @@ impl<T> Deref for PeripheralRef<'_, T> {
     }
 }
 
-impl<T> DerefMut for PeripheralRef<'_, T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
 /// Trait for any type that can be used as a peripheral of type `P`.
 ///
 /// This is used in driver constructors, to allow passing either owned
@@ -151,7 +146,7 @@ impl<T> DerefMut for PeripheralRef<'_, T> {
 ///
 /// `.into_ref()` on an owned `T` yields a `PeripheralRef<'static, T>`.
 /// `.into_ref()` on an `&'a mut T` yields a `PeripheralRef<'a, T>`.
-pub trait Peripheral: Sized + crate::private::Sealed {
+pub trait Peripheral: Sized {
     /// Peripheral singleton type
     type P;
 
@@ -206,19 +201,17 @@ pub trait Peripheral: Sized + crate::private::Sealed {
     }
 }
 
-impl<T, P> Peripheral for &mut T
+impl<T: DerefMut> Peripheral for T
 where
-    T: Peripheral<P = P>,
+    T::Target: Peripheral,
 {
-    type P = P;
+    type P = <T::Target as Peripheral>::P;
 
+    #[inline]
     unsafe fn clone_unchecked(&self) -> Self::P {
-        T::clone_unchecked(self)
+        T::Target::clone_unchecked(self)
     }
 }
-
-impl<T> crate::private::Sealed for &mut T where T: crate::private::Sealed {}
-impl<T> crate::private::Sealed for PeripheralRef<'_, T> where T: crate::private::Sealed {}
 
 impl<T: Peripheral> Peripheral for PeripheralRef<'_, T> {
     type P = T::P;

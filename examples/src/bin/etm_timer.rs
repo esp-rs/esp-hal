@@ -13,9 +13,10 @@ use esp_backtrace as _;
 use esp_hal::{
     etm::Etm,
     gpio::{
-        etm::{Channels, OutputConfig},
+        etm::{Channels, OutputConfig as EtmOutputConfig},
         Level,
         Output,
+        OutputConfig,
         Pull,
     },
     main,
@@ -30,7 +31,7 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut led = Output::new(peripherals.GPIO2, Level::Low);
+    let mut led = Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default());
     led.set_high();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
@@ -42,7 +43,7 @@ fn main() -> ! {
     let gpio_ext = Channels::new(peripherals.GPIO_SD);
     let led_task = gpio_ext.channel0_task.toggle(
         led,
-        OutputConfig {
+        EtmOutputConfig {
             open_drain: false,
             pull: Pull::None,
             initial_state: Level::Low,

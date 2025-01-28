@@ -70,7 +70,7 @@
 //! use esp_hal::{
 //!     clock::CpuClock,
 //!     delay::Delay,
-//!     gpio::{Io, Level, Output},
+//!     gpio::{Io, Level, Output, OutputConfig},
 //!     main,
 //! };
 //!
@@ -80,7 +80,7 @@
 //!     let peripherals = esp_hal::init(config);
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let mut led = Output::new(peripherals.GPIO0, Level::High);
+//!     let mut led = Output::new(peripherals.GPIO0, Level::High, OutputConfig::default());
 //!
 //!     let delay = Delay::new();
 //!
@@ -168,7 +168,7 @@ pub use self::soc::lp_core;
 pub use self::soc::peripherals;
 pub(crate) use self::soc::peripherals::pac;
 #[instability::unstable]
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+#[cfg(feature = "psram")]
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
 #[instability::unstable]
@@ -551,7 +551,7 @@ pub struct Config {
     /// PSRAM configuration.
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+    #[cfg(feature = "psram")]
     pub psram: psram::PsramConfig,
 }
 
@@ -633,7 +633,7 @@ pub fn init(config: Config) -> Peripherals {
 
     crate::gpio::bind_default_interrupt_handler();
 
-    #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+    #[cfg(feature = "psram")]
     crate::psram::init_psram(config.psram);
 
     peripherals

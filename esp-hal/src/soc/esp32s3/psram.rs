@@ -18,8 +18,9 @@
 //! ### Octal/Quad PSRAM
 //! This example shows how to use PSRAM as heap-memory via esp-alloc.
 //! You need an ESP32-S3 with at least 2 MB of PSRAM memory.
-//! Either `Octal` or `Quad` PSRAM will be used, depending on whether
-//! `octal-psram` or `quad-psram` feature is enabled.
+//! Either `Octal` or `Quad` PSRAM will be used, depending on the
+//! setting of `ESP_HAL_CONFIG_PSRAM_MODE`.
+//!
 //! Notice that PSRAM example **must** be built in release mode!
 //!
 //! ```rust, no_run
@@ -233,7 +234,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     }
 }
 
-#[cfg(feature = "quad-psram")]
+#[cfg(psram_mode_quad)]
 pub(crate) mod utils {
     use procmacros::ram;
 
@@ -788,7 +789,7 @@ pub(crate) mod utils {
     }
 }
 
-#[cfg(feature = "octal-psram")]
+#[cfg(psram_mode_octal)]
 pub(crate) mod utils {
     use procmacros::ram;
 

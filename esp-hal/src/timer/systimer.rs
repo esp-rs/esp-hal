@@ -23,7 +23,7 @@ use fugit::{Instant, MicrosDurationU64};
 
 use super::{Error, Timer as _};
 use crate::{
-    interrupt::{self, InterruptConfigurable, InterruptHandler},
+    interrupt::{self, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     sync::{lock, RawMutex},
@@ -386,7 +386,7 @@ impl Alarm {
     }
 
     /// Set the interrupt handler for this comparator.
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
         let interrupt = match self.channel() {
             0 => Interrupt::SYSTIMER_TARGET0,
             1 => Interrupt::SYSTIMER_TARGET1,
@@ -435,12 +435,6 @@ impl Alarm {
             }
         }
         unwrap!(interrupt::enable(interrupt, handler.priority()));
-    }
-}
-
-impl InterruptConfigurable for Alarm {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.set_interrupt_handler(handler)
     }
 }
 
@@ -586,6 +580,10 @@ impl super::Timer for Alarm {
             2 => Interrupt::SYSTIMER_TARGET2,
             _ => unreachable!(),
         }
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler)
     }
 }
 

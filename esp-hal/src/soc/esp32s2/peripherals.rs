@@ -20,7 +20,6 @@ crate::peripherals! {
     peripherals: [
         I2C0 <= I2C0,
         I2C1 <= I2C1,
-        IO_MUX <= IO_MUX,
         SPI2 <= SPI2 (SPI2_DMA, SPI2),
         SPI3 <= SPI3 (SPI3_DMA, SPI3),
         UART0 <= UART0,
@@ -43,6 +42,7 @@ crate::peripherals! {
         HMAC <= HMAC,
         I2S0 <= I2S0 (I2S0),
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
+        IO_MUX <= IO_MUX,
         LEDC <= LEDC,
         LPWR <= RTC_CNTL,
         PCNT <= PCNT,

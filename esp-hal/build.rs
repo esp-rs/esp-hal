@@ -8,7 +8,7 @@ use std::{
 };
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, Value};
+use esp_config::{generate_config, Validator, Value};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -24,12 +24,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_unique_used_features!(
         "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
     );
-
-    #[cfg(all(
-        feature = "flip-link",
-        not(any(feature = "esp32c6", feature = "esp32h2"))
-    ))]
-    esp_build::error!("flip-link is only available on ESP32-C6/ESP32-H2");
 
     // NOTE: update when adding new device support!
     // Determine the name of the configured device:
@@ -55,15 +49,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let chip = Chip::from_str(device_name)?;
     let config = Config::for_chip(&chip);
 
-    // Check PSRAM features are only given if the target supports PSRAM:
-    if !config.contains(&String::from("psram")) && cfg!(feature = "quad-psram") {
-        panic!("The target does not support PSRAM");
-    }
-
-    if !config.contains(&String::from("octal_psram")) && cfg!(feature = "octal-psram") {
-        panic!("The target does not support Octal PSRAM");
-    }
-
     // Define all necessary configuration symbols for the configured device:
     config.define_symbols();
 
@@ -73,44 +58,56 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     // emit config
-    let cfg = generate_config(
-        "esp_hal",
-        &[
-            (
-                "place-spi-driver-in-ram",
-                "Places the SPI driver in RAM for better performance",
-                Value::Bool(false),
-                None
-            ),
-            (
-                "spi-address-workaround",
-                "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
-                Value::Bool(true),
-                None
-            ),
-            (
-                "place-switch-tables-in-ram",
-                "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
-                Value::Bool(true),
-                None
-            ),
-            (
-                "place-anon-in-ram",
-                "Places anonymous symbols into RAM - resulting in better performance at the cost of significant more RAM consumption. Best to be combined with `place-switch-tables-in-ram`.",
-                Value::Bool(false),
-                None
-            ),
-        ],
-        true,
-    );
+    let cfg = generate_config("esp_hal", &[
+        (
+            "place-spi-driver-in-ram",
+            "Places the SPI driver in RAM for better performance",
+            Value::Bool(false),
+            None
+        ),
+        (
+            "place-switch-tables-in-ram",
+            "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
+            Value::Bool(true),
+            None
+        ),
+        (
+            "place-anon-in-ram",
+            "Places anonymous symbols into RAM - resulting in better performance at the cost of significant more RAM consumption. Best to be combined with `place-switch-tables-in-ram`.",
+            Value::Bool(false),
+            None
+        ),
+        // ideally we should only offer this for ESP32 but the config system doesn't
+        // support per target configs, yet
+        (
+            "spi-address-workaround",
+            "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
+            Value::Bool(true),
+            None
+        ),
+        // ideally we should only offer this for ESP32-C6/ESP32-H2 but the config system doesn't support per target configs, yet
+        (
+            "flip-link",
+            "(ESP32-C6/ESP32-H2 only): Move the stack to start of RAM to get zero-cost stack overflow protection.",
+            Value::Bool(false),
+            None
+        ),
+        // ideally we should only offer this for ESP32, ESP32-S2 and `octal` only for ESP32-S3 but the config system doesn't support per target configs, yet
+        (
+            "psram-mode",
+            "(ESP32, ESP32-S2 and ESP32-S3 only, `octal` is only supported for ESP32-S3) SPIRAM chip mode",
+            Value::String(String::from("quad")),
+            Some(Validator::Enumeration(
+                    vec![String::from("quad"), String::from("octal")]
+            )),
+        )
+    ], true);
 
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
 
     #[allow(unused_mut)]
     let mut config_symbols = config.all().collect::<Vec<_>>();
-    #[cfg(feature = "flip-link")]
-    config_symbols.push("flip-link");
 
     for (key, value) in &cfg {
         if let Value::Bool(true) = value {
@@ -253,7 +250,7 @@ fn generate_memory_extras() -> Vec<u8> {
 
 #[cfg(feature = "esp32s2")]
 fn generate_memory_extras() -> Vec<u8> {
-    let reserved_cache = if cfg!(feature = "quad-psram") {
+    let reserved_cache = if cfg!(feature = "psram") {
         "0x4000"
     } else {
         "0x2000"

@@ -502,7 +502,6 @@ impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
             type Output = ();
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                LCD_DONE_WAKER.register(cx.waker());
                 if Instance::is_lcd_done_set() {
                     // Interrupt bit will be cleared in Self::wait.
                     // This allows `wait_for_done` to be called more than once.
@@ -510,6 +509,7 @@ impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
                     // Instance::clear_lcd_done();
                     Poll::Ready(())
                 } else {
+                    LCD_DONE_WAKER.register(cx.waker());
                     Instance::listen_lcd_done();
                     Poll::Pending
                 }
