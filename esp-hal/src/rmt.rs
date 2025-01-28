@@ -220,6 +220,8 @@
 //! 
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
+use cfg_if::cfg_if;
+
 use core::{
     default::Default,
     marker::PhantomData,
@@ -772,6 +774,8 @@ macro_rules! impl_rx_channel_creator {
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 mod impl_for_chip {
+    use cfg_if::cfg_if;
+
     use core::marker::PhantomData;
 
     use crate::{
@@ -1065,6 +1069,8 @@ mod impl_for_chip {
 
 #[cfg(esp32s3)]
 mod impl_for_chip {
+    use cfg_if::cfg_if;
+
     use core::marker::PhantomData;
 
     use crate::{
@@ -1240,6 +1246,7 @@ where
     C: RxChannel,
 {
     channel: C,
+    #[allow(dead_code)]
     index: usize,
     data: &'a mut [u32],
 }
@@ -1248,61 +1255,94 @@ impl<C> RxTransaction<'_, C>
 where
     C: RxChannel,
 {
-    /// Wait for the transaction to complete
-    pub fn wait(mut self) -> Result<C, (Error, C)> {
-        let half_channel_ram_size = constants::RMT_CHANNEL_RAM_SIZE / 2;
-        // We want to either keep reading until we fill up the `data` buffer,
-        // or stop early if the receiver enters an idle state
-        loop {
-            if <C as RxChannelInternal>::is_error() {
-                return Err((Error::TransmissionError, self.channel));
-            }
+    cfg_if! {
+        if #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))] {
+            /// Wait for the transaction to complete
+            pub fn wait(mut self) -> Result<C, (Error, C)> {
+                let half_channel_ram_size = constants::RMT_CHANNEL_RAM_SIZE / 2;
+                // We want to either keep reading until we fill up the `data` buffer,
+                // or stop early if the receiver enters an idle state
+                loop {
+                    if <C as RxChannelInternal>::is_error() {
+                        return Err((Error::TransmissionError, self.channel));
+                    }
 
-            if self.index >= self.data.len() {
-                break;
-            }
+                    if self.index >= self.data.len() {
+                        break;
+                    }
 
-            // wait for RX-THR, an error, or the receiver to go idle
-            while !<C as RxChannelInternal>::is_threshold_set() {
-                if <C as RxChannelInternal>::is_error() {
-                    return Err((Error::TransmissionError, self.channel));
+                    // wait for RX-THR, an error, or the receiver to go idle
+                    while !<C as RxChannelInternal>::is_threshold_set() {
+                        if <C as RxChannelInternal>::is_error() {
+                            return Err((Error::TransmissionError, self.channel));
+                        }
+                        if <C as RxChannelInternal>::is_done() {
+                            break;
+                        }
+                    }
+                    <C as RxChannelInternal>::reset_threshold_set();
+
+                    // load new data into memory buffer
+                    let ram_index = (((self.index - constants::RMT_CHANNEL_RAM_SIZE)
+                        / (half_channel_ram_size))
+                        % 2)
+                        * (half_channel_ram_size);
+
+                    let ptr = (constants::RMT_RAM_START
+                        + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4
+                        + ram_index * 4) as *mut u32;
+
+                    for (idx, entry) in self.data[self.index..]
+                        .iter_mut()
+                        .take(half_channel_ram_size)
+                        .enumerate()
+                    {
+                        *entry = unsafe { ptr.add(idx).read_volatile() };
+                        // Stops us from writing garbage data if the transaction
+                        // finishes early due to the receiver going idle
+                        unsafe { ptr.add(idx).write_volatile(0); }
+                    }
+
+                    if <C as RxChannelInternal>::is_done() {
+                        break;
+                    }
+                    self.index += half_channel_ram_size;
                 }
-                if <C as RxChannelInternal>::is_done() {
-                    break;
+
+                <C as RxChannelInternal>::stop();
+                <C as RxChannelInternal>::clear_interrupts();
+                <C as RxChannelInternal>::update();
+
+                Ok(self.channel)
+            }
+        } else {
+            /// Wait for transaction to complete
+            pub fn wait(self) -> Result<C, (Error, C)> {
+                loop {
+                    if <C as RxChannelInternal>::is_error() {
+                        return Err((Error::TransmissionError, self.channel));
+                    }
+
+                    if <C as RxChannelInternal>::is_done() {
+                        break;
+                    }
                 }
+
+                <C as RxChannelInternal>::stop();
+                <C as RxChannelInternal>::clear_interrupts();
+                <C as RxChannelInternal>::update();
+
+                let ptr = (constants::RMT_RAM_START
+                    + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
+                    as *mut u32;
+                let len = self.data.len();
+                for (idx, entry) in self.data.iter_mut().take(len).enumerate() {
+                    *entry = unsafe { ptr.add(idx).read_volatile() };
+                }
+
+                Ok(self.channel)
             }
-            <C as RxChannelInternal>::reset_threshold_set();
-
-            // load new data into memory buffer
-            let ram_index = (((self.index - constants::RMT_CHANNEL_RAM_SIZE)
-                / (half_channel_ram_size))
-                % 2)
-                * (half_channel_ram_size);
-
-            let ptr = (constants::RMT_RAM_START
-                + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4
-                + ram_index * 4) as *mut u32;
-
-            for (idx, entry) in self.data[self.index..]
-                .iter_mut()
-                .take(half_channel_ram_size)
-                .enumerate()
-            {
-                *entry = unsafe { ptr.add(idx).read_volatile() };
-                unsafe { ptr.add(idx).write_volatile(0); }
-            }
-
-            if <C as RxChannelInternal>::is_done() {
-                break;
-            }
-            self.index += half_channel_ram_size;
         }
-
-        <C as RxChannelInternal>::stop();
-        <C as RxChannelInternal>::clear_interrupts();
-        <C as RxChannelInternal>::update();
-
-        Ok(self.channel)
     }
 }
 
@@ -2083,8 +2123,17 @@ mod chip_specific {
                 #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
                 fn set_threshold(threshold: u8) {
                     let rmt = crate::peripherals::RMT::regs();
-                    rmt.ch_rx_lim($ch_index)
-                        .modify(|_, w| unsafe {w.rx_lim().bits(threshold as u16) });
+                    
+                    cfg_if! {
+                        if #[cfg(any(esp32s3, esp32c3))] {
+                            rmt.ch_rx_lim($ch_index)
+                                .modify(|_, w| unsafe {w.rx_lim().bits(threshold as u16) });
+                        } else {
+                            #[cfg(any(esp32c6, esp32h2))]
+                            rmt.ch_rx_lim($ch_index)
+                                .modify(|_, w| unsafe {w.rmt_rx_lim().bits(threshold as u16) });
+                        }
+                    }
                 }
 
                 fn stop() {
