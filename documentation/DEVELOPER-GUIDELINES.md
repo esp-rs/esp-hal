@@ -1,4 +1,4 @@
-# `esp-rs` API Guidelines
+# `esp-hal` developers' guidelines
 
 ## About
 
@@ -35,7 +35,11 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
   - The `ConfigError` enum should be separate from other `Error` enums used by the driver.
   - The driver should implement `fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError>`.
   - In case the driver's configuration is infallible (all possible combinations of options are supported by the hardware), the `ConfigError` should be implemented as an empty `enum`.
-  - Configuration structs should derive `procmacros::BuilderLite` in order to automatically implement the Builder Lite pattern for them.
+  - Configuration structs should
+    - Derive `procmacros::BuilderLite` in order to automatically implement the Builder Lite pattern for them.
+    - Implement `Copy` if possible.
+    - The fields should be private. The `BuilderLite` macro generates setters and getters automatically.
+    - If calculating register values based on the configuration is costly, the configuration struct should precompute and store the result of those calculations.
 - If a driver implements both blocking and async operations, or only implements blocking operations, but may support asynchronous ones in the future, the driver's type signature must include a `crate::Mode` type parameter.
 - By default, constructors must configure the driver for blocking mode. The driver must implement `into_async` (and a matching `into_blocking`) function that reconfigures the driver.
   - `into_async` must configure the driver and/or the associated DMA channels. This most often means enabling an interrupt handler.
