@@ -1115,13 +1115,13 @@ pub enum DriveMode {
 #[non_exhaustive]
 pub struct OutputConfig {
     /// Output drive mode.
-    pub drive_mode: DriveMode,
+    drive_mode: DriveMode,
 
     /// Pin drive strength.
-    pub drive_strength: DriveStrength,
+    drive_strength: DriveStrength,
 
     /// Pin pull direction.
-    pub pull: Pull,
+    pull: Pull,
 }
 
 impl Default for OutputConfig {
@@ -1332,7 +1332,7 @@ impl<'d> Output<'d> {
 #[non_exhaustive]
 pub struct InputConfig {
     /// Initial pull of the pin.
-    pub pull: Pull,
+    pull: Pull,
 }
 
 impl Default for InputConfig {

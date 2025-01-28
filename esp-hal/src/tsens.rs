@@ -68,6 +68,7 @@ pub enum ClockSource {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
+    /// Clock source for the temperature sensor
     clock_source: ClockSource,
 }
 

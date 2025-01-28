@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - SPI: Added support for 3-wire SPI (#2919)
 - UART: Add separate config for Rx and Tx (#2965)
+- Added accessor methods to config structs (#3011)
 
 ### Changed
 
@@ -41,9 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
 - OutputOpenDrain has been removed (#3029)
-
-- `spi::master::Config::frequency` is no longer public (#3011)
-- `uart::Config::clock_source` is no longer public (#3011)
+- The fields of config structs are no longer public (#3011)
 
 ## [0.23.1] - 2025-01-15
 

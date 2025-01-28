@@ -33,8 +33,7 @@
 //! );
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
-//! let mut config = Config::default();
-//! config.frequency = 20.MHz();
+//! let config = Config::default().with_frequency(20.MHz());
 //!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
@@ -540,35 +539,35 @@ impl<BUF: DmaTxBuffer, Dm: DriverMode> Drop for I8080Transfer<'_, BUF, Dm> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Configuration settings for the I8080 interface.
 pub struct Config {
     /// Specifies the clock mode, including polarity and phase settings.
-    pub clock_mode: ClockMode,
+    clock_mode: ClockMode,
 
     /// The frequency of the pixel clock.
-    pub frequency: HertzU32,
+    frequency: HertzU32,
 
     /// Setup cycles expected, must be at least 1. (6 bits)
-    pub setup_cycles: usize,
+    setup_cycles: usize,
 
     /// Hold cycles expected, must be at least 1. (13 bits)
-    pub hold_cycles: usize,
+    hold_cycles: usize,
 
     /// The default value of LCD_CD.
-    pub cd_idle_edge: bool,
+    cd_idle_edge: bool,
     /// The value of LCD_CD during CMD phase.
-    pub cd_cmd_edge: bool,
+    cd_cmd_edge: bool,
     /// The value of LCD_CD during dummy phase.
-    pub cd_dummy_edge: bool,
+    cd_dummy_edge: bool,
     /// The value of LCD_CD during data phase.
-    pub cd_data_edge: bool,
+    cd_data_edge: bool,
 
     /// The output LCD_CD is delayed by module clock LCD_CLK.
-    pub cd_mode: DelayMode,
+    cd_mode: DelayMode,
     /// The output data bits are delayed by module clock LCD_CLK.
-    pub output_bit_mode: DelayMode,
+    output_bit_mode: DelayMode,
 }
 
 impl Default for Config {

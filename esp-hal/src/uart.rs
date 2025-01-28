@@ -371,17 +371,17 @@ impl Config {
 pub struct AtCmdConfig {
     /// Optional idle time before the AT command detection begins, in clock
     /// cycles.
-    pub pre_idle_count: Option<u16>,
+    pre_idle_count: Option<u16>,
     /// Optional idle time after the AT command detection ends, in clock
     /// cycles.
-    pub post_idle_count: Option<u16>,
+    post_idle_count: Option<u16>,
     /// Optional timeout between characters in the AT command, in clock
     /// cycles.
-    pub gap_timeout: Option<u16>,
+    gap_timeout: Option<u16>,
     /// The character that triggers the AT command detection.
-    pub cmd_char: u8,
+    cmd_char: u8,
     /// Optional number of characters to detect as part of the AT command.
-    pub char_num: u8,
+    char_num: u8,
 }
 
 impl Default for AtCmdConfig {

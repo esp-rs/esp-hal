@@ -419,6 +419,7 @@ impl Address {
 /// SPI clock source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum ClockSource {
     /// Use the APB clock.
     Apb,
@@ -440,6 +441,7 @@ pub struct Config {
     frequency: HertzU32,
 
     /// The clock source
+    #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
     #[builder_lite(skip_setter)]
     clock_source: ClockSource,
 
@@ -491,6 +493,7 @@ impl Config {
     }
 
     /// Set the clock source of the SPI bus.
+    #[instability::unstable]
     pub fn with_clock_source(mut self, clock_source: ClockSource) -> Self {
         self.clock_source = clock_source;
         self.reg = self.recalculate();
