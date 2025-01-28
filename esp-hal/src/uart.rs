@@ -559,6 +559,7 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the RX half.
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[instability::unstable]
     pub fn apply_config(&mut self, _config: &Config) -> Result<(), ConfigError> {
         // Nothing to do so far.
@@ -752,6 +753,7 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the TX half.
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
@@ -986,6 +988,7 @@ impl<'d> Uart<'d, Blocking> {
     /// .with_tx(peripherals.GPIO2);
     /// # }
     /// ```
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -1176,6 +1179,7 @@ where
     }
 
     /// Change the configuration.
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
@@ -1853,6 +1857,12 @@ pub mod lp_uart {
 
     impl LpUart {
         /// Initialize the UART driver using the provided configuration
+        ///
+        /// # Panics
+        ///  
+        /// [`Apb`] is a wrong clock source for LP_UART
+        ///
+        /// [`Apb`]: super::ClockSource::Apb
         // TODO: CTS and RTS pins
         pub fn new(
             uart: LP_UART,
@@ -1988,6 +1998,12 @@ pub mod lp_uart {
         }
 
         /// Modify UART baud rate and reset TX/RX fifo.
+        ///
+        /// # Panics
+        ///
+        /// [`Apb`] is a wrong clock source for LP_UART
+        ///
+        /// [`Apb`]: super::ClockSource::Apb
         pub fn change_baud(&mut self, baudrate: u32, clock_source: super::ClockSource) {
             self.change_baud_internal(baudrate, clock_source);
             self.txfifo_reset();
