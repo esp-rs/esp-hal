@@ -431,7 +431,7 @@ impl core::hash::Hash for BusClockConfig {
 #[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
-    #[builder_lite_into]
+    #[builder_lite(into)]
     pub clock: BusClockConfig,
 
     /// I2C SCL timeout period.

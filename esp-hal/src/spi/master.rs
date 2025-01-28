@@ -587,7 +587,7 @@ impl core::hash::Hash for BusClockConfig {
 #[non_exhaustive]
 pub struct Config {
     /// SPI bus clock frequency.
-    #[builder_lite_into]
+    #[builder_lite(into)]
     pub clock: BusClockConfig,
 
     /// SPI sample/shift mode.

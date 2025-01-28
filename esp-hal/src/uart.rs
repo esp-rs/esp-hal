@@ -331,7 +331,7 @@ impl BaudRateConfig {
 pub struct Config {
     /// The baud rate (speed) of the UART communication in bits per second
     /// (bps).
-    #[builder_lite_into]
+    #[builder_lite(into)]
     pub baudrate: BaudRateConfig,
     /// Number of data bits in each frame (5, 6, 7, or 8 bits).
     pub data_bits: DataBits,

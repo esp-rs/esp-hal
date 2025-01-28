@@ -244,7 +244,7 @@ pub fn blocking_main(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 ///
 /// [Builder Lite]: https://matklad.github.io/2022/05/29/builder-lite.html
-#[proc_macro_derive(BuilderLite, attributes(builder_lite_into))]
+#[proc_macro_derive(BuilderLite, attributes(builder_lite))]
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
     builder::builder_lite_derive(item)
 }

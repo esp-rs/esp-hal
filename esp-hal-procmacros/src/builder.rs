@@ -2,13 +2,17 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
     parse::Error as ParseError,
+    punctuated::Punctuated,
     spanned::Spanned,
+    Attribute,
     Data,
     DataStruct,
     GenericArgument,
+    Ident,
     Path,
     PathArguments,
     PathSegment,
+    Token,
     Type,
 };
 
@@ -43,12 +47,13 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
                 (quote! { #field_type }, quote! { #field_ident })
             };
 
+            let helper_attributes = match collect_helper_attrs(&field.attrs) {
+                Ok(attr) => attr,
+                Err(err) => return err.to_compile_error().into(),
+            };
+
             // Wrap type and assignment with `Into` if needed.
-            if field
-                .attrs
-                .iter()
-                .any(|attr| attr.path().is_ident("builder_lite_into"))
-            {
+            if helper_attributes.iter().any(|h| h == "into") {
                 field_type = quote! { impl Into<#field_type> };
                 field_assigns = quote! { #field_ident .into() };
             }
@@ -113,4 +118,33 @@ fn extract_option_segment(path: &Path) -> Option<&PathSegment> {
         .into_iter()
         .find(|s| idents_of_path == *s)
         .and_then(|_| path.segments.last())
+}
+
+fn collect_helper_attrs(attrs: &[Attribute]) -> Result<Vec<Ident>, syn::Error> {
+    const KNOWN_HELPERS: &[&str] = &["into"];
+
+    let mut helper_attributes = Vec::new();
+    for attr in attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("builder_lite"))
+    {
+        for helper in attr.parse_args_with(|input: syn::parse::ParseStream| {
+            Punctuated::<Ident, Token![,]>::parse_terminated(input)
+        })? {
+            if !KNOWN_HELPERS.iter().any(|known| helper == *known) {
+                return Err(ParseError::new(
+                    helper.span(),
+                    format!(
+                        "Unknown helper attribute `{}`. Only the following are allowed: {}",
+                        helper,
+                        KNOWN_HELPERS.join(", ")
+                    ),
+                ));
+            }
+
+            helper_attributes.push(helper);
+        }
+    }
+
+    Ok(helper_attributes)
 }
