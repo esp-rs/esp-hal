@@ -133,12 +133,14 @@ Use `DataMode::SingleTwoDataLines` to get the previous behavior.
 The `flip-link` feature is removed and replaced by the `ESP_HAL_CONFIG_FLIP_LINK` option.
 
 Cargo.toml
+
 ```diff
 - esp-hal = { version = "0.23.0", features = ["flip-link"]}
 + esp-hal = "0.23.0"
 ```
 
 config/config.toml
+
 ```diff
 [env]
 + ESP_HAL_CONFIG_FLIP_LINK = "true"
@@ -151,17 +153,18 @@ The features `psram-quad`/`prsram-octal` are replaced by a single `psram` featur
 `ESP_HAL_CONFIG_PSRAM_MODE` defaults to `quad` and (for ESP32-S3) also allows `octal`.
 
 Cargo.toml
+
 ```diff
 - esp-hal = { version = "0.23.0", features = ["psram-octal"]}
 + esp-hal = { version = "0.23.0", features = ["psram"]}
 ```
 
 config/config.toml
+
 ```diff
 [env]
 + ESP_HAL_CONFIG_PSRAM_MODE = "octal"
 ```
-
 
 ## UART halves have their configuration split too
 
@@ -199,4 +202,17 @@ The OutputOpenDrain driver has been removed. You can use `Output` instead with
      OutputConfig::default()
          .with_drive_mode(DriveMode::OpenDrain),
  );
+```
+
+## Rng changes
+
+`rng::Rng::try_fill_bytes` is now behind the `rand_core::TryRngCore` trait.
+
+```diff
+- use rand_core::RngCore;
++ use rand_core::TryRngCore;
+
+let mut rng = Rng::new(peripherals.RNG);
+let mut buf = [0u8, 4];
+rng.try_fill_bytes(&mut buf).unwrap();
 ```
