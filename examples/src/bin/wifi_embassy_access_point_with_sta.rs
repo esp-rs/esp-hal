@@ -49,6 +49,7 @@ use esp_wifi::{
     },
     EspWifiController,
 };
+use rand_core::RngCore;
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -101,7 +102,7 @@ async fn main(spawner: Spawner) -> ! {
     });
     let sta_config = embassy_net::Config::dhcpv4(Default::default());
 
-    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
+    let seed = rng.next_u64();
 
     // Init network stacks
     let (ap_stack, ap_runner) = embassy_net::new(

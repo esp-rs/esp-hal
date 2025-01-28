@@ -49,6 +49,7 @@ edge-dhcp = { version = "0.5.0" }
 edge-raw = { version = "0.5.0" }
 edge-nal = { version = "0.5.0" }
 edge-nal-embassy = { version = "0.5.0" }
+rand_core = "0.9.0"
 
 [features]
 esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-wifi?/esp32"]

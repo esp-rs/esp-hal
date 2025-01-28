@@ -45,6 +45,7 @@ use esp_wifi::{
     },
     EspWifiController,
 };
+use rand_core::RngCore;
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {
@@ -98,7 +99,7 @@ async fn main(spawner: Spawner) -> ! {
         dns_servers: Default::default(),
     });
 
-    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
+    let seed = rng.next_u64();
 
     // Init network stack
     let (stack, runner) = embassy_net::new(
