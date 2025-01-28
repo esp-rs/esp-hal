@@ -15,6 +15,7 @@
 //! let mut touchpad = TouchPad::new(touch_pin0, &touch);
 //! // ... give the peripheral some time for the measurement
 //! let touch_val = touchpad.read();
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -193,6 +194,7 @@ impl<'d> Touch<'d, OneShot, Blocking> {
     ///     ..Default::default()
     /// });
     /// let touch = Touch::one_shot_mode(peripherals.TOUCH, touch_cfg);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn one_shot_mode(
@@ -253,6 +255,7 @@ impl<'d> Touch<'d, Continuous, Blocking> {
     ///     ..Default::default()
     /// });
     /// let touch = Touch::continuous_mode(peripherals.TOUCH, touch_cfg);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn continuous_mode(
@@ -296,6 +299,7 @@ impl<'d> Touch<'d, Continuous, Async> {
     /// # use esp_hal::touch::{Touch, TouchConfig};
     /// let mut rtc = Rtc::new(peripherals.LPWR);
     /// let touch = Touch::async_mode(peripherals.TOUCH, &mut rtc, None);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn async_mode(

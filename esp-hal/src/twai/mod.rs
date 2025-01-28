@@ -62,10 +62,10 @@
 //!
 //! loop {
 //!     // Wait for a frame to be received.
-//!     let frame = block!(twai.receive()).unwrap();
+//!     let frame = block!(twai.receive())?;
 //!
 //!     // Transmit the frame back.
-//!     let _result = block!(twai.transmit(&frame)).unwrap();
+//!     let _result = block!(twai.transmit(&frame))?;
 //! }
 //! # }
 //! ```
@@ -111,7 +111,7 @@
 //!
 //! let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO,
 //!     &[1, 2, 3]).unwrap(); // Wait for a frame to be received.
-//! let frame = block!(can.receive()).unwrap();
+//! let frame = block!(can.receive())?;
 //!
 //! # loop {}
 //! # }

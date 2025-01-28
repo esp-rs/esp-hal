@@ -31,9 +31,9 @@
 //! let mut pcnt = Pcnt::new(peripherals.PCNT);
 //! pcnt.set_interrupt_handler(interrupt_handler);
 //! let u0 = pcnt.unit1;
-//! u0.set_low_limit(Some(-100)).unwrap();
-//! u0.set_high_limit(Some(100)).unwrap();
-//! u0.set_filter(Some(min(10u16 * 80, 1023u16))).unwrap();
+//! u0.set_low_limit(Some(-100))?;
+//! u0.set_high_limit(Some(100))?;
+//! u0.set_filter(Some(min(10u16 * 80, 1023u16)))?;
 //! u0.clear();
 //!
 //! // Set up channels with control and edge signals

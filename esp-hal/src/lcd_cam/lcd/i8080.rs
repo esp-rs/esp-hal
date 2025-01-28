@@ -19,7 +19,7 @@
 //! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::dma::DmaTxBuf;
 //!
-//! # let mut dma_buf = dma_tx_buffer!(32678).unwrap();
+//! # let mut dma_buf = dma_tx_buffer!(32678)?;
 //!
 //! let tx_pins = TxEightBits::new(
 //!     peripherals.GPIO9,
@@ -40,13 +40,13 @@
 //!     peripherals.DMA_CH0,
 //!     tx_pins,
 //!     config,
-//! )
-//! .unwrap()
+//! )?
 //! .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
 //!
 //! dma_buf.fill(&[0x55]);
-//! let transfer = i8080.send(0x3Au8, 0, dma_buf).unwrap(); // RGB565
+//! let transfer = i8080.send(0x3Au8, 0, dma_buf)?; // RGB565
 //! transfer.wait();
+//! # Ok(())
 //! # }
 //! ```
 

@@ -59,7 +59,7 @@
 //!     .with_de_idle_level(Level::Low)
 //!     .with_disable_black_region(false);
 //!
-//! let mut dpi = Dpi::new(lcd_cam.lcd, channel, config).unwrap()
+//! let mut dpi = Dpi::new(lcd_cam.lcd, channel, config)?
 //!     .with_vsync(peripherals.GPIO3)
 //!     .with_hsync(peripherals.GPIO46)
 //!     .with_de(peripherals.GPIO17)
@@ -89,8 +89,9 @@
 //!     chunk.copy_from_slice(&color.to_le_bytes());
 //! }
 //!
-//! let transfer = dpi.send(false, dma_buf).map_err(|e| e.0).unwrap();
+//! let transfer = dpi.send(false, dma_buf).map_err(|e| e.0)?;
 //! transfer.wait();
+//! # Ok(())
 //! # }
 //! ```
 

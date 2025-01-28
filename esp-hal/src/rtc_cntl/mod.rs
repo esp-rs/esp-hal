@@ -59,6 +59,7 @@
 //! rtc.rwdt.listen();
 //!
 //! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
+//! # Ok(())
 //! # }
 //!
 //! // Where the `LP_WDT` interrupt handler is defined as:

@@ -44,13 +44,14 @@
 //! while !source_data.is_empty() {
 //!     // All the HW Sha functions are infallible so unwrap is fine to use if
 //!     // you use block!
-//!     source_data = block!(hasher.update(source_data)).unwrap();
+//!     source_data = block!(hasher.update(source_data))?;
 //! }
 //!
 //! // Finish can be called as many times as desired to get multiple copies of
 //! // the output.
-//! block!(hasher.finish(output.as_mut_slice())).unwrap();
+//! block!(hasher.finish(output.as_mut_slice()))?;
 //!
+//! # Ok(())
 //! # }
 //! ```
 //! ## Implementation State

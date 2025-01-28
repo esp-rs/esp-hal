@@ -28,8 +28,7 @@
 //!
 //! let temperature_sensor = TemperatureSensor::new(
 //!         peripherals.TSENS,
-//!         Config::default()
-//!     ).unwrap();
+//!         Config::default())?;
 //! let delay = Delay::new();
 //! delay.delay_micros(200);
 //! loop {

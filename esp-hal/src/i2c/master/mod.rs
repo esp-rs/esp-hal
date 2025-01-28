@@ -429,13 +429,13 @@ impl Default for Config {
 /// let mut i2c = I2c::new(
 ///     peripherals.I2C0,
 ///     Config::default(),
-/// )
-/// .unwrap()
+/// )?
 /// .with_sda(peripherals.GPIO1)
 /// .with_scl(peripherals.GPIO2);
 ///
 /// let mut data = [0u8; 22];
 /// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data).ok();
+/// # Ok(())
 /// # }
 /// ```
 #[derive(Debug)]
@@ -604,10 +604,10 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
     /// #   Config::default(),
-    /// # )
-    /// # .unwrap();
+    /// # )?;
     /// # const DEVICE_ADDR: u8 = 0x77;
-    /// i2c.write(DEVICE_ADDR, &[0xaa]).ok();
+    /// i2c.write(DEVICE_ADDR, &[0xaa])?;
+    /// # Ok(())
     /// # }
     /// ```
     pub fn write<A: Into<I2cAddress>>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
@@ -623,11 +623,11 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
     /// #   Config::default(),
-    /// # )
-    /// # .unwrap();
+    /// # )?;
     /// # const DEVICE_ADDR: u8 = 0x77;
     /// let mut data = [0u8; 22];
     /// i2c.read(DEVICE_ADDR, &mut data).ok();
+    /// # Ok(())
     /// # }
     /// ```
     /// 
@@ -652,11 +652,11 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
     /// #   Config::default(),
-    /// # )
-    /// # .unwrap();
+    /// # )?;
     /// # const DEVICE_ADDR: u8 = 0x77;
     /// let mut data = [0u8; 22];
-    /// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data).ok();
+    /// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data)?;
+    /// # Ok(())
     /// # }
     /// ```
     /// 
@@ -707,14 +707,14 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
     /// #   Config::default(),
-    /// # )
-    /// # .unwrap();
+    /// # )?;
     /// # const DEVICE_ADDR: u8 = 0x77;
     /// let mut data = [0u8; 22];
     /// i2c.transaction(
     ///     DEVICE_ADDR,
     ///     &mut [Operation::Write(&[0xaa]), Operation::Read(&mut data)]
-    /// ).ok();
+    /// )?;
+    /// # Ok(())
     /// # }
     /// ```
     /// 

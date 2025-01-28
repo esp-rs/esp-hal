@@ -45,10 +45,10 @@
 //! let mut send = tx_buffer;
 //!
 //! let transfer = spi
-//!     .transfer(&mut receive, &mut send)
-//!     .unwrap();
+//!     .transfer(&mut receive, &mut send)?;
 //!
-//! transfer.wait().unwrap();
+//! transfer.wait()?;
+//! # Ok(())
 //! # }
 //! ```
 //! 

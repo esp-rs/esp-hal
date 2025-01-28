@@ -49,7 +49,8 @@
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
-//! usb_serial.write_bytes(b"Hello, world!").expect("write error!");
+//! usb_serial.write_bytes(b"Hello, world!")?;
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -65,8 +66,9 @@
 //!
 //! // Each component can be used individually to interact with the USB
 //! // Serial/JTAG:
-//! tx.write_bytes(&[42u8]).expect("write error!");
-//! let byte = rx.read_byte().expect("read error!");
+//! tx.write_bytes(&[42u8])?;
+//! let byte = rx.read_byte()?;
+//! # Ok(())
 //! # }
 //! ```
 //! 

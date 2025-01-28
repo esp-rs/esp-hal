@@ -16,6 +16,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! let peripherals = esp_hal::init(esp_hal::Config::default());
+//! Ok(())
 //! # }
 //! ```
 //! 
@@ -29,6 +30,7 @@
 //!     with_watchdog(esp_hal::config::WatchdogConfig::default().
 //!     with_rwdt(esp_hal::config::WatchdogStatus::Enabled(fugit::MicrosDurationU64::millis(1000u64))));
 //! let peripherals = esp_hal::init(config);
+//! # Ok(())
 //! # }
 //! ```
 

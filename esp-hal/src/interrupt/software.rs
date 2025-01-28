@@ -23,6 +23,7 @@
 //!     int0.set_interrupt_handler(swint0_handler);
 //!     SWINT0.borrow_ref_mut(cs).replace(int0);
 //! });
+//! # Ok(())
 //! # }
 //!
 //! # use core::cell::RefCell;

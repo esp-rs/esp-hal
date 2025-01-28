@@ -51,8 +51,7 @@
 //! );
 //! # let mut uart0 = Uart::new(
 //! #    peripherals.UART0,
-//! #    config)
-//! # .unwrap();
+//! #    config)?;
 //! uart0.set_interrupt_handler(interrupt_handler);
 //!
 //! critical_section::with(|cs| {
@@ -644,9 +643,9 @@ impl<'d> UartTx<'d, Blocking> {
     /// # use esp_hal::uart::{Config, UartTx};
     /// let tx = UartTx::new(
     ///     peripherals.UART0,
-    ///     Config::default())
-    /// .unwrap()
+    ///     Config::default())?
     /// .with_tx(peripherals.GPIO1);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn new(
@@ -926,9 +925,9 @@ impl<'d> UartRx<'d, Blocking> {
     /// # use esp_hal::uart::{Config, UartRx};
     /// let rx = UartRx::new(
     ///     peripherals.UART1,
-    ///     Config::default())
-    /// .unwrap()
+    ///     Config::default())?
     /// .with_rx(peripherals.GPIO2);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn new(
@@ -983,10 +982,10 @@ impl<'d> Uart<'d, Blocking> {
     /// # use esp_hal::uart::{Config, Uart};
     /// let mut uart1 = Uart::new(
     ///     peripherals.UART1,
-    ///     Config::default())
-    /// .unwrap()
+    ///     Config::default())?
     /// .with_rx(peripherals.GPIO1)
     /// .with_tx(peripherals.GPIO2);
+    /// # Ok(())
     /// # }
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
@@ -1087,17 +1086,17 @@ where
     /// # use esp_hal::uart::{Config, Uart};
     /// # let mut uart1 = Uart::new(
     /// #     peripherals.UART1,
-    /// #     Config::default())
-    /// # .unwrap()
+    /// #     Config::default())?
     /// # .with_rx(peripherals.GPIO1)
     /// # .with_tx(peripherals.GPIO2);
     /// // The UART can be split into separate Transmit and Receive components:
     /// let (mut rx, mut tx) = uart1.split();
     ///
     /// // Each component can be used individually to interact with the UART:
-    /// tx.write_bytes(&[42u8]).expect("write error!");
+    /// tx.write_bytes(&[42u8])?;
     /// let mut byte = [0u8; 1];
     /// rx.read_bytes(&mut byte);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
@@ -1110,10 +1109,10 @@ where
     /// # use esp_hal::uart::{Config, Uart};
     /// # let mut uart1 = Uart::new(
     /// #     peripherals.UART1,
-    /// #     Config::default())
-    /// # .unwrap();
+    /// #     Config::default())?;
     /// // Write bytes out over the UART:
-    /// uart1.write_bytes(b"Hello, world!").expect("write error!");
+    /// uart1.write_bytes(b"Hello, world!")?;
+    /// # Ok(())
     /// # }
     /// ```
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {

@@ -627,11 +627,11 @@ pub enum ConfigError {}
 /// let mut spi = Spi::new(
 ///     peripherals.SPI2,
 ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-/// )
-/// .unwrap()
+/// )?
 /// .with_sck(peripherals.GPIO0)
 /// .with_mosi(peripherals.GPIO1)
 /// .with_miso(peripherals.GPIO2);
+/// # Ok(())
 /// # }
 /// ```
 #[derive(Debug)]
@@ -762,20 +762,20 @@ impl<'d> Spi<'d, Blocking> {
     /// let dma_rx_buf = DmaRxBuf::new(
     ///     rx_descriptors,
     ///     rx_buffer
-    /// ).unwrap();
+    /// )?;
     ///
     /// let dma_tx_buf = DmaTxBuf::new(
     ///     tx_descriptors,
     ///     tx_buffer
-    /// ).unwrap();
+    /// )?;
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
     ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-    /// )
-    /// .unwrap()
+    /// )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
+    /// # Ok(())
     /// # }
     /// ```
     #[instability::unstable]
@@ -1232,20 +1232,20 @@ mod dma {
     /// let dma_rx_buf = DmaRxBuf::new(
     ///     rx_descriptors,
     ///     rx_buffer
-    /// ).unwrap();
+    /// )?;
     ///
     /// let dma_tx_buf = DmaTxBuf::new(
     ///     tx_descriptors,
     ///     tx_buffer
-    /// ).unwrap();
+    /// )?;
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
     ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-    /// )
-    /// .unwrap()
+    /// )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
+    /// # Ok(())
     /// # }
     /// ```
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
