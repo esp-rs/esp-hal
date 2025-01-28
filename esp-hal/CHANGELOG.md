@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - SPI: Added support for 3-wire SPI (#2919)
 - UART: Add separate config for Rx and Tx (#2965)
 
@@ -41,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
 - OutputOpenDrain has been removed (#3029)
+- `try_fill_bytes` implementation removed from esp-hal::rng::Rng (#3046)
 
 ## [0.23.1] - 2025-01-15
 
