@@ -220,8 +220,6 @@
 //! 
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
-use cfg_if::cfg_if;
-
 use core::{
     default::Default,
     marker::PhantomData,
@@ -229,6 +227,7 @@ use core::{
     task::{Context, Poll},
 };
 
+use cfg_if::cfg_if;
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 
@@ -774,9 +773,9 @@ macro_rules! impl_rx_channel_creator {
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 mod impl_for_chip {
-    use cfg_if::cfg_if;
-
     use core::marker::PhantomData;
+
+    use cfg_if::cfg_if;
 
     use crate::{
         peripheral::{Peripheral, PeripheralRef},
@@ -1069,9 +1068,9 @@ mod impl_for_chip {
 
 #[cfg(esp32s3)]
 mod impl_for_chip {
-    use cfg_if::cfg_if;
-
     use core::marker::PhantomData;
+
+    use cfg_if::cfg_if;
 
     use crate::{
         peripheral::{Peripheral, PeripheralRef},
@@ -2122,7 +2121,7 @@ mod chip_specific {
                 #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
                 fn set_threshold(threshold: u8) {
                     let rmt = crate::peripherals::RMT::regs();
-                    
+
                     cfg_if! {
                         if #[cfg(any(esp32s3, esp32c3))] {
                             rmt.ch_rx_lim($ch_index)
