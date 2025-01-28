@@ -1502,7 +1502,6 @@ pub trait RxChannelAsync: RxChannelInternal {
             let len = data.len();
             for (idx, entry) in data.iter_mut().take(len).enumerate() {
                 *entry = unsafe { ptr.add(idx).read_volatile().into() };
-                unsafe {ptr.add(idx).write_volatile(0); }
             }
 
             Ok(())
