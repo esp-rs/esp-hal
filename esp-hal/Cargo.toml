@@ -50,7 +50,7 @@ procmacros               = { version = "0.16.0", package = "esp-hal-procmacros",
 strum                    = { version = "0.26.3", default-features = false, features = ["derive"] }
 void                     = { version = "1.0.2", default-features = false }
 usb-device               = { version = "0.3.2", optional = true }
-rand_core                = "0.6.4"
+rand_core                = "0.9.0"
 ufmt-write               = "0.1.0"
 
 # IMPORTANT:
