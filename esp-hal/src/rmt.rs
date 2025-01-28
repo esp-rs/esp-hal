@@ -1240,6 +1240,7 @@ where
     C: RxChannel,
 {
     channel: C,
+    index: usize,
     data: &'a mut [u32],
 }
 
@@ -1248,28 +1249,57 @@ where
     C: RxChannel,
 {
     /// Wait for the transaction to complete
-    pub fn wait(self) -> Result<C, (Error, C)> {
+    pub fn wait(mut self) -> Result<C, (Error, C)> {
+        let half_channel_ram_size = constants::RMT_CHANNEL_RAM_SIZE / 2;
+        // We want to either keep reading until we fill up the `data` buffer,
+        // or stop early if the receiver enters an idle state
         loop {
             if <C as RxChannelInternal>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
             }
 
+            if self.index >= self.data.len() {
+                break;
+            }
+
+            // wait for RX-THR, an error, or the receiver to go idle
+            while !<C as RxChannelInternal>::is_threshold_set() {
+                if <C as RxChannelInternal>::is_error() {
+                    return Err((Error::TransmissionError, self.channel));
+                }
+                if <C as RxChannelInternal>::is_done() {
+                    break;
+                }
+            }
+            <C as RxChannelInternal>::reset_threshold_set();
+
+            // load new data into memory buffer
+            let ram_index = (((self.index - constants::RMT_CHANNEL_RAM_SIZE)
+                / (half_channel_ram_size))
+                % 2)
+                * (half_channel_ram_size);
+
+            let ptr = (constants::RMT_RAM_START
+                + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4
+                + ram_index * 4) as *mut u32;
+
+            for (idx, entry) in self.data[self.index..]
+                .iter_mut()
+                .take(half_channel_ram_size)
+                .enumerate()
+            {
+                *entry = unsafe { ptr.add(idx).read_volatile() };
+            }
+
             if <C as RxChannelInternal>::is_done() {
                 break;
             }
+            self.index += half_channel_ram_size;
         }
 
         <C as RxChannelInternal>::stop();
         <C as RxChannelInternal>::clear_interrupts();
         <C as RxChannelInternal>::update();
-
-        let ptr = (constants::RMT_RAM_START
-            + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
-            as *mut u32;
-        let len = self.data.len();
-        for (idx, entry) in self.data.iter_mut().take(len).enumerate() {
-            *entry = unsafe { ptr.add(idx).read_volatile() };
-        }
 
         Ok(self.channel)
     }
@@ -1280,19 +1310,15 @@ pub trait RxChannel: RxChannelInternal {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
-    /// The length of the received data cannot exceed the allocated RMT RAM.
     fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self>, Error>
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE {
-            return Err(Error::InvalidArgument);
-        }
-
         Self::start_receive_raw();
 
         Ok(RxTransaction {
             channel: self,
+            index: 0,
             data,
         })
     }
@@ -1435,6 +1461,7 @@ pub trait RxChannelAsync: RxChannelInternal {
             let len = data.len();
             for (idx, entry) in data.iter_mut().take(len).enumerate() {
                 *entry = unsafe { ptr.add(idx).read_volatile().into() };
+                unsafe {ptr.add(idx).write_volatile(0); }
             }
 
             Ok(())
@@ -1681,11 +1708,25 @@ pub trait RxChannelInternal {
 
     fn start_receive_raw() {
         Self::clear_interrupts();
-        Self::set_wrap_mode(false);
+
+        #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
+        {
+            Self::set_threshold((constants::RMT_CHANNEL_RAM_SIZE / 2) as u8);
+            Self::set_wrap_mode(true);
+        }
         Self::set_memsize(1);
         Self::start_rx();
         Self::update();
     }
+
+    #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
+    fn is_threshold_set() -> bool;
+
+    #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
+    fn reset_threshold_set();
+
+    #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
+    fn set_threshold(threshold: u8);
 
     fn stop();
 
@@ -2049,6 +2090,26 @@ mod chip_specific {
                 fn is_error() -> bool {
                     let rmt = crate::peripherals::RMT::regs();
                     rmt.int_raw().read().ch_rx_err($ch_index).bit()
+                }
+
+                #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
+                fn is_threshold_set() -> bool {
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.int_raw().read().ch_rx_thr_event($ch_index).bit()
+                }
+
+                #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
+                fn reset_threshold_set() {
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.int_clr()
+                        .write(|w| w.ch_rx_thr_event($ch_index).set_bit());
+                }
+
+                #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
+                fn set_threshold(threshold: u8) {
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_rx_lim($ch_index)
+                        .modify(|_, w| unsafe {w.rx_lim().bits(threshold as u16) });
                 }
 
                 fn stop() {
