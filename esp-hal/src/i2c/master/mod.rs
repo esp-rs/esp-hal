@@ -32,7 +32,6 @@ use embassy_embedded_hal::SetConfig;
 use embedded_hal::i2c::Operation as EhalOperation;
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
-use procmacros::BuilderLite;
 
 use crate::{
     asynch::AtomicWaker,
@@ -391,57 +390,30 @@ impl From<Ack> for u32 {
     }
 }
 
-/// Bus clock configuration.
-///
-/// This struct holds information necessary to configure the SPI bus clock.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct BusClockConfig {
-    /// The target SCL frequency
-    frequency: HertzU32,
-}
-
-impl Default for BusClockConfig {
-    fn default() -> Self {
-        Self::new(HertzU32::kHz(100))
-    }
-}
-
-impl BusClockConfig {
-    fn new(frequency: HertzU32) -> Self {
-        Self { frequency }
-    }
-}
-
-impl From<HertzU32> for BusClockConfig {
-    fn from(frequency: HertzU32) -> Self {
-        Self::new(frequency)
-    }
-}
-
-impl core::hash::Hash for BusClockConfig {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.frequency.to_Hz().hash(state); // HertzU32 doesn't implement Hash
-    }
-}
-
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, BuilderLite, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
-    #[builder_lite(into)]
-    pub clock: BusClockConfig,
+    pub frequency: HertzU32,
 
     /// I2C SCL timeout period.
     pub timeout: BusTimeout,
 }
 
+impl core::hash::Hash for Config {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.frequency.to_Hz().hash(state); // `HertzU32` doesn't implement `Hash`
+        self.timeout.hash(state);
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
+        use fugit::RateExtU32;
         Config {
-            clock: BusClockConfig::default(),
+            frequency: 100.kHz(),
             timeout: BusTimeout::BusCycles(10),
         }
     }
@@ -1427,7 +1399,7 @@ impl Driver<'_> {
         set_filter(self.regs(), Some(7), Some(7));
 
         // Configure frequency
-        self.set_frequency(&config.clock, config.timeout)?;
+        self.set_frequency(config, config.timeout)?;
 
         self.update_config();
 
@@ -1469,11 +1441,7 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(
-        &self,
-        clock_config: &BusClockConfig,
-        timeout: BusTimeout,
-    ) -> Result<(), ConfigError> {
+    fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         let source_clk = clocks.i2c_clock.raw();
         let bus_freq = clock_config.frequency.raw();
@@ -1551,11 +1519,7 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(
-        &self,
-        clock_config: &BusClockConfig,
-        timeout: BusTimeout,
-    ) -> Result<(), ConfigError> {
+    fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         let source_clk = clocks.apb_clock.raw();
         let bus_freq = clock_config.frequency.raw();
@@ -1613,11 +1577,7 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(
-        &self,
-        clock_config: &BusClockConfig,
-        timeout: BusTimeout,
-    ) -> Result<(), ConfigError> {
+    fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         let source_clk = clocks.xtal_clock.raw();
         let bus_freq = clock_config.frequency.raw();

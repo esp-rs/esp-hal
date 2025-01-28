@@ -41,7 +41,9 @@ fn main() -> ! {
 
     let mut spi = Spi::new(
         peripherals.SPI2,
-        Config::default().with_clock(100.kHz()).with_mode(Mode::_0),
+        Config::default()
+            .with_frequency(100.kHz())
+            .with_mode(Mode::_0),
     )
     .unwrap()
     .with_sck(sclk)

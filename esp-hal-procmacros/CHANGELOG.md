@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added `#[builder_lite(into)]` attribute that generates the setter with `impl Into<T>` parameter (#3011)
+- Added `#[builder_lite(skip)]` attribute to skip generating setter (#3011)
 
 ### Changed
 

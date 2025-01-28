@@ -11,10 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: Added support for 3-wire SPI (#2919)
 - UART: Add separate config for Rx and Tx (#2965)
 
-- `i2c::master::BusClockConfig` (#3011)
-- `spi::master::BusClockConfig` (#3011)
-- `uart::BaudRateConfig` (#3011)
-
 ### Changed
 
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
@@ -35,10 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
 
-- SPI and I2C `Config::frequency` has been replaced by `clock`. (#3011)
-- SPI `Config::frequency` has been replaced by `clock`. (#3011)
-- SPI `Config::with_frequency` has been renamed to `with_clock`. (#3011)
-
 ### Fixed
 
 - `DmaDescriptor` is now `#[repr(C)]` (#2988)
@@ -50,7 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
 - OutputOpenDrain has been removed (#3029)
 
-- `clock_source` form `uart::Config` (#3011)
+- `spi::master::Config::frequency` is no longer public (#3011)
+- `uart::Config::clock_source` is no longer public (#3011)
 
 ## [0.23.1] - 2025-01-15
 

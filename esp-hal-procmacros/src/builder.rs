@@ -25,6 +25,16 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
     let mut fns = Vec::new();
     if let Data::Struct(DataStruct { fields, .. }) = &input.data {
         for field in fields {
+            let helper_attributes = match collect_helper_attrs(&field.attrs) {
+                Ok(attr) => attr,
+                Err(err) => return err.to_compile_error().into(),
+            };
+
+            // Ignore field if it has a `skip` helper attribute.
+            if helper_attributes.iter().any(|h| h == "skip") {
+                continue;
+            }
+
             let field_ident = field.ident.as_ref().unwrap();
             let field_type = &field.ty;
 
@@ -45,11 +55,6 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
                 (quote! { #inner_type }, quote! { Some(#field_ident) })
             } else {
                 (quote! { #field_type }, quote! { #field_ident })
-            };
-
-            let helper_attributes = match collect_helper_attrs(&field.attrs) {
-                Ok(attr) => attr,
-                Err(err) => return err.to_compile_error().into(),
             };
 
             // Wrap type and assignment with `Into` if needed.
@@ -121,7 +126,7 @@ fn extract_option_segment(path: &Path) -> Option<&PathSegment> {
 }
 
 fn collect_helper_attrs(attrs: &[Attribute]) -> Result<Vec<Ident>, syn::Error> {
-    const KNOWN_HELPERS: &[&str] = &["into"];
+    const KNOWN_HELPERS: &[&str] = &["into", "skip"];
 
     let mut helper_attributes = Vec::new();
     for attr in attrs

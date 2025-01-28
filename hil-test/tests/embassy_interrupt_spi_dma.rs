@@ -125,7 +125,7 @@ mod test {
         let mut spi = Spi::new(
             peripherals.SPI2,
             Config::default()
-                .with_clock(10000.kHz())
+                .with_frequency(10000.kHz())
                 .with_mode(Mode::_0),
         )
         .unwrap()
@@ -139,7 +139,7 @@ mod test {
         let other_peripheral = Spi::new(
             peripherals.SPI3,
             Config::default()
-                .with_clock(10000.kHz())
+                .with_frequency(10000.kHz())
                 .with_mode(Mode::_0),
         )
         .unwrap()
@@ -226,7 +226,9 @@ mod test {
 
             let mut spi = Spi::new(
                 peripherals.spi,
-                Config::default().with_clock(100.kHz()).with_mode(Mode::_0),
+                Config::default()
+                    .with_frequency(100.kHz())
+                    .with_mode(Mode::_0),
             )
             .unwrap()
             .with_dma(peripherals.dma_channel)

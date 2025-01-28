@@ -426,41 +426,62 @@ pub enum ClockSource {
     // Xtal,
 }
 
-/// Bus clock configuration.
-///
-/// This struct holds information necessary to configure the SPI bus clock.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// SPI peripheral configuration
+#[derive(Clone, Copy, Debug, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct BusClockConfig {
+#[non_exhaustive]
+pub struct Config {
     /// The saved register value, calculated when first needed.
+    #[builder_lite(skip)]
     reg: Result<u32, ConfigError>,
 
     /// The target frequency
+    #[builder_lite(skip)]
     frequency: HertzU32,
 
     /// The clock source
+    #[builder_lite(skip)]
     clock_source: ClockSource,
+
+    /// SPI sample/shift mode.
+    pub mode: Mode,
+
+    /// Bit order of the read data.
+    pub read_bit_order: BitOrder,
+
+    /// Bit order of the written data.
+    pub write_bit_order: BitOrder,
 }
 
-impl Default for BusClockConfig {
+impl Default for Config {
     fn default() -> Self {
-        Self::new(1_u32.MHz(), ClockSource::Apb)
-    }
-}
-
-impl BusClockConfig {
-    fn new(frequency: HertzU32, clock_source: ClockSource) -> Self {
-        let mut this = Self {
+        let mut this = Config {
             reg: Ok(0),
-            frequency,
-            clock_source,
+            frequency: 1_u32.MHz(),
+            clock_source: ClockSource::Apb,
+            mode: Mode::_0,
+            read_bit_order: BitOrder::MsbFirst,
+            write_bit_order: BitOrder::MsbFirst,
         };
 
         this.reg = this.recalculate();
 
         this
     }
+}
 
+impl core::hash::Hash for Config {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.reg.hash(state);
+        self.frequency.to_Hz().hash(state); // HertzU32 doesn't implement Hash
+        self.clock_source.hash(state);
+        self.mode.hash(state);
+        self.read_bit_order.hash(state);
+        self.write_bit_order.hash(state);
+    }
+}
+
+impl Config {
     /// Set the frequency of the SPI bus clock.
     pub fn with_frequency(mut self, frequency: HertzU32) -> Self {
         self.frequency = frequency;
@@ -567,50 +588,6 @@ impl BusClockConfig {
     }
 }
 
-impl From<HertzU32> for BusClockConfig {
-    fn from(frequency: HertzU32) -> Self {
-        Self::new(frequency, ClockSource::Apb)
-    }
-}
-
-impl core::hash::Hash for BusClockConfig {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.reg.hash(state);
-        self.frequency.to_Hz().hash(state); // HertzU32 doesn't implement Hash
-        self.clock_source.hash(state);
-    }
-}
-
-/// SPI peripheral configuration
-#[derive(Clone, Copy, Debug, PartialEq, Eq, procmacros::BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct Config {
-    /// SPI bus clock frequency.
-    #[builder_lite(into)]
-    pub clock: BusClockConfig,
-
-    /// SPI sample/shift mode.
-    pub mode: Mode,
-
-    /// Bit order of the read data.
-    pub read_bit_order: BitOrder,
-
-    /// Bit order of the written data.
-    pub write_bit_order: BitOrder,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            clock: BusClockConfig::default(),
-            mode: Mode::_0,
-            read_bit_order: BitOrder::MsbFirst,
-            write_bit_order: BitOrder::MsbFirst,
-        }
-    }
-}
-
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct SpiPinGuard {
@@ -637,7 +614,7 @@ pub enum ConfigError {}
 /// # use esp_hal::spi::master::{Config, Spi};
 /// let mut spi = Spi::new(
 ///     peripherals.SPI2,
-///     Config::default().with_clock(100.kHz()).with_mode(Mode::_0)
+///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
 /// )
 /// .unwrap()
 /// .with_sck(peripherals.GPIO0)
@@ -782,7 +759,7 @@ impl<'d> Spi<'d, Blocking> {
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
-    ///     Config::default().with_clock(100.kHz()).with_mode(Mode::_0)
+    ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
     /// )
     /// .unwrap()
     /// .with_dma(dma_channel)
@@ -1252,7 +1229,7 @@ mod dma {
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
-    ///     Config::default().with_clock(100.kHz()).with_mode(Mode::_0)
+    ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
     /// )
     /// .unwrap()
     /// .with_dma(dma_channel)
@@ -3096,7 +3073,7 @@ impl Driver {
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
-        self.ch_bus_freq(&config.clock)?;
+        self.ch_bus_freq(config)?;
         self.set_bit_order(config.read_bit_order, config.write_bit_order);
         self.set_data_mode(config.mode);
         Ok(())
@@ -3121,7 +3098,7 @@ impl Driver {
         });
     }
 
-    fn ch_bus_freq(&self, bus_clock_config: &BusClockConfig) -> Result<(), ConfigError> {
+    fn ch_bus_freq(&self, bus_clock_config: &Config) -> Result<(), ConfigError> {
         fn enable_clocks(_reg_block: &RegisterBlock, _enable: bool) {
             #[cfg(gdma)]
             _reg_block.clk_gate().modify(|_, w| {
