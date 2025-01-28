@@ -64,11 +64,11 @@
 //! loop {
 //!     critical_section::with(|cs| {
 //!         let mut serial = SERIAL.borrow_ref_mut(cs);
-//!         let serial = serial.as_mut().unwrap();
+//!         if let Some(serial) = serial.as_mut() {
 //!         writeln!(serial,
 //!             "Hello World! Send a single `#` character or send
-//!                 at least 30 characters to trigger interrupts.")
-//!         .ok();
+//!                 at least 30 characters to trigger interrupts.").ok();
+//!         }
 //!     });
 //!     delay.delay(1.secs());
 //! }
@@ -86,24 +86,24 @@
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
 //!         let mut serial = SERIAL.borrow_ref_mut(cs);
-//!         let serial = serial.as_mut().unwrap();
+//!         if let Some(serial) = serial.as_mut() {
+//!             let mut buf = [0u8; 64];
+//!             if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
+//!                 writeln!(serial, "Read {} bytes", cnt).ok();
+//!             }
 //!
-//!         let mut buf = [0u8; 64];
-//!         if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
-//!             writeln!(serial, "Read {} bytes", cnt).ok();
+//!             let pending_interrupts = serial.interrupts();
+//!             writeln!(
+//!                 serial,
+//!                 "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
+//!                 pending_interrupts.contains(UartInterrupt::AtCmd),
+//!                 pending_interrupts.contains(UartInterrupt::RxFifoFull),
+//!             ).ok();
+//!
+//!             serial.clear_interrupts(
+//!                 UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
+//!             );
 //!         }
-//!
-//!         let pending_interrupts = serial.interrupts();
-//!         writeln!(
-//!             serial,
-//!             "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
-//!             pending_interrupts.contains(UartInterrupt::AtCmd),
-//!             pending_interrupts.contains(UartInterrupt::RxFifoFull),
-//!         ).ok();
-//!
-//!         serial.clear_interrupts(
-//!             UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
-//!         );
 //!     });
 //! }
 //! ```

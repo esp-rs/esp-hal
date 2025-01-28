@@ -41,7 +41,9 @@
 //!
 //!     // Clear the interrupt request.
 //!     critical_section::with(|cs| {
-//!         SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
+//!         if let Some(swint) = SWINT0.borrow_ref(cs).as_ref() {
+//!             swint.reset();
+//!         }
 //!     });
 //! }
 //! ```

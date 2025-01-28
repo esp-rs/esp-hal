@@ -27,9 +27,9 @@ macro_rules! before_snippet {
 # }
 # struct ExampleError {}
 # impl <T> From<T> for ExampleError where T: core::fmt::Debug {
-#     fn from(value: T) -> Self {
-#         Self{}
-#     }
+#   fn from(_value: T) -> Self {
+#       Self{}
+#   }
 # }
 # fn example() -> Result<(), ExampleError> {
 #   let mut peripherals = esp_hal::init(esp_hal::Config::default());

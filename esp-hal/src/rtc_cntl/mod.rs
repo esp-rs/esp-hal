@@ -76,13 +76,14 @@
 //!         println!("RWDT Interrupt");
 //!
 //!         let mut rwdt = RWDT.borrow_ref_mut(cs);
-//!         let rwdt = rwdt.as_mut().unwrap();
-//!         rwdt.clear_interrupt();
+//!         if let Some(rwdt) = rwdt.as_mut() {
+//!             rwdt.clear_interrupt();
 //!
-//!         println!("Restarting in 5 seconds...");
+//!             println!("Restarting in 5 seconds...");
 //!
-//!         rwdt.set_timeout(RwdtStage::Stage0, 5000u64.millis());
-//!         rwdt.unlisten();
+//!             rwdt.set_timeout(RwdtStage::Stage0, 5000u64.millis());
+//!             rwdt.unlisten();
+//!         }
 //!     });
 //! }
 //! ```

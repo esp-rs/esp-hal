@@ -88,11 +88,9 @@
 //!
 //! loop {
 //!     critical_section::with(|cs| {
-//!         writeln!(
-//!             USB_SERIAL.borrow_ref_mut(cs).as_mut().unwrap(),
-//!             "Hello world!"
-//!         )
-//!         .ok();
+//!         if let Some(serial) = USB_SERIAL.borrow_ref_mut(cs).as_mut() {
+//!             writeln!(serial, "Hello world!").ok();
+//!         }
 //!     });
 //!
 //!     delay.delay(1.secs());
@@ -110,15 +108,15 @@
 //! fn usb_device() {
 //!     critical_section::with(|cs| {
 //!         let mut usb_serial = USB_SERIAL.borrow_ref_mut(cs);
-//!         let usb_serial = usb_serial.as_mut().unwrap();
+//!         if let Some(usb_serial) = usb_serial.as_mut() {
+//!             writeln!(usb_serial, "USB serial interrupt").ok();
 //!
-//!         writeln!(usb_serial, "USB serial interrupt").unwrap();
+//!             while let nb::Result::Ok(c) = usb_serial.read_byte() {
+//!                 writeln!(usb_serial, "Read byte: {:02x}", c).ok();
+//!             }
 //!
-//!         while let nb::Result::Ok(c) = usb_serial.read_byte() {
-//!             writeln!(usb_serial, "Read byte: {:02x}", c).unwrap();
+//!             usb_serial.reset_rx_packet_recv_interrupt();
 //!         }
-//!
-//!         usb_serial.reset_rx_packet_recv_interrupt();
 //!     });
 //! }
 //! ```

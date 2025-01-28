@@ -434,7 +434,7 @@ impl Default for Config {
 /// .with_scl(peripherals.GPIO2);
 ///
 /// let mut data = [0u8; 22];
-/// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data).ok();
+/// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data)?;
 /// # Ok(())
 /// # }
 /// ```
@@ -626,7 +626,7 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     /// # )?;
     /// # const DEVICE_ADDR: u8 = 0x77;
     /// let mut data = [0u8; 22];
-    /// i2c.read(DEVICE_ADDR, &mut data).ok();
+    /// i2c.read(DEVICE_ADDR, &mut data)?;
     /// # Ok(())
     /// # }
     /// ```

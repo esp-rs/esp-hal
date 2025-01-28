@@ -76,15 +76,16 @@
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
 //!         let mut u0 = UNIT0.borrow_ref_mut(cs);
-//!         let u0 = u0.as_mut().unwrap();
-//!         if u0.interrupt_is_set() {
-//!             let events = u0.events();
-//!             if events.high_limit {
-//!                 VALUE.fetch_add(100, Ordering::SeqCst);
-//!             } else if events.low_limit {
-//!                 VALUE.fetch_add(-100, Ordering::SeqCst);
+//!         if let Some(u0) = u0.as_mut() {
+//!             if u0.interrupt_is_set() {
+//!                 let events = u0.events();
+//!                 if events.high_limit {
+//!                     VALUE.fetch_add(100, Ordering::SeqCst);
+//!                 } else if events.low_limit {
+//!                     VALUE.fetch_add(-100, Ordering::SeqCst);
+//!                 }
+//!                 u0.reset_interrupt();
 //!             }
-//!             u0.reset_interrupt();
 //!         }
 //!     });
 //! }
