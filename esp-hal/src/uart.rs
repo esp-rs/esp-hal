@@ -284,20 +284,20 @@ pub enum StopBits {
 pub struct Config {
     /// The baud rate (speed) of the UART communication in bits per second
     /// (bps).
-    pub baudrate: u32,
+    baudrate: u32,
     /// Number of data bits in each frame (5, 6, 7, or 8 bits).
-    pub data_bits: DataBits,
+    data_bits: DataBits,
     /// Parity setting (None, Even, or Odd).
-    pub parity: Parity,
+    parity: Parity,
     /// Number of stop bits in each frame (1, 1.5, or 2 bits).
-    pub stop_bits: StopBits,
+    stop_bits: StopBits,
     /// Clock source used by the UART peripheral.
     #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
     clock_source: ClockSource,
     /// UART Receive part configuration.
-    pub rx: RxConfig,
+    rx: RxConfig,
     /// UART Transmit part configuration.
-    pub tx: TxConfig,
+    tx: TxConfig,
 }
 
 /// UART Receive part configuration.
@@ -306,9 +306,9 @@ pub struct Config {
 #[non_exhaustive]
 pub struct RxConfig {
     /// Threshold level at which the RX FIFO is considered full.
-    pub fifo_full_threshold: u16,
+    fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
-    pub timeout: Option<u8>,
+    timeout: Option<u8>,
 }
 
 impl Default for Config {

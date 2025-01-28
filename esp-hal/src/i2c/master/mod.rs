@@ -396,10 +396,10 @@ impl From<Ack> for u32 {
 #[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
-    pub frequency: HertzU32,
+    frequency: HertzU32,
 
     /// I2C SCL timeout period.
-    pub timeout: BusTimeout,
+    timeout: BusTimeout,
 }
 
 impl core::hash::Hash for Config {

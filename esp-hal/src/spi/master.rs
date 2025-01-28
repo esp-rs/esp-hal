@@ -436,21 +436,21 @@ pub struct Config {
     reg: Result<u32, ConfigError>,
 
     /// The target frequency
-    #[builder_lite(skip)]
+    #[builder_lite(skip_setter)]
     frequency: HertzU32,
 
     /// The clock source
-    #[builder_lite(skip)]
+    #[builder_lite(skip_setter)]
     clock_source: ClockSource,
 
     /// SPI sample/shift mode.
-    pub mode: Mode,
+    mode: Mode,
 
     /// Bit order of the read data.
-    pub read_bit_order: BitOrder,
+    read_bit_order: BitOrder,
 
     /// Bit order of the written data.
-    pub write_bit_order: BitOrder,
+    write_bit_order: BitOrder,
 }
 
 impl Default for Config {
