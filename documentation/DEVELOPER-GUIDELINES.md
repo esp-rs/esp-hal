@@ -36,7 +36,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
   - The driver should implement `fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError>`.
   - In case the driver's configuration is infallible (all possible combinations of options are supported by the hardware), the `ConfigError` should be implemented as an empty `enum`.
   - Configuration structs should
-    - Derive `procmacros::BuilderLite` in order to automatically implement the Builder Lite pattern for them.
+    - Use the [Builder Lite](https://matklad.github.io/2022/05/29/builder-lite.html) pattern. Prefer deriving `procmacros::BuilderLite` in order to automatically implement the pattern.
     - Implement `Copy` if possible.
     - The fields should be private. The `BuilderLite` macro generates setters and getters automatically.
     - If calculating register values based on the configuration is costly, the configuration struct should precompute and store the result of those calculations.
