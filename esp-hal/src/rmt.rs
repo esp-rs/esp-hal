@@ -1245,8 +1245,6 @@ where
     C: RxChannel,
 {
     channel: C,
-    #[allow(dead_code)]
-    index: usize,
     data: &'a mut [u32],
 }
 
@@ -1257,8 +1255,9 @@ where
     cfg_if! {
         if #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))] {
             /// Wait for the transaction to complete
-            pub fn wait(mut self) -> Result<C, (Error, C)> {
+            pub fn wait(self) -> Result<C, (Error, C)> {
                 let half_channel_ram_size = constants::RMT_CHANNEL_RAM_SIZE / 2;
+                let mut index = 0;
                 // We want to either keep reading until we fill up the `data` buffer,
                 // or stop early if the receiver enters an idle state
                 loop {
@@ -1266,7 +1265,7 @@ where
                         return Err((Error::TransmissionError, self.channel));
                     }
 
-                    if self.index >= self.data.len() {
+                    if index >= self.data.len() {
                         break;
                     }
 
@@ -1282,7 +1281,7 @@ where
                     <C as RxChannelInternal>::reset_threshold_set();
 
                     // load new data into memory buffer
-                    let ram_index = (((self.index - constants::RMT_CHANNEL_RAM_SIZE)
+                    let ram_index = (((index - constants::RMT_CHANNEL_RAM_SIZE)
                         / (half_channel_ram_size))
                         % 2)
                         * (half_channel_ram_size);
@@ -1291,7 +1290,7 @@ where
                         + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4
                         + ram_index * 4) as *mut u32;
 
-                    for (idx, entry) in self.data[self.index..]
+                    for (idx, entry) in self.data[index..]
                         .iter_mut()
                         .take(half_channel_ram_size)
                         .enumerate()
@@ -1305,7 +1304,7 @@ where
                     if <C as RxChannelInternal>::is_done() {
                         break;
                     }
-                    self.index += half_channel_ram_size;
+                    index += half_channel_ram_size;
                 }
 
                 <C as RxChannelInternal>::stop();
@@ -1358,7 +1357,6 @@ pub trait RxChannel: RxChannelInternal {
 
         Ok(RxTransaction {
             channel: self,
-            index: 0,
             data,
         })
     }
