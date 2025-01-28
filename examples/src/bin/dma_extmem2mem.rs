@@ -1,6 +1,8 @@
 //! Uses DMA to copy psram to internal memory.
+//!
+//! If your module is octal PSRAM then you need to set `ESP_HAL_CONFIG_PSRAM_MODE` to `octal`.
 
-//% FEATURES: esp-hal/log esp-hal/octal-psram aligned esp-hal/unstable
+//% FEATURES: esp-hal/log esp-hal/psram aligned esp-hal/unstable
 //% CHIPS: esp32s3
 
 #![no_std]

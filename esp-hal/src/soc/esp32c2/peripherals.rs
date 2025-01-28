@@ -19,7 +19,6 @@ pub use pac::Interrupt;
 crate::peripherals! {
     peripherals: [
         I2C0 <= I2C0,
-        IO_MUX <= IO_MUX,
         SPI2 <= SPI2 (SPI2),
         UART0 <= UART0,
         UART1 <= UART1,
@@ -37,6 +36,7 @@ crate::peripherals! {
         EXTMEM <= EXTMEM,
         GPIO <= GPIO,
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
+        IO_MUX <= IO_MUX,
         LEDC <= LEDC,
         LPWR <= RTC_CNTL,
         MODEM_CLKRST <= MODEM_CLKRST,

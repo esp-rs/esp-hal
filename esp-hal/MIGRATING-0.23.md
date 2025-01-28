@@ -127,3 +127,76 @@ Use `DataMode::SingleTwoDataLines` to get the previous behavior.
 ```
 
 `Spi` now offers both, `with_mosi` and `with_sio0`. Consider using `with_sio` for half-duplex SPI except for [DataMode::SingleTwoDataLines] or for a mixed-bus.
+
+## Removed `flip-link` Feature
+
+The `flip-link` feature is removed and replaced by the `ESP_HAL_CONFIG_FLIP_LINK` option.
+
+Cargo.toml
+```diff
+- esp-hal = { version = "0.23.0", features = ["flip-link"]}
++ esp-hal = "0.23.0"
+```
+
+config/config.toml
+```diff
+[env]
++ ESP_HAL_CONFIG_FLIP_LINK = "true"
+```
+
+## Removed `psram-quad`/`prsram-octal` Feature
+
+The features `psram-quad`/`prsram-octal` are replaced by a single `psram` feature and an additional config option (`ESP_HAL_CONFIG_PSRAM_MODE`).
+
+`ESP_HAL_CONFIG_PSRAM_MODE` defaults to `quad` and (for ESP32-S3) also allows `octal`.
+
+Cargo.toml
+```diff
+- esp-hal = { version = "0.23.0", features = ["psram-octal"]}
++ esp-hal = { version = "0.23.0", features = ["psram"]}
+```
+
+config/config.toml
+```diff
+[env]
++ ESP_HAL_CONFIG_PSRAM_MODE = "octal"
+```
+
+
+## UART halves have their configuration split too
+
+`Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
+
+```diff
+- let config = Config::default().with_rx_fifo_full_threshold(30);
++ let config = Config::default()
++     .with_rx(RxConfig::default()
++       .with_fifo_full_threshold(30)
++ );
+```
+
+## GPIO changes
+
+GPIO drivers now take configuration structs.
+
+```diff
+- Input::new(peripherals.GPIO0, Pull::Up);
++ Input::new(peripherals.GPIO0, InputConfig::default().with_pull_direction(Pull::Up));
+ 
+- Output::new(peripherals.GPIO0, Level::Low);
++ Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
+```
+
+The OutputOpenDrain driver has been removed. You can use `Output` instead with
+`DriveMode::OpenDrain`. The input-related methods of `OutputOpenDrain` (`level`,
+`is_high`, `is_low`) are available through the (unstable) `Flex` driver.
+
+```diff
+- OutputOpenDrain::new(peripherals.GPIO0, Level::Low);
++ Output::new(
+     peripherals.GPIO0,
+     Level::Low,
+     OutputConfig::default()
+         .with_drive_mode(DriveMode::OpenDrain),
+ );
+```

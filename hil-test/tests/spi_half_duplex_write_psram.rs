@@ -1,7 +1,9 @@
 //! SPI Half Duplex Write Test
 
 //% CHIPS: esp32s3
-//% FEATURES: unstable octal-psram
+//% FEATURES: unstable psram
+// The dev kit in the HIL-tester has octal PSRAM.
+//% ENV: ESP_HAL_CONFIG_PSRAM_MODE=octal
 
 #![no_std]
 #![no_main]

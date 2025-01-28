@@ -20,7 +20,7 @@ use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     cpu_control::{CpuControl, Stack},
-    gpio::{Level, Output},
+    gpio::{Level, Output, OutputConfig},
     timer::{timg::TimerGroup, AnyTimer},
     Cpu,
 };
@@ -63,7 +63,7 @@ async fn main(_spawner: Spawner) {
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = Output::new(peripherals.GPIO0, Level::Low);
+    let led = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
 
     let _guard = cpu_control
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {

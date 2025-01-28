@@ -9,7 +9,7 @@
 use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Level, Output},
+    gpio::{Level, Output, OutputConfig},
     spi::{
         master::{Address, Command, Config, Spi, SpiDma},
         DataMode,
@@ -37,7 +37,7 @@ mod tests {
         let sclk = peripherals.GPIO0;
         let (miso, miso_mirror) = hil_test::common_test_pins!(peripherals);
 
-        let miso_mirror = Output::new(miso_mirror, Level::High);
+        let miso_mirror = Output::new(miso_mirror, Level::High, OutputConfig::default());
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {

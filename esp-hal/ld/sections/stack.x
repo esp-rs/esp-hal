@@ -1,4 +1,4 @@
-#IF flip-link
+#IF ESP_HAL_CONFIG_FLIP_LINK
 /* no Xtensa chip is supported - so we can assume RISC-V */
 SECTIONS {
   /* must be last segment using RWDATA */

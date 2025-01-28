@@ -8,7 +8,7 @@ use smoltcp::{
 use super::{WifiApDevice, WifiController, WifiDevice, WifiDeviceMode, WifiError, WifiStaDevice};
 use crate::EspWifiController;
 
-// [esp_hal::time::now()] as a smoltcp [`Instant]`
+// [esp_hal::time::now()] as a smoltcp [`Instant`]
 #[cfg(feature = "smoltcp")]
 fn timestamp() -> smoltcp::time::Instant {
     smoltcp::time::Instant::from_micros(

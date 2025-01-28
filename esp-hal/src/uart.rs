@@ -44,9 +44,11 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::uart::{AtCmdConfig, Config, Uart, UartInterrupt};
+//! # use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
 //! # let delay = Delay::new();
-//! # let config = Config::default().with_rx_fifo_full_threshold(30);
+//! # let config = Config::default().with_rx(
+//!     RxConfig::default().with_fifo_full_threshold(30)
+//! );
 //! # let mut uart0 = Uart::new(
 //! #    peripherals.UART0,
 //! #    config)
@@ -123,9 +125,10 @@ use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
-        interconnect::{PeripheralInput, PeripheralOutput},
+        interconnect::{OutputConnection, PeripheralInput, PeripheralOutput},
         InputSignal,
         OutputSignal,
+        PinGuard,
         Pull,
     },
     interrupt::{InterruptConfigurable, InterruptHandler},
@@ -290,10 +293,50 @@ pub struct Config {
     pub stop_bits: StopBits,
     /// Clock source used by the UART peripheral.
     pub clock_source: ClockSource,
+    /// UART Receive part configuration.
+    pub rx: RxConfig,
+    /// UART Transmit part configuration.
+    pub tx: TxConfig,
+}
+
+/// UART Receive part configuration.
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct RxConfig {
     /// Threshold level at which the RX FIFO is considered full.
-    pub rx_fifo_full_threshold: u16,
+    pub fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
-    pub rx_timeout: Option<u8>,
+    pub timeout: Option<u8>,
+}
+
+/// UART Transmit part configuration.
+#[derive(Debug, Clone, Copy, Default, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct TxConfig {}
+
+impl Default for RxConfig {
+    fn default() -> RxConfig {
+        RxConfig {
+            fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
+            timeout: Some(UART_TOUT_THRESH_DEFAULT),
+        }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            rx: RxConfig::default(),
+            tx: TxConfig::default(),
+            baudrate: 115_200,
+            data_bits: Default::default(),
+            parity: Default::default(),
+            stop_bits: Default::default(),
+            clock_source: Default::default(),
+        }
+    }
 }
 
 impl Config {
@@ -316,20 +359,6 @@ impl Config {
             _ => 2, // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
         };
         length
-    }
-}
-
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            baudrate: 115_200,
-            data_bits: Default::default(),
-            parity: Default::default(),
-            stop_bits: Default::default(),
-            clock_source: Default::default(),
-            rx_fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-            rx_timeout: Some(UART_TOUT_THRESH_DEFAULT),
-        }
     }
 }
 
@@ -387,6 +416,9 @@ where
         let rx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
         let tx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
 
+        let rts_pin = PinGuard::new_unconnected(self.uart.info().rts_signal);
+        let tx_pin = PinGuard::new_unconnected(self.uart.info().tx_signal);
+
         let mut serial = Uart {
             rx: UartRx {
                 uart: unsafe { self.uart.clone_unchecked() },
@@ -397,6 +429,8 @@ where
                 uart: self.uart,
                 phantom: PhantomData,
                 guard: tx_guard,
+                rts_pin,
+                tx_pin,
             },
         };
         serial.init(config)?;
@@ -416,6 +450,8 @@ pub struct UartTx<'d, Dm> {
     uart: PeripheralRef<'d, AnyUart>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
+    rts_pin: PinGuard,
+    tx_pin: PinGuard,
 }
 
 /// UART (Receive)
@@ -496,10 +532,10 @@ where
     Dm: DriverMode,
 {
     /// Configure RTS pin
-    pub fn with_rts(self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    pub fn with_rts(mut self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(rts);
         rts.set_to_push_pull_output();
-        self.uart.info().rts_signal.connect_to(rts);
+        self.rts_pin = OutputConnection::connect_with_guard(rts, self.uart.info().rts_signal);
 
         self
     }
@@ -508,12 +544,14 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the UART
     /// TX signal.
-    pub fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    ///
+    /// Disconnects the previous pin that was assigned with `with_tx`.
+    pub fn with_tx(mut self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(tx);
         // Make sure we don't cause an unexpected low pulse on the pin.
         tx.set_output_high(true);
         tx.set_to_push_pull_output();
-        self.uart.info().tx_signal.connect_to(tx);
+        self.tx_pin = OutputConnection::connect_with_guard(tx, self.uart.info().tx_signal);
 
         self
     }
@@ -521,8 +559,11 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the RX half.
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.uart.info().apply_config(config)
+    #[instability::unstable]
+    pub fn apply_config(&mut self, _config: &Config) -> Result<(), ConfigError> {
+        // Nothing to do so far.
+        self.uart.info().txfifo_reset();
+        Ok(())
     }
 
     /// Writes bytes
@@ -628,6 +669,8 @@ impl<'d> UartTx<'d, Blocking> {
             uart: self.uart,
             phantom: PhantomData,
             guard: self.guard,
+            rts_pin: self.rts_pin,
+            tx_pin: self.tx_pin,
         }
     }
 }
@@ -647,6 +690,8 @@ impl<'d> UartTx<'d, Async> {
             uart: self.uart,
             phantom: PhantomData,
             guard: self.guard,
+            rts_pin: self.rts_pin,
+            tx_pin: self.tx_pin,
         }
     }
 }
@@ -707,8 +752,17 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the TX half.
+    #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.uart.info().apply_config(config)
+        self.uart
+            .info()
+            .set_rx_fifo_full_threshold(config.rx.fifo_full_threshold)?;
+        self.uart
+            .info()
+            .set_rx_timeout(config.rx.timeout, config.symbol_length())?;
+
+        self.uart.info().rxfifo_reset();
+        Ok(())
     }
 
     /// Reads and clears errors.
@@ -955,11 +1009,8 @@ impl<'d> Uart<'d, Blocking> {
     /// configure the driver side (i.e. the TX pin), or ensure that the line is
     /// initially high, to avoid receiving a non-data byte caused by an
     /// initial low signal level.
-    pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
-        crate::into_mapped_ref!(rx);
-        rx.init_input(Pull::Up);
-        self.rx.uart.info().rx_signal.connect_to(rx);
-
+    pub fn with_rx(mut self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        self.rx = self.rx.with_rx(rx);
         self
     }
 
@@ -967,13 +1018,8 @@ impl<'d> Uart<'d, Blocking> {
     ///
     /// Sets the specified pin to push-pull output and connects it to the UART
     /// TX signal.
-    pub fn with_tx(self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        crate::into_mapped_ref!(tx);
-        // Make sure we don't cause an unexpected low pulse on the pin.
-        tx.set_output_high(true);
-        tx.set_to_push_pull_output();
-        self.tx.uart.info().tx_signal.connect_to(tx);
-
+    pub fn with_tx(mut self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        self.tx = self.tx.with_tx(tx);
         self
     }
 }
@@ -1002,7 +1048,7 @@ pub enum UartInterrupt {
     TxDone,
 
     /// The receiver has received more data than what
-    /// [`Config::rx_fifo_full_threshold`] specifies.
+    /// [`RxConfig::fifo_full_threshold`] specifies.
     RxFifoFull,
 }
 
@@ -1132,6 +1178,8 @@ where
     /// Change the configuration.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
+        self.tx.apply_config(config)?;
+        self.rx.uart.info().apply_config(config)?;
         Ok(())
     }
 
@@ -1156,7 +1204,7 @@ where
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
 
-        self.rx.uart.info().apply_config(&config)?;
+        self.apply_config(&config)?;
 
         // Don't wait after transmissions by default,
         // so that bytes written to TX FIFO are always immediately transmitted.
@@ -2137,8 +2185,6 @@ impl Info {
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
-        self.set_rx_fifo_full_threshold(config.rx_fifo_full_threshold)?;
-        self.set_rx_timeout(config.rx_timeout, config.symbol_length())?;
         self.change_baud(config.baudrate, config.clock_source);
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);

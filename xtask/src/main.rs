@@ -1,19 +1,18 @@
 use std::{
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     process::Command,
 };
 
 use anyhow::{bail, ensure, Context as _, Result};
-use clap::{Args, Parser};
+use clap::{Args, Parser, ValueEnum};
 use esp_metadata::{Arch, Chip, Config};
 use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
+    firmware::Metadata,
     target_triple,
-    Metadata,
     Package,
     Version,
 };
@@ -24,9 +23,9 @@ use xtask::{
 #[derive(Debug, Parser)]
 enum Cli {
     /// Build documentation for the specified chip.
-    BuildDocumentationIndex(BuildDocumentationArgs),
-    /// Build documentation for the specified chip.
     BuildDocumentation(BuildDocumentationArgs),
+    /// Build documentation index including the specified packages.
+    BuildDocumentationIndex(BuildDocumentationIndexArgs),
     /// Build all examples for the specified chip.
     BuildExamples(ExampleArgs),
     /// Build the specified package with the given options.
@@ -85,12 +84,19 @@ struct TestArgs {
 
 #[derive(Debug, Args)]
 struct BuildDocumentationArgs {
-    /// Package to build documentation for.
-    #[arg(long, value_enum, value_delimiter(','))]
+    /// Package(s) to document.
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
     packages: Vec<Package>,
-    /// Which chip to build the documentation for.
-    #[arg(long, value_enum, value_delimiter(','), default_values_t = Chip::iter())]
+    /// Chip(s) to build documentation for.
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
     chips: Vec<Chip>,
+}
+
+#[derive(Debug, Args)]
+struct BuildDocumentationIndexArgs {
+    /// Package(s) to build documentation index for.
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    packages: Vec<Package>,
 }
 
 #[derive(Debug, Args)]
@@ -127,6 +133,10 @@ struct FmtPackagesArgs {
     /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
     #[arg(long)]
     check: bool,
+
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
 }
 
 #[derive(Debug, Args)]
@@ -180,8 +190,7 @@ fn main() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let workspace = std::env::current_dir()?;
-
-    let out_path = Path::new("target");
+    let target_path = Path::new("target");
 
     match Cli::parse() {
         Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
@@ -189,12 +198,14 @@ fn main() -> Result<()> {
         Cli::BuildExamples(args) => examples(
             &workspace,
             args,
-            CargoAction::Build(out_path.join("examples")),
+            CargoAction::Build(target_path.join("examples")),
         ),
         Cli::BuildPackage(args) => build_package(&workspace, args),
-        Cli::BuildTests(args) => {
-            tests(&workspace, args, CargoAction::Build(out_path.join("tests")))
-        }
+        Cli::BuildTests(args) => tests(
+            &workspace,
+            args,
+            CargoAction::Build(target_path.join("tests")),
+        ),
         Cli::BumpVersion(args) => bump_version(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
@@ -235,7 +246,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     };
 
     // Load all examples which support the specified chip and parse their metadata:
-    let mut examples = xtask::load_examples(&example_path)?
+    let mut examples = xtask::firmware::load(&example_path)?
         .iter()
         .filter_map(|example| {
             if example.supports_chip(args.chip) {
@@ -247,7 +258,7 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
         .collect::<Vec<_>>();
 
     // Sort all examples by name:
-    examples.sort_by_key(|a| a.name());
+    examples.sort_by_key(|a| a.binary_name());
 
     // Execute the specified action:
     match action {
@@ -268,11 +279,11 @@ fn build_examples(
 
     if examples
         .iter()
-        .find(|ex| Some(ex.name()) == args.example)
+        .find(|ex| ex.matches(&args.example))
         .is_some()
     {
         // Attempt to build only the specified example:
-        for example in examples.iter().filter(|ex| Some(ex.name()) == args.example) {
+        for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
             xtask::execute_app(
                 package_path,
                 args.chip,
@@ -310,7 +321,7 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
     // Filter the examples down to only the binary we're interested in, assuming it
     // actually supports the specified chip:
     let mut found_one = false;
-    for example in examples.iter().filter(|ex| Some(ex.name()) == args.example) {
+    for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
         found_one = true;
         xtask::execute_app(
             package_path,
@@ -349,7 +360,7 @@ fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path)
     for example in examples {
         let mut skip = false;
 
-        log::info!("Running example '{}'", example.name());
+        log::info!("Running example '{}'", example.output_file_name());
         if let Some(description) = example.description() {
             log::info!(
                 "\n\n{}\n\nPress ENTER to run example, `s` to skip",
@@ -413,21 +424,17 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let target = target_triple(Package::HilTest, &args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = xtask::load_examples(&package_path.join("tests"))?
+    let mut tests = xtask::firmware::load(&package_path.join("tests"))?
         .into_iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
 
     // Sort all tests by name:
-    tests.sort_by_key(|a| a.name());
+    tests.sort_by_key(|a| a.binary_name());
 
     // Execute the specified action:
-    if tests
-        .iter()
-        .find(|test| Some(test.name()) == args.test)
-        .is_some()
-    {
-        for test in tests.iter().filter(|test| Some(test.name()) == args.test) {
+    if tests.iter().find(|test| test.matches(&args.test)).is_some() {
+        for test in tests.iter().filter(|test| test.matches(&args.test)) {
             xtask::execute_app(
                 &package_path,
                 args.chip,
@@ -455,60 +462,141 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
             )
             .is_err()
             {
-                failed.push(test.name());
+                failed.push(test.name_with_configuration());
             }
         }
 
         if !failed.is_empty() {
-            bail!("Failed tests: {:?}", failed);
+            bail!("Failed tests: {:#?}", failed);
         }
 
         Ok(())
     }
 }
 
-fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
+fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Result<()> {
     let output_path = workspace.join("docs");
 
     fs::create_dir_all(&output_path)
         .with_context(|| format!("Failed to create {}", output_path.display()))?;
 
-    let mut packages = HashMap::new();
-    for package in args.packages {
-        packages.insert(
-            package,
-            build_documentation_for_package(workspace, package, &args.chips)?,
-        );
-    }
+    args.packages.sort();
 
-    generate_index(workspace, &packages)?;
+    for package in args.packages {
+        // Not all packages need documentation built:
+        if matches!(
+            package,
+            Package::Examples | Package::HilTest | Package::QaTest
+        ) {
+            continue;
+        }
+
+        // If the package does not have chip features, then just ignore
+        // whichever chip(s) were specified as arguments:
+        let chips = if package.has_chip_features() {
+            // Some packages have chip features, but they have no effect on the public API;
+            // in this case, there's no point building it multiple times, so just build one
+            // copy of the docs. Otherwise, use the provided chip arguments:
+            match package {
+                _ if package.chip_features_matter() => args.chips.clone(),
+                Package::XtensaLxRt => vec![Chip::Esp32s3],
+                _ => vec![Chip::Esp32c6],
+            }
+        } else {
+            log::warn!("Package '{package}' does not have chip features, ignoring argument");
+            vec![]
+        };
+
+        if chips.is_empty() {
+            build_documentation_for_package(workspace, package, None)?;
+        } else {
+            for chip in chips {
+                build_documentation_for_package(workspace, package, Some(chip))?;
+            }
+        }
+    }
 
     Ok(())
 }
 
-fn build_documentation_index(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
-    let mut packages = HashMap::new();
-    for package in args.packages {
-        packages.insert(
-            package,
-            generate_documentation_meta_for_package(workspace, package, &args.chips)?,
-        );
-    }
+fn build_documentation_index(
+    workspace: &Path,
+    mut args: BuildDocumentationIndexArgs,
+) -> Result<()> {
+    let docs_path = workspace.join("docs");
 
-    generate_index(workspace, &packages)?;
+    args.packages.sort();
+
+    for package in args.packages {
+        // Not all packages have documentation built:
+        if matches!(
+            package,
+            Package::Examples | Package::HilTest | Package::QaTest
+        ) {
+            continue;
+        }
+
+        // If the chip features are not relevant, then there is no need to generate an
+        // index for the given package's documentation:
+        if !package.chip_features_matter() {
+            log::warn!("Package '{package}' does not have device-specific documentation, no need to generate an index");
+            continue;
+        }
+
+        let package_docs_path = docs_path.join(package.to_string());
+        let mut device_doc_paths = Vec::new();
+
+        // Each path we iterate over should be the directory for a given version of
+        // the package's documentation:
+        for path in fs::read_dir(package_docs_path)? {
+            let path = path?.path();
+            if path.is_file() {
+                log::debug!("Path is not a directory, skipping: '{}'", path.display());
+                continue;
+            }
+
+            for path in fs::read_dir(&path)? {
+                let path = path?.path();
+                if path.is_dir() {
+                    device_doc_paths.push(path);
+                }
+            }
+
+            let mut chips = device_doc_paths
+                .iter()
+                .map(|path| {
+                    let chip = path
+                        .components()
+                        .into_iter()
+                        .last()
+                        .unwrap()
+                        .as_os_str()
+                        .to_string_lossy();
+                    let chip = Chip::from_str(&chip, true).unwrap();
+
+                    chip
+                })
+                .collect::<Vec<_>>();
+
+            chips.sort();
+
+            let meta = generate_documentation_meta_for_package(workspace, package, &chips)?;
+            generate_index(workspace, &path, &meta)?;
+        }
+    }
 
     Ok(())
 }
 
-fn generate_index(workspace: &Path, packages: &HashMap<Package, Vec<Value>>) -> Result<()> {
-    let output_path = workspace.join("docs");
+fn generate_index(workspace: &Path, package_version_path: &Path, meta: &[Value]) -> Result<()> {
     let resources = workspace.join("resources");
 
-    fs::create_dir_all(&output_path)
-        .with_context(|| format!("Failed to create {}", output_path.display()))?;
     // Copy any additional assets to the documentation's output path:
-    fs::copy(resources.join("esp-rs.svg"), output_path.join("esp-rs.svg"))
-        .context("Failed to copy esp-rs.svg")?;
+    fs::copy(
+        resources.join("esp-rs.svg"),
+        package_version_path.join("esp-rs.svg"),
+    )
+    .context("Failed to copy esp-rs.svg")?;
 
     // Render the index and write it out to the documentaiton's output path:
     let source = fs::read_to_string(resources.join("index.html.jinja"))
@@ -518,9 +606,13 @@ fn generate_index(workspace: &Path, packages: &HashMap<Package, Vec<Value>>) -> 
     env.add_template("index", &source)?;
 
     let tmpl = env.get_template("index")?;
-    let html = tmpl.render(minijinja::context! { packages => packages })?;
+    let html = tmpl.render(minijinja::context! { metadata => meta })?;
 
-    fs::write(output_path.join("index.html"), html).context("Failed to write index.html")?;
+    let index = package_version_path.join("index.html");
+
+    fs::write(&index, html).context("Failed to write index.html")?;
+
+    log::info!("Created {}", index.display());
 
     Ok(())
 }
@@ -528,48 +620,56 @@ fn generate_index(workspace: &Path, packages: &HashMap<Package, Vec<Value>>) -> 
 fn build_documentation_for_package(
     workspace: &Path,
     package: Package,
-    chips: &[Chip],
-) -> Result<Vec<Value>> {
-    let output_path = workspace.join("docs");
-
+    chip: Option<Chip>,
+) -> Result<()> {
     let version = xtask::package_version(workspace, package)?;
 
-    for chip in chips {
-        // Ensure that the package/chip combination provided are valid:
-        validate_package_chip(&package, chip)?;
-
-        // Build the documentation for the specified package, targeting the
-        // specified chip:
-        let docs_path = xtask::build_documentation(workspace, package, *chip)?;
-
-        ensure!(
-            docs_path.exists(),
-            "Documentation not found at {}",
-            docs_path.display()
-        );
-
-        let output_path = output_path
-            .join(package.to_string())
-            .join(version.to_string())
-            .join(chip.to_string());
-        let output_path = xtask::windows_safe_path(&output_path);
-
-        // Create the output directory, and copy the built documentation into it:
-        fs::create_dir_all(&output_path)
-            .with_context(|| format!("Failed to create {}", output_path.display()))?;
-
-        copy_dir_all(&docs_path, &output_path).with_context(|| {
-            format!(
-                "Failed to copy {} to {}",
-                docs_path.display(),
-                output_path.display()
-            )
-        })?;
+    // Ensure that the package/chip combination provided are valid:
+    if let Some(chip) = chip {
+        if let Err(err) = validate_package_chip(&package, &chip) {
+            log::warn!("{err}");
+            return Ok(());
+        }
     }
 
-    Ok(generate_documentation_meta_for_package(
-        workspace, package, chips,
-    )?)
+    // Build the documentation for the specified package, targeting the
+    // specified chip:
+    let docs_path = xtask::build_documentation(workspace, package, chip)?;
+
+    ensure!(
+        docs_path.exists(),
+        "Documentation not found at {}",
+        docs_path.display()
+    );
+
+    let mut output_path = workspace
+        .join("docs")
+        .join(package.to_string())
+        .join(version.to_string());
+
+    if let Some(chip) = chip {
+        // Sometimes we need to specify a chip feature, but it does not affect the
+        // public API; so, only append the chip name to the path if it is significant:
+        if package.chip_features_matter() {
+            output_path = output_path.join(chip.to_string());
+        }
+    }
+
+    let output_path = xtask::windows_safe_path(&output_path);
+
+    // Create the output directory, and copy the built documentation into it:
+    fs::create_dir_all(&output_path)
+        .with_context(|| format!("Failed to create {}", output_path.display()))?;
+
+    copy_dir_all(&docs_path, &output_path).with_context(|| {
+        format!(
+            "Failed to copy {} to {}",
+            docs_path.display(),
+            output_path.display()
+        )
+    })?;
+
+    Ok(())
 }
 
 fn generate_documentation_meta_for_package(
@@ -645,8 +745,26 @@ fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result
 }
 
 fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
-    for path in xtask::package_paths(workspace)? {
-        log::info!("Formatting package: {}", path.display());
+    let mut packages = args.packages;
+    packages.sort();
+
+    for package in packages {
+        log::info!("Formatting package: {}", package);
+        let path = workspace.join(package.to_string());
+
+        // we need to list all source files since modules in `unstable_module!` macros
+        // won't get picked up otherwise
+        let source_files: Vec<String> = walkdir::WalkDir::new(path.join("src"))
+            .into_iter()
+            .filter_map(|entry| {
+                let path = entry.unwrap().into_path();
+                if let Some("rs") = path.extension().unwrap_or_default().to_str() {
+                    Some(String::from(path.to_str().unwrap()))
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let mut cargo_args = CargoArgsBuilder::default()
             .toolchain("nightly")
@@ -658,6 +776,9 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
             cargo_args.push("--".into());
             cargo_args.push("--check".into());
         }
+
+        cargo_args.push("--".into());
+        cargo_args.extend_from_slice(&source_files);
 
         xtask::cargo::run(&cargo_args, &path)?;
     }
@@ -705,11 +826,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         features.push_str(",bluetooth")
                     }
                     if device.contains("psram") {
-                        // TODO this doesn't test octal psram as it would require a separate build
-                        features.push_str(",quad-psram")
-                    }
-                    if matches!(chip, Chip::Esp32c6 | Chip::Esp32h2) {
-                        features.push_str(",flip-link")
+                        // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
+                        // defaults to `quad`) as it would require a separate build
+                        features.push_str(",psram")
                     }
 
                     lint_package(

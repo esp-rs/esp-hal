@@ -27,7 +27,7 @@ use esp_hal::{
     delay::Delay,
     dma::DmaTxBuf,
     dma_tx_buffer,
-    gpio::{Input, Level, Output, Pull},
+    gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
     lcd_cam::{
         lcd::i8080::{Config, TxEightBits, I8080},
         LcdCam,
@@ -53,9 +53,9 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let mut backlight = Output::new(lcd_backlight, Level::Low);
-    let mut reset = Output::new(lcd_reset, Level::Low);
-    let tear_effect = Input::new(lcd_te, Pull::None);
+    let mut backlight = Output::new(lcd_backlight, Level::Low, OutputConfig::default());
+    let mut reset = Output::new(lcd_reset, Level::Low, OutputConfig::default());
+    let tear_effect = Input::new(lcd_te, InputConfig::default().with_pull(Pull::None));
 
     let tx_pins = TxEightBits::new(
         peripherals.GPIO9,

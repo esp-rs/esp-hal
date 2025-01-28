@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - SPI: Added support for 3-wire SPI (#2919)
+- UART: Add separate config for Rx and Tx (#2965)
 
 ### Changed
+
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
 - RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
 - RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
@@ -20,10 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `embedded-hal-nb` traits (#2882)
 - `timer::wait` is now blocking (#2882)
 - By default, set `tx_idle_num` to 0 so that bytes written to TX FIFO are always immediately transmitted. (#2859)
-
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
-
+- SPI, UART, I2C: `with_<pin>` functions of peripheral drivers now disconnect the previously assigned pins from the peripheral. (#3012)
+- SPI, UART, I2C: Dropping a driver now disconnects pins from their peripherals. (#3012)
 - `Async` drivers are no longer `Send` (#2980)
+- GPIO drivers now take configuration structs (#2990, #3029)
+- `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`) (#3001)
+
+- Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
 
 ### Fixed
 
@@ -34,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
+- OutputOpenDrain has been removed (#3029)
 
 ## [0.23.1] - 2025-01-15
 

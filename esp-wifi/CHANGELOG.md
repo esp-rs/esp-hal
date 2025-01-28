@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed a problem using BLE on ESP32-C6 when connected via Serial-JTAG (#2981)
 
+- Fix a possible dead-lock when the rx-queue is overrun (#3015)
+
 ### Removed
 
 ## 0.12.0 - 2025-01-15

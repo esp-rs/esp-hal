@@ -16,34 +16,9 @@
 //!
 //! The I2C driver implements a number of third-party traits, with the
 //! intention of making the HAL inter-compatible with various device drivers
-//! from the community, including the [`embedded-hal`].
+//! from the community, including the [embedded-hal].
 //!
-//! ## Examples
-//!
-//! ### Read Data from a BMP180 Sensor
-//!
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::i2c::master::{Config, I2c};
-//!
-//! // Create a new peripheral object with the described wiring
-//! // and standard I2C clock speed.
-//! let mut i2c = I2c::new(
-//!     peripherals.I2C0,
-//!     Config::default(),
-//! )
-//! .unwrap()
-//! .with_sda(peripherals.GPIO1)
-//! .with_scl(peripherals.GPIO2);
-//!
-//! loop {
-//!     let mut data = [0u8; 22];
-//!     i2c.write_read(0x77, &[0xaa], &mut data).ok();
-//! }
-//! # }
-//! ```
-//! 
-//! [`embedded-hal`]:embedded_hal
+//! [embedded-hal]: embedded_hal
 
 use core::marker::PhantomData;
 #[cfg(not(esp32))]
@@ -61,7 +36,13 @@ use fugit::HertzU32;
 use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
-    gpio::{interconnect::PeripheralOutput, InputSignal, OutputSignal, Pull},
+    gpio::{
+        interconnect::{OutputConnection, PeripheralOutput},
+        InputSignal,
+        OutputSignal,
+        PinGuard,
+        Pull,
+    },
     interrupt::{InterruptConfigurable, InterruptHandler},
     pac::i2c0::{RegisterBlock, COMD},
     peripheral::{Peripheral, PeripheralRef},
@@ -439,6 +420,24 @@ impl Default for Config {
 }
 
 /// I2C driver
+///
+/// ### I2C initialization and communication with the device
+/// ```rust, no_run
+#[doc = crate::before_snippet!()]
+/// # use esp_hal::i2c::master::{Config, I2c};
+/// # const DEVICE_ADDR: u8 = 0x77;
+/// let mut i2c = I2c::new(
+///     peripherals.I2C0,
+///     Config::default(),
+/// )
+/// .unwrap()
+/// .with_sda(peripherals.GPIO1)
+/// .with_scl(peripherals.GPIO2);
+///
+/// let mut data = [0u8; 22];
+/// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data).ok();
+/// # }
+/// ```
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct I2c<'d, Dm: DriverMode> {
@@ -446,6 +445,8 @@ pub struct I2c<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     config: Config,
     guard: PeripheralGuard,
+    sda_pin: PinGuard,
+    scl_pin: PinGuard,
 }
 
 #[cfg(any(doc, feature = "unstable"))]
@@ -549,27 +550,35 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
     }
 
     /// Connect a pin to the I2C SDA signal.
-    pub fn with_sda(self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    ///
+    /// This will replace previous pin assignments for this signal.
+    pub fn with_sda(mut self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
-        self.with_pin(sda, input, output)
+        Self::connect_pin(sda, input, output, &mut self.sda_pin);
+
+        self
     }
 
     /// Connect a pin to the I2C SCL signal.
-    pub fn with_scl(self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    ///
+    /// This will replace previous pin assignments for this signal.
+    pub fn with_scl(mut self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
-        self.with_pin(scl, input, output)
+        Self::connect_pin(scl, input, output, &mut self.scl_pin);
+
+        self
     }
 
-    fn with_pin(
-        self,
+    fn connect_pin(
         pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
         input: InputSignal,
         output: OutputSignal,
-    ) -> Self {
+        guard: &mut PinGuard,
+    ) {
         crate::into_mapped_ref!(pin);
         // avoid the pin going low during configuration
         pin.set_output_high(true);
@@ -578,17 +587,14 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
         pin.enable_input(true);
         pin.pull_direction(Pull::Up);
 
-        input.connect_to(&mut pin);
-        output.connect_to(&mut pin);
+        input.connect_to(pin.reborrow());
 
-        self
+        *guard = OutputConnection::connect_with_guard(pin, output);
     }
 }
 
 impl<'d> I2c<'d, Blocking> {
-    /// Create a new I2C instance
-    /// This will enable the peripheral but the peripheral won't get
-    /// automatically disabled when this gets dropped.
+    /// Create a new I2C instance.
     pub fn new(
         i2c: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -597,11 +603,16 @@ impl<'d> I2c<'d, Blocking> {
 
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
+        let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
+        let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
+
         let i2c = I2c {
             i2c,
             phantom: PhantomData,
             config,
             guard,
+            sda_pin,
+            scl_pin,
         };
 
         i2c.driver().setup(&i2c.config)?;
@@ -624,7 +635,7 @@ impl<'d> I2c<'d, Blocking> {
     /// You can restore the default/unhandled interrupt handler by using
     /// [crate::DEFAULT_INTERRUPT_HANDLER]
     #[instability::unstable]
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.i2c.info().set_interrupt_handler(handler);
     }
 
@@ -661,10 +672,24 @@ impl<'d> I2c<'d, Blocking> {
             phantom: PhantomData,
             config: self.config,
             guard: self.guard,
+            sda_pin: self.sda_pin,
+            scl_pin: self.scl_pin,
         }
     }
 
     /// Writes bytes to slave with address `address`
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// # let mut i2c = I2c::new(
+    /// #   peripherals.I2C0,
+    /// #   Config::default(),
+    /// # )
+    /// # .unwrap();
+    /// # const DEVICE_ADDR: u8 = 0x77;
+    /// i2c.write(DEVICE_ADDR, &[0xaa]).ok();
+    /// # }
+    /// ```
     pub fn write<A: Into<I2cAddress>>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.driver()
             .write_blocking(address.into(), buffer, true, true)
@@ -672,6 +697,19 @@ impl<'d> I2c<'d, Blocking> {
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// # let mut i2c = I2c::new(
+    /// #   peripherals.I2C0,
+    /// #   Config::default(),
+    /// # )
+    /// # .unwrap();
+    /// # const DEVICE_ADDR: u8 = 0x77;
+    /// let mut data = [0u8; 22];
+    /// i2c.read(DEVICE_ADDR, &mut data).ok();
+    /// # }
+    /// ```
     pub fn read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -684,6 +722,19 @@ impl<'d> I2c<'d, Blocking> {
 
     /// Writes bytes to slave with address `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// # let mut i2c = I2c::new(
+    /// #   peripherals.I2C0,
+    /// #   Config::default(),
+    /// # )
+    /// # .unwrap();
+    /// # const DEVICE_ADDR: u8 = 0x77;
+    /// let mut data = [0u8; 22];
+    /// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data).ok();
+    /// # }
+    /// ```
     pub fn write_read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -721,6 +772,23 @@ impl<'d> I2c<'d, Blocking> {
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c, Operation};
+    /// # let mut i2c = I2c::new(
+    /// #   peripherals.I2C0,
+    /// #   Config::default(),
+    /// # )
+    /// # .unwrap();
+    /// # const DEVICE_ADDR: u8 = 0x77;
+    /// let mut data = [0u8; 22];
+    /// i2c.transaction(
+    ///     DEVICE_ADDR,
+    ///     &mut [Operation::Write(&[0xaa]), Operation::Read(&mut data)]
+    /// ).ok();
+    /// # }
+    /// ```
     pub fn transaction<'a, A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -858,6 +926,8 @@ impl<'d> I2c<'d, Async> {
             phantom: PhantomData,
             config: self.config,
             guard: self.guard,
+            sda_pin: self.sda_pin,
+            scl_pin: self.scl_pin,
         }
     }
 

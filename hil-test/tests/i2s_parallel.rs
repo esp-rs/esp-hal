@@ -7,16 +7,10 @@
 #![no_main]
 
 use esp_hal::{
-    delay::Delay,
-    dma_buffers,
-    gpio::{AnyPin, NoPin, Pin},
-    i2s::{
-        master::{DataFormat, I2s, I2sTx, Standard},
-        parallel::{I2sParallel, TxSixteenBits},
-    },
+    gpio::NoPin,
+    i2s::parallel::{I2sParallel, TxSixteenBits},
     peripherals::I2S0,
     time::RateExtU32,
-    Async,
 };
 use hil_test as _;
 

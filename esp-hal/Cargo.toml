@@ -120,11 +120,6 @@ esp32s2 = ["dep:esp32s2", "portable-atomic/critical-section", "procmacros/has-ul
 # Target the ESP32-S3.
 esp32s3 = ["dep:esp32s3", "procmacros/has-ulp-core", "procmacros/rtc-slow", "usb-otg", "xtensa-lx-rt/esp32s3"]
 
-#! ### RISC-V Exclusive Feature Flags
-## Move the stack to start of RAM to get zero-cost stack overflow protection
-## (ESP32-C6 and ESPS32-H2 only!).
-flip-link = ["esp-riscv-rt/fix-sp"]
-
 #! ### Trait Implementation Feature Flags
 ## Implement `defmt::Format` on certain types.
 defmt = [
@@ -145,11 +140,8 @@ defmt = [
 ]
 
 #! ### PSRAM Feature Flags
-## Use externally connected Quad PSRAM
-quad-psram = []
-
-## Use externally connected Octal RAM
-octal-psram = []
+## Use externally connected PSRAM (`quad` by default, can be configured to `octal` via ESP_HAL_CONFIG_PSRAM_MODE)
+psram = []
 
 # This feature is intended for testing; you probably don't want to enable it:
 ci = ["defmt", "bluetooth"]

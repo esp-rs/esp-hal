@@ -11,7 +11,7 @@
 
 use esp_hal::{
     dma_buffers,
-    gpio::{Input, Level, Output, Pull},
+    gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
     peripheral::Peripheral,
     spi::{slave::Spi, Mode},
     Blocking,
@@ -115,10 +115,10 @@ mod tests {
             }
         }
 
-        let mosi_gpio = Output::new(mosi_pin, Level::Low);
-        let cs_gpio = Output::new(cs_pin, Level::High);
-        let sclk_gpio = Output::new(sclk_pin, Level::Low);
-        let miso_gpio = Input::new(miso_pin, Pull::None);
+        let mosi_gpio = Output::new(mosi_pin, Level::Low, OutputConfig::default());
+        let cs_gpio = Output::new(cs_pin, Level::High, OutputConfig::default());
+        let sclk_gpio = Output::new(sclk_pin, Level::Low, OutputConfig::default());
+        let miso_gpio = Input::new(miso_pin, InputConfig::default().with_pull(Pull::None));
 
         let cs = cs_gpio.peripheral_input();
         let sclk = sclk_gpio.peripheral_input();

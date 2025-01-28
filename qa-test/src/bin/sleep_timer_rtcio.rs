@@ -18,7 +18,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     gpio,
-    gpio::{Input, Pull},
+    gpio::{Input, InputConfig, Pull},
     main,
     rtc_cntl::{
         reset_reason,
@@ -46,11 +46,12 @@ fn main() -> ! {
     let delay = Delay::new();
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
+    let config = InputConfig::default().with_pull(Pull::None);
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32c3", feature = "esp32c2"))] {
             let mut pin2 = peripherals.GPIO2;
             let mut pin3 = peripherals.GPIO3;
-            let _pin2_input = Input::new(&mut pin2, Pull::None);
+            let _pin2_input = Input::new(&mut pin2, config);
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
                 (&mut pin2, WakeupLevel::Low),
@@ -59,7 +60,7 @@ fn main() -> ! {
         } else if #[cfg(feature = "esp32s3")] {
             let mut pin17 = peripherals.GPIO17;
             let mut pin18 = peripherals.GPIO18;
-            let _pin17_input = Input::new(&mut pin17, Pull::None);
+            let _pin17_input = Input::new(&mut pin17, config);
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut [
                 (&mut pin17, WakeupLevel::Low),

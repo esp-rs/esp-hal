@@ -74,29 +74,37 @@ pub enum Error {
 }
 
 /// Functionality provided by any timer peripheral.
-pub trait Timer: Into<AnyTimer> + InterruptConfigurable + 'static + crate::private::Sealed {
+pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
     /// Start the timer.
+    #[doc(hidden)]
     fn start(&self);
 
     /// Stop the timer.
+    #[doc(hidden)]
     fn stop(&self);
 
     /// Reset the timer value to 0.
+    #[doc(hidden)]
     fn reset(&self);
 
     /// Is the timer running?
+    #[doc(hidden)]
     fn is_running(&self) -> bool;
 
     /// The current timer value.
+    #[doc(hidden)]
     fn now(&self) -> Instant<u64, 1, 1_000_000>;
 
     /// Load a target value into the timer.
+    #[doc(hidden)]
     fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
 
     /// Enable auto reload of the loaded value.
+    #[doc(hidden)]
     fn enable_auto_reload(&self, auto_reload: bool);
 
     /// Enable or disable the timer's interrupt.
+    #[doc(hidden)]
     fn enable_interrupt(&self, state: bool);
 
     /// Clear the timer's interrupt.
@@ -109,13 +117,19 @@ pub trait Timer: Into<AnyTimer> + InterruptConfigurable + 'static + crate::priva
     ///
     /// Requires the correct `InterruptHandler` to be installed to function
     /// correctly.
+    #[doc(hidden)]
     async fn wait(&self);
 
     /// Returns the HAL provided async interrupt handler
+    #[doc(hidden)]
     fn async_interrupt_handler(&self) -> InterruptHandler;
 
     /// Returns the interrupt source for the underlying timer
     fn peripheral_interrupt(&self) -> Interrupt;
+
+    /// Configures the interrupt handler.
+    #[doc(hidden)]
+    fn set_interrupt_handler(&self, handler: InterruptHandler);
 }
 
 /// A one-shot timer.
@@ -137,7 +151,7 @@ impl<'d> OneShotTimer<'d, Blocking> {
 
 impl<'d> OneShotTimer<'d, Blocking> {
     /// Converts the driver to [`Async`] mode.
-    pub fn into_async(mut self) -> OneShotTimer<'d, Async> {
+    pub fn into_async(self) -> OneShotTimer<'d, Async> {
         let handler = self.inner.async_interrupt_handler();
         self.inner.set_interrupt_handler(handler);
         OneShotTimer {
@@ -385,18 +399,7 @@ impl Timer for AnyTimer {
             async fn wait(&self);
             fn async_interrupt_handler(&self) -> InterruptHandler;
             fn peripheral_interrupt(&self) -> Interrupt;
-        }
-    }
-}
-
-impl InterruptConfigurable for AnyTimer {
-    delegate::delegate! {
-        to match &mut self.0 {
-            AnyTimerInner::TimgTimer(inner) => inner,
-            #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarm(inner) => inner,
-        } {
-            fn set_interrupt_handler(&mut self, handler: InterruptHandler);
+            fn set_interrupt_handler(&self, handler: InterruptHandler);
         }
     }
 }

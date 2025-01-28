@@ -485,9 +485,6 @@ _abs_start:
 "#,
 r#"
 _start_trap: // Handle exceptions in vectored mode
-"#,
-#[cfg(feature="fix-sp")]
-r#"
     // move SP to some save place if it's pointing below the RAM
     // otherwise we won't be able to do anything reasonable
     // (since we don't have a working stack)
@@ -495,7 +492,7 @@ r#"
     // most probably we will just print something and halt in this case
     // we actually can't do anything else
     csrw mscratch, t0
-    la t0, _stack_end
+    la t0, _dram_origin
     bge sp, t0, 1f
 
     // use the reserved exception cause 14 to signal we detected a stack overflow
@@ -511,8 +508,7 @@ r#"
     1:
     csrr t0, mscratch
     // now SP is in RAM - continue
-"#,
-r#"
+
     addi sp, sp, -40*4
     sw ra, 0(sp)
     la ra, _start_trap_rust_hal /* Load the HAL trap handler */
