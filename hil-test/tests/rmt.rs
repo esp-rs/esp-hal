@@ -147,8 +147,7 @@ mod tests {
             .with_clk_divider(10)
             .with_idle_threshold(1000);
 
-        let tx_config = TxChannelConfig::default()
-            .with_clk_divider(10);
+        let tx_config = TxChannelConfig::default().with_clk_divider(10);
 
         let tx_channel = {
             use esp_hal::rmt::TxChannelCreator;
@@ -168,7 +167,7 @@ mod tests {
                 };
             }
         }
-        
+
         let mut rcv_data: [u32; 105] = [PulseCode::empty(); 105];
 
         let mut tx_data = [PulseCode::empty(); 22];

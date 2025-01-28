@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
 - RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
 - RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
+- RMT: `RxChannel::receive` now supports reading arbitrary amounts of data on chips that support wrap mode Rx (#TBD)
 - Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read (#2882)
 - Uart `read_bytes` is now blocking  returns the number of bytes read (#2882)
 - Uart `flush` is now blocking (#2882)

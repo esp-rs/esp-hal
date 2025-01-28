@@ -1289,6 +1289,7 @@ where
                 .enumerate()
             {
                 *entry = unsafe { ptr.add(idx).read_volatile() };
+                unsafe { ptr.add(idx).write_volatile(0); }
             }
 
             if <C as RxChannelInternal>::is_done() {
