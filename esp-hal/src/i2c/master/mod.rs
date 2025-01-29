@@ -449,8 +449,7 @@ pub struct I2c<'d, Dm: DriverMode> {
     scl_pin: PinGuard,
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm: DriverMode> SetConfig for I2c<'_, Dm> {
     type Config = Config;
     type ConfigError = ConfigError;

@@ -1000,8 +1000,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> SetConfig for Spi<'_, Dm>
 where
     Dm: DriverMode,
@@ -1586,8 +1585,7 @@ mod dma {
         }
     }
 
-    #[cfg(any(doc, feature = "unstable"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    #[instability::unstable]
     impl<Dm> SetConfig for SpiDma<'_, Dm>
     where
         Dm: DriverMode,
@@ -2220,8 +2218,7 @@ mod dma {
         }
     }
 
-    #[cfg(any(doc, feature = "unstable"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    #[instability::unstable]
     impl<Dm> SetConfig for SpiDmaBus<'_, Dm>
     where
         Dm: DriverMode,
@@ -2282,8 +2279,7 @@ mod dma {
             }
         }
 
-        #[cfg(any(doc, feature = "unstable"))]
-        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        #[instability::unstable]
         impl SpiDmaBus<'_, Async> {
             /// Fill the given buffer with data from the bus.
             #[instability::unstable]
@@ -2413,8 +2409,7 @@ mod dma {
             }
         }
 
-        #[cfg(any(doc, feature = "unstable"))]
-        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        #[instability::unstable]
         impl embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, Async> {
             async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 self.read_async(words).await
@@ -2446,8 +2441,7 @@ mod dma {
         #[cfg(any(doc, feature = "unstable"))]
         use super::*;
 
-        #[cfg(any(doc, feature = "unstable"))]
-        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        #[instability::unstable]
         impl<Dm> ErrorType for SpiDmaBus<'_, Dm>
         where
             Dm: DriverMode,
@@ -2455,8 +2449,7 @@ mod dma {
             type Error = Error;
         }
 
-        #[cfg(any(doc, feature = "unstable"))]
-        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        #[instability::unstable]
         impl<Dm> SpiBus for SpiDmaBus<'_, Dm>
         where
             Dm: DriverMode,

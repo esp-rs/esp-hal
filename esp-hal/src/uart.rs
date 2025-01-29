@@ -178,8 +178,7 @@ impl core::fmt::Display for Error {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io::Error for Error {
     fn kind(&self) -> embedded_io::ErrorKind {
         embedded_io::ErrorKind::Other
@@ -477,8 +476,7 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> SetConfig for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -491,8 +489,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> SetConfig for UartRx<'_, Dm>
 where
     Dm: DriverMode,
@@ -505,8 +502,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> SetConfig for UartTx<'_, Dm>
 where
     Dm: DriverMode,
@@ -1309,6 +1305,7 @@ impl Uart<'_, Blocking> {
     }
 }
 
+#[instability::unstable]
 impl<Dm> ufmt_write::uWrite for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -1326,6 +1323,7 @@ where
     }
 }
 
+#[instability::unstable]
 impl<Dm> ufmt_write::uWrite for UartTx<'_, Dm>
 where
     Dm: DriverMode,
@@ -1361,26 +1359,22 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ErrorType for Uart<'_, Dm> {
     type Error = Error;
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ErrorType for UartTx<'_, Dm> {
     type Error = Error;
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ErrorType for UartRx<'_, Dm> {
     type Error = Error;
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::Read for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -1390,8 +1384,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::Read for UartRx<'_, Dm>
 where
     Dm: DriverMode,
@@ -1409,8 +1402,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ReadReady for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -1420,8 +1412,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ReadReady for UartRx<'_, Dm>
 where
     Dm: DriverMode,
@@ -1431,8 +1422,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::Write for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -1446,8 +1436,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::Write for UartTx<'_, Dm>
 where
     Dm: DriverMode,
@@ -1755,8 +1744,7 @@ impl UartRx<'_, Async> {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io_async::Read for Uart<'_, Async> {
     /// In contrast to the documentation of embedded_io_async::Read, this
     /// method blocks until an uart interrupt occurs.
@@ -1766,8 +1754,7 @@ impl embedded_io_async::Read for Uart<'_, Async> {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io_async::Read for UartRx<'_, Async> {
     /// In contrast to the documentation of embedded_io_async::Read, this
     /// method blocks until an uart interrupt occurs.
@@ -1777,8 +1764,7 @@ impl embedded_io_async::Read for UartRx<'_, Async> {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io_async::Write for Uart<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_async(buf).await
@@ -1789,8 +1775,7 @@ impl embedded_io_async::Write for Uart<'_, Async> {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io_async::Write for UartTx<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_async(buf).await
