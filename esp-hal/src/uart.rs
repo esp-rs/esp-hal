@@ -47,8 +47,8 @@
 //! # use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
 //! # let delay = Delay::new();
 //! # let config = Config::default().with_rx(
-//!     RxConfig::default().with_fifo_full_threshold(30)
-//! );
+//! #    RxConfig::default().with_fifo_full_threshold(30)
+//! # );
 //! # let mut uart0 = Uart::new(
 //! #    peripherals.UART0,
 //! #    config)?;
@@ -62,14 +62,7 @@
 //! });
 //!
 //! loop {
-//!     critical_section::with(|cs| {
-//!         let mut serial = SERIAL.borrow_ref_mut(cs);
-//!         if let Some(serial) = serial.as_mut() {
-//!         writeln!(serial,
-//!             "Hello World! Send a single `#` character or send
-//!                 at least 30 characters to trigger interrupts.").ok();
-//!         }
-//!     });
+//!     println!("Send `#` character or >=30 characters");
 //!     delay.delay(1.secs());
 //! }
 //! # }
@@ -89,16 +82,15 @@
 //!         if let Some(serial) = serial.as_mut() {
 //!             let mut buf = [0u8; 64];
 //!             if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
-//!                 writeln!(serial, "Read {} bytes", cnt).ok();
+//!                 println!("Read {} bytes", cnt);
 //!             }
 //!
 //!             let pending_interrupts = serial.interrupts();
-//!             writeln!(
-//!                 serial,
+//!             println!(
 //!                 "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
 //!                 pending_interrupts.contains(UartInterrupt::AtCmd),
 //!                 pending_interrupts.contains(UartInterrupt::RxFifoFull),
-//!             ).ok();
+//!             );
 //!
 //!             serial.clear_interrupts(
 //!                 UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
