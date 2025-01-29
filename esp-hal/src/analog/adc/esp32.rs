@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+
 use super::{AdcConfig, Attenuation};
 use crate::{
     peripheral::PeripheralRef,

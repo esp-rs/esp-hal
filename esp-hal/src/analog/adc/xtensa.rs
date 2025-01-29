@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+
 #[cfg(esp32s3)]
 pub use self::calibration::*;
 use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};

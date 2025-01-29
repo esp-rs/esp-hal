@@ -1,4 +1,10 @@
 use core::marker::PhantomData;
+
+#[cfg(esp32c3)]
+use Interrupt::APB_ADC as InterruptSource;
+#[cfg(esp32c6)]
+use Interrupt::APB_SARADC as InterruptSource;
+
 #[cfg(not(esp32h2))]
 pub use self::calibration::*;
 use super::{AdcCalSource, AdcConfig, Attenuation};
@@ -6,22 +12,19 @@ use super::{AdcCalSource, AdcConfig, Attenuation};
 use crate::clock::clocks_ll::regi2c_write_mask;
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
 use crate::efuse::Efuse;
-use crate::{
-    peripheral::PeripheralRef, peripherals::APB_SARADC, system::{GenericPeripheralGuard, Peripheral}, Blocking
-};
-
 #[cfg(any(esp32c3, esp32c6))]
 use crate::{
     analog::adc::asynch::AdcFuture,
-    peripherals::Interrupt,
     interrupt::{InterruptConfigurable, InterruptHandler},
+    peripherals::Interrupt,
     Async,
 };
-
-#[cfg(esp32c3)]
-use Interrupt::APB_ADC as InterruptSource;
-#[cfg(esp32c6)]
-use Interrupt::APB_SARADC as InterruptSource;
+use crate::{
+    peripheral::PeripheralRef,
+    peripherals::APB_SARADC,
+    system::{GenericPeripheralGuard, Peripheral},
+    Blocking,
+};
 
 mod calibration;
 
@@ -395,14 +398,13 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
     }
 }
 
-
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADCI, Dm: crate::DriverMode> {
     _adc: PeripheralRef<'d, ADCI>,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
-    _phantom: PhantomData<Dm>
+    _phantom: PhantomData<Dm>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI, Blocking>
@@ -429,7 +431,7 @@ where
             attenuations: config.attenuations,
             active_channel: None,
             _guard: guard,
-            _phantom: PhantomData
+            _phantom: PhantomData,
         }
     }
 
@@ -439,7 +441,8 @@ where
         self.set_interrupt_handler(asynch::adc_interrupt_handler);
 
         // Reset interrupt flags and disable oneshot reading to normalize state before
-        // entering async mode, otherwise there can be '0' readings, happening initially using ADC2
+        // entering async mode, otherwise there can be '0' readings, happening initially
+        // using ADC2
         ADCI::reset();
 
         Adc {
@@ -447,7 +450,7 @@ where
             attenuations: self.attenuations,
             active_channel: self.active_channel,
             _guard: self._guard,
-            _phantom: PhantomData
+            _phantom: PhantomData,
         }
     }
 
@@ -535,7 +538,10 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
             crate::interrupt::disable(core, InterruptSource);
         }
         unsafe { crate::interrupt::bind_interrupt(InterruptSource, handler.handler()) };
-        unwrap!(crate::interrupt::enable(InterruptSource, handler.priority()));
+        unwrap!(crate::interrupt::enable(
+            InterruptSource,
+            handler.priority()
+        ));
     }
 }
 
@@ -629,13 +635,11 @@ mod adc_implementation {
     }
 }
 
-
 #[cfg(any(esp32c3, esp32c6))]
 impl<'d, ADCI> Adc<'d, ADCI, Async>
 where
     ADCI: RegisterAccess + 'd,
 {
-
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Adc<'d, ADCI, Blocking> {
         crate::interrupt::disable(crate::Cpu::current(), InterruptSource);
@@ -644,7 +648,7 @@ where
             attenuations: self.attenuations,
             active_channel: self.active_channel,
             _guard: self._guard,
-            _phantom: PhantomData
+            _phantom: PhantomData,
         }
     }
 
@@ -654,11 +658,9 @@ where
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     ///
-    /// TODO: This method does not handle concurrent reads to multiple channels yet
-    pub async fn read_oneshot<PIN, CS>(
-        &mut self,
-        pin: &mut super::AdcPin<PIN, ADCI, CS>,
-    ) -> u16
+    /// TODO: This method does not handle concurrent reads to multiple channels
+    /// yet
+    pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCI, CS>) -> u16
     where
         ADCI: asynch::AsyncAccess,
         PIN: super::AdcChannel,
@@ -703,16 +705,13 @@ where
 pub(crate) mod asynch {
     use core::{
         marker::PhantomData,
-        task::Poll,
         pin::Pin,
-        task::Context
+        task::{Context, Poll},
     };
+
     use procmacros::handler;
-    use crate::{
-        asynch::AtomicWaker,
-        Async,
-        peripherals::APB_SARADC,
-    };
+
+    use crate::{asynch::AtomicWaker, peripherals::APB_SARADC, Async};
 
     #[handler]
     pub(crate) fn adc_interrupt_handler() {
@@ -751,15 +750,21 @@ pub(crate) mod asynch {
 
     impl AsyncAccess for crate::peripherals::ADC1 {
         fn enable_interrupt() {
-            APB_SARADC::regs().int_ena().modify(|_, w| w.adc1_done().set_bit());
+            APB_SARADC::regs()
+                .int_ena()
+                .modify(|_, w| w.adc1_done().set_bit());
         }
 
         fn disable_interrupt() {
-            APB_SARADC::regs().int_ena().modify(|_, w| w.adc1_done().clear_bit());
+            APB_SARADC::regs()
+                .int_ena()
+                .modify(|_, w| w.adc1_done().clear_bit());
         }
 
         fn clear_interrupt() {
-            APB_SARADC::regs().int_clr().write(|w| w.adc1_done().clear_bit_by_one());
+            APB_SARADC::regs()
+                .int_clr()
+                .write(|w| w.adc1_done().clear_bit_by_one());
         }
 
         fn waker() -> &'static AtomicWaker {
@@ -771,17 +776,22 @@ pub(crate) mod asynch {
 
     #[cfg(esp32c3)]
     impl AsyncAccess for crate::peripherals::ADC2 {
-
         fn enable_interrupt() {
-            APB_SARADC::regs().int_ena().modify(|_, w| w.adc2_done().set_bit());
+            APB_SARADC::regs()
+                .int_ena()
+                .modify(|_, w| w.adc2_done().set_bit());
         }
 
         fn disable_interrupt() {
-            APB_SARADC::regs().int_ena().modify(|_, w| w.adc2_done().clear_bit());
+            APB_SARADC::regs()
+                .int_ena()
+                .modify(|_, w| w.adc2_done().clear_bit());
         }
 
         fn clear_interrupt() {
-            APB_SARADC::regs().int_clr().write(|w| w.adc2_done().clear_bit_by_one());
+            APB_SARADC::regs()
+                .int_clr()
+                .write(|w| w.adc2_done().clear_bit_by_one());
         }
 
         fn waker() -> &'static AtomicWaker {
@@ -824,5 +834,4 @@ pub(crate) mod asynch {
             ADCI::disable_interrupt();
         }
     }
-
 }
