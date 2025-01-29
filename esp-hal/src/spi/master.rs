@@ -1248,7 +1248,6 @@ mod dma {
     /// # }
     /// ```
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    #[instability::unstable]
     pub struct SpiDma<'d, Dm>
     where
         Dm: DriverMode,
