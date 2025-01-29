@@ -98,6 +98,9 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - Generally, follow common "good practices" and idiomatic Rust style
 - All `Future` objects (public or private) must be marked with ``#[must_use = "futures do nothing unless you `.await` or poll them"]``.
 - Prefer `cfg_if!` (or, if the branches just pick between separate values of the same variable, `cfg!()`) over multiple exclusive `#[cfg]` attributes. `cfg_if!`/`cfg!()` visually divide the options, often results in simpler conditions and simplifies adding new branches in the future.
+- When marking an API as `unstable`:
+  - Prefer to use `#[instability::unstable]`.
+  - Use the attribute on each public function instead of inherent impl blocks.
 
 ## Driver implementation
 
