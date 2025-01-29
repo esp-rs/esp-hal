@@ -160,11 +160,6 @@ impl rand_core::RngCore for Rng {
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         self.read(dest);
     }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.read(dest);
-        Ok(())
-    }
 }
 
 /// True Random Number Generator (TRNG) driver
@@ -238,10 +233,6 @@ impl rand_core::RngCore for Trng<'_> {
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         self.rng.fill_bytes(dest)
-    }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.rng.try_fill_bytes(dest)
     }
 }
 
