@@ -596,101 +596,6 @@ impl<'d, Dm: DriverMode> I2c<'d, Dm> {
 
         *guard = OutputConnection::connect_with_guard(pin, output);
     }
-}
-
-impl<'d> I2c<'d, Blocking> {
-    /// Create a new I2C instance.
-    ///
-    /// # Errors
-    ///
-    /// A [`ConfigError`] variant will be returned if bus frequency or timeout
-    /// passed in config is invalid.
-    pub fn new(
-        i2c: impl Peripheral<P = impl Instance> + 'd,
-        config: Config,
-    ) -> Result<Self, ConfigError> {
-        crate::into_mapped_ref!(i2c);
-
-        let guard = PeripheralGuard::new(i2c.info().peripheral);
-
-        let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
-        let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
-
-        let i2c = I2c {
-            i2c,
-            phantom: PhantomData,
-            config,
-            guard,
-            sda_pin,
-            scl_pin,
-        };
-
-        i2c.driver().setup(&i2c.config)?;
-
-        Ok(i2c)
-    }
-
-    #[cfg_attr(
-        not(multi_core),
-        doc = "Registers an interrupt handler for the peripheral."
-    )]
-    #[cfg_attr(
-        multi_core,
-        doc = "Registers an interrupt handler for the peripheral on the current core."
-    )]
-    #[doc = ""]
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
-    ///
-    /// You can restore the default/unhandled interrupt handler by using
-    /// [crate::DEFAULT_INTERRUPT_HANDLER]
-    ///
-    /// # Panics
-    ///
-    /// Panics if passed interrupt handler is invalid (e.g. has priority
-    /// `None`)
-    #[instability::unstable]
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.i2c.info().set_interrupt_handler(handler);
-    }
-
-    /// Listen for the given interrupts
-    #[instability::unstable]
-    pub fn listen(&mut self, interrupts: impl Into<EnumSet<Event>>) {
-        self.i2c.info().enable_listen(interrupts.into(), true)
-    }
-
-    /// Unlisten the given interrupts
-    #[instability::unstable]
-    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<Event>>) {
-        self.i2c.info().enable_listen(interrupts.into(), false)
-    }
-
-    /// Gets asserted interrupts
-    #[instability::unstable]
-    pub fn interrupts(&mut self) -> EnumSet<Event> {
-        self.i2c.info().interrupts()
-    }
-
-    /// Resets asserted interrupts
-    #[instability::unstable]
-    pub fn clear_interrupts(&mut self, interrupts: EnumSet<Event>) {
-        self.i2c.info().clear_interrupts(interrupts)
-    }
-
-    /// Configures the I2C peripheral to operate in asynchronous mode.
-    pub fn into_async(mut self) -> I2c<'d, Async> {
-        self.set_interrupt_handler(self.driver().info.async_handler);
-
-        I2c {
-            i2c: self.i2c,
-            phantom: PhantomData,
-            config: self.config,
-            guard: self.guard,
-            sda_pin: self.sda_pin,
-            scl_pin: self.scl_pin,
-        }
-    }
 
     /// Writes bytes to slave with address `address`
     /// ```rust, no_run
@@ -823,6 +728,101 @@ impl<'d> I2c<'d, Blocking> {
     ) -> Result<(), Error> {
         self.transaction_impl(address.into(), operations.into_iter().map(Operation::from))
             .inspect_err(|_| self.internal_recover())
+    }
+}
+
+impl<'d> I2c<'d, Blocking> {
+    /// Create a new I2C instance.
+    ///
+    /// # Errors
+    ///
+    /// A [`ConfigError`] variant will be returned if bus frequency or timeout
+    /// passed in config is invalid.
+    pub fn new(
+        i2c: impl Peripheral<P = impl Instance> + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
+        crate::into_mapped_ref!(i2c);
+
+        let guard = PeripheralGuard::new(i2c.info().peripheral);
+
+        let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
+        let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
+
+        let i2c = I2c {
+            i2c,
+            phantom: PhantomData,
+            config,
+            guard,
+            sda_pin,
+            scl_pin,
+        };
+
+        i2c.driver().setup(&i2c.config)?;
+
+        Ok(i2c)
+    }
+
+    #[cfg_attr(
+        not(multi_core),
+        doc = "Registers an interrupt handler for the peripheral."
+    )]
+    #[cfg_attr(
+        multi_core,
+        doc = "Registers an interrupt handler for the peripheral on the current core."
+    )]
+    #[doc = ""]
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    ///
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [crate::DEFAULT_INTERRUPT_HANDLER]
+    ///
+    /// # Panics
+    ///
+    /// Panics if passed interrupt handler is invalid (e.g. has priority
+    /// `None`)
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.i2c.info().set_interrupt_handler(handler);
+    }
+
+    /// Listen for the given interrupts
+    #[instability::unstable]
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<Event>>) {
+        self.i2c.info().enable_listen(interrupts.into(), true)
+    }
+
+    /// Unlisten the given interrupts
+    #[instability::unstable]
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<Event>>) {
+        self.i2c.info().enable_listen(interrupts.into(), false)
+    }
+
+    /// Gets asserted interrupts
+    #[instability::unstable]
+    pub fn interrupts(&mut self) -> EnumSet<Event> {
+        self.i2c.info().interrupts()
+    }
+
+    /// Resets asserted interrupts
+    #[instability::unstable]
+    pub fn clear_interrupts(&mut self, interrupts: EnumSet<Event>) {
+        self.i2c.info().clear_interrupts(interrupts)
+    }
+
+    /// Configures the I2C peripheral to operate in asynchronous mode.
+    pub fn into_async(mut self) -> I2c<'d, Async> {
+        self.set_interrupt_handler(self.driver().info.async_handler);
+
+        I2c {
+            i2c: self.i2c,
+            phantom: PhantomData,
+            config: self.config,
+            guard: self.guard,
+            sda_pin: self.sda_pin,
+            scl_pin: self.scl_pin,
+        }
     }
 }
 
@@ -959,7 +959,7 @@ impl<'d> I2c<'d, Async> {
     }
 
     /// Writes bytes to slave with address `address`
-    pub async fn write<A: Into<I2cAddress>>(
+    pub async fn write_async<A: Into<I2cAddress>>(
         &mut self,
         address: A,
         buffer: &[u8],
@@ -976,7 +976,7 @@ impl<'d> I2c<'d, Async> {
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// passed buffer has zero length.
-    pub async fn read<A: Into<I2cAddress>>(
+    pub async fn read_async<A: Into<I2cAddress>>(
         &mut self,
         address: A,
         buffer: &mut [u8],
@@ -994,7 +994,7 @@ impl<'d> I2c<'d, Async> {
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// passed buffer has zero length.
-    pub async fn write_read<A: Into<I2cAddress>>(
+    pub async fn write_read_async<A: Into<I2cAddress>>(
         &mut self,
         address: A,
         write_buffer: &[u8],
@@ -1039,7 +1039,7 @@ impl<'d> I2c<'d, Async> {
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// buffer passed to an [`Operation`] has zero length.
-    pub async fn transaction<'a, A: Into<I2cAddress>>(
+    pub async fn transaction_async<'a, A: Into<I2cAddress>>(
         &mut self,
         address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,

@@ -44,7 +44,9 @@ async fn main(_spawner: Spawner) {
 
     loop {
         let mut data = [0u8; 22];
-        i2c.write_read(0x77, &[0xaa], &mut data).await.unwrap();
+        i2c.write_read_async(0x77, &[0xaa], &mut data)
+            .await
+            .unwrap();
         esp_println::println!("direct:       {:02x?}", data);
         read_data(&mut i2c).await;
         Timer::after(Duration::from_millis(1000)).await;
