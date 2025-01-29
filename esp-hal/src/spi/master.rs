@@ -704,7 +704,8 @@ impl<'d> Spi<'d, Async> {
             return Ok(());
         }
 
-        SpiFuture::new(&driver).await;
+        let future = SpiFuture::setup(&driver).await;
+        future.await;
 
         Ok(())
     }
@@ -3270,10 +3271,11 @@ impl Driver {
 
     /// Starts the operation and waits for it to complete.
     async fn execute_operation_async(&self) {
-        self.enable_listen(SpiInterrupt::TransferDone.into(), false);
-        self.clear_interrupts(SpiInterrupt::TransferDone.into());
+        // On ESP32, the interrupt seems to not fire in specific circumstances, when
+        // `listen` is called after `start_operation`. Let's call it before, to be sure.
+        let future = SpiFuture::setup(self).await;
         self.start_operation();
-        SpiFuture::new(self).await;
+        future.await;
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -3576,8 +3578,13 @@ struct SpiFuture<'a> {
 }
 
 impl<'a> SpiFuture<'a> {
-    pub fn new(driver: &'a Driver) -> Self {
-        Self { driver }
+    fn setup(driver: &'a Driver) -> impl Future<Output = Self> {
+        core::future::poll_fn(move |cx| {
+            driver.state.waker.register(cx.waker());
+            driver.clear_interrupts(SpiInterrupt::TransferDone.into());
+            driver.enable_listen(SpiInterrupt::TransferDone.into(), true);
+            Poll::Ready(Self { driver })
+        })
     }
 }
 
@@ -3590,7 +3597,7 @@ use core::{
 impl Future for SpiFuture<'_> {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         if self
             .driver
             .interrupts()
@@ -3601,9 +3608,6 @@ impl Future for SpiFuture<'_> {
             return Poll::Ready(());
         }
 
-        self.driver.state.waker.register(cx.waker());
-        self.driver
-            .enable_listen(SpiInterrupt::TransferDone.into(), true);
         Poll::Pending
     }
 }
