@@ -437,6 +437,11 @@ where
     /// Reconfigures the ADC driver to operate in asynchronous mode.
     pub fn into_async(mut self) -> Adc<'d, ADCI, Async> {
         self.set_interrupt_handler(asynch::adc_interrupt_handler);
+
+        // Reset interrupt flags and disable oneshot reading to normalize state before
+        // entering async mode, otherwise there can be '0' readings, happening initially using ADC2
+        ADCI::reset();
+
         Adc {
             _adc: self._adc,
             attenuations: self.attenuations,
@@ -664,8 +669,6 @@ where
             panic!("Channel {} is not configured reading!", channel);
         }
 
-        let adc_ready_future = AdcFuture::new(self);
-
         // Set ADC unit calibration according used scheme for pin
         ADCI::set_init_code(pin.cal_scheme.adc_cal());
 
@@ -674,6 +677,7 @@ where
         ADCI::start_onetime_sample();
 
         // Wait for ADC to finish conversion and get value
+        let adc_ready_future = AdcFuture::new(self);
         adc_ready_future.await;
         let converted_value = ADCI::read_data();
 
@@ -699,24 +703,16 @@ where
 pub(crate) mod asynch {
     use core::{
         marker::PhantomData,
-        sync::atomic::Ordering,
-        task::Poll
+        task::Poll,
+        pin::Pin,
+        task::Context
     };
-    use portable_atomic::AtomicBool;
     use procmacros::handler;
     use crate::{
-        peripherals::APB_SARADC,
         asynch::AtomicWaker,
-        analog::adc::Adc,
-        Async
+        Async,
+        peripherals::APB_SARADC,
     };
-
-    static ADC1_DONE_WAKER: AtomicWaker = AtomicWaker::new();
-    static ADC1_DONE_SIGNAL: AtomicBool = AtomicBool::new(false);
-    #[cfg(esp32c3)]
-    static ADC2_DONE_WAKER: AtomicWaker = AtomicWaker::new();
-    #[cfg(esp32c3)]
-    static ADC2_DONE_SIGNAL: AtomicBool = AtomicBool::new(false);
 
     #[handler]
     pub(crate) fn adc_interrupt_handler() {
@@ -724,36 +720,19 @@ pub(crate) mod asynch {
         let interrupt_status = saradc.int_st().read();
 
         if interrupt_status.adc1_done().bit_is_set() {
-            ADC1_DONE_SIGNAL.store(true, Ordering::Relaxed);
-            saradc.int_clr().write(|w| {
-                w.adc1_done().clear_bit_by_one()
-            });
-            ADC1_DONE_WAKER.wake();
+            handle_async(crate::peripherals::ADC1)
         }
 
         #[cfg(esp32c3)]
         if interrupt_status.adc2_done().bit_is_set() {
-            ADC2_DONE_SIGNAL.store(true, Ordering::Relaxed);
-            saradc.int_clr().write(|w| {
-                w.adc2_done().clear_bit_by_one()
-            });
-            ADC2_DONE_WAKER.wake();
+            handle_async(crate::peripherals::ADC2)
         }
     }
 
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct AdcFuture<ADCI: AsyncAccess> {
-        _phantom: PhantomData<ADCI>,
+    fn handle_async<ADCI: AsyncAccess>(_instance: ADCI) {
+        ADCI::waker().wake();
+        ADCI::disable_interrupt();
     }
-
-    impl<ADCI: AsyncAccess> AdcFuture<ADCI> {
-        pub fn new(_instance: &Adc<'_, ADCI, Async>) -> Self {
-            ADCI::signal().store(false, Ordering::Relaxed);
-            ADCI::enable_interrupt();
-            Self { _phantom: PhantomData }
-        }
-    }
-
 
     #[doc(hidden)]
     pub trait AsyncAccess {
@@ -763,14 +742,11 @@ pub(crate) mod asynch {
         /// Disable the ADC interrupt
         fn disable_interrupt();
 
+        /// Clear the ADC interrupt
+        fn clear_interrupt();
+
         /// Obtain the waker for the ADC interrupt
         fn waker() -> &'static AtomicWaker;
-
-        /// Obtain the signal for the ADC interrupt
-        fn signal() -> &'static AtomicBool;
-
-        /// Check if the ADC data is ready
-        fn is_data_ready() -> bool;
     }
 
     impl AsyncAccess for crate::peripherals::ADC1 {
@@ -782,21 +758,20 @@ pub(crate) mod asynch {
             APB_SARADC::regs().int_ena().modify(|_, w| w.adc1_done().clear_bit());
         }
 
+        fn clear_interrupt() {
+            APB_SARADC::regs().int_clr().write(|w| w.adc1_done().clear_bit_by_one());
+        }
+
         fn waker() -> &'static AtomicWaker {
-            &ADC1_DONE_WAKER
-        }
+            static WAKER: AtomicWaker = AtomicWaker::new();
 
-        fn signal() -> &'static AtomicBool {
-            &ADC1_DONE_SIGNAL
-        }
-
-        fn is_data_ready() -> bool {
-            Self::signal().load(Ordering::Acquire)
+            &WAKER
         }
     }
 
     #[cfg(esp32c3)]
     impl AsyncAccess for crate::peripherals::ADC2 {
+
         fn enable_interrupt() {
             APB_SARADC::regs().int_ena().modify(|_, w| w.adc2_done().set_bit());
         }
@@ -805,28 +780,40 @@ pub(crate) mod asynch {
             APB_SARADC::regs().int_ena().modify(|_, w| w.adc2_done().clear_bit());
         }
 
+        fn clear_interrupt() {
+            APB_SARADC::regs().int_clr().write(|w| w.adc2_done().clear_bit_by_one());
+        }
+
         fn waker() -> &'static AtomicWaker {
-            &ADC2_DONE_WAKER
-        }
+            static WAKER: AtomicWaker = AtomicWaker::new();
 
-        fn signal() -> &'static AtomicBool {
-            &ADC2_DONE_SIGNAL
-        }
-
-        fn is_data_ready() -> bool {
-            Self::signal().load(Ordering::Acquire)
+            &WAKER
         }
     }
 
-    impl<ADCI: AsyncAccess> core::future::Future for AdcFuture<ADCI> {
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub(crate) struct AdcFuture<ADCI: AsyncAccess> {
+        phantom: PhantomData<ADCI>,
+    }
+
+    impl<ADCI: AsyncAccess> AdcFuture<ADCI> {
+        pub fn new(_self: &super::Adc<'_, ADCI, Async>) -> Self {
+            Self {
+                phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<ADCI: AsyncAccess + super::RegisterAccess> core::future::Future for AdcFuture<ADCI> {
         type Output = ();
 
-        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>) -> core::task::Poll<Self::Output> {
-            ADCI::waker().register(cx.waker());
-
-            if ADCI::is_data_ready() {
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            if ADCI::is_done() {
+                ADCI::clear_interrupt();
                 Poll::Ready(())
             } else {
+                ADCI::waker().register(cx.waker());
+                ADCI::enable_interrupt();
                 Poll::Pending
             }
         }

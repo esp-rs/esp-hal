@@ -23,15 +23,30 @@ async fn main(_spawner: Spawner) {
     esp_hal_embassy::init(timg0.timer0);
 
     let mut adc1_config = AdcConfig::new();
-    let analog_pin = peripherals.GPIO5;
-    let mut pin = adc1_config.enable_pin(analog_pin, Attenuation::_11dB);
+    let analog_pin1 = peripherals.GPIO4;
+    let mut pin1 = adc1_config.enable_pin(analog_pin1, Attenuation::_11dB);
     let mut adc1 = Adc::new(peripherals.ADC1, adc1_config).into_async();
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32c3")] {
+            let mut adc2_config = AdcConfig::new();
+            let analog_pin2 = peripherals.GPIO5;
+            let mut pin2 = adc2_config.enable_pin(analog_pin2, Attenuation::_11dB);
+            let mut adc2 = Adc::new(peripherals.ADC2, adc2_config).into_async();
+        }
+    }
 
     let delay = Delay::new();
 
     loop {
-        let adc_value: u16 = adc1.read_oneshot(&mut pin).await;
-        println!("ADC value: {}", adc_value);
+        let adc1_value: u16 = adc1.read_oneshot(&mut pin1).await;
+        println!("ADC1 value: {}", adc1_value);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32c3")] {
+                let adc2_value: u16 = adc2.read_oneshot(&mut pin2).await;
+                println!("ADC2 value: {}", adc2_value);
+            }
+        }
         delay.delay_millis(1000);
     }
 }
