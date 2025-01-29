@@ -534,6 +534,7 @@ where
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     pub fn new(
         spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
         config: Config,
@@ -658,6 +659,11 @@ impl<'d> Spi<'d, Blocking> {
     ///
     /// You can restore the default/unhandled interrupt handler by using
     /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+    ///
+    /// # Panics
+    ///
+    /// Panics if passed interrupt handler is invalid (e.g. has priority
+    /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         let interrupt = self.driver().info.interrupt;
@@ -843,6 +849,7 @@ where
     }
 
     /// Change the bus configuration.
+    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
@@ -928,6 +935,12 @@ where
     Dm: DriverMode,
 {
     /// Half-duplex read.
+    ///
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if
+    /// passed buffer is bigger than FIFO size or if buffer is empty (currently
+    /// unsupported).
     #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
@@ -962,6 +975,15 @@ where
     }
 
     /// Half-duplex write.
+    ///
+    /// # Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if
+    /// passed buffer is bigger than FIFO size.
+    #[cfg_attr(
+        esp32,
+        doc = "Dummy phase configuration is currently not supported, only value `0` is valid (see issue [#2240](https://github.com/esp-rs/esp-hal/issues/2240))."
+    )]
     #[instability::unstable]
     pub fn half_duplex_write(
         &mut self,
@@ -1402,6 +1424,7 @@ mod dma {
         }
 
         /// Change the bus configuration.
+        // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.driver().apply_config(config)
@@ -1864,6 +1887,7 @@ mod dma {
         }
 
         /// Change the bus configuration.
+        // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.spi_dma.apply_config(config)

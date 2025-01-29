@@ -216,3 +216,12 @@ let mut rng = Rng::new(peripherals.RNG);
 let mut buf = [0u8, 4];
 rng.try_fill_bytes(&mut buf).unwrap();
 ```
+
+## I2C Changes
+
+All async functions now include the `_async` postfix. Additionally the non-async functions are now available in async-mode.
+
+```diff
+- let result = i2c.write_read(0x77, &[0xaa], &mut data).await;
++ let result = i2c.write_read_async(0x77, &[0xaa], &mut data).await;
+```

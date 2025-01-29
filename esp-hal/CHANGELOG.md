@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
 
+- I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
+
 ### Fixed
 
 - `DmaDescriptor` is now `#[repr(C)]` (#2988)

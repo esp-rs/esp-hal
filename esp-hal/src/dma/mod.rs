@@ -2938,7 +2938,6 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            self.tx.waker().register(cx.waker());
             if self.tx.is_done() {
                 self.tx.clear_interrupts();
                 Poll::Ready(Ok(()))
@@ -2950,6 +2949,7 @@ pub(crate) mod asynch {
                 self.tx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.tx.waker().register(cx.waker());
                 self.tx
                     .listen_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
                 Poll::Pending
@@ -2994,7 +2994,6 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            self.rx.waker().register(cx.waker());
             if self.rx.is_done() {
                 self.rx.clear_interrupts();
                 Poll::Ready(Ok(()))
@@ -3006,6 +3005,7 @@ pub(crate) mod asynch {
                 self.rx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.rx.waker().register(cx.waker());
                 self.rx.listen_in(
                     DmaRxInterrupt::SuccessfulEof
                         | DmaRxInterrupt::DescriptorError
@@ -3060,7 +3060,6 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            self.tx.waker().register(cx.waker());
             if self
                 .tx
                 .pending_out_interrupts()
@@ -3076,6 +3075,7 @@ pub(crate) mod asynch {
                 self.tx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.tx.waker().register(cx.waker());
                 self.tx
                     .listen_out(DmaTxInterrupt::Done | DmaTxInterrupt::DescriptorError);
                 Poll::Pending
@@ -3124,7 +3124,6 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            self.rx.waker().register(cx.waker());
             if self
                 .rx
                 .pending_in_interrupts()
@@ -3140,6 +3139,7 @@ pub(crate) mod asynch {
                 self.rx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.rx.waker().register(cx.waker());
                 self.rx.listen_in(
                     DmaRxInterrupt::Done
                         | DmaRxInterrupt::DescriptorError
