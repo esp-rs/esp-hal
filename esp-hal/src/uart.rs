@@ -1305,7 +1305,6 @@ impl Uart<'_, Blocking> {
     }
 }
 
-#[instability::unstable]
 impl<Dm> ufmt_write::uWrite for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -1323,7 +1322,6 @@ where
     }
 }
 
-#[instability::unstable]
 impl<Dm> ufmt_write::uWrite for UartTx<'_, Dm>
 where
     Dm: DriverMode,

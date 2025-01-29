@@ -505,7 +505,6 @@ where
     }
 }
 
-#[instability::unstable]
 impl<Dm> ufmt_write::uWrite for UsbSerialJtag<'_, Dm>
 where
     Dm: DriverMode,
@@ -523,7 +522,6 @@ where
     }
 }
 
-#[instability::unstable]
 impl<Dm> ufmt_write::uWrite for UsbSerialJtagTx<'_, Dm>
 where
     Dm: DriverMode,
