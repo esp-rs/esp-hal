@@ -319,21 +319,34 @@ impl Clocks {
     #[cfg(systimer)]
     #[inline]
     pub(crate) fn xtal_freq() -> Rate {
-        if let Some(clocks) = Self::try_get() {
-            clocks.xtal_clock
-        } else {
-            Self::measure_xtal_frequency().frequency()
+        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
+            if let Some(clocks) = Self::try_get() {
+                return clocks.xtal_clock;
+            }
         }
+
+        Self::measure_xtal_frequency().frequency()
     }
 }
 
 #[cfg(esp32)]
 impl Clocks {
     fn measure_xtal_frequency() -> XtalClock {
-        if RtcClock::estimate_xtal_frequency() > 33 {
-            XtalClock::_40M
+        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
+            if RtcClock::estimate_xtal_frequency() > 33 {
+                XtalClock::_40M
+            } else {
+                XtalClock::_26M
+            }
         } else {
-            XtalClock::_26M
+            const {
+                match esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY").as_bytes() {
+                    b"auto" => XtalClock::Other(0),
+                    b"26" => XtalClock::_26M,
+                    b"40" => XtalClock::_40M,
+                    other => XtalClock::Other(esp_config::esp_config_int_parse!(u32, other)),
+                }
+            }
         }
     }
 
@@ -370,10 +383,21 @@ impl Clocks {
 #[cfg(esp32c2)]
 impl Clocks {
     fn measure_xtal_frequency() -> XtalClock {
-        if RtcClock::estimate_xtal_frequency() > 33 {
-            XtalClock::_40M
+        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
+            if RtcClock::estimate_xtal_frequency() > 33 {
+                XtalClock::_40M
+            } else {
+                XtalClock::_26M
+            }
         } else {
-            XtalClock::_26M
+            const {
+                match esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY").as_bytes() {
+                    b"auto" => XtalClock::Other(0),
+                    b"26" => XtalClock::_26M,
+                    b"40" => XtalClock::_40M,
+                    other => XtalClock::Other(esp_config::esp_config_int_parse!(u32, other)),
+                }
+            }
         }
     }
 
