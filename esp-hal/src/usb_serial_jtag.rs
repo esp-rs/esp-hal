@@ -628,13 +628,11 @@ where
 static WAKER_TX: AtomicWaker = AtomicWaker::new();
 static WAKER_RX: AtomicWaker = AtomicWaker::new();
 
-#[instability::unstable]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagWriteFuture<'d> {
     peripheral: PeripheralRef<'d, USB_DEVICE>,
 }
 
-#[instability::unstable]
 impl<'d> UsbSerialJtagWriteFuture<'d> {
     fn new(peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         crate::into_ref!(peripheral);
@@ -658,7 +656,6 @@ impl<'d> UsbSerialJtagWriteFuture<'d> {
     }
 }
 
-#[instability::unstable]
 impl core::future::Future for UsbSerialJtagWriteFuture<'_> {
     type Output = ();
 
@@ -675,13 +672,11 @@ impl core::future::Future for UsbSerialJtagWriteFuture<'_> {
     }
 }
 
-#[instability::unstable]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagReadFuture<'d> {
     peripheral: PeripheralRef<'d, USB_DEVICE>,
 }
 
-#[instability::unstable]
 impl<'d> UsbSerialJtagReadFuture<'d> {
     fn new(peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
         crate::into_ref!(peripheral);
@@ -695,7 +690,6 @@ impl<'d> UsbSerialJtagReadFuture<'d> {
         Self { peripheral }
     }
 
-    #[instability::unstable]
     fn event_bit_is_clear(&self) -> bool {
         self.peripheral
             .register_block()
@@ -706,7 +700,6 @@ impl<'d> UsbSerialJtagReadFuture<'d> {
     }
 }
 
-#[instability::unstable]
 impl core::future::Future for UsbSerialJtagReadFuture<'_> {
     type Output = ();
 
@@ -741,7 +734,6 @@ impl<'d> UsbSerialJtag<'d, Async> {
     }
 }
 
-#[instability::unstable]
 impl UsbSerialJtagTx<'_, Async> {
     async fn write_bytes_async(&mut self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(64) {
@@ -773,7 +765,6 @@ impl UsbSerialJtagTx<'_, Async> {
     }
 }
 
-#[instability::unstable]
 impl UsbSerialJtagRx<'_, Async> {
     async fn read_bytes_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if buf.is_empty() {

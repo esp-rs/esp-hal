@@ -2278,7 +2278,6 @@ mod dma {
             }
         }
 
-        #[instability::unstable]
         impl SpiDmaBus<'_, Async> {
             /// Fill the given buffer with data from the bus.
             #[instability::unstable]

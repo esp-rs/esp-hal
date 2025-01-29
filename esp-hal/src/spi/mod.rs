@@ -40,7 +40,7 @@ pub enum Error {
 }
 
 #[doc(hidden)]
-#[instability::unstable]
+#[cfg(feature = "unstable")]
 impl From<DmaError> for Error {
     fn from(value: DmaError) -> Self {
         Error::DmaError(value)
