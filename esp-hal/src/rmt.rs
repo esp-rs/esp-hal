@@ -324,19 +324,19 @@ impl PulseCode for u32 {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TxChannelConfig {
     /// Channel's clock divider
-    pub clk_divider: u8,
+    clk_divider: u8,
     /// Set the idle output level to low/high
-    pub idle_output_level: Level,
+    idle_output_level: Level,
     /// Enable idle output
-    pub idle_output: bool,
+    idle_output: bool,
     /// Enable carrier modulation
-    pub carrier_modulation: bool,
+    carrier_modulation: bool,
     /// Carrier high phase in ticks
-    pub carrier_high: u16,
+    carrier_high: u16,
     /// Carrier low phase in ticks
-    pub carrier_low: u16,
+    carrier_low: u16,
     /// Level of the carrier
-    pub carrier_level: Level,
+    carrier_level: Level,
 }
 
 impl Default for TxChannelConfig {
@@ -358,19 +358,19 @@ impl Default for TxChannelConfig {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxChannelConfig {
     /// Channel's clock divider
-    pub clk_divider: u8,
+    clk_divider: u8,
     /// Enable carrier demodulation
-    pub carrier_modulation: bool,
+    carrier_modulation: bool,
     /// Carrier high phase in ticks
-    pub carrier_high: u16,
+    carrier_high: u16,
     /// Carrier low phase in ticks
-    pub carrier_low: u16,
+    carrier_low: u16,
     /// Level of the carrier
-    pub carrier_level: Level,
+    carrier_level: Level,
     /// Filter threshold in ticks
-    pub filter_threshold: u8,
+    filter_threshold: u8,
     /// Idle threshold in ticks
-    pub idle_threshold: u16,
+    idle_threshold: u16,
 }
 
 impl Default for RxChannelConfig {

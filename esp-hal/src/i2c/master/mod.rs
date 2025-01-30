@@ -396,10 +396,10 @@ impl From<Ack> for u32 {
 #[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
-    pub frequency: HertzU32,
+    frequency: HertzU32,
 
     /// I2C SCL timeout period.
-    pub timeout: BusTimeout,
+    timeout: BusTimeout,
 }
 
 impl core::hash::Hash for Config {
@@ -1399,17 +1399,7 @@ impl Driver<'_> {
         set_filter(self.regs(), Some(7), Some(7));
 
         // Configure frequency
-        let clocks = Clocks::get();
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                let clock = clocks.i2c_clock.convert();
-            } else if #[cfg(esp32s2)] {
-                let clock = clocks.apb_clock.convert();
-            } else {
-                let clock = clocks.xtal_clock.convert();
-            }
-        }
-        self.set_frequency(clock, config.frequency, config.timeout)?;
+        self.set_frequency(config, config.timeout)?;
 
         self.update_config();
 
@@ -1451,14 +1441,10 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(
-        &self,
-        source_clk: HertzU32,
-        bus_freq: HertzU32,
-        timeout: BusTimeout,
-    ) -> Result<(), ConfigError> {
-        let source_clk = source_clk.raw();
-        let bus_freq = bus_freq.raw();
+    fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
+        let clocks = Clocks::get();
+        let source_clk = clocks.i2c_clock.raw();
+        let bus_freq = clock_config.frequency.raw();
 
         let half_cycle: u32 = source_clk / bus_freq / 2;
         let scl_low = half_cycle;
@@ -1533,14 +1519,10 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(
-        &self,
-        source_clk: HertzU32,
-        bus_freq: HertzU32,
-        timeout: BusTimeout,
-    ) -> Result<(), ConfigError> {
-        let source_clk = source_clk.raw();
-        let bus_freq = bus_freq.raw();
+    fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
+        let clocks = Clocks::get();
+        let source_clk = clocks.apb_clock.raw();
+        let bus_freq = clock_config.frequency.raw();
 
         let half_cycle: u32 = source_clk / bus_freq / 2;
         // SCL
@@ -1595,14 +1577,10 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(
-        &self,
-        source_clk: HertzU32,
-        bus_freq: HertzU32,
-        timeout: BusTimeout,
-    ) -> Result<(), ConfigError> {
-        let source_clk = source_clk.raw();
-        let bus_freq = bus_freq.raw();
+    fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
+        let clocks = Clocks::get();
+        let source_clk = clocks.xtal_clock.raw();
+        let bus_freq = clock_config.frequency.raw();
 
         let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
         let sclk_freq: u32 = source_clk / clkm_div;
