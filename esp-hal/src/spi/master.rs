@@ -432,7 +432,16 @@ pub enum ClockSource {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
-    /// The saved register value, calculated when first needed.
+    /// The precomputed clock configuration register value.
+    ///
+    /// Clock divider calculations are relatively expensive, and the SPI
+    /// peripheral is commonly expected to be used in a shared bus
+    /// configuration, where different devices may need different bus clock
+    /// frequencies. To reduce the time required to reconfigure the bus, we
+    /// cache clock register's value here, for each configuration.
+    ///
+    /// This field is not intended to be set by the user, and is only used
+    /// internally.
     #[builder_lite(skip)]
     reg: Result<u32, ConfigError>,
 
