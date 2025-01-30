@@ -128,7 +128,7 @@ use crate::{
         OutputSignal,
         Pull,
     },
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     pac::twai0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralGuard,
@@ -203,8 +203,7 @@ impl_display! {
     Other => "A different error occurred. The original error may contain more information",
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl From<ErrorKind> for embedded_can::ErrorKind {
     fn from(value: ErrorKind) -> Self {
         match value {
@@ -219,8 +218,7 @@ impl From<ErrorKind> for embedded_can::ErrorKind {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_can::Error for ErrorKind {
     fn kind(&self) -> embedded_can::ErrorKind {
         (*self).into()
@@ -282,16 +280,14 @@ impl StandardId {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl From<StandardId> for embedded_can::StandardId {
     fn from(value: StandardId) -> Self {
         embedded_can::StandardId::new(value.as_raw()).unwrap()
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl From<embedded_can::StandardId> for StandardId {
     fn from(value: embedded_can::StandardId) -> Self {
         StandardId::new(value.as_raw()).unwrap()
@@ -346,16 +342,14 @@ impl ExtendedId {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl From<ExtendedId> for embedded_can::ExtendedId {
     fn from(value: ExtendedId) -> Self {
         embedded_can::ExtendedId::new(value.0).unwrap()
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl From<embedded_can::ExtendedId> for ExtendedId {
     fn from(value: embedded_can::ExtendedId) -> Self {
         ExtendedId::new(value.as_raw()).unwrap()
@@ -386,8 +380,7 @@ impl From<ExtendedId> for Id {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl From<Id> for embedded_can::Id {
     fn from(value: Id) -> Self {
         match value {
@@ -397,8 +390,7 @@ impl From<Id> for embedded_can::Id {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl From<embedded_can::Id> for Id {
     fn from(value: embedded_can::Id) -> Self {
         match value {
@@ -500,8 +492,7 @@ impl EspTwaiFrame {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_can::Frame for EspTwaiFrame {
     fn new(id: impl Into<embedded_can::Id>, data: &[u8]) -> Option<Self> {
         Self::new(id.into(), data)
@@ -981,6 +972,15 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
             _guard: self._guard,
         }
     }
+
+    /// Registers an interrupt handler for the TWAI peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.internal_set_interrupt_handler(handler);
+    }
 }
 
 impl<'d> TwaiConfiguration<'d, Async> {
@@ -1003,7 +1003,8 @@ impl<'d> TwaiConfiguration<'d, Async> {
 
 impl crate::private::Sealed for TwaiConfiguration<'_, Blocking> {}
 
-impl InterruptConfigurable for TwaiConfiguration<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for TwaiConfiguration<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.internal_set_interrupt_handler(handler);
     }
@@ -1216,8 +1217,7 @@ pub enum EspTwaiError {
     EmbeddedHAL(ErrorKind),
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_can::Error for EspTwaiError {
     fn kind(&self) -> embedded_can::ErrorKind {
         if let Self::EmbeddedHAL(kind) = self {
@@ -1260,7 +1260,7 @@ unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
+#[instability::unstable]
 impl<Dm> embedded_can::nb::Can for Twai<'_, Dm>
 where
     Dm: DriverMode,

@@ -2496,6 +2496,7 @@ where
     /// Sets the interrupt handler for RX and TX interrupts.
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.rx.set_interrupt_handler(handler);
         self.tx.set_interrupt_handler(handler);

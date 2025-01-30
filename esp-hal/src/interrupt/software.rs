@@ -56,6 +56,7 @@ pub struct SoftwareInterrupt<const NUM: u8>;
 
 impl<const NUM: u8> SoftwareInterrupt<NUM> {
     /// Sets the interrupt handler for this software-interrupt
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         let interrupt = match NUM {
             0 => crate::peripherals::Interrupt::FROM_CPU_INTR0,

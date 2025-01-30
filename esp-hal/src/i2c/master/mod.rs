@@ -27,8 +27,6 @@ use core::{
     task::{Context, Poll},
 };
 
-#[cfg(any(doc, feature = "unstable"))]
-use embassy_embedded_hal::SetConfig;
 use embedded_hal::i2c::Operation as EhalOperation;
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
@@ -43,7 +41,7 @@ use crate::{
         PinGuard,
         Pull,
     },
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     pac::i2c0::{RegisterBlock, COMD},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
@@ -449,9 +447,8 @@ pub struct I2c<'d, Dm: DriverMode> {
     scl_pin: PinGuard,
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<Dm: DriverMode> SetConfig for I2c<'_, Dm> {
+#[instability::unstable]
+impl<Dm: DriverMode> embassy_embedded_hal::SetConfig for I2c<'_, Dm> {
     type Config = Config;
     type ConfigError = ConfigError;
 
@@ -828,7 +825,8 @@ impl<'d> I2c<'d, Blocking> {
 
 impl private::Sealed for I2c<'_, Blocking> {}
 
-impl InterruptConfigurable for I2c<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for I2c<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.i2c.info().set_interrupt_handler(handler);
     }

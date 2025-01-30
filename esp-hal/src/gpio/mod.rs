@@ -56,8 +56,6 @@ use portable_atomic::{AtomicU32, Ordering};
 use procmacros::ram;
 use strum::EnumCount;
 
-#[cfg(feature = "unstable")]
-use crate::interrupt::InterruptConfigurable;
 #[cfg(any(lp_io, rtc_cntl))]
 use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
@@ -789,7 +787,7 @@ impl Io {
 impl crate::private::Sealed for Io {}
 
 #[instability::unstable]
-impl InterruptConfigurable for Io {
+impl crate::interrupt::InterruptConfigurable for Io {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
     }
