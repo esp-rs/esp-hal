@@ -1794,10 +1794,10 @@ pub mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            TX_WAKER.register(cx.waker());
             if Instance::is_tx_done_set() {
                 Poll::Ready(())
             } else {
+                TX_WAKER.register(cx.waker());
                 Instance::listen_tx_done();
                 Poll::Pending
             }
