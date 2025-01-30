@@ -1359,7 +1359,7 @@ pub trait RxChannel: RxChannelInternal {
     /// complete and get back the channel for further use.
     #![cfg_attr(
         not(any(esp32s3, esp32c3, esp32c6, esp32h2)),
-        doc = ""
+        doc = "The length of the received data cannot exceed the allocated RMT RAM."
     )]
     fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self>, Error>
     where
