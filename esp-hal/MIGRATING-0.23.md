@@ -200,3 +200,12 @@ The OutputOpenDrain driver has been removed. You can use `Output` instead with
          .with_drive_mode(DriveMode::OpenDrain),
  );
 ```
+
+## I2C Changes
+
+All async functions now include the `_async` postfix. Additionally the non-async functions are now available in async-mode.
+
+```diff
+- let result = i2c.write_read(0x77, &[0xaa], &mut data).await;
++ let result = i2c.write_read_async(0x77, &[0xaa], &mut data).await;
+```
