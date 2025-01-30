@@ -657,9 +657,6 @@ where
     /// This method takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
-    ///
-    /// TODO: This method does not handle concurrent reads to multiple channels
-    /// yet
     pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCI, CS>) -> u16
     where
         ADCI: asynch::AsyncAccess,
