@@ -243,7 +243,7 @@ esp-build    = { path = "../esp-build" }
 esp-metadata = { path = "../esp-metadata" }
 
 [features]
-default = ["defmt"]
+default = []
 unstable = ["esp-hal/unstable"]
 
 defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt"]
