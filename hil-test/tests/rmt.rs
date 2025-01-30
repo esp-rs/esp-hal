@@ -171,27 +171,34 @@ mod tests {
         let mut rcv_data: [u32; 105] = [PulseCode::empty(); 105];
 
         let mut tx_data = [PulseCode::empty(); 22];
-
         // Periodic data so we can be sure we aren't dropping bytes
         for i in 0..21 {
             tx_data[i] = PulseCode::new(Level::High, (i + 10) as u16, Level::Low, 50);
         }
 
-        let rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
-
-        // We use `transmit_continuously` here because the rx wait monopolizes
-        // a core and this lets us transmit more than the RMT buffer's
-        // worth of bytes using dedicated hardware
-        let tx_transaction = tx_channel.transmit_continuously(&tx_data).unwrap();
-
-        rx_transaction.wait().unwrap();
-        tx_transaction.stop().unwrap();
-
-        let mut expected_received = [PulseCode::empty(); 105];
+        let mut expected_received_data = [PulseCode::empty(); 105];
         for i in 0..105 {
-            expected_received[i] = tx_data[i % 21];
+            expected_received_data[i] = tx_data[i % 21];
         }
 
-        assert_eq!(rcv_data, expected_received);
+        let rx_transaction = rx_channel.receive(&mut rcv_data);
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))] {
+                // These chips support wrap RX mode, so should fill the
+                // `rcv_data` buffer with 5 copies of tx_data
+                let tx_transaction = tx_channel.transmit_continuously(&tx_data).unwrap();
+
+                rx_transaction.unwrap().wait().unwrap();
+                tx_transaction.stop().unwrap();
+
+                assert_eq!(rcv_data, expected_received_data);
+            } else {
+                // Chips which don't support wrap RX mode, so should error
+                // due to passing in a too-long array to `rx_channel.receive()`
+                assert!(rx_transaction.is_err());
+                assert!(matches!(rx_transaction, Err(Error::InvalidArgument)));
+            }
+        }
     }
 }

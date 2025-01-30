@@ -1353,6 +1353,11 @@ pub trait RxChannel: RxChannelInternal {
     where
         Self: Sized,
     {
+        #[cfg(not(any(esp32s3, esp32c3, esp32c6, esp32h2)))]
+        if data.len() > constants::RMT_CHANNEL_RAM_SIZE {
+            return Err(Error::InvalidArgument);
+        }
+
         Self::start_receive_raw();
 
         Ok(RxTransaction {
