@@ -43,6 +43,7 @@
 //! println!("Bluetooth enabled {}", Efuse::is_bluetooth_enabled());
 //! println!("Chip type {:?}", Efuse::chip_type());
 //! println!("Max CPU clock {:?}", Efuse::max_cpu_frequency());
+//! # Ok(())
 //! # }
 //! ```
 

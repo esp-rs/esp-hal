@@ -58,7 +58,7 @@
 //! # use crate::esp_hal::rmt::TxChannelCreator;
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
@@ -71,8 +71,8 @@
 //!             .with_carrier_high(1)
 //!             .with_carrier_low(1)
 //!             .with_carrier_level(Level::Low),
-//!     )
-//!     .unwrap();
+//!     )?;
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -86,14 +86,13 @@
 //! // Configure frequency based on chip type
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //!
 //! let tx_config = TxChannelConfig::default().with_clk_divider(255);
 //!
 //! let mut channel = rmt
 //!     .channel0
-//!     .configure(peripherals.GPIO4, tx_config)
-//!     .unwrap();
+//!     .configure(peripherals.GPIO4, tx_config)?;
 //!
 //! let delay = Delay::new();
 //!
@@ -102,8 +101,8 @@
 //! data[data.len() - 1] = PulseCode::empty();
 //!
 //! loop {
-//!     let transaction = channel.transmit(&data).unwrap();
-//!     channel = transaction.wait().unwrap();
+//!     let transaction = channel.transmit(&data)?;
+//!     channel = transaction.wait()?;
 //!     delay.delay_millis(500);
 //! }
 //! # }
@@ -127,22 +126,22 @@
 //! // Configure frequency based on chip type
 #![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
 #![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+//! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //!
 //! let rx_config = RxChannelConfig::default()
 //!     .with_clk_divider(1)
 //!     .with_idle_threshold(10000);
 #![cfg_attr(
     any(esp32, esp32s2),
-    doc = "let mut channel = rmt.channel0.configure(peripherals.GPIO4, rx_config).unwrap();"
+    doc = "let mut channel = rmt.channel0.configure(peripherals.GPIO4, rx_config)?;"
 )]
 #![cfg_attr(
     esp32s3,
-    doc = "let mut channel = rmt.channel7.configure(peripherals.GPIO4, rx_config).unwrap();"
+    doc = "let mut channel = rmt.channel7.configure(peripherals.GPIO4, rx_config)?;"
 )]
 #![cfg_attr(
     not(any(esp32, esp32s2, esp32s3)),
-    doc = "let mut channel = rmt.channel2.configure(peripherals.GPIO4, rx_config).unwrap();"
+    doc = "let mut channel = rmt.channel2.configure(peripherals.GPIO4, rx_config)?;"
 )]
 //! let delay = Delay::new();
 //! let mut data: [u32; 48] = [PulseCode::empty(); 48];
@@ -152,7 +151,7 @@
 //!         x.reset()
 //!     }
 //!
-//!     let transaction = channel.receive(&mut data).unwrap();
+//!     let transaction = channel.receive(&mut data)?;
 //!
 //!     // Simulate input
 //!     for i in 0u32..5u32 {

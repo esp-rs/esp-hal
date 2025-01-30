@@ -29,13 +29,13 @@
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-//! )
-//! .unwrap()
+//! )?
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
 //! .with_miso(miso)
 //! .with_cs(cs)
 //! .with_dma(dma_channel);
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -452,6 +452,7 @@ pub const CHUNK_SIZE: usize = 4092;
 /// // and TX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_buffers!(32000, 32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -475,6 +476,7 @@ macro_rules! dma_buffers {
 /// // and TX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_circular_buffers!(32000, 32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -498,6 +500,7 @@ macro_rules! dma_circular_buffers {
 /// // Create RX and TX descriptors for transactions up to 32000 bytes - passing
 /// // only one parameter assumes RX and TX are the same size.
 /// let (rx_descriptors, tx_descriptors) = dma_descriptors!(32000, 32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -522,6 +525,7 @@ macro_rules! dma_descriptors {
 /// // bytes - passing only one parameter assumes RX and TX are the same size.
 /// let (rx_descriptors, tx_descriptors) =
 ///     dma_circular_descriptors!(32000, 32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -571,6 +575,7 @@ pub use as_mut_byte_array; // TODO: can be removed as soon as DMA is stabilized
 /// // and RX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_buffers_chunk_size!(32000, 32000, 4032);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -596,6 +601,7 @@ macro_rules! dma_buffers_chunk_size {
 /// // and TX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_circular_buffers_chunk_size!(32000, 32000, 4032);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -620,6 +626,7 @@ macro_rules! dma_circular_buffers_chunk_size {
 /// // only one parameter assumes RX and TX are the same size.
 /// let (rx_descriptors, tx_descriptors) =
 ///     dma_descriptors_chunk_size!(32000, 32000, 4032);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -645,6 +652,7 @@ macro_rules! dma_descriptors_chunk_size {
 /// // only one parameter assumes RX and TX are the same size.
 /// let (rx_descriptors, tx_descriptors) =
 ///     dma_circular_descriptors_chunk_size!(32000, 32000, 4032);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -734,6 +742,7 @@ macro_rules! dma_descriptor_count {
 /// use esp_hal::dma_tx_buffer;
 ///
 /// let tx_buf = dma_tx_buffer!(32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -759,6 +768,7 @@ macro_rules! dma_tx_buffer {
 ///
 /// let buf = dma_rx_stream_buffer!(32000);
 /// let buf = dma_rx_stream_buffer!(32000, 1000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -782,6 +792,7 @@ macro_rules! dma_rx_stream_buffer {
 /// use esp_hal::dma_loop_buffer;
 ///
 /// let buf = dma_loop_buffer!(2000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -1690,10 +1701,10 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// let spi = Spi::new(
 ///     peripherals.SPI2,
 ///     Config::default(),
-/// )
-/// .unwrap();
+/// )?;
 ///
 /// let spi_dma = configures_spi_dma(spi, dma_channel);
+/// # Ok(())
 /// # }
 /// ```
 pub trait DmaChannelFor<P: DmaEligible>:

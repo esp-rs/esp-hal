@@ -49,7 +49,8 @@
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
-//! usb_serial.write_bytes(b"Hello, world!").expect("write error!");
+//! usb_serial.write_bytes(b"Hello, world!")?;
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -65,8 +66,9 @@
 //!
 //! // Each component can be used individually to interact with the USB
 //! // Serial/JTAG:
-//! tx.write_bytes(&[42u8]).expect("write error!");
-//! let byte = rx.read_byte().expect("read error!");
+//! tx.write_bytes(&[42u8])?;
+//! let byte = rx.read_byte()?;
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -85,14 +87,7 @@
 //! USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));
 //!
 //! loop {
-//!     critical_section::with(|cs| {
-//!         writeln!(
-//!             USB_SERIAL.borrow_ref_mut(cs).as_mut().unwrap(),
-//!             "Hello world!"
-//!         )
-//!         .ok();
-//!     });
-//!
+//!     println!("Send keystrokes to see the interrupt trigger");
 //!     delay.delay(1.secs());
 //! }
 //! # }
@@ -108,15 +103,15 @@
 //! fn usb_device() {
 //!     critical_section::with(|cs| {
 //!         let mut usb_serial = USB_SERIAL.borrow_ref_mut(cs);
-//!         let usb_serial = usb_serial.as_mut().unwrap();
+//!         if let Some(usb_serial) = usb_serial.as_mut() {
+//!             println!("USB serial interrupt");
 //!
-//!         writeln!(usb_serial, "USB serial interrupt").unwrap();
+//!             while let nb::Result::Ok(c) = usb_serial.read_byte() {
+//!                 println!("Read byte: {:02x}", c);
+//!             }
 //!
-//!         while let nb::Result::Ok(c) = usb_serial.read_byte() {
-//!             writeln!(usb_serial, "Read byte: {:02x}", c).unwrap();
+//!             usb_serial.reset_rx_packet_recv_interrupt();
 //!         }
-//!
-//!         usb_serial.reset_rx_packet_recv_interrupt();
 //!     });
 //! }
 //! ```

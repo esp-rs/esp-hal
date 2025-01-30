@@ -42,8 +42,7 @@
 //!         duty: timer::config::Duty::Duty5Bit,
 //!         clock_source: timer::LSClockSource::APBClk,
 //!         frequency: 24.kHz(),
-//!     })
-//!     .unwrap();
+//!     })?;
 //!
 //! let mut channel0 = ledc.channel(channel::Number::Channel0, led);
 //! channel0
@@ -51,15 +50,14 @@
 //!         timer: &lstimer0,
 //!         duty_pct: 10,
 //!         pin_config: channel::config::PinConfig::PushPull,
-//!     })
-//!     .unwrap();
+//!     })?;
 //!
 //! loop {
 //!     // Set up a breathing LED: fade from off to on over a second, then
 //!     // from on back off over the next second.  Then loop.
-//!     channel0.start_duty_fade(0, 100, 1000).unwrap();
+//!     channel0.start_duty_fade(0, 100, 1000)?;
 //!     while channel0.is_duty_fade_running() {}
-//!     channel0.start_duty_fade(100, 0, 1000).unwrap();
+//!     channel0.start_duty_fade(100, 0, 1000)?;
 //!     while channel0.is_duty_fade_running() {}
 //! }
 //! # }

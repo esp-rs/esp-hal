@@ -55,14 +55,14 @@
 //!     .with_din(peripherals.GPIO5)
 //!     .build();
 //!
-//! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
+//! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer)?;
 //!
 //! loop {
-//!     let avail = transfer.available().unwrap();
+//!     let avail = transfer.available()?;
 //!
 //!     if avail > 0 {
 //!         let mut rcv = [0u8; 5000];
-//!         transfer.pop(&mut rcv[..avail]).unwrap();
+//!         transfer.pop(&mut rcv[..avail])?;
 //!     }
 //! }
 //! # }

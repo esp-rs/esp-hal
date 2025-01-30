@@ -26,7 +26,7 @@
 //!     .start_app_core(
 //!         unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
 //!         cpu1_fnctn
-//!     ).unwrap();
+//!     )?;
 //!
 //! loop {
 //!     delay.delay(1.secs());

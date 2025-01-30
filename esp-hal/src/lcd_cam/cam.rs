@@ -45,14 +45,14 @@
 //!     peripherals.DMA_CH0,
 //!     data_pins,
 //!     config,
-//! )
-//! .unwrap()
+//! )?
 //! .with_master_clock(mclk_pin) // Remove this for slave mode
 //! .with_pixel_clock(pclk_pin)
 //! .with_ctrl_pins(vsync_pin, href_pin);
 //!
-//! let transfer = camera.receive(dma_buf).map_err(|e| e.0).unwrap();
+//! let transfer = camera.receive(dma_buf).map_err(|e| e.0)?;
 //!
+//! # Ok(())
 //! # }
 //! ```
 

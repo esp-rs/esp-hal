@@ -31,9 +31,9 @@
 //! let mut pcnt = Pcnt::new(peripherals.PCNT);
 //! pcnt.set_interrupt_handler(interrupt_handler);
 //! let u0 = pcnt.unit1;
-//! u0.set_low_limit(Some(-100)).unwrap();
-//! u0.set_high_limit(Some(100)).unwrap();
-//! u0.set_filter(Some(min(10u16 * 80, 1023u16))).unwrap();
+//! u0.set_low_limit(Some(-100))?;
+//! u0.set_high_limit(Some(100))?;
+//! u0.set_filter(Some(min(10u16 * 80, 1023u16)))?;
 //! u0.clear();
 //!
 //! // Set up channels with control and edge signals
@@ -76,15 +76,16 @@
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
 //!         let mut u0 = UNIT0.borrow_ref_mut(cs);
-//!         let u0 = u0.as_mut().unwrap();
-//!         if u0.interrupt_is_set() {
-//!             let events = u0.events();
-//!             if events.high_limit {
-//!                 VALUE.fetch_add(100, Ordering::SeqCst);
-//!             } else if events.low_limit {
-//!                 VALUE.fetch_add(-100, Ordering::SeqCst);
+//!         if let Some(u0) = u0.as_mut() {
+//!             if u0.interrupt_is_set() {
+//!                 let events = u0.events();
+//!                 if events.high_limit {
+//!                     VALUE.fetch_add(100, Ordering::SeqCst);
+//!                 } else if events.low_limit {
+//!                     VALUE.fetch_add(-100, Ordering::SeqCst);
+//!                 }
+//!                 u0.reset_interrupt();
 //!             }
-//!             u0.reset_interrupt();
 //!         }
 //!     });
 //! }

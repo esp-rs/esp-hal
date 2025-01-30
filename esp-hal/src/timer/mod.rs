@@ -22,6 +22,7 @@
 //! let mut one_shot = OneShotTimer::new(timg0.timer0);
 //!
 //! one_shot.delay_millis(500);
+//! # Ok(())
 //! # }
 //! ```
 //! 

@@ -47,12 +47,11 @@
 //! # use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
 //! # let delay = Delay::new();
 //! # let config = Config::default().with_rx(
-//!     RxConfig::default().with_fifo_full_threshold(30)
-//! );
+//! #    RxConfig::default().with_fifo_full_threshold(30)
+//! # );
 //! # let mut uart0 = Uart::new(
 //! #    peripherals.UART0,
-//! #    config)
-//! # .unwrap();
+//! #    config)?;
 //! uart0.set_interrupt_handler(interrupt_handler);
 //!
 //! critical_section::with(|cs| {
@@ -63,14 +62,7 @@
 //! });
 //!
 //! loop {
-//!     critical_section::with(|cs| {
-//!         let mut serial = SERIAL.borrow_ref_mut(cs);
-//!         let serial = serial.as_mut().unwrap();
-//!         writeln!(serial,
-//!             "Hello World! Send a single `#` character or send
-//!                 at least 30 characters to trigger interrupts.")
-//!         .ok();
-//!     });
+//!     println!("Send `#` character or >=30 characters");
 //!     delay.delay(1.secs());
 //! }
 //! # }
@@ -87,24 +79,23 @@
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
 //!         let mut serial = SERIAL.borrow_ref_mut(cs);
-//!         let serial = serial.as_mut().unwrap();
+//!         if let Some(serial) = serial.as_mut() {
+//!             let mut buf = [0u8; 64];
+//!             if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
+//!                 println!("Read {} bytes", cnt);
+//!             }
 //!
-//!         let mut buf = [0u8; 64];
-//!         if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
-//!             writeln!(serial, "Read {} bytes", cnt).ok();
+//!             let pending_interrupts = serial.interrupts();
+//!             println!(
+//!                 "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
+//!                 pending_interrupts.contains(UartInterrupt::AtCmd),
+//!                 pending_interrupts.contains(UartInterrupt::RxFifoFull),
+//!             );
+//!
+//!             serial.clear_interrupts(
+//!                 UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
+//!             );
 //!         }
-//!
-//!         let pending_interrupts = serial.interrupts();
-//!         writeln!(
-//!             serial,
-//!             "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
-//!             pending_interrupts.contains(UartInterrupt::AtCmd),
-//!             pending_interrupts.contains(UartInterrupt::RxFifoFull),
-//!         ).ok();
-//!
-//!         serial.clear_interrupts(
-//!             UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
-//!         );
 //!     });
 //! }
 //! ```
@@ -644,9 +635,9 @@ impl<'d> UartTx<'d, Blocking> {
     /// # use esp_hal::uart::{Config, UartTx};
     /// let tx = UartTx::new(
     ///     peripherals.UART0,
-    ///     Config::default())
-    /// .unwrap()
+    ///     Config::default())?
     /// .with_tx(peripherals.GPIO1);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn new(
@@ -926,9 +917,9 @@ impl<'d> UartRx<'d, Blocking> {
     /// # use esp_hal::uart::{Config, UartRx};
     /// let rx = UartRx::new(
     ///     peripherals.UART1,
-    ///     Config::default())
-    /// .unwrap()
+    ///     Config::default())?
     /// .with_rx(peripherals.GPIO2);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn new(
@@ -983,10 +974,10 @@ impl<'d> Uart<'d, Blocking> {
     /// # use esp_hal::uart::{Config, Uart};
     /// let mut uart1 = Uart::new(
     ///     peripherals.UART1,
-    ///     Config::default())
-    /// .unwrap()
+    ///     Config::default())?
     /// .with_rx(peripherals.GPIO1)
     /// .with_tx(peripherals.GPIO2);
+    /// # Ok(())
     /// # }
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
@@ -1087,17 +1078,17 @@ where
     /// # use esp_hal::uart::{Config, Uart};
     /// # let mut uart1 = Uart::new(
     /// #     peripherals.UART1,
-    /// #     Config::default())
-    /// # .unwrap()
+    /// #     Config::default())?
     /// # .with_rx(peripherals.GPIO1)
     /// # .with_tx(peripherals.GPIO2);
     /// // The UART can be split into separate Transmit and Receive components:
     /// let (mut rx, mut tx) = uart1.split();
     ///
     /// // Each component can be used individually to interact with the UART:
-    /// tx.write_bytes(&[42u8]).expect("write error!");
+    /// tx.write_bytes(&[42u8])?;
     /// let mut byte = [0u8; 1];
     /// rx.read_bytes(&mut byte);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
@@ -1110,10 +1101,10 @@ where
     /// # use esp_hal::uart::{Config, Uart};
     /// # let mut uart1 = Uart::new(
     /// #     peripherals.UART1,
-    /// #     Config::default())
-    /// # .unwrap();
+    /// #     Config::default())?;
     /// // Write bytes out over the UART:
-    /// uart1.write_bytes(b"Hello, world!").expect("write error!");
+    /// uart1.write_bytes(b"Hello, world!")?;
+    /// # Ok(())
     /// # }
     /// ```
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {

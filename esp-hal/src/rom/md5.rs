@@ -34,6 +34,7 @@
 //! # let data = "Dummy";
 //! let d: md5::Digest = md5::compute(&data);
 //! println!("{}", d);
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -49,6 +50,7 @@
 //! ctx.consume(&data1);
 //! let d: md5::Digest = ctx.compute();
 //! println!("{}", d);
+//! # Ok(())
 //! # }
 //! ```
 //! 

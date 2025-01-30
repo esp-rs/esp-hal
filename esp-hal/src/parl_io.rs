@@ -40,8 +40,7 @@
 //!     dma_channel,
 //!     rx_descriptors,
 //!     1.MHz(),
-//! )
-//! .unwrap();
+//! )?;
 //!
 //! let mut parl_io_rx = parl_io
 //!     .rx
@@ -50,8 +49,7 @@
 //!         &mut rx_clk_pin,
 //!         BitPackOrder::Msb,
 //!         Some(0xfff),
-//!     )
-//!     .unwrap();
+//!     )?;
 //!
 //! // Initialize the buffer and delay
 //! let mut buffer = rx_buffer;
@@ -60,8 +58,8 @@
 //!
 //! loop {
 //!     // Read data via DMA and print received values
-//!     let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
-//!     transfer.wait().unwrap();
+//!     let transfer = parl_io_rx.read_dma(&mut buffer)?;
+//!     transfer.wait()?;
 //!
 //!     delay.delay_millis(500);
 //! }
@@ -96,8 +94,7 @@
 //!     dma_channel,
 //!     tx_descriptors,
 //!     1.MHz(),
-//! )
-//! .unwrap();
+//! )?;
 //!
 //! let mut clock_pin = ClkOutPin::new(peripherals.GPIO6);
 //! let mut parl_io_tx = parl_io
@@ -108,8 +105,7 @@
 //!         0,
 //!         SampleEdge::Normal,
 //!         BitPackOrder::Msb,
-//!     )
-//! .unwrap();
+//!     )?;
 //!
 //! let buffer = tx_buffer;
 //! for i in 0..buffer.len() {
@@ -118,8 +114,8 @@
 //!
 //! let delay = Delay::new();
 //! loop {
-//!     let transfer = parl_io_tx.write_dma(&buffer).unwrap();
-//!     transfer.wait().unwrap();
+//!     let transfer = parl_io_tx.write_dma(&buffer)?;
+//!     transfer.wait()?;
 //!     delay.delay_millis(500);
 //! }
 //! # }

@@ -40,6 +40,7 @@
 //! aes.process(&mut block, Mode::Decryption128, keybuf);
 //!
 //! // The decryption happens in-place, so the plaintext is in `block`
+//! # Ok(())
 //! # }
 //! ```
 //! 
