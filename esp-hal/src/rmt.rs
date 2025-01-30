@@ -1357,6 +1357,10 @@ pub trait RxChannel: RxChannelInternal {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
+    #![cfg_attr(
+        not(any(esp32s3, esp32c3, esp32c6, esp32h2)),
+        doc = ""
+    )]
     fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self>, Error>
     where
         Self: Sized,
@@ -2138,7 +2142,6 @@ mod chip_specific {
                             rmt.ch_rx_lim($ch_index)
                                 .modify(|_, w| unsafe {w.rx_lim().bits(threshold as u16) });
                         } else {
-                            #[cfg(any(esp32c6, esp32h2))]
                             rmt.ch_rx_lim($ch_index)
                                 .modify(|_, w| unsafe {w.rmt_rx_lim().bits(threshold as u16) });
                         }
