@@ -585,6 +585,14 @@ impl Config {
     fn raw_clock_reg_value(&self) -> Result<u32, ConfigError> {
         self.reg
     }
+
+    fn validate(&self) -> Result<(), ConfigError> {
+        // Max supported frequency is 80Mhz
+        if self.frequency > HertzU32::MHz(80) {
+            return Err(ConfigError::UnsupportedFrequency);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -602,7 +610,22 @@ struct SpiPinGuard {
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum ConfigError {}
+pub enum ConfigError {
+    /// The requested frequency is not supported.
+    UnsupportedFrequency,
+}
+
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ConfigError::UnsupportedFrequency => {
+                write!(f, " The requested frequency is not supported")
+            }
+        }
+    }
+}
 
 /// SPI peripheral driver
 ///
@@ -983,6 +1006,10 @@ where
     }
 
     /// Change the bus configuration.
+    ///
+    /// # Errors.
+    /// If frequency passed in config exceeds 80Mhz, a corresponding
+    /// [`ConfigError`] variant will be returned.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
@@ -1554,6 +1581,10 @@ mod dma {
         }
 
         /// Change the bus configuration.
+        ///
+        /// # Errors.
+        /// If frequency passed in config exceeds 80Mhz, a corresponding
+        /// [`ConfigError`] variant will be returned.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.driver().apply_config(config)
@@ -2016,6 +2047,10 @@ mod dma {
         }
 
         /// Change the bus configuration.
+        ///
+        /// # Errors.
+        /// If frequency passed in config exceeds 80Mhz, a corresponding
+        /// [`ConfigError`] variant will be returned.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.spi_dma.apply_config(config)
@@ -3062,6 +3097,7 @@ impl Driver {
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
+        config.validate()?;
         self.ch_bus_freq(config)?;
         self.set_bit_order(config.read_bit_order, config.write_bit_order);
         self.set_data_mode(config.mode);
