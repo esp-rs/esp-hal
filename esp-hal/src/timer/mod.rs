@@ -22,6 +22,7 @@
 //! let mut one_shot = OneShotTimer::new(timg0.timer0);
 //!
 //! one_shot.delay_millis(500);
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -249,6 +250,7 @@ where
     /// Set the interrupt handler
     ///
     /// Note that this will replace any previously set interrupt handler
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }
@@ -344,6 +346,7 @@ where
     /// Set the interrupt handler
     ///
     /// Note that this will replace any previously set interrupt handler
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }

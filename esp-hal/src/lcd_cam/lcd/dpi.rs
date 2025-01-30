@@ -30,36 +30,36 @@
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
-//! let mut config = dpi::Config::default();
-//! config.frequency = 1.MHz();
-//! config.clock_mode = ClockMode {
-//!     polarity: Polarity::IdleLow,
-//!     phase: Phase::ShiftLow,
-//! };
-//! config.format = Format {
-//!     enable_2byte_mode: true,
-//!     ..Default::default()
-//! };
-//! config.timing = FrameTiming {
-//!     horizontal_active_width: 480,
-//!     horizontal_total_width: 520,
-//!     horizontal_blank_front_porch: 10,
+//! let config = dpi::Config::default()
+//!     .with_frequency(1.MHz())
+//!     .with_clock_mode(ClockMode {
+//!         polarity: Polarity::IdleLow,
+//!         phase: Phase::ShiftLow,
+//!     })
+//!     .with_format(Format {
+//!         enable_2byte_mode: true,
+//!         ..Default::default()
+//!     })
+//!     .with_timing(FrameTiming {
+//!         horizontal_active_width: 480,
+//!         horizontal_total_width: 520,
+//!         horizontal_blank_front_porch: 10,
 //!
-//!     vertical_active_height: 480,
-//!     vertical_total_height: 510,
-//!     vertical_blank_front_porch: 10,
+//!         vertical_active_height: 480,
+//!         vertical_total_height: 510,
+//!         vertical_blank_front_porch: 10,
 //!
-//!     hsync_width: 10,
-//!     vsync_width: 10,
+//!         hsync_width: 10,
+//!         vsync_width: 10,
 //!
-//!     hsync_position: 0,
-//! };
-//! config.vsync_idle_level = Level::High;
-//! config.hsync_idle_level = Level::High;
-//! config.de_idle_level = Level::Low;
-//! config.disable_black_region = false;
+//!         hsync_position: 0,
+//!     })
+//!     .with_vsync_idle_level(Level::High)
+//!     .with_hsync_idle_level(Level::High)
+//!     .with_de_idle_level(Level::Low)
+//!     .with_disable_black_region(false);
 //!
-//! let mut dpi = Dpi::new(lcd_cam.lcd, channel, config).unwrap()
+//! let mut dpi = Dpi::new(lcd_cam.lcd, channel, config)?
 //!     .with_vsync(peripherals.GPIO3)
 //!     .with_hsync(peripherals.GPIO46)
 //!     .with_de(peripherals.GPIO17)
@@ -89,8 +89,9 @@
 //!     chunk.copy_from_slice(&color.to_le_bytes());
 //! }
 //!
-//! let transfer = dpi.send(false, dma_buf).map_err(|e| e.0).unwrap();
+//! let transfer = dpi.send(false, dma_buf).map_err(|e| e.0)?;
 //! transfer.wait();
+//! # Ok(())
 //! # }
 //! ```
 
@@ -694,46 +695,46 @@ impl<BUF: DmaTxBuffer, Dm: DriverMode> Drop for DpiTransfer<'_, BUF, Dm> {
 
 /// Configuration settings for the RGB/DPI interface.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// Specifies the clock mode, including polarity and phase settings.
-    pub clock_mode: ClockMode,
+    clock_mode: ClockMode,
 
     /// The frequency of the pixel clock.
-    pub frequency: HertzU32,
+    frequency: HertzU32,
 
     /// Format of the byte data sent out.
-    pub format: Format,
+    format: Format,
 
     /// Timing settings for the peripheral.
-    pub timing: FrameTiming,
+    timing: FrameTiming,
 
     /// The vsync signal level in IDLE state.
-    pub vsync_idle_level: Level,
+    vsync_idle_level: Level,
 
     /// The hsync signal level in IDLE state.
-    pub hsync_idle_level: Level,
+    hsync_idle_level: Level,
 
     /// The de signal level in IDLE state.
-    pub de_idle_level: Level,
+    de_idle_level: Level,
 
     /// If enabled, the hsync pulse will be sent out in vertical blanking lines.
     /// i.e. When no valid data is actually sent out. Otherwise, hysnc
     /// pulses will only be sent out in active region lines.
-    pub hs_blank_en: bool,
+    hs_blank_en: bool,
 
     /// Disables blank region when LCD sends data out.
-    pub disable_black_region: bool,
+    disable_black_region: bool,
 
     /// The output LCD_DE is delayed by module clock LCD_CLK.
-    pub de_mode: DelayMode,
+    de_mode: DelayMode,
     /// The output LCD_HSYNC is delayed by module clock LCD_CLK.
-    pub hsync_mode: DelayMode,
+    hsync_mode: DelayMode,
     /// The output LCD_VSYNC is delayed by module clock LCD_CLK.
-    pub vsync_mode: DelayMode,
+    vsync_mode: DelayMode,
     /// The output data bits are delayed by module clock LCD_CLK.
-    pub output_bit_mode: DelayMode,
+    output_bit_mode: DelayMode,
 }
 
 impl Default for Config {

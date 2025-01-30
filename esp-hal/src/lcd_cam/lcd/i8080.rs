@@ -19,7 +19,7 @@
 //! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::dma::DmaTxBuf;
 //!
-//! # let mut dma_buf = dma_tx_buffer!(32678).unwrap();
+//! # let mut dma_buf = dma_tx_buffer!(32678)?;
 //!
 //! let tx_pins = TxEightBits::new(
 //!     peripherals.GPIO9,
@@ -33,21 +33,20 @@
 //! );
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
-//! let mut config = Config::default();
-//! config.frequency = 20.MHz();
+//! let config = Config::default().with_frequency(20.MHz());
 //!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
 //!     peripherals.DMA_CH0,
 //!     tx_pins,
 //!     config,
-//! )
-//! .unwrap()
+//! )?
 //! .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
 //!
 //! dma_buf.fill(&[0x55]);
-//! let transfer = i8080.send(0x3Au8, 0, dma_buf).unwrap(); // RGB565
+//! let transfer = i8080.send(0x3Au8, 0, dma_buf)?; // RGB565
 //! transfer.wait();
+//! # Ok(())
 //! # }
 //! ```
 
@@ -502,7 +501,6 @@ impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
             type Output = ();
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                LCD_DONE_WAKER.register(cx.waker());
                 if Instance::is_lcd_done_set() {
                     // Interrupt bit will be cleared in Self::wait.
                     // This allows `wait_for_done` to be called more than once.
@@ -510,6 +508,7 @@ impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
                     // Instance::clear_lcd_done();
                     Poll::Ready(())
                 } else {
+                    LCD_DONE_WAKER.register(cx.waker());
                     Instance::listen_lcd_done();
                     Poll::Pending
                 }
@@ -540,35 +539,35 @@ impl<BUF: DmaTxBuffer, Dm: DriverMode> Drop for I8080Transfer<'_, BUF, Dm> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Configuration settings for the I8080 interface.
 pub struct Config {
     /// Specifies the clock mode, including polarity and phase settings.
-    pub clock_mode: ClockMode,
+    clock_mode: ClockMode,
 
     /// The frequency of the pixel clock.
-    pub frequency: HertzU32,
+    frequency: HertzU32,
 
     /// Setup cycles expected, must be at least 1. (6 bits)
-    pub setup_cycles: usize,
+    setup_cycles: usize,
 
     /// Hold cycles expected, must be at least 1. (13 bits)
-    pub hold_cycles: usize,
+    hold_cycles: usize,
 
     /// The default value of LCD_CD.
-    pub cd_idle_edge: bool,
+    cd_idle_edge: bool,
     /// The value of LCD_CD during CMD phase.
-    pub cd_cmd_edge: bool,
+    cd_cmd_edge: bool,
     /// The value of LCD_CD during dummy phase.
-    pub cd_dummy_edge: bool,
+    cd_dummy_edge: bool,
     /// The value of LCD_CD during data phase.
-    pub cd_data_edge: bool,
+    cd_data_edge: bool,
 
     /// The output LCD_CD is delayed by module clock LCD_CLK.
-    pub cd_mode: DelayMode,
+    cd_mode: DelayMode,
     /// The output data bits are delayed by module clock LCD_CLK.
-    pub output_bit_mode: DelayMode,
+    output_bit_mode: DelayMode,
 }
 
 impl Default for Config {

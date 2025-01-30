@@ -29,13 +29,13 @@
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-//! )
-//! .unwrap()
+//! )?
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
 //! .with_miso(miso)
 //! .with_cs(cs)
 //! .with_dma(dma_channel);
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -452,6 +452,7 @@ pub const CHUNK_SIZE: usize = 4092;
 /// // and TX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_buffers!(32000, 32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -475,6 +476,7 @@ macro_rules! dma_buffers {
 /// // and TX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_circular_buffers!(32000, 32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -498,6 +500,7 @@ macro_rules! dma_circular_buffers {
 /// // Create RX and TX descriptors for transactions up to 32000 bytes - passing
 /// // only one parameter assumes RX and TX are the same size.
 /// let (rx_descriptors, tx_descriptors) = dma_descriptors!(32000, 32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -522,6 +525,7 @@ macro_rules! dma_descriptors {
 /// // bytes - passing only one parameter assumes RX and TX are the same size.
 /// let (rx_descriptors, tx_descriptors) =
 ///     dma_circular_descriptors!(32000, 32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -571,6 +575,7 @@ pub use as_mut_byte_array; // TODO: can be removed as soon as DMA is stabilized
 /// // and RX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_buffers_chunk_size!(32000, 32000, 4032);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -596,6 +601,7 @@ macro_rules! dma_buffers_chunk_size {
 /// // and TX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_circular_buffers_chunk_size!(32000, 32000, 4032);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -620,6 +626,7 @@ macro_rules! dma_circular_buffers_chunk_size {
 /// // only one parameter assumes RX and TX are the same size.
 /// let (rx_descriptors, tx_descriptors) =
 ///     dma_descriptors_chunk_size!(32000, 32000, 4032);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -645,6 +652,7 @@ macro_rules! dma_descriptors_chunk_size {
 /// // only one parameter assumes RX and TX are the same size.
 /// let (rx_descriptors, tx_descriptors) =
 ///     dma_circular_descriptors_chunk_size!(32000, 32000, 4032);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -734,6 +742,7 @@ macro_rules! dma_descriptor_count {
 /// use esp_hal::dma_tx_buffer;
 ///
 /// let tx_buf = dma_tx_buffer!(32000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -759,6 +768,7 @@ macro_rules! dma_tx_buffer {
 ///
 /// let buf = dma_rx_stream_buffer!(32000);
 /// let buf = dma_rx_stream_buffer!(32000, 1000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -782,6 +792,7 @@ macro_rules! dma_rx_stream_buffer {
 /// use esp_hal::dma_loop_buffer;
 ///
 /// let buf = dma_loop_buffer!(2000);
+/// # Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -1690,10 +1701,10 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// let spi = Spi::new(
 ///     peripherals.SPI2,
 ///     Config::default(),
-/// )
-/// .unwrap();
+/// )?;
 ///
 /// let spi_dma = configures_spi_dma(spi, dma_channel);
+/// # Ok(())
 /// # }
 /// ```
 pub trait DmaChannelFor<P: DmaEligible>:
@@ -2485,6 +2496,7 @@ where
     /// Sets the interrupt handler for RX and TX interrupts.
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.rx.set_interrupt_handler(handler);
         self.tx.set_interrupt_handler(handler);
@@ -2938,7 +2950,6 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            self.tx.waker().register(cx.waker());
             if self.tx.is_done() {
                 self.tx.clear_interrupts();
                 Poll::Ready(Ok(()))
@@ -2950,6 +2961,7 @@ pub(crate) mod asynch {
                 self.tx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.tx.waker().register(cx.waker());
                 self.tx
                     .listen_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
                 Poll::Pending
@@ -2994,7 +3006,6 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            self.rx.waker().register(cx.waker());
             if self.rx.is_done() {
                 self.rx.clear_interrupts();
                 Poll::Ready(Ok(()))
@@ -3006,6 +3017,7 @@ pub(crate) mod asynch {
                 self.rx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.rx.waker().register(cx.waker());
                 self.rx.listen_in(
                     DmaRxInterrupt::SuccessfulEof
                         | DmaRxInterrupt::DescriptorError
@@ -3060,7 +3072,6 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            self.tx.waker().register(cx.waker());
             if self
                 .tx
                 .pending_out_interrupts()
@@ -3076,6 +3087,7 @@ pub(crate) mod asynch {
                 self.tx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.tx.waker().register(cx.waker());
                 self.tx
                     .listen_out(DmaTxInterrupt::Done | DmaTxInterrupt::DescriptorError);
                 Poll::Pending
@@ -3124,7 +3136,6 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            self.rx.waker().register(cx.waker());
             if self
                 .rx
                 .pending_in_interrupts()
@@ -3140,6 +3151,7 @@ pub(crate) mod asynch {
                 self.rx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
+                self.rx.waker().register(cx.waker());
                 self.rx.listen_in(
                     DmaRxInterrupt::Done
                         | DmaRxInterrupt::DescriptorError

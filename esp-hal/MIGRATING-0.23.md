@@ -107,6 +107,18 @@ e.g.
 + uart.read_bytes(&mut byte);
 ```
 
+### UART halves have their configuration split too
+
+`Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
+
+```diff
+- let config = Config::default().with_rx_fifo_full_threshold(30);
++ let config = Config::default()
++     .with_rx(RxConfig::default()
++       .with_fifo_full_threshold(30)
++ );
+```
+
 ## `timer::wait` is now blocking
 
 ```diff
@@ -191,29 +203,37 @@ On the RX side, the `EofMode` is now decided at transfer time, rather than confi
 - `EofMode::ByteLen` -> `Some(<number of bytes to receive>)`
 - `EofMode::EnableSignal` -> `None`
 
-## UART halves have their configuration split too
-
-`Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
-
-```diff
-- let config = Config::default().with_rx_fifo_full_threshold(30);
-+ let config = Config::default()
-+     .with_rx(RxConfig::default()
-+       .with_fifo_full_threshold(30)
-+ );
-```
-
 ## GPIO changes
 
-GPIO drivers now take configuration structs, and their constructors are fallible.
+GPIO drivers now take configuration structs.
 
 ```diff
 - Input::new(peripherals.GPIO0, Pull::Up);
-+ Input::new(peripherals.GPIO0, InputConfig::default().with_pull(Pull::Up)).unwrap();
++ Input::new(peripherals.GPIO0, InputConfig::default().with_pull_direction(Pull::Up));
+ 
 - Output::new(peripherals.GPIO0, Level::Low);
-+ Output::new(peripherals.GPIO0, OutputConfig::default().with_level(Level::Low)).unwrap();
-- OutputOpenDrain::new(peripherals.GPIO0, Level::Low, Pull::Up);
-+ OutputOpenDrain::new(
-+     peripherals.GPIO0,
-+     OutputOpenDrainConfig::default().with_level(Level::Low).with_pull(Pull::Up)
-+ ).unwrap();
++ Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
+```
+
+The OutputOpenDrain driver has been removed. You can use `Output` instead with
+`DriveMode::OpenDrain`. The input-related methods of `OutputOpenDrain` (`level`,
+`is_high`, `is_low`) are available through the (unstable) `Flex` driver.
+
+```diff
+- OutputOpenDrain::new(peripherals.GPIO0, Level::Low);
++ Output::new(
+     peripherals.GPIO0,
+     Level::Low,
+     OutputConfig::default()
+         .with_drive_mode(DriveMode::OpenDrain),
+ );
+```
+
+## I2C Changes
+
+All async functions now include the `_async` postfix. Additionally the non-async functions are now available in async-mode.
+
+```diff
+- let result = i2c.write_read(0x77, &[0xaa], &mut data).await;
++ let result = i2c.write_read_async(0x77, &[0xaa], &mut data).await;
+```

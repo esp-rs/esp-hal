@@ -51,11 +51,12 @@ mod tests {
     async fn test_i8080_8bit(ctx: Context<'static>) {
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
-        let i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
-            let mut config = Config::default();
-            config.frequency = 20.MHz();
-            config
-        })
+        let i8080 = I8080::new(
+            ctx.lcd_cam.lcd,
+            ctx.dma,
+            pins,
+            Config::default().with_frequency(20.MHz()),
+        )
         .unwrap();
 
         // explicitly drop the camera half to see if it disables clocks (unexpectedly,

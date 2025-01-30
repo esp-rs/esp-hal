@@ -39,6 +39,7 @@
 //!
 //! println!("MAC address {:02x?}", Efuse::mac_address());
 //! println!("Flash Encryption {:?}", Efuse::flash_encryption());
+//! # Ok(())
 //! # }
 //! ```
 

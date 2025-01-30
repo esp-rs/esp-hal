@@ -66,8 +66,7 @@ fn main() -> ! {
         peripherals.GPIO16,
     );
 
-    let mut cam_config = cam::Config::default();
-    cam_config.frequency = 20u32.MHz();
+    let cam_config = cam::Config::default().with_frequency(20u32.MHz());
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
     let camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, cam_data_pins, cam_config)

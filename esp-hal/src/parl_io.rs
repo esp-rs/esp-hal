@@ -23,7 +23,7 @@
 //!
 //! // Initialize DMA buffer and descriptors for data reception
 //! let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
-//! let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+//! let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
 //! let dma_channel = peripherals.DMA_CH0;
 //!
 //! // Configure the 4-bit input pins and clock pin
@@ -41,8 +41,7 @@
 //!     peripherals.PARL_IO,
 //!     dma_channel,
 //!     1.MHz(),
-//! )
-//! .unwrap();
+//! )?;
 //!
 //! let mut parl_io_rx = parl_io
 //!     .rx
@@ -51,8 +50,7 @@
 //!         &mut rx_clk_pin,
 //!         BitPackOrder::Msb,
 //!         Some(0xfff),
-//!     )
-//!     .unwrap();
+//!     )?;
 //!
 //! // Initialize the buffer and delay
 //! dma_rx_buf.as_mut_slice().fill(0u8);
@@ -60,7 +58,7 @@
 //!
 //! loop {
 //!     // Read data via DMA and print received values
-//!     let transfer = parl_io_rx.read(Some(dma_rx_buf.len()), dma_rx_buf).unwrap();
+//!     let transfer = parl_io_rx.read(Some(dma_rx_buf.len()), dma_rx_buf)?;
 //!     (_, parl_io_rx, dma_rx_buf) = transfer.wait();
 //!
 //!     delay.delay_millis(500);
@@ -95,8 +93,7 @@
 //!     peripherals.PARL_IO,
 //!     dma_channel,
 //!     1.MHz(),
-//! )
-//! .unwrap();
+//! )?;
 //!
 //! let mut clock_pin = ClkOutPin::new(peripherals.GPIO6);
 //! let mut parl_io_tx = parl_io
@@ -107,8 +104,7 @@
 //!         0,
 //!         SampleEdge::Normal,
 //!         BitPackOrder::Msb,
-//!     )
-//! .unwrap();
+//!     )?;
 //!
 //! for i in 0..dma_tx_buf.len() {
 //!      dma_tx_buf.as_mut_slice()[i] = (i % 255) as u8;
@@ -116,7 +112,7 @@
 //!
 //! let delay = Delay::new();
 //! loop {
-//!     let transfer = parl_io_tx.write(dma_tx_buf.len(), dma_tx_buf).unwrap();
+//!     let transfer = parl_io_tx.write(dma_tx_buf.len(), dma_tx_buf)?;
 //!     (_, parl_io_tx, dma_tx_buf) = transfer.wait();
 //!     delay.delay_millis(500);
 //! }
@@ -149,7 +145,7 @@ use crate::{
         interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
         NoPin,
     },
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
     peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
@@ -1153,6 +1149,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     /// [crate::interrupt::Priority::min()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         internal_set_interrupt_handler(handler);
     }
@@ -1180,7 +1177,8 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
 
 impl crate::private::Sealed for ParlIoFullDuplex<'_, Blocking> {}
 
-impl InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoFullDuplex::set_interrupt_handler(self, handler);
     }
@@ -1277,6 +1275,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     /// [crate::interrupt::Priority::min()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         internal_set_interrupt_handler(handler);
     }
@@ -1316,7 +1315,8 @@ impl<'d> ParlIoTxOnly<'d, Async> {
 
 impl crate::private::Sealed for ParlIoTxOnly<'_, Blocking> {}
 
-impl InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoTxOnly::set_interrupt_handler(self, handler);
     }
@@ -1397,6 +1397,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     /// [crate::interrupt::Priority::min()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         internal_set_interrupt_handler(handler);
     }
@@ -1436,7 +1437,8 @@ impl<'d> ParlIoRxOnly<'d, Async> {
 
 impl crate::private::Sealed for ParlIoRxOnly<'_, Blocking> {}
 
-impl InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoRxOnly::set_interrupt_handler(self, handler);
     }

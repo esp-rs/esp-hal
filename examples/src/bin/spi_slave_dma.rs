@@ -44,26 +44,13 @@ use esp_println::println;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut master_sclk = Output::new(
-        peripherals.GPIO4,
-        OutputConfig::default().with_level(Level::Low),
-    )
-    .unwrap();
+    let mut master_sclk = Output::new(peripherals.GPIO4, Level::Low, OutputConfig::default());
     let master_miso = Input::new(
         peripherals.GPIO5,
         InputConfig::default().with_pull(Pull::None),
-    )
-    .unwrap();
-    let mut master_mosi = Output::new(
-        peripherals.GPIO8,
-        OutputConfig::default().with_level(Level::Low),
-    )
-    .unwrap();
-    let mut master_cs = Output::new(
-        peripherals.GPIO9,
-        OutputConfig::default().with_level(Level::High),
-    )
-    .unwrap();
+    );
+    let mut master_mosi = Output::new(peripherals.GPIO8, Level::Low, OutputConfig::default());
+    let mut master_cs = Output::new(peripherals.GPIO9, Level::Low, OutputConfig::default());
 
     let slave_sclk = peripherals.GPIO0;
     let slave_miso = peripherals.GPIO1;

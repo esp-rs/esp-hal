@@ -24,7 +24,7 @@
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     pac,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, RSA},
@@ -68,17 +68,27 @@ impl<'d> Rsa<'d, Blocking> {
             _guard: self._guard,
         }
     }
-}
 
-impl crate::private::Sealed for Rsa<'_, Blocking> {}
-
-impl InterruptConfigurable for Rsa<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    /// Registers an interrupt handler for the RSA peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::RSA);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::RSA, handler.handler()) };
         unwrap!(crate::interrupt::enable(Interrupt::RSA, handler.priority()));
+    }
+}
+
+impl crate::private::Sealed for Rsa<'_, Blocking> {}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Rsa<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }
 

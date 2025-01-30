@@ -61,10 +61,10 @@ pub enum WakeupLevel {
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
-/// let reason =
-/// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
-///
+/// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
+///
+/// println!("{:?} {?}", reason, wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(5));
 /// delay.delay_millis(100);
@@ -112,12 +112,12 @@ pub enum Error {
 ///
 /// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin_4 = peripherals.GPIO4;
-/// let pin_4_input = Input::new(&mut pin_4, config).unwrap();
+/// let pin_4_input = Input::new(&mut pin_4, config);
 ///
-/// let reason =
-///     reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
-///
+/// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
+///
+/// println!("{:?} {?}", reason, wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
@@ -167,12 +167,12 @@ impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
 /// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin_2 = peripherals.GPIO2;
 /// let mut pin_4 = peripherals.GPIO4;
-/// let pin_4_driver = Input::new(&mut pin_4, config).unwrap();
+/// let pin_4_driver = Input::new(&mut pin_4, config);
 ///
-/// let reason = reset_reason(Cpu::ProCpu)
-///     .unwrap_or(SocResetReason::ChipPowerOn);
-///
+/// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
+///
+/// println!("{:?} {?}", reason, wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
@@ -224,12 +224,12 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin2 = peripherals.GPIO2;
 /// let mut pin3 = peripherals.GPIO3;
-/// let mut pin2_input = Input::new(&mut pin2, config).unwrap();
+/// let mut pin2_input = Input::new(&mut pin2, config);
 ///
-/// let reason =
-/// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
-///
+/// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
+///
+/// println!("{:?} {?}", reason, wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
@@ -281,10 +281,10 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 ///
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///
-/// let reason =
-/// reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
-///
+/// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
+///
+/// println!("{:?} {?}", reason, wake_reason);
 ///
 /// let delay = Delay::new();
 /// let timer = TimerWakeupSource::new(Duration::from_secs(10));

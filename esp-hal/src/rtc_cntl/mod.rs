@@ -59,6 +59,7 @@
 //! rtc.rwdt.listen();
 //!
 //! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
+//! # Ok(())
 //! # }
 //!
 //! // Where the `LP_WDT` interrupt handler is defined as:
@@ -75,13 +76,14 @@
 //!         println!("RWDT Interrupt");
 //!
 //!         let mut rwdt = RWDT.borrow_ref_mut(cs);
-//!         let rwdt = rwdt.as_mut().unwrap();
-//!         rwdt.clear_interrupt();
+//!         if let Some(rwdt) = rwdt.as_mut() {
+//!             rwdt.clear_interrupt();
 //!
-//!         println!("Restarting in 5 seconds...");
+//!             println!("Restarting in 5 seconds...");
 //!
-//!         rwdt.set_timeout(RwdtStage::Stage0, 5000u64.millis());
-//!         rwdt.unlisten();
+//!             rwdt.set_timeout(RwdtStage::Stage0, 5000u64.millis());
+//!             rwdt.unlisten();
+//!         }
 //!     });
 //! }
 //! ```
@@ -123,7 +125,7 @@ use crate::peripherals::{LPWR, TIMG0};
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
-    interrupt::{self, InterruptConfigurable, InterruptHandler},
+    interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     reset::{SleepSource, WakeupReason},
@@ -454,11 +456,13 @@ impl<'d> Rtc<'d> {
             .store4()
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
     }
-}
-impl crate::private::Sealed for Rtc<'_> {}
 
-impl InterruptConfigurable for Rtc<'_> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    /// Register an interrupt handler for the RTC.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
                 let interrupt = Interrupt::LP_WDT;
@@ -471,6 +475,14 @@ impl InterruptConfigurable for Rtc<'_> {
         }
         unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
         unwrap!(interrupt::enable(interrupt, handler.priority()));
+    }
+}
+impl crate::private::Sealed for Rtc<'_> {}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Rtc<'_> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }
 

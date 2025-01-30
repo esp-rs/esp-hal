@@ -1,7 +1,7 @@
 //! GPIO Test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable embassy
+//% FEATURES(unstable): unstable embassy
 //% FEATURES(stable):
 
 #![no_std]
@@ -19,7 +19,7 @@ use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin
 use esp_hal::{
     // OutputOpenDrain is here because will be unused otherwise
     delay::Delay,
-    gpio::{Event, Flex, Io, OutputOpenDrain, OutputOpenDrainConfig},
+    gpio::{DriveMode, Event, Flex, Io},
     handler,
     timer::timg::TimerGroup,
 };
@@ -93,10 +93,8 @@ mod tests {
             test_gpio2,
             ..
         } = ctx;
-        let mut test_gpio1 =
-            Input::new(test_gpio1, InputConfig::default().with_pull(Pull::Down)).unwrap();
-        let mut test_gpio2 =
-            Output::new(test_gpio2, OutputConfig::default().with_level(Level::Low)).unwrap();
+        let mut test_gpio1 = Input::new(test_gpio1, InputConfig::default().with_pull(Pull::Down));
+        let mut test_gpio2 = Output::new(test_gpio2, Level::Low, OutputConfig::default());
         embassy_futures::select::select(
             async {
                 loop {
@@ -119,8 +117,7 @@ mod tests {
 
     #[test]
     async fn a_pin_can_wait(ctx: Context) {
-        let mut first =
-            Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down)).unwrap();
+        let mut first = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
 
         embassy_futures::select::select(
             first.wait_for_rising_edge(),
@@ -133,8 +130,7 @@ mod tests {
 
     #[test]
     fn gpio_input(ctx: Context) {
-        let test_gpio1 =
-            Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down)).unwrap();
+        let test_gpio1 = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
         // `InputPin`:
         assert_eq!(test_gpio1.is_low(), true);
         assert_eq!(test_gpio1.is_high(), false);
@@ -143,23 +139,15 @@ mod tests {
     #[test]
     async fn waiting_for_level_does_not_hang(ctx: Context) {
         let mut test_gpio1 =
-            Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down)).unwrap();
-        let _test_gpio2 = Output::new(
-            ctx.test_gpio2,
-            OutputConfig::default().with_level(Level::High),
-        )
-        .unwrap();
+            Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+        let _test_gpio2 = Output::new(ctx.test_gpio2, Level::High, OutputConfig::default());
 
         test_gpio1.wait_for_high().await;
     }
 
     #[test]
     fn gpio_output(ctx: Context) {
-        let mut test_gpio2 = Output::new(
-            ctx.test_gpio2,
-            OutputConfig::default().with_level(Level::Low),
-        )
-        .unwrap();
+        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
 
         // `StatefulOutputPin`:
         assert_eq!(test_gpio2.is_set_low(), true);
@@ -179,13 +167,8 @@ mod tests {
 
     #[test]
     fn gpio_output_embedded_hal_1_0(ctx: Context) {
-        let test_gpio1 =
-            Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down)).unwrap();
-        let mut test_gpio2 = Output::new(
-            ctx.test_gpio2,
-            OutputConfig::default().with_level(Level::Low),
-        )
-        .unwrap();
+        let test_gpio1 = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
 
         fn set<T>(pin: &mut T, state: bool)
         where
@@ -233,12 +216,8 @@ mod tests {
     #[cfg(feature = "unstable")] // Interrupts are unstable
     fn gpio_interrupt(ctx: Context) {
         let mut test_gpio1 =
-            Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down)).unwrap();
-        let mut test_gpio2 = Output::new(
-            ctx.test_gpio2,
-            OutputConfig::default().with_level(Level::Low),
-        )
-        .unwrap();
+            Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
 
         critical_section::with(|cs| {
             *COUNTER.borrow_ref_mut(cs) = 0;
@@ -275,51 +254,54 @@ mod tests {
     #[test]
     #[cfg(feature = "unstable")] // delay is unstable
     fn gpio_od(ctx: Context) {
-        let config = OutputOpenDrainConfig::default()
-            .with_level(Level::High)
-            .with_pull(Pull::Up);
-        let mut test_gpio1 = OutputOpenDrain::new(ctx.test_gpio1, config).unwrap();
-        let mut test_gpio2 = OutputOpenDrain::new(ctx.test_gpio2, config).unwrap();
+        let input_pull_up = InputConfig::default().with_pull(Pull::Up);
+        let input_pull_down = InputConfig::default().with_pull(Pull::Down);
+        let input_no_pull = InputConfig::default().with_pull(Pull::None);
+
+        let mut output = Output::new(
+            ctx.test_gpio1,
+            Level::High,
+            OutputConfig::default()
+                .with_drive_mode(DriveMode::OpenDrain)
+                .with_pull(Pull::None),
+        );
+        let mut input = Input::new(ctx.test_gpio2, input_pull_up);
 
         ctx.delay.delay_millis(1);
 
-        assert_eq!(test_gpio1.is_high(), true);
-        assert_eq!(test_gpio2.is_high(), true);
+        // With pull up resistor
 
-        test_gpio1.set_low();
-        test_gpio2.set_high();
+        assert_eq!(input.level(), Level::High);
+        output.set_low();
         ctx.delay.delay_millis(1);
-
-        assert_eq!(test_gpio1.is_low(), true);
-        assert_eq!(test_gpio2.is_low(), true);
-
-        test_gpio1.set_high();
-        test_gpio2.set_high();
+        assert_eq!(input.level(), Level::Low);
+        output.set_high();
         ctx.delay.delay_millis(1);
+        assert_eq!(input.level(), Level::High);
 
-        assert_eq!(test_gpio1.is_high(), true);
-        assert_eq!(test_gpio2.is_high(), true);
+        // With pull down resistor
+        input.apply_config(&input_pull_down);
 
-        test_gpio1.set_high();
-        test_gpio2.set_low();
+        output.set_high();
         ctx.delay.delay_millis(1);
-
-        assert_eq!(test_gpio1.is_low(), true);
-        assert_eq!(test_gpio2.is_low(), true);
-
-        test_gpio1.set_high();
-        test_gpio2.set_high();
+        assert_eq!(input.level(), Level::Low);
+        output.set_low();
         ctx.delay.delay_millis(1);
+        assert_eq!(input.level(), Level::Low);
 
-        assert_eq!(test_gpio1.is_high(), true);
-        assert_eq!(test_gpio2.is_high(), true);
+        // With pull up on output
+        input.apply_config(&input_no_pull);
+        output.apply_config(
+            &OutputConfig::default()
+                .with_drive_mode(DriveMode::OpenDrain)
+                .with_pull(Pull::Up),
+        );
 
-        test_gpio1.set_low();
-        test_gpio2.set_low();
         ctx.delay.delay_millis(1);
-
-        assert_eq!(test_gpio1.is_low(), true);
-        assert_eq!(test_gpio2.is_low(), true);
+        assert_eq!(input.level(), Level::Low);
+        output.set_high();
+        ctx.delay.delay_millis(1);
+        assert_eq!(input.level(), Level::High);
     }
 
     #[test]
@@ -330,7 +312,7 @@ mod tests {
 
         test_gpio1.set_high();
         test_gpio1.set_as_output();
-        test_gpio2.set_as_input(Pull::None);
+        test_gpio2.enable_input(true);
 
         ctx.delay.delay_millis(1);
 
@@ -343,7 +325,7 @@ mod tests {
         assert_eq!(test_gpio1.is_set_high(), false);
         assert_eq!(test_gpio2.is_high(), false);
 
-        test_gpio1.set_as_input(Pull::None);
+        test_gpio1.enable_input(true);
         test_gpio2.set_as_output();
         ctx.delay.delay_millis(1);
 
@@ -370,9 +352,8 @@ mod tests {
         let any_pin2 = ctx.test_gpio1;
         let any_pin3 = ctx.test_gpio2;
 
-        let out_pin =
-            Output::new(any_pin2, OutputConfig::default().with_level(Level::High)).unwrap();
-        let in_pin = Input::new(any_pin3, InputConfig::default().with_pull(Pull::Down)).unwrap();
+        let out_pin = Output::new(any_pin2, Level::High, OutputConfig::default());
+        let in_pin = Input::new(any_pin3, InputConfig::default().with_pull(Pull::Down));
 
         assert_eq!(out_pin.is_set_high(), true);
         assert_eq!(in_pin.is_high(), true);
@@ -385,9 +366,8 @@ mod tests {
         let any_pin2 = ctx.test_gpio1;
         let any_pin3 = ctx.test_gpio2;
 
-        let out_pin =
-            Output::new(any_pin3, OutputConfig::default().with_level(Level::Low)).unwrap();
-        let in_pin = Input::new(any_pin2, InputConfig::default().with_pull(Pull::Down)).unwrap();
+        let out_pin = Output::new(any_pin3, Level::Low, OutputConfig::default());
+        let in_pin = Input::new(any_pin2, InputConfig::default().with_pull(Pull::Down));
 
         assert_eq!(out_pin.is_set_high(), false);
         assert_eq!(in_pin.is_high(), false);
@@ -398,7 +378,7 @@ mod tests {
     fn can_configure_rtcio_pins_as_input() {
         let pin = unsafe { esp_hal::gpio::GpioPin::<37>::steal() };
 
-        _ = Input::new(pin, InputConfig::default().with_pull(Pull::Down)).unwrap();
+        _ = Input::new(pin, InputConfig::default().with_pull(Pull::Down));
     }
 
     #[test]
@@ -419,7 +399,7 @@ mod tests {
 
         #[embassy_executor::task]
         async fn test_task(pin: AnyPin) {
-            let mut pin = Input::new(pin, InputConfig::default().with_pull(Pull::Down)).unwrap();
+            let mut pin = Input::new(pin, InputConfig::default().with_pull(Pull::Down));
 
             // This line must return, even if the executor
             // is running at a higher priority than the GPIO handler.

@@ -70,9 +70,9 @@ async fn main(_spawner: Spawner) -> ! {
     let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = Input::new(peripherals.GPIO0, config).unwrap();
+            let button = Input::new(peripherals.GPIO0, config);
         } else {
-            let button = Input::new(peripherals.GPIO9, config).unwrap();
+            let button = Input::new(peripherals.GPIO9, config);
         }
     }
 

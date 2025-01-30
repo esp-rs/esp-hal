@@ -37,8 +37,7 @@
 //!     peripherals.GPIO16,
 //! );
 //!
-//! let mut config = Config::default();
-//! config.frequency = 20.MHz();
+//! let config = Config::default().with_frequency(20.MHz());
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //! let mut camera = Camera::new(
@@ -46,14 +45,14 @@
 //!     peripherals.DMA_CH0,
 //!     data_pins,
 //!     config,
-//! )
-//! .unwrap()
+//! )?
 //! .with_master_clock(mclk_pin) // Remove this for slave mode
 //! .with_pixel_clock(pclk_pin)
 //! .with_ctrl_pins(vsync_pin, href_pin);
 //!
-//! let transfer = camera.receive(dma_buf).map_err(|e| e.0).unwrap();
+//! let transfer = camera.receive(dma_buf).map_err(|e| e.0)?;
 //!
+//! # Ok(())
 //! # }
 //! ```
 
@@ -599,21 +598,21 @@ pub trait RxPins {
     const BUS_WIDTH: usize;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Configuration settings for the Camera interface.
 pub struct Config {
     /// The pixel clock frequency for the camera interface.
-    pub frequency: HertzU32,
+    frequency: HertzU32,
 
     /// The byte order for the camera data.
-    pub byte_order: ByteOrder,
+    byte_order: ByteOrder,
 
     /// The bit order for the camera data.
-    pub bit_order: BitOrder,
+    bit_order: BitOrder,
 
     /// The Vsync filter threshold.
-    pub vsync_filter_threshold: Option<VsyncFilterThreshold>,
+    vsync_filter_threshold: Option<VsyncFilterThreshold>,
 }
 
 impl Default for Config {

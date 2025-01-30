@@ -20,3 +20,4 @@ serde        = { version = "1.0.215", features = ["derive"] }
 serde_json   = "1.0.70"
 strum        = { version = "0.26.3",  features = ["derive"] }
 toml_edit    = "0.22.22"
+walkdir      = "2.5.0"

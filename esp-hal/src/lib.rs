@@ -80,8 +80,7 @@
 //!     let peripherals = esp_hal::init(config);
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let config = OutputConfig::default().with_level(Level::High);
-//!     let mut led = Output::new(peripherals.GPIO0, config).unwrap();
+//!     let mut led = Output::new(peripherals.GPIO0, Level::High, OutputConfig::default());
 //!
 //!     let delay = Delay::new();
 //!
@@ -539,21 +538,21 @@ use crate::{
 ///
 /// For usage examples, see the [config module documentation](crate::config).
 #[non_exhaustive]
-#[derive(Default, procmacros::BuilderLite)]
+#[derive(Default, Clone, Copy, procmacros::BuilderLite)]
 pub struct Config {
     /// The CPU clock configuration.
-    pub cpu_clock: CpuClock,
+    cpu_clock: CpuClock,
 
     /// Enable watchdog timer(s).
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    pub watchdog: WatchdogConfig,
+    watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[cfg(feature = "psram")]
-    pub psram: psram::PsramConfig,
+    psram: psram::PsramConfig,
 }
 
 /// Initialize the system.
@@ -573,13 +572,13 @@ pub fn init(config: Config) -> Peripherals {
         if #[cfg(feature = "unstable")]
         {
             #[cfg(not(any(esp32, esp32s2)))]
-            if config.watchdog.swd {
+            if config.watchdog.swd() {
                 rtc.swd.enable();
             } else {
                 rtc.swd.disable();
             }
 
-            match config.watchdog.rwdt {
+            match config.watchdog.rwdt() {
                 WatchdogStatus::Enabled(duration) => {
                     rtc.rwdt.enable();
                     rtc.rwdt
@@ -590,7 +589,7 @@ pub fn init(config: Config) -> Peripherals {
                 }
             }
 
-            match config.watchdog.timg0 {
+            match config.watchdog.timg0() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new();
                     timg0_wd.enable();
@@ -602,7 +601,7 @@ pub fn init(config: Config) -> Peripherals {
             }
 
             #[cfg(timg1)]
-            match config.watchdog.timg1 {
+            match config.watchdog.timg1() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new();
                     timg1_wd.enable();

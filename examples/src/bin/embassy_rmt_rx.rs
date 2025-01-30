@@ -68,13 +68,11 @@ async fn main(spawner: Spawner) {
     }
 
     spawner
-        .spawn(signal_task(
-            Output::new(
-                peripherals.GPIO5,
-                OutputConfig::default().with_level(Level::Low),
-            )
-            .unwrap(),
-        ))
+        .spawn(signal_task(Output::new(
+            peripherals.GPIO5,
+            Level::Low,
+            OutputConfig::default(),
+        )))
         .unwrap();
 
     let mut data: [u32; 48] = [PulseCode::empty(); 48];
