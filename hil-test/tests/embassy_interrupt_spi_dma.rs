@@ -37,6 +37,7 @@ macro_rules! mk_static {
     }};
 }
 
+static STOP_INTERRUPT_TASK: AtomicBool = AtomicBool::new(false);
 static INTERRUPT_TASK_WORKING: AtomicBool = AtomicBool::new(false);
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
@@ -55,6 +56,10 @@ async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Blocki
         spi.transfer_in_place_async(&mut buffer).await.unwrap();
         INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
 
+        if STOP_INTERRUPT_TASK.load(portable_atomic::Ordering::Acquire) {
+            break;
+        }
+
         Timer::after(Duration::from_millis(1)).await;
     }
 }
@@ -70,6 +75,10 @@ async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocki
         INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Release);
         i2s_tx.write_dma_async(&mut buffer).await.unwrap();
         INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
+
+        if STOP_INTERRUPT_TASK.load(portable_atomic::Ordering::Acquire) {
+            break;
+        }
 
         Timer::after(Duration::from_millis(1)).await;
     }
@@ -181,6 +190,7 @@ mod test {
             assert!(dst_buffer.iter().all(|&v| v == i));
 
             if start.elapsed() > Duration::from_secs(1) {
+                STOP_INTERRUPT_TASK.store(true, portable_atomic::Ordering::Release);
                 // make sure the other peripheral didn't get stuck
                 while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Acquire) {}
                 break;
@@ -316,5 +326,9 @@ mod test {
             assert_ne!(next, last, "stuck");
             last = next;
         }
+
+        STOP_INTERRUPT_TASK.store(true, portable_atomic::Ordering::Release);
+        // make sure the other peripheral didn't get stuck
+        while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Acquire) {}
     }
 }
