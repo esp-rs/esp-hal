@@ -123,7 +123,6 @@ mod tests {
         assert!(matches!(tx_transaction, Err(Error::EndMarkerMissing)));
     }
 
-    #[cfg(any(esp32s3, esp32c3, esp32c6, esp32h2))]
     #[test]
     fn rmt_loopback_fill_longer_buffer() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
