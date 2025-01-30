@@ -65,7 +65,7 @@
 //! }
 //! # }
 //! ```
-//!
+//! 
 //! ### Initialization for TX
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -119,8 +119,11 @@
 //! # }
 //! ```
 
-use core::mem::ManuallyDrop;
-use core::ops::{Deref, DerefMut};
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
+
 use enumset::{EnumSet, EnumSetType};
 use fugit::HertzU32;
 use peripheral::PeripheralRef;
@@ -134,6 +137,8 @@ use crate::{
         DmaChannelFor,
         DmaError,
         DmaPeripheral,
+        DmaRxBuffer,
+        DmaTxBuffer,
         PeripheralRxChannel,
         PeripheralTxChannel,
         Rx,
@@ -146,6 +151,7 @@ use crate::{
         NoPin,
     },
     interrupt::InterruptHandler,
+    parl_io::asynch::interrupt_handler,
     peripheral::{self, Peripheral},
     peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
@@ -153,8 +159,6 @@ use crate::{
     Blocking,
     DriverMode,
 };
-use crate::dma::{DmaRxBuffer, DmaTxBuffer};
-use crate::parl_io::asynch::interrupt_handler;
 
 #[allow(unused)]
 const MAX_DMA_SIZE: usize = 32736;
@@ -1120,17 +1124,23 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
             unsafe {
                 crate::interrupt::bind_interrupt(Interrupt::PARL_IO, interrupt_handler.handler());
             }
-            unwrap!(crate::interrupt::enable(Interrupt::PARL_IO, interrupt_handler.priority()));
+            unwrap!(crate::interrupt::enable(
+                Interrupt::PARL_IO,
+                interrupt_handler.priority()
+            ));
         }
         #[cfg(esp32h2)]
         {
             unsafe {
-                crate::interrupt::bind_interrupt(Interrupt::PARL_IO_TX, interrupt_handler.handler());
+                crate::interrupt::bind_interrupt(
+                    Interrupt::PARL_IO_TX,
+                    interrupt_handler.handler(),
+                );
             }
             unwrap!(crate::interrupt::enable(
-                    Interrupt::PARL_IO_TX,
-                    interrupt_handler.priority()
-                ));
+                Interrupt::PARL_IO_TX,
+                interrupt_handler.priority()
+            ));
         }
 
         ParlIoFullDuplex {
@@ -1250,17 +1260,23 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
             unsafe {
                 crate::interrupt::bind_interrupt(Interrupt::PARL_IO, interrupt_handler.handler());
             }
-            unwrap!(crate::interrupt::enable(Interrupt::PARL_IO, interrupt_handler.priority()));
+            unwrap!(crate::interrupt::enable(
+                Interrupt::PARL_IO,
+                interrupt_handler.priority()
+            ));
         }
         #[cfg(esp32h2)]
         {
             unsafe {
-                crate::interrupt::bind_interrupt(Interrupt::PARL_IO_TX, interrupt_handler.handler());
+                crate::interrupt::bind_interrupt(
+                    Interrupt::PARL_IO_TX,
+                    interrupt_handler.handler(),
+                );
             }
             unwrap!(crate::interrupt::enable(
-                    Interrupt::PARL_IO_TX,
-                    interrupt_handler.priority()
-                ));
+                Interrupt::PARL_IO_TX,
+                interrupt_handler.priority()
+            ));
         }
 
         ParlIoTxOnly {
@@ -1372,17 +1388,23 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
             unsafe {
                 crate::interrupt::bind_interrupt(Interrupt::PARL_IO, interrupt_handler.handler());
             }
-            unwrap!(crate::interrupt::enable(Interrupt::PARL_IO, interrupt_handler.priority()));
+            unwrap!(crate::interrupt::enable(
+                Interrupt::PARL_IO,
+                interrupt_handler.priority()
+            ));
         }
         #[cfg(esp32h2)]
         {
             unsafe {
-                crate::interrupt::bind_interrupt(Interrupt::PARL_IO_TX, interrupt_handler.handler());
+                crate::interrupt::bind_interrupt(
+                    Interrupt::PARL_IO_TX,
+                    interrupt_handler.handler(),
+                );
             }
             unwrap!(crate::interrupt::enable(
-                    Interrupt::PARL_IO_TX,
-                    interrupt_handler.priority()
-                ));
+                Interrupt::PARL_IO_TX,
+                interrupt_handler.priority()
+            ));
         }
 
         ParlIoRxOnly {
@@ -1521,7 +1543,8 @@ where
     }
 }
 
-/// Represents an ongoing (or potentially finished) transfer using the PARL_IO TX.
+/// Represents an ongoing (or potentially finished) transfer using the PARL_IO
+/// TX.
 pub struct ParlIoTxTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
     parl_io: ManuallyDrop<ParlIoTx<'d, Dm>>,
     buf_view: ManuallyDrop<BUF::View>,
@@ -1556,8 +1579,10 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> ParlIoTxTransfer<'d, BUF, Dm> {
 
     fn release(mut self) -> (ParlIoTx<'d, Dm>, BUF::View) {
         let (parl_io, view) = unsafe {
-            (ManuallyDrop::take(&mut self.parl_io),
-            ManuallyDrop::take(&mut self.buf_view))
+            (
+                ManuallyDrop::take(&mut self.parl_io),
+                ManuallyDrop::take(&mut self.buf_view),
+            )
         };
         core::mem::forget(self);
         (parl_io, view)
@@ -1580,8 +1605,8 @@ impl<BUF: DmaTxBuffer, Dm: DriverMode> DerefMut for ParlIoTxTransfer<'_, BUF, Dm
 
 impl<BUF: DmaTxBuffer, Dm: DriverMode> Drop for ParlIoTxTransfer<'_, BUF, Dm> {
     fn drop(&mut self) {
-        // There's no documented way to cancel the PARL IO transfer, so we'll just stop the DMA to
-        // stop the memory access.
+        // There's no documented way to cancel the PARL IO transfer, so we'll just stop
+        // the DMA to stop the memory access.
         self.parl_io.tx_channel.stop_transfer();
 
         // SAFETY: This is Drop, we know that self.parl_io and self.buf_view
@@ -1602,12 +1627,13 @@ where
     ///
     /// This will return a [ParlIoRxTransfer]
     ///
-    /// When the number of bytes is specified, the maximum amount of data is 32736 bytes and
-    /// the transfer ends when the number of specified bytes is received.
+    /// When the number of bytes is specified, the maximum amount of data is
+    /// 32736 bytes and the transfer ends when the number of specified bytes
+    /// is received.
     ///
-    /// When the number of bytes is unspecified, there's no limit the amount of data transferred
-    /// and the transfer ends when the enable signal signals the end or the DMA buffer runs out of
-    /// space.
+    /// When the number of bytes is unspecified, there's no limit the amount of
+    /// data transferred and the transfer ends when the enable signal
+    /// signals the end or the DMA buffer runs out of space.
     pub fn read<BUF>(
         mut self,
         number_of_bytes: Option<usize>,
@@ -1652,7 +1678,8 @@ where
     }
 }
 
-/// Represents an ongoing (or potentially finished) transfer using the PARL_IO TX.
+/// Represents an ongoing (or potentially finished) transfer using the PARL_IO
+/// TX.
 pub struct ParlIoRxTransfer<'d, BUF: DmaRxBuffer, Dm: DriverMode> {
     parl_io: ManuallyDrop<ParlIoRx<'d, Dm>>,
     buf_view: ManuallyDrop<BUF::View>,
@@ -1693,8 +1720,10 @@ impl<'d, BUF: DmaRxBuffer, Dm: DriverMode> ParlIoRxTransfer<'d, BUF, Dm> {
 
     fn release(mut self) -> (ParlIoRx<'d, Dm>, BUF::View) {
         let (parl_io, view) = unsafe {
-            (ManuallyDrop::take(&mut self.parl_io),
-             ManuallyDrop::take(&mut self.buf_view))
+            (
+                ManuallyDrop::take(&mut self.parl_io),
+                ManuallyDrop::take(&mut self.buf_view),
+            )
         };
         core::mem::forget(self);
         (parl_io, view)
@@ -1717,8 +1746,8 @@ impl<BUF: DmaRxBuffer, Dm: DriverMode> DerefMut for ParlIoRxTransfer<'_, BUF, Dm
 
 impl<BUF: DmaRxBuffer, Dm: DriverMode> Drop for ParlIoRxTransfer<'_, BUF, Dm> {
     fn drop(&mut self) {
-        // There's no documented way to cancel the PARL IO transfer, so we'll just stop the DMA to
-        // stop the memory access.
+        // There's no documented way to cancel the PARL IO transfer, so we'll just stop
+        // the DMA to stop the memory access.
         self.parl_io.rx_channel.stop_transfer();
 
         // SAFETY: This is Drop, we know that self.parl_io and self.buf_view
@@ -1776,9 +1805,8 @@ pub mod asynch {
     use super::{private::Instance, ParlIoRxTransfer, ParlIoTxTransfer};
     use crate::{
         asynch::AtomicWaker,
-        dma::asynch::DmaRxFuture,
+        dma::{asynch::DmaRxFuture, DmaRxBuffer, DmaTxBuffer},
     };
-    use crate::dma::{DmaRxBuffer, DmaTxBuffer};
 
     static TX_WAKER: AtomicWaker = AtomicWaker::new();
 
@@ -2026,9 +2054,10 @@ mod private {
         pub fn set_eof_gen_sel(mode: EofMode) {
             let reg_block = PARL_IO::regs();
 
-            reg_block
-                .rx_cfg0()
-                .modify(|_, w| w.rx_eof_gen_sel().bit(matches!(mode, EofMode::EnableSignal)));
+            reg_block.rx_cfg0().modify(|_, w| {
+                w.rx_eof_gen_sel()
+                    .bit(matches!(mode, EofMode::EnableSignal))
+            });
         }
 
         pub fn set_rx_pulse_submode_sel(sel: u8) {
@@ -2243,9 +2272,10 @@ mod private {
         pub fn set_eof_gen_sel(mode: EofMode) {
             let reg_block = PARL_IO::regs();
 
-            reg_block
-                .rx_genrl_cfg()
-                .modify(|_, w| w.rx_eof_gen_sel().bit(matches!(mode, EofMode::EnableSignal)));
+            reg_block.rx_genrl_cfg().modify(|_, w| {
+                w.rx_eof_gen_sel()
+                    .bit(matches!(mode, EofMode::EnableSignal))
+            });
         }
 
         pub fn set_rx_pulse_submode_sel(sel: u8) {
