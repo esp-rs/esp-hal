@@ -594,6 +594,7 @@ impl FullDuplex for TxOneBit<'_> {}
 impl FullDuplex for TxTwoBits<'_> {}
 impl FullDuplex for TxFourBits<'_> {}
 impl FullDuplex for TxEightBits<'_> {}
+impl FullDuplex for TxPinConfigWithValidPin<'_, TxFourBits<'_>> {}
 
 impl NotContainsValidSignalPin for TxOneBit<'_> {}
 impl NotContainsValidSignalPin for TxTwoBits<'_> {}
@@ -805,6 +806,7 @@ impl FullDuplex for RxOneBit<'_> {}
 impl FullDuplex for RxTwoBits<'_> {}
 impl FullDuplex for RxFourBits<'_> {}
 impl FullDuplex for RxEightBits<'_> {}
+impl FullDuplex for RxPinConfigWithValidPin<'_, RxFourBits<'_>> {}
 
 impl NotContainsValidSignalPin for RxOneBit<'_> {}
 impl NotContainsValidSignalPin for RxTwoBits<'_> {}

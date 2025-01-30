@@ -116,6 +116,10 @@ name    = "spi_slave"
 harness = false
 
 [[test]]
+name    = "parl_io"
+harness = false
+
+[[test]]
 name    = "parl_io_tx"
 harness = false
 
@@ -239,7 +243,7 @@ esp-build    = { path = "../esp-build" }
 esp-metadata = { path = "../esp-metadata" }
 
 [features]
-default = []
+default = ["defmt"]
 unstable = ["esp-hal/unstable"]
 
 defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt"]
