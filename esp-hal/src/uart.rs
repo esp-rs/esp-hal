@@ -545,7 +545,6 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the RX half.
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[instability::unstable]
     pub fn apply_config(&mut self, _config: &Config) -> Result<(), ConfigError> {
         // Nothing to do so far.
@@ -739,7 +738,18 @@ where
     /// Change the configuration.
     ///
     /// Note that this also changes the configuration of the TX half.
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
+    ///
+    /// # Errors
+    /// The corresponding error variant from [`ConfigError`] will be returned if
+    /// the RX FIFO threshold passed in `Config` exceeds the maximum value (
+    #[cfg_attr(esp32, doc = "0x7F")]
+    #[cfg_attr(any(esp32c6, esp32h2), doc = "0xFF")]
+    #[cfg_attr(any(esp32c3, esp32c2, esp32s2), doc = "0x1FF")]
+    #[cfg_attr(esp32h2, doc = "0x3FF")]
+    /// ) or if the passed timeout exceeds the maximum value (
+    #[cfg_attr(esp32, doc = "0x7F")]
+    #[cfg_attr(not(esp32), doc = "0x3FF")]
+    /// ).
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
@@ -1165,7 +1175,10 @@ where
     }
 
     /// Change the configuration.
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
+    ///
+    /// # Errors.
+    /// Errors will be returned in the cases described in
+    /// [`UartRx::apply_config`].
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;

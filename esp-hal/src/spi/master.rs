@@ -994,7 +994,6 @@ where
     }
 
     /// Change the bus configuration.
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
@@ -1084,7 +1083,8 @@ where
     ///
     /// The corresponding error variant from [`Error`] will be returned if
     /// passed buffer is bigger than FIFO size or if buffer is empty (currently
-    /// unsupported).
+    /// unsupported). `DataMode::Single` cannot be combined with any other
+    /// [`DataMode`].
     #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
@@ -1565,7 +1565,6 @@ mod dma {
         }
 
         /// Change the bus configuration.
-        // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.driver().apply_config(config)
@@ -2028,7 +2027,6 @@ mod dma {
         }
 
         /// Change the bus configuration.
-        // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.spi_dma.apply_config(config)
