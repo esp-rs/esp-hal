@@ -13,7 +13,7 @@ use core::marker::PhantomData;
 use crate::{
     asynch::AtomicWaker,
     handler,
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
     peripheral::Peripheral,
     peripherals::{Interrupt, LCD_CAM},
