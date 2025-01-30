@@ -52,11 +52,11 @@ async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Blocki
     loop {
         let mut buffer: [u8; 8] = [0; 8];
 
-        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Release);
+        INTERRUPT_TASK_WORKING.store(true, portable_atomic::Ordering::Relaxed);
         spi.transfer_in_place_async(&mut buffer).await.unwrap();
-        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
+        INTERRUPT_TASK_WORKING.store(false, portable_atomic::Ordering::Relaxed);
 
-        if STOP_INTERRUPT_TASK.load(portable_atomic::Ordering::Acquire) {
+        if STOP_INTERRUPT_TASK.load(portable_atomic::Ordering::Relaxed) {
             break;
         }
 
@@ -72,11 +72,11 @@ async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocki
     loop {
         let mut buffer: [u8; 8] = [0; 8];
 
-        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Release);
+        INTERRUPT_TASK_WORKING.store(true, portable_atomic::Ordering::Relaxed);
         i2s_tx.write_dma_async(&mut buffer).await.unwrap();
-        INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
+        INTERRUPT_TASK_WORKING.store(false, portable_atomic::Ordering::Relaxed);
 
-        if STOP_INTERRUPT_TASK.load(portable_atomic::Ordering::Acquire) {
+        if STOP_INTERRUPT_TASK.load(portable_atomic::Ordering::Relaxed) {
             break;
         }
 
@@ -190,14 +190,15 @@ mod test {
             assert!(dst_buffer.iter().all(|&v| v == i));
 
             if start.elapsed() > Duration::from_secs(1) {
-                STOP_INTERRUPT_TASK.store(true, portable_atomic::Ordering::Release);
-                // make sure the other peripheral didn't get stuck
-                while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Acquire) {}
                 break;
             }
 
             i = i.wrapping_add(1);
         }
+
+        // make sure the other peripheral didn't get stuck
+        STOP_INTERRUPT_TASK.store(true, portable_atomic::Ordering::Relaxed);
+        while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Relaxed) {}
     }
 
     // Reproducer of https://github.com/esp-rs/esp-hal/issues/2369
@@ -327,8 +328,8 @@ mod test {
             last = next;
         }
 
-        STOP_INTERRUPT_TASK.store(true, portable_atomic::Ordering::Release);
         // make sure the other peripheral didn't get stuck
-        while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Acquire) {}
+        STOP_INTERRUPT_TASK.store(true, portable_atomic::Ordering::Relaxed);
+        while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Relaxed) {}
     }
 }
