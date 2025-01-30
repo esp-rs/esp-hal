@@ -10,7 +10,7 @@
 #![no_std]
 #![no_main]
 
-use embassy_time::{Duration, Instant, Ticker};
+use embassy_time::{Duration, Instant, Timer};
 use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
@@ -42,8 +42,6 @@ static INTERRUPT_TASK_WORKING: AtomicBool = AtomicBool::new(false);
 #[cfg(any(esp32, esp32s2, esp32s3))]
 #[embassy_executor::task]
 async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Blocking>) {
-    let mut ticker = Ticker::every(Duration::from_millis(1));
-
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
@@ -57,15 +55,13 @@ async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Blocki
         spi.transfer_in_place_async(&mut buffer).await.unwrap();
         INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
 
-        ticker.next().await;
+        Timer::after(Duration::from_millis(1)).await;
     }
 }
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 #[embassy_executor::task]
 async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocking>) {
-    let mut ticker = Ticker::every(Duration::from_millis(1));
-
     let mut i2s_tx = i2s_tx.into_async().i2s_tx.build();
 
     loop {
@@ -75,7 +71,7 @@ async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocki
         i2s_tx.write_dma_async(&mut buffer).await.unwrap();
         INTERRUPT_TASK_WORKING.fetch_not(portable_atomic::Ordering::Acquire);
 
-        ticker.next().await;
+        Timer::after(Duration::from_millis(1)).await;
     }
 }
 
