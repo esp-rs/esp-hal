@@ -38,8 +38,6 @@ use core::marker::PhantomData;
 
 #[instability::unstable]
 pub use dma::*;
-#[cfg(any(doc, feature = "unstable"))]
-use embassy_embedded_hal::SetConfig;
 use enumset::{EnumSet, EnumSetType};
 use fugit::{HertzU32, RateExtU32};
 #[cfg(place_spi_driver_in_ram)]
@@ -57,7 +55,7 @@ use crate::{
         OutputSignal,
         PinGuard,
     },
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
     private::{self, Sealed},
@@ -820,7 +818,8 @@ impl<'d> Spi<'d, Blocking> {
     }
 }
 
-impl InterruptConfigurable for Spi<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Spi<'_, Blocking> {
     /// Sets the interrupt handler
     ///
     /// Interrupts are not enabled at the peripheral level here.
@@ -1001,7 +1000,7 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> SetConfig for Spi<'_, Dm>
+impl<Dm> embassy_embedded_hal::SetConfig for Spi<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -1195,16 +1194,13 @@ mod dma {
     };
 
     use super::*;
-    use crate::{
-        dma::{
-            asynch::{DmaRxFuture, DmaTxFuture},
-            Channel,
-            DmaRxBuf,
-            DmaTxBuf,
-            EmptyBuf,
-            PeripheralDmaChannel,
-        },
-        interrupt::InterruptConfigurable,
+    use crate::dma::{
+        asynch::{DmaRxFuture, DmaTxFuture},
+        Channel,
+        DmaRxBuf,
+        DmaTxBuf,
+        EmptyBuf,
+        PeripheralDmaChannel,
     };
 
     /// A DMA capable SPI instance.
@@ -1311,7 +1307,8 @@ mod dma {
         }
     }
 
-    impl InterruptConfigurable for SpiDma<'_, Blocking> {
+    #[instability::unstable]
+    impl crate::interrupt::InterruptConfigurable for SpiDma<'_, Blocking> {
         /// Sets the interrupt handler
         ///
         /// Interrupts are not enabled at the peripheral level here.
@@ -1585,7 +1582,7 @@ mod dma {
     }
 
     #[instability::unstable]
-    impl<Dm> SetConfig for SpiDma<'_, Dm>
+    impl<Dm> embassy_embedded_hal::SetConfig for SpiDma<'_, Dm>
     where
         Dm: DriverMode,
     {
@@ -1985,7 +1982,8 @@ mod dma {
         }
     }
 
-    impl InterruptConfigurable for SpiDmaBus<'_, Blocking> {
+    #[instability::unstable]
+    impl crate::interrupt::InterruptConfigurable for SpiDmaBus<'_, Blocking> {
         /// Sets the interrupt handler
         ///
         /// Interrupts are not enabled at the peripheral level here.
@@ -2218,7 +2216,7 @@ mod dma {
     }
 
     #[instability::unstable]
-    impl<Dm> SetConfig for SpiDmaBus<'_, Dm>
+    impl<Dm> embassy_embedded_hal::SetConfig for SpiDmaBus<'_, Dm>
     where
         Dm: DriverMode,
     {

@@ -97,7 +97,7 @@
 
 use self::unit::Unit;
 use crate::{
-    interrupt::{self, InterruptConfigurable, InterruptHandler},
+    interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, PCNT},
     system::GenericPeripheralGuard,
@@ -181,16 +181,26 @@ impl<'d> Pcnt<'d> {
             _guard: guard,
         }
     }
-}
 
-impl crate::private::Sealed for Pcnt<'_> {}
-
-impl InterruptConfigurable for Pcnt<'_> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    /// Set the interrupt handler for the PCNT peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::PCNT);
         }
         unsafe { interrupt::bind_interrupt(Interrupt::PCNT, handler.handler()) };
         unwrap!(interrupt::enable(Interrupt::PCNT, handler.priority()));
+    }
+}
+
+impl crate::private::Sealed for Pcnt<'_> {}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Pcnt<'_> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }

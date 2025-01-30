@@ -64,13 +64,13 @@ impl<'d> LcdCam<'d, Blocking> {
             cam: self.cam,
         }
     }
-}
 
-impl crate::private::Sealed for LcdCam<'_, Blocking> {}
-// TODO: This interrupt is shared with the Camera module, we should handle this
-// in a similar way to the gpio::IO
-impl InterruptConfigurable for LcdCam<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    /// Registers an interrupt handler for the LCD_CAM peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::LCD_CAM);
         }
@@ -79,6 +79,16 @@ impl InterruptConfigurable for LcdCam<'_, Blocking> {
             Interrupt::LCD_CAM,
             handler.priority()
         ));
+    }
+}
+
+impl crate::private::Sealed for LcdCam<'_, Blocking> {}
+// TODO: This interrupt is shared with the Camera module, we should handle this
+// in a similar way to the gpio::IO
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for LcdCam<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }
 

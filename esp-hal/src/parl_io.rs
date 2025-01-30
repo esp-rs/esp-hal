@@ -152,7 +152,7 @@ use crate::{
         interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
         NoPin,
     },
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     peripheral::{self, Peripheral},
     peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
@@ -1162,6 +1162,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     /// [crate::interrupt::Priority::min()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         internal_set_interrupt_handler(handler);
     }
@@ -1189,7 +1190,8 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
 
 impl crate::private::Sealed for ParlIoFullDuplex<'_, Blocking> {}
 
-impl InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoFullDuplex::set_interrupt_handler(self, handler);
     }
@@ -1273,6 +1275,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     /// [crate::interrupt::Priority::min()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         internal_set_interrupt_handler(handler);
     }
@@ -1313,7 +1316,8 @@ impl<'d> ParlIoTxOnly<'d, Async> {
 
 impl crate::private::Sealed for ParlIoTxOnly<'_, Blocking> {}
 
-impl InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoTxOnly::set_interrupt_handler(self, handler);
     }
@@ -1380,6 +1384,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     /// [crate::interrupt::Priority::min()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         internal_set_interrupt_handler(handler);
     }
@@ -1420,7 +1425,8 @@ impl<'d> ParlIoRxOnly<'d, Async> {
 
 impl crate::private::Sealed for ParlIoRxOnly<'_, Blocking> {}
 
-impl InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoRxOnly::set_interrupt_handler(self, handler);
     }

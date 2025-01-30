@@ -107,8 +107,6 @@
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
-#[cfg(any(doc, feature = "unstable"))]
-use embassy_embedded_hal::SetConfig;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
@@ -122,7 +120,7 @@ use crate::{
         PinGuard,
         Pull,
     },
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
@@ -477,7 +475,7 @@ impl core::fmt::Display for ConfigError {
 }
 
 #[instability::unstable]
-impl<Dm> SetConfig for Uart<'_, Dm>
+impl<Dm> embassy_embedded_hal::SetConfig for Uart<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -490,7 +488,7 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> SetConfig for UartRx<'_, Dm>
+impl<Dm> embassy_embedded_hal::SetConfig for UartRx<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -503,7 +501,7 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> SetConfig for UartTx<'_, Dm>
+impl<Dm> embassy_embedded_hal::SetConfig for UartTx<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -1252,7 +1250,8 @@ where
 
 impl crate::private::Sealed for Uart<'_, Blocking> {}
 
-impl InterruptConfigurable for Uart<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Uart<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // `self.tx.uart` and `self.rx.uart` are the same
         self.tx.uart.info().set_interrupt_handler(handler);

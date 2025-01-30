@@ -129,7 +129,6 @@ use procmacros::handler;
 
 use crate::{
     asynch::AtomicWaker,
-    interrupt::InterruptConfigurable,
     pac::usb_device::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, USB_DEVICE},
@@ -346,16 +345,10 @@ impl<'d> UsbSerialJtag<'d, Blocking> {
 
 impl crate::private::Sealed for UsbSerialJtag<'_, Blocking> {}
 
-impl InterruptConfigurable for UsbSerialJtag<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for UsbSerialJtag<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        for core in crate::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::USB_DEVICE);
-        }
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::USB_DEVICE, handler.handler()) };
-        unwrap!(crate::interrupt::enable(
-            Interrupt::USB_DEVICE,
-            handler.priority()
-        ));
+        self.set_interrupt_handler(handler);
     }
 }
 
@@ -446,6 +439,22 @@ where
     /// Reset RX-PACKET-RECV interrupt
     pub fn reset_rx_packet_recv_interrupt(&mut self) {
         self.rx.reset_rx_packet_recv_interrupt()
+    }
+
+    /// Registers an interrupt handler for the USB Serial JTAG peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        for core in crate::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::USB_DEVICE);
+        }
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::USB_DEVICE, handler.handler()) };
+        unwrap!(crate::interrupt::enable(
+            Interrupt::USB_DEVICE,
+            handler.priority()
+        ));
     }
 }
 

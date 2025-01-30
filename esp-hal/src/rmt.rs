@@ -236,7 +236,6 @@ use crate::{
         Level,
     },
     handler,
-    interrupt::InterruptConfigurable,
     peripheral::Peripheral,
     peripherals::{Interrupt, RMT},
     soc::constants,
@@ -446,17 +445,27 @@ impl<'d> Rmt<'d, Blocking> {
         self.set_interrupt_handler(async_interrupt_handler);
         Rmt::create(self.peripheral)
     }
-}
 
-impl crate::private::Sealed for Rmt<'_, Blocking> {}
-
-impl InterruptConfigurable for Rmt<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+    /// Registers an interrupt handler for the RMT peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         for core in crate::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::RMT);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::RMT, handler.handler()) };
         unwrap!(crate::interrupt::enable(Interrupt::RMT, handler.priority()));
+    }
+}
+
+impl crate::private::Sealed for Rmt<'_, Blocking> {}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }
 

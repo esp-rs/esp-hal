@@ -128,7 +128,7 @@ use crate::{
         OutputSignal,
         Pull,
     },
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     pac::twai0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralGuard,
@@ -972,6 +972,15 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
             _guard: self._guard,
         }
     }
+
+    /// Registers an interrupt handler for the TWAI peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.internal_set_interrupt_handler(handler);
+    }
 }
 
 impl<'d> TwaiConfiguration<'d, Async> {
@@ -994,7 +1003,8 @@ impl<'d> TwaiConfiguration<'d, Async> {
 
 impl crate::private::Sealed for TwaiConfiguration<'_, Blocking> {}
 
-impl InterruptConfigurable for TwaiConfiguration<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for TwaiConfiguration<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.internal_set_interrupt_handler(handler);
     }
