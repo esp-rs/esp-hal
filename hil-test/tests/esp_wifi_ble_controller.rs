@@ -1,6 +1,6 @@
 //! Test we can talk to the BLE controller.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
 //% FEATURES: unstable esp-wifi esp-alloc esp-wifi/ble
 
 #![no_std]
