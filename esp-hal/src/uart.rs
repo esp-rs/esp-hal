@@ -349,6 +349,14 @@ impl Config {
         };
         length
     }
+
+    fn validate(&self) -> Result<(), ConfigError> {
+        // Max supported baud rate is 5Mbaud
+        if self.baudrate == 0 || self.baudrate > 5_000_000 {
+            return Err(ConfigError::UnsupportedBaudrate);
+        }
+        Ok(())
+    }
 }
 
 /// Configuration for the AT-CMD detection functionality
@@ -455,6 +463,8 @@ pub struct UartRx<'d, Dm> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
+    /// The requested baud rate is not supported.
+    UnsupportedBaudrate,
     /// The requested timeout is not supported.
     UnsupportedTimeout,
     /// The requested FIFO threshold is not supported.
@@ -466,6 +476,9 @@ impl core::error::Error for ConfigError {}
 impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            ConfigError::UnsupportedBaudrate => {
+                write!(f, "The requested baud rate is not supported")
+            }
             ConfigError::UnsupportedTimeout => write!(f, "The requested timeout is not supported"),
             ConfigError::UnsupportedFifoThreshold => {
                 write!(f, "The requested FIFO threshold is not supported")
@@ -1178,7 +1191,8 @@ where
     ///
     /// # Errors.
     /// Errors will be returned in the cases described in
-    /// [`UartRx::apply_config`].
+    /// [`UartRx::apply_config`] and if baud rate passed in config exceeds
+    /// 5MBaud or is equal to zero.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
@@ -2190,6 +2204,7 @@ impl Info {
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
+        config.validate()?;
         self.change_baud(config);
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
