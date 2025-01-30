@@ -108,10 +108,7 @@ mod tests {
 
         let (_, tx) = hil_test::common_test_pins!(peripherals);
 
-        let tx_config = TxChannelConfig {
-            clk_divider: 255,
-            ..TxChannelConfig::default()
-        };
+        let tx_config = TxChannelConfig::default().with_clk_divider(255);
 
         let tx_channel = {
             use esp_hal::rmt::TxChannelCreator;

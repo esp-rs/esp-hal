@@ -34,6 +34,7 @@
 //! let mut crc = crc32_be(!CRC_INITIAL, &data0.as_ref()); // start
 //! crc = crc32_be(crc, &data1.as_ref());
 //! crc = !crc32_be(crc, &data2.as_ref()); // finish
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -47,6 +48,7 @@
 //! # use esp_hal::rom::crc::crc32_le;
 //! # let data = "123456789";
 //! let crc = crc32_le(!0xffffffff, &data.as_ref());
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -56,6 +58,7 @@
 //! # use esp_hal::rom::crc::crc32_be;
 //! # let data = "123456789";
 //! let crc = crc32_be(!0xffffffff, &data.as_ref());
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -65,6 +68,7 @@
 //! # use esp_hal::rom::crc::crc32_be;
 //! # let data = "123456789";
 //! let crc = !crc32_be(!0xffffffff, &data.as_ref());
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -74,6 +78,7 @@
 //! # use esp_hal::rom::crc::crc32_be;
 //! # let data = "123456789";
 //! let crc = crc32_be(!0, &data.as_ref());
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -83,6 +88,7 @@
 //! # use esp_hal::rom::crc::crc16_le;
 //! # let data = "123456789";
 //! let crc = !crc16_le(!0, &data.as_ref());
+//! # Ok(())
 //! # }
 //! ```
 

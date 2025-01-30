@@ -47,12 +47,11 @@
 //! # use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
 //! # let delay = Delay::new();
 //! # let config = Config::default().with_rx(
-//!     RxConfig::default().with_fifo_full_threshold(30)
-//! );
+//! #    RxConfig::default().with_fifo_full_threshold(30)
+//! # );
 //! # let mut uart0 = Uart::new(
 //! #    peripherals.UART0,
-//! #    config)
-//! # .unwrap();
+//! #    config)?;
 //! uart0.set_interrupt_handler(interrupt_handler);
 //!
 //! critical_section::with(|cs| {
@@ -63,14 +62,7 @@
 //! });
 //!
 //! loop {
-//!     critical_section::with(|cs| {
-//!         let mut serial = SERIAL.borrow_ref_mut(cs);
-//!         let serial = serial.as_mut().unwrap();
-//!         writeln!(serial,
-//!             "Hello World! Send a single `#` character or send
-//!                 at least 30 characters to trigger interrupts.")
-//!         .ok();
-//!     });
+//!     println!("Send `#` character or >=30 characters");
 //!     delay.delay(1.secs());
 //! }
 //! # }
@@ -87,24 +79,23 @@
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
 //!         let mut serial = SERIAL.borrow_ref_mut(cs);
-//!         let serial = serial.as_mut().unwrap();
+//!         if let Some(serial) = serial.as_mut() {
+//!             let mut buf = [0u8; 64];
+//!             if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
+//!                 println!("Read {} bytes", cnt);
+//!             }
 //!
-//!         let mut buf = [0u8; 64];
-//!         if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
-//!             writeln!(serial, "Read {} bytes", cnt).ok();
+//!             let pending_interrupts = serial.interrupts();
+//!             println!(
+//!                 "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
+//!                 pending_interrupts.contains(UartInterrupt::AtCmd),
+//!                 pending_interrupts.contains(UartInterrupt::RxFifoFull),
+//!             );
+//!
+//!             serial.clear_interrupts(
+//!                 UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
+//!             );
 //!         }
-//!
-//!         let pending_interrupts = serial.interrupts();
-//!         writeln!(
-//!             serial,
-//!             "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
-//!             pending_interrupts.contains(UartInterrupt::AtCmd),
-//!             pending_interrupts.contains(UartInterrupt::RxFifoFull),
-//!         ).ok();
-//!
-//!         serial.clear_interrupts(
-//!             UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
-//!         );
 //!     });
 //! }
 //! ```
@@ -116,8 +107,6 @@
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
-#[cfg(any(doc, feature = "unstable"))]
-use embassy_embedded_hal::SetConfig;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
@@ -131,7 +120,7 @@ use crate::{
         PinGuard,
         Pull,
     },
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
@@ -187,19 +176,18 @@ impl core::fmt::Display for Error {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io::Error for Error {
     fn kind(&self) -> embedded_io::ErrorKind {
         embedded_io::ErrorKind::Other
     }
 }
 
-// (outside of `config` module in order not to "use" it an extra time)
 /// UART clock source
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
+#[instability::unstable]
 pub enum ClockSource {
     /// APB_CLK clock source
     #[cfg_attr(not(any(esp32c6, esp32h2, lp_uart)), default)]
@@ -284,19 +272,20 @@ pub enum StopBits {
 pub struct Config {
     /// The baud rate (speed) of the UART communication in bits per second
     /// (bps).
-    pub baudrate: u32,
+    baudrate: u32,
     /// Number of data bits in each frame (5, 6, 7, or 8 bits).
-    pub data_bits: DataBits,
+    data_bits: DataBits,
     /// Parity setting (None, Even, or Odd).
-    pub parity: Parity,
+    parity: Parity,
     /// Number of stop bits in each frame (1, 1.5, or 2 bits).
-    pub stop_bits: StopBits,
+    stop_bits: StopBits,
     /// Clock source used by the UART peripheral.
-    pub clock_source: ClockSource,
+    #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
+    clock_source: ClockSource,
     /// UART Receive part configuration.
-    pub rx: RxConfig,
+    rx: RxConfig,
     /// UART Transmit part configuration.
-    pub tx: TxConfig,
+    tx: TxConfig,
 }
 
 /// UART Receive part configuration.
@@ -305,9 +294,23 @@ pub struct Config {
 #[non_exhaustive]
 pub struct RxConfig {
     /// Threshold level at which the RX FIFO is considered full.
-    pub fifo_full_threshold: u16,
+    fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
-    pub timeout: Option<u8>,
+    timeout: Option<u8>,
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            rx: RxConfig::default(),
+            tx: TxConfig::default(),
+            baudrate: 115_200,
+            data_bits: Default::default(),
+            parity: Default::default(),
+            stop_bits: Default::default(),
+            clock_source: Default::default(),
+        }
+    }
 }
 
 /// UART Transmit part configuration.
@@ -321,20 +324,6 @@ impl Default for RxConfig {
         RxConfig {
             fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
             timeout: Some(UART_TOUT_THRESH_DEFAULT),
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            rx: RxConfig::default(),
-            tx: TxConfig::default(),
-            baudrate: 115_200,
-            data_bits: Default::default(),
-            parity: Default::default(),
-            stop_bits: Default::default(),
-            clock_source: Default::default(),
         }
     }
 }
@@ -370,17 +359,17 @@ impl Config {
 pub struct AtCmdConfig {
     /// Optional idle time before the AT command detection begins, in clock
     /// cycles.
-    pub pre_idle_count: Option<u16>,
+    pre_idle_count: Option<u16>,
     /// Optional idle time after the AT command detection ends, in clock
     /// cycles.
-    pub post_idle_count: Option<u16>,
+    post_idle_count: Option<u16>,
     /// Optional timeout between characters in the AT command, in clock
     /// cycles.
-    pub gap_timeout: Option<u16>,
+    gap_timeout: Option<u16>,
     /// The character that triggers the AT command detection.
-    pub cmd_char: u8,
+    cmd_char: u8,
     /// Optional number of characters to detect as part of the AT command.
-    pub char_num: u8,
+    char_num: u8,
 }
 
 impl Default for AtCmdConfig {
@@ -485,9 +474,8 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<Dm> SetConfig for Uart<'_, Dm>
+#[instability::unstable]
+impl<Dm> embassy_embedded_hal::SetConfig for Uart<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -499,9 +487,8 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<Dm> SetConfig for UartRx<'_, Dm>
+#[instability::unstable]
+impl<Dm> embassy_embedded_hal::SetConfig for UartRx<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -513,9 +500,8 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl<Dm> SetConfig for UartTx<'_, Dm>
+#[instability::unstable]
+impl<Dm> embassy_embedded_hal::SetConfig for UartTx<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -643,9 +629,9 @@ impl<'d> UartTx<'d, Blocking> {
     /// # use esp_hal::uart::{Config, UartTx};
     /// let tx = UartTx::new(
     ///     peripherals.UART0,
-    ///     Config::default())
-    /// .unwrap()
+    ///     Config::default())?
     /// .with_tx(peripherals.GPIO1);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn new(
@@ -925,9 +911,9 @@ impl<'d> UartRx<'d, Blocking> {
     /// # use esp_hal::uart::{Config, UartRx};
     /// let rx = UartRx::new(
     ///     peripherals.UART1,
-    ///     Config::default())
-    /// .unwrap()
+    ///     Config::default())?
     /// .with_rx(peripherals.GPIO2);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn new(
@@ -982,10 +968,10 @@ impl<'d> Uart<'d, Blocking> {
     /// # use esp_hal::uart::{Config, Uart};
     /// let mut uart1 = Uart::new(
     ///     peripherals.UART1,
-    ///     Config::default())
-    /// .unwrap()
+    ///     Config::default())?
     /// .with_rx(peripherals.GPIO1)
     /// .with_tx(peripherals.GPIO2);
+    /// # Ok(())
     /// # }
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
@@ -1086,17 +1072,17 @@ where
     /// # use esp_hal::uart::{Config, Uart};
     /// # let mut uart1 = Uart::new(
     /// #     peripherals.UART1,
-    /// #     Config::default())
-    /// # .unwrap()
+    /// #     Config::default())?
     /// # .with_rx(peripherals.GPIO1)
     /// # .with_tx(peripherals.GPIO2);
     /// // The UART can be split into separate Transmit and Receive components:
     /// let (mut rx, mut tx) = uart1.split();
     ///
     /// // Each component can be used individually to interact with the UART:
-    /// tx.write_bytes(&[42u8]).expect("write error!");
+    /// tx.write_bytes(&[42u8])?;
     /// let mut byte = [0u8; 1];
     /// rx.read_bytes(&mut byte);
+    /// # Ok(())
     /// # }
     /// ```
     pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
@@ -1109,10 +1095,10 @@ where
     /// # use esp_hal::uart::{Config, Uart};
     /// # let mut uart1 = Uart::new(
     /// #     peripherals.UART1,
-    /// #     Config::default())
-    /// # .unwrap();
+    /// #     Config::default())?;
     /// // Write bytes out over the UART:
-    /// uart1.write_bytes(b"Hello, world!").expect("write error!");
+    /// uart1.write_bytes(b"Hello, world!")?;
+    /// # Ok(())
     /// # }
     /// ```
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
@@ -1264,7 +1250,8 @@ where
 
 impl crate::private::Sealed for Uart<'_, Blocking> {}
 
-impl InterruptConfigurable for Uart<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Uart<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // `self.tx.uart` and `self.rx.uart` are the same
         self.tx.uart.info().set_interrupt_handler(handler);
@@ -1317,6 +1304,7 @@ impl Uart<'_, Blocking> {
     }
 }
 
+#[instability::unstable]
 impl<Dm> ufmt_write::uWrite for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -1334,6 +1322,7 @@ where
     }
 }
 
+#[instability::unstable]
 impl<Dm> ufmt_write::uWrite for UartTx<'_, Dm>
 where
     Dm: DriverMode,
@@ -1369,26 +1358,22 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ErrorType for Uart<'_, Dm> {
     type Error = Error;
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ErrorType for UartTx<'_, Dm> {
     type Error = Error;
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ErrorType for UartRx<'_, Dm> {
     type Error = Error;
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::Read for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -1398,8 +1383,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::Read for UartRx<'_, Dm>
 where
     Dm: DriverMode,
@@ -1417,8 +1401,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ReadReady for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -1428,8 +1411,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::ReadReady for UartRx<'_, Dm>
 where
     Dm: DriverMode,
@@ -1439,8 +1421,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::Write for Uart<'_, Dm>
 where
     Dm: DriverMode,
@@ -1454,8 +1435,7 @@ where
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl<Dm> embedded_io::Write for UartTx<'_, Dm>
 where
     Dm: DriverMode,
@@ -1763,8 +1743,7 @@ impl UartRx<'_, Async> {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io_async::Read for Uart<'_, Async> {
     /// In contrast to the documentation of embedded_io_async::Read, this
     /// method blocks until an uart interrupt occurs.
@@ -1774,8 +1753,7 @@ impl embedded_io_async::Read for Uart<'_, Async> {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io_async::Read for UartRx<'_, Async> {
     /// In contrast to the documentation of embedded_io_async::Read, this
     /// method blocks until an uart interrupt occurs.
@@ -1785,8 +1763,7 @@ impl embedded_io_async::Read for UartRx<'_, Async> {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io_async::Write for Uart<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_async(buf).await
@@ -1797,8 +1774,7 @@ impl embedded_io_async::Write for Uart<'_, Async> {
     }
 }
 
-#[cfg(any(doc, feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 impl embedded_io_async::Write for UartTx<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_async(buf).await
@@ -1912,7 +1888,7 @@ pub mod lp_uart {
 
             // Override protocol parameters from the configuration
             // uart_hal_set_baudrate(&hal, cfg->uart_proto_cfg.baud_rate, sclk_freq);
-            me.change_baud_internal(config.baudrate, config.clock_source);
+            me.change_baud_internal(&config);
             // uart_hal_set_parity(&hal, cfg->uart_proto_cfg.parity);
             me.change_parity(config.parity);
             // uart_hal_set_data_bit_num(&hal, cfg->uart_proto_cfg.data_bits);
@@ -1967,17 +1943,17 @@ pub mod lp_uart {
             }
         }
 
-        fn change_baud_internal(&mut self, baudrate: u32, clock_source: super::ClockSource) {
+        fn change_baud_internal(&mut self, config: &Config) {
             // TODO: Currently it's not possible to use XtalD2Clk
             let clk = 16_000_000_u32;
             let max_div = 0b1111_1111_1111 - 1;
-            let clk_div = clk.div_ceil(max_div * baudrate);
+            let clk_div = clk.div_ceil(max_div * config.baudrate);
 
             self.uart.register_block().clk_conf().modify(|_, w| unsafe {
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0);
                 w.sclk_div_num().bits(clk_div as u8 - 1);
-                w.sclk_sel().bits(match clock_source {
+                w.sclk_sel().bits(match config.clock_source {
                     super::ClockSource::Xtal => 3,
                     super::ClockSource::RcFast => 2,
                     super::ClockSource::Apb => panic!("Wrong clock source for LP_UART"),
@@ -1986,7 +1962,7 @@ pub mod lp_uart {
             });
 
             let clk = clk / clk_div;
-            let divider = clk / baudrate;
+            let divider = clk / config.baudrate;
             let divider = divider as u16;
 
             self.uart
@@ -2004,8 +1980,8 @@ pub mod lp_uart {
         /// [`Apb`] is a wrong clock source for LP_UART
         ///
         /// [`Apb`]: super::ClockSource::Apb
-        pub fn change_baud(&mut self, baudrate: u32, clock_source: super::ClockSource) {
-            self.change_baud_internal(baudrate, clock_source);
+        pub fn change_baud(&mut self, config: &Config) {
+            self.change_baud_internal(config);
             self.txfifo_reset();
             self.rxfifo_reset();
         }
@@ -2201,7 +2177,7 @@ impl Info {
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
-        self.change_baud(config.baudrate, config.clock_source);
+        self.change_baud(config);
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
@@ -2390,17 +2366,17 @@ impl Info {
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+    fn change_baud(&self, config: &Config) {
         use crate::peripherals::LPWR;
 
         let clocks = Clocks::get();
-        let clk = match clock_source {
+        let clk = match config.clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
             ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
         };
 
-        if clock_source == ClockSource::RcFast {
+        if config.clock_source == ClockSource::RcFast {
             LPWR::regs()
                 .clk_conf()
                 .modify(|_, w| w.dig_clk8m_en().variant(true));
@@ -2409,9 +2385,9 @@ impl Info {
         }
 
         let max_div = 0b1111_1111_1111 - 1;
-        let clk_div = clk.div_ceil(max_div * baudrate);
+        let clk_div = clk.div_ceil(max_div * config.baudrate);
         self.regs().clk_conf().write(|w| unsafe {
-            w.sclk_sel().bits(match clock_source {
+            w.sclk_sel().bits(match config.clock_source {
                 ClockSource::Apb => 1,
                 ClockSource::RcFast => 2,
                 ClockSource::Xtal => 3,
@@ -2423,7 +2399,7 @@ impl Info {
             w.tx_sclk_en().bit(true)
         });
 
-        let divider = (clk << 4) / (baudrate * clk_div);
+        let divider = (clk << 4) / (config.baudrate * clk_div);
         let divider_integer = (divider >> 4) as u16;
         let divider_frag = (divider & 0xf) as u8;
         self.regs()
@@ -2440,16 +2416,16 @@ impl Info {
     }
 
     #[cfg(any(esp32c6, esp32h2))]
-    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
+    fn change_baud(&self, config: &Config) {
         let clocks = Clocks::get();
-        let clk = match clock_source {
+        let clk = match config.clock_source {
             ClockSource::Apb => clocks.apb_clock.to_Hz(),
             ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
             ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
         };
 
         let max_div = 0b1111_1111_1111 - 1;
-        let clk_div = clk.div_ceil(max_div * baudrate);
+        let clk_div = clk.div_ceil(max_div * config.baudrate);
 
         // UART clocks are configured via PCR
         let pcr = crate::peripherals::PCR::regs();
@@ -2462,7 +2438,7 @@ impl Info {
                 w.uart0_sclk_div_a().bits(0);
                 w.uart0_sclk_div_b().bits(0);
                 w.uart0_sclk_div_num().bits(clk_div as u8 - 1);
-                w.uart0_sclk_sel().bits(match clock_source {
+                w.uart0_sclk_sel().bits(match config.clock_source {
                     ClockSource::Apb => 1,
                     ClockSource::RcFast => 2,
                     ClockSource::Xtal => 3,
@@ -2477,7 +2453,7 @@ impl Info {
                 w.uart1_sclk_div_a().bits(0);
                 w.uart1_sclk_div_b().bits(0);
                 w.uart1_sclk_div_num().bits(clk_div as u8 - 1);
-                w.uart1_sclk_sel().bits(match clock_source {
+                w.uart1_sclk_sel().bits(match config.clock_source {
                     ClockSource::Apb => 1,
                     ClockSource::RcFast => 2,
                     ClockSource::Xtal => 3,
@@ -2487,7 +2463,7 @@ impl Info {
         }
 
         let clk = clk / clk_div;
-        let divider = clk / baudrate;
+        let divider = clk / config.baudrate;
         let divider = divider as u16;
 
         self.regs()
@@ -2498,18 +2474,19 @@ impl Info {
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn change_baud(&self, baudrate: u32, clock_source: ClockSource) {
-        let clk = match clock_source {
+    fn change_baud(&self, config: &Config) {
+        let clk = match config.clock_source {
             ClockSource::Apb => Clocks::get().apb_clock.to_Hz(),
             // ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
             ClockSource::RefTick => crate::soc::constants::REF_TICK.to_Hz(),
         };
 
-        self.regs()
-            .conf0()
-            .modify(|_, w| w.tick_ref_always_on().bit(clock_source == ClockSource::Apb));
+        self.regs().conf0().modify(|_, w| {
+            w.tick_ref_always_on()
+                .bit(config.clock_source == ClockSource::Apb)
+        });
 
-        let divider = clk / baudrate;
+        let divider = clk / config.baudrate;
 
         self.regs()
             .clkdiv()

@@ -24,6 +24,7 @@
 //! // configure GPIO 1 as LP output pin
 //! let lp_pin: LowPowerOutput<'_, 1> =
 //!     LowPowerOutput::new(peripherals.GPIO1);
+//! # Ok(())
 //! # }
 //! ```
 

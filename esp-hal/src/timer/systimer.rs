@@ -736,6 +736,7 @@ pub mod etm {
     //! let timer = PeriodicTimer::new(alarm0);
     //! // configure the timer as usual
     //! // when it fires it will toggle the GPIO
+    //! # Ok(())
     //! # }
     //! ```
 

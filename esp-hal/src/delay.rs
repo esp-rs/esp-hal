@@ -24,6 +24,7 @@
 //! let mut delay = Delay::new();
 //!
 //! delay.delay_ms(1000 as u32);
+//! # Ok(())
 //! # }
 //! ```
 //! 

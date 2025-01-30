@@ -44,13 +44,14 @@
 //! while !source_data.is_empty() {
 //!     // All the HW Sha functions are infallible so unwrap is fine to use if
 //!     // you use block!
-//!     source_data = block!(hasher.update(source_data)).unwrap();
+//!     source_data = block!(hasher.update(source_data))?;
 //! }
 //!
 //! // Finish can be called as many times as desired to get multiple copies of
 //! // the output.
-//! block!(hasher.finish(output.as_mut_slice())).unwrap();
+//! block!(hasher.finish(output.as_mut_slice()))?;
 //!
+//! # Ok(())
 //! # }
 //! ```
 //! ## Implementation State
@@ -107,6 +108,7 @@ impl<'d> Sha<'d> {
 impl crate::private::Sealed for Sha<'_> {}
 
 #[cfg(not(esp32))]
+#[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for Sha<'_> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         for core in crate::Cpu::other() {

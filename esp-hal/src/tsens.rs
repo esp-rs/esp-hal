@@ -28,8 +28,7 @@
 //!
 //! let temperature_sensor = TemperatureSensor::new(
 //!         peripherals.TSENS,
-//!         Config::default()
-//!     ).unwrap();
+//!         Config::default())?;
 //! let delay = Delay::new();
 //! delay.delay_micros(200);
 //! loop {
@@ -68,6 +67,7 @@ pub enum ClockSource {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
+    /// Clock source for the temperature sensor
     clock_source: ClockSource,
 }
 

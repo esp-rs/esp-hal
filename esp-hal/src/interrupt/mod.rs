@@ -42,7 +42,9 @@
 //! });
 //!
 //! critical_section::with(|cs| {
-//!     SWINT0.borrow_ref(cs).as_ref().unwrap().raise();
+//!     if let Some(swint) = SWINT0.borrow_ref(cs).as_ref(){
+//!         swint.raise();
+//!     }
 //! });
 //! #
 //! # loop {}
@@ -62,7 +64,9 @@
 //! fn swint0_handler() {
 //!     println!("SW interrupt0");
 //!     critical_section::with(|cs| {
-//!         SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
+//!         if let Some(swint) = SWINT0.borrow_ref(cs).as_ref() {
+//!             swint.reset();
+//!         }
 //!     });
 //! }
 //! ```

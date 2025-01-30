@@ -76,11 +76,12 @@ mod tests {
     fn test_i8080_8bit(ctx: Context<'static>) {
         let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
 
-        let i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
-            let mut config = Config::default();
-            config.frequency = 20.MHz();
-            config
-        })
+        let i8080 = I8080::new(
+            ctx.lcd_cam.lcd,
+            ctx.dma,
+            pins,
+            Config::default().with_frequency(20.MHz()),
+        )
         .unwrap();
 
         let xfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
@@ -138,11 +139,12 @@ mod tests {
             NoPin,
         );
 
-        let mut i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
-            let mut config = Config::default();
-            config.frequency = 20.MHz();
-            config
-        })
+        let mut i8080 = I8080::new(
+            ctx.lcd_cam.lcd,
+            ctx.dma,
+            pins,
+            Config::default().with_frequency(20.MHz()),
+        )
         .unwrap()
         .with_cs(cs_signal)
         .with_ctrl_pins(NoPin, NoPin);
@@ -259,11 +261,12 @@ mod tests {
             unit3_signal,
         );
 
-        let mut i8080 = I8080::new(ctx.lcd_cam.lcd, ctx.dma, pins, {
-            let mut config = Config::default();
-            config.frequency = 20.MHz();
-            config
-        })
+        let mut i8080 = I8080::new(
+            ctx.lcd_cam.lcd,
+            ctx.dma,
+            pins,
+            Config::default().with_frequency(20.MHz()),
+        )
         .unwrap()
         .with_cs(cs_signal)
         .with_ctrl_pins(NoPin, NoPin);

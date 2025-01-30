@@ -56,8 +56,6 @@ use portable_atomic::{AtomicU32, Ordering};
 use procmacros::ram;
 use strum::EnumCount;
 
-#[cfg(feature = "unstable")]
-use crate::interrupt::InterruptConfigurable;
 #[cfg(any(lp_io, rtc_cntl))]
 use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
@@ -447,6 +445,7 @@ pub trait Pin: Sealed {
     ///
     /// let mut delay = Delay::new();
     /// toggle_pins(pins, &mut delay);
+    /// # Ok(())
     /// # }
     /// ```
     fn degrade(self) -> AnyPin
@@ -647,6 +646,7 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// let (rx, tx) = peripherals.GPIO2.split();
+    /// # Ok(())
     /// # }
     /// ```
     #[instability::unstable]
@@ -787,7 +787,7 @@ impl Io {
 impl crate::private::Sealed for Io {}
 
 #[instability::unstable]
-impl InterruptConfigurable for Io {
+impl crate::interrupt::InterruptConfigurable for Io {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
     }
@@ -1115,13 +1115,13 @@ pub enum DriveMode {
 #[non_exhaustive]
 pub struct OutputConfig {
     /// Output drive mode.
-    pub drive_mode: DriveMode,
+    drive_mode: DriveMode,
 
     /// Pin drive strength.
-    pub drive_strength: DriveStrength,
+    drive_strength: DriveStrength,
 
     /// Pin pull direction.
-    pub pull: Pull,
+    pull: Pull,
 }
 
 impl Default for OutputConfig {
@@ -1181,6 +1181,7 @@ impl<'d> Output<'d> {
     /// let mut delay = Delay::new();
     ///
     /// blink_once(&mut led, &mut delay);
+    /// # Ok(())
     /// # }
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
@@ -1211,6 +1212,7 @@ impl<'d> Output<'d> {
     /// # let config = OutputConfig::default();
     /// let pin1 = Output::new(peripherals.GPIO1, Level::High, config);
     /// let (input, output) = pin1.split();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]
@@ -1230,6 +1232,7 @@ impl<'d> Output<'d> {
     /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High, config);
     /// // Can be passed as an input.
     /// let input = pin1_gpio.peripheral_input();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]
@@ -1249,6 +1252,7 @@ impl<'d> Output<'d> {
     /// # let config = OutputConfig::default();
     /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High, config);
     /// let output = pin1_gpio.into_peripheral_output();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]
@@ -1332,7 +1336,7 @@ impl<'d> Output<'d> {
 #[non_exhaustive]
 pub struct InputConfig {
     /// Initial pull of the pin.
-    pub pull: Pull,
+    pull: Pull,
 }
 
 impl Default for InputConfig {
@@ -1394,6 +1398,7 @@ impl<'d> Input<'d> {
     /// let mut delay = Delay::new();
     ///
     /// print_when_pressed(&mut button, &mut delay);
+    /// # Ok(())
     /// # }
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
@@ -1418,6 +1423,7 @@ impl<'d> Input<'d> {
     /// let config = InputConfig::default().with_pull(Pull::Up);
     /// let pin1_gpio = Input::new(peripherals.GPIO1, config);
     /// let pin1 = pin1_gpio.peripheral_input();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]
@@ -1485,6 +1491,7 @@ impl<'d> Input<'d> {
     ///     button.listen(Event::LowLevel);
     ///     BUTTON.borrow_ref_mut(cs).replace(button);
     /// });
+    /// # Ok(())
     /// # }
     ///
     /// // Outside of your `main` function:
@@ -1571,6 +1578,7 @@ impl<'d> Input<'d> {
     /// let config = InputConfig::default().with_pull(Pull::Up);
     /// let pin1 = Input::new(peripherals.GPIO1, config);
     /// let (input, output) = pin1.split();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]
@@ -1591,6 +1599,7 @@ impl<'d> Input<'d> {
     /// let pin1_gpio = Input::new(peripherals.GPIO1, config);
     /// // Can be passed as an output.
     /// let pin1 = pin1_gpio.into_peripheral_output();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]
@@ -1666,6 +1675,7 @@ impl<'d> Flex<'d> {
     /// let pin1_gpio = Flex::new(peripherals.GPIO1);
     /// // Can be passed as an input.
     /// let pin1 = pin1_gpio.peripheral_input();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]
@@ -1901,6 +1911,7 @@ impl<'d> Flex<'d> {
     /// # use esp_hal::gpio::Flex;
     /// let pin1 = Flex::new(peripherals.GPIO1);
     /// let (input, output) = pin1.split();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]
@@ -1921,6 +1932,7 @@ impl<'d> Flex<'d> {
     /// let pin1_gpio = Flex::new(peripherals.GPIO1);
     /// // Can be passed as an output.
     /// let pin1 = pin1_gpio.into_peripheral_output();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]
@@ -1966,6 +1978,7 @@ impl AnyPin {
     /// # use esp_hal::gpio::{AnyPin, Pin};
     /// let pin1 = peripherals.GPIO1.degrade();
     /// let (input, output) = pin1.split();
+    /// # Ok(())
     /// # }
     /// ```
     #[inline]

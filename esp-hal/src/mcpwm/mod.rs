@@ -57,11 +57,11 @@
 //! // initialize peripheral
 #![cfg_attr(
     esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(40.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(40.MHz())?;"
 )]
 #![cfg_attr(
     not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(32.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(32.MHz())?;"
 )]
 //! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 //!
@@ -75,12 +75,12 @@
 //! // start timer with timestamp values in the range of 0..=99 and a frequency
 //! // of 20 kHz
 //! let timer_clock_cfg = clock_cfg
-//!     .timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20.kHz())
-//!     .unwrap();
+//!     .timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20.kHz())?;
 //! mcpwm.timer0.start(timer_clock_cfg);
 //!
 //! // pin will be high 50% of the time
 //! pwm_pin.set_timestamp(50);
+//! # Ok(())
 //! # }
 //! ```
 
