@@ -3579,6 +3579,8 @@ struct SpiFuture<'a> {
 
 impl<'a> SpiFuture<'a> {
     fn setup(driver: &'a Driver) -> impl Future<Output = Self> {
+        // Make sure this is called before starting an async operation. On the ESP32,
+        // calling after may cause the interrupt to not fire.
         core::future::poll_fn(move |cx| {
             driver.state.waker.register(cx.waker());
             driver.clear_interrupts(SpiInterrupt::TransferDone.into());
