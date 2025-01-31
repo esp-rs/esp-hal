@@ -207,4 +207,14 @@ All async functions now include the `_async` postfix. Additionally the non-async
 ```diff
 - let result = i2c.write_read(0x77, &[0xaa], &mut data).await;
 + let result = i2c.write_read_async(0x77, &[0xaa], &mut data).await;
+
+## ADC Changes
+
+The ADC driver has gained a new `Async`/`Blocking` mode parameter.
+NOTE: Async support is only supported in ESP32C3 and ESP32C6 for now
+
+
+```diff
+- Adc<'d, ADC>
++ Adc<'d, ADC, Blocking>
 ```

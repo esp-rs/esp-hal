@@ -106,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: Made Wi-Fi peripheral non virtual. (#2942)
 - `UartRx::check_for_errors`, `Uart::check_for_rx_errors`, `{Uart, UartRx}::read_buffered_bytes` (#2935)
 - Added `i2c` interrupt API (#2944)
+- Async support for ADC oneshot reads for ESP32C3 and ESP32C6 (#2925)
 
 ### Changed
 
