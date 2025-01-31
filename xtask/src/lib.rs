@@ -80,6 +80,11 @@ impl Package {
 
         matches!(self, EspHal | EspLpHal | EspWifi)
     }
+
+    /// Should documentation be built for the package?
+    pub fn should_document(&self) -> bool {
+        !matches!(self, Package::Examples | Package::HilTest | Package::QaTest)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Display, ValueEnum)]
