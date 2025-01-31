@@ -265,6 +265,18 @@ pub enum StopBits {
     _2   = 3,
 }
 
+/// Defines how strictly the requested baud rate must be met.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BaudrateTolerance {
+    /// Accept the closest achievable baud rate without restriction.
+    #[default]
+    Closest,
+    /// Require an exact match, otherwise return an error.
+    Exact,
+    /// Allow a certain percentage of deviation.
+    ErrorPercent(u8),
+}
+
 /// UART Configuration
 #[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -273,6 +285,9 @@ pub struct Config {
     /// The baud rate (speed) of the UART communication in bits per second
     /// (bps).
     baudrate: u32,
+    /// Determines how close to the desired baud rate value the driver should
+    /// set the baud rate.
+    baudrate_tolerance: BaudrateTolerance,
     /// Number of data bits in each frame (5, 6, 7, or 8 bits).
     data_bits: DataBits,
     /// Parity setting (None, Even, or Odd).
@@ -305,6 +320,7 @@ impl Default for Config {
             rx: RxConfig::default(),
             tx: TxConfig::default(),
             baudrate: 115_200,
+            baudrate_tolerance: BaudrateTolerance::default(),
             data_bits: Default::default(),
             parity: Default::default(),
             stop_bits: Default::default(),
@@ -463,6 +479,8 @@ pub struct UartRx<'d, Dm> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
+    /// The requested baud rate is not achievable.
+    UnachievableBaudrate,
     /// The requested baud rate is not supported.
     UnsupportedBaudrate,
     /// The requested timeout is not supported.
@@ -476,6 +494,9 @@ impl core::error::Error for ConfigError {}
 impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            ConfigError::UnachievableBaudrate => {
+                write!(f, "The requested baud rate is not achievable")
+            }
             ConfigError::UnsupportedBaudrate => {
                 write!(f, "The requested baud rate is not supported")
             }
@@ -2205,7 +2226,7 @@ impl Info {
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
         config.validate()?;
-        self.change_baud(config);
+        self.change_baud(config)?;
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
@@ -2475,6 +2496,24 @@ impl Info {
         });
 
         self.sync_regs();
+
+        let actual_baud = self.get_baudrate(clk);
+
+        match config.baudrate_tolerance {
+            BaudrateTolerance::Exact if actual_baud != config.baudrate => {
+                return Err(ConfigError::UnachievableBaudrate)
+            }
+            BaudrateTolerance::ErrorPercent(percent) => {
+                let deviation = ((config.baudrate as i64 - actual_baud as i64).abs() as u64 * 100)
+                    / actual_baud as u64;
+                if deviation > percent as u64 {
+                    return Err(ConfigError::UnachievableBaudrate);
+                }
+            }
+            _ => {}
+        }
+
+        Ok(())
     }
 
     fn change_data_bits(&self, data_bits: DataBits) {
@@ -2530,6 +2569,32 @@ impl Info {
 
         txfifo_rst(self.regs(), true);
         txfifo_rst(self.regs(), false);
+    }
+
+    fn get_baudrate(&self, clk: u32) -> u32 {
+        // taken from https://github.com/espressif/esp-idf/blob/master/components/hal/esp32c6/include/hal/uart_ll.h#L433-L444
+        // (it's different for different chips)
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                let clkdiv_reg = self.regs().clkdiv().read();
+                let clkdiv = clkdiv_reg.clkdiv().bits() as u32;
+                let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
+                (clk << 4) / ((clkdiv << 4) | clkdiv_frag)
+            } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
+                let clkdiv_reg = self.regs().clkdiv().read();
+                let clkdiv = clkdiv_reg.clkdiv().bits() as u32;
+                let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
+                let sclk_div_num = self.regs().clk_conf().read().sclk_div_num().bits() as u32;
+                (clk << 4) / (((clkdiv << 4) | clkdiv_frag) * (sclk_div_num + 1))
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                let pcr = crate::peripherals::PCR::regs();
+                let clkdiv_reg = self.regs().clkdiv().read();
+                let clkdiv = clkdiv_reg.clkdiv().bits() as u32;
+                let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
+                let sclk_div_num = pcr.uart0_sclk_conf().read().uart0_sclk_div_num().bits() as u32;
+                (clk << 4) / (((clkdiv << 4) | clkdiv_frag) * (sclk_div_num + 1))
+            }
+        }
     }
 }
 
