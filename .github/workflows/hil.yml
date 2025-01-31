@@ -30,7 +30,7 @@ env:
 jobs:
   build-xtasks:
     name: Build xtasks | ${{ matrix.host.arch }}
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
 
     strategy:
       fail-fast: false
