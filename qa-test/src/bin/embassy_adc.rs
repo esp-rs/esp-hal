@@ -1,6 +1,6 @@
 //! This shows how to asynchronously read ADC data
 
-//% CHIPS: esp32c3 esp32c6 esp32h2
+//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
