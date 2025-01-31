@@ -1,9 +1,12 @@
 use core::marker::PhantomData;
 
-#[cfg(esp32c3)]
-use Interrupt::APB_ADC as InterruptSource;
-#[cfg(esp32c6)]
-use Interrupt::APB_SARADC as InterruptSource;
+cfg_if::cfg_if! {
+    if #[cfg(any(esp32c3, esp32h2))] {
+        use Interrupt::APB_ADC as InterruptSource;
+    } else if #[cfg(esp32c6)] {
+        use Interrupt::APB_SARADC as InterruptSource;
+    }
+}
 
 #[cfg(not(esp32h2))]
 pub use self::calibration::*;
@@ -12,7 +15,7 @@ use super::{AdcCalSource, AdcConfig, Attenuation};
 use crate::clock::clocks_ll::regi2c_write_mask;
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
 use crate::efuse::Efuse;
-#[cfg(any(esp32c3, esp32c6))]
+#[cfg(any(esp32c3, esp32c6, esp32h2))]
 use crate::{
     analog::adc::asynch::AdcFuture,
     interrupt::{InterruptConfigurable, InterruptHandler},
@@ -435,7 +438,7 @@ where
         }
     }
 
-    #[cfg(any(esp32c3, esp32c6))]
+    #[cfg(any(esp32c3, esp32c6, esp32h2))]
     /// Reconfigures the ADC driver to operate in asynchronous mode.
     pub fn into_async(mut self) -> Adc<'d, ADCI, Async> {
         self.set_interrupt_handler(asynch::adc_interrupt_handler);
@@ -531,7 +534,7 @@ where
 
 impl<ADCI> crate::private::Sealed for Adc<'_, ADCI, Blocking> {}
 
-#[cfg(any(esp32c3, esp32c6))]
+#[cfg(any(esp32c3, esp32c6, esp32h2))]
 impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
@@ -635,7 +638,7 @@ mod adc_implementation {
     }
 }
 
-#[cfg(any(esp32c3, esp32c6))]
+#[cfg(any(esp32c3, esp32c6, esp32h2))]
 impl<'d, ADCI> Adc<'d, ADCI, Async>
 where
     ADCI: RegisterAccess + 'd,
@@ -697,7 +700,7 @@ where
     }
 }
 
-#[cfg(any(esp32c3, esp32c6))]
+#[cfg(any(esp32c3, esp32c6, esp32h2))]
 /// Async functionality
 pub(crate) mod asynch {
     use core::{
