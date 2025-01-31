@@ -196,6 +196,11 @@ name              = "esp_wifi_floats"
 harness           = false
 required-features = ["esp-wifi", "esp-alloc"]
 
+[[test]]
+name              = "esp_wifi_ble_controller"
+harness           = false
+required-features = ["esp-wifi", "esp-alloc"]
+
 [dependencies]
 cfg-if             = "1.0.0"
 critical-section   = "1.1.3"
@@ -206,6 +211,7 @@ embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.0"
 embassy-time       = "0.4.0"
 embedded-hal       = "1.0.0"
+embedded-io        = "0.6.1"
 embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
 embedded-hal-nb    = "1.0.0"
@@ -213,7 +219,7 @@ esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["exception-handler", "defmt", "semihosting"] }
 esp-hal            = { path = "../esp-hal", default-features = false, features = ["digest"], optional = true } # TODO: default-features = false should be removed for 1.0.0-beta0
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
-esp-wifi           = { path = "../esp-wifi", optional = true, features = ["wifi"] }
+esp-wifi           = { path = "../esp-wifi", optional = true }
 portable-atomic    = "1.9.0"
 static_cell        = { version = "2.1.0", features = ["nightly"] }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }

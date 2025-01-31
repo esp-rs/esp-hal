@@ -21,7 +21,7 @@ DEFMT_LOG = "info"
 ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE="multiple-integrated"
 
 [unstable]
-build-std = ["core"]
+build-std = ["core", "alloc"]
 
 [net]
 git-fetch-with-cli = true
