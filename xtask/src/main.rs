@@ -12,7 +12,9 @@ use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
-    target_triple, Package, Version,
+    target_triple,
+    Package,
+    Version,
 };
 
 // ----------------------------------------------------------------------------
@@ -52,6 +54,8 @@ enum Cli {
     RunElfs(RunElfArgs),
     /// Perform (parts of) the checks done in CI
     Ci(CiArgs),
+    /// Generate git tags for all new package releases.
+    TagReleases(TagReleasesArgs),
 }
 
 #[derive(Debug, Args)]
@@ -193,6 +197,16 @@ struct CiArgs {
     chip: Chip,
 }
 
+#[derive(Debug, Args)]
+struct TagReleasesArgs {
+    /// Chip to target.
+    #[arg(value_enum)]
+    chip: Chip,
+    /// Package(s) to tag.
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    packages: Vec<Package>,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -226,6 +240,7 @@ fn main() -> Result<()> {
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
         Cli::RunTests(args) => tests(&workspace, args, CargoAction::Run),
         Cli::Ci(args) => run_ci_checks(&workspace, args),
+        Cli::TagReleases(args) => tag_releases(&workspace, args),
     }
 }
 
@@ -1084,6 +1099,47 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     if failure {
         bail!("CI checks failed");
     }
+
+    Ok(())
+}
+
+fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
+    args.packages.sort();
+
+    let mut created = 0;
+    for package in args.packages {
+        // If a package does not require documentation, this also means that it is not
+        // published (maybe this function needs a better name), so we can skip tagging
+        // it:
+        if !package.is_published() {
+            continue;
+        }
+
+        let version = xtask::package_version(workspace, package)?;
+        let tag = if package == Package::EspHal {
+            format!("v{version}")
+        } else {
+            format!("{package}-v{version}")
+        };
+
+        let output = Command::new("git")
+            .arg("tag")
+            .arg(&tag)
+            .current_dir(workspace)
+            .output()?;
+
+        if output.stderr.is_empty() {
+            created += 1;
+            log::info!("Created tag '{tag}'");
+        } else {
+            let err = String::from_utf8_lossy(&output.stderr);
+            let err = err.trim_start_matches("fatal: ");
+            log::warn!("{}", err);
+        }
+    }
+
+    log::info!("Created {created} tags");
+    log::info!("IMPORTANT: Don't forget to push the tags to the correct remote!");
 
     Ok(())
 }
