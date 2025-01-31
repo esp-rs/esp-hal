@@ -63,6 +63,9 @@ fn main() -> ! {
     let mut wifi = peripherals.WIFI;
     let (iface, device, mut controller) =
         create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+    controller
+        .set_power_saving(esp_wifi::config::PowerSaveMode::None)
+        .unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let mut socket_set = SocketSet::new(&mut socket_set_entries[..]);
