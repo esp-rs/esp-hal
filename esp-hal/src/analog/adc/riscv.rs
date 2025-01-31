@@ -441,6 +441,7 @@ where
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
     /// Reconfigures the ADC driver to operate in asynchronous mode.
     pub fn into_async(mut self) -> Adc<'d, ADCI, Async> {
+        asynch::acquire_async_adc();
         self.set_interrupt_handler(asynch::adc_interrupt_handler);
 
         // Reset interrupt flags and disable oneshot reading to normalize state before
@@ -645,7 +646,12 @@ where
 {
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Adc<'d, ADCI, Blocking> {
-        crate::interrupt::disable(crate::Cpu::current(), InterruptSource);
+        if asynch::release_async_adc() {
+            // Disable ADC interrupt on all cores if the last async ADC instance is disabled
+            for cpu in crate::Cpu::all() {
+                crate::interrupt::disable(cpu, InterruptSource);
+            }
+        }
         Adc {
             _adc: self._adc,
             attenuations: self.attenuations,
@@ -709,9 +715,29 @@ pub(crate) mod asynch {
         task::{Context, Poll},
     };
 
+    #[cfg(esp32c3)]
+    use portable_atomic::{AtomicU32, Ordering};
     use procmacros::handler;
 
     use crate::{asynch::AtomicWaker, peripherals::APB_SARADC, Async};
+
+    #[cfg(esp32c3)]
+    static ASYNC_ADC_COUNT: AtomicU32 = AtomicU32::new(0);
+
+    pub(super) fn acquire_async_adc() {
+        #[cfg(esp32c3)]
+        ASYNC_ADC_COUNT.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(super) fn release_async_adc() -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32c3)] {
+                ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
+            } else {
+                true
+            }
+        }
+    }
 
     #[handler]
     pub(crate) fn adc_interrupt_handler() {
