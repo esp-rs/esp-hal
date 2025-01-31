@@ -43,6 +43,8 @@ macro_rules! trm_link {
 pub use chip;
 
 pub(crate) mod constants {
+    use crate::time::Rate;
+
     /// The base clock frequency for the I2S peripheral (Hertz).
     pub const I2S_SCLK: u32 = 160_000_000;
     /// The default clock source for I2S operations.
@@ -55,7 +57,7 @@ pub(crate) mod constants {
     /// RMT Clock source value.
     pub const RMT_CLOCK_SRC: u8 = 1;
     /// RMT Clock source frequency.
-    pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(80);
+    pub const RMT_CLOCK_SRC_FREQ: Rate = Rate::from_mhz(80);
 
     /// The lower bound of the system's DRAM (Data RAM) address space.
     pub const SOC_DRAM_LOW: usize = 0x3FC8_8000;
@@ -63,7 +65,7 @@ pub(crate) mod constants {
     pub const SOC_DRAM_HIGH: usize = 0x3FD0_0000;
 
     /// A reference clock tick of 1 MHz.
-    pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
+    pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);
 }
 
 #[doc(hidden)]

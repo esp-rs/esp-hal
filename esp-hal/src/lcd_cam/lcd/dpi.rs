@@ -31,7 +31,7 @@
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
 //! let config = dpi::Config::default()
-//!     .with_frequency(1.MHz())
+//!     .with_frequency(Rate::from_mhz(1))
 //!     .with_clock_mode(ClockMode {
 //!         polarity: Polarity::IdleLow,
 //!         phase: Phase::ShiftLow,
@@ -101,8 +101,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use fugit::{HertzU32, RateExtU32};
-
 use crate::{
     clock::Clocks,
     dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, Tx, TxChannelFor},
@@ -118,6 +116,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
+    time::Rate,
     Blocking,
     DriverMode,
 };
@@ -176,11 +175,11 @@ where
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
         let (i, divider) = calculate_clkm(
-            (config.frequency.to_Hz() * 2) as _,
+            (config.frequency.as_hz() * 2) as _,
             &[
-                clocks.xtal_clock.to_Hz() as _,
-                clocks.cpu_clock.to_Hz() as _,
-                clocks.crypto_pwm_clock.to_Hz() as _,
+                clocks.xtal_clock.as_hz() as _,
+                clocks.cpu_clock.as_hz() as _,
+                clocks.crypto_pwm_clock.as_hz() as _,
             ],
         )
         .map_err(ConfigError::Clock)?;
@@ -702,7 +701,7 @@ pub struct Config {
     clock_mode: ClockMode,
 
     /// The frequency of the pixel clock.
-    frequency: HertzU32,
+    frequency: Rate,
 
     /// Format of the byte data sent out.
     format: Format,
@@ -741,7 +740,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             clock_mode: Default::default(),
-            frequency: 1.MHz(),
+            frequency: Rate::from_mhz(1),
             format: Default::default(),
             timing: Default::default(),
             vsync_idle_level: Level::Low,

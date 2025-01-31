@@ -33,7 +33,7 @@ use esp_hal::{
         LcdCam,
     },
     main,
-    time::RateExtU32,
+    time::Rate,
     Blocking,
 };
 use esp_println::println;
@@ -73,7 +73,7 @@ fn main() -> ! {
         lcd_cam.lcd,
         peripherals.DMA_CH0,
         tx_pins,
-        Config::default().with_frequency(20.MHz()),
+        Config::default().with_frequency(Rate::from_mhz(20)),
     )
     .unwrap()
     .with_ctrl_pins(lcd_rs, lcd_wr);

@@ -63,7 +63,7 @@
 //!
 //! loop {
 //!     println!("Send `#` character or >=30 characters");
-//!     delay.delay(1.secs());
+//!     delay.delay(Duration::from_secs(1));
 //! }
 //! # }
 //!
@@ -2371,9 +2371,9 @@ impl Info {
 
         let clocks = Clocks::get();
         let clk = match config.clock_source {
-            ClockSource::Apb => clocks.apb_clock.to_Hz(),
-            ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
+            ClockSource::Apb => clocks.apb_clock.as_hz(),
+            ClockSource::Xtal => clocks.xtal_clock.as_hz(),
+            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.as_hz(),
         };
 
         if config.clock_source == ClockSource::RcFast {
@@ -2419,9 +2419,9 @@ impl Info {
     fn change_baud(&self, config: &Config) {
         let clocks = Clocks::get();
         let clk = match config.clock_source {
-            ClockSource::Apb => clocks.apb_clock.to_Hz(),
-            ClockSource::Xtal => clocks.xtal_clock.to_Hz(),
-            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.to_Hz(),
+            ClockSource::Apb => clocks.apb_clock.as_hz(),
+            ClockSource::Xtal => clocks.xtal_clock.as_hz(),
+            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.as_hz(),
         };
 
         let max_div = 0b1111_1111_1111 - 1;
@@ -2476,9 +2476,9 @@ impl Info {
     #[cfg(any(esp32, esp32s2))]
     fn change_baud(&self, config: &Config) {
         let clk = match config.clock_source {
-            ClockSource::Apb => Clocks::get().apb_clock.to_Hz(),
+            ClockSource::Apb => Clocks::get().apb_clock.as_hz(),
             // ESP32(/-S2) TRM, section 3.2.4.2 (6.2.4.2 for S2)
-            ClockSource::RefTick => crate::soc::constants::REF_TICK.to_Hz(),
+            ClockSource::RefTick => crate::soc::constants::REF_TICK.as_hz(),
         };
 
         self.regs().conf0().modify(|_, w| {

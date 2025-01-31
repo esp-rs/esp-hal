@@ -49,7 +49,7 @@ const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 const HOST_IP: &str = env!("HOST_IP");
 
-const TEST_DURATION: Duration = Duration::secs(15);
+const TEST_DURATION: Duration = Duration::from_secs(15);
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
 const IO_BUFFER_SIZE: usize = 1024;
@@ -87,7 +87,7 @@ fn main() -> ! {
     }]);
     socket_set.add(dhcp_socket);
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
@@ -184,7 +184,7 @@ fn test_download<'a, D: smoltcp::phy::Device>(
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
+    let kbps = (total + 512) / 1024 / TEST_DURATION.as_secs();
     println!("download: {} kB/s", kbps);
 
     socket.disconnect();
@@ -218,7 +218,7 @@ fn test_upload<'a, D: smoltcp::phy::Device>(
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
+    let kbps = (total + 512) / 1024 / TEST_DURATION.as_secs();
     println!("upload: {} kB/s", kbps);
 
     socket.disconnect();
@@ -259,7 +259,7 @@ fn test_upload_download<'a, D: smoltcp::phy::Device>(
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
+    let kbps = (total + 512) / 1024 / TEST_DURATION.as_secs();
     println!("upload+download: {} kB/s", kbps);
 
     socket.disconnect();

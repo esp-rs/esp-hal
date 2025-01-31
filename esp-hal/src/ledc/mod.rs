@@ -41,7 +41,7 @@
 //!     .configure(timer::config::Config {
 //!         duty: timer::config::Duty::Duty5Bit,
 //!         clock_source: timer::LSClockSource::APBClk,
-//!         frequency: 24.kHz(),
+//!         frequency: Rate::from_khz(24),
 //!     })?;
 //!
 //! let mut channel0 = ledc.channel(channel::Number::Channel0, led);

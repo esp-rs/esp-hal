@@ -77,7 +77,7 @@ fn main() -> ! {
     }]);
     socket_set.add(dhcp_socket);
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
@@ -146,7 +146,7 @@ fn main() -> ! {
             .unwrap();
         socket.flush().unwrap();
 
-        let deadline = time::now() + Duration::secs(20);
+        let deadline = time::now() + Duration::from_secs(20);
         let mut buffer = [0u8; 512];
         while let Ok(len) = socket.read(&mut buffer) {
             let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
@@ -161,7 +161,7 @@ fn main() -> ! {
 
         socket.disconnect();
 
-        let deadline = time::now() + Duration::secs(5);
+        let deadline = time::now() + Duration::from_secs(5);
         while time::now() < deadline {
             socket.work();
         }

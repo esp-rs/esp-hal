@@ -42,6 +42,8 @@ macro_rules! trm_link {
 pub use chip;
 
 pub(crate) mod constants {
+    use crate::time::Rate;
+
     /// System clock frequency for the I2S peripheral, in Hertz.
     pub const I2S_SCLK: u32 = 160_000_000;
     /// Default clock source for the I2S peripheral.
@@ -55,7 +57,7 @@ pub(crate) mod constants {
     /// End address of the system's DRAM (high range).
     pub const SOC_DRAM_HIGH: usize = 0x4000_0000;
     /// Reference clock tick frequency, set to 1 MHz.
-    pub const REF_TICK: fugit::HertzU32 = fugit::HertzU32::MHz(1);
+    pub const REF_TICK: Rate = Rate::from_mhz(1);
 }
 
 /// Function initializes ESP32 specific memories (RTC slow and fast) and

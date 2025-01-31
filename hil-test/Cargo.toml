@@ -236,7 +236,6 @@ elliptic-curve      = { version = "0.13.8", default-features = false, features =
 embassy-executor    = { version = "0.7.0", default-features = false }
 # Add the `embedded-test/defmt` feature for more verbose testing
 embedded-test       = { version = "0.6.0", default-features = false, features = ["embassy", "external-executor"] }
-fugit               = "0.3.7"
 hex-literal         = "0.4.1"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }

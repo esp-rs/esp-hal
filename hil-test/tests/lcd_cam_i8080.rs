@@ -19,7 +19,7 @@ use esp_hal::{
         channel::{CtrlMode, EdgeMode},
         Pcnt,
     },
-    time::RateExtU32,
+    time::Rate,
     Blocking,
 };
 use hil_test as _;
@@ -80,7 +80,7 @@ mod tests {
             ctx.lcd_cam.lcd,
             ctx.dma,
             pins,
-            Config::default().with_frequency(20.MHz()),
+            Config::default().with_frequency(Rate::from_mhz(20)),
         )
         .unwrap();
 
@@ -143,7 +143,7 @@ mod tests {
             ctx.lcd_cam.lcd,
             ctx.dma,
             pins,
-            Config::default().with_frequency(20.MHz()),
+            Config::default().with_frequency(Rate::from_mhz(20)),
         )
         .unwrap()
         .with_cs(cs_signal)
@@ -265,7 +265,7 @@ mod tests {
             ctx.lcd_cam.lcd,
             ctx.dma,
             pins,
-            Config::default().with_frequency(20.MHz()),
+            Config::default().with_frequency(Rate::from_mhz(20)),
         )
         .unwrap()
         .with_cs(cs_signal)

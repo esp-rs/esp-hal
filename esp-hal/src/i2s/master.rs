@@ -43,7 +43,7 @@
 //!     peripherals.I2S0,
 //!     Standard::Philips,
 //!     DataFormat::Data16Channel16,
-//!     44100.Hz(),
+//!     Rate::from_hz(44100),
 //!     dma_channel,
 //!     rx_descriptors,
 //!     tx_descriptors,
@@ -101,6 +101,7 @@ use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralGuard,
+    time::Rate,
     Async,
     Blocking,
     DriverMode,
@@ -332,7 +333,7 @@ impl<'d> I2s<'d, Blocking> {
         i2s: impl Peripheral<P = impl RegisterAccess> + 'd,
         standard: Standard,
         data_format: DataFormat,
-        sample_rate: impl Into<fugit::HertzU32>,
+        sample_rate: Rate,
         channel: impl Peripheral<P = CH> + 'd,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -681,7 +682,6 @@ impl<T> RegisterAccess for T where T: RegisterAccessPrivate {}
 
 mod private {
     use enumset::EnumSet;
-    use fugit::HertzU32;
 
     use super::*;
     #[cfg(not(i2s1))]
@@ -1744,11 +1744,7 @@ mod private {
         numerator: u32,
     }
 
-    pub fn calculate_clock(
-        sample_rate: impl Into<fugit::HertzU32>,
-        channels: u8,
-        data_bits: u8,
-    ) -> I2sClockDividers {
+    pub fn calculate_clock(sample_rate: Rate, channels: u8, data_bits: u8) -> I2sClockDividers {
         // this loosely corresponds to `i2s_std_calculate_clock` and
         // `i2s_ll_tx_set_mclk` in esp-idf
         //
@@ -1759,8 +1755,7 @@ mod private {
         let mclk_multiple = if data_bits == 24 { 192 } else { 256 };
         let sclk = crate::soc::constants::I2S_SCLK; // for now it's fixed 160MHz and 96MHz (just H2)
 
-        let rate_hz: HertzU32 = sample_rate.into();
-        let rate = rate_hz.raw();
+        let rate = sample_rate.as_hz();
 
         let bclk = rate * channels as u32 * data_bits as u32;
         let mclk = rate * mclk_multiple;

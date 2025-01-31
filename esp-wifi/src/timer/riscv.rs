@@ -9,14 +9,14 @@ use crate::{
         interrupt::{self, TrapFrame},
         peripherals::{self, Interrupt},
         riscv,
+        time::Rate,
     },
     preempt::task_switch,
     TimeBase,
 };
 
 /// The timer responsible for time slicing.
-const TIMESLICE_FREQUENCY: fugit::HertzU64 =
-    fugit::HertzU64::from_raw(crate::CONFIG.tick_rate_hz as u64);
+const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(crate::CONFIG.tick_rate_hz);
 
 // Time keeping
 pub const TICKS_PER_SECOND: u64 = 1_000_000;
@@ -29,7 +29,7 @@ pub(crate) fn setup_timer(mut alarm0: TimeBase) {
 
     let cb: extern "C" fn() = unsafe { core::mem::transmute(handler as *const ()) };
     alarm0.set_interrupt_handler(InterruptHandler::new(cb, interrupt::Priority::Priority1));
-    unwrap!(alarm0.start(TIMESLICE_FREQUENCY.into_duration()));
+    unwrap!(alarm0.start(TIMESLICE_FREQUENCY.as_duration()));
     TIMER.with(|timer| {
         alarm0.enable_interrupt(true);
         timer.replace(alarm0);
@@ -92,7 +92,7 @@ pub(crate) fn yield_task() {
 /// Current systimer count value
 /// A tick is 1 / 1_000_000 seconds
 pub(crate) fn systimer_count() -> u64 {
-    esp_hal::time::now().ticks()
+    esp_hal::time::now().duration_since_epoch().as_micros()
 }
 
 // TODO: use an Instance type instead...

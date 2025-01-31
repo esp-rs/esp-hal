@@ -108,11 +108,11 @@ use esp_hal as hal;
 use esp_hal::peripheral::Peripheral;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-use fugit::MegahertzU32;
 use hal::{
     clock::Clocks,
     rng::{Rng, Trng},
     system::RadioClockController,
+    time::Rate,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
     Blocking,
 };
@@ -370,9 +370,9 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     _radio_clocks: impl Peripheral<P = hal::peripherals::RADIO_CLK> + 'd,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
-    const MIN_CLOCK: u32 = 80;
+    const MIN_CLOCK: Rate = Rate::from_mhz(80);
     let clocks = Clocks::get();
-    if clocks.cpu_clock < MegahertzU32::MHz(MIN_CLOCK) {
+    if clocks.cpu_clock < MIN_CLOCK {
         return Err(InitializationError::WrongClockConfig);
     }
 

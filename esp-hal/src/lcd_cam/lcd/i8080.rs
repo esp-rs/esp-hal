@@ -33,7 +33,7 @@
 //! );
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //!
-//! let config = Config::default().with_frequency(20.MHz());
+//! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
 //! let mut i8080 = I8080::new(
 //!     lcd_cam.lcd,
@@ -57,8 +57,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use fugit::{HertzU32, RateExtU32};
-
 use crate::{
     clock::Clocks,
     dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, Tx, TxChannelFor},
@@ -80,6 +78,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
+    time::Rate,
     Blocking,
     DriverMode,
 };
@@ -141,11 +140,11 @@ where
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
         let (i, divider) = calculate_clkm(
-            (config.frequency.to_Hz() * 2) as _,
+            (config.frequency.as_hz() * 2) as _,
             &[
-                clocks.xtal_clock.to_Hz() as _,
-                clocks.cpu_clock.to_Hz() as _,
-                clocks.crypto_pwm_clock.to_Hz() as _,
+                clocks.xtal_clock.as_hz() as _,
+                clocks.cpu_clock.as_hz() as _,
+                clocks.crypto_pwm_clock.as_hz() as _,
             ],
         )
         .map_err(ConfigError::Clock)?;
@@ -547,7 +546,7 @@ pub struct Config {
     clock_mode: ClockMode,
 
     /// The frequency of the pixel clock.
-    frequency: HertzU32,
+    frequency: Rate,
 
     /// Setup cycles expected, must be at least 1. (6 bits)
     setup_cycles: usize,
@@ -574,7 +573,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             clock_mode: Default::default(),
-            frequency: 20.MHz(),
+            frequency: Rate::from_mhz(20),
             setup_cycles: 1,
             hold_cycles: 1,
             cd_idle_edge: false,

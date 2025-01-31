@@ -19,8 +19,6 @@
 
 use core::fmt::Debug;
 
-use fugit::{Instant, MicrosDurationU64};
-
 use super::{Error, Timer as _};
 use crate::{
     interrupt::{self, InterruptHandler},
@@ -28,6 +26,7 @@ use crate::{
     peripherals::{Interrupt, SYSTIMER},
     sync::{lock, RawMutex},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    time::{Duration, Instant},
     Cpu,
 };
 
@@ -88,7 +87,7 @@ impl SystemTimer {
                 const MULTIPLIER: u64 = 10_000_000 / 25;
             }
         }
-        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().to_MHz();
+        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().as_mhz();
         xtal_freq_mhz as u64 * MULTIPLIER
     }
 
@@ -475,7 +474,7 @@ impl super::Timer for Alarm {
         self.is_enabled()
     }
 
-    fn now(&self) -> Instant<u64, 1, 1_000_000> {
+    fn now(&self) -> Instant {
         // This should be safe to access from multiple contexts; worst case
         // scenario the second accessor ends up reading an older time stamp.
 
@@ -483,13 +482,13 @@ impl super::Timer for Alarm {
 
         let us = ticks / (SystemTimer::ticks_per_second() / 1_000_000);
 
-        Instant::<u64, 1, 1_000_000>::from_ticks(us)
+        Instant::from_ticks(us)
     }
 
-    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
+    fn load_value(&self, value: Duration) -> Result<(), Error> {
         let mode = self.mode();
 
-        let us = value.ticks();
+        let us = value.as_micros();
         let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000);
 
         if matches!(mode, ComparatorMode::Period) {
@@ -713,7 +712,6 @@ pub mod etm {
     //! #     Level,
     //! #     Pull,
     //! # };
-    //! # use fugit::ExtU32;
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let etm = Etm::new(peripherals.SOC_ETM);
     //! let gpio_ext = Channels::new(peripherals.GPIO_SD);

@@ -12,7 +12,7 @@ use crate::EspWifiController;
 #[cfg(feature = "smoltcp")]
 fn timestamp() -> smoltcp::time::Instant {
     smoltcp::time::Instant::from_micros(
-        esp_hal::time::now().duration_since_epoch().to_micros() as i64
+        esp_hal::time::now().duration_since_epoch().as_micros() as i64
     )
 }
 

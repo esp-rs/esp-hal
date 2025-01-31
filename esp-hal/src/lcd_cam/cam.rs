@@ -17,7 +17,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::lcd_cam::{cam::{Camera, Config, RxEightBits}, LcdCam};
-//! # use fugit::RateExtU32;
 //! # use esp_hal::dma_rx_stream_buffer;
 //!
 //! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
@@ -37,7 +36,7 @@
 //!     peripherals.GPIO16,
 //! );
 //!
-//! let config = Config::default().with_frequency(20.MHz());
+//! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //! let mut camera = Camera::new(
@@ -61,8 +60,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use fugit::{HertzU32, RateExtU32};
-
 use crate::{
     clock::Clocks,
     dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, PeripheralRxChannel, Rx, RxChannelFor},
@@ -77,6 +74,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
+    time::Rate,
     Blocking,
 };
 
@@ -171,11 +169,11 @@ impl<'d> Camera<'d> {
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         let (i, divider) = calculate_clkm(
-            config.frequency.to_Hz() as _,
+            config.frequency.as_hz() as _,
             &[
-                clocks.xtal_clock.to_Hz() as _,
-                clocks.cpu_clock.to_Hz() as _,
-                clocks.crypto_pwm_clock.to_Hz() as _,
+                clocks.xtal_clock.as_hz() as _,
+                clocks.cpu_clock.as_hz() as _,
+                clocks.crypto_pwm_clock.as_hz() as _,
             ],
         )
         .map_err(ConfigError::Clock)?;
@@ -603,7 +601,7 @@ pub trait RxPins {
 /// Configuration settings for the Camera interface.
 pub struct Config {
     /// The pixel clock frequency for the camera interface.
-    frequency: HertzU32,
+    frequency: Rate,
 
     /// The byte order for the camera data.
     byte_order: ByteOrder,
@@ -618,7 +616,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            frequency: 20.MHz(),
+            frequency: Rate::from_mhz(20),
             byte_order: Default::default(),
             bit_order: Default::default(),
             vsync_filter_threshold: None,

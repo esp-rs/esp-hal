@@ -29,7 +29,7 @@
 //!     )?;
 //!
 //! loop {
-//!     delay.delay(1.secs());
+//!     delay.delay(Duration::from_secs(1));
 //!     let count = critical_section::with(|cs| *counter.borrow_ref(cs));
 //! }
 //! # }
@@ -42,7 +42,7 @@
 //!     counter: &critical_section::Mutex<RefCell<i32>>,
 //! ) -> ! {
 //!     loop {
-//!         delay.delay(500.millis());
+//!         delay.delay(Duration::from_millis(500));
 //!
 //!         critical_section::with(|cs| {
 //!             let mut val = counter.borrow_ref_mut(cs);

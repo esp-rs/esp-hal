@@ -16,7 +16,7 @@ use esp_hal::{
 };
 use esp_hal::{
     peripherals::Peripherals,
-    time::ExtU64,
+    time,
     timer::{timg::TimerGroup, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]
@@ -56,27 +56,27 @@ mod test_cases {
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
         assert!(
-            (t2 - t1).to_millis() >= 80u64,
+            (t2 - t1).as_millis() >= 80u64,
             "diff: {:?}",
-            (t2 - t1).to_millis()
+            (t2 - t1).as_millis()
         );
     }
 
     pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
         let mut periodic = PeriodicTimer::new(timer);
 
-        let t1 = esp_hal::time::now();
-        periodic.start(100.millis()).unwrap();
+        let t1 = time::now();
+        periodic.start(time::Duration::from_millis(100)).unwrap();
 
         periodic.wait();
 
-        let t2 = esp_hal::time::now();
+        let t2 = time::now();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
         assert!(
-            (t2 - t1).to_millis() >= 100u64,
+            (t2 - t1).as_millis() >= 100u64,
             "diff: {:?}",
-            (t2 - t1).to_millis()
+            (t2 - t1).as_millis()
         );
     }
 
@@ -89,9 +89,9 @@ mod test_cases {
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
         assert!(
-            (t2 - t1).to_millis() >= 50u64,
+            (t2 - t1).as_millis() >= 50u64,
             "diff: {:?}",
-            (t2 - t1).to_millis()
+            (t2 - t1).as_millis()
         );
     }
 
@@ -103,9 +103,9 @@ mod test_cases {
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
         assert!(
-            (t2 - t1).to_millis() >= 100u64,
+            (t2 - t1).as_millis() >= 100u64,
             "diff: {:?}",
-            (t2 - t1).to_millis()
+            (t2 - t1).as_millis()
         );
     }
 }
@@ -227,9 +227,9 @@ mod test {
 
                 assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
                 assert!(
-                    (t2 - t1).to_micros() >= 85000u64,
+                    (t2 - t1).as_micros() >= 85000u64,
                     "diff: {:?}",
-                    (t2 - t1).to_micros()
+                    (t2 - t1).as_micros()
                 );
             };
 
@@ -263,9 +263,9 @@ mod test {
             let t2 = esp_hal::time::now();
 
             assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
-            let duration = (t2 - t1).to_micros();
+            let duration = (t2 - t1).as_micros();
 
-            assert!(duration >= 19000, "diff: {:?}", (t2 - t1).to_micros());
+            assert!(duration >= 19000, "diff: {:?}", (t2 - t1).as_micros());
             if duration <= 21000 {
                 return;
             }

@@ -42,7 +42,7 @@ mod tests {
         let t2 = esp_hal::time::now();
 
         assert!(t2 > t1);
-        assert!((t2 - t1).to_millis() >= 500u64);
+        assert!((t2 - t1).as_millis() >= 500u64);
     }
 
     #[cfg(systimer)]

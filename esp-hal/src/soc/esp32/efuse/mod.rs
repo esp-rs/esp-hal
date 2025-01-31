@@ -47,10 +47,8 @@
 //! # }
 //! ```
 
-use fugit::{HertzU32, RateExtU32};
-
 pub use self::fields::*;
-use crate::peripherals::EFUSE;
+use crate::{peripherals::EFUSE, time::Rate};
 
 mod fields;
 
@@ -99,14 +97,14 @@ impl Efuse {
     ///
     /// Note that the actual clock may be lower, depending on the current power
     /// configuration of the chip, clock source, and other settings.
-    pub fn max_cpu_frequency() -> HertzU32 {
+    pub fn max_cpu_frequency() -> Rate {
         let has_rating = Self::read_bit(CHIP_CPU_FREQ_RATED);
         let has_low_rating = Self::read_bit(CHIP_CPU_FREQ_LOW);
 
         if has_rating && has_low_rating {
-            160.MHz()
+            Rate::from_mhz(160)
         } else {
-            240.MHz()
+            Rate::from_mhz(240)
         }
     }
 

@@ -65,7 +65,7 @@ fn main() -> ! {
 
     let mut bluetooth = peripherals.BT;
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::now().duration_since_epoch().as_millis();
     loop {
         let connector = BleConnector::new(&init, &mut bluetooth);
         let hci = HciConnector::new(connector, now);

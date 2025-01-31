@@ -28,8 +28,8 @@
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-//! )?
+//!     Config::default().with_frequency(Rate::from_khz(100)).
+//! with_mode(Mode::_0) )?
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
 //! .with_miso(miso)

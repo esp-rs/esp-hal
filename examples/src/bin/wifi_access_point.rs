@@ -73,7 +73,7 @@ fn main() -> ! {
     let mut wifi = peripherals.WIFI;
     let (iface, device, mut controller) =
         create_network_interface(&init, &mut wifi, WifiApDevice).unwrap();
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::now().duration_since_epoch().as_millis();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
@@ -129,7 +129,7 @@ fn main() -> ! {
             println!("Connected");
 
             let mut time_out = false;
-            let deadline = time::now() + Duration::secs(20);
+            let deadline = time::now() + Duration::from_secs(20);
             let mut buffer = [0u8; 1024];
             let mut pos = 0;
             while let Ok(len) = socket.read(&mut buffer[pos..]) {
@@ -172,8 +172,8 @@ fn main() -> ! {
             println!();
         }
 
-        let deadline = time::now() + Duration::secs(5);
-        while time::now() < deadline {
+        let start = time::now();
+        while start.elapsed() < Duration::from_secs(5) {
             socket.work();
         }
     }

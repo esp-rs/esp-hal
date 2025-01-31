@@ -91,7 +91,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     let connector = BleConnector::new(&init, &mut bluetooth);
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::now().duration_since_epoch().as_millis();
     let mut ble = Ble::new(connector, now);
     println!("Connector created");
 
