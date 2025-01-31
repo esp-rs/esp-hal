@@ -5,9 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>esp-rs Documentation</title>
+  <title>{{ metadata[0].package }} Documentation</title>
 
-  <link rel="icon" href="esp-rs.svg" />
+  <link rel="icon" href="../../esp-rs.svg" />
   <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400;1,600&display=swap"
     rel="stylesheet" />
@@ -92,18 +92,20 @@
 <body>
   <div class="content">
     <div class="logo">
-      <img src="esp-rs.svg" alt="esp-rs logo" />
-      <div>esp-rs Documentation</div>
+      <img src="../../esp-rs.svg" alt="esp-rs logo" />
+      <div>{{ metadata[0].package }} Documentation</div>
     </div>
 
-    <h2>Packages</h2>
+    <h2>{{ metadata[0].package }}</h2>
 
     {%- for meta in metadata %}
     <div class="crate">
       <span class="crate-name">
-        <a href="{{ meta.url }}">{{ meta.name }}</a>
+        <a href="{{ meta.chip }}/{{ meta.package }}/index.html">
+          {{ meta.chip_pretty }}
+        </a>
       </span>
-      <span class="crate-description">Documentation for <code>{{ meta.name }}</code> crate</span>
+      <span class="crate-description">{{ meta.name }} (targeting {{ meta.chip_pretty }})</span>
       <span class="crate-version">{{ meta.version }}</span>
     </div>
     {%- endfor %}

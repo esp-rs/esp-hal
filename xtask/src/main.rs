@@ -484,10 +484,7 @@ fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Re
 
     for package in args.packages {
         // Not all packages need documentation built:
-        if matches!(
-            package,
-            Package::Examples | Package::HilTest | Package::QaTest
-        ) {
+        if !package.should_document() {
             continue;
         }
 
@@ -524,15 +521,13 @@ fn build_documentation_index(
     mut args: BuildDocumentationIndexArgs,
 ) -> Result<()> {
     let docs_path = workspace.join("docs");
+    let resources_path = workspace.join("resources");
 
     args.packages.sort();
 
     for package in args.packages {
         // Not all packages have documentation built:
-        if matches!(
-            package,
-            Package::Examples | Package::HilTest | Package::QaTest
-        ) {
+        if !package.should_document() {
             continue;
         }
 
@@ -548,14 +543,17 @@ fn build_documentation_index(
 
         // Each path we iterate over should be the directory for a given version of
         // the package's documentation:
-        for path in fs::read_dir(package_docs_path)? {
-            let path = path?.path();
-            if path.is_file() {
-                log::debug!("Path is not a directory, skipping: '{}'", path.display());
+        for version_path in fs::read_dir(package_docs_path)? {
+            let version_path = version_path?.path();
+            if version_path.is_file() {
+                log::debug!(
+                    "Path is not a directory, skipping: '{}'",
+                    version_path.display()
+                );
                 continue;
             }
 
-            for path in fs::read_dir(&path)? {
+            for path in fs::read_dir(&version_path)? {
                 let path = path?.path();
                 if path.is_dir() {
                     device_doc_paths.push(path);
@@ -567,11 +565,11 @@ fn build_documentation_index(
                 .map(|path| {
                     let chip = path
                         .components()
-                        .into_iter()
                         .last()
                         .unwrap()
                         .as_os_str()
                         .to_string_lossy();
+
                     let chip = Chip::from_str(&chip, true).unwrap();
 
                     chip
@@ -581,38 +579,87 @@ fn build_documentation_index(
             chips.sort();
 
             let meta = generate_documentation_meta_for_package(workspace, package, &chips)?;
-            generate_index(workspace, &path, &meta)?;
+            render_template(
+                "package_index.html.jinja",
+                "index.html",
+                &version_path,
+                &resources_path,
+                minijinja::context! { metadata => meta },
+            )?;
         }
     }
+
+    // Copy any additional assets to the documentation's output path:
+    fs::copy(
+        resources_path.join("esp-rs.svg"),
+        docs_path.join("esp-rs.svg"),
+    )
+    .context("Failed to copy esp-rs.svg")?;
+
+    let meta = generate_documentation_meta_for_index(&workspace)?;
+
+    render_template(
+        "index.html.jinja",
+        "index.html",
+        &docs_path,
+        &resources_path,
+        minijinja::context! { metadata => meta },
+    )?;
 
     Ok(())
 }
 
-fn generate_index(workspace: &Path, package_version_path: &Path, meta: &[Value]) -> Result<()> {
-    let resources = workspace.join("resources");
+fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>> {
+    let mut metadata = Vec::new();
 
-    // Copy any additional assets to the documentation's output path:
-    fs::copy(
-        resources.join("esp-rs.svg"),
-        package_version_path.join("esp-rs.svg"),
-    )
-    .context("Failed to copy esp-rs.svg")?;
+    for package in Package::iter() {
+        // Not all packages have documentation built:
+        if !package.should_document() {
+            continue;
+        }
 
-    // Render the index and write it out to the documentaiton's output path:
-    let source = fs::read_to_string(resources.join("index.html.jinja"))
-        .context("Failed to read index.html.jinja")?;
+        let version = xtask::package_version(workspace, package)?;
+
+        let url = if package.chip_features_matter() {
+            format!("{package}/{version}/index.html")
+        } else {
+            let crate_name = package.to_string().replace('-', "_");
+            format!("{package}/{version}/{crate_name}/index.html")
+        };
+
+        metadata.push(minijinja::context! {
+            name => package,
+            version => version,
+            url => url,
+        });
+    }
+
+    Ok(metadata)
+}
+
+fn render_template<C>(
+    template: &str,
+    name: &str,
+    path: &Path,
+    resources: &Path,
+    ctx: C,
+) -> Result<()>
+where
+    C: serde::Serialize,
+{
+    let source = fs::read_to_string(resources.join(template))
+        .context(format!("Failed to read {template}"))?;
 
     let mut env = minijinja::Environment::new();
-    env.add_template("index", &source)?;
+    env.add_template(template, &source)?;
 
-    let tmpl = env.get_template("index")?;
-    let html = tmpl.render(minijinja::context! { metadata => meta })?;
+    let tmpl = env.get_template(template)?;
+    let html = tmpl.render(ctx)?;
 
-    let index = package_version_path.join("index.html");
-
-    fs::write(&index, html).context("Failed to write index.html")?;
-
-    log::info!("Created {}", index.display());
+    // Write out the rendered HTML to the desired path:
+    let path = path.join(name);
+    fs::write(&path, html).context(format!("Failed to write {name}"))?;
+    log::info!("Created {}", path.display());
 
     Ok(())
 }
