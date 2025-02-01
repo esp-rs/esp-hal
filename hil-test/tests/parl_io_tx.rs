@@ -115,7 +115,10 @@ mod tests {
 
         for _ in 0..100 {
             clock_unit.clear();
-            let xfer = pio.write(dma_tx_buf.len(), dma_tx_buf).unwrap();
+            let xfer = pio
+                .write(dma_tx_buf.len(), dma_tx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
             (_, pio, dma_tx_buf) = xfer.wait();
             info!("clock count: {}", clock_unit.value());
             assert_eq!(clock_unit.value(), BUFFER_SIZE as _);
@@ -174,7 +177,10 @@ mod tests {
 
         for _ in 0..100 {
             clock_unit.clear();
-            let xfer = pio.write(dma_tx_buf.len(), dma_tx_buf).unwrap();
+            let xfer = pio
+                .write(dma_tx_buf.len(), dma_tx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
             (_, pio, dma_tx_buf) = xfer.wait();
             info!("clock count: {}", clock_unit.value());
             assert_eq!(clock_unit.value(), BUFFER_SIZE as _);

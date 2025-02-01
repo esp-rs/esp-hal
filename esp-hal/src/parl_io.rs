@@ -58,8 +58,9 @@
 //!
 //! loop {
 //!     // Read data via DMA and print received values
-//!     let transfer = parl_io_rx.read(Some(dma_rx_buf.len()), dma_rx_buf)?;
-//!     (_, parl_io_rx, dma_rx_buf) = transfer.wait();
+//!     let transfer = parl_io_rx.read(Some(dma_rx_buf.len()),
+//! dma_rx_buf).map_err(|e| e.0)?;     (_, parl_io_rx, dma_rx_buf) =
+//! transfer.wait();
 //!
 //!     delay.delay_millis(500);
 //! }
@@ -112,9 +113,9 @@
 //!
 //! let delay = Delay::new();
 //! loop {
-//!     let transfer = parl_io_tx.write(dma_tx_buf.len(), dma_tx_buf)?;
-//!     (_, parl_io_tx, dma_tx_buf) = transfer.wait();
-//!     delay.delay_millis(500);
+//!     let transfer = parl_io_tx.write(dma_tx_buf.len(),
+//! dma_tx_buf).map_err(|e| e.0)?;     (_, parl_io_tx, dma_tx_buf) =
+//! transfer.wait();     delay.delay_millis(500);
 //! }
 //! # }
 //! ```
@@ -1507,12 +1508,12 @@ where
         mut self,
         number_of_bytes: usize,
         mut buffer: BUF,
-    ) -> Result<ParlIoTxTransfer<'d, BUF, Dm>, Error>
+    ) -> Result<ParlIoTxTransfer<'d, BUF, Dm>, (Error, Self, BUF)>
     where
         BUF: DmaTxBuffer,
     {
         if number_of_bytes > MAX_DMA_SIZE {
-            return Err(Error::MaxDmaTransferSizeExceeded);
+            return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
         }
 
         PCR::regs()
@@ -1522,10 +1523,13 @@ where
         Instance::clear_tx_interrupts();
         Instance::set_tx_bytes(number_of_bytes as u16);
 
-        unsafe {
+        let result = unsafe {
             self.tx_channel
                 .prepare_transfer(DmaPeripheral::ParlIo, &mut buffer)
-                .and_then(|_| self.tx_channel.start_transfer())?;
+                .and_then(|_| self.tx_channel.start_transfer())
+        };
+        if let Err(err) = result {
+            return Err((Error::DmaError(err), self, buffer));
         }
 
         while !Instance::is_tx_ready() {}
@@ -1638,7 +1642,7 @@ where
         mut self,
         number_of_bytes: Option<usize>,
         mut buffer: BUF,
-    ) -> Result<ParlIoRxTransfer<'d, BUF, Dm>, Error>
+    ) -> Result<ParlIoRxTransfer<'d, BUF, Dm>, (Error, Self, BUF)>
     where
         BUF: DmaRxBuffer,
     {
@@ -1652,7 +1656,7 @@ where
         Instance::clear_rx_interrupts();
         if let Some(number_of_bytes) = number_of_bytes {
             if number_of_bytes > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
+                return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
             Instance::set_rx_bytes(number_of_bytes as u16);
             Instance::set_eof_gen_sel(EofMode::ByteLen);
@@ -1660,10 +1664,13 @@ where
             Instance::set_eof_gen_sel(EofMode::EnableSignal);
         }
 
-        unsafe {
+        let result = unsafe {
             self.rx_channel
                 .prepare_transfer(DmaPeripheral::ParlIo, &mut buffer)
-                .and_then(|_| self.rx_channel.start_transfer())?;
+                .and_then(|_| self.rx_channel.start_transfer())
+        };
+        if let Err(err) = result {
+            return Err((Error::DmaError(err), self, buffer));
         }
 
         Instance::set_rx_reg_update();

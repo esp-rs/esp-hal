@@ -105,8 +105,14 @@ mod tests {
             *b = i as u8;
         }
 
-        let rx_transfer = pio_rx.read(Some(dma_rx_buf.len()), dma_rx_buf).unwrap();
-        let tx_transfer = pio_tx.write(dma_tx_buf.len(), dma_tx_buf).unwrap();
+        let rx_transfer = pio_rx
+            .read(Some(dma_rx_buf.len()), dma_rx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        let tx_transfer = pio_tx
+            .write(dma_tx_buf.len(), dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
         (_, _, dma_tx_buf) = tx_transfer.wait();
         (_, _, dma_rx_buf) = rx_transfer.wait();
 
