@@ -92,7 +92,7 @@ mod tests {
                 tx_pins,
                 clock_out_pin,
                 0,
-                SampleEdge::Normal,
+                SampleEdge::Invert,
                 BitPackOrder::Lsb,
             )
             .unwrap();
