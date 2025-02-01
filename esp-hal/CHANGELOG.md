@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Async` drivers are no longer `Send` (#2980)
 - GPIO drivers now take configuration structs (#2990, #3029)
 - `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`) (#3001)
-
+- Migrate AES driver to DMA move API (#3084)
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
 
 - I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
