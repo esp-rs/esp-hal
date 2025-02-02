@@ -750,7 +750,7 @@ macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
         let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size, is_circular = false);
 
-        $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
+        $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap()
     }};
 }
 

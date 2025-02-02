@@ -49,7 +49,7 @@ mod tests {
         let i2s = I2sParallel::new(ctx.i2s, ctx.dma_channel, 20.MHz(), pins, NoPin).into_async();
 
         // Try sending an empty buffer, as an edge case
-        let tx_buf = esp_hal::dma_tx_buffer!(4096).unwrap();
+        let tx_buf = esp_hal::dma_tx_buffer!(4096);
         let mut xfer = i2s
             .send(tx_buf)
             .map_err(|_| "failed to send empty buffer")

@@ -218,3 +218,12 @@ NOTE: Async support is only supported in ESP32C3 and ESP32C6 for now
 - Adc<'d, ADC>
 + Adc<'d, ADC, Blocking>
 ```
+
+## DMA macro changes
+
+`dma_tx_buffer` no longer returns an error
+
+```diff
+- let mut dma_buf = dma_tx_buffer!(32678).unwrap();
++ let mut dma_buf = dma_tx_buffer!(32678);
+```

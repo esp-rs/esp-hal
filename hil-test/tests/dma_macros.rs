@@ -205,18 +205,11 @@ mod tests {
 
     #[test]
     fn test_dma_tx_buffer() {
-        use esp_hal::dma::{DmaBufError, DmaTxBuf};
+        use esp_hal::dma::DmaTxBuf;
         const TX_SIZE: usize = DATA_SIZE;
 
-        fn check(result: Result<DmaTxBuf, DmaBufError>, size: usize) {
-            match result {
-                Ok(tx_buf) => {
-                    core::assert_eq!(tx_buf.len(), size);
-                }
-                Err(_) => {
-                    core::panic!("Failed to create DmaTxBuf");
-                }
-            }
+        fn check(tx_buf: DmaTxBuf, size: usize) {
+            core::assert_eq!(tx_buf.len(), size);
         }
         check(esp_hal::dma_tx_buffer!(TX_SIZE), TX_SIZE);
         check(esp_hal::dma_tx_buffer!(TX_SIZE + 1), TX_SIZE + 1);

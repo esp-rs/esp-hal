@@ -19,7 +19,7 @@
 //! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::dma::DmaTxBuf;
 //!
-//! # let mut dma_buf = dma_tx_buffer!(32678)?;
+//! # let mut dma_buf = dma_tx_buffer!(32678);
 //!
 //! let tx_pins = TxEightBits::new(
 //!     peripherals.GPIO9,

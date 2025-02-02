@@ -49,7 +49,7 @@ fn main() -> ! {
     let lcd_wr = peripherals.GPIO47; // Write clock
     let lcd_te = peripherals.GPIO48; // Frame sync
 
-    let dma_tx_buf = dma_tx_buffer!(4000).unwrap();
+    let dma_tx_buf = dma_tx_buffer!(4000);
 
     let delay = Delay::new();
 

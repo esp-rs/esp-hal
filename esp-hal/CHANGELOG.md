@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`) (#3001)
 
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
-
+- `dma_tx_buffer` no longer returns an error (#3085)
 - I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
 
 ### Fixed
