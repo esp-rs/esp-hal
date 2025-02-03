@@ -228,7 +228,7 @@ pub(crate) use unstable_module;
 unstable_module! {
     #[cfg(aes)]
     pub mod aes;
-    #[cfg(any(adc, dac))]
+    #[cfg(any(adc1, adc2, dac))]
     pub mod analog;
     pub mod asynch;
     #[cfg(assist_debug)]

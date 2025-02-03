@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: Added support for 3-wire SPI (#2919)
 - UART: Add separate config for Rx and Tx (#2965)
 - Added accessor methods to config structs (#3011)
+- Async support for ADC oneshot reads for ESP32C2, ESP32C3, ESP32C6 and ESP32H2 (#2925, #3082)
 
 ### Changed
 
@@ -106,7 +107,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: Made Wi-Fi peripheral non virtual. (#2942)
 - `UartRx::check_for_errors`, `Uart::check_for_rx_errors`, `{Uart, UartRx}::read_buffered_bytes` (#2935)
 - Added `i2c` interrupt API (#2944)
-- Async support for ADC oneshot reads for ESP32C3 and ESP32C6 (#2925)
 
 ### Changed
 
