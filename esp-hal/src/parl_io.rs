@@ -58,9 +58,8 @@
 //!
 //! loop {
 //!     // Read data via DMA and print received values
-//!     let transfer = parl_io_rx.read(Some(dma_rx_buf.len()),
-//! dma_rx_buf).map_err(|e| e.0)?;     (_, parl_io_rx, dma_rx_buf) =
-//! transfer.wait();
+//!     let transfer = parl_io_rx.read(Some(dma_rx_buf.len()), dma_rx_buf)?;
+//!     (_, parl_io_rx, dma_rx_buf) = transfer.wait();
 //!
 //!     delay.delay_millis(500);
 //! }
@@ -113,9 +112,9 @@
 //!
 //! let delay = Delay::new();
 //! loop {
-//!     let transfer = parl_io_tx.write(dma_tx_buf.len(),
-//! dma_tx_buf).map_err(|e| e.0)?;     (_, parl_io_tx, dma_tx_buf) =
-//! transfer.wait();     delay.delay_millis(500);
+//!     let transfer = parl_io_tx.write(dma_tx_buf.len(), dma_tx_buf)?;
+//!     (_, parl_io_tx, dma_tx_buf) = transfer.wait();
+//!     delay.delay_millis(500);
 //! }
 //! # }
 //! ```
