@@ -957,6 +957,22 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     }
                 }
 
+                Package::EspRustlsProvider => {
+                    if [Chip::Esp32, Chip::Esp32s3, Chip::Esp32c6].contains(chip) {
+                        let features = format!("--features=esp-hal/{chip},esp-hal/unstable");
+                        lint_package(
+                            chip,
+                            &path,
+                            &[
+                                "-Zbuild-std=core,alloc",
+                                &features,
+                                &format!("--target={}", chip.target()),
+                            ],
+                            args.fix,
+                        )?;
+                    }
+                }
+
                 Package::EspStorage => {
                     lint_package(
                         chip,
