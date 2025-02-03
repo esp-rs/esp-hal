@@ -1618,10 +1618,6 @@ pub trait DmaChannel: Peripheral<P = Self> {
     /// A description of the TX half of a DMA Channel.
     type Tx: DmaTxChannel;
 
-    /// Sets the priority of the DMA channel.
-    #[cfg(gdma)]
-    fn set_priority(&self, priority: DmaPriority);
-
     /// Splits the DMA channel into its RX and TX halves.
     #[cfg(any(esp32c6, esp32h2, esp32s3))] // TODO relax this to allow splitting on all chips
     fn split(self) -> (Self::Rx, Self::Tx) {

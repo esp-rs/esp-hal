@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
 - OutputOpenDrain has been removed (#3029)
 - The fields of config structs are no longer public (#3011)
+- Removed the dysfunctional `DmaChannel::set_priority` function (#3088)
 
 ## [0.23.1] - 2025-01-15
 
