@@ -71,24 +71,28 @@ impl SystemTimer {
     }
 
     /// Returns the tick frequency of the underlying timer unit.
+    #[inline]
     pub fn ticks_per_second() -> u64 {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
-                const MULTIPLIER: u64 = 2_000_000;
+                const MULTIPLIER: u32 = 2;
+                const DIVIDER: u32 = 1;
             } else if #[cfg(esp32h2)] {
                 // The counters and comparators are driven using `XTAL_CLK`.
                 // The average clock frequency is fXTAL_CLK/2, which is 16 MHz.
                 // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u64 = 10_000_000 / 20;
+                const MULTIPLIER: u32 = 1;
+                const DIVIDER: u32 = 2;
             } else {
                 // The counters and comparators are driven using `XTAL_CLK`.
                 // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
                 // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u64 = 10_000_000 / 25;
+                const MULTIPLIER: u32 = 4;
+                const DIVIDER: u32 = 10;
             }
         }
-        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().as_mhz();
-        xtal_freq_mhz as u64 * MULTIPLIER
+        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().as_hz();
+        ((xtal_freq_mhz * MULTIPLIER) / DIVIDER) as u64
     }
 
     /// Create a new instance.

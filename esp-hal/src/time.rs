@@ -16,18 +16,21 @@ type InnerDuration = fugit::Duration<u64, 1, 1_000_000>;
 pub struct Rate(InnerRate);
 
 impl core::hash::Hash for Rate {
+    #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.as_hz().hash(state);
     }
 }
 
 impl Display for Rate {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{} Hz", self.as_hz())
     }
 }
 
 impl Debug for Rate {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Rate({} Hz)", self.as_hz())
     }
@@ -35,6 +38,7 @@ impl Debug for Rate {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for Rate {
+    #[inline]
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(f, "{=u32} Hz", self.as_hz())
     }
@@ -87,6 +91,7 @@ impl Rate {
 impl core::ops::Div for Rate {
     type Output = u32;
 
+    #[inline]
     fn div(self, rhs: Self) -> Self::Output {
         self.0 / rhs.0
     }
@@ -95,6 +100,7 @@ impl core::ops::Div for Rate {
 impl core::ops::Mul<u32> for Rate {
     type Output = Rate;
 
+    #[inline]
     fn mul(self, rhs: u32) -> Self::Output {
         Rate(self.0 * rhs)
     }
@@ -103,6 +109,7 @@ impl core::ops::Mul<u32> for Rate {
 impl core::ops::Div<u32> for Rate {
     type Output = Rate;
 
+    #[inline]
     fn div(self, rhs: u32) -> Self::Output {
         Rate(self.0 / rhs)
     }
@@ -113,6 +120,7 @@ impl core::ops::Div<u32> for Rate {
 pub struct Instant(InnerInstant);
 
 impl Debug for Instant {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
@@ -123,6 +131,7 @@ impl Debug for Instant {
 }
 
 impl Display for Instant {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
@@ -134,6 +143,7 @@ impl Display for Instant {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for Instant {
+    #[inline]
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(
             f,
@@ -155,20 +165,24 @@ impl Instant {
     #[cfg_attr(esp32, doc = "36_558 years")]
     #[cfg_attr(esp32s2, doc = "7_311 years")]
     #[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
+    #[inline]
     pub fn now() -> Self {
         now()
     }
 
+    #[inline]
     pub(crate) fn from_ticks(ticks: u64) -> Self {
         Instant(InnerInstant::from_ticks(ticks))
     }
 
     /// Returns the elapsed time since boot.
+    #[inline]
     pub fn duration_since_epoch(&self) -> Duration {
         Self::EPOCH.elapsed()
     }
 
     /// Returns the elapsed `Duration` since this instant was created.
+    #[inline]
     pub fn elapsed(&self) -> Duration {
         Self::now() - *self
     }
@@ -177,12 +191,14 @@ impl Instant {
 impl core::ops::Add<Duration> for Instant {
     type Output = Self;
 
+    #[inline]
     fn add(self, rhs: Duration) -> Self::Output {
         Instant(self.0 + rhs.0)
     }
 }
 
 impl core::ops::AddAssign<Duration> for Instant {
+    #[inline]
     fn add_assign(&mut self, rhs: Duration) {
         self.0 += rhs.0;
     }
@@ -191,6 +207,7 @@ impl core::ops::AddAssign<Duration> for Instant {
 impl core::ops::Sub for Instant {
     type Output = Duration;
 
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         Duration(self.0 - rhs.0)
     }
@@ -199,12 +216,14 @@ impl core::ops::Sub for Instant {
 impl core::ops::Sub<Duration> for Instant {
     type Output = Self;
 
+    #[inline]
     fn sub(self, rhs: Duration) -> Self::Output {
         Instant(self.0 - rhs.0)
     }
 }
 
 impl core::ops::SubAssign<Duration> for Instant {
+    #[inline]
     fn sub_assign(&mut self, rhs: Duration) {
         self.0 -= rhs.0;
     }
@@ -215,12 +234,14 @@ impl core::ops::SubAssign<Duration> for Instant {
 pub struct Duration(InnerDuration);
 
 impl Debug for Duration {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Duration({} µs)", self.as_micros())
     }
 }
 
 impl Display for Duration {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{} µs", self.as_micros())
     }
@@ -228,6 +249,7 @@ impl Display for Duration {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for Duration {
+    #[inline]
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(f, "{=u64} µs", self.as_micros())
     }
@@ -296,6 +318,7 @@ impl Duration {
     }
 
     /// Add two durations while checking for overflow.
+    #[inline]
     pub const fn checked_add(self, rhs: Self) -> Option<Self> {
         if let Some(val) = self.0.checked_add(rhs.0) {
             Some(Duration(val))
@@ -305,6 +328,7 @@ impl Duration {
     }
 
     /// Subtract two durations while checking for overflow.
+    #[inline]
     pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
         if let Some(val) = self.0.checked_sub(rhs.0) {
             Some(Duration(val))
@@ -314,6 +338,7 @@ impl Duration {
     }
 
     /// Add two durations, returning the maximum value if overflow occurred.
+    #[inline]
     pub const fn saturating_add(self, rhs: Self) -> Self {
         if let Some(val) = self.checked_add(rhs) {
             val
@@ -324,6 +349,7 @@ impl Duration {
 
     /// Subtract two durations, returning the minimum value if the result would
     /// be negative.
+    #[inline]
     pub const fn saturating_sub(self, rhs: Self) -> Self {
         if let Some(val) = self.checked_sub(rhs) {
             val
@@ -336,12 +362,14 @@ impl Duration {
 impl core::ops::Add for Duration {
     type Output = Self;
 
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         Duration(self.0 + rhs.0)
     }
 }
 
 impl core::ops::AddAssign for Duration {
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         self.0 += rhs.0;
     }
@@ -350,12 +378,14 @@ impl core::ops::AddAssign for Duration {
 impl core::ops::Sub for Duration {
     type Output = Self;
 
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         Duration(self.0 - rhs.0)
     }
 }
 
 impl core::ops::SubAssign for Duration {
+    #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         self.0 -= rhs.0;
     }
@@ -364,6 +394,7 @@ impl core::ops::SubAssign for Duration {
 impl core::ops::Mul<u32> for Duration {
     type Output = Self;
 
+    #[inline]
     fn mul(self, rhs: u32) -> Self::Output {
         Duration(self.0 * rhs)
     }
@@ -372,6 +403,7 @@ impl core::ops::Mul<u32> for Duration {
 impl core::ops::Div<u32> for Duration {
     type Output = Self;
 
+    #[inline]
     fn div(self, rhs: u32) -> Self::Output {
         Duration(self.0 / rhs)
     }
@@ -380,11 +412,13 @@ impl core::ops::Div<u32> for Duration {
 impl core::ops::Div<Duration> for Duration {
     type Output = u64;
 
+    #[inline]
     fn div(self, rhs: Duration) -> Self::Output {
         self.0 / rhs.0
     }
 }
 
+#[inline]
 fn now() -> Instant {
     #[cfg(esp32)]
     let (ticks, div) = {

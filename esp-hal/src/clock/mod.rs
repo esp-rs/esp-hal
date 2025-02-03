@@ -317,6 +317,7 @@ impl Clocks {
     /// This function will run the frequency estimation if called before
     /// [`crate::init()`].
     #[cfg(systimer)]
+    #[inline]
     pub(crate) fn xtal_freq() -> Rate {
         if let Some(clocks) = Self::try_get() {
             clocks.xtal_clock
