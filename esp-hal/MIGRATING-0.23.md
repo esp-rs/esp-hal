@@ -200,6 +200,36 @@ The OutputOpenDrain driver has been removed. You can use `Output` instead with
  );
 ```
 
+## AES DMA driver changes
+AES now uses the newer DMA move API.
+
+```diff
+  let (output, rx_descriptors, input, tx_descriptors) = dma_buffers!(32000);
++ let mut output = DmaRxBuf::new(rx_descriptors, output).unwrap();
++ let mut input = DmaTxBuf::new(tx_descriptors, input).unwrap();
+
+  let mut aes = Aes::new(peripherals.AES).with_dma(
+      dma_channel,
+-     rx_descriptors,
+-     tx_descriptors,
+  );
+
+  let transfer = aes
+      .process(
+-         &input,
+-         &mut output,
++         output.len().div_ceil(16), // Number of blocks
++         output,
++         input,
+          Mode::Encryption128,
+          CipherMode::Ecb,
+          keybuf,
+      )
++     .map_err(|e| e.0)
+      .unwrap();
+  transfer.wait();
+```
+
 ## I2C Changes
 
 All async functions now include the `_async` postfix. Additionally the non-async functions are now available in async-mode.
