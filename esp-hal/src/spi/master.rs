@@ -425,6 +425,19 @@ pub enum ClockSource {
     // Xtal,
 }
 
+/// Defines how strictly the requested frequency must be met.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum FrequencyTolerance {
+    /// Accept the closest achievable baud rate without restriction.
+    #[default]
+    Closest,
+    /// Require an exact match, otherwise return an error.
+    Exact,
+    /// Allow a certain percentage of deviation.
+    ErrorPercent(u8),
+}
+
 /// SPI peripheral configuration
 #[derive(Clone, Copy, Debug, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -447,6 +460,10 @@ pub struct Config {
     #[builder_lite(skip_setter)]
     frequency: HertzU32,
 
+    /// Determines how close to the desired baud rate value the driver should
+    /// set the baud rate.
+    frequency_tolerance: FrequencyTolerance,
+
     /// The clock source
     #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
     #[builder_lite(skip_setter)]
@@ -467,6 +484,7 @@ impl Default for Config {
         let mut this = Config {
             reg: Ok(0),
             frequency: 1_u32.MHz(),
+            frequency_tolerance: FrequencyTolerance::default(),
             clock_source: ClockSource::Apb,
             mode: Mode::_0,
             read_bit_order: BitOrder::MsbFirst,
@@ -544,7 +562,7 @@ impl Config {
             let mut besterr: i32 = 0;
             let mut errval: i32;
 
-            let raw_freq = self.frequency.raw() as i32;
+            let raw_desired_freq = self.frequency.raw() as i32;
             let raw_apb_freq = apb_clk_freq.raw() as i32;
 
             // Start at n = 2. We need to be able to set h/l so we have at least
@@ -554,7 +572,7 @@ impl Config {
                 // Effectively, this does:
                 // pre = round((APB_CLK_FREQ / n) / frequency)
 
-                pre = ((raw_apb_freq / n) + (raw_freq / 2)) / raw_freq;
+                pre = ((raw_apb_freq / n) + (raw_desired_freq / 2)) / raw_desired_freq;
 
                 if pre <= 0 {
                     pre = 1;
@@ -564,7 +582,7 @@ impl Config {
                     pre = 16;
                 }
 
-                errval = (raw_apb_freq / (pre * n) - raw_freq).abs();
+                errval = (raw_apb_freq / (pre * n) - raw_desired_freq).abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
                     bestn = n;
@@ -588,7 +606,25 @@ impl Config {
                 | ((h as u32 - 1) << 6)
                 | ((n as u32 - 1) << 12)
                 | ((pre as u32 - 1) << 18);
-        }
+
+            // Get the frequency of given dividers
+            // taken from https://github.com/espressif/esp-hal-3rdparty/blob/release/v5.1.c/components/hal/esp32/include/hal/spi_ll.h#L548-L551
+            let actual_freq = raw_apb_freq / (pre * n);
+
+            match self.frequency_tolerance {
+                FrequencyTolerance::Exact if actual_freq != raw_desired_freq => {
+                    return Err(ConfigError::UnsupportedFrequency)
+                }
+                FrequencyTolerance::ErrorPercent(percent) => {
+                    let deviation = ((raw_desired_freq as i64 - actual_freq as i64).unsigned_abs() * 100)
+                        / actual_freq as u64;
+                    if deviation > percent as u64 {
+                        return Err(ConfigError::UnsupportedFrequency);
+                    }
+                }
+                _ => {}
+            }
+        }        
 
         Ok(reg_val)
     }
