@@ -27,7 +27,3 @@ As part of limiting public API changes due to config options, the `csi_enabled` 
 -esp-wifi = { version = "0.12.0", features = ["wifi"] }
 +esp-wifi = { version = "0.12.0", features = ["wifi", "csi"] }
 ```
-
-## Setting the power-save-mode is allowed now even when `coex` feature is enabled
-
-Previously we didn't allow to change the power-save-mode with the `coex` feature. This limitation is now lifted.
