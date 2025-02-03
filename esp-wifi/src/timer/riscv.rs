@@ -92,7 +92,9 @@ pub(crate) fn yield_task() {
 /// Current systimer count value
 /// A tick is 1 / 1_000_000 seconds
 pub(crate) fn systimer_count() -> u64 {
-    esp_hal::time::now().duration_since_epoch().as_micros()
+    esp_hal::time::Instant::now()
+        .duration_since_epoch()
+        .as_micros()
 }
 
 // TODO: use an Instance type instead...

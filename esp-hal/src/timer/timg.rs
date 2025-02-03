@@ -151,7 +151,7 @@ impl TimerGroupInstance for TIMG0 {
 
     fn reset_peripheral() {
         // FIXME: for TIMG0 do nothing for now because the reset breaks
-        // `time::now`
+        // `time::Instant::now`
     }
 
     fn configure_wdt_src_clk() {

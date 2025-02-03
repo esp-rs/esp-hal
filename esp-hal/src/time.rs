@@ -144,7 +144,17 @@ impl defmt::Format for Instant {
 }
 
 impl Instant {
+    /// Represents the moment the system booted.
+    pub const EPOCH: Instant = Instant(InnerInstant::from_ticks(0));
+
     /// Returns the current instant.
+    ///
+    /// The counter won’t measure time in sleep-mode.
+    ///
+    /// The timer has a 1 microsecond resolution and will wrap after
+    #[cfg_attr(esp32, doc = "36_558 years")]
+    #[cfg_attr(esp32s2, doc = "7_311 years")]
+    #[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
     pub fn now() -> Self {
         now()
     }
@@ -154,8 +164,8 @@ impl Instant {
     }
 
     /// Returns the elapsed time since boot.
-    pub const fn duration_since_epoch(&self) -> Duration {
-        Duration::from_micros(self.0.ticks())
+    pub fn duration_since_epoch(&self) -> Duration {
+        Self::EPOCH.elapsed()
     }
 
     /// Returns the elapsed `Duration` since this instant was created.
@@ -375,15 +385,7 @@ impl core::ops::Div<Duration> for Duration {
     }
 }
 
-/// Provides time since system start in microseconds precision.
-///
-/// The counter won’t measure time in sleep-mode.
-///
-/// The timer will wrap after
-#[cfg_attr(esp32, doc = "36_558 years")]
-#[cfg_attr(esp32s2, doc = "7_311 years")]
-#[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
-pub fn now() -> Instant {
+fn now() -> Instant {
     #[cfg(esp32)]
     let (ticks, div) = {
         // on ESP32 use LACT

@@ -10,7 +10,7 @@ use embassy_time_driver::Driver;
 use esp_hal::{
     interrupt::{InterruptHandler, Priority},
     sync::Locked,
-    time::{now, Duration},
+    time::{Duration, Instant},
     timer::OneShotTimer,
     Blocking,
 };
@@ -203,7 +203,7 @@ impl EmbassyTimer {
     /// Returns `true` if the timer was armed, `false` if the timestamp is in
     /// the past.
     fn arm(timer: &mut Timer, timestamp: u64) -> bool {
-        let now = now().duration_since_epoch().as_micros();
+        let now = Instant::now().duration_since_epoch().as_micros();
 
         if timestamp > now {
             let timeout = Duration::from_micros(timestamp - now);
@@ -294,7 +294,7 @@ impl EmbassyTimer {
 
 impl Driver for EmbassyTimer {
     fn now(&self) -> u64 {
-        now().duration_since_epoch().as_micros()
+        Instant::now().duration_since_epoch().as_micros()
     }
 
     fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {

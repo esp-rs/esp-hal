@@ -49,10 +49,10 @@ mod test_cases {
     use super::*;
 
     pub async fn run_test_one_shot_async() {
-        let t1 = esp_hal::time::now();
+        let t1 = esp_hal::time::Instant::now();
         Timer::after_millis(50).await;
         Timer::after_millis(30).await;
-        let t2 = esp_hal::time::now();
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
         assert!(
@@ -65,12 +65,12 @@ mod test_cases {
     pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
         let mut periodic = PeriodicTimer::new(timer);
 
-        let t1 = time::now();
+        let t1 = time::Instant::now();
         periodic.start(time::Duration::from_millis(100)).unwrap();
 
         periodic.wait();
 
-        let t2 = time::now();
+        let t2 = time::Instant::now();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
         assert!(
@@ -83,9 +83,9 @@ mod test_cases {
     pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
         let mut timer = OneShotTimer::new(timer);
 
-        let t1 = esp_hal::time::now();
+        let t1 = esp_hal::time::Instant::now();
         timer.delay_millis(50);
-        let t2 = esp_hal::time::now();
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
         assert!(
@@ -96,10 +96,10 @@ mod test_cases {
     }
 
     pub async fn run_join_test() {
-        let t1 = esp_hal::time::now();
+        let t1 = esp_hal::time::Instant::now();
         embassy_futures::join::join(Timer::after_millis(50), Timer::after_millis(30)).await;
         Timer::after_millis(50).await;
-        let t2 = esp_hal::time::now();
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
         assert!(
@@ -219,11 +219,11 @@ mod test {
             let outcome = async {
                 let mut ticker = Ticker::every(Duration::from_millis(30));
 
-                let t1 = esp_hal::time::now();
+                let t1 = esp_hal::time::Instant::now();
                 ticker.next().await;
                 ticker.next().await;
                 ticker.next().await;
-                let t2 = esp_hal::time::now();
+                let t2 = esp_hal::time::Instant::now();
 
                 assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
                 assert!(
@@ -254,13 +254,13 @@ mod test {
         // We are retrying 5 times because probe-rs polling RTT may introduce some
         // jitter.
         for _ in 0..5 {
-            let t1 = esp_hal::time::now();
+            let t1 = esp_hal::time::Instant::now();
 
             let mut ticker = Ticker::every(Duration::from_hz(100_000));
             for _ in 0..2000 {
                 ticker.next().await;
             }
-            let t2 = esp_hal::time::now();
+            let t2 = esp_hal::time::Instant::now();
 
             assert!(t2 > t1, "t2: {:?}, t1: {:?}", t2, t1);
             let duration = (t2 - t1).as_micros();

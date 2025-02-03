@@ -3,7 +3,7 @@
 //! ## Overview
 //!
 //! The Delay driver provides blocking delay functionalities using the
-//! [now] function.
+//! [`Instant`] struct.
 //!
 //! ## Configuration
 //!
@@ -30,7 +30,6 @@
 //! 
 //! [DelayNs]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/trait.DelayNs.html
 //! [embedded-hal]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/index.html
-//! [now]: crate::time::now
 
 use crate::time::{Duration, Instant};
 

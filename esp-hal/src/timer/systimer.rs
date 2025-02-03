@@ -93,7 +93,7 @@ impl SystemTimer {
 
     /// Create a new instance.
     pub fn new(_systimer: SYSTIMER) -> Self {
-        // Don't reset Systimer as it will break `time::now`, only enable it
+        // Don't reset Systimer as it will break `time::Instant::now`, only enable it
         PeripheralClockControl::enable(PeripheralEnable::Systimer);
 
         #[cfg(soc_etm)]
@@ -124,7 +124,7 @@ impl SystemTimer {
     ///
     /// - Disabling a `Unit` whilst [`Alarm`]s are using it will affect the
     ///   [`Alarm`]s operation.
-    /// - Disabling Unit0 will affect [`now`](crate::time::now).
+    /// - Disabling Unit0 will affect [`Instant::now`].
     pub unsafe fn configure_unit(unit: Unit, config: UnitConfig) {
         unit.configure(config)
     }
@@ -139,8 +139,7 @@ impl SystemTimer {
     ///
     /// - Modifying a unit's count whilst [`Alarm`]s are using it may cause
     ///   unexpected behaviour
-    /// - Any modification of the unit0 count will affect
-    ///   [`now`](crate::time::now).
+    /// - Any modification of the unit0 count will affect [`Instant::now`]
     pub unsafe fn set_unit_value(unit: Unit, value: u64) {
         unit.set_count(value)
     }

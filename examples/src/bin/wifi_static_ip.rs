@@ -64,7 +64,7 @@ fn main() -> ! {
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
 
-    let now = || time::now().duration_since_epoch().as_millis();
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
@@ -143,7 +143,7 @@ fn main() -> ! {
             println!("Connected");
 
             let mut time_out = false;
-            let deadline = time::now() + Duration::from_secs(20);
+            let deadline = time::Instant::now() + Duration::from_secs(20);
             let mut buffer = [0u8; 1024];
             let mut pos = 0;
             while let Ok(len) = socket.read(&mut buffer[pos..]) {
@@ -157,7 +157,7 @@ fn main() -> ! {
 
                 pos += len;
 
-                if time::now() > deadline {
+                if time::Instant::now() > deadline {
                     println!("Timeout");
                     time_out = true;
                     break;
@@ -185,8 +185,8 @@ fn main() -> ! {
             println!();
         }
 
-        let deadline = time::now() + Duration::from_secs(5);
-        while time::now() < deadline {
+        let deadline = time::Instant::now() + Duration::from_secs(5);
+        while time::Instant::now() < deadline {
             socket.work();
         }
     }
