@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI: Added support for 3-wire SPI (#2919)
 - UART: Add separate config for Rx and Tx (#2965)
 - Added accessor methods to config structs (#3011)
+- Async support for ADC oneshot reads for ESP32C2, ESP32C3, ESP32C6 and ESP32H2 (#2925, #3082)
 
 ### Changed
 
@@ -26,10 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 - SPI, UART, I2C: `with_<pin>` functions of peripheral drivers now disconnect the previously assigned pins from the peripheral. (#3012)
 - SPI, UART, I2C: Dropping a driver now disconnects pins from their peripherals. (#3012)
+- Migrate PARL_IO driver to DMA move API (#3033)
 - `Async` drivers are no longer `Send` (#2980)
 - GPIO drivers now take configuration structs (#2990, #3029)
 - `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`) (#3001)
-
+- Migrate AES driver to DMA move API (#3084)
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
 
 - I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
@@ -45,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
 - OutputOpenDrain has been removed (#3029)
 - The fields of config structs are no longer public (#3011)
+- Removed the dysfunctional `DmaChannel::set_priority` function (#3088)
 
 ## [0.23.1] - 2025-01-15
 
@@ -106,7 +109,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: Made Wi-Fi peripheral non virtual. (#2942)
 - `UartRx::check_for_errors`, `Uart::check_for_rx_errors`, `{Uart, UartRx}::read_buffered_bytes` (#2935)
 - Added `i2c` interrupt API (#2944)
-- Async support for ADC oneshot reads for ESP32C3 and ESP32C6 (#2925)
 
 ### Changed
 

@@ -42,11 +42,6 @@ impl DmaChannel for AnyGdmaChannel {
     type Rx = AnyGdmaRxChannel;
     type Tx = AnyGdmaTxChannel;
 
-    fn set_priority(&self, priority: DmaPriority) {
-        AnyGdmaRxChannel(self.0).set_priority(priority);
-        AnyGdmaTxChannel(self.0).set_priority(priority);
-    }
-
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (AnyGdmaRxChannel(self.0), AnyGdmaTxChannel(self.0))
     }
@@ -675,10 +670,6 @@ macro_rules! impl_channel {
             impl DmaChannel for [<DmaChannel $num>] {
                 type Rx = AnyGdmaRxChannel;
                 type Tx = AnyGdmaTxChannel;
-
-                fn set_priority(&self, priority: DmaPriority) {
-                    AnyGdmaChannel($num).set_priority(priority);
-                }
 
                 unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
                     (AnyGdmaRxChannel($num), AnyGdmaTxChannel($num))

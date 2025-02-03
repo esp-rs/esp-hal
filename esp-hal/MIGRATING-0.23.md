@@ -174,6 +174,35 @@ config/config.toml
 + ESP_HAL_CONFIG_PSRAM_MODE = "octal"
 ```
 
+## PARL_IO changes
+Parallel IO now uses the newer DMA Move API.
+
+Changes on the TX side
+```diff
+  let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
++ let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+- let transfer = parl_io_tx.write_dma(&tx_buffer).unwrap();
+- transfer.wait().unwrap();
++ let transfer = parl_io_tx.write(dma_tx_buf.len(), dma_tx_buf).unwrap();
++ (result, parl_io_tx, dma_tx_buf) = transfer.wait();
++ result.unwrap();
+```
+
+Changes on the RX side
+```diff
+  let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
++ let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+- let transfer = parl_io_rx.read_dma(&mut rx_buffer).unwrap();
+- transfer.wait().unwrap();
++ let transfer = parl_io_rx.read(Some(dma_rx_buf.len()), dma_rx_buf).unwrap();
++ (_, parl_io_rx, dma_rx_buf) = transfer.wait();
+```
+
+On the RX side, the `EofMode` is now decided at transfer time, rather than config time.
+- `EofMode::ByteLen` -> `Some(<number of bytes to receive>)`
+- `EofMode::EnableSignal` -> `None`
+
 ## GPIO changes
 
 GPIO drivers now take configuration structs.
@@ -198,6 +227,36 @@ The OutputOpenDrain driver has been removed. You can use `Output` instead with
      OutputConfig::default()
          .with_drive_mode(DriveMode::OpenDrain),
  );
+```
+
+## AES DMA driver changes
+AES now uses the newer DMA move API.
+
+```diff
+  let (output, rx_descriptors, input, tx_descriptors) = dma_buffers!(32000);
++ let mut output = DmaRxBuf::new(rx_descriptors, output).unwrap();
++ let mut input = DmaTxBuf::new(tx_descriptors, input).unwrap();
+
+  let mut aes = Aes::new(peripherals.AES).with_dma(
+      dma_channel,
+-     rx_descriptors,
+-     tx_descriptors,
+  );
+
+  let transfer = aes
+      .process(
+-         &input,
+-         &mut output,
++         output.len().div_ceil(16), // Number of blocks
++         output,
++         input,
+          Mode::Encryption128,
+          CipherMode::Ecb,
+          keybuf,
+      )
++     .map_err(|e| e.0)
+      .unwrap();
+  transfer.wait();
 ```
 
 ## I2C Changes

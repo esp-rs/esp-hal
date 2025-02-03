@@ -53,7 +53,7 @@
 //!
 //! ## Implementation State
 //!
-//! * AES-DMA mode is currently not supported on ESP32 and ESP32S2
+//! * AES-DMA mode is currently not supported on ESP32
 //! * AES-DMA Initialization Vector (IV) is currently not supported
 
 use crate::{
@@ -235,25 +235,19 @@ pub enum Endianness {
 /// CTR, CFB8, and CFB128.
 #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
 pub mod dma {
+    use core::mem::ManuallyDrop;
+
     use crate::{
         aes::{Key, Mode},
         dma::{
-            dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             Channel,
-            ChannelRx,
-            ChannelTx,
-            DescriptorChain,
             DmaChannelFor,
-            DmaDescriptor,
             DmaPeripheral,
-            DmaTransferRxTx,
+            DmaRxBuffer,
+            DmaTxBuffer,
             PeripheralDmaChannel,
-            PeripheralRxChannel,
-            PeripheralTxChannel,
-            ReadBuffer,
             Rx,
             Tx,
-            WriteBuffer,
         },
         peripheral::Peripheral,
         peripherals::AES,
@@ -286,29 +280,17 @@ pub mod dma {
         pub aes: super::Aes<'d>,
 
         channel: Channel<'d, Blocking, PeripheralDmaChannel<AES>>,
-        rx_chain: DescriptorChain,
-        tx_chain: DescriptorChain,
     }
 
     impl<'d> crate::aes::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
-        pub fn with_dma<CH>(
-            self,
-            channel: impl Peripheral<P = CH> + 'd,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> AesDma<'d>
+        pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> AesDma<'d>
         where
             CH: DmaChannelFor<AES>,
         {
             let channel = Channel::new(channel.map(|ch| ch.degrade()));
             channel.runtime_ensure_compatible(&self.aes);
-            AesDma {
-                aes: self,
-                channel,
-                rx_chain: DescriptorChain::new(rx_descriptors),
-                tx_chain: DescriptorChain::new(tx_descriptors),
-            }
+            AesDma { aes: self, channel }
         }
     }
 
@@ -318,47 +300,7 @@ pub mod dma {
         }
     }
 
-    impl DmaSupport for AesDma<'_> {
-        fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-            while self.aes.regs().state().read().state().bits() != 2 // DMA status DONE == 2
-            && !self.channel.tx.is_done()
-            {
-                // wait until done
-            }
-
-            self.finish_transform();
-        }
-
-        fn peripheral_dma_stop(&mut self) {
-            unreachable!("unsupported")
-        }
-    }
-
-    impl<'d> DmaSupportTx for AesDma<'d> {
-        type TX = ChannelTx<'d, Blocking, PeripheralTxChannel<AES>>;
-
-        fn tx(&mut self) -> &mut Self::TX {
-            &mut self.channel.tx
-        }
-
-        fn chain(&mut self) -> &mut DescriptorChain {
-            &mut self.tx_chain
-        }
-    }
-
-    impl<'d> DmaSupportRx for AesDma<'d> {
-        type RX = ChannelRx<'d, Blocking, PeripheralRxChannel<AES>>;
-
-        fn rx(&mut self) -> &mut Self::RX {
-            &mut self.channel.rx
-        }
-
-        fn chain(&mut self) -> &mut DescriptorChain {
-            &mut self.rx_chain
-        }
-    }
-
-    impl AesDma<'_> {
+    impl<'d> AesDma<'d> {
         /// Writes the encryption key to the AES hardware, checking that its
         /// length matches expected constraints.
         pub fn write_key<K>(&mut self, key: K)
@@ -380,80 +322,62 @@ pub mod dma {
 
         /// Perform a DMA transfer.
         ///
-        /// This will return a [DmaTransferRxTx]. The maximum amount of data to
+        /// This will return a [AesTransfer]. The maximum amount of data to
         /// be sent/received is 32736 bytes.
-        pub fn process<'t, K, TXBUF, RXBUF>(
-            &'t mut self,
-            words: &'t TXBUF,
-            read_buffer: &'t mut RXBUF,
+        pub fn process<K, RXBUF, TXBUF>(
+            mut self,
+            number_of_blocks: usize,
+            mut output: RXBUF,
+            mut input: TXBUF,
             mode: Mode,
             cipher_mode: CipherMode,
             key: K,
-        ) -> Result<DmaTransferRxTx<'t, Self>, crate::dma::DmaError>
+        ) -> Result<AesTransfer<'d, RXBUF, TXBUF>, (crate::dma::DmaError, Self, RXBUF, TXBUF)>
         where
             K: Into<Key>,
-            TXBUF: ReadBuffer,
-            RXBUF: WriteBuffer,
-        {
-            let (write_ptr, write_len) = unsafe { words.read_buffer() };
-            let (read_ptr, read_len) = unsafe { read_buffer.write_buffer() };
-
-            self.start_transfer_dma(
-                read_ptr,
-                read_len,
-                write_ptr,
-                write_len,
-                mode,
-                cipher_mode,
-                key.into(),
-            )?;
-
-            Ok(DmaTransferRxTx::new(self))
-        }
-
-        #[allow(clippy::too_many_arguments)]
-        fn start_transfer_dma<K>(
-            &mut self,
-            read_buffer_ptr: *mut u8,
-            read_buffer_len: usize,
-            write_buffer_ptr: *const u8,
-            write_buffer_len: usize,
-            mode: Mode,
-            cipher_mode: CipherMode,
-            key: K,
-        ) -> Result<(), crate::dma::DmaError>
-        where
-            K: Into<Key>,
+            TXBUF: DmaTxBuffer,
+            RXBUF: DmaRxBuffer,
         {
             // AES has to be restarted after each calculation
             self.reset_aes();
 
-            unsafe {
-                self.tx_chain
-                    .fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
+            let result = unsafe {
                 self.channel
                     .tx
-                    .prepare_transfer_without_start(self.dma_peripheral(), &self.tx_chain)
-                    .and_then(|_| self.channel.tx.start_transfer())?;
+                    .prepare_transfer(self.dma_peripheral(), &mut input)
+                    .and_then(|_| self.channel.tx.start_transfer())
+            };
+            if let Err(err) = result {
+                return Err((err, self, output, input));
+            }
 
-                self.rx_chain
-                    .fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
+            let result = unsafe {
                 self.channel
                     .rx
-                    .prepare_transfer_without_start(self.dma_peripheral(), &self.rx_chain)
-                    .and_then(|_| self.channel.rx.start_transfer())?;
+                    .prepare_transfer(self.dma_peripheral(), &mut output)
+                    .and_then(|_| self.channel.rx.start_transfer())
+            };
+            if let Err(err) = result {
+                self.channel.tx.stop_transfer();
+
+                return Err((err, self, output, input));
             }
+
             self.enable_dma(true);
             self.enable_interrupt();
             self.aes.write_mode(mode);
             self.set_cipher_mode(cipher_mode);
             self.write_key(key.into());
 
-            self.set_num_block((write_buffer_len as u32).div_ceil(16));
+            self.set_num_block(number_of_blocks as u32);
 
             self.start_transform();
 
-            Ok(())
+            Ok(AesTransfer {
+                aes_dma: ManuallyDrop::new(self),
+                rx_view: ManuallyDrop::new(output.into_view()),
+                tx_view: ManuallyDrop::new(input.into_view()),
+            })
         }
 
         #[cfg(any(esp32c3, esp32s2, esp32s3))]
@@ -524,6 +448,82 @@ pub mod dma {
                 .regs()
                 .block_num()
                 .modify(|_, w| unsafe { w.block_num().bits(block) });
+        }
+    }
+
+    /// Represents an ongoing (or potentially stopped) transfer with the Aes.
+    #[instability::unstable]
+    pub struct AesTransfer<'d, RX: DmaRxBuffer, TX: DmaTxBuffer> {
+        aes_dma: ManuallyDrop<AesDma<'d>>,
+        rx_view: ManuallyDrop<RX::View>,
+        tx_view: ManuallyDrop<TX::View>,
+    }
+
+    impl<'d, RX: DmaRxBuffer, TX: DmaTxBuffer> AesTransfer<'d, RX, TX> {
+        /// Returns true when [Self::wait] will not block.
+        pub fn is_done(&self) -> bool {
+            // DMA status DONE == 2
+            self.aes_dma.aes.regs().state().read().state().bits() == 2
+        }
+
+        /// Waits for the transfer to finish and returns the peripheral and
+        /// buffers.
+        pub fn wait(mut self) -> (AesDma<'d>, RX, TX) {
+            while !self.is_done() {}
+
+            // Stop the DMA as it doesn't know that the aes has stopped.
+            self.aes_dma.channel.rx.stop_transfer();
+            self.aes_dma.channel.tx.stop_transfer();
+
+            self.aes_dma.finish_transform();
+
+            let (aes_dma, rx_view, tx_view) = unsafe {
+                let aes_dma = ManuallyDrop::take(&mut self.aes_dma);
+                let rx_view = ManuallyDrop::take(&mut self.rx_view);
+                let tx_view = ManuallyDrop::take(&mut self.tx_view);
+                core::mem::forget(self);
+                (aes_dma, rx_view, tx_view)
+            };
+
+            (aes_dma, RX::from_view(rx_view), TX::from_view(tx_view))
+        }
+
+        /// Provides shared access to the DMA rx buffer view.
+        pub fn rx_view(&self) -> &RX::View {
+            &self.rx_view
+        }
+
+        /// Provides exclusive access to the DMA rx buffer view.
+        pub fn rx_view_mut(&mut self) -> &mut RX::View {
+            &mut self.rx_view
+        }
+
+        /// Provides shared access to the DMA tx buffer view.
+        pub fn tx_view(&self) -> &TX::View {
+            &self.tx_view
+        }
+
+        /// Provides exclusive access to the DMA tx buffer view.
+        pub fn tx_view_mut(&mut self) -> &mut TX::View {
+            &mut self.tx_view
+        }
+    }
+
+    impl<RX: DmaRxBuffer, TX: DmaTxBuffer> Drop for AesTransfer<'_, RX, TX> {
+        fn drop(&mut self) {
+            // Stop the DMA to prevent further memory access.
+            self.aes_dma.channel.rx.stop_transfer();
+            self.aes_dma.channel.tx.stop_transfer();
+
+            // SAFETY: This is Drop, we know that self.i8080 and self.buf_view
+            // won't be touched again.
+            unsafe {
+                ManuallyDrop::drop(&mut self.aes_dma);
+            }
+            let rx_view = unsafe { ManuallyDrop::take(&mut self.rx_view) };
+            let tx_view = unsafe { ManuallyDrop::take(&mut self.tx_view) };
+            let _ = RX::from_view(rx_view);
+            let _ = TX::from_view(tx_view);
         }
     }
 }
