@@ -4,7 +4,7 @@
 //! Following pins are used:
 //! - ADC read pin => GPIO3
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32s3
+//% CHIPS: esp32s3
 
 #![no_std]
 #![no_main]
