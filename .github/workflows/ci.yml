@@ -113,24 +113,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          ldproxy: false
+          version: ${{ env.MSRV }}
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: ${{ env.MSRV }}
           components: rust-src
-      - name: install esp toolchain
-        run: |
-          if [ ! -f "$HOME/.cargo/bin/espup" ]; then
-            curl -L https://github.com/esp-rs/espup/releases/latest/download/espup-aarch64-apple-darwin -o "$HOME/.cargo/bin/espup"
-            chmod a+x "$HOME/.cargo/bin/espup"
-          fi
-
-          source "$HOME/.cargo/env"
-          "$HOME/.cargo/bin/espup" install -l debug --export-file $HOME/exports --targets all --toolchain-version 1.84.0.0
-          source "$HOME/exports"
-          echo "$PATH" >> "$GITHUB_PATH"
-          echo "LIBCLANG_PATH=${LIBCLANG_PATH}" >> "$GITHUB_ENV"
-          rustup override unset
       - uses: Swatinem/rust-cache@v2
 
       # Verify the MSRV for all RISC-V chips.
