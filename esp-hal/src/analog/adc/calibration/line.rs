@@ -1,13 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::analog::adc::{
-    AdcCalBasic,
-    AdcCalEfuse,
-    AdcCalScheme,
-    AdcCalSource,
-    AdcConfig,
-    Attenuation,
-    CalibrationAccess,
+    AdcCalBasic, AdcCalEfuse, AdcCalScheme, AdcCalSource, AdcConfig, Attenuation, CalibrationAccess,
 };
 
 /// Marker trait for ADC units which support line fitting

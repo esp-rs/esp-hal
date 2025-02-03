@@ -1,12 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::analog::adc::{
-    AdcCalEfuse,
-    AdcCalLine,
-    AdcCalScheme,
-    AdcHasLineCal,
-    Attenuation,
-    CalibrationAccess,
+    AdcCalEfuse, AdcCalLine, AdcCalScheme, AdcHasLineCal, Attenuation, CalibrationAccess,
 };
 
 const COEFF_MUL: i64 = 1 << 52;
@@ -92,16 +87,12 @@ where
         let err = if val == 0 {
             0
         } else {
-            // err = coeff[0] + coeff[1] * val + coeff[2] * val^2 + ... + coeff[n] * val^n
-            let mut var = 1i64;
-            let mut err = (var * self.coeff[0] / COEFF_MUL) as i32;
-
-            for coeff in &self.coeff[1..] {
-                var *= val as i64;
-                err += (var * *coeff / COEFF_MUL) as i32;
+            let x = val as i64;
+            let mut poly = 0_i64;
+            for &c in self.coeff.iter().rev() {
+                poly = poly * x + c;
             }
-
-            err
+            (poly / COEFF_MUL) as i32
         };
 
         (val as i32 - err) as u16
