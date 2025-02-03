@@ -1,5 +1,8 @@
 use super::*;
-use crate::hal::{interrupt, peripherals::Interrupt};
+use crate::{
+    binary::c_types::c_char,
+    hal::{interrupt, peripherals::Interrupt},
+};
 
 pub(crate) static mut BT_INTERRUPT_FUNCTION5: (
     *mut crate::binary::c_types::c_void,
@@ -43,7 +46,7 @@ pub(super) struct osi_funcs_s {
     task_create: Option<
         unsafe extern "C" fn(
             *mut crate::binary::c_types::c_void,
-            *const u8,
+            *const c_char,
             u32,
             *mut crate::binary::c_types::c_void,
             u32,
