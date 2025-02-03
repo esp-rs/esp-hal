@@ -12,7 +12,7 @@
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 //!
 
-//% FEATURES: embassy esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
+//% FEATURES: embassy esp-wifi esp-wifi/wifi esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -40,11 +40,9 @@ use esp_wifi::{
         AccessPointConfiguration,
         ClientConfiguration,
         Configuration,
-        WifiApDevice,
         WifiController,
         WifiDevice,
         WifiEvent,
-        WifiStaDevice,
         WifiState,
     },
     EspWifiController,
@@ -74,14 +72,16 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let mut rng = Rng::new(peripherals.RNG);
 
-    let init = &*mk_static!(
+    let esp_wifi_ctrl = &*mk_static!(
         EspWifiController<'static>,
         init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap()
     );
 
-    let wifi = peripherals.WIFI;
-    let (wifi_ap_interface, wifi_sta_interface, mut controller) =
-        esp_wifi::wifi::new_ap_sta(&init, wifi).unwrap();
+    let (mut controller, interfaces) =
+        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+
+    let wifi_ap_device = interfaces.ap;
+    let wifi_sta_device = interfaces.sta;
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
@@ -105,13 +105,13 @@ async fn main(spawner: Spawner) -> ! {
 
     // Init network stacks
     let (ap_stack, ap_runner) = embassy_net::new(
-        wifi_ap_interface,
+        wifi_ap_device,
         ap_config,
         mk_static!(StackResources<3>, StackResources::<3>::new()),
         seed,
     );
     let (sta_stack, sta_runner) = embassy_net::new(
-        wifi_sta_interface,
+        wifi_sta_device,
         sta_config,
         mk_static!(StackResources<3>, StackResources::<3>::new()),
         seed,
@@ -329,11 +329,11 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn ap_task(mut runner: Runner<'static, WifiDevice<'static, WifiApDevice>>) {
+async fn ap_task(mut runner: Runner<'static, WifiDevice<'static>>) {
     runner.run().await
 }
 
 #[embassy_executor::task]
-async fn sta_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+async fn sta_task(mut runner: Runner<'static, WifiDevice<'static>>) {
     runner.run().await
 }

@@ -2,7 +2,7 @@
 //!
 //! Broadcasts, receives and sends messages via esp-now
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/esp-now esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -33,7 +33,7 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
+    let esp_wifi_ctrl = init(
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
@@ -41,7 +41,7 @@ fn main() -> ! {
     .unwrap();
 
     let wifi = peripherals.WIFI;
-    let mut esp_now = esp_wifi::esp_now::EspNow::new(&init, wifi).unwrap();
+    let mut esp_now = esp_wifi::esp_now::EspNow::new(&esp_wifi_ctrl, wifi).unwrap();
 
     println!("esp-now version {}", esp_now.version().unwrap());
 

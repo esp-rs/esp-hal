@@ -129,10 +129,6 @@ csi = []
 ## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
 
-## Provide utilities for smoltcp initialization. Adds smoltcp dependency
-utils = ["smoltcp"]
-
-
 # Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde", "heapless/serde"]
 

@@ -8,7 +8,7 @@
 //! Note: On ESP32-C2 and ESP32-C3 you need a wifi-heap size of 70000, on ESP32-C6 you need 80000 and a tx_queue_size of 10
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/ble esp-wifi/coex esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-wifi/ble esp-wifi/coex esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![allow(static_mut_refs)]
@@ -43,7 +43,7 @@ use esp_println::{print, println};
 use esp_wifi::{
     ble::controller::BleConnector,
     init,
-    wifi::{utils::create_network_interface, ClientConfiguration, Configuration, WifiStaDevice},
+    wifi::{ClientConfiguration, Configuration},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
@@ -83,13 +83,16 @@ fn main() -> ! {
 
     let mut rng = Rng::new(peripherals.RNG);
 
-    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
-    let mut wifi = peripherals.WIFI;
     let bluetooth = peripherals.BT;
 
-    let (iface, device, mut controller) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+    let (mut controller, interfaces) =
+        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+
+    let mut device = interfaces.sta;
+    let iface = device.interface();
+
     controller
         .set_power_saving(esp_wifi::config::PowerSaveMode::None)
         .unwrap();
@@ -145,7 +148,7 @@ fn main() -> ! {
         }
     }
 
-    let connector = BleConnector::new(&init, bluetooth);
+    let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth);
     let hci = HciConnector::new(connector, now);
     let mut ble = Ble::new(&hci);
 

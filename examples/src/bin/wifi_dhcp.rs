@@ -6,8 +6,10 @@
 //! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi  esp-hal/unstable esp-wifi/smoltcp
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
+
+// esp-wifi/utils
 
 #![no_std]
 #![no_main]
@@ -29,14 +31,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_wifi::{
     init,
-    wifi::{
-        utils::create_network_interface,
-        AccessPointInfo,
-        ClientConfiguration,
-        Configuration,
-        WifiError,
-        WifiStaDevice,
-    },
+    wifi::{AccessPointInfo, ClientConfiguration, Configuration, WifiError},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
@@ -58,14 +53,13 @@ fn main() -> ! {
 
     let mut rng = Rng::new(peripherals.RNG);
 
-    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
-    let mut wifi = peripherals.WIFI;
-    let (iface, device, mut controller) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
-    controller
-        .set_power_saving(esp_wifi::config::PowerSaveMode::None)
-        .unwrap();
+    let (mut controller, interfaces) =
+        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+
+    let mut device = interfaces.sta;
+    let iface = device.interface();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let mut socket_set = SocketSet::new(&mut socket_set_entries[..]);
@@ -79,6 +73,10 @@ fn main() -> ! {
 
     let now = || time::now().duration_since_epoch().to_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
+
+    controller
+        .set_power_saving(esp_wifi::config::PowerSaveMode::None)
+        .unwrap();
 
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
