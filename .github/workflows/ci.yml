@@ -88,7 +88,7 @@ jobs:
           toolchain: ${{ matrix.device.toolchain }}
 
   extras:
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
 
     steps:
       - uses: actions/checkout@v4
@@ -97,8 +97,6 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
       # Build the extra crates
       - name: Build the bench-server
         run: cd extras/bench-server && cargo build
@@ -111,9 +109,7 @@ jobs:
   # MSRV
 
   msrv:
-    runs-on: ubuntu-latest
-    env:
-      RUSTC_BOOTSTRAP: 1
+    runs-on: macos-m1-self-hosted
 
     steps:
       - uses: actions/checkout@v4
@@ -166,7 +162,7 @@ jobs:
   # Format
 
   rustfmt:
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
 
     steps:
       - uses: actions/checkout@v4
@@ -185,7 +181,7 @@ jobs:
   # host tests
 
   host-tests:
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
 
     steps:
       - uses: actions/checkout@v4

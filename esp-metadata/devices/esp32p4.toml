@@ -93,6 +93,8 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
+    # "adc1",
+    # "adc2",
     "clic",
     "very_large_intr_status",
     "gpio_bank_1",

@@ -116,6 +116,10 @@ name    = "spi_slave"
 harness = false
 
 [[test]]
+name    = "parl_io"
+harness = false
+
+[[test]]
 name    = "parl_io_tx"
 harness = false
 

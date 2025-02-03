@@ -1,9 +1,12 @@
 use core::marker::PhantomData;
 
-#[cfg(esp32c3)]
-use Interrupt::APB_ADC as InterruptSource;
-#[cfg(esp32c6)]
-use Interrupt::APB_SARADC as InterruptSource;
+cfg_if::cfg_if! {
+    if #[cfg(esp32c6)] {
+        use Interrupt::APB_SARADC as InterruptSource;
+    } else {
+        use Interrupt::APB_ADC as InterruptSource;
+    }
+}
 
 #[cfg(not(esp32h2))]
 pub use self::calibration::*;
@@ -12,17 +15,13 @@ use super::{AdcCalSource, AdcConfig, Attenuation};
 use crate::clock::clocks_ll::regi2c_write_mask;
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
 use crate::efuse::Efuse;
-#[cfg(any(esp32c3, esp32c6))]
 use crate::{
     analog::adc::asynch::AdcFuture,
     interrupt::{InterruptConfigurable, InterruptHandler},
-    peripherals::Interrupt,
-    Async,
-};
-use crate::{
     peripheral::PeripheralRef,
-    peripherals::APB_SARADC,
+    peripherals::{Interrupt, APB_SARADC},
     system::{GenericPeripheralGuard, Peripheral},
+    Async,
     Blocking,
 };
 
@@ -51,7 +50,7 @@ fn regi2c_write_mask(block: u8, host_id: u8, reg_add: u8, msb: u8, lsb: u8, data
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h2/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h4/include/soc/regi2c_saradc.h
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))] {
+    if #[cfg(adc1)] {
         const I2C_SAR_ADC: u8 = 0x69;
         const I2C_SAR_ADC_HOSTID: u8 = 0;
 
@@ -82,7 +81,7 @@ cfg_if::cfg_if! {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(esp32c3)] {
+    if #[cfg(adc2)] {
         const ADC_SAR2_ENCAL_GND_ADDR: u8 = 0x7;
         const ADC_SAR2_ENCAL_GND_ADDR_MSB: u8 = 7;
         const ADC_SAR2_ENCAL_GND_ADDR_LSB: u8 = 7;
@@ -194,6 +193,7 @@ pub trait RegisterAccess {
     fn set_init_code(data: u16);
 }
 
+#[cfg(adc1)]
 impl RegisterAccess for crate::peripherals::ADC1 {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
@@ -256,6 +256,7 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     }
 }
 
+#[cfg(adc1)]
 impl super::CalibrationAccess for crate::peripherals::ADC1 {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
@@ -296,7 +297,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
     }
 }
 
-#[cfg(esp32c3)]
+#[cfg(adc2)]
 impl RegisterAccess for crate::peripherals::ADC2 {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
@@ -357,7 +358,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     }
 }
 
-#[cfg(esp32c3)]
+#[cfg(adc2)]
 impl super::CalibrationAccess for crate::peripherals::ADC2 {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
@@ -435,9 +436,9 @@ where
         }
     }
 
-    #[cfg(any(esp32c3, esp32c6))]
     /// Reconfigures the ADC driver to operate in asynchronous mode.
     pub fn into_async(mut self) -> Adc<'d, ADCI, Async> {
+        asynch::acquire_async_adc();
         self.set_interrupt_handler(asynch::adc_interrupt_handler);
 
         // Reset interrupt flags and disable oneshot reading to normalize state before
@@ -531,7 +532,6 @@ where
 
 impl<ADCI> crate::private::Sealed for Adc<'_, ADCI, Blocking> {}
 
-#[cfg(any(esp32c3, esp32c6))]
 impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::Cpu::other() {
@@ -545,7 +545,7 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
+#[cfg(all(adc1, not(esp32h2)))]
 impl super::AdcCalEfuse for crate::peripherals::ADC1 {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(1, atten)
@@ -560,7 +560,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1 {
     }
 }
 
-#[cfg(esp32c3)]
+#[cfg(adc2)]
 impl super::AdcCalEfuse for crate::peripherals::ADC2 {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(2, atten)
@@ -635,14 +635,18 @@ mod adc_implementation {
     }
 }
 
-#[cfg(any(esp32c3, esp32c6))]
 impl<'d, ADCI> Adc<'d, ADCI, Async>
 where
     ADCI: RegisterAccess + 'd,
 {
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Adc<'d, ADCI, Blocking> {
-        crate::interrupt::disable(crate::Cpu::current(), InterruptSource);
+        if asynch::release_async_adc() {
+            // Disable ADC interrupt on all cores if the last async ADC instance is disabled
+            for cpu in crate::Cpu::all() {
+                crate::interrupt::disable(cpu, InterruptSource);
+            }
+        }
         Adc {
             _adc: self._adc,
             attenuations: self.attenuations,
@@ -697,7 +701,6 @@ where
     }
 }
 
-#[cfg(any(esp32c3, esp32c6))]
 /// Async functionality
 pub(crate) mod asynch {
     use core::{
@@ -706,20 +709,42 @@ pub(crate) mod asynch {
         task::{Context, Poll},
     };
 
+    // We only have to count on devices that have multiple ADCs sharing the same interrupt
+    #[cfg(all(adc1, adc2))]
+    use portable_atomic::{AtomicU32, Ordering};
     use procmacros::handler;
 
     use crate::{asynch::AtomicWaker, peripherals::APB_SARADC, Async};
+
+    #[cfg(all(adc1, adc2))]
+    static ASYNC_ADC_COUNT: AtomicU32 = AtomicU32::new(0);
+
+    pub(super) fn acquire_async_adc() {
+        #[cfg(all(adc1, adc2))]
+        ASYNC_ADC_COUNT.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(super) fn release_async_adc() -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(all(adc1, adc2))] {
+                ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
+            } else {
+                true
+            }
+        }
+    }
 
     #[handler]
     pub(crate) fn adc_interrupt_handler() {
         let saradc = APB_SARADC::regs();
         let interrupt_status = saradc.int_st().read();
 
+        #[cfg(adc1)]
         if interrupt_status.adc1_done().bit_is_set() {
             handle_async(crate::peripherals::ADC1)
         }
 
-        #[cfg(esp32c3)]
+        #[cfg(adc2)]
         if interrupt_status.adc2_done().bit_is_set() {
             handle_async(crate::peripherals::ADC2)
         }
@@ -745,6 +770,7 @@ pub(crate) mod asynch {
         fn waker() -> &'static AtomicWaker;
     }
 
+    #[cfg(adc1)]
     impl AsyncAccess for crate::peripherals::ADC1 {
         fn enable_interrupt() {
             APB_SARADC::regs()
@@ -771,7 +797,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(esp32c3)]
+    #[cfg(adc2)]
     impl AsyncAccess for crate::peripherals::ADC2 {
         fn enable_interrupt() {
             APB_SARADC::regs()
