@@ -1,21 +1,30 @@
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
+
 use crate::{
     dma::{
-        dma_private::{DmaSupport, DmaSupportRx},
         AnyGdmaChannel,
         AnyGdmaRxChannel,
+        AnyGdmaTxChannel,
+        BurstConfig,
         Channel,
         ChannelRx,
-        DescriptorChain,
+        ChannelTx,
         DmaChannelConvert,
         DmaDescriptor,
         DmaEligible,
         DmaError,
         DmaPeripheral,
-        DmaTransferRx,
-        ReadBuffer,
+        DmaRxBuf,
+        DmaRxBuffer,
+        DmaRxInterrupt,
+        DmaTxBuf,
+        DmaTxBuffer,
+        DmaTxInterrupt,
         Rx,
         Tx,
-        WriteBuffer,
     },
     Async,
     Blocking,
@@ -31,10 +40,10 @@ pub struct Mem2Mem<'d, Dm>
 where
     Dm: DriverMode,
 {
-    channel: Channel<Dm, AnyGdmaChannel<'d>>,
-    rx_chain: DescriptorChain,
-    tx_chain: DescriptorChain,
-    peripheral: DmaPeripheral,
+    /// RX Half
+    pub rx: Mem2MemRx<'d, Dm>,
+    /// TX Half
+    pub tx: Mem2MemTx<'d, Dm>,
 }
 
 impl<'d> Mem2Mem<'d, Blocking> {
@@ -42,134 +51,456 @@ impl<'d> Mem2Mem<'d, Blocking> {
     pub fn new(
         channel: impl DmaChannelConvert<AnyGdmaChannel<'d>>,
         peripheral: impl DmaEligible,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Result<Self, DmaError> {
-        unsafe {
-            Self::new_unsafe(
-                channel,
-                peripheral.dma_peripheral(),
-                rx_descriptors,
-                tx_descriptors,
-                crate::dma::CHUNK_SIZE,
-            )
-        }
-    }
-
-    /// Create a new Mem2Mem instance with specific chunk size.
-    pub fn new_with_chunk_size(
-        channel: impl DmaChannelConvert<AnyGdmaChannel<'d>>,
-        peripheral: impl DmaEligible,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-        chunk_size: usize,
-    ) -> Result<Self, DmaError> {
-        unsafe {
-            Self::new_unsafe(
-                channel,
-                peripheral.dma_peripheral(),
-                rx_descriptors,
-                tx_descriptors,
-                chunk_size,
-            )
-        }
+    ) -> Self {
+        unsafe { Self::new_unsafe(channel, peripheral.dma_peripheral()) }
     }
 
     /// Create a new Mem2Mem instance.
     ///
     /// # Safety
     ///
-    /// You must ensure that your not using DMA for the same peripheral and
-    /// that your the only one using the DmaPeripheral.
+    /// You must ensure that you're not using DMA for the same peripheral and
+    /// that you're the only one using the DmaPeripheral.
     pub unsafe fn new_unsafe(
         channel: impl DmaChannelConvert<AnyGdmaChannel<'d>>,
         peripheral: DmaPeripheral,
+    ) -> Self {
+        let mut channel = Channel::new(channel.degrade());
+
+        channel.rx.set_mem2mem_mode(true);
+
+        Mem2Mem {
+            rx: Mem2MemRx {
+                channel: channel.rx,
+                peripheral,
+            },
+            tx: Mem2MemTx {
+                channel: channel.tx,
+                peripheral,
+            },
+        }
+    }
+
+    /// Shortcut to create a [SimpleMem2Mem]
+    pub fn with_descriptors(
+        self,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
-        chunk_size: usize,
-    ) -> Result<Self, DmaError> {
-        if !(1..=4092).contains(&chunk_size) {
-            return Err(DmaError::InvalidChunkSize);
-        }
-        if tx_descriptors.is_empty() || rx_descriptors.is_empty() {
-            return Err(DmaError::OutOfDescriptors);
-        }
-        Ok(Mem2Mem {
-            channel: Channel::new(channel.degrade()),
-            peripheral,
-            rx_chain: DescriptorChain::new_with_chunk_size(rx_descriptors, chunk_size),
-            tx_chain: DescriptorChain::new_with_chunk_size(tx_descriptors, chunk_size),
-        })
+        config: BurstConfig,
+    ) -> Result<SimpleMem2Mem<'d, Blocking>, DmaError> {
+        SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors, config)
     }
 
     /// Convert Mem2Mem to an async Mem2Mem.
     pub fn into_async(self) -> Mem2Mem<'d, Async> {
         Mem2Mem {
+            rx: self.rx.into_async(),
+            tx: self.tx.into_async(),
+        }
+    }
+}
+
+/// The RX half of [Mem2Mem].
+pub struct Mem2MemRx<'d, Dm: DriverMode> {
+    channel: ChannelRx<Dm, AnyGdmaRxChannel<'d>>,
+    peripheral: DmaPeripheral,
+}
+
+impl<'d> Mem2MemRx<'d, Blocking> {
+    /// Convert Mem2MemRx to an async Mem2MemRx.
+    pub fn into_async(self) -> Mem2MemRx<'d, Async> {
+        Mem2MemRx {
             channel: self.channel.into_async(),
-            rx_chain: self.rx_chain,
-            tx_chain: self.tx_chain,
             peripheral: self.peripheral,
         }
     }
 }
 
-impl<Dm> Mem2Mem<'_, Dm>
+impl<'d, Dm> Mem2MemRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Start a memory to memory transfer.
-    pub fn start_transfer<'t, TXBUF, RXBUF>(
-        &mut self,
-        rx_buffer: &'t mut RXBUF,
-        tx_buffer: &'t TXBUF,
-    ) -> Result<DmaTransferRx<'_, Self>, DmaError>
+    /// Start the RX half of a memory to memory transfer.
+    pub fn receive<BUF>(
+        mut self,
+        mut buf: BUF,
+    ) -> Result<Mem2MemRxTransfer<'d, Dm, BUF>, (DmaError, Self, BUF)>
     where
-        TXBUF: ReadBuffer,
-        RXBUF: WriteBuffer,
+        BUF: DmaRxBuffer,
     {
-        let (tx_ptr, tx_len) = unsafe { tx_buffer.read_buffer() };
-        let (rx_ptr, rx_len) = unsafe { rx_buffer.write_buffer() };
-        self.tx_chain.fill_for_tx(false, tx_ptr, tx_len)?;
-        self.rx_chain.fill_for_rx(false, rx_ptr, rx_len)?;
-        unsafe {
+        let result = unsafe {
             self.channel
-                .tx
-                .prepare_transfer_without_start(self.peripheral, &self.tx_chain)?;
-            self.channel
-                .rx
-                .prepare_transfer_without_start(self.peripheral, &self.rx_chain)?;
-            self.channel.rx.set_mem2mem_mode(true);
+                .prepare_transfer(self.peripheral, &mut buf)
+                .and_then(|_| self.channel.start_transfer())
+        };
+
+        if let Err(e) = result {
+            return Err((e, self, buf));
         }
-        self.channel.tx.start_transfer()?;
-        self.channel.rx.start_transfer()?;
-        Ok(DmaTransferRx::new(self))
+
+        Ok(Mem2MemRxTransfer {
+            m2m: ManuallyDrop::new(self),
+            buf_view: ManuallyDrop::new(buf.into_view()),
+        })
     }
 }
 
-impl<Dm> DmaSupport for Mem2Mem<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        while !self.channel.rx.is_done() {}
+/// Represents an ongoing (or potentially finished) DMA Memory-to-Memory RX
+/// transfer.
+pub struct Mem2MemRxTransfer<'d, M: DriverMode, BUF: DmaRxBuffer> {
+    m2m: ManuallyDrop<Mem2MemRx<'d, M>>,
+    buf_view: ManuallyDrop<BUF::View>,
+}
+
+impl<'d, M: DriverMode, BUF: DmaRxBuffer> Mem2MemRxTransfer<'d, M, BUF> {
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        let done_interrupts = DmaRxInterrupt::DescriptorError | DmaRxInterrupt::DescriptorEmpty;
+        !self
+            .m2m
+            .channel
+            .pending_in_interrupts()
+            .is_disjoint(done_interrupts)
     }
 
-    fn peripheral_dma_stop(&mut self) {
-        unreachable!("unsupported")
+    /// Waits for the transfer to stop and returns the peripheral and buffer.
+    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemRx<'d, M>, BUF) {
+        while !self.is_done() {}
+
+        let (m2m, view) = self.release();
+
+        let result = if m2m.channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        };
+
+        (result, m2m, BUF::from_view(view))
+    }
+
+    /// Stops this transfer on the spot and returns the peripheral and buffer.
+    pub fn stop(self) -> (Mem2MemRx<'d, M>, BUF) {
+        let (mut m2m, view) = self.release();
+
+        m2m.channel.stop_transfer();
+
+        (m2m, BUF::from_view(view))
+    }
+
+    fn release(mut self) -> (Mem2MemRx<'d, M>, BUF::View) {
+        // SAFETY: Since forget is called on self, we know that self.m2m and
+        // self.buf_view won't be touched again.
+        let result = unsafe {
+            let m2m = ManuallyDrop::take(&mut self.m2m);
+            let view = ManuallyDrop::take(&mut self.buf_view);
+            (m2m, view)
+        };
+        core::mem::forget(self);
+        result
     }
 }
 
-impl<'d, Dm> DmaSupportRx for Mem2Mem<'d, Dm>
-where
-    Dm: DriverMode,
-{
-    type RX = ChannelRx<Dm, AnyGdmaRxChannel<'d>>;
+impl<M: DriverMode, BUF: DmaRxBuffer> Deref for Mem2MemRxTransfer<'_, M, BUF> {
+    type Target = BUF::View;
 
-    fn rx(&mut self) -> &mut Self::RX {
-        &mut self.channel.rx
+    fn deref(&self) -> &Self::Target {
+        &self.buf_view
+    }
+}
+
+impl<M: DriverMode, BUF: DmaRxBuffer> DerefMut for Mem2MemRxTransfer<'_, M, BUF> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf_view
+    }
+}
+
+impl<M: DriverMode, BUF: DmaRxBuffer> Drop for Mem2MemRxTransfer<'_, M, BUF> {
+    fn drop(&mut self) {
+        self.m2m.channel.stop_transfer();
+
+        // SAFETY: This is Drop, we know that self.m2m and self.buf_view
+        // won't be touched again.
+        let view = unsafe {
+            ManuallyDrop::drop(&mut self.m2m);
+            ManuallyDrop::take(&mut self.buf_view)
+        };
+        let _ = BUF::from_view(view);
+    }
+}
+
+/// The TX half of [Mem2Mem].
+pub struct Mem2MemTx<'d, Dm: DriverMode> {
+    channel: ChannelTx<Dm, AnyGdmaTxChannel<'d>>,
+    peripheral: DmaPeripheral,
+}
+
+impl<'d> Mem2MemTx<'d, Blocking> {
+    /// Convert Mem2MemTx to an async Mem2MemTx.
+    pub fn into_async(self) -> Mem2MemTx<'d, Async> {
+        Mem2MemTx {
+            channel: self.channel.into_async(),
+            peripheral: self.peripheral,
+        }
+    }
+}
+
+impl<'d, Dm: DriverMode> Mem2MemTx<'d, Dm> {
+    /// Start the TX half of a memory to memory transfer.
+    pub fn send<BUF>(
+        mut self,
+        mut buf: BUF,
+    ) -> Result<Mem2MemTxTransfer<'d, Dm, BUF>, (DmaError, Self, BUF)>
+    where
+        BUF: DmaTxBuffer,
+    {
+        let result = unsafe {
+            self.channel
+                .prepare_transfer(self.peripheral, &mut buf)
+                .and_then(|_| self.channel.start_transfer())
+        };
+
+        if let Err(e) = result {
+            return Err((e, self, buf));
+        }
+
+        Ok(Mem2MemTxTransfer {
+            m2m: ManuallyDrop::new(self),
+            buf_view: ManuallyDrop::new(buf.into_view()),
+        })
+    }
+}
+
+/// Represents an ongoing (or potentially finished) DMA Memory-to-Memory TX
+/// transfer.
+pub struct Mem2MemTxTransfer<'d, Dm: DriverMode, BUF: DmaTxBuffer> {
+    m2m: ManuallyDrop<Mem2MemTx<'d, Dm>>,
+    buf_view: ManuallyDrop<BUF::View>,
+}
+
+impl<'d, Dm: DriverMode, BUF: DmaTxBuffer> Mem2MemTxTransfer<'d, Dm, BUF> {
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        let done_interrupts = DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof;
+        !self
+            .m2m
+            .channel
+            .pending_out_interrupts()
+            .is_disjoint(done_interrupts)
     }
 
-    fn chain(&mut self) -> &mut DescriptorChain {
-        &mut self.tx_chain
+    /// Waits for the transfer to stop and returns the peripheral and buffer.
+    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemTx<'d, Dm>, BUF) {
+        while !self.is_done() {}
+
+        let (m2m, view) = self.release();
+
+        let result = if m2m.channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        };
+
+        (result, m2m, BUF::from_view(view))
+    }
+
+    /// Stops this transfer on the spot and returns the peripheral and buffer.
+    pub fn stop(self) -> (Mem2MemTx<'d, Dm>, BUF) {
+        let (mut m2m, view) = self.release();
+
+        m2m.channel.stop_transfer();
+
+        (m2m, BUF::from_view(view))
+    }
+
+    fn release(mut self) -> (Mem2MemTx<'d, Dm>, BUF::View) {
+        // SAFETY: Since forget is called on self, we know that self.m2m and
+        // self.buf_view won't be touched again.
+        let result = unsafe {
+            let m2m = ManuallyDrop::take(&mut self.m2m);
+            let view = ManuallyDrop::take(&mut self.buf_view);
+            (m2m, view)
+        };
+        core::mem::forget(self);
+        result
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaTxBuffer> Deref for Mem2MemTxTransfer<'_, Dm, BUF> {
+    type Target = BUF::View;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buf_view
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaTxBuffer> DerefMut for Mem2MemTxTransfer<'_, Dm, BUF> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf_view
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaTxBuffer> Drop for Mem2MemTxTransfer<'_, Dm, BUF> {
+    fn drop(&mut self) {
+        self.m2m.channel.stop_transfer();
+
+        // SAFETY: This is Drop, we know that self.m2m and self.buf_view
+        // won't be touched again.
+        let view = unsafe {
+            ManuallyDrop::drop(&mut self.m2m);
+            ManuallyDrop::take(&mut self.buf_view)
+        };
+        let _ = BUF::from_view(view);
+    }
+}
+
+/// A simple and easy to use wrapper around [SimpleMem2Mem].
+/// More complex memory to memory transfers should use [Mem2Mem] directly.
+pub struct SimpleMem2Mem<'d, Dm: DriverMode> {
+    state: State<'d, Dm>,
+    config: BurstConfig,
+}
+
+enum State<'d, Dm: DriverMode> {
+    Idle(
+        Mem2Mem<'d, Dm>,
+        &'static mut [DmaDescriptor],
+        &'static mut [DmaDescriptor],
+    ),
+    Active(
+        Mem2MemRxTransfer<'d, Dm, DmaRxBuf>,
+        Mem2MemTxTransfer<'d, Dm, DmaTxBuf>,
+    ),
+    InUse,
+}
+
+impl<'d, Dm: DriverMode> SimpleMem2Mem<'d, Dm> {
+    /// Creates a new [SimpleMem2Mem].
+    pub fn new(
+        mem2mem: Mem2Mem<'d, Dm>,
+        rx_descriptors: &'static mut [DmaDescriptor],
+        tx_descriptors: &'static mut [DmaDescriptor],
+        config: BurstConfig,
+    ) -> Result<Self, DmaError> {
+        if rx_descriptors.is_empty() || tx_descriptors.is_empty() {
+            return Err(DmaError::OutOfDescriptors);
+        }
+        Ok(Self {
+            state: State::Idle(mem2mem, rx_descriptors, tx_descriptors),
+            config,
+        })
+    }
+}
+
+impl<'d, Dm: DriverMode> SimpleMem2Mem<'d, Dm> {
+    /// Starts a memory to memory transfer.
+    pub fn start_transfer(
+        &mut self,
+        rx_buffer: &mut [u8],
+        tx_buffer: &[u8],
+    ) -> Result<SimpleMem2MemTransfer<'_, 'd, Dm>, DmaError> {
+        let State::Idle(mem2mem, rx_descriptors, tx_descriptors) =
+            core::mem::replace(&mut self.state, State::InUse)
+        else {
+            panic!("SimpleMem2MemTransfer was forgotten with core::mem::forget or similar");
+        };
+
+        // Raise these buffers to 'static. This is not safe, bad things will happen if
+        // the user calls core::mem::forget on SimpleMem2MemTransfer. This is
+        // just the unfortunate consequence of doing DMA without enforcing
+        // 'static.
+        let rx_buffer =
+            unsafe { core::slice::from_raw_parts_mut(rx_buffer.as_mut_ptr(), rx_buffer.len()) };
+        let tx_buffer =
+            unsafe { core::slice::from_raw_parts_mut(tx_buffer.as_ptr() as _, tx_buffer.len()) };
+
+        let dma_tx_buf = unwrap!(
+            DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, self.config),
+            "There's no way to get the descriptors back yet"
+        );
+
+        let tx = match mem2mem.tx.send(dma_tx_buf) {
+            Ok(tx) => tx,
+            Err((err, tx, buf)) => {
+                let (tx_descriptors, _tx_buffer) = buf.split();
+                self.state = State::Idle(
+                    Mem2Mem { rx: mem2mem.rx, tx },
+                    rx_descriptors,
+                    tx_descriptors,
+                );
+                return Err(err);
+            }
+        };
+
+        let dma_rx_buf = unwrap!(
+            DmaRxBuf::new_with_config(rx_descriptors, rx_buffer, self.config),
+            "There's no way to get the descriptors back yet"
+        );
+
+        let rx = match mem2mem.rx.receive(dma_rx_buf) {
+            Ok(rx) => rx,
+            Err((err, rx, buf)) => {
+                let (rx_descriptors, _rx_buffer) = buf.split();
+                let (tx, buf) = tx.stop();
+                let (tx_descriptors, _tx_buffer) = buf.split();
+                self.state = State::Idle(Mem2Mem { rx, tx }, rx_descriptors, tx_descriptors);
+                return Err(err);
+            }
+        };
+
+        self.state = State::Active(rx, tx);
+
+        Ok(SimpleMem2MemTransfer(self))
+    }
+}
+
+impl<Dm: DriverMode> Drop for SimpleMem2Mem<'_, Dm> {
+    fn drop(&mut self) {
+        if !matches!(&mut self.state, State::Idle(_, _, _)) {
+            panic!("SimpleMem2MemTransfer was forgotten with core::mem::forget or similar");
+        }
+    }
+}
+
+/// Represents an ongoing (or potentially finished) DMA Memory-to-Memory
+/// transfer.
+pub struct SimpleMem2MemTransfer<'a, 'd, Dm: DriverMode>(&'a mut SimpleMem2Mem<'d, Dm>);
+
+impl<Dm: DriverMode> SimpleMem2MemTransfer<'_, '_, Dm> {
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        let State::Active(rx, tx) = &self.0.state else {
+            unreachable!()
+        };
+
+        // Wait for transmission to finish, and wait for the RX channel to receive the
+        // one and only EOF that DmaTxBuf will send.
+        tx.is_done()
+            && rx
+                .m2m
+                .channel
+                .pending_in_interrupts()
+                .contains(DmaRxInterrupt::SuccessfulEof)
+    }
+
+    /// Wait for the transfer to finish.
+    pub fn wait(self) -> Result<(), DmaError> {
+        while !self.is_done() {}
+        Ok(())
+    }
+}
+
+impl<Dm: DriverMode> Drop for SimpleMem2MemTransfer<'_, '_, Dm> {
+    fn drop(&mut self) {
+        let State::Active(rx, tx) = core::mem::replace(&mut self.0.state, State::InUse) else {
+            unreachable!()
+        };
+
+        let (tx, dma_tx_buf) = tx.stop();
+        let (rx, dma_rx_buf) = rx.stop();
+
+        let (tx_descriptors, _tx_buffer) = dma_tx_buf.split();
+        let (rx_descriptors, _rx_buffer) = dma_rx_buf.split();
+
+        self.0.state = State::Idle(Mem2Mem { rx, tx }, rx_descriptors, tx_descriptors);
     }
 }
