@@ -12,11 +12,7 @@
 use embassy_executor::Spawner;
 use embassy_time::Timer;
 use esp_backtrace as _;
-use esp_hal::analog::adc::*;
-use esp_hal::delay::Delay;
-use esp_hal::gpio::GpioPin;
-use esp_hal::main;
-use esp_hal::peripherals::ADC1;
+use esp_hal::{analog::adc::*, delay::Delay, gpio::GpioPin, main, peripherals::ADC1};
 use esp_println::*;
 
 // Samples per second
@@ -39,7 +35,7 @@ async fn main(_spawner: Spawner) -> ! {
         Attenuation::_11dB,
     ];
 
-    //check for overflow
+    // check for overflow
     for atn in atenuattion {
         println!();
         println!("Starting Test with {:?} Attenuation:", atn);
@@ -47,7 +43,7 @@ async fn main(_spawner: Spawner) -> ! {
 
         let basic = AdcCalBasic::<ADC1>::new_cal(*atn);
 
-        //only resolution its 13b
+        // only resolution its 13b
         for value in 0..4096 {
             basic.adc_val(value);
         }
@@ -56,7 +52,7 @@ async fn main(_spawner: Spawner) -> ! {
 
         let line = AdcCalLine::<ADC1>::new_cal(*atn);
 
-        //only resolution its 13b
+        // only resolution its 13b
         for value in 0..4096 {
             line.adc_val(value);
         }
@@ -85,7 +81,8 @@ async fn main(_spawner: Spawner) -> ! {
     // this need to be called to calibrate the esp
     AdcConfig::<ADC1>::adc_calibrate(Attenuation::_11dB, AdcCalSource::Ref);
 
-    // Instead of create a new calibration and convert outside, attach the pin with a calibration scheme
+    // Instead of create a new calibration and convert outside, attach the pin with
+    // a calibration scheme
     let mut pin = adc1_config
         .enable_pin_with_cal::<GpioPin<3>, AdcCalCurve<ADC1>>(ph.GPIO3, Attenuation::_11dB);
 
