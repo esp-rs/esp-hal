@@ -267,6 +267,7 @@ pub enum StopBits {
 
 /// Defines how strictly the requested baud rate must be met.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BaudrateTolerance {
     /// Accept the closest achievable baud rate without restriction.
     #[default]
@@ -2504,7 +2505,7 @@ impl Info {
                 return Err(ConfigError::UnachievableBaudrate)
             }
             BaudrateTolerance::ErrorPercent(percent) => {
-                let deviation = ((config.baudrate as i64 - actual_baud as i64).abs() as u64 * 100)
+                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs() * 100)
                     / actual_baud as u64;
                 if deviation > percent as u64 {
                     return Err(ConfigError::UnachievableBaudrate);
