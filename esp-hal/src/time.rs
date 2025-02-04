@@ -1,6 +1,8 @@
-//! # Time
+//! # Timekeeping
 //!
-//! The `time` module offers a way to get the system now.
+//! This module provides types for representing frequency and duration, as well
+//! as an instant in time. Time is measured since boot, and can be accessed
+//! by the [`Instant::now`] function.
 
 use core::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
@@ -175,13 +177,13 @@ impl Instant {
         Instant(InnerInstant::from_ticks(ticks))
     }
 
-    /// Returns the elapsed time since boot.
+    /// Returns the elapsed `Duration` since boot.
     #[inline]
     pub fn duration_since_epoch(&self) -> Duration {
         Self::EPOCH.elapsed()
     }
 
-    /// Returns the elapsed `Duration` since this instant was created.
+    /// Returns the elapsed `Duration` since this `Instant` was created.
     #[inline]
     pub fn elapsed(&self) -> Duration {
         Self::now() - *self
