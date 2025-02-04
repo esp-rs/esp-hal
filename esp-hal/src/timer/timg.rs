@@ -69,6 +69,8 @@
 use core::marker::PhantomData;
 
 use super::Error;
+#[cfg(timg1)]
+use crate::peripherals::TIMG1;
 #[cfg(any(esp32c6, esp32h2))]
 use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
@@ -78,14 +80,21 @@ use crate::{
     peripheral::Peripheral,
     peripherals::{Interrupt, TIMG0},
     private::Sealed,
-    sync::{lock, RawMutex},
     system::PeripheralClockControl,
     time::{Duration, Instant, Rate},
 };
 
 const NUM_TIMG: usize = 1 + cfg!(timg1) as usize;
 
-static INT_ENA_LOCK: [RawMutex; NUM_TIMG] = [const { RawMutex::new() }; NUM_TIMG];
+cfg_if::cfg_if! {
+    // We need no locks when a TIMG has a single timer, and we don't need locks for ESP32
+    // and S2 where the effective interrupt enable register (config) is not shared between
+    // the timers.
+    if #[cfg(all(timg_timer1, not(any(esp32, esp32s2))))] {
+        use crate::sync::{lock, RawMutex};
+        static INT_ENA_LOCK: [RawMutex; NUM_TIMG] = [const { RawMutex::new() }; NUM_TIMG];
+    }
+}
 
 /// A timer group consisting of
 #[cfg_attr(not(timg_timer1), doc = "a general purpose timer")]
@@ -300,18 +309,7 @@ impl super::Timer for Timer {
     }
 
     fn enable_interrupt(&self, state: bool) {
-        // always use level interrupt
-        #[cfg(any(esp32, esp32s2))]
-        self.register_block()
-            .t(self.timer_number().into())
-            .config()
-            .modify(|_, w| w.level_int_en().set_bit());
-
-        lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
-            self.register_block()
-                .int_ena()
-                .modify(|_, w| w.t(self.timer_number()).bit(state));
-        });
+        self.set_interrupt_enabled(state);
     }
 
     fn clear_interrupt(&self) {
@@ -531,6 +529,27 @@ impl Timer {
             .read()
             .t(self.timer)
             .bit_is_set()
+    }
+
+    fn set_interrupt_enabled(&self, state: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                self.register_block()
+                    .t(self.timer as usize)
+                    .config()
+                    .modify(|_, w| w.level_int_en().bit(state));
+            } else if #[cfg(timg_timer1)] {
+                lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
+                    self.register_block()
+                        .int_ena()
+                        .modify(|_, w| w.t(self.timer_number()).bit(state));
+                });
+            } else {
+                self.register_block()
+                    .int_ena()
+                    .modify(|_, w| w.t(0).bit(state));
+            }
+        }
     }
 }
 
@@ -793,17 +812,17 @@ mod asynch {
     use super::*;
     use crate::asynch::AtomicWaker;
 
-    cfg_if::cfg_if! {
-        if #[cfg(all(timg1, timg_timer1))] {
-            const NUM_WAKERS: usize = 4;
-        } else if #[cfg(timg1)] {
-            const NUM_WAKERS: usize = 2;
-        } else {
-            const NUM_WAKERS: usize = 1;
-        }
-    }
+    const NUM_WAKERS: usize = {
+        let timer_per_group = 1 + cfg!(timg_timer1) as usize;
+        NUM_TIMG * timer_per_group
+    };
 
     static WAKERS: [AtomicWaker; NUM_WAKERS] = [const { AtomicWaker::new() }; NUM_WAKERS];
+
+    fn waker(timer: &Timer) -> &AtomicWaker {
+        let index = (timer.timer_number() << 1) | timer.timer_group();
+        &WAKERS[index as usize]
+    }
 
     pub(crate) struct TimerFuture<'a> {
         timer: &'a Timer,
@@ -818,13 +837,8 @@ mod asynch {
             Self { timer }
         }
 
-        fn event_bit_is_clear(&self) -> bool {
-            self.timer
-                .register_block()
-                .int_ena()
-                .read()
-                .t(self.timer.timer_number())
-                .bit_is_clear()
+        fn is_done(&self) -> bool {
+            self.timer.is_interrupt_set()
         }
     }
 
@@ -832,10 +846,9 @@ mod asynch {
         type Output = ();
 
         fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-            let index = (self.timer.timer_number() << 1) | self.timer.timer_group();
-            WAKERS[index as usize].register(ctx.waker());
+            waker(self.timer).register(ctx.waker());
 
-            if self.event_bit_is_clear() {
+            if self.is_done() {
                 Poll::Ready(())
             } else {
                 Poll::Pending
@@ -846,7 +859,14 @@ mod asynch {
     impl Drop for TimerFuture<'_> {
         fn drop(&mut self) {
             self.timer.clear_interrupt();
+            self.timer.set_interrupt_enabled(false);
         }
+    }
+
+    #[inline]
+    fn handle_irq(timer: Timer) {
+        timer.set_interrupt_enabled(false);
+        waker(&timer).wake();
     }
 
     // INT_ENA means that when the interrupt occurs, it will show up in the
@@ -855,63 +875,41 @@ mod asynch {
     // clear the INT_CLR as well.
     #[handler]
     pub(crate) fn timg0_timer0_handler() {
-        lock(&INT_ENA_LOCK[0], || {
-            crate::peripherals::TIMG0::regs()
-                .int_ena()
-                .modify(|_, w| w.t(0).clear_bit())
+        handle_irq(Timer {
+            register_block: TIMG0::regs(),
+            timer: 0,
+            tg: 0,
         });
-
-        crate::peripherals::TIMG0::regs()
-            .int_clr()
-            .write(|w| w.t(0).clear_bit_by_one());
-
-        WAKERS[0].wake();
     }
 
     #[cfg(timg1)]
     #[handler]
     pub(crate) fn timg1_timer0_handler() {
-        lock(&INT_ENA_LOCK[1], || {
-            crate::peripherals::TIMG1::regs()
-                .int_ena()
-                .modify(|_, w| w.t(0).clear_bit())
+        handle_irq(Timer {
+            register_block: TIMG1::regs(),
+            timer: 0,
+            tg: 1,
         });
-        crate::peripherals::TIMG1::regs()
-            .int_clr()
-            .write(|w| w.t(0).clear_bit_by_one());
-
-        WAKERS[1].wake();
     }
 
     #[cfg(timg_timer1)]
     #[handler]
     pub(crate) fn timg0_timer1_handler() {
-        lock(&INT_ENA_LOCK[0], || {
-            crate::peripherals::TIMG0::regs()
-                .int_ena()
-                .modify(|_, w| w.t(1).clear_bit())
+        handle_irq(Timer {
+            register_block: TIMG0::regs(),
+            timer: 1,
+            tg: 0,
         });
-        crate::peripherals::TIMG0::regs()
-            .int_clr()
-            .write(|w| w.t(1).clear_bit_by_one());
-
-        WAKERS[2].wake();
     }
 
     #[cfg(all(timg1, timg_timer1))]
     #[handler]
     pub(crate) fn timg1_timer1_handler() {
-        lock(&INT_ENA_LOCK[1], || {
-            crate::peripherals::TIMG1::regs()
-                .int_ena()
-                .modify(|_, w| w.t(1).clear_bit())
+        handle_irq(Timer {
+            register_block: TIMG1::regs(),
+            timer: 1,
+            tg: 1,
         });
-
-        crate::peripherals::TIMG1::regs()
-            .int_clr()
-            .write(|w| w.t(1).clear_bit_by_one());
-
-        WAKERS[3].wake();
     }
 }
 
