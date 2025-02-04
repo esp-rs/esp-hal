@@ -616,7 +616,7 @@ mod asynch {
     use procmacros::handler;
 
     use super::*;
-    use crate::{asynch::AtomicWaker, peripherals::SYSTIMER};
+    use crate::asynch::AtomicWaker;
 
     const NUM_ALARMS: usize = 3;
 
@@ -629,17 +629,15 @@ mod asynch {
 
     impl<'a> AlarmFuture<'a> {
         pub(crate) fn new(alarm: &'a Alarm) -> Self {
+            // For some reason, on the S2 we need to enable the interrupt before we
+            // read its status. Doing so in the other order causes the interrupt
+            // request to never be fired.
             alarm.enable_interrupt(true);
-
             Self { alarm }
         }
 
-        fn event_bit_is_clear(&self) -> bool {
-            SYSTIMER::regs()
-                .int_ena()
-                .read()
-                .target(self.alarm.channel())
-                .bit_is_clear()
+        fn is_done(&self) -> bool {
+            self.alarm.is_interrupt_set()
         }
     }
 
@@ -647,9 +645,11 @@ mod asynch {
         type Output = ();
 
         fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+            // Interrupts are enabled, so we need to register the waker before we check for
+            // done. Otherwise we might miss the interrupt that would wake us.
             WAKERS[self.alarm.channel() as usize].register(ctx.waker());
 
-            if self.event_bit_is_clear() {
+            if self.is_done() {
                 Poll::Ready(())
             } else {
                 Poll::Pending
@@ -657,37 +657,37 @@ mod asynch {
         }
     }
 
+    impl Drop for AlarmFuture<'_> {
+        fn drop(&mut self) {
+            self.alarm.enable_interrupt(false);
+            self.alarm.clear_interrupt();
+        }
+    }
+
+    #[inline]
+    fn handle_alarm(alarm: u8) {
+        Alarm {
+            comp: alarm,
+            unit: Unit::Unit0,
+        }
+        .enable_interrupt(false);
+
+        WAKERS[alarm as usize].wake();
+    }
+
     #[handler]
     pub(crate) fn target0_handler() {
-        lock(&INT_ENA_LOCK, || {
-            SYSTIMER::regs()
-                .int_ena()
-                .modify(|_, w| w.target0().clear_bit());
-        });
-
-        WAKERS[0].wake();
+        handle_alarm(0);
     }
 
     #[handler]
     pub(crate) fn target1_handler() {
-        lock(&INT_ENA_LOCK, || {
-            SYSTIMER::regs()
-                .int_ena()
-                .modify(|_, w| w.target1().clear_bit());
-        });
-
-        WAKERS[1].wake();
+        handle_alarm(1);
     }
 
     #[handler]
     pub(crate) fn target2_handler() {
-        lock(&INT_ENA_LOCK, || {
-            SYSTIMER::regs()
-                .int_ena()
-                .modify(|_, w| w.target2().clear_bit());
-        });
-
-        WAKERS[2].wake();
+        handle_alarm(2);
     }
 }
 
