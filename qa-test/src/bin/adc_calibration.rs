@@ -9,7 +9,6 @@
 #![no_std]
 #![no_main]
 
-use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{analog::adc::*, delay::Delay, gpio::GpioPin, peripherals::ADC1};
 use esp_println::*;
@@ -17,8 +16,8 @@ use esp_println::*;
 // Samples per second
 const SAMPLES: usize = 100;
 
-#[esp_hal_embassy::main]
-async fn main(_spawner: Spawner) -> ! {
+#[main]
+fn main() -> ! {
     esp_println::logger::init_logger_from_env();
 
     println!("\nStarting adc overflow check");
