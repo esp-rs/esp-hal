@@ -10,7 +10,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{analog::adc::*, delay::Delay, gpio::GpioPin, peripherals::ADC1};
+use esp_hal::{analog::adc::*, delay::Delay, gpio::GpioPin, main, peripherals::ADC1};
 use esp_println::*;
 
 // Samples per second
