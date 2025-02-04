@@ -2505,7 +2505,8 @@ impl Info {
                 return Err(ConfigError::UnachievableBaudrate)
             }
             BaudrateTolerance::ErrorPercent(percent) => {
-                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs() * 100)
+                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs()
+                    * 100)
                     / actual_baud as u64;
                 if deviation > percent as u64 {
                     return Err(ConfigError::UnachievableBaudrate);
@@ -2578,7 +2579,7 @@ impl Info {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
                 let clkdiv_reg = self.regs().clkdiv().read();
-                let clkdiv = clkdiv_reg.clkdiv().bits() as u32;
+                let clkdiv = clkdiv_reg.clkdiv().bits();
                 let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
                 (clk << 4) / ((clkdiv << 4) | clkdiv_frag)
             } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {

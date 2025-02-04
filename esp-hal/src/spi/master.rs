@@ -604,7 +604,8 @@ impl Config {
                     return Err(ConfigError::UnsupportedFrequency)
                 }
                 FrequencyTolerance::ErrorPercent(percent) => {
-                    let deviation = ((raw_desired_freq as i64 - actual_freq as i64).unsigned_abs() * 100)
+                    let deviation = ((raw_desired_freq as i64 - actual_freq as i64).unsigned_abs()
+                        * 100)
                         / actual_freq as u64;
                     if deviation > percent as u64 {
                         return Err(ConfigError::UnsupportedFrequency);
@@ -612,7 +613,7 @@ impl Config {
                 }
                 _ => {}
             }
-        }        
+        }
 
         Ok(reg_val)
     }
