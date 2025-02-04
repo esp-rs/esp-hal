@@ -18,7 +18,7 @@ use esp_hal::{
     delay::Delay,
     main,
     rng::Rng,
-    time::ExtU64,
+    time::Duration,
     timer::timg::TimerGroup,
 };
 use esp_wifi::{init, wifi};
@@ -114,6 +114,6 @@ fn main() -> ! {
 
     loop {
         sniffer.send_raw_frame(false, beacon, false).unwrap();
-        delay.delay(100.millis());
+        delay.delay(Duration::from_millis(100));
     }
 }

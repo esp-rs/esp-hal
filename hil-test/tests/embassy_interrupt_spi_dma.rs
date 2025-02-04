@@ -20,7 +20,7 @@ use esp_hal::{
         master::{Config, Spi},
         Mode,
     },
-    time::RateExtU32,
+    time::Rate,
     timer::AnyTimer,
     Blocking,
 };
@@ -130,7 +130,7 @@ mod test {
         let mut spi = Spi::new(
             peripherals.SPI2,
             Config::default()
-                .with_frequency(10000.kHz())
+                .with_frequency(Rate::from_khz(10000))
                 .with_mode(Mode::_0),
         )
         .unwrap()
@@ -144,7 +144,7 @@ mod test {
         let other_peripheral = Spi::new(
             peripherals.SPI3,
             Config::default()
-                .with_frequency(10000.kHz())
+                .with_frequency(Rate::from_khz(10000))
                 .with_mode(Mode::_0),
         )
         .unwrap()
@@ -158,7 +158,7 @@ mod test {
                 peripherals.I2S0,
                 esp_hal::i2s::master::Standard::Philips,
                 esp_hal::i2s::master::DataFormat::Data8Channel8,
-                8u32.kHz(),
+                Rate::from_khz(8),
                 dma_channel2,
                 rx_descriptors,
                 tx_descriptors,
@@ -234,7 +234,7 @@ mod test {
             let mut spi = Spi::new(
                 peripherals.spi,
                 Config::default()
-                    .with_frequency(100.kHz())
+                    .with_frequency(Rate::from_khz(100))
                     .with_mode(Mode::_0),
             )
             .unwrap()

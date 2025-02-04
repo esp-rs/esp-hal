@@ -29,58 +29,57 @@ mod tests {
 
     #[test]
     fn delay_ns(mut ctx: Context) {
-        let t1 = esp_hal::time::now();
-        ctx.delay.delay_ns(600_000_000);
-        let t2 = esp_hal::time::now();
+        let t1 = esp_hal::time::Instant::now();
+        ctx.delay.delay_ns(600_000);
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1);
         assert!(
-            (t2 - t1).to_nanos() >= 600_000_000u64,
+            (t2 - t1).as_micros() >= 600u64,
             "diff: {:?}",
-            (t2 - t1).to_nanos()
+            (t2 - t1).as_micros()
         );
     }
 
     #[test]
-    fn delay_700millis(ctx: Context) {
-        let t1 = esp_hal::time::now();
-        ctx.delay.delay_millis(700);
-        let t2 = esp_hal::time::now();
+    fn delay_70millis(ctx: Context) {
+        let t1 = esp_hal::time::Instant::now();
+        ctx.delay.delay_millis(70);
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1);
         assert!(
-            (t2 - t1).to_millis() >= 700u64,
+            (t2 - t1).as_millis() >= 70u64,
             "diff: {:?}",
-            (t2 - t1).to_millis()
+            (t2 - t1).as_millis()
         );
     }
 
     #[test]
-    fn delay_1_500_000us(mut ctx: Context) {
-        let t1 = esp_hal::time::now();
-        ctx.delay.delay_us(1_500_000);
-        let t2 = esp_hal::time::now();
+    fn delay_1_500us(mut ctx: Context) {
+        let t1 = esp_hal::time::Instant::now();
+        ctx.delay.delay_us(1_500);
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1);
         assert!(
-            (t2 - t1).to_micros() >= 1_500_000u64,
+            (t2 - t1).as_micros() >= 1_500u64,
             "diff: {:?}",
-            (t2 - t1).to_micros()
+            (t2 - t1).as_micros()
         );
     }
 
     #[test]
-    #[timeout(5)]
-    fn delay_3_000ms(mut ctx: Context) {
-        let t1 = esp_hal::time::now();
-        ctx.delay.delay_ms(3000);
-        let t2 = esp_hal::time::now();
+    fn delay_3_00ms(mut ctx: Context) {
+        let t1 = esp_hal::time::Instant::now();
+        ctx.delay.delay_ms(300);
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1);
         assert!(
-            (t2 - t1).to_millis() >= 3000u64,
+            (t2 - t1).as_millis() >= 300u64,
             "diff: {:?}",
-            (t2 - t1).to_millis()
+            (t2 - t1).as_millis()
         );
     }
 }

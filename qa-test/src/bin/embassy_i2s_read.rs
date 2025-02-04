@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{
     dma_buffers,
     i2s::master::{DataFormat, I2s, Standard},
-    time::RateExtU32,
+    time::Rate,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -48,7 +48,7 @@ async fn main(_spawner: Spawner) {
         peripherals.I2S0,
         Standard::Philips,
         DataFormat::Data16Channel16,
-        44100u32.Hz(),
+        Rate::from_hz(44100),
         dma_channel,
         rx_descriptors,
         tx_descriptors,

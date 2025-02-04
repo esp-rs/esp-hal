@@ -37,6 +37,7 @@ pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
             } as u8)
         });
 
+        // FIXME untangle this
         let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
         rtc_cntl.store5().modify(|_, w| w.scratch5().bits(value));
     }

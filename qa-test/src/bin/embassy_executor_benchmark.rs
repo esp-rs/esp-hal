@@ -90,5 +90,5 @@ async fn main(spawner: Spawner) {
     let mut timer = OneShotTimer::new(systimer.alarm1);
     timer.set_interrupt_handler(timer_handler);
     timer.enable_interrupt(true);
-    timer.schedule(Duration::millis(TEST_MILLIS)).unwrap();
+    timer.schedule(Duration::from_millis(TEST_MILLIS)).unwrap();
 }

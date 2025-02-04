@@ -29,7 +29,7 @@ use esp_hal::{
         Pcnt,
     },
     peripherals::PARL_IO,
-    time::RateExtU32,
+    time::Rate,
 };
 use hil_test as _;
 
@@ -89,7 +89,7 @@ mod tests {
         let mut pins = TxPinConfigIncludingValidPin::new(pins);
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, 10.MHz()).unwrap();
+        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10)).unwrap();
 
         let mut pio = pio
             .tx
@@ -151,7 +151,7 @@ mod tests {
 
         let mut clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, 10.MHz()).unwrap();
+        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10)).unwrap();
 
         let mut pio = pio
             .tx

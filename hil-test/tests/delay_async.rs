@@ -24,16 +24,16 @@ struct Context {
 
 async fn test_async_delay_ns(mut timer: impl DelayNs, duration: u32) {
     for i in 1..5 {
-        let t1 = esp_hal::time::now();
+        let t1 = esp_hal::time::Instant::now();
         timer.delay_ns(duration).await;
-        let t2 = esp_hal::time::now();
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1);
         assert!(
-            (t2 - t1).to_nanos() >= duration as u64,
+            (t2 - t1).as_micros() >= duration.div_ceil(1000) as u64,
             "diff[{}]: {:?} >= {}",
             i,
-            (t2 - t1).to_nanos(),
+            (t2 - t1).as_micros(),
             duration
         );
     }
@@ -41,30 +41,30 @@ async fn test_async_delay_ns(mut timer: impl DelayNs, duration: u32) {
 
 async fn test_async_delay_us(mut timer: impl DelayNs, duration: u32) {
     for _ in 1..5 {
-        let t1 = esp_hal::time::now();
+        let t1 = esp_hal::time::Instant::now();
         timer.delay_us(duration).await;
-        let t2 = esp_hal::time::now();
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1);
         assert!(
-            (t2 - t1).to_nanos() >= duration as u64,
+            (t2 - t1).as_micros() >= duration as u64,
             "diff: {:?}",
-            (t2 - t1).to_nanos()
+            (t2 - t1).as_micros()
         );
     }
 }
 
 async fn test_async_delay_ms(mut timer: impl DelayNs, duration: u32) {
     for _ in 1..5 {
-        let t1 = esp_hal::time::now();
+        let t1 = esp_hal::time::Instant::now();
         timer.delay_ms(duration).await;
-        let t2 = esp_hal::time::now();
+        let t2 = esp_hal::time::Instant::now();
 
         assert!(t2 > t1);
         assert!(
-            (t2 - t1).to_nanos() >= duration as u64,
+            (t2 - t1).as_millis() >= duration as u64,
             "diff: {:?}",
-            (t2 - t1).to_nanos()
+            (t2 - t1).as_millis()
         );
     }
 }

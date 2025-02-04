@@ -34,7 +34,7 @@
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut periodic = PeriodicTimer::new(timg0.timer0);
 //!
-//! periodic.start(1.secs());
+//! periodic.start(Duration::from_secs(1));
 //! loop {
 //!    periodic.wait();
 //! }
@@ -43,12 +43,11 @@
 
 use core::marker::PhantomData;
 
-use fugit::{ExtU64, Instant, MicrosDurationU64};
-
 use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
+    time::{Duration, Instant},
     Async,
     Blocking,
     Cpu,
@@ -94,11 +93,11 @@ pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
 
     /// The current timer value.
     #[doc(hidden)]
-    fn now(&self) -> Instant<u64, 1, 1_000_000>;
+    fn now(&self) -> Instant;
 
     /// Load a target value into the timer.
     #[doc(hidden)]
-    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
+    fn load_value(&self, value: Duration) -> Result<(), Error>;
 
     /// Enable auto reload of the loaded value.
     #[doc(hidden)]
@@ -174,21 +173,21 @@ impl OneShotTimer<'_, Async> {
 
     /// Delay for *at least* `ns` nanoseconds.
     pub async fn delay_nanos_async(&mut self, ns: u32) {
-        self.delay_async(MicrosDurationU64::from_ticks(ns.div_ceil(1000) as u64))
+        self.delay_async(Duration::from_micros(ns.div_ceil(1000) as u64))
             .await
     }
 
     /// Delay for *at least* `ms` milliseconds.
     pub async fn delay_millis_async(&mut self, ms: u32) {
-        self.delay_async((ms as u64).millis()).await;
+        self.delay_async(Duration::from_millis(ms as u64)).await;
     }
 
     /// Delay for *at least* `us` microseconds.
     pub async fn delay_micros_async(&mut self, us: u32) {
-        self.delay_async((us as u64).micros()).await;
+        self.delay_async(Duration::from_micros(us as u64)).await;
     }
 
-    async fn delay_async(&mut self, us: MicrosDurationU64) {
+    async fn delay_async(&mut self, us: Duration) {
         unwrap!(self.schedule(us));
         self.inner.wait().await;
         self.stop();
@@ -202,20 +201,20 @@ where
 {
     /// Delay for *at least* `ms` milliseconds.
     pub fn delay_millis(&mut self, ms: u32) {
-        self.delay((ms as u64).millis());
+        self.delay(Duration::from_millis(ms as u64));
     }
 
     /// Delay for *at least* `us` microseconds.
     pub fn delay_micros(&mut self, us: u32) {
-        self.delay((us as u64).micros());
+        self.delay(Duration::from_micros(us as u64));
     }
 
     /// Delay for *at least* `ns` nanoseconds.
     pub fn delay_nanos(&mut self, ns: u32) {
-        self.delay((ns.div_ceil(1000) as u64).micros())
+        self.delay(Duration::from_micros(ns.div_ceil(1000) as u64))
     }
 
-    fn delay(&mut self, us: MicrosDurationU64) {
+    fn delay(&mut self, us: Duration) {
         self.schedule(us).unwrap();
 
         while !self.inner.is_interrupt_set() {
@@ -227,7 +226,7 @@ where
     }
 
     /// Start counting until the given timeout and raise an interrupt
-    pub fn schedule(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
+    pub fn schedule(&mut self, timeout: Duration) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();
         }
@@ -311,7 +310,7 @@ where
     Dm: DriverMode,
 {
     /// Start a new count down.
-    pub fn start(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
+    pub fn start(&mut self, period: Duration) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();
         }
@@ -320,7 +319,7 @@ where
         self.inner.reset();
 
         self.inner.enable_auto_reload(true);
-        self.inner.load_value(timeout)?;
+        self.inner.load_value(period)?;
         self.inner.start();
 
         Ok(())
@@ -393,8 +392,8 @@ impl Timer for AnyTimer {
             fn stop(&self);
             fn reset(&self);
             fn is_running(&self) -> bool;
-            fn now(&self) -> Instant<u64, 1, 1_000_000>;
-            fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
+            fn now(&self) -> Instant;
+            fn load_value(&self, value: Duration) -> Result<(), Error>;
             fn enable_auto_reload(&self, auto_reload: bool);
             fn enable_interrupt(&self, state: bool);
             fn clear_interrupt(&self);

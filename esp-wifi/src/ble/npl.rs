@@ -661,7 +661,9 @@ unsafe extern "C" fn ble_npl_time_ms_to_ticks(
 
 unsafe extern "C" fn ble_npl_time_get() -> u32 {
     trace!("ble_npl_time_get");
-    esp_hal::time::now().duration_since_epoch().to_millis() as u32
+    esp_hal::time::Instant::now()
+        .duration_since_epoch()
+        .as_millis() as u32
 }
 
 unsafe extern "C" fn ble_npl_callout_set_arg(

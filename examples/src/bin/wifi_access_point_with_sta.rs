@@ -70,7 +70,7 @@ fn main() -> ! {
         mut controller,
     } = create_ap_sta_network_interface(&init, wifi).unwrap();
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut ap_socket_set_entries: [SocketStorage; 3] = Default::default();
     let ap_socket_set = SocketSet::new(&mut ap_socket_set_entries[..]);
     let mut ap_stack = Stack::new(ap_interface, ap_device, ap_socket_set, now, rng.random());
@@ -154,7 +154,7 @@ fn main() -> ! {
             println!("Connected");
 
             let mut time_out = false;
-            let deadline = time::now() + Duration::secs(20);
+            let deadline = time::Instant::now() + Duration::from_secs(20);
             let mut buffer = [0u8; 1024];
             let mut pos = 0;
             loop {
@@ -173,7 +173,7 @@ fn main() -> ! {
                     break;
                 }
 
-                if time::now() > deadline {
+                if time::Instant::now() > deadline {
                     println!("Timeout");
                     time_out = true;
                     break;
@@ -193,7 +193,7 @@ fn main() -> ! {
                     .unwrap();
                 sta_socket.flush().unwrap();
 
-                let deadline = time::now() + Duration::secs(20);
+                let deadline = time::Instant::now() + Duration::from_secs(20);
                 loop {
                     let mut buffer = [0u8; 512];
                     if let Ok(len) = sta_socket.read(&mut buffer) {
@@ -203,7 +203,7 @@ fn main() -> ! {
                         break;
                     }
 
-                    if time::now() > deadline {
+                    if time::Instant::now() > deadline {
                         println!("Timeout");
                         break;
                     }
@@ -219,8 +219,8 @@ fn main() -> ! {
             println!();
         }
 
-        let deadline = time::now() + Duration::secs(5);
-        while time::now() < deadline {
+        let start = time::Instant::now();
+        while start.elapsed() < Duration::from_secs(5) {
             ap_socket.work();
         }
     }

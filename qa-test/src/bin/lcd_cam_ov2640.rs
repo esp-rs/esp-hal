@@ -38,7 +38,7 @@ use esp_hal::{
         LcdCam,
     },
     main,
-    time::RateExtU32,
+    time::Rate,
     Blocking,
 };
 use esp_println::{print, println};
@@ -66,7 +66,7 @@ fn main() -> ! {
         peripherals.GPIO16,
     );
 
-    let cam_config = cam::Config::default().with_frequency(20u32.MHz());
+    let cam_config = cam::Config::default().with_frequency(Rate::from_mhz(20));
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
     let camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, cam_data_pins, cam_config)

@@ -40,7 +40,7 @@
 //!  let parl_io = ParlIoRxOnly::new(
 //!     peripherals.PARL_IO,
 //!     dma_channel,
-//!     1.MHz(),
+//!     Rate::from_mhz(1),
 //! )?;
 //!
 //! let mut parl_io_rx = parl_io
@@ -92,7 +92,7 @@
 //!  let parl_io = ParlIoTxOnly::new(
 //!     peripherals.PARL_IO,
 //!     dma_channel,
-//!     1.MHz(),
+//!     Rate::from_mhz(1),
 //! )?;
 //!
 //! let mut clock_pin = ClkOutPin::new(peripherals.GPIO6);
@@ -125,7 +125,6 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use fugit::HertzU32;
 use peripheral::PeripheralRef;
 use private::*;
 
@@ -155,6 +154,7 @@ use crate::{
     peripheral::{self, Peripheral},
     peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
+    time::Rate,
     Async,
     Blocking,
     DriverMode,
@@ -1083,7 +1083,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = PARL_IO> + 'd,
         dma_channel: impl Peripheral<P = CH> + 'd,
-        frequency: HertzU32,
+        frequency: Rate,
     ) -> Result<Self, Error>
     where
         CH: DmaChannelFor<PARL_IO>,
@@ -1225,7 +1225,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = PARL_IO> + 'd,
         dma_channel: impl Peripheral<P = CH> + 'd,
-        frequency: HertzU32,
+        frequency: Rate,
     ) -> Result<Self, Error>
     where
         CH: TxChannelFor<PARL_IO>,
@@ -1353,7 +1353,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = PARL_IO> + 'd,
         dma_channel: impl Peripheral<P = CH> + 'd,
-        frequency: HertzU32,
+        frequency: Rate,
     ) -> Result<Self, Error>
     where
         CH: RxChannelFor<PARL_IO>,
@@ -1466,12 +1466,12 @@ impl crate::interrupt::InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
     }
 }
 
-fn internal_init(frequency: HertzU32) -> Result<(), Error> {
-    if frequency.raw() > 40_000_000 {
+fn internal_init(frequency: Rate) -> Result<(), Error> {
+    if frequency.as_hz() > 40_000_000 {
         return Err(Error::UnreachableClockRate);
     }
 
-    let divider = crate::soc::constants::PARL_IO_SCLK / frequency.raw();
+    let divider = crate::soc::constants::PARL_IO_SCLK / frequency.as_hz();
     if divider > 0xffff {
         return Err(Error::UnreachableClockRate);
     }

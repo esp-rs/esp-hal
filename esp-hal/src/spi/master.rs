@@ -39,7 +39,6 @@ use core::marker::PhantomData;
 #[instability::unstable]
 pub use dma::*;
 use enumset::{EnumSet, EnumSetType};
-use fugit::{HertzU32, RateExtU32};
 #[cfg(place_spi_driver_in_ram)]
 use procmacros::ram;
 
@@ -61,6 +60,7 @@ use crate::{
     private::{self, Sealed},
     spi::AnySpi,
     system::PeripheralGuard,
+    time::Rate,
     Async,
     Blocking,
     Cpu,
@@ -426,7 +426,7 @@ pub enum ClockSource {
 }
 
 /// SPI peripheral configuration
-#[derive(Clone, Copy, Debug, PartialEq, Eq, procmacros::BuilderLite)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
@@ -445,7 +445,7 @@ pub struct Config {
 
     /// The target frequency
     #[builder_lite(skip_setter)]
-    frequency: HertzU32,
+    frequency: Rate,
 
     /// The clock source
     #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
@@ -466,7 +466,7 @@ impl Default for Config {
     fn default() -> Self {
         let mut this = Config {
             reg: Ok(0),
-            frequency: 1_u32.MHz(),
+            frequency: Rate::from_mhz(1),
             clock_source: ClockSource::Apb,
             mode: Mode::_0,
             read_bit_order: BitOrder::MsbFirst,
@@ -479,20 +479,9 @@ impl Default for Config {
     }
 }
 
-impl core::hash::Hash for Config {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.reg.hash(state);
-        self.frequency.to_Hz().hash(state); // HertzU32 doesn't implement Hash
-        self.clock_source.hash(state);
-        self.mode.hash(state);
-        self.read_bit_order.hash(state);
-        self.write_bit_order.hash(state);
-    }
-}
-
 impl Config {
     /// Set the frequency of the SPI bus clock.
-    pub fn with_frequency(mut self, frequency: HertzU32) -> Self {
+    pub fn with_frequency(mut self, frequency: Rate) -> Self {
         self.frequency = frequency;
         self.reg = self.recalculate();
 
@@ -544,8 +533,8 @@ impl Config {
             let mut besterr: i32 = 0;
             let mut errval: i32;
 
-            let raw_freq = self.frequency.raw() as i32;
-            let raw_apb_freq = apb_clk_freq.raw() as i32;
+            let raw_freq = self.frequency.as_hz() as i32;
+            let raw_apb_freq = apb_clk_freq.as_hz() as i32;
 
             // Start at n = 2. We need to be able to set h/l so we have at least
             // one high and one low pulse.
@@ -624,8 +613,8 @@ pub enum ConfigError {}
 /// # use esp_hal::spi::master::{Config, Spi};
 /// let mut spi = Spi::new(
 ///     peripherals.SPI2,
-///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-/// )?
+///     Config::default().with_frequency(Rate::from_khz(100)).
+/// with_mode(Mode::_0) )?
 /// .with_sck(peripherals.GPIO0)
 /// .with_mosi(peripherals.GPIO1)
 /// .with_miso(peripherals.GPIO2);
@@ -769,8 +758,8 @@ impl<'d> Spi<'d, Blocking> {
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
-    ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-    /// )?
+    ///     Config::default().with_frequency(Rate::from_khz(100)).
+    /// with_mode(Mode::_0) )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
     /// # Ok(())
@@ -1237,8 +1226,8 @@ mod dma {
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
-    ///     Config::default().with_frequency(100.kHz()).with_mode(Mode::_0)
-    /// )?
+    ///     Config::default().with_frequency(Rate::from_khz(100)).
+    /// with_mode(Mode::_0) )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
     /// # Ok(())

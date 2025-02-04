@@ -19,8 +19,6 @@
 
 use core::fmt::Debug;
 
-use fugit::{Instant, MicrosDurationU64};
-
 use super::{Error, Timer as _};
 use crate::{
     interrupt::{self, InterruptHandler},
@@ -28,6 +26,7 @@ use crate::{
     peripherals::{Interrupt, SYSTIMER},
     sync::{lock, RawMutex},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    time::{Duration, Instant},
     Cpu,
 };
 
@@ -72,29 +71,33 @@ impl SystemTimer {
     }
 
     /// Returns the tick frequency of the underlying timer unit.
+    #[inline]
     pub fn ticks_per_second() -> u64 {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
-                const MULTIPLIER: u64 = 2_000_000;
+                const MULTIPLIER: u32 = 2;
+                const DIVIDER: u32 = 1;
             } else if #[cfg(esp32h2)] {
                 // The counters and comparators are driven using `XTAL_CLK`.
                 // The average clock frequency is fXTAL_CLK/2, which is 16 MHz.
                 // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u64 = 10_000_000 / 20;
+                const MULTIPLIER: u32 = 1;
+                const DIVIDER: u32 = 2;
             } else {
                 // The counters and comparators are driven using `XTAL_CLK`.
                 // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
                 // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u64 = 10_000_000 / 25;
+                const MULTIPLIER: u32 = 4;
+                const DIVIDER: u32 = 10;
             }
         }
-        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().to_MHz();
-        xtal_freq_mhz as u64 * MULTIPLIER
+        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().as_hz();
+        ((xtal_freq_mhz * MULTIPLIER) / DIVIDER) as u64
     }
 
     /// Create a new instance.
     pub fn new(_systimer: SYSTIMER) -> Self {
-        // Don't reset Systimer as it will break `time::now`, only enable it
+        // Don't reset Systimer as it will break `time::Instant::now`, only enable it
         PeripheralClockControl::enable(PeripheralEnable::Systimer);
 
         #[cfg(soc_etm)]
@@ -125,7 +128,7 @@ impl SystemTimer {
     ///
     /// - Disabling a `Unit` whilst [`Alarm`]s are using it will affect the
     ///   [`Alarm`]s operation.
-    /// - Disabling Unit0 will affect [`now`](crate::time::now).
+    /// - Disabling Unit0 will affect [`Instant::now`].
     pub unsafe fn configure_unit(unit: Unit, config: UnitConfig) {
         unit.configure(config)
     }
@@ -140,8 +143,7 @@ impl SystemTimer {
     ///
     /// - Modifying a unit's count whilst [`Alarm`]s are using it may cause
     ///   unexpected behaviour
-    /// - Any modification of the unit0 count will affect
-    ///   [`now`](crate::time::now).
+    /// - Any modification of the unit0 count will affect [`Instant::now`]
     pub unsafe fn set_unit_value(unit: Unit, value: u64) {
         unit.set_count(value)
     }
@@ -475,7 +477,7 @@ impl super::Timer for Alarm {
         self.is_enabled()
     }
 
-    fn now(&self) -> Instant<u64, 1, 1_000_000> {
+    fn now(&self) -> Instant {
         // This should be safe to access from multiple contexts; worst case
         // scenario the second accessor ends up reading an older time stamp.
 
@@ -483,13 +485,13 @@ impl super::Timer for Alarm {
 
         let us = ticks / (SystemTimer::ticks_per_second() / 1_000_000);
 
-        Instant::<u64, 1, 1_000_000>::from_ticks(us)
+        Instant::from_ticks(us)
     }
 
-    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
+    fn load_value(&self, value: Duration) -> Result<(), Error> {
         let mode = self.mode();
 
-        let us = value.ticks();
+        let us = value.as_micros();
         let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000);
 
         if matches!(mode, ComparatorMode::Period) {
@@ -713,7 +715,6 @@ pub mod etm {
     //! #     Level,
     //! #     Pull,
     //! # };
-    //! # use fugit::ExtU32;
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let etm = Etm::new(peripherals.SOC_ETM);
     //! let gpio_ext = Channels::new(peripherals.GPIO_SD);
