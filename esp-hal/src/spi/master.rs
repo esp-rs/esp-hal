@@ -623,8 +623,8 @@ impl Config {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
-        // Max supported frequency is 80Mhz
-        if self.frequency > HertzU32::MHz(80) {
+        // Maximum supported frequency is 80Mhz, minimum is about 70khz.
+        if self.frequency < HertzU32::kHz(70) || self.frequency > HertzU32::MHz(80) {
             return Err(ConfigError::UnsupportedFrequency);
         }
         Ok(())
@@ -1044,8 +1044,12 @@ where
     /// Change the bus configuration.
     ///
     /// # Errors.
-    /// If frequency passed in config exceeds 80Mhz, a corresponding
-    /// [`ConfigError`] variant will be returned.
+    /// If frequency passed in config exceeds 80Mhz or is below 70kHz, a
+    /// corresponding [`ConfigError`] variant will be returned. If the user
+    /// has specified in the configuration that they want frequency to
+    /// correspond exactly or with some percentage of deviation to the
+    /// desired value, and the driver cannot reach this speed - an error
+    /// will also be returned.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }

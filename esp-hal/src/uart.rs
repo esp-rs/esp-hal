@@ -272,7 +272,8 @@ pub enum BaudrateTolerance {
     /// Accept the closest achievable baud rate without restriction.
     #[default]
     Closest,
-    /// Require an exact match, otherwise return an error.
+    /// In this setting, the deviation of only 1% from the desired baud value is
+    /// tolerated.
     Exact,
     /// Allow a certain percentage of deviation.
     ErrorPercent(u8),
@@ -288,6 +289,7 @@ pub struct Config {
     baudrate: u32,
     /// Determines how close to the desired baud rate value the driver should
     /// set the baud rate.
+    #[builder_lite(skip_setter)]
     baudrate_tolerance: BaudrateTolerance,
     /// Number of data bits in each frame (5, 6, 7, or 8 bits).
     data_bits: DataBits,
@@ -346,6 +348,19 @@ impl Default for RxConfig {
 }
 
 impl Config {
+    /// Set the baudrate tolerance of the UART configuration.
+    pub fn with_baudrate_tolerance(mut self, tolerance: BaudrateTolerance) -> Self {
+        self.baudrate_tolerance = match tolerance {
+            BaudrateTolerance::Exact => BaudrateTolerance::Exact,
+            BaudrateTolerance::Closest => BaudrateTolerance::Closest,
+            BaudrateTolerance::ErrorPercent(percentage) => {
+                assert!(percentage > 0 && percentage <= 100);
+                BaudrateTolerance::ErrorPercent(percentage)
+            }
+        };
+
+        self
+    }
     /// Calculates the total symbol length in bits based on the configured
     /// data bits, parity, and stop bits.
     fn symbol_length(&self) -> u8 {
@@ -1214,7 +1229,10 @@ where
     /// # Errors.
     /// Errors will be returned in the cases described in
     /// [`UartRx::apply_config`] and if baud rate passed in config exceeds
-    /// 5MBaud or is equal to zero.
+    /// 5MBaud or is equal to zero. If the user has specified in the
+    /// configuration that they want baudrate to correspond exactly or with some
+    /// percentage of deviation to the desired value, and the driver cannot
+    /// reach this speed - an error will also be returned.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
@@ -2501,8 +2519,15 @@ impl Info {
         let actual_baud = self.get_baudrate(clk);
 
         match config.baudrate_tolerance {
-            BaudrateTolerance::Exact if actual_baud != config.baudrate => {
-                return Err(ConfigError::UnachievableBaudrate)
+            BaudrateTolerance::Exact => {
+                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs()
+                    * 100)
+                    / actual_baud as u64;
+                // We tolerate deviation of 1% from the desired baud value, as it never will be
+                // exactly the same
+                if deviation > 1 as u64 {
+                    return Err(ConfigError::UnachievableBaudrate);
+                }
             }
             BaudrateTolerance::ErrorPercent(percent) => {
                 let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs()
