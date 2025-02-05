@@ -12,7 +12,6 @@ env:
   DEFMT_LOG: trace
 
 jobs:
-
   esp-hal-nightly:
     name: esp-hal | nightly (${{ matrix.device.soc }})
     runs-on: ubuntu-latest
@@ -52,20 +51,18 @@ jobs:
           target: ${{ matrix.device.target }}
           toolchain: nightly
 
-      - name: Create or Update GitHub Issue
-        if: failure()
+      - if: failure()
+        name: Create or Update GitHub Issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           sudo apt-get install gh -y
           ISSUE_NAME=$(gh issue list --state open --search "Nightly CI Failure in:title" --json number --jq '.[0].number')
 
-          if [[ -n "$ISSUE_NAME" ]]; then
-            gh issue comment "$ISSUE_NAME" \
-              --body "Another CI failure detected! [View the failed job](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
-          else
+          if [[ -n "$ISSUE_NAME" ]];
+          then
             gh issue create \
               --title "Nightly CI Failure" \
               --body "Nightly CI Workflow Failed! [View the failed job](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})." \
               --label "ci-nightly"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
