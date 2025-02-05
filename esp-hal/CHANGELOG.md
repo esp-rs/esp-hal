@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue that caused LCD_CAM drivers to turn off their clocks unexpectedly (#3007)
 - Fixed an issue where DMA-driver peripherals started transferring before the data was ready (#3003)
 
+- ESP32-S2: Fixed linker script (#3096)
+
 ### Removed
 
 - Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
