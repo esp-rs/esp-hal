@@ -2234,7 +2234,7 @@ impl Info {
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
+        for core in crate::cpu::Cpu::other() {
             crate::interrupt::disable(core, self.interrupt);
         }
         self.enable_listen(EnumSet::all(), false);
@@ -2244,7 +2244,7 @@ impl Info {
     }
 
     fn disable_interrupts(&self) {
-        crate::interrupt::disable(crate::Cpu::current(), self.interrupt);
+        crate::interrupt::disable(crate::cpu::Cpu::current(), self.interrupt);
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {

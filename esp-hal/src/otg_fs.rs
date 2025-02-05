@@ -147,7 +147,7 @@ pub mod asynch {
     use procmacros::handler;
 
     use super::*;
-    use crate::Cpu;
+    use crate::cpu::Cpu;
 
     // From ESP32-S3 TRM:
     // Six additional endpoints (endpoint numbers 1 to 6), configurable as IN or OUT

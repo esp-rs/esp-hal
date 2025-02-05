@@ -111,7 +111,7 @@ impl crate::private::Sealed for Sha<'_> {}
 #[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for Sha<'_> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        for core in crate::Cpu::other() {
+        for core in crate::cpu::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::SHA);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::SHA, handler.handler()) };

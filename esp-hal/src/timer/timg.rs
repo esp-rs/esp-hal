@@ -391,7 +391,7 @@ impl Timer {
             _ => unreachable!(),
         };
 
-        for core in crate::Cpu::other() {
+        for core in crate::cpu::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
         unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };

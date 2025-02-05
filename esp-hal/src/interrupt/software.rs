@@ -66,7 +66,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
             _ => unreachable!(),
         };
 
-        for core in crate::Cpu::other() {
+        for core in crate::cpu::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
         unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };

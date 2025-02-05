@@ -49,13 +49,13 @@ use core::{
 
 use crate::{
     asynch::AtomicWaker,
+    cpu::Cpu,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     time::{Duration, Instant},
     Async,
     Blocking,
-    Cpu,
     DriverMode,
 };
 

@@ -23,9 +23,9 @@ pub use self::plic::*;
 pub use self::vectored::*;
 use super::InterruptStatus;
 use crate::{
+    cpu::Cpu,
     pac,
     peripherals::{Interrupt, INTERRUPT_CORE0},
-    Cpu,
 };
 
 /// Interrupt Error
@@ -560,7 +560,7 @@ mod vectored {
 #[cfg(not(plic))]
 mod classic {
     use super::{CpuInterrupt, InterruptKind, Priority};
-    use crate::{peripherals::INTERRUPT_CORE0, Cpu};
+    use crate::{cpu::Cpu, peripherals::INTERRUPT_CORE0};
 
     #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
@@ -710,7 +710,7 @@ mod classic {
 #[cfg(plic)]
 mod plic {
     use super::{CpuInterrupt, InterruptKind, Priority};
-    use crate::{peripherals::PLIC_MX, Cpu};
+    use crate::{cpu::Cpu, peripherals::PLIC_MX};
 
     #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 31;

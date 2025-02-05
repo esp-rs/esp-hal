@@ -9,10 +9,10 @@ use core::time::Duration;
 
 use esp_backtrace as _;
 use esp_hal::{
+    cpu::Cpu,
     delay::Delay,
     main,
     rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason},
-    Cpu,
 };
 use esp_println::println;
 

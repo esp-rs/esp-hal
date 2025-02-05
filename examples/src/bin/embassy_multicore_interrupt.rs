@@ -23,7 +23,7 @@ use esp_hal::{
     interrupt::{software::SoftwareInterruptControl, Priority},
     main,
     timer::{timg::TimerGroup, AnyTimer},
-    Cpu,
+    cpu::Cpu,
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;

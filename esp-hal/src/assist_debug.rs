@@ -52,7 +52,7 @@ impl<'d> DebugAssist<'d> {
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
+        for core in crate::cpu::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::ASSIST_DEBUG);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::ASSIST_DEBUG, handler.handler()) };

@@ -128,7 +128,7 @@ mod multicore {
     const UNUSED_THREAD_ID_VALUE: usize = 0x100;
 
     pub fn thread_id() -> usize {
-        crate::raw_core()
+        crate::cpu::raw_core()
     }
 
     pub(super) struct AtomicLock {

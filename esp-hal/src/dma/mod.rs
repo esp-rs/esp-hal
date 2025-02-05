@@ -61,6 +61,7 @@ pub use self::m2m::*;
 #[cfg(pdma)]
 pub use self::pdma::*;
 use crate::{
+    cpu::Cpu,
     interrupt::InterruptHandler,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
@@ -68,7 +69,6 @@ use crate::{
     system,
     Async,
     Blocking,
-    Cpu,
     DriverMode,
 };
 
@@ -1873,7 +1873,7 @@ where
         self.clear_in(EnumSet::all());
 
         if let Some(interrupt) = self.rx_impl.peripheral_interrupt() {
-            for core in crate::Cpu::other() {
+            for core in crate::cpu::Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
             unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
@@ -2168,7 +2168,7 @@ where
         self.clear_out(EnumSet::all());
 
         if let Some(interrupt) = self.tx_impl.peripheral_interrupt() {
-            for core in crate::Cpu::other() {
+            for core in crate::cpu::Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
             unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };

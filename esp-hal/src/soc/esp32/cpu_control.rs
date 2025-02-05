@@ -58,9 +58,9 @@ use core::{
 };
 
 use crate::{
+    cpu::Cpu,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{CPU_CTRL, DPORT, LPWR, SPI0},
-    Cpu,
 };
 
 /// Data type for a properly aligned stack of N bytes

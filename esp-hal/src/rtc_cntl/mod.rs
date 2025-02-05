@@ -123,12 +123,12 @@ use crate::efuse::Efuse;
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
+    cpu::Cpu,
     interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     reset::{SleepSource, WakeupReason},
     time::Duration,
-    Cpu,
 };
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::{
@@ -474,7 +474,7 @@ impl<'d> Rtc<'d> {
                 let interrupt = Interrupt::RTC_CORE;
             }
         }
-        for core in crate::Cpu::other() {
+        for core in crate::cpu::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
         unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };

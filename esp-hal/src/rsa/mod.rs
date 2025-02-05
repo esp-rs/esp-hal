@@ -24,6 +24,7 @@
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
+    cpu::Cpu,
     interrupt::InterruptHandler,
     pac,
     peripheral::{Peripheral, PeripheralRef},
@@ -31,7 +32,6 @@ use crate::{
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
     Async,
     Blocking,
-    Cpu,
 };
 
 #[cfg_attr(esp32s2, path = "esp32sX.rs")]
@@ -75,7 +75,7 @@ impl<'d> Rsa<'d, Blocking> {
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
+        for core in crate::cpu::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::RSA);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::RSA, handler.handler()) };

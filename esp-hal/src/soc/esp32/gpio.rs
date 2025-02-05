@@ -43,10 +43,10 @@
 use core::mem::transmute;
 
 use crate::{
+    cpu::Cpu,
     gpio::{AlternateFunction, GpioPin},
     pac::io_mux,
     peripherals::{GPIO, IO_MUX},
-    Cpu,
 };
 
 /// The total number of GPIO pins available.

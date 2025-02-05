@@ -122,6 +122,7 @@ use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
 use crate::{
+    cpu::Cpu,
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -745,7 +746,7 @@ where
     }
 
     fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
+        for core in Cpu::other() {
             crate::interrupt::disable(core, self.twai.interrupt());
         }
         unsafe { crate::interrupt::bind_interrupt(self.twai.interrupt(), handler.handler()) };
@@ -986,7 +987,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
 impl<'d> TwaiConfiguration<'d, Async> {
     /// Convert the configuration into a blocking configuration.
     pub fn into_blocking(self) -> TwaiConfiguration<'d, Blocking> {
-        use crate::{interrupt, Cpu};
+        use crate::{cpu::Cpu, interrupt};
 
         interrupt::disable(Cpu::current(), self.twai.interrupt());
 

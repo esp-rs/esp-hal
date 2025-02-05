@@ -22,13 +22,13 @@ use core::fmt::Debug;
 use super::{Error, Timer as _};
 use crate::{
     asynch::AtomicWaker,
+    cpu::Cpu,
     interrupt::{self, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     sync::{lock, RawMutex},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
-    Cpu,
 };
 
 /// The configuration of a unit.
@@ -397,7 +397,7 @@ impl Alarm {
             _ => unreachable!(),
         };
 
-        for core in crate::Cpu::other() {
+        for core in crate::cpu::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
 
