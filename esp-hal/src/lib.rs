@@ -261,8 +261,6 @@ unstable_module! {
     pub mod parl_io;
     #[cfg(pcnt)]
     pub mod pcnt;
-    #[cfg(any(lp_clkrst, rtc_cntl))]
-    pub mod reset;
     #[cfg(rmt)]
     pub mod rmt;
     #[cfg(rng)]

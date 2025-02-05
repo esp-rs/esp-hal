@@ -123,11 +123,10 @@ use crate::efuse::Efuse;
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
-    cpu::Cpu,
+    cpu::{Cpu, SleepSource, WakeupReason},
     interrupt::{self, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
-    reset::{SleepSource, WakeupReason},
     time::Duration,
 };
 #[cfg(not(any(esp32c6, esp32h2)))]
