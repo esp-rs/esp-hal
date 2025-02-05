@@ -170,16 +170,17 @@ pub fn software_reset() {
     crate::rom::software_reset();
 }
 
-/// Performs a software reset on the CPU.
-pub fn software_reset_cpu() {
-    crate::rom::software_reset_cpu();
+/// Resets the given CPU, leaving peripherals unchanged.
+#[instability::unstable]
+pub fn software_reset_cpu(cpu: Cpu) {
+    crate::rom::software_reset_cpu(cpu as u32);
 }
 
 /// Retrieves the reason for the last reset as a SocResetReason enum value.
 /// Returns `None` if the reset reason cannot be determined.
 #[instability::unstable]
 pub fn reset_reason() -> Option<SocResetReason> {
-    crate::rtc_cntl::reset_reason(crate::cpu::Cpu::current())
+    crate::rtc_cntl::reset_reason(Cpu::current())
 }
 
 /// Retrieves the cause of the last wakeup event as a SleepSource enum value.

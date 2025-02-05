@@ -113,12 +113,12 @@ pub(crate) fn rtc_get_reset_reason(cpu_num: u32) -> u32 {
 }
 
 #[inline(always)]
-pub(crate) fn software_reset_cpu() {
+pub(crate) fn software_reset_cpu(cpu_num: u32) {
     extern "C" {
-        fn software_reset_cpu();
+        fn software_reset_cpu(cpu_num: u32);
     }
 
-    unsafe { software_reset_cpu() };
+    unsafe { software_reset_cpu(cpu_num) };
 }
 
 #[inline(always)]
