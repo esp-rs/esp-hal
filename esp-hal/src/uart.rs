@@ -2388,10 +2388,8 @@ impl Info {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6, esp32h2))] {
 
-                let max_div = 0b1111_1111_1111u64 - 1;
-                // this operation may exceed u32::MAX at high bauds, convert to u64
-                let clk_div = (clk as u64).div_ceil(max_div * config.baudrate as u64);
-                let clk_div = clk_div as u32;
+                const MAX_DIV: u32 = 0b1111_1111_1111 - 1;
+                let clk_div = (clk.div_ceil(MAX_DIV)).div_ceil(config.baudrate);
 
                 // define `conf` in scope for modification below
                 cfg_if::cfg_if! {
