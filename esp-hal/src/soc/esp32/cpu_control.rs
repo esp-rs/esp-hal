@@ -9,7 +9,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::cpu_control::{CpuControl, Stack};
+//! # use esp_hal::cpu::{CpuControl, Stack};
 //! # use core::{cell::RefCell, ptr::addr_of_mut};
 //! # use critical_section::Mutex;
 //! static mut APP_CORE_STACK: Stack<8192> = Stack::new();

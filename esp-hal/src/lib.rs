@@ -155,8 +155,6 @@ pub use esp_riscv_rt::{self, riscv};
 pub use xtensa_lx_rt::{self, xtensa_lx};
 
 // TODO what should we reexport stably?
-#[cfg(any(esp32, esp32s3))]
-pub use self::soc::cpu_control;
 #[cfg(efuse)]
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]

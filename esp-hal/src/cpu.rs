@@ -1,5 +1,8 @@
 //! CPU related functionality
 
+#[cfg(any(esp32, esp32s3))]
+pub use crate::soc::cpu_control::*;
+
 /// Available CPU cores
 ///
 /// The actual number of available cores depends on the target.

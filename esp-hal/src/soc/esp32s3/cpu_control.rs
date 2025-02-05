@@ -10,7 +10,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::cpu_control::{CpuControl, Stack};
+//! # use esp_hal::cpu::{CpuControl, Stack};
 //! # use core::{cell::RefCell, ptr::addr_of_mut};
 //! # use critical_section::Mutex;
 //! # let delay = Delay::new();

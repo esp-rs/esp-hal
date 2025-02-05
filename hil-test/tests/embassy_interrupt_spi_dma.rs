@@ -308,7 +308,7 @@ mod test {
             }
         };
 
-        use esp_hal::cpu_control::{CpuControl, Stack};
+        use esp_hal::cpu::{CpuControl, Stack};
         const DISPLAY_STACK_SIZE: usize = 8192;
         let app_core_stack = mk_static!(Stack<DISPLAY_STACK_SIZE>, Stack::new());
         let cpu_control = CpuControl::new(peripherals.CPU_CTRL);
