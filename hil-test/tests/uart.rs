@@ -72,6 +72,7 @@ mod tests {
             #[cfg(esp32s2)]
             (9600, ClockSource::RefTick),
             (921_600, ClockSource::Apb),
+            (2_000_000, ClockSource::Apb),
         ];
 
         let mut byte_to_write = 0xA5;
