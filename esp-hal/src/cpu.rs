@@ -167,15 +167,15 @@ bitflags::bitflags! {
 
 /// Performs a software reset on the chip.
 #[inline]
-pub fn software_reset() {
-    crate::rom::software_reset();
+pub fn software_reset() -> ! {
+    crate::rom::software_reset()
 }
 
 /// Resets the given CPU, leaving peripherals unchanged.
 #[instability::unstable]
 #[inline]
 pub fn software_reset_cpu(cpu: Cpu) {
-    crate::rom::software_reset_cpu(cpu as u32);
+    crate::rom::software_reset_cpu(cpu as u32)
 }
 
 /// Retrieves the reason for the last reset as a SocResetReason enum value.

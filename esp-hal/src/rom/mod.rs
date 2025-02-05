@@ -122,12 +122,12 @@ pub(crate) fn software_reset_cpu(cpu_num: u32) {
 }
 
 #[inline(always)]
-pub(crate) fn software_reset() {
+pub(crate) fn software_reset() -> ! {
     extern "C" {
-        fn software_reset();
+        fn software_reset() -> !;
     }
 
-    unsafe { software_reset() };
+    unsafe { software_reset() }
 }
 
 #[cfg(esp32s3)]
