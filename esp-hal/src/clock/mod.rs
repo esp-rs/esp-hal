@@ -46,7 +46,10 @@
 
 #[cfg(any(esp32, esp32c2))]
 use crate::rtc_cntl::RtcClock;
-use crate::time::Rate;
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    time::Rate,
+};
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
@@ -562,5 +565,82 @@ impl Clocks {
             xtal_clock: xtal_freq.frequency(),
             crypto_pwm_clock: Rate::from_mhz(160),
         }
+    }
+}
+
+/// Control the radio peripheral clocks
+#[cfg(any(bt, ieee802154, wifi))]
+#[instability::unstable]
+pub struct RadioClockController<'d> {
+    _rcc: PeripheralRef<'d, crate::peripherals::RADIO_CLK>,
+}
+
+#[cfg(any(bt, ieee802154, wifi))]
+impl<'d> RadioClockController<'d> {
+    /// Create a new instance of the radio clock controller
+    #[instability::unstable]
+    pub fn new(rcc: impl Peripheral<P = crate::peripherals::RADIO_CLK> + 'd) -> Self {
+        crate::into_ref!(rcc);
+        Self { _rcc: rcc }
+    }
+
+    /// Enable the PHY clocks
+    #[instability::unstable]
+    #[cfg(phy)]
+    #[inline]
+    pub fn enable_phy(&mut self, enable: bool) {
+        clocks_ll::enable_phy(enable);
+    }
+
+    /// Enable the Bluetooth clocks
+    #[instability::unstable]
+    #[cfg(bt)]
+    #[inline]
+    pub fn enable_bt(&mut self, enable: bool) {
+        clocks_ll::enable_bt(enable);
+    }
+
+    /// Enable the WiFi clocks
+    #[instability::unstable]
+    #[cfg(wifi)]
+    #[inline]
+    pub fn enable_wifi(&mut self, enable: bool) {
+        clocks_ll::enable_wifi(enable);
+    }
+
+    /// Enable the IEEE 802.15.4 peripheral clocks
+    #[instability::unstable]
+    #[cfg(ieee802154)]
+    #[inline]
+    pub fn enable_ieee802154(&mut self, enable: bool) {
+        clocks_ll::enable_ieee802154(enable);
+    }
+
+    /// Reset the MAC
+    #[instability::unstable]
+    #[inline]
+    pub fn reset_mac(&mut self) {
+        clocks_ll::reset_mac();
+    }
+
+    /// Do any common initial initialization needed
+    #[instability::unstable]
+    #[inline]
+    pub fn init_clocks(&mut self) {
+        clocks_ll::init_clocks();
+    }
+
+    /// Initialize BLE RTC clocks
+    #[instability::unstable]
+    #[inline]
+    pub fn ble_rtc_clk_init(&mut self) {
+        clocks_ll::ble_rtc_clk_init();
+    }
+
+    /// Reset the Resolvable Private Address (RPA).
+    #[instability::unstable]
+    #[inline]
+    pub fn reset_rpa(&mut self) {
+        clocks_ll::reset_rpa();
     }
 }

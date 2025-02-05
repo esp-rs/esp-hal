@@ -10,7 +10,6 @@ pub(crate) mod os_adapter_chip_specific;
 use core::{cell::RefCell, ptr::addr_of_mut};
 
 use enumset::EnumSet;
-use esp_hal::sync::{Locked, RawMutex};
 
 use super::WifiEvent;
 use crate::{
@@ -30,7 +29,11 @@ use crate::{
         },
         malloc::calloc,
     },
-    hal::system::{RadioClockController, RadioPeripherals},
+    hal::{
+        clock::RadioClockController,
+        peripherals::RADIO_CLK,
+        sync::{Locked, RawMutex},
+    },
     memory_fence::memory_fence,
     timer::yield_task,
 };
@@ -1046,8 +1049,8 @@ pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
     // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.reset_mac();
+    let radio_clocks = unsafe { RADIO_CLK::steal() };
+    RadioClockController::new(radio_clocks).reset_mac();
 }
 
 /// **************************************************************************
@@ -1067,8 +1070,8 @@ pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
     // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.enable(RadioPeripherals::Wifi);
+    let radio_clocks = unsafe { RADIO_CLK::steal() };
+    RadioClockController::new(radio_clocks).enable_wifi(true);
 }
 
 /// **************************************************************************
@@ -1088,8 +1091,8 @@ pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
     // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.disable(RadioPeripherals::Wifi);
+    let radio_clocks = unsafe { RADIO_CLK::steal() };
+    RadioClockController::new(radio_clocks).enable_wifi(false);
 }
 
 /// **************************************************************************

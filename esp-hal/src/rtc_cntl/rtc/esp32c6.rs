@@ -22,7 +22,6 @@ use crate::{
     peripherals::TIMG0,
     rtc_cntl::RtcClock,
     soc::efuse::Efuse,
-    system::RadioPeripherals,
     time::Rate,
 };
 
@@ -311,22 +310,12 @@ fn modem_clock_hal_enable_wifipwr_clock(enable: bool) {
     }
 }
 
-fn modem_clock_select_lp_clock_source(
-    periph: RadioPeripherals,
-    src: ModemClockLpclkSource,
-    divider: u16,
-) {
-    match periph {
-        RadioPeripherals::Wifi => {
-            modem_clock_hal_deselect_all_wifi_lpclk_source();
-            modem_clock_hal_select_wifi_lpclk_source(src);
-            modem_lpcon_ll_set_wifi_lpclk_divisor_value(divider);
-            modem_clock_hal_enable_wifipwr_clock(true);
-        }
-        RadioPeripherals::Phy | RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => {
-            todo!("unused by setup code")
-        }
-    }
+// PHY, BT, IEEE802154 are not used by the init code so they are unimplemented
+fn modem_clock_select_lp_clock_source_wifi(src: ModemClockLpclkSource, divider: u16) {
+    modem_clock_hal_deselect_all_wifi_lpclk_source();
+    modem_clock_hal_select_wifi_lpclk_source(src);
+    modem_lpcon_ll_set_wifi_lpclk_divisor_value(divider);
+    modem_clock_hal_enable_wifipwr_clock(true);
 }
 
 const fn hp_retention_regdma_config(dir: u8, entry: u8) -> u8 {
@@ -1196,7 +1185,7 @@ pub(crate) fn init() {
     // TODO - WIFI-5233
     let modem_lpclk_src = ModemClockLpclkSource::from(RtcSlowClockSource::current());
 
-    modem_clock_select_lp_clock_source(RadioPeripherals::Wifi, modem_lpclk_src, 0);
+    modem_clock_select_lp_clock_source_wifi(modem_lpclk_src, 0);
 }
 
 pub(crate) fn configure_clock() {

@@ -1,11 +1,7 @@
 use portable_atomic::{AtomicU32, Ordering};
 
 use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
-use crate::{
-    binary::include::*,
-    compat::common::str_from_c,
-    hal::system::{RadioClockController, RadioPeripherals},
-};
+use crate::{binary::include::*, compat::common::str_from_c};
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -30,7 +26,7 @@ pub(crate) unsafe fn phy_enable() {
     let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
-            phy_enable_clock();
+            super::phy_enable_clock();
 
             if !G_IS_PHY_CALIBRATED {
                 let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
@@ -88,7 +84,7 @@ pub(crate) unsafe fn phy_disable() {
 
             // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
             // RNG
-            phy_disable_clock();
+            super::phy_disable_clock();
             trace!("PHY DISABLE");
         });
     }
@@ -109,25 +105,4 @@ fn phy_digital_regs_store() {
             S_IS_PHY_REG_STORED = true;
         }
     }
-}
-
-pub(crate) unsafe fn phy_enable_clock() {
-    trace!("phy_enable_clock");
-    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
-    // value) into `init`
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.enable(RadioPeripherals::Phy);
-
-    trace!("phy_enable_clock done!");
-}
-
-#[allow(unused)]
-pub(crate) unsafe fn phy_disable_clock() {
-    trace!("phy_disable_clock");
-    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
-    // value) into `init`
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.disable(RadioPeripherals::Phy);
-
-    trace!("phy_disable_clock done!");
 }

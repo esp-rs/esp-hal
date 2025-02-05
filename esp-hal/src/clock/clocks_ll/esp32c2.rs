@@ -2,7 +2,6 @@ use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
     peripherals::{APB_CTRL, MODEM_CLKRST},
     rom::{regi2c_write, regi2c_write_mask},
-    system::{RadioClockController, RadioPeripherals},
 };
 
 const I2C_BBPLL: u32 = 0x66;
@@ -177,63 +176,29 @@ const SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x78078F;
 // SYSTEM_WIFI_CLK_EN : R/W ;bitpos:[31:0] ;default: 32'hfffce030
 const SYSTEM_WIFI_CLK_EN: u32 = 0x00FB9FCF;
 
-impl RadioClockController for crate::peripherals::RADIO_CLK {
-    fn enable(&mut self, peripheral: RadioPeripherals) {
-        match peripheral {
-            RadioPeripherals::Phy => enable_phy(),
-            RadioPeripherals::Bt => common_wifi_bt_clock_enable(),
-            RadioPeripherals::Wifi => common_wifi_bt_clock_enable(),
-        }
-    }
-
-    fn disable(&mut self, peripheral: RadioPeripherals) {
-        match peripheral {
-            RadioPeripherals::Phy => disable_phy(),
-            RadioPeripherals::Bt => common_wifi_bt_clock_disable(),
-            RadioPeripherals::Wifi => common_wifi_bt_clock_disable(),
-        }
-    }
-
-    fn reset_mac(&mut self) {
-        reset_mac();
-    }
-
-    fn init_clocks(&mut self) {
-        init_clocks();
-    }
-
-    fn ble_rtc_clk_init(&mut self) {
-        ble_rtc_clk_init();
-    }
-
-    fn reset_rpa(&mut self) {
-        reset_rpa();
-    }
-}
-
-fn enable_phy() {
+pub(super) fn enable_phy(enable: bool) {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
-    APB_CTRL::regs()
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
-}
-
-fn disable_phy() {
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
-    APB_CTRL::regs()
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M) });
+    APB_CTRL::regs().wifi_clk_en().modify(|r, w| unsafe {
+        if enable {
+            w.bits(r.bits() | SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M)
+        } else {
+            w.bits(r.bits() & !SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M)
+        }
+    });
 }
 
-fn common_wifi_bt_clock_enable() {
+pub(super) fn enable_bt(_: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`, no-op
-}
-
-fn common_wifi_bt_clock_disable() {
     // `periph_ll_wifi_module_disable_clk_clear_rst`, no-op
 }
 
-fn reset_mac() {
+pub(super) fn enable_wifi(_: bool) {
+    // `periph_ll_wifi_module_enable_clk_clear_rst`, no-op
+    // `periph_ll_wifi_module_disable_clk_clear_rst`, no-op
+}
+
+pub(super) fn reset_mac() {
     const SYSTEM_MAC_RST: u32 = 1 << 2;
     APB_CTRL::regs()
         .wifi_rst_en()
@@ -243,7 +208,7 @@ fn reset_mac() {
         .modify(|r, w| unsafe { w.wifi_rst().bits(r.wifi_rst().bits() & !SYSTEM_MAC_RST) });
 }
 
-fn init_clocks() {
+pub(super) fn init_clocks() {
     // from `esp_perip_clk_init`
     const SYSTEM_WIFI_CLK_UNUSED_BIT5: u32 = 1 << 5;
     const SYSTEM_WIFI_CLK_UNUSED_BIT12: u32 = 1 << 12;
@@ -254,7 +219,7 @@ fn init_clocks() {
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }
 
-fn ble_rtc_clk_init() {
+pub(super) fn ble_rtc_clk_init() {
     let modem_clkrst = MODEM_CLKRST::regs();
     modem_clkrst
         .modem_lp_timer_conf()
@@ -282,7 +247,7 @@ fn ble_rtc_clk_init() {
         .modify(|_, w| w.etm_clk_sel().clear_bit());
 }
 
-fn reset_rpa() {
+pub(super) fn reset_rpa() {
     const BLE_RPA_REST_BIT: u32 = 1 << 27;
     APB_CTRL::regs()
         .wifi_rst_en()

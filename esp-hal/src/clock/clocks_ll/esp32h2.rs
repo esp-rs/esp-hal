@@ -1,7 +1,6 @@
 use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
     peripherals::{LP_AON, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
-    system::{RadioClockController, RadioPeripherals},
 };
 
 const I2C_BBPLL: u8 = 0x66;
@@ -326,43 +325,7 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
     regi2c_disable_block(block);
 }
 
-impl RadioClockController for crate::peripherals::RADIO_CLK {
-    fn enable(&mut self, peripheral: RadioPeripherals) {
-        match peripheral {
-            RadioPeripherals::Phy => enable_phy(true),
-            RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => {
-                ble_ieee802154_clock_enable(true)
-            }
-        }
-    }
-
-    fn disable(&mut self, peripheral: RadioPeripherals) {
-        match peripheral {
-            RadioPeripherals::Phy => enable_phy(false),
-            RadioPeripherals::Bt | RadioPeripherals::Ieee802154 => {
-                ble_ieee802154_clock_enable(false)
-            }
-        }
-    }
-
-    fn reset_mac(&mut self) {
-        reset_mac();
-    }
-
-    fn init_clocks(&mut self) {
-        init_clocks();
-    }
-
-    fn ble_rtc_clk_init(&mut self) {
-        // nothing for this target (yet)
-    }
-
-    fn reset_rpa(&mut self) {
-        // nothing for this target (yet)
-    }
-}
-
-fn enable_phy(en: bool) {
+pub(super) fn enable_phy(en: bool) {
     MODEM_LPCON::regs()
         .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_en().bit(en));
@@ -389,11 +352,19 @@ fn ble_ieee802154_clock_enable(en: bool) {
         .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
-fn reset_mac() {
+pub(super) fn enable_bt(en: bool) {
+    ble_ieee802154_clock_enable(en);
+}
+
+pub(super) fn enable_ieee802154(en: bool) {
+    ble_ieee802154_clock_enable(en);
+}
+
+pub(super) fn reset_mac() {
     // empty
 }
 
-fn init_clocks() {
+pub(super) fn init_clocks() {
     unsafe {
         let pmu = PMU::regs();
 
@@ -417,4 +388,12 @@ fn init_clocks() {
                 .set_bit()
         });
     }
+}
+
+pub(super) fn ble_rtc_clk_init() {
+    // nothing for this target (yet)
+}
+
+pub(super) fn reset_rpa() {
+    // nothing for this target (yet)
 }

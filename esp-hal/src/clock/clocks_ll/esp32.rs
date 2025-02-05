@@ -1,5 +1,6 @@
 use crate::{
     clock::{Clock, PllClock, XtalClock},
+    peripherals::DPORT,
     rom::regi2c_write,
 };
 
@@ -254,90 +255,45 @@ fn esp32_update_cpu_freq(mhz: u32) {
     }
 }
 
-use crate::{
-    peripherals::DPORT,
-    system::{RadioClockController, RadioPeripherals},
-};
-
 const DPORT_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x000003c9;
 const DPORT_WIFI_CLK_WIFI_EN_M: u32 = 0x00000406;
 const DPORT_WIFI_CLK_BT_EN_M: u32 = 0x00030800;
 
-impl RadioClockController for crate::peripherals::RADIO_CLK {
-    fn enable(&mut self, peripheral: RadioPeripherals) {
-        match peripheral {
-            RadioPeripherals::Phy => enable_phy(),
-            RadioPeripherals::Bt => bt_clock_enable(),
-            RadioPeripherals::Wifi => wifi_clock_enable(),
-        }
-    }
-
-    fn disable(&mut self, peripheral: RadioPeripherals) {
-        match peripheral {
-            RadioPeripherals::Phy => disable_phy(),
-            RadioPeripherals::Bt => bt_clock_disable(),
-            RadioPeripherals::Wifi => wifi_clock_disable(),
-        }
-    }
-
-    fn reset_mac(&mut self) {
-        reset_mac();
-    }
-
-    fn init_clocks(&mut self) {
-        init_clocks();
-    }
-
-    fn ble_rtc_clk_init(&mut self) {
-        // nothing for this target
-    }
-
-    fn reset_rpa(&mut self) {
-        // nothing for this target
-    }
-}
-
-fn enable_phy() {
+pub(super) fn enable_phy(enable: bool) {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
-    DPORT::regs()
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_BT_COMMON_M) });
-}
-
-fn disable_phy() {
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
-    DPORT::regs()
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() & !DPORT_WIFI_CLK_WIFI_BT_COMMON_M) });
+    DPORT::regs().wifi_clk_en().modify(|r, w| unsafe {
+        if enable {
+            w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_BT_COMMON_M)
+        } else {
+            w.bits(r.bits() & !DPORT_WIFI_CLK_WIFI_BT_COMMON_M)
+        }
+    });
 }
 
-fn bt_clock_enable() {
-    DPORT::regs()
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() | DPORT_WIFI_CLK_BT_EN_M) });
+pub(super) fn enable_bt(enable: bool) {
+    DPORT::regs().wifi_clk_en().modify(|r, w| unsafe {
+        if enable {
+            w.bits(r.bits() | DPORT_WIFI_CLK_BT_EN_M)
+        } else {
+            w.bits(r.bits() & !DPORT_WIFI_CLK_BT_EN_M)
+        }
+    });
 }
 
-fn bt_clock_disable() {
-    DPORT::regs()
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() & !DPORT_WIFI_CLK_BT_EN_M) });
-}
-
-fn wifi_clock_enable() {
+pub(super) fn enable_wifi(enable: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`
-    DPORT::regs()
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_EN_M) });
-}
-
-fn wifi_clock_disable() {
     // `periph_ll_wifi_module_disable_clk_set_rst`
-    DPORT::regs()
-        .wifi_clk_en()
-        .modify(|r, w| unsafe { w.bits(r.bits() & !DPORT_WIFI_CLK_WIFI_EN_M) });
+    DPORT::regs().wifi_clk_en().modify(|r, w| unsafe {
+        if enable {
+            w.bits(r.bits() | DPORT_WIFI_CLK_WIFI_EN_M)
+        } else {
+            w.bits(r.bits() & !DPORT_WIFI_CLK_WIFI_EN_M)
+        }
+    });
 }
 
-fn reset_mac() {
+pub(super) fn reset_mac() {
     const SYSTEM_MAC_RST: u8 = 1 << 2;
     DPORT::regs()
         .core_rst_en()
@@ -347,7 +303,7 @@ fn reset_mac() {
         .modify(|r, w| unsafe { w.core_rst().bits(r.core_rst().bits() & !SYSTEM_MAC_RST) });
 }
 
-fn init_clocks() {
+pub(super) fn init_clocks() {
     // esp-idf assumes all clocks are enabled by default, and disables the following
     // bits:
     //
@@ -374,4 +330,12 @@ fn init_clocks() {
     DPORT::regs()
         .wifi_clk_en()
         .write(|w| unsafe { w.bits(u32::MAX) });
+}
+
+pub(super) fn ble_rtc_clk_init() {
+    // nothing for this target
+}
+
+pub(super) fn reset_rpa() {
+    // nothing for this target
 }

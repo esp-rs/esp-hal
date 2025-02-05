@@ -104,14 +104,17 @@ use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
-use esp_hal as hal;
-use esp_hal::peripheral::Peripheral;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
+use esp_hal::{
+    self as hal,
+    clock::RadioClockController,
+    peripheral::Peripheral,
+    peripherals::RADIO_CLK,
+};
 use hal::{
     clock::Clocks,
     rng::{Rng, Trng},
-    system::RadioClockController,
     time::Rate,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
     Blocking,
@@ -367,7 +370,7 @@ impl private::Sealed for Trng<'_> {}
 pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     timer: impl Peripheral<P = T> + 'd,
     _rng: impl Peripheral<P = R> + 'd,
-    _radio_clocks: impl Peripheral<P = hal::peripherals::RADIO_CLK> + 'd,
+    _radio_clocks: impl Peripheral<P = RADIO_CLK> + 'd,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
     const MIN_CLOCK: Rate = Rate::from_mhz(80);
@@ -478,6 +481,6 @@ pub fn wifi_set_log_verbose() {
 }
 
 fn init_clocks() {
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.init_clocks();
+    let radio_clocks = unsafe { RADIO_CLK::steal() };
+    RadioClockController::new(radio_clocks).init_clocks();
 }
