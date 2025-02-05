@@ -1,9 +1,4 @@
 //! # System Control
-//!
-//! ## Overview
-//!
-//! This `system` module defines the available radio peripherals and provides an
-//! interface to control and configure radio clocks.
 
 use core::cell::RefCell;
 
@@ -1091,43 +1086,4 @@ impl PeripheralClockControl {
 
         true
     }
-}
-
-/// Enumeration of the available radio peripherals for this chip.
-#[cfg(any(bt, ieee802154, wifi))]
-pub enum RadioPeripherals {
-    /// Represents the PHY (Physical Layer) peripheral.
-    #[cfg(phy)]
-    Phy,
-    /// Represents the Bluetooth peripheral.
-    #[cfg(bt)]
-    Bt,
-    /// Represents the WiFi peripheral.
-    #[cfg(wifi)]
-    Wifi,
-    /// Represents the IEEE 802.15.4 peripheral.
-    #[cfg(ieee802154)]
-    Ieee802154,
-}
-
-/// Control the radio peripheral clocks
-#[cfg(any(bt, ieee802154, wifi))]
-pub trait RadioClockController {
-    /// Enable the peripheral
-    fn enable(&mut self, peripheral: RadioPeripherals);
-
-    /// Disable the peripheral
-    fn disable(&mut self, peripheral: RadioPeripherals);
-
-    /// Reset the MAC
-    fn reset_mac(&mut self);
-
-    /// Do any common initial initialization needed
-    fn init_clocks(&mut self);
-
-    /// Initialize BLE RTC clocks
-    fn ble_rtc_clk_init(&mut self);
-
-    /// Reset the Resolvable Private Address (RPA).
-    fn reset_rpa(&mut self);
 }

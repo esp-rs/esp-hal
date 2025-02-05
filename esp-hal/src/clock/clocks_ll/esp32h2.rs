@@ -1,6 +1,6 @@
 use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
-    peripherals::{LP_AON, PCR, PMU},
+    peripherals::{LP_AON, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
 };
 
 const I2C_BBPLL: u8 = 0x66;
@@ -323,4 +323,77 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
     while reg_get_bit(I2C_MST_I2C0_CTRL_REG, REGI2C_RTC_BUSY) != 0 {}
 
     regi2c_disable_block(block);
+}
+
+pub(super) fn enable_phy(en: bool) {
+    MODEM_LPCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_en().bit(en));
+}
+
+fn ble_ieee802154_clock_enable(en: bool) {
+    MODEM_SYSCON::regs().clk_conf().modify(|_, w| {
+        w.clk_zb_apb_en().bit(en);
+        w.clk_zb_mac_en().bit(en)
+    });
+
+    MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
+        w.clk_bt_apb_en().bit(en);
+        w.clk_bt_en().bit(en);
+        w.clk_fe_16m_en().bit(en);
+        w.clk_fe_32m_en().bit(en);
+        w.clk_fe_adc_en().bit(en);
+        w.clk_fe_apb_en().bit(en);
+        w.clk_fe_sdm_en().bit(en)
+    });
+
+    MODEM_LPCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_coex_en().bit(en));
+}
+
+pub(super) fn enable_bt(en: bool) {
+    ble_ieee802154_clock_enable(en);
+}
+
+pub(super) fn enable_ieee802154(en: bool) {
+    ble_ieee802154_clock_enable(en);
+}
+
+pub(super) fn reset_mac() {
+    // empty
+}
+
+pub(super) fn init_clocks() {
+    unsafe {
+        let pmu = PMU::regs();
+
+        pmu.hp_sleep_icg_modem()
+            .modify(|_, w| w.hp_sleep_dig_icg_modem_code().bits(0));
+        pmu.hp_modem_icg_modem()
+            .modify(|_, w| w.hp_modem_dig_icg_modem_code().bits(1));
+        pmu.hp_active_icg_modem()
+            .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(2));
+        pmu.imm_modem_icg()
+            .write(|w| w.update_dig_icg_modem_en().set_bit());
+        pmu.imm_sleep_sysclk()
+            .write(|w| w.update_dig_icg_switch().set_bit());
+
+        MODEM_LPCON::regs().clk_conf().modify(|_, w| {
+            w.clk_i2c_mst_en()
+                .set_bit()
+                .clk_coex_en()
+                .set_bit()
+                .clk_fe_mem_en()
+                .set_bit()
+        });
+    }
+}
+
+pub(super) fn ble_rtc_clk_init() {
+    // nothing for this target (yet)
+}
+
+pub(super) fn reset_rpa() {
+    // nothing for this target (yet)
 }

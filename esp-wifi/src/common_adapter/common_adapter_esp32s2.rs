@@ -4,8 +4,8 @@ use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
 use crate::{
     binary::include::*,
     hal::{
+        peripherals::{LPWR, SYSCON},
         ram,
-        system::{RadioClockController, RadioPeripherals},
     },
 };
 
@@ -16,7 +16,6 @@ static mut G_IS_PHY_CALIBRATED: bool = false;
 static mut G_PHY_DIGITAL_REGS_MEM: *mut u32 = core::ptr::null_mut();
 static mut S_IS_PHY_REG_STORED: bool = false;
 static PHY_ACCESS_REF: AtomicU32 = AtomicU32::new(0);
-static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
 pub(crate) fn enable_wifi_power_domain() {
     const DPORT_WIFIBB_RST: u32 = 1 << 0;
@@ -33,26 +32,21 @@ pub(crate) fn enable_wifi_power_domain() {
         | DPORT_BTMAC_RST
         | DPORT_RW_BTMAC_RST;
 
-    unsafe {
-        let rtc_cntl = &*crate::hal::peripherals::LPWR::ptr();
+    LPWR::regs()
+        .dig_pwc()
+        .modify(|_, w| w.wifi_force_pd().clear_bit());
 
-        let syscon = &*crate::hal::peripherals::SYSCON::ptr();
+    SYSCON::regs()
+        .wifi_rst_en()
+        .modify(|r, w| unsafe { w.bits(r.bits() | MODEM_RESET_FIELD_WHEN_PU) });
 
-        rtc_cntl
-            .dig_pwc()
-            .modify(|_, w| w.wifi_force_pd().clear_bit());
+    SYSCON::regs()
+        .wifi_rst_en()
+        .modify(|r, w| unsafe { w.bits(r.bits() & !MODEM_RESET_FIELD_WHEN_PU) });
 
-        syscon
-            .wifi_rst_en()
-            .modify(|r, w| w.bits(r.bits() | MODEM_RESET_FIELD_WHEN_PU));
-        syscon
-            .wifi_rst_en()
-            .modify(|r, w| w.bits(r.bits() & !MODEM_RESET_FIELD_WHEN_PU));
-
-        rtc_cntl
-            .dig_iso()
-            .modify(|_, w| w.wifi_force_iso().clear_bit());
-    }
+    LPWR::regs()
+        .dig_iso()
+        .modify(|_, w| w.wifi_force_iso().clear_bit());
 }
 
 pub(crate) fn phy_mem_init() {
@@ -65,7 +59,7 @@ pub(crate) unsafe fn phy_enable() {
     let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
-            phy_enable_clock();
+            super::phy_enable_clock();
 
             if !G_IS_PHY_CALIBRATED {
                 let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
@@ -111,7 +105,7 @@ pub(crate) unsafe fn phy_disable() {
 
             // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
             // RNG
-            phy_disable_clock();
+            super::phy_disable_clock();
         });
     }
 }
@@ -130,29 +124,6 @@ fn phy_digital_regs_store() {
             phy_dig_reg_backup(true, G_PHY_DIGITAL_REGS_MEM);
             S_IS_PHY_REG_STORED = true;
         }
-    }
-}
-
-pub(crate) unsafe fn phy_enable_clock() {
-    let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::SeqCst);
-    if count == 0 {
-        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
-        // value) into `init`
-        let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-        radio_clocks.enable(RadioPeripherals::Phy);
-        trace!("phy_enable_clock done!");
-    }
-}
-
-#[allow(unused)]
-pub(crate) unsafe fn phy_disable_clock() {
-    let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::SeqCst);
-    if count == 1 {
-        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
-        // value) into `init`
-        let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-        radio_clocks.disable(RadioPeripherals::Phy);
-        trace!("phy_disable_clock done!");
     }
 }
 

@@ -13,7 +13,6 @@ crate::unstable_module! {
     pub mod efuse;
     #[cfg(feature = "psram")]
     pub mod psram;
-    pub mod radio_clocks;
     pub mod trng;
 }
 pub mod cpu_control;
