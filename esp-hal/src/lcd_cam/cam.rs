@@ -169,7 +169,7 @@ impl<'d> Camera<'d> {
     ///
     /// # Errors
     ///
-    /// A [`ConfigError`] variant will be returned if the frequency passed in
+    /// [`ConfigError::Clock`] will be returned if the frequency passed in
     /// `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
