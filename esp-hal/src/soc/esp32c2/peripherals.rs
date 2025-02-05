@@ -35,6 +35,7 @@ crate::peripherals! {
         EFUSE <= EFUSE,
         EXTMEM <= EXTMEM,
         GPIO <= GPIO,
+        I2C_ANA_MST <= I2C_ANA_MST,
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
         IO_MUX <= IO_MUX,
         LEDC <= LEDC,
