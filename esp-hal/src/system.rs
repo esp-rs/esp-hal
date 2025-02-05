@@ -741,15 +741,11 @@ impl PeripheralClockControl {
             }
             #[cfg(uart0)]
             Peripheral::Uart0 => {
-                system
-                    .uart0_conf()
-                    .modify(|_, w| w.uart0_clk_en().bit(enable));
+                system.uart(0).conf().modify(|_, w| w.clk_en().bit(enable));
             }
             #[cfg(uart1)]
             Peripheral::Uart1 => {
-                system
-                    .uart1_conf()
-                    .modify(|_, w| w.uart1_clk_en().bit(enable));
+                system.uart(1).conf().modify(|_, w| w.clk_en().bit(enable));
             }
             #[cfg(rsa)]
             Peripheral::Rsa => {
@@ -934,21 +930,13 @@ impl PeripheralClockControl {
             }
             #[cfg(uart0)]
             Peripheral::Uart0 => {
-                system
-                    .uart0_conf()
-                    .modify(|_, w| w.uart0_rst_en().set_bit());
-                system
-                    .uart0_conf()
-                    .modify(|_, w| w.uart0_rst_en().clear_bit());
+                system.uart(0).conf().modify(|_, w| w.rst_en().set_bit());
+                system.uart(0).conf().modify(|_, w| w.rst_en().clear_bit());
             }
             #[cfg(uart1)]
             Peripheral::Uart1 => {
-                system
-                    .uart1_conf()
-                    .modify(|_, w| w.uart1_rst_en().set_bit());
-                system
-                    .uart1_conf()
-                    .modify(|_, w| w.uart1_rst_en().clear_bit());
+                system.uart(1).conf().modify(|_, w| w.rst_en().set_bit());
+                system.uart(1).conf().modify(|_, w| w.rst_en().clear_bit());
             }
             #[cfg(rsa)]
             Peripheral::Rsa => {
