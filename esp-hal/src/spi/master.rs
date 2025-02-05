@@ -590,11 +590,11 @@ impl Config {
         // Maximum supported frequency is 80Mhz, minimum is about 70khz.
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
-                if self.frequency < HertzU32::kHz(70) || self.frequency > HertzU32::MHz(48) {
+                if self.frequency < Rate::from_khz(70) || self.frequency > Rate::from_mhz(48) {
                     return Err(ConfigError::UnsupportedFrequency);
                 }
             } else {
-                if self.frequency < HertzU32::kHz(70) || self.frequency > HertzU32::MHz(80) {
+                if self.frequency < Rate::from_khz(70) || self.frequency > Rate::from_mhz(80) {
                     return Err(ConfigError::UnsupportedFrequency);
                 }
             }

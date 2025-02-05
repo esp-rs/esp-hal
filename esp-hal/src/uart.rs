@@ -2530,7 +2530,7 @@ impl Info {
                     / actual_baud as u64;
                 // We tolerate deviation of 1% from the desired baud value, as it never will be
                 // exactly the same
-                if deviation > 1 as u64 {
+                if deviation > 1_u64 {
                     return Err(ConfigError::UnachievableBaudrate);
                 }
             }
