@@ -2403,7 +2403,7 @@ impl Info {
                             // esp_rom_delay_us(SOC_DELAY_RC_FAST_DIGI_SWITCH);
                             crate::rom::ets_delay_us(5);
                         }
-                    
+
                         let conf = self.regs().clk_conf();
                     } else {
                         // UART clocks are configured via PCR
@@ -2441,9 +2441,12 @@ impl Info {
         let divider_integer = divider >> 4;
         let divider_frag = (divider & 0xf) as u8;
 
-        self.regs()
-            .clkdiv()
-            .write(|w| unsafe { w.clkdiv().bits(divider_integer as _).frag().bits(divider_frag) });
+        self.regs().clkdiv().write(|w| unsafe {
+            w.clkdiv()
+                .bits(divider_integer as _)
+                .frag()
+                .bits(divider_frag)
+        });
 
         self.sync_regs();
     }
