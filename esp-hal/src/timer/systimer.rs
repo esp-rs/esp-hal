@@ -21,6 +21,7 @@ use core::fmt::Debug;
 
 use super::{Error, Timer as _};
 use crate::{
+    asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
@@ -562,10 +563,6 @@ impl super::Timer for Alarm {
             .bit_is_set()
     }
 
-    async fn wait(&self) {
-        asynch::AlarmFuture::new(self).await
-    }
-
     fn async_interrupt_handler(&self) -> InterruptHandler {
         match self.channel() {
             0 => asynch::target0_handler,
@@ -586,6 +583,10 @@ impl super::Timer for Alarm {
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler)
+    }
+
+    fn waker(&self) -> &AtomicWaker {
+        asynch::waker(self)
     }
 }
 
@@ -608,86 +609,42 @@ static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 // Async functionality of the system timer.
 mod asynch {
-    use core::{
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
     use procmacros::handler;
 
     use super::*;
-    use crate::{asynch::AtomicWaker, peripherals::SYSTIMER};
+    use crate::asynch::AtomicWaker;
 
     const NUM_ALARMS: usize = 3;
-
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [const { AtomicWaker::new() }; NUM_ALARMS];
 
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct AlarmFuture<'a> {
-        alarm: &'a Alarm,
+    pub(super) fn waker(alarm: &Alarm) -> &AtomicWaker {
+        &WAKERS[alarm.channel() as usize]
     }
 
-    impl<'a> AlarmFuture<'a> {
-        pub(crate) fn new(alarm: &'a Alarm) -> Self {
-            alarm.enable_interrupt(true);
-
-            Self { alarm }
+    #[inline]
+    fn handle_alarm(alarm: u8) {
+        Alarm {
+            comp: alarm,
+            unit: Unit::Unit0,
         }
+        .enable_interrupt(false);
 
-        fn event_bit_is_clear(&self) -> bool {
-            SYSTIMER::regs()
-                .int_ena()
-                .read()
-                .target(self.alarm.channel())
-                .bit_is_clear()
-        }
-    }
-
-    impl core::future::Future for AlarmFuture<'_> {
-        type Output = ();
-
-        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-            WAKERS[self.alarm.channel() as usize].register(ctx.waker());
-
-            if self.event_bit_is_clear() {
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
-        }
+        WAKERS[alarm as usize].wake();
     }
 
     #[handler]
     pub(crate) fn target0_handler() {
-        lock(&INT_ENA_LOCK, || {
-            SYSTIMER::regs()
-                .int_ena()
-                .modify(|_, w| w.target0().clear_bit());
-        });
-
-        WAKERS[0].wake();
+        handle_alarm(0);
     }
 
     #[handler]
     pub(crate) fn target1_handler() {
-        lock(&INT_ENA_LOCK, || {
-            SYSTIMER::regs()
-                .int_ena()
-                .modify(|_, w| w.target1().clear_bit());
-        });
-
-        WAKERS[1].wake();
+        handle_alarm(1);
     }
 
     #[handler]
     pub(crate) fn target2_handler() {
-        lock(&INT_ENA_LOCK, || {
-            SYSTIMER::regs()
-                .int_ena()
-                .modify(|_, w| w.target2().clear_bit());
-        });
-
-        WAKERS[2].wake();
+        handle_alarm(2);
     }
 }
 
