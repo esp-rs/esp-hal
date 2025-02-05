@@ -268,6 +268,7 @@ pub enum StopBits {
 /// Defines how strictly the requested baud rate must be met.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum BaudrateTolerance {
     /// Accept the closest achievable baud rate without restriction.
     #[default]
@@ -349,6 +350,7 @@ impl Default for RxConfig {
 
 impl Config {
     /// Set the baudrate tolerance of the UART configuration.
+    #[instability::unstable]
     pub fn with_baudrate_tolerance(mut self, tolerance: BaudrateTolerance) -> Self {
         self.baudrate_tolerance = match tolerance {
             BaudrateTolerance::Exact => BaudrateTolerance::Exact,

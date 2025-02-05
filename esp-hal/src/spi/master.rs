@@ -428,6 +428,7 @@ pub enum ClockSource {
 /// Defines how strictly the requested frequency must be met.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum FrequencyTolerance {
     /// Accept the closest achievable baud rate without restriction.
     #[default]
@@ -462,6 +463,7 @@ pub struct Config {
 
     /// Determines how close to the desired baud rate value the driver should
     /// set the baud rate.
+    #[builder_lite(skip_setter)]
     frequency_tolerance: FrequencyTolerance,
 
     /// The clock source
@@ -505,6 +507,23 @@ impl Config {
         self
     }
 
+    /// Set the frequency tolerance of the SPI configuration.
+    #[instability::unstable]
+    pub fn with_frequency_tolerance(mut self, tolerance: FrequencyTolerance) -> Self {
+        self.frequency_tolerance = match tolerance {
+            FrequencyTolerance::Exact => FrequencyTolerance::Exact,
+            FrequencyTolerance::Closest => FrequencyTolerance::Closest,
+            FrequencyTolerance::ErrorPercent(percentage) => {
+                assert!(percentage > 0 && percentage <= 100);
+                FrequencyTolerance::ErrorPercent(percentage)
+            }
+        };
+
+        self.reg = self.recalculate();
+
+        self
+    }
+
     /// Set the clock source of the SPI bus.
     #[instability::unstable]
     pub fn with_clock_source(mut self, clock_source: ClockSource) -> Self {
@@ -534,6 +553,11 @@ impl Config {
         // The value written to register is one lower than the used value.
 
         if self.frequency > ((apb_clk_freq / 4) * 3) {
+            // If the user requests for `Exact` frequency, which is above 80Mhz
+            if self.frequency_tolerance == FrequencyTolerance::Exact && self.frequency > HertzU32::MHz(80){
+                return Err(ConfigError::UnsupportedFrequency)
+            }
+            
             // Using APB frequency directly will give us the best result here.
             reg_val = 1 << 31;
         } else {
@@ -600,7 +624,8 @@ impl Config {
             let actual_freq = raw_apb_freq / (pre * n);
 
             match self.frequency_tolerance {
-                FrequencyTolerance::Exact if actual_freq != raw_desired_freq => {
+                FrequencyTolerance::Exact => {
+                    panic!("{} vs {}", actual_freq, raw_desired_freq);
                     return Err(ConfigError::UnsupportedFrequency)
                 }
                 FrequencyTolerance::ErrorPercent(percent) => {
@@ -623,10 +648,18 @@ impl Config {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
-        // Maximum supported frequency is 80Mhz, minimum is about 70khz.
-        if self.frequency < HertzU32::kHz(70) || self.frequency > HertzU32::MHz(80) {
-            return Err(ConfigError::UnsupportedFrequency);
-        }
+        // Maximum supported frequency is 80Mhz, minimum is about 80khz.
+        // cfg_if::cfg_if! {
+        //     if #[cfg(esp32h2)] {
+        //         if self.frequency < HertzU32::kHz(70) || self.frequency > HertzU32::MHz(48) {
+        //             return Err(ConfigError::UnsupportedFrequency);
+        //         }
+        //     } else {
+        //         if self.frequency < HertzU32::kHz(70) || self.frequency > HertzU32::MHz(80) {
+        //             return Err(ConfigError::UnsupportedFrequency);
+        //         }
+        //     }
+        // }
         Ok(())
     }
 }
