@@ -1,9 +1,4 @@
 //! # System Control
-//!
-//! ## Overview
-//!
-//! This `system` module defines the available radio peripherals and provides an
-//! interface to control and configure radio clocks.
 
 use core::cell::RefCell;
 
