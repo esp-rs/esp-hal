@@ -68,28 +68,21 @@ impl Cpu {
 
 /// Returns the raw value of the mhartid register.
 ///
-/// Safety: This method should never return UNUSED_THREAD_ID_VALUE
-#[cfg(riscv)]
+/// On RISC-V, this is the hardware thread ID.
+///
+/// On Xtensa, this returns the result of reading the PRID register logically
+/// ANDed with 0x2000, the 13th bit in the register. Espressif Xtensa chips use
+/// this bit to determine the core id.
 #[inline(always)]
 pub(crate) fn raw_core() -> usize {
-    #[cfg(multi_core)]
-    {
-        riscv::register::mhartid::read()
+    // This method must never return UNUSED_THREAD_ID_VALUE
+    cfg_if::cfg_if! {
+        if #[cfg(all(multi_core, riscv))] {
+            riscv::register::mhartid::read()
+        } else if #[cfg(all(multi_core, xtensa))] {
+            (xtensa_lx::get_processor_id() & 0x2000) as usize
+        } else {
+            0
+        }
     }
-
-    #[cfg(not(multi_core))]
-    0
-}
-
-/// Returns the result of reading the PRID register logically ANDed with 0x2000,
-/// the 13th bit in the register. Espressif Xtensa chips use this bit to
-/// determine the core id.
-///
-/// Returns either 0 or 0x2000
-///
-/// Safety: This method should never return UNUSED_THREAD_ID_VALUE
-#[cfg(xtensa)]
-#[inline(always)]
-pub(crate) fn raw_core() -> usize {
-    (xtensa_lx::get_processor_id() & 0x2000) as usize
 }
