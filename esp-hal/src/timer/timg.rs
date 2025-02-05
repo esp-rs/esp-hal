@@ -74,6 +74,7 @@ use crate::peripherals::TIMG1;
 #[cfg(any(esp32c6, esp32h2))]
 use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
+    asynch::AtomicWaker,
     clock::Clocks,
     interrupt::{self, InterruptConfigurable, InterruptHandler},
     pac::timg0::RegisterBlock,
@@ -320,10 +321,6 @@ impl super::Timer for Timer {
         self.is_interrupt_set()
     }
 
-    async fn wait(&self) {
-        asynch::TimerFuture::new(self).await
-    }
-
     fn async_interrupt_handler(&self) -> InterruptHandler {
         match (self.timer_group(), self.timer_number()) {
             (0, 0) => asynch::timg0_timer0_handler,
@@ -352,6 +349,10 @@ impl super::Timer for Timer {
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler)
+    }
+
+    fn waker(&self) -> &AtomicWaker {
+        asynch::waker(self)
     }
 }
 
@@ -802,11 +803,6 @@ where
 
 // Async functionality of the timer groups.
 mod asynch {
-    use core::{
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
     use procmacros::handler;
 
     use super::*;
@@ -819,48 +815,9 @@ mod asynch {
 
     static WAKERS: [AtomicWaker; NUM_WAKERS] = [const { AtomicWaker::new() }; NUM_WAKERS];
 
-    fn waker(timer: &Timer) -> &AtomicWaker {
+    pub(super) fn waker(timer: &Timer) -> &AtomicWaker {
         let index = (timer.timer_number() << 1) | timer.timer_group();
         &WAKERS[index as usize]
-    }
-
-    pub(crate) struct TimerFuture<'a> {
-        timer: &'a Timer,
-    }
-
-    impl<'a> TimerFuture<'a> {
-        pub(crate) fn new(timer: &'a Timer) -> Self {
-            use crate::timer::Timer;
-
-            timer.enable_interrupt(true);
-
-            Self { timer }
-        }
-
-        fn is_done(&self) -> bool {
-            self.timer.is_interrupt_set()
-        }
-    }
-
-    impl core::future::Future for TimerFuture<'_> {
-        type Output = ();
-
-        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-            waker(self.timer).register(ctx.waker());
-
-            if self.is_done() {
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
-        }
-    }
-
-    impl Drop for TimerFuture<'_> {
-        fn drop(&mut self) {
-            self.timer.clear_interrupt();
-            self.timer.set_interrupt_enabled(false);
-        }
     }
 
     #[inline]

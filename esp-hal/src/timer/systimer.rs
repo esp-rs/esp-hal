@@ -21,6 +21,7 @@ use core::fmt::Debug;
 
 use super::{Error, Timer as _};
 use crate::{
+    asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
@@ -562,10 +563,6 @@ impl super::Timer for Alarm {
             .bit_is_set()
     }
 
-    async fn wait(&self) {
-        asynch::AlarmFuture::new(self).await
-    }
-
     fn async_interrupt_handler(&self) -> InterruptHandler {
         match self.channel() {
             0 => asynch::target0_handler,
@@ -586,6 +583,10 @@ impl super::Timer for Alarm {
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler)
+    }
+
+    fn waker(&self) -> &AtomicWaker {
+        asynch::waker(self)
     }
 }
 
@@ -608,60 +609,16 @@ static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 // Async functionality of the system timer.
 mod asynch {
-    use core::{
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
     use procmacros::handler;
 
     use super::*;
     use crate::asynch::AtomicWaker;
 
     const NUM_ALARMS: usize = 3;
-
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [const { AtomicWaker::new() }; NUM_ALARMS];
 
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct AlarmFuture<'a> {
-        alarm: &'a Alarm,
-    }
-
-    impl<'a> AlarmFuture<'a> {
-        pub(crate) fn new(alarm: &'a Alarm) -> Self {
-            // For some reason, on the S2 we need to enable the interrupt before we
-            // read its status. Doing so in the other order causes the interrupt
-            // request to never be fired.
-            alarm.enable_interrupt(true);
-            Self { alarm }
-        }
-
-        fn is_done(&self) -> bool {
-            self.alarm.is_interrupt_set()
-        }
-    }
-
-    impl core::future::Future for AlarmFuture<'_> {
-        type Output = ();
-
-        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-            // Interrupts are enabled, so we need to register the waker before we check for
-            // done. Otherwise we might miss the interrupt that would wake us.
-            WAKERS[self.alarm.channel() as usize].register(ctx.waker());
-
-            if self.is_done() {
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
-        }
-    }
-
-    impl Drop for AlarmFuture<'_> {
-        fn drop(&mut self) {
-            self.alarm.enable_interrupt(false);
-            self.alarm.clear_interrupt();
-        }
+    pub(super) fn waker(alarm: &Alarm) -> &AtomicWaker {
+        &WAKERS[alarm.channel() as usize]
     }
 
     #[inline]

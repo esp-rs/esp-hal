@@ -41,9 +41,14 @@
 //! # }
 //! ```
 
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use crate::{
+    asynch::AtomicWaker,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
@@ -113,13 +118,6 @@ pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
     /// Has the timer triggered?
     fn is_interrupt_set(&self) -> bool;
 
-    /// Asynchronously wait for the timer interrupt to fire.
-    ///
-    /// Requires the correct `InterruptHandler` to be installed to function
-    /// correctly.
-    #[doc(hidden)]
-    async fn wait(&self);
-
     /// Returns the HAL provided async interrupt handler
     #[doc(hidden)]
     fn async_interrupt_handler(&self) -> InterruptHandler;
@@ -130,6 +128,9 @@ pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
     /// Configures the interrupt handler.
     #[doc(hidden)]
     fn set_interrupt_handler(&self, handler: InterruptHandler);
+
+    #[doc(hidden)]
+    fn waker(&self) -> &AtomicWaker;
 }
 
 /// A one-shot timer.
@@ -189,9 +190,53 @@ impl OneShotTimer<'_, Async> {
 
     async fn delay_async(&mut self, us: Duration) {
         unwrap!(self.schedule(us));
-        self.inner.wait().await;
+
+        WaitFuture::new(self.inner.reborrow()).await;
+
         self.stop();
         self.clear_interrupt();
+    }
+}
+
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+struct WaitFuture<'d> {
+    timer: PeripheralRef<'d, AnyTimer>,
+}
+
+impl<'d> WaitFuture<'d> {
+    fn new(timer: impl Peripheral<P = AnyTimer> + 'd) -> Self {
+        crate::into_ref!(timer);
+        // For some reason, on the S2 we need to enable the interrupt before we
+        // read its status. Doing so in the other order causes the interrupt
+        // request to never be fired.
+        timer.enable_interrupt(true);
+        Self { timer }
+    }
+
+    fn is_done(&self) -> bool {
+        self.timer.is_interrupt_set()
+    }
+}
+
+impl core::future::Future for WaitFuture<'_> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Interrupts are enabled, so we need to register the waker before we check for
+        // done. Otherwise we might miss the interrupt that would wake us.
+        self.timer.waker().register(ctx.waker());
+
+        if self.is_done() {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+impl Drop for WaitFuture<'_> {
+    fn drop(&mut self) {
+        self.timer.enable_interrupt(false);
     }
 }
 
@@ -398,10 +443,10 @@ impl Timer for AnyTimer {
             fn enable_interrupt(&self, state: bool);
             fn clear_interrupt(&self);
             fn is_interrupt_set(&self) -> bool;
-            async fn wait(&self);
             fn async_interrupt_handler(&self) -> InterruptHandler;
             fn peripheral_interrupt(&self) -> Interrupt;
             fn set_interrupt_handler(&self, handler: InterruptHandler);
+            fn waker(&self) -> &AtomicWaker;
         }
     }
 }
