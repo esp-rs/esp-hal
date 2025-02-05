@@ -1,4 +1,5 @@
 use esp_wifi_sys::include::timeval;
+use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
@@ -307,21 +308,27 @@ pub unsafe extern "C" fn floor(v: f64) -> f64 {
     libm::floor(v)
 }
 
-// TODO: previously ESP32 and S2 refcounted the PHY clock. Should we?
+static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
 pub(crate) unsafe fn phy_enable_clock() {
-    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
-    // value) into `init`
-    let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).enable_phy(true);
-    trace!("phy_enable_clock done!");
+    let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::Acquire);
+    if count == 0 {
+        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+        // value) into `init`
+        let radio_clocks = unsafe { RADIO_CLK::steal() };
+        RadioClockController::new(radio_clocks).enable_phy(true);
+        trace!("phy_enable_clock done!");
+    }
 }
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
-    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
-    // value) into `init`
-    let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).enable_phy(false);
-    trace!("phy_disable_clock done!");
+    let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::Release);
+    if count == 1 {
+        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+        // value) into `init`
+        let radio_clocks = unsafe { RADIO_CLK::steal() };
+        RadioClockController::new(radio_clocks).enable_phy(false);
+        trace!("phy_disable_clock done!");
+    }
 }
