@@ -50,20 +50,17 @@ impl ErrorType for BleConnector<'_> {
 }
 
 impl Read for BleConnector<'_> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+    fn read(&mut self, mut buf: &mut [u8]) -> Result<usize, Self::Error> {
         let mut total = 0;
-        for b in buf {
-            let mut buffer = [0u8];
-            let len = read_hci(&mut buffer);
-
-            if len == 1 {
-                *b = buffer[0];
-                total += 1;
-            } else {
-                return Ok(total);
+        while !buf.is_empty() {
+            let len = read_hci(buf);
+            if len == 0 {
+                break;
             }
-        }
 
+            buf = &mut buf[len..];
+            total += len;
+        }
         Ok(total)
     }
 }
@@ -105,24 +102,24 @@ pub(crate) mod asynch {
     }
 
     impl embedded_io_async::Read for BleConnector<'_> {
-        async fn read(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
-            if !have_hci_read_data() {
-                HciReadyEventFuture.await;
+        async fn read(&mut self, mut buf: &mut [u8]) -> Result<usize, BleConnectorError> {
+            if buf.is_empty() {
+                return Ok(0);
             }
 
             let mut total = 0;
-            for b in buf {
-                let mut buffer = [0u8];
-                let len = read_hci(&mut buffer);
-
-                if len == 1 {
-                    *b = buffer[0];
-                    total += 1;
-                } else {
-                    return Ok(total);
-                }
+            if !have_hci_read_data() {
+                HciReadyEventFuture.await;
             }
+            while !buf.is_empty() {
+                let len = read_hci(buf);
+                if len == 0 {
+                    break;
+                }
 
+                buf = &mut buf[len..];
+                total += len;
+            }
             Ok(total)
         }
     }
