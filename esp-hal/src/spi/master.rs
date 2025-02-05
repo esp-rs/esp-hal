@@ -577,7 +577,6 @@ impl Config {
                 | ((h as u32 - 1) << 6)
                 | ((n as u32 - 1) << 12)
                 | ((pre as u32 - 1) << 18);
-
         }
 
         Ok(reg_val)
@@ -698,7 +697,9 @@ where
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
+    ///
+    /// # Errors
+    /// See [`Spi::apply_config`].
     pub fn new(
         spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
         config: Config,
@@ -1017,12 +1018,11 @@ where
     /// Change the bus configuration.
     ///
     /// # Errors.
-    /// If frequency passed in config exceeds 80Mhz or is below 70kHz, a
-    /// corresponding [`ConfigError`] variant will be returned. If the user
-    /// has specified in the configuration that they want frequency to
-    /// correspond exactly or with some percentage of deviation to the
-    /// desired value, and the driver cannot reach this speed - an error
-    /// will also be returned.
+    /// If frequency passed in config exceeds
+    #[cfg_attr(not(esp32h2), doc = " 80MHz")]
+    #[cfg_attr(esp32h2, doc = " 48MHz")]
+    /// or is below 70kHz,
+    /// [`ConfigError::UnsupportedFrequency`] error will be returned.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
@@ -1110,10 +1110,10 @@ where
     ///
     /// # Errors
     ///
-    /// The corresponding error variant from [`Error`] will be returned if
+    /// [`Error::FifoSizeExeeded`] or [`Error::Unsupported`] will be returned if
     /// passed buffer is bigger than FIFO size or if buffer is empty (currently
     /// unsupported). `DataMode::Single` cannot be combined with any other
-    /// [`DataMode`].
+    /// [`DataMode`], otherwise [`Error::Unsupported`] will be returned.
     #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
@@ -1151,7 +1151,7 @@ where
     ///
     /// # Errors
     ///
-    /// The corresponding error variant from [`Error`] will be returned if
+    /// [`Error::FifoSizeExeeded`] will be returned if
     /// passed buffer is bigger than FIFO size.
     #[cfg_attr(
         esp32,
@@ -1597,7 +1597,7 @@ mod dma {
         ///
         /// # Errors.
         /// If frequency passed in config exceeds 80Mhz, a corresponding
-        /// [`ConfigError`] variant will be returned.
+        /// [`ConfigError::UnsupportedFrequency`] error will be returned.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.driver().apply_config(config)
@@ -2063,7 +2063,7 @@ mod dma {
         ///
         /// # Errors.
         /// If frequency passed in config exceeds 80Mhz, a corresponding
-        /// [`ConfigError`] variant will be returned.
+        /// [`ConfigError::UnsupportedFrequency`] error will be returned.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.spi_dma.apply_config(config)

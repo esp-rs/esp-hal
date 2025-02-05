@@ -792,8 +792,8 @@ where
     /// Note that this also changes the configuration of the TX half.
     ///
     /// # Errors
-    /// The corresponding error variant from [`ConfigError`] will be returned if
-    /// the RX FIFO threshold passed in `Config` exceeds the maximum value (
+    /// [`ConfigError::UnsupportedFifoThreshold`] will be returned if the RX
+    /// FIFO threshold passed in `Config` exceeds the maximum value (
     #[cfg_attr(esp32, doc = "0x7F")]
     #[cfg_attr(any(esp32c6, esp32h2), doc = "0xFF")]
     #[cfg_attr(any(esp32c3, esp32c2, esp32s2), doc = "0x1FF")]
@@ -1036,7 +1036,9 @@ impl<'d> Uart<'d, Blocking> {
     /// # Ok(())
     /// # }
     /// ```
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
+    /// 
+    /// # Errors
+    /// See [`Uart::apply_config`].
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -1229,12 +1231,13 @@ where
     /// Change the configuration.
     ///
     /// # Errors.
-    /// Errors will be returned in the cases described in
-    /// [`UartRx::apply_config`] and if baud rate passed in config exceeds
-    /// 5MBaud or is equal to zero. If the user has specified in the
+    /// [`ConfigError::UnsupportedFifoThreshold`] will be returned in the cases
+    /// described in [`UartRx::apply_config`] and
+    /// [`ConfigError::UnsupportedBaudrate`] if baud rate passed in config
+    /// exceeds 5MBaud or is equal to zero. If the user has specified in the
     /// configuration that they want baudrate to correspond exactly or with some
     /// percentage of deviation to the desired value, and the driver cannot
-    /// reach this speed - an error will also be returned.
+    /// reach this speed - an above mentioned error will also be returned.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
