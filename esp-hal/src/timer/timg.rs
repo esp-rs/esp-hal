@@ -535,6 +535,9 @@ impl Timer {
     fn set_interrupt_enabled(&self, state: bool) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
+                // On ESP32 and S2, the `int_ena` register is ineffective - interrupts fire even
+                // without int_ena enabling them. We use level interrupts so that we have a status
+                // bit available.
                 self.register_block()
                     .t(self.timer as usize)
                     .config()
