@@ -1,14 +1,13 @@
 use esp_hal::interrupt::InterruptHandler;
 
 use crate::{
-    hal::{interrupt, trapframe::TrapFrame, xtensa_lx, xtensa_lx_rt},
+    hal::{interrupt, time::Rate, trapframe::TrapFrame, xtensa_lx, xtensa_lx_rt},
     preempt::task_switch,
     TimeBase,
 };
 
 /// The timer responsible for time slicing.
-const TIMESLICE_FREQUENCY: fugit::HertzU64 =
-    fugit::HertzU64::from_raw(crate::CONFIG.tick_rate_hz as u64);
+const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(crate::CONFIG.tick_rate_hz);
 
 use super::TIMER;
 
@@ -18,7 +17,9 @@ pub const TICKS_PER_SECOND: u64 = 1_000_000;
 /// This function must not be called in a critical section. Doing so may return
 /// an incorrect value.
 pub(crate) fn systimer_count() -> u64 {
-    esp_hal::time::now().ticks()
+    esp_hal::time::Instant::now()
+        .duration_since_epoch()
+        .as_micros()
 }
 
 pub(crate) fn setup_timer(mut timer1: TimeBase) {
@@ -26,7 +27,7 @@ pub(crate) fn setup_timer(mut timer1: TimeBase) {
         unsafe { core::mem::transmute::<*const (), extern "C" fn()>(handler as *const ()) },
         interrupt::Priority::Priority2,
     ));
-    unwrap!(timer1.start(TIMESLICE_FREQUENCY.into_duration()));
+    unwrap!(timer1.start(TIMESLICE_FREQUENCY.as_duration()));
     TIMER.with(|timer| {
         timer1.enable_interrupt(true);
         timer.replace(timer1);

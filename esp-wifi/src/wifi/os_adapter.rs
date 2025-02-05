@@ -1500,7 +1500,9 @@ pub unsafe extern "C" fn log_writev(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn log_timestamp() -> u32 {
-    esp_hal::time::now().duration_since_epoch().to_millis() as u32
+    esp_hal::time::Instant::now()
+        .duration_since_epoch()
+        .as_millis() as u32
 }
 
 /// **************************************************************************

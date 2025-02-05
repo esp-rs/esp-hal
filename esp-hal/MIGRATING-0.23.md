@@ -266,6 +266,7 @@ All async functions now include the `_async` postfix. Additionally the non-async
 ```diff
 - let result = i2c.write_read(0x77, &[0xaa], &mut data).await;
 + let result = i2c.write_read_async(0x77, &[0xaa], &mut data).await;
+```
 
 ## ADC Changes
 
@@ -277,3 +278,17 @@ NOTE: Async support is only supported in ESP32C3 and ESP32C6 for now
 - Adc<'d, ADC>
 + Adc<'d, ADC, Blocking>
 ```
+
+## time API changes
+
+ESP-HAL no longer publicly exposes `fugit` and no longer exposes the concept of a `tick`.
+This comes with a number of changes:
+
+- The `RateExtU32` and similar traits are no longer used, which means `.kHz()` and similar suffix
+  conversions are no longer available. A number of matching constructors are available. For example,
+  instead of `1.MHz()` you need to write `Rate::from_mhz(1)`.
+- Methods on `esp_hal::time` types are named differently.
+  - Getters are prefixed with `as_`, e.g. `Duration::as_secs`.
+  - Constructors are prefixed with `from`, e.g. `Rate::from_mhz`.
+  - A number of functions that convert from a number into a time type (e.g. `Duration::from_ticks`)
+    are not available. Use conversions from physical units of time, like `Duration::from_millis`.

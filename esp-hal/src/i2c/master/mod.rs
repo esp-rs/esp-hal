@@ -29,7 +29,6 @@ use core::{
 
 use embedded_hal::i2c::Operation as EhalOperation;
 use enumset::{EnumSet, EnumSetType};
-use fugit::HertzU32;
 
 use crate::{
     asynch::AtomicWaker,
@@ -47,6 +46,7 @@ use crate::{
     peripherals::Interrupt,
     private,
     system::{PeripheralClockControl, PeripheralGuard},
+    time::Rate,
     Async,
     Blocking,
     DriverMode,
@@ -389,29 +389,21 @@ impl From<Ack> for u32 {
 }
 
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
-    frequency: HertzU32,
+    frequency: Rate,
 
     /// I2C SCL timeout period.
     timeout: BusTimeout,
 }
 
-impl core::hash::Hash for Config {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.frequency.to_Hz().hash(state); // `HertzU32` doesn't implement `Hash`
-        self.timeout.hash(state);
-    }
-}
-
 impl Default for Config {
     fn default() -> Self {
-        use fugit::RateExtU32;
         Config {
-            frequency: 100.kHz(),
+            frequency: Rate::from_khz(100),
             timeout: BusTimeout::BusCycles(10),
         }
     }
@@ -1441,8 +1433,8 @@ impl Driver<'_> {
     /// i2c_ll_set_bus_timing in ESP-IDF
     fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
-        let source_clk = clocks.i2c_clock.raw();
-        let bus_freq = clock_config.frequency.raw();
+        let source_clk = clocks.i2c_clock.as_hz();
+        let bus_freq = clock_config.frequency.as_hz();
 
         let half_cycle: u32 = source_clk / bus_freq / 2;
         let scl_low = half_cycle;
@@ -1519,8 +1511,8 @@ impl Driver<'_> {
     /// i2c_ll_set_bus_timing in ESP-IDF
     fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
-        let source_clk = clocks.apb_clock.raw();
-        let bus_freq = clock_config.frequency.raw();
+        let source_clk = clocks.apb_clock.as_hz();
+        let bus_freq = clock_config.frequency.as_hz();
 
         let half_cycle: u32 = source_clk / bus_freq / 2;
         // SCL
@@ -1577,8 +1569,8 @@ impl Driver<'_> {
     /// i2c_ll_set_bus_timing in ESP-IDF
     fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
-        let source_clk = clocks.xtal_clock.raw();
-        let bus_freq = clock_config.frequency.raw();
+        let source_clk = clocks.xtal_clock.as_hz();
+        let bus_freq = clock_config.frequency.as_hz();
 
         let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
         let sclk_freq: u32 = source_clk / clkm_div;

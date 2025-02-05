@@ -24,21 +24,24 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! use esp_hal::clock::CpuClock;
+//! use esp_hal::time::Duration;
 //!
 //! let config =
 //! esp_hal::Config::default().with_cpu_clock(CpuClock::max()).
 //!     with_watchdog(esp_hal::config::WatchdogConfig::default().
-//!     with_rwdt(esp_hal::config::WatchdogStatus::Enabled(fugit::MicrosDurationU64::millis(1000u64))));
+//!     with_rwdt(esp_hal::config::WatchdogStatus::Enabled(Duration::from_millis(1000u64))));
 //! let peripherals = esp_hal::init(config);
 //! # Ok(())
 //! # }
 //! ```
 
+use crate::time::Duration;
+
 /// Watchdog status.
 #[derive(Default, PartialEq, Clone, Copy)]
 pub enum WatchdogStatus {
     /// Enables a watchdog timer with the specified timeout.
-    Enabled(fugit::MicrosDurationU64),
+    Enabled(Duration),
     /// Disables the watchdog timer.
     #[default]
     Disabled,

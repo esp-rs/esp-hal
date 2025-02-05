@@ -45,7 +45,7 @@ fn main() -> ! {
 
     println!("esp-now version {}", esp_now.version().unwrap());
 
-    let mut next_send_time = time::now() + Duration::secs(5);
+    let mut next_send_time = time::Instant::now() + Duration::from_secs(5);
     loop {
         let r = esp_now.receive();
         if let Some(r) = r {
@@ -70,8 +70,8 @@ fn main() -> ! {
             }
         }
 
-        if time::now() >= next_send_time {
-            next_send_time = time::now() + Duration::secs(5);
+        if time::Instant::now() >= next_send_time {
+            next_send_time = time::Instant::now() + Duration::from_secs(5);
             println!("Send");
             let status = esp_now
                 .send(&BROADCAST_ADDRESS, b"0123456789")

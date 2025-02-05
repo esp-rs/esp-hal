@@ -22,8 +22,8 @@ use esp_hal::{
         LcdCam,
     },
     peripherals::Peripherals,
+    time::Rate,
 };
-use fugit::RateExtU32;
 use hil_test as _;
 
 struct Context {
@@ -78,7 +78,7 @@ mod tests {
                 polarity: Polarity::IdleHigh,
                 phase: Phase::ShiftLow,
             })
-            .with_frequency(500u32.kHz())
+            .with_frequency(Rate::from_khz(500))
             .with_format(Format {
                 enable_2byte_mode: false,
                 ..Default::default()
@@ -121,7 +121,7 @@ mod tests {
             lcd_cam.cam,
             rx_channel,
             RxEightBits::new(d0_in, d1_in, d2_in, d3_in, d4_in, d5_in, d6_in, d7_in),
-            cam::Config::default().with_frequency(1u32.MHz()),
+            cam::Config::default().with_frequency(Rate::from_mhz(1)),
         )
         .unwrap()
         .with_ctrl_pins_and_de(vsync_in, hsync_in, de_in)

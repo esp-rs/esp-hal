@@ -42,6 +42,8 @@ pub(crate) mod registers {
 }
 
 pub(crate) mod constants {
+    use crate::time::Rate;
+
     /// The default clock source for the timer group.
     pub const TIMG_DEFAULT_CLK_SRC: u8 = 1;
 
@@ -57,7 +59,7 @@ pub(crate) mod constants {
     /// The default clock source for the RMT peripheral.
     pub const RMT_CLOCK_SRC: u8 = 1;
     /// The frequency of the RMT clock source in Hertz.
-    pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(80);
+    pub const RMT_CLOCK_SRC_FREQ: Rate = Rate::from_mhz(80);
 
     /// The clock frequency for the Parallel IO peripheral in Hertz.
     pub const PARL_IO_SCLK: u32 = 240_000_000;
@@ -68,5 +70,5 @@ pub(crate) mod constants {
     pub const SOC_DRAM_HIGH: usize = 0x4088_0000;
 
     /// RC FAST Clock value (Hertz).
-    pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17_500);
+    pub const RC_FAST_CLK: Rate = Rate::from_khz(17_500);
 }

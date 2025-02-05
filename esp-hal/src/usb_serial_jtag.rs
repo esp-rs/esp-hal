@@ -88,7 +88,7 @@
 //!
 //! loop {
 //!     println!("Send keystrokes to see the interrupt trigger");
-//!     delay.delay(1.secs());
+//!     delay.delay(Duration::from_secs(1));
 //! }
 //! # }
 //!

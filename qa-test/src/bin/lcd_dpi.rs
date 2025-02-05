@@ -48,7 +48,7 @@ use esp_hal::{
     },
     main,
     peripherals::Peripherals,
-    time::RateExtU32,
+    time::Rate,
     Blocking,
 };
 use esp_println::println;
@@ -61,7 +61,7 @@ fn main() -> ! {
 
     let i2c = I2c::new(
         peripherals.I2C0,
-        i2c::master::Config::default().with_frequency(400.kHz()),
+        i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
     )
     .unwrap()
     .with_sda(peripherals.GPIO47)
@@ -140,7 +140,7 @@ fn main() -> ! {
             polarity: Polarity::IdleLow,
             phase: Phase::ShiftLow,
         })
-        .with_frequency(16.MHz())
+        .with_frequency(Rate::from_mhz(16))
         .with_format(Format {
             enable_2byte_mode: true,
             ..Default::default()

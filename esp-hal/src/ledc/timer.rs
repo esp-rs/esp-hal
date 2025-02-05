@@ -11,12 +11,10 @@
 //!
 //! LEDC uses APB as clock source.
 
-use fugit::HertzU32;
-
 #[cfg(esp32)]
 use super::HighSpeed;
 use super::{LowSpeed, Speed};
-use crate::{clock::Clocks, pac};
+use crate::{clock::Clocks, pac, time::Rate};
 
 const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
 
@@ -63,7 +61,7 @@ pub enum Number {
 
 /// Timer configuration
 pub mod config {
-    use fugit::HertzU32;
+    use crate::time::Rate;
 
     /// Number of bits reserved for duty cycle adjustment
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -162,7 +160,7 @@ pub mod config {
         /// The clock source for the timer.
         pub clock_source: CS,
         /// The frequency of the PWM signal in Hertz.
-        pub frequency: HertzU32,
+        pub frequency: Rate,
     }
 }
 
@@ -188,7 +186,7 @@ impl TimerSpeed for HighSpeed {
 /// Interface for Timers
 pub trait TimerIFace<S: TimerSpeed> {
     /// Return the frequency of the timer
-    fn freq(&self) -> Option<HertzU32>;
+    fn freq(&self) -> Option<Rate>;
 
     /// Configure the timer
     fn configure(&mut self, config: config::Config<S::ClockSourceType>) -> Result<(), Error>;
@@ -209,7 +207,7 @@ pub trait TimerIFace<S: TimerSpeed> {
 /// Interface for HW configuration of timer
 pub trait TimerHW<S: TimerSpeed> {
     /// Get the current source timer frequency from the HW
-    fn freq_hw(&self) -> Option<HertzU32>;
+    fn freq_hw(&self) -> Option<Rate>;
 
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32);
@@ -234,7 +232,7 @@ where
     Timer<'a, S>: TimerHW<S>,
 {
     /// Return the frequency of the timer
-    fn freq(&self) -> Option<HertzU32> {
+    fn freq(&self) -> Option<Rate> {
         self.freq_hw()
     }
 
@@ -244,9 +242,9 @@ where
         self.clock_source = Some(config.clock_source);
 
         // TODO: we should return some error here if `unwrap()` fails
-        let src_freq: u32 = self.freq().unwrap().to_Hz();
+        let src_freq: u32 = self.freq().unwrap().as_hz();
         let precision = 1 << config.duty as u32;
-        let frequency: u32 = config.frequency.raw();
+        let frequency: u32 = config.frequency.as_hz();
         self.frequency = frequency;
 
         let mut divisor = ((src_freq as u64) << 8) / frequency as u64 / precision as u64;
@@ -309,7 +307,7 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
 /// Timer HW implementation for LowSpeed timers
 impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
     /// Get the current source timer frequency from the HW
-    fn freq_hw(&self) -> Option<HertzU32> {
+    fn freq_hw(&self) -> Option<Rate> {
         self.clock_source.map(|source| match source {
             LSClockSource::APBClk => {
                 let clocks = Clocks::get();
@@ -372,7 +370,7 @@ impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
 /// Timer HW implementation for HighSpeed timers
 impl TimerHW<HighSpeed> for Timer<'_, HighSpeed> {
     /// Get the current source timer frequency from the HW
-    fn freq_hw(&self) -> Option<HertzU32> {
+    fn freq_hw(&self) -> Option<Rate> {
         self.clock_source.map(|source| match source {
             HSClockSource::APBClk => {
                 let clocks = Clocks::get();

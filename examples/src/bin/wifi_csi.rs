@@ -64,7 +64,7 @@ fn main() -> ! {
     }]);
     socket_set.add(dhcp_socket);
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {

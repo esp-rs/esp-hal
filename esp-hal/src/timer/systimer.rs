@@ -19,15 +19,15 @@
 
 use core::fmt::Debug;
 
-use fugit::{Instant, MicrosDurationU64};
-
 use super::{Error, Timer as _};
 use crate::{
+    asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     sync::{lock, RawMutex},
     system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    time::{Duration, Instant},
     Cpu,
 };
 
@@ -72,29 +72,33 @@ impl SystemTimer {
     }
 
     /// Returns the tick frequency of the underlying timer unit.
+    #[inline]
     pub fn ticks_per_second() -> u64 {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
-                const MULTIPLIER: u64 = 2_000_000;
+                const MULTIPLIER: u32 = 2;
+                const DIVIDER: u32 = 1;
             } else if #[cfg(esp32h2)] {
                 // The counters and comparators are driven using `XTAL_CLK`.
                 // The average clock frequency is fXTAL_CLK/2, which is 16 MHz.
                 // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u64 = 10_000_000 / 20;
+                const MULTIPLIER: u32 = 1;
+                const DIVIDER: u32 = 2;
             } else {
                 // The counters and comparators are driven using `XTAL_CLK`.
                 // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
                 // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u64 = 10_000_000 / 25;
+                const MULTIPLIER: u32 = 4;
+                const DIVIDER: u32 = 10;
             }
         }
-        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().to_MHz();
-        xtal_freq_mhz as u64 * MULTIPLIER
+        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().as_hz();
+        ((xtal_freq_mhz * MULTIPLIER) / DIVIDER) as u64
     }
 
     /// Create a new instance.
     pub fn new(_systimer: SYSTIMER) -> Self {
-        // Don't reset Systimer as it will break `time::now`, only enable it
+        // Don't reset Systimer as it will break `time::Instant::now`, only enable it
         PeripheralClockControl::enable(PeripheralEnable::Systimer);
 
         #[cfg(soc_etm)]
@@ -125,7 +129,7 @@ impl SystemTimer {
     ///
     /// - Disabling a `Unit` whilst [`Alarm`]s are using it will affect the
     ///   [`Alarm`]s operation.
-    /// - Disabling Unit0 will affect [`now`](crate::time::now).
+    /// - Disabling Unit0 will affect [`Instant::now`].
     pub unsafe fn configure_unit(unit: Unit, config: UnitConfig) {
         unit.configure(config)
     }
@@ -140,8 +144,7 @@ impl SystemTimer {
     ///
     /// - Modifying a unit's count whilst [`Alarm`]s are using it may cause
     ///   unexpected behaviour
-    /// - Any modification of the unit0 count will affect
-    ///   [`now`](crate::time::now).
+    /// - Any modification of the unit0 count will affect [`Instant::now`]
     pub unsafe fn set_unit_value(unit: Unit, value: u64) {
         unit.set_count(value)
     }
@@ -475,7 +478,7 @@ impl super::Timer for Alarm {
         self.is_enabled()
     }
 
-    fn now(&self) -> Instant<u64, 1, 1_000_000> {
+    fn now(&self) -> Instant {
         // This should be safe to access from multiple contexts; worst case
         // scenario the second accessor ends up reading an older time stamp.
 
@@ -483,13 +486,13 @@ impl super::Timer for Alarm {
 
         let us = ticks / (SystemTimer::ticks_per_second() / 1_000_000);
 
-        Instant::<u64, 1, 1_000_000>::from_ticks(us)
+        Instant::from_ticks(us)
     }
 
-    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error> {
+    fn load_value(&self, value: Duration) -> Result<(), Error> {
         let mode = self.mode();
 
-        let us = value.ticks();
+        let us = value.as_micros();
         let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000);
 
         if matches!(mode, ComparatorMode::Period) {
@@ -560,10 +563,6 @@ impl super::Timer for Alarm {
             .bit_is_set()
     }
 
-    async fn wait(&self) {
-        asynch::AlarmFuture::new(self).await
-    }
-
     fn async_interrupt_handler(&self) -> InterruptHandler {
         match self.channel() {
             0 => asynch::target0_handler,
@@ -584,6 +583,10 @@ impl super::Timer for Alarm {
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler)
+    }
+
+    fn waker(&self) -> &AtomicWaker {
+        asynch::waker(self)
     }
 }
 
@@ -606,86 +609,42 @@ static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 // Async functionality of the system timer.
 mod asynch {
-    use core::{
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
     use procmacros::handler;
 
     use super::*;
-    use crate::{asynch::AtomicWaker, peripherals::SYSTIMER};
+    use crate::asynch::AtomicWaker;
 
     const NUM_ALARMS: usize = 3;
-
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [const { AtomicWaker::new() }; NUM_ALARMS];
 
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct AlarmFuture<'a> {
-        alarm: &'a Alarm,
+    pub(super) fn waker(alarm: &Alarm) -> &AtomicWaker {
+        &WAKERS[alarm.channel() as usize]
     }
 
-    impl<'a> AlarmFuture<'a> {
-        pub(crate) fn new(alarm: &'a Alarm) -> Self {
-            alarm.enable_interrupt(true);
-
-            Self { alarm }
+    #[inline]
+    fn handle_alarm(alarm: u8) {
+        Alarm {
+            comp: alarm,
+            unit: Unit::Unit0,
         }
+        .enable_interrupt(false);
 
-        fn event_bit_is_clear(&self) -> bool {
-            SYSTIMER::regs()
-                .int_ena()
-                .read()
-                .target(self.alarm.channel())
-                .bit_is_clear()
-        }
-    }
-
-    impl core::future::Future for AlarmFuture<'_> {
-        type Output = ();
-
-        fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-            WAKERS[self.alarm.channel() as usize].register(ctx.waker());
-
-            if self.event_bit_is_clear() {
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
-        }
+        WAKERS[alarm as usize].wake();
     }
 
     #[handler]
     pub(crate) fn target0_handler() {
-        lock(&INT_ENA_LOCK, || {
-            SYSTIMER::regs()
-                .int_ena()
-                .modify(|_, w| w.target0().clear_bit());
-        });
-
-        WAKERS[0].wake();
+        handle_alarm(0);
     }
 
     #[handler]
     pub(crate) fn target1_handler() {
-        lock(&INT_ENA_LOCK, || {
-            SYSTIMER::regs()
-                .int_ena()
-                .modify(|_, w| w.target1().clear_bit());
-        });
-
-        WAKERS[1].wake();
+        handle_alarm(1);
     }
 
     #[handler]
     pub(crate) fn target2_handler() {
-        lock(&INT_ENA_LOCK, || {
-            SYSTIMER::regs()
-                .int_ena()
-                .modify(|_, w| w.target2().clear_bit());
-        });
-
-        WAKERS[2].wake();
+        handle_alarm(2);
     }
 }
 
@@ -713,7 +672,6 @@ pub mod etm {
     //! #     Level,
     //! #     Pull,
     //! # };
-    //! # use fugit::ExtU32;
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
     //! let etm = Etm::new(peripherals.SOC_ETM);
     //! let gpio_ext = Channels::new(peripherals.GPIO_SD);

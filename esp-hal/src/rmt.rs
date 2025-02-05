@@ -56,8 +56,8 @@
 //! # use esp_hal::rmt::TxChannelConfig;
 //! # use esp_hal::rmt::Rmt;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
-#![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
-#![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
+#![cfg_attr(esp32h2, doc = "let freq = Rate::from_mhz(32);")]
+#![cfg_attr(not(esp32h2), doc = "let freq = Rate::from_mhz(80);")]
 //! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //! let mut channel = rmt
 //!     .channel0
@@ -84,8 +84,8 @@
 //! # use esp_hal::rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator};
 //!
 //! // Configure frequency based on chip type
-#![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
-#![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
+#![cfg_attr(esp32h2, doc = "let freq = Rate::from_mhz(32);")]
+#![cfg_attr(not(esp32h2), doc = "let freq = Rate::from_mhz(80);")]
 //! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //!
 //! let tx_config = TxChannelConfig::default().with_clk_divider(255);
@@ -124,8 +124,8 @@
 //! );
 //!
 //! // Configure frequency based on chip type
-#![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
-#![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
+#![cfg_attr(esp32h2, doc = "let freq = Rate::from_mhz(32);")]
+#![cfg_attr(not(esp32h2), doc = "let freq = Rate::from_mhz(80);")]
 //! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //!
 //! let rx_config = RxChannelConfig::default()
@@ -227,7 +227,6 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use fugit::HertzU32;
 
 use crate::{
     asynch::AtomicWaker,
@@ -240,6 +239,7 @@ use crate::{
     peripherals::{Interrupt, RMT},
     soc::constants,
     system::{self, GenericPeripheralGuard},
+    time::Rate,
     Async,
     Blocking,
 };
@@ -393,7 +393,7 @@ where
 {
     pub(crate) fn new_internal(
         peripheral: impl Peripheral<P = RMT> + 'd,
-        frequency: HertzU32,
+        frequency: Rate,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
         me.configure_clock(frequency)?;
@@ -401,8 +401,8 @@ where
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
-        if frequency != HertzU32::MHz(80) {
+    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
+        if frequency != Rate::from_mhz(80) {
             return Err(Error::UnreachableTargetFrequency);
         }
 
@@ -412,7 +412,7 @@ where
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
-    fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
+    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
 
         if frequency > src_clock {
@@ -433,10 +433,7 @@ where
 
 impl<'d> Rmt<'d, Blocking> {
     /// Create a new RMT instance
-    pub fn new(
-        peripheral: impl Peripheral<P = RMT> + 'd,
-        frequency: HertzU32,
-    ) -> Result<Self, Error> {
+    pub fn new(peripheral: impl Peripheral<P = RMT> + 'd, frequency: Rate) -> Result<Self, Error> {
         Self::new_internal(peripheral, frequency)
     }
 

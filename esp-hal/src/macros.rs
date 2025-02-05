@@ -11,7 +11,7 @@ macro_rules! before_snippet {
         r#"
 # #![no_std]
 # use procmacros::handler;
-# use esp_hal::{interrupt::{self, InterruptConfigurable}, time::{RateExtU32 as _, ExtU64 as _}};
+# use esp_hal::{interrupt::{self, InterruptConfigurable}, time::{Duration, Instant, Rate}};
 # macro_rules! println {
 #     ($($tt:tt)*) => { };
 # }

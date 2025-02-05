@@ -57,11 +57,11 @@
 //! // initialize peripheral
 #![cfg_attr(
     esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(40.MHz())?;"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;"
 )]
 #![cfg_attr(
     not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(32.MHz())?;"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
 )]
 //! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 //!
@@ -75,8 +75,8 @@
 //! // start timer with timestamp values in the range of 0..=99 and a frequency
 //! // of 20 kHz
 //! let timer_clock_cfg = clock_cfg
-//!     .timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20.kHz())?;
-//! mcpwm.timer0.start(timer_clock_cfg);
+//!     .timer_clock_with_frequency(99, PwmWorkingMode::Increase,
+//! Rate::from_khz(20))?; mcpwm.timer0.start(timer_clock_cfg);
 //!
 //! // pin will be high 50% of the time
 //! pwm_pin.set_timestamp(50);
@@ -84,7 +84,6 @@
 //! # }
 //! ```
 
-use fugit::HertzU32;
 use operator::Operator;
 use timer::Timer;
 
@@ -94,6 +93,7 @@ use crate::{
     pac,
     peripheral::{Peripheral, PeripheralRef},
     system::{self, PeripheralGuard},
+    time::Rate,
 };
 
 /// MCPWM operators
@@ -190,7 +190,7 @@ impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
 /// Clock configuration of the MCPWM peripheral
 #[derive(Copy, Clone)]
 pub struct PeripheralClockConfig {
-    frequency: HertzU32,
+    frequency: Rate,
     prescaler: u8,
 }
 
@@ -236,7 +236,7 @@ impl PeripheralClockConfig {
     /// Only divisors of the input clock (`160 Mhz / 1`, `160 Mhz / 2`, ...,
     /// `160 Mhz / 256`) are representable exactly. Other target frequencies
     /// will be rounded up to the next divisor.
-    pub fn with_frequency(target_freq: HertzU32) -> Result<Self, FrequencyError> {
+    pub fn with_frequency(target_freq: Rate) -> Result<Self, FrequencyError> {
         let clocks = Clocks::get();
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -250,7 +250,7 @@ impl PeripheralClockConfig {
             }
         }
 
-        if target_freq.raw() == 0 || target_freq > source_clock {
+        if target_freq.as_hz() == 0 || target_freq > source_clock {
             return Err(FrequencyError);
         }
 
@@ -266,7 +266,7 @@ impl PeripheralClockConfig {
     ///
     /// ### Note:
     /// The actual value is rounded down to the nearest `u32` value
-    pub fn frequency(&self) -> HertzU32 {
+    pub fn frequency(&self) -> Rate {
         self.frequency
     }
 
@@ -301,7 +301,7 @@ impl PeripheralClockConfig {
         &self,
         period: u16,
         mode: timer::PwmWorkingMode,
-        target_freq: HertzU32,
+        target_freq: Rate,
     ) -> Result<timer::TimerClockConfig, FrequencyError> {
         timer::TimerClockConfig::with_frequency(self, period, mode, target_freq)
     }

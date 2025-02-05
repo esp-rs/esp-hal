@@ -2,7 +2,6 @@
 // on the same version until documentation is released and the code can be
 // reasoned about.
 
-use fugit::HertzU32;
 use strum::FromRepr;
 
 use crate::{
@@ -24,6 +23,7 @@ use crate::{
     rtc_cntl::RtcClock,
     soc::efuse::Efuse,
     system::RadioPeripherals,
+    time::Rate,
 };
 
 const I2C_DIG_REG: u8 = 0x6d;
@@ -1359,13 +1359,13 @@ pub(crate) enum RtcFastClock {
 }
 
 impl Clock for RtcFastClock {
-    fn frequency(&self) -> HertzU32 {
+    fn frequency(&self) -> Rate {
         match self {
             RtcFastClock::RtcFastClockXtalD2 => {
                 // TODO: Is the value correct?
-                HertzU32::Hz(40_000_000 / 2)
+                Rate::from_hz(40_000_000 / 2)
             }
-            RtcFastClock::RtcFastClockRcFast => HertzU32::Hz(17_500_000),
+            RtcFastClock::RtcFastClockRcFast => Rate::from_hz(17_500_000),
         }
     }
 }
@@ -1385,12 +1385,12 @@ pub enum RtcSlowClock {
 }
 
 impl Clock for RtcSlowClock {
-    fn frequency(&self) -> HertzU32 {
+    fn frequency(&self) -> Rate {
         match self {
-            RtcSlowClock::RtcSlowClockRcSlow => HertzU32::Hz(136_000),
-            RtcSlowClock::RtcSlowClock32kXtal => HertzU32::Hz(32_768),
-            RtcSlowClock::RtcSlowClock32kRc => HertzU32::Hz(32_768),
-            RtcSlowClock::RtcSlowOscSlow => HertzU32::Hz(32_768),
+            RtcSlowClock::RtcSlowClockRcSlow => Rate::from_hz(136_000),
+            RtcSlowClock::RtcSlowClock32kXtal => Rate::from_hz(32_768),
+            RtcSlowClock::RtcSlowClock32kRc => Rate::from_hz(32_768),
+            RtcSlowClock::RtcSlowOscSlow => Rate::from_hz(32_768),
         }
     }
 }
@@ -1671,7 +1671,7 @@ impl RtcClock {
             }
         };
 
-        let us_time_estimate = (HertzU32::MHz(slowclk_cycles) / expected_freq).to_Hz();
+        let us_time_estimate = (Rate::from_mhz(slowclk_cycles) / expected_freq).as_hz();
 
         // Start calibration
         timg0
@@ -1814,7 +1814,7 @@ impl RtcClock {
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
         (timg0.rtccalicfg1().read().rtc_cali_value().bits()
-            * (RtcSlowClock::RtcSlowClockRcSlow.frequency().to_Hz() / 100))
+            * (RtcSlowClock::RtcSlowClockRcSlow.frequency().as_hz() / 100))
             / 1_000_000
     }
 }

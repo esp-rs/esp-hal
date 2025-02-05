@@ -49,7 +49,7 @@ const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 const HOST_IP: &str = env!("HOST_IP");
 
-const TEST_DURATION: Duration = Duration::secs(15);
+const TEST_DURATION: Duration = Duration::from_secs(15);
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
 const IO_BUFFER_SIZE: usize = 1024;
@@ -87,7 +87,7 @@ fn main() -> ! {
     }]);
     socket_set.add(dhcp_socket);
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
@@ -170,7 +170,7 @@ fn test_download<'a, D: smoltcp::phy::Device>(
     let mut buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let deadline = time::now() + TEST_DURATION;
+    let deadline = time::Instant::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Ok(len) = socket.read(&mut buf) {
@@ -179,12 +179,12 @@ fn test_download<'a, D: smoltcp::phy::Device>(
             break;
         }
 
-        if time::now() > deadline {
+        if time::Instant::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
+    let kbps = (total + 512) / 1024 / TEST_DURATION.as_secs();
     println!("download: {} kB/s", kbps);
 
     socket.disconnect();
@@ -204,7 +204,7 @@ fn test_upload<'a, D: smoltcp::phy::Device>(
     let buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let deadline = time::now() + TEST_DURATION;
+    let deadline = time::Instant::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Ok(len) = socket.write(&buf) {
@@ -213,12 +213,12 @@ fn test_upload<'a, D: smoltcp::phy::Device>(
             break;
         }
 
-        if time::now() > deadline {
+        if time::Instant::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
+    let kbps = (total + 512) / 1024 / TEST_DURATION.as_secs();
     println!("upload: {} kB/s", kbps);
 
     socket.disconnect();
@@ -239,7 +239,7 @@ fn test_upload_download<'a, D: smoltcp::phy::Device>(
     let mut rx_buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let deadline = time::now() + TEST_DURATION;
+    let deadline = time::Instant::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Err(_) = socket.write(&tx_buf) {
@@ -254,12 +254,12 @@ fn test_upload_download<'a, D: smoltcp::phy::Device>(
             break;
         }
 
-        if time::now() > deadline {
+        if time::Instant::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
+    let kbps = (total + 512) / 1024 / TEST_DURATION.as_secs();
     println!("upload+download: {} kB/s", kbps);
 
     socket.disconnect();

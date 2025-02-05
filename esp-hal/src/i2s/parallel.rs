@@ -66,7 +66,7 @@
 //! let mut parallel = I2sParallel::new(
 //!     i2s,
 //!     dma_channel,
-//!     1.MHz(),
+//!     Rate::from_mhz(1),
 //!     pins,
 //!     clock,
 //! ).into_async();
@@ -102,8 +102,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use fugit::HertzU32;
-
 use crate::{
     dma::{
         asynch::DmaTxFuture,
@@ -125,6 +123,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{I2S0, I2S1},
     system::PeripheralGuard,
+    time::Rate,
     Async,
     Blocking,
     DriverMode,
@@ -249,7 +248,7 @@ impl<'d> I2sParallel<'d, Blocking> {
     pub fn new<CH>(
         i2s: impl Peripheral<P = impl Instance> + 'd,
         channel: impl Peripheral<P = CH> + 'd,
-        frequency: impl Into<fugit::HertzU32>,
+        frequency: Rate,
         mut pins: impl TxPins<'d>,
         clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
     ) -> Self
@@ -421,7 +420,7 @@ pub struct I2sClockDividers {
     pub numerator: u32,
 }
 
-fn calculate_clock(sample_rate: impl Into<fugit::HertzU32>, data_bits: u8) -> I2sClockDividers {
+fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
     // this loosely corresponds to `i2s_std_calculate_clock` and
     // `i2s_ll_tx_set_mclk` in esp-idf
     //
@@ -430,8 +429,7 @@ fn calculate_clock(sample_rate: impl Into<fugit::HertzU32>, data_bits: u8) -> I2
 
     let sclk = crate::soc::constants::I2S_SCLK; // for now it's fixed 160MHz and 96MHz (just H2)
 
-    let rate_hz: HertzU32 = sample_rate.into();
-    let rate = rate_hz.raw();
+    let rate = sample_rate.as_hz();
 
     let mclk = rate * 2;
     let bclk_divider: u32 = if data_bits == 8 { 2 } else { 1 };
@@ -600,9 +598,7 @@ pub trait Instance: Peripheral<P = Self> + DmaEligible + Into<AnyI2s> + 'static 
         });
     }
 
-    fn setup(&self, frequency: impl Into<fugit::HertzU32>, bits: u8) {
-        let frequency: HertzU32 = frequency.into();
-
+    fn setup(&self, frequency: Rate, bits: u8) {
         self.set_clock(calculate_clock(frequency, bits));
 
         // Initialize I2S dev

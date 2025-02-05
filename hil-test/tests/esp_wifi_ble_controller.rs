@@ -72,7 +72,7 @@ mod tests {
         // so if we don't get the expected response we'll timeout and fail
         let mut buf = [0u8; 255];
         loop {
-            let len = connector.read(&mut buf).unwrap();
+            let len = read_packet(&mut connector, &mut buf);
             if len == 7 {
                 assert_eq!(buf[0], 4, "Expected packet type = 4 (EVENT)");
                 assert_eq!(buf[1], 14, "Expected event code = 14 (COMMAND_COMPLETE)");
@@ -89,5 +89,23 @@ mod tests {
                 break;
             }
         }
+    }
+}
+
+fn read_packet(connector: &mut BleConnector, buf: &mut [u8]) -> usize {
+    // Read header
+    read_all(connector, &mut buf[..3]);
+
+    // Read payload
+    let payload_len = buf[2] as usize;
+    read_all(connector, &mut buf[3..][..payload_len]);
+
+    3 + payload_len
+}
+
+fn read_all(connector: &mut BleConnector, mut buf: &mut [u8]) {
+    while !buf.is_empty() {
+        let len = connector.read(buf).unwrap();
+        buf = &mut buf[len..];
     }
 }

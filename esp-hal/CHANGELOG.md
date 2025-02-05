@@ -8,10 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - SPI: Added support for 3-wire SPI (#2919)
 - UART: Add separate config for Rx and Tx (#2965)
 - Added accessor methods to config structs (#3011)
+- `esp_hal::time::{Rate, Duration, Instant}` (#3083)
 - Async support for ADC oneshot reads for ESP32C2, ESP32C3, ESP32C6 and ESP32H2 (#2925, #3082)
+- `ESP_HAL_CONFIG_XTAL_FREQUENCY` configuration. For now, chips other than ESP32 and ESP32-C2 have a single option only. (#3054)
 
 ### Changed
 
@@ -33,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`) (#3001)
 - Migrate AES driver to DMA move API (#3084)
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
+- The `esp_hal::time` module no longer reexports `fugit` types (#3083)
 
 - I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
 
@@ -42,7 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue that caused LCD_CAM drivers to turn off their clocks unexpectedly (#3007)
 - Fixed an issue where DMA-driver peripherals started transferring before the data was ready (#3003)
 - Fixed an issue where ADC Curve Calibration overflows when converting from a value > 3095 (#3061)
-
+- Fixed an issue on ESP32 and S2 where short asynchronous Timer delays would never resolve (#3093)
+- ESP32-S2: Fixed linker script (#3096)
 
 ### Removed
 
@@ -50,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OutputOpenDrain has been removed (#3029)
 - The fields of config structs are no longer public (#3011)
 - Removed the dysfunctional `DmaChannel::set_priority` function (#3088)
+- `esp_hal::time::now()`, which has been replaced by `esp_hal::time::Instant::now()` (#3083)
 
 ## [0.23.1] - 2025-01-15
 
