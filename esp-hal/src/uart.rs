@@ -2398,7 +2398,7 @@ impl Info {
                             crate::peripherals::LPWR::regs()
                                 .clk_conf()
                                 .modify(|_, w| w.dig_clk8m_en().variant(true));
-                            // esp_rom_delay_us(SOC_DELAY_RC_FAST_DIGI_SWITCH);
+                            // small delay whilst the clock source changes (SOC_DELAY_RC_FAST_DIGI_SWITCH from esp-idf)
                             crate::rom::ets_delay_us(5);
                         }
 
