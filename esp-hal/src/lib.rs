@@ -184,6 +184,7 @@ pub mod peripheral;
 mod reg_access;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
+pub mod system;
 pub mod time;
 #[cfg(any(uart0, uart1, uart2))]
 pub mod uart;
@@ -273,8 +274,6 @@ unstable_module! {
     pub mod sha;
     #[doc(hidden)]
     pub mod sync;
-    #[cfg(any(dport, hp_sys, pcr, system))]
-    pub mod system;
     #[cfg(any(systimer, timg0, timg1))]
     pub mod timer;
     #[cfg(touch)]
