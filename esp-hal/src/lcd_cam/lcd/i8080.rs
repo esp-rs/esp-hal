@@ -134,6 +134,11 @@ where
     }
 
     /// Applies configuration.
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::Clock`] variant will be returned if the frequency passed
+    /// in `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf

@@ -166,6 +166,11 @@ impl<'d> Camera<'d> {
     }
 
     /// Applies the configuration to the camera interface.
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::Clock`] will be returned if the frequency passed in
+    /// `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         let (i, divider) = calculate_clkm(

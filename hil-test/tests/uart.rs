@@ -44,6 +44,35 @@ mod tests {
     }
 
     #[test]
+    fn test_different_tolerance(mut ctx: Context) {
+        ctx.uart
+            .apply_config(
+                &uart::Config::default()
+                    .with_baudrate(19_200)
+                    .with_baudrate_tolerance(uart::BaudrateTolerance::Exact),
+            )
+            .unwrap();
+
+        ctx.uart.write_bytes(&[0x42]).unwrap();
+        let mut byte = [0u8; 1];
+        ctx.uart.read_bytes(&mut byte).unwrap();
+        assert_eq!(byte[0], 0x42);
+
+        ctx.uart
+            .apply_config(
+                &uart::Config::default()
+                    .with_baudrate(9600)
+                    .with_baudrate_tolerance(uart::BaudrateTolerance::ErrorPercent(10)),
+            )
+            .unwrap();
+
+        ctx.uart.write_bytes(&[0x42]).unwrap();
+        let mut byte = [0u8; 1];
+        ctx.uart.read_bytes(&mut byte).unwrap();
+        assert_eq!(byte[0], 0x42);
+    }
+
+    #[test]
     fn test_send_receive_buffer(mut ctx: Context) {
         const BUF_SIZE: usize = 128; // UART_FIFO_SIZE
 
@@ -73,6 +102,8 @@ mod tests {
             (9600, ClockSource::RefTick),
             (921_600, ClockSource::Apb),
             (2_000_000, ClockSource::Apb),
+            (3_500_000, ClockSource::Apb),
+            (5_000_000, ClockSource::Apb),
         ];
 
         let mut byte_to_write = 0xA5;

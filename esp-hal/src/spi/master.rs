@@ -585,6 +585,21 @@ impl Config {
     fn raw_clock_reg_value(&self) -> Result<u32, ConfigError> {
         self.reg
     }
+
+    fn validate(&self) -> Result<(), ConfigError> {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                if self.frequency < Rate::from_khz(70) || self.frequency > Rate::from_mhz(48) {
+                    return Err(ConfigError::UnsupportedFrequency);
+                }
+            } else {
+                if self.frequency < Rate::from_khz(70) || self.frequency > Rate::from_mhz(80) {
+                    return Err(ConfigError::UnsupportedFrequency);
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -602,7 +617,22 @@ struct SpiPinGuard {
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum ConfigError {}
+pub enum ConfigError {
+    /// The requested frequency is not supported.
+    UnsupportedFrequency,
+}
+
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ConfigError::UnsupportedFrequency => {
+                write!(f, "The requested frequency is not supported")
+            }
+        }
+    }
+}
 
 /// SPI peripheral driver
 ///
@@ -666,7 +696,10 @@ where
 
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
+    ///
+    /// # Errors
+    ///
+    /// See [`Spi::apply_config`].
     pub fn new(
         spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
         config: Config,
@@ -983,7 +1016,14 @@ where
     }
 
     /// Change the bus configuration.
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
+    ///
+    /// # Errors
+    ///
+    /// If frequency passed in config exceeds
+    #[cfg_attr(not(esp32h2), doc = " 80MHz")]
+    #[cfg_attr(esp32h2, doc = " 48MHz")]
+    /// or is below 70kHz,
+    /// [`ConfigError::UnsupportedFrequency`] error will be returned.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
@@ -1071,9 +1111,10 @@ where
     ///
     /// # Errors
     ///
-    /// The corresponding error variant from [`Error`] will be returned if
+    /// [`Error::FifoSizeExeeded`] or [`Error::Unsupported`] will be returned if
     /// passed buffer is bigger than FIFO size or if buffer is empty (currently
-    /// unsupported).
+    /// unsupported). `DataMode::Single` cannot be combined with any other
+    /// [`DataMode`], otherwise [`Error::Unsupported`] will be returned.
     #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
@@ -1111,7 +1152,7 @@ where
     ///
     /// # Errors
     ///
-    /// The corresponding error variant from [`Error`] will be returned if
+    /// [`Error::FifoSizeExeeded`] will be returned if
     /// passed buffer is bigger than FIFO size.
     #[cfg_attr(
         esp32,
@@ -1554,7 +1595,14 @@ mod dma {
         }
 
         /// Change the bus configuration.
-        // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
+        ///
+        /// # Errors
+        ///
+        /// If frequency passed in config exceeds
+        #[cfg_attr(not(esp32h2), doc = " 80MHz")]
+        #[cfg_attr(esp32h2, doc = " 48MHz")]
+        /// or is below 70kHz,
+        /// [`ConfigError::UnsupportedFrequency`] error will be returned.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.driver().apply_config(config)
@@ -2017,7 +2065,14 @@ mod dma {
         }
 
         /// Change the bus configuration.
-        // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
+        ///
+        /// # Errors
+        ///
+        /// If frequency passed in config exceeds
+        #[cfg_attr(not(esp32h2), doc = " 80MHz")]
+        #[cfg_attr(esp32h2, doc = " 48MHz")]
+        /// or is below 70kHz,
+        /// [`ConfigError::UnsupportedFrequency`] error will be returned.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
             self.spi_dma.apply_config(config)
@@ -3064,6 +3119,7 @@ impl Driver {
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
+        config.validate()?;
         self.ch_bus_freq(config)?;
         self.set_bit_order(config.read_bit_order, config.write_bit_order);
         self.set_data_mode(config.mode);

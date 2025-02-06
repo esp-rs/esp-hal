@@ -1262,7 +1262,6 @@ impl<'d> Output<'d> {
     }
 
     /// Change the configuration.
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
     pub fn apply_config(&mut self, config: &OutputConfig) {
         self.pin.apply_output_config(config)
@@ -1451,7 +1450,6 @@ impl<'d> Input<'d> {
     }
 
     /// Change the configuration.
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     pub fn apply_config(&mut self, config: &InputConfig) {
         self.pin.apply_input_config(config)
     }
