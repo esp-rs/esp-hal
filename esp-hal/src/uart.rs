@@ -789,6 +789,7 @@ where
     /// Note that this also changes the configuration of the TX half.
     ///
     /// # Errors
+    ///
     /// [`ConfigError::UnsupportedFifoThreshold`] will be returned if the RX
     /// FIFO threshold passed in `Config` exceeds the maximum value (
     #[cfg_attr(esp32, doc = "0x7F")]
@@ -1035,6 +1036,7 @@ impl<'d> Uart<'d, Blocking> {
     /// ```
     /// 
     /// # Errors
+    ///
     /// See [`Uart::apply_config`].
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
@@ -1227,7 +1229,8 @@ where
 
     /// Change the configuration.
     ///
-    /// # Errors.
+    /// # Errors
+    ///
     /// [`ConfigError::UnsupportedFifoThreshold`] will be returned in the cases
     /// described in [`UartRx::apply_config`] and
     /// [`ConfigError::UnsupportedBaudrate`] if baud rate passed in config
@@ -2343,6 +2346,7 @@ impl Info {
     /// Configures the RX-FIFO threshold
     ///
     /// # Errors
+    ///
     /// [`Err(ConfigError::UnsupportedFifoThreshold)`][ConfigError::UnsupportedFifoThreshold] if provided value exceeds maximum value
     /// for SOC :
     /// - `esp32` **0x7F**
@@ -2379,7 +2383,8 @@ impl Info {
     /// `timeout` - the number of symbols ("bytes") to wait for before
     /// triggering a timeout. Pass None to disable the timeout.
     ///
-    ///  # Errors
+    /// # Errors
+    ///
     /// [`Err(ConfigError::UnsupportedTimeout)`][ConfigError::UnsupportedTimeout] if the provided value exceeds
     /// the maximum value for SOC :
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
@@ -2443,7 +2448,7 @@ impl Info {
         sync_regs(self.regs());
     }
 
-    fn change_baud(&self, config: &Config) {
+    fn change_baud(&self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         let clk = match config.clock_source {
             ClockSource::Apb => clocks.apb_clock.as_hz(),
@@ -2518,7 +2523,7 @@ impl Info {
 
         self.sync_regs();
 
-        let actual_baud = self.get_baudrate(clk);
+        self.verify_baudrate(clk, config)?;
 
         Ok(())
     }
@@ -2579,7 +2584,7 @@ impl Info {
     }
 
     fn verify_baudrate(&self, clk: u32, config: &Config) -> Result<(), ConfigError> {
-        // taken from https://github.com/espressif/esp-idf/blob/master/components/hal/esp32c6/include/hal/uart_ll.h#L433-L444
+        // taken from https://github.com/espressif/esp-idf/blob/c5865270b50529cd32353f588d8a917d89f3dba4/components/hal/esp32c6/include/hal/uart_ll.h#L433-L444
         // (it's different for different chips)
         let clkdiv_reg = self.regs().clkdiv().read();
         let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
@@ -2593,7 +2598,12 @@ impl Info {
                 let actual_baud = (clk << 4) / ((((clkdiv as u32) << 4) | clkdiv_frag) * (sclk_div_num + 1));
             } else { // esp32c6, esp32h2
                 let pcr = crate::peripherals::PCR::regs();
-                let sclk_div_num = pcr.uart0_sclk_conf().read().uart0_sclk_div_num().bits() as u32;
+                let conf = if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
+                    pcr.uart(0).clk_conf()
+                } else {
+                    pcr.uart(1).clk_conf()
+                };
+                let sclk_div_num = conf.read().sclk_div_num().bits() as u32;
                 let actual_baud = (clk << 4) / ((((clkdiv as u32) << 4) | clkdiv_frag) * (sclk_div_num + 1));
             }
         };

@@ -698,6 +698,7 @@ impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     ///
     /// # Errors
+    ///
     /// See [`Spi::apply_config`].
     pub fn new(
         spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
@@ -1016,7 +1017,8 @@ where
 
     /// Change the bus configuration.
     ///
-    /// # Errors.
+    /// # Errors
+    ///
     /// If frequency passed in config exceeds
     #[cfg_attr(not(esp32h2), doc = " 80MHz")]
     #[cfg_attr(esp32h2, doc = " 48MHz")]
@@ -1594,7 +1596,8 @@ mod dma {
 
         /// Change the bus configuration.
         ///
-        /// # Errors.
+        /// # Errors
+        ///
         /// If frequency passed in config exceeds
         #[cfg_attr(not(esp32h2), doc = " 80MHz")]
         #[cfg_attr(esp32h2, doc = " 48MHz")]
@@ -2063,7 +2066,8 @@ mod dma {
 
         /// Change the bus configuration.
         ///
-        /// # Errors.
+        /// # Errors
+        ///
         /// If frequency passed in config exceeds
         #[cfg_attr(not(esp32h2), doc = " 80MHz")]
         #[cfg_attr(esp32h2, doc = " 48MHz")]
