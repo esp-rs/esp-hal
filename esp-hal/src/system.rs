@@ -3,18 +3,8 @@
 use core::cell::RefCell;
 
 use critical_section::{CriticalSection, Mutex};
-use strum::{EnumCount, EnumIter, IntoEnumIterator};
 
 use crate::peripherals::SYSTEM;
-
-pub(crate) const KEEP_ENABLED: &[Peripheral] = &[
-    Peripheral::Uart0,
-    #[cfg(usb_device)]
-    Peripheral::UsbDevice,
-    #[cfg(systimer)]
-    Peripheral::Systimer,
-    Peripheral::Timg0,
-];
 
 /// Peripherals which can be enabled via `PeripheralClockControl`.
 ///
@@ -24,7 +14,7 @@ pub(crate) const KEEP_ENABLED: &[Peripheral] = &[
 // FIXME: This enum needs to be public because it's exposed via a bunch of traits, but it's not
 // useful to users.
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumCount, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Peripheral {
@@ -133,6 +123,90 @@ pub enum Peripheral {
 }
 
 impl Peripheral {
+    const KEEP_ENABLED: &[Peripheral] = &[
+        Peripheral::Uart0,
+        #[cfg(usb_device)]
+        Peripheral::UsbDevice,
+        #[cfg(systimer)]
+        Peripheral::Systimer,
+        Peripheral::Timg0,
+    ];
+
+    const COUNT: usize = Self::ALL.len();
+
+    const ALL: &[Self] = &[
+        #[cfg(spi2)]
+        Self::Spi2,
+        #[cfg(spi3)]
+        Self::Spi3,
+        #[cfg(i2c0)]
+        Self::I2cExt0,
+        #[cfg(i2c1)]
+        Self::I2cExt1,
+        #[cfg(rmt)]
+        Self::Rmt,
+        #[cfg(ledc)]
+        Self::Ledc,
+        #[cfg(mcpwm0)]
+        Self::Mcpwm0,
+        #[cfg(mcpwm1)]
+        Self::Mcpwm1,
+        #[cfg(pcnt)]
+        Self::Pcnt,
+        #[cfg(apb_saradc)]
+        Self::ApbSarAdc,
+        #[cfg(gdma)]
+        Self::Gdma,
+        #[cfg(pdma)]
+        Self::Dma,
+        #[cfg(i2s0)]
+        Self::I2s0,
+        #[cfg(i2s1)]
+        Self::I2s1,
+        #[cfg(usb0)]
+        Self::Usb,
+        #[cfg(aes)]
+        Self::Aes,
+        #[cfg(twai0)]
+        Self::Twai0,
+        #[cfg(twai1)]
+        Self::Twai1,
+        #[cfg(timg0)]
+        Self::Timg0,
+        #[cfg(timg1)]
+        Self::Timg1,
+        #[cfg(sha)]
+        Self::Sha,
+        #[cfg(usb_device)]
+        Self::UsbDevice,
+        #[cfg(uart0)]
+        Self::Uart0,
+        #[cfg(uart1)]
+        Self::Uart1,
+        #[cfg(uart2)]
+        Self::Uart2,
+        #[cfg(rsa)]
+        Self::Rsa,
+        #[cfg(parl_io)]
+        Self::ParlIo,
+        #[cfg(hmac)]
+        Self::Hmac,
+        #[cfg(ecc)]
+        Self::Ecc,
+        #[cfg(soc_etm)]
+        Self::Etm,
+        #[cfg(trace0)]
+        Self::Trace0,
+        #[cfg(lcd_cam)]
+        Self::LcdCam,
+        #[cfg(systimer)]
+        Self::Systimer,
+        #[cfg(tsens)]
+        Self::Tsens,
+    ];
+}
+
+impl Peripheral {
     pub fn try_from(value: u8) -> Option<Peripheral> {
         if value >= Peripheral::COUNT as u8 {
             return None;
@@ -151,11 +225,11 @@ static PERIPHERAL_REF_COUNT: Mutex<RefCell<[usize; Peripheral::COUNT]>> =
 pub(crate) fn disable_peripherals() {
     // Take the critical section up front to avoid taking it multiple times.
     critical_section::with(|cs| {
-        for p in Peripheral::iter() {
-            if KEEP_ENABLED.contains(&p) {
+        for p in Peripheral::ALL {
+            if Peripheral::KEEP_ENABLED.contains(p) {
                 continue;
             }
-            PeripheralClockControl::enable_forced_with_cs(p, false, true, cs);
+            PeripheralClockControl::enable_forced_with_cs(*p, false, true, cs);
         }
     })
 }
@@ -168,7 +242,7 @@ pub(crate) struct PeripheralGuard {
 
 impl PeripheralGuard {
     pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
-        if !KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p) {
+        if !Peripheral::KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p) {
             PeripheralClockControl::reset(p);
             init();
         }
@@ -183,7 +257,7 @@ impl PeripheralGuard {
 
 impl Drop for PeripheralGuard {
     fn drop(&mut self) {
-        if !KEEP_ENABLED.contains(&self.peripheral) {
+        if !Peripheral::KEEP_ENABLED.contains(&self.peripheral) {
             PeripheralClockControl::disable(self.peripheral);
         }
     }
@@ -197,7 +271,7 @@ impl<const P: u8> GenericPeripheralGuard<P> {
     pub(crate) fn new_with(init: fn(CriticalSection<'_>)) -> Self {
         let peripheral = unwrap!(Peripheral::try_from(P));
         critical_section::with(|cs| {
-            if !KEEP_ENABLED.contains(&peripheral)
+            if !Peripheral::KEEP_ENABLED.contains(&peripheral)
                 && PeripheralClockControl::enable_with_cs(peripheral, cs)
             {
                 PeripheralClockControl::reset(peripheral);
@@ -216,7 +290,7 @@ impl<const P: u8> GenericPeripheralGuard<P> {
 impl<const P: u8> Drop for GenericPeripheralGuard<P> {
     fn drop(&mut self) {
         let peripheral = unwrap!(Peripheral::try_from(P));
-        if !KEEP_ENABLED.contains(&peripheral) {
+        if !Peripheral::KEEP_ENABLED.contains(&peripheral) {
             PeripheralClockControl::disable(peripheral);
         }
     }
