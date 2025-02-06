@@ -290,7 +290,6 @@ pub struct Config {
     baudrate: u32,
     /// Determines how close to the desired baud rate value the driver should
     /// set the baud rate.
-    #[builder_lite(skip_setter)]
     baudrate_tolerance: BaudrateTolerance,
     /// Number of data bits in each frame (5, 6, 7, or 8 bits).
     data_bits: DataBits,
@@ -349,17 +348,6 @@ impl Default for RxConfig {
 }
 
 impl Config {
-    /// Set the baudrate tolerance of the UART configuration.
-    #[instability::unstable]
-    pub fn with_baudrate_tolerance(mut self, tolerance: BaudrateTolerance) -> Self {
-        if let BaudrateTolerance::ErrorPercent(percentage) = tolerance {
-            assert!(percentage > 0 && percentage <= 100);
-        }
-
-        self.baudrate_tolerance = tolerance;
-
-        self
-    }
     /// Calculates the total symbol length in bits based on the configured
     /// data bits, parity, and stop bits.
     fn symbol_length(&self) -> u8 {
@@ -382,6 +370,10 @@ impl Config {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
+        if let BaudrateTolerance::ErrorPercent(percentage) = self.baudrate_tolerance {
+            assert!(percentage > 0 && percentage <= 100);
+        }
+
         // Max supported baud rate is 5Mbaud
         if self.baudrate == 0 || self.baudrate > 5_000_000 {
             return Err(ConfigError::UnsupportedBaudrate);
@@ -495,6 +487,8 @@ pub struct UartRx<'d, Dm> {
 #[non_exhaustive]
 pub enum ConfigError {
     /// The requested baud rate is not achievable.
+    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     UnachievableBaudrate,
     /// The requested baud rate is not supported.
     UnsupportedBaudrate,
@@ -509,6 +503,7 @@ impl core::error::Error for ConfigError {}
 impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            #[cfg(feature = "unstable")]
             ConfigError::UnachievableBaudrate => {
                 write!(f, "The requested baud rate is not achievable")
             }
@@ -790,13 +785,16 @@ where
     ///
     /// # Errors
     ///
-    /// [`ConfigError::UnsupportedFifoThreshold`] will be returned if the RX
-    /// FIFO threshold passed in `Config` exceeds the maximum value (
+    /// [`ConfigError::UnsupportedFifoThreshold`] will be returned under the
+    /// following conditions:
+    ///   * if the RX FIFO threshold passed in `Config` exceeds the maximum
+    ///     value (
     #[cfg_attr(esp32, doc = "0x7F")]
     #[cfg_attr(any(esp32c6, esp32h2), doc = "0xFF")]
     #[cfg_attr(any(esp32c3, esp32c2, esp32s2), doc = "0x1FF")]
     #[cfg_attr(esp32h2, doc = "0x3FF")]
-    /// ) or if the passed timeout exceeds the maximum value (
+    /// )
+    ///   * if the passed timeout exceeds the maximum value (
     #[cfg_attr(esp32, doc = "0x7F")]
     #[cfg_attr(not(esp32), doc = "0x3FF")]
     /// ).
@@ -1232,12 +1230,13 @@ where
     /// # Errors
     ///
     /// [`ConfigError::UnsupportedFifoThreshold`] will be returned in the cases
-    /// described in [`UartRx::apply_config`] and
-    /// [`ConfigError::UnsupportedBaudrate`] if baud rate passed in config
-    /// exceeds 5MBaud or is equal to zero. If the user has specified in the
-    /// configuration that they want baudrate to correspond exactly or with some
-    /// percentage of deviation to the desired value, and the driver cannot
-    /// reach this speed - an above mentioned error will also be returned.
+    /// described in [`UartRx::apply_config`].
+    /// [`ConfigError::UnsupportedBaudrate`] will be returned under the
+    /// following conditions:
+    ///   * if baud rate passed in config exceeds 5MBaud or is equal to zero.
+    ///   * if the user has specified in the configuration that they want
+    ///     baudrate to correspond exactly or with some percentage of deviation
+    ///     to the desired value, and the driver cannot reach this speed
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
@@ -2523,6 +2522,7 @@ impl Info {
 
         self.sync_regs();
 
+        #[cfg(feature = "unstable")]
         self.verify_baudrate(clk, config)?;
 
         Ok(())
@@ -2583,6 +2583,7 @@ impl Info {
         txfifo_rst(self.regs(), false);
     }
 
+    #[cfg(feature = "unstable")]
     fn verify_baudrate(&self, clk: u32, config: &Config) -> Result<(), ConfigError> {
         // taken from https://github.com/espressif/esp-idf/blob/c5865270b50529cd32353f588d8a917d89f3dba4/components/hal/esp32c6/include/hal/uart_ll.h#L433-L444
         // (it's different for different chips)
@@ -2610,20 +2611,20 @@ impl Info {
 
         match config.baudrate_tolerance {
             BaudrateTolerance::Exact => {
-                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs()
+                let deviation = ((config.baudrate as i32 - actual_baud as i32).unsigned_abs()
                     * 100)
-                    / actual_baud as u64;
+                    / actual_baud;
                 // We tolerate deviation of 1% from the desired baud value, as it never will be
                 // exactly the same
-                if deviation > 1_u64 {
+                if deviation > 1_u32 {
                     return Err(ConfigError::UnachievableBaudrate);
                 }
             }
             BaudrateTolerance::ErrorPercent(percent) => {
-                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs()
+                let deviation = ((config.baudrate as i32 - actual_baud as i32).unsigned_abs()
                     * 100)
-                    / actual_baud as u64;
-                if deviation > percent as u64 {
+                    / actual_baud;
+                if deviation > percent as u32 {
                     return Err(ConfigError::UnachievableBaudrate);
                 }
             }
