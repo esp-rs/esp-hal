@@ -131,6 +131,8 @@ smoltcp = ["dep:smoltcp"]
 ## Provide utilities for smoltcp initialization. Adds smoltcp dependency
 utils = ["smoltcp"]
 
+# Use external scheduler
+preempt-extern = []
 
 # Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde", "heapless/serde"]

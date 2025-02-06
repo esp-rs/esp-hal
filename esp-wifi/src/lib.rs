@@ -134,6 +134,7 @@ mod binary {
 }
 mod compat;
 
+#[cfg_attr(feature = "preempt-extern", path = "preempt_extern.rs")]
 mod preempt;
 
 mod radio;
@@ -239,7 +240,7 @@ const _: () = {
     core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
 };
 
-pub(crate) type TimeBase = PeriodicTimer<'static, Blocking>;
+pub type TimeBase = PeriodicTimer<'static, Blocking>;
 
 pub(crate) mod flags {
     use portable_atomic::{AtomicBool, AtomicUsize};
