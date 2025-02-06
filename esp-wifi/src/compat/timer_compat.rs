@@ -76,7 +76,7 @@ impl TimerQueue {
         let mut current = self.head.as_mut();
         while let Some(timer) = current {
             if timer.active
-                && crate::timer::time_diff(timer.started, current_timestamp) >= timer.timeout
+                && crate::time::time_diff(timer.started, current_timestamp) >= timer.timeout
             {
                 return Some(timer);
             }
@@ -149,8 +149,8 @@ pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bo
 }
 
 pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
-    let systick = crate::timer::systimer_count();
-    let ticks = crate::timer::micros_to_ticks(us as u64);
+    let systick = crate::time::systimer_count();
+    let ticks = crate::time::micros_to_ticks(us as u64);
 
     trace!(
         "timer_arm_us {:x} current: {} ticks: {} repeat: {}",

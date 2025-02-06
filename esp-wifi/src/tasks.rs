@@ -1,7 +1,7 @@
 use crate::{
     compat::timer_compat::TIMERS,
     preempt::{task_create, yield_task},
-    timer::systimer_count,
+    time::systimer_count,
 };
 
 /// Initializes the `timer` task for the Wi-Fi driver.

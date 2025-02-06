@@ -18,9 +18,6 @@ use crate::{
 /// The timer responsible for time slicing.
 const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(crate::CONFIG.tick_rate_hz);
 
-// Time keeping
-pub const TICKS_PER_SECOND: u64 = 1_000_000;
-
 use super::TIMER;
 
 pub(crate) fn setup_timer(mut alarm0: TimeBase) {
@@ -87,18 +84,4 @@ pub(crate) fn yield_task() {
     SystemPeripheral::regs()
         .cpu_intr_from_cpu_3()
         .modify(|_, w| w.cpu_intr_from_cpu_3().set_bit());
-}
-
-/// Current systimer count value
-/// A tick is 1 / 1_000_000 seconds
-pub(crate) fn systimer_count() -> u64 {
-    esp_hal::time::Instant::now()
-        .duration_since_epoch()
-        .as_micros()
-}
-
-// TODO: use an Instance type instead...
-pub(crate) fn time_diff(start: u64, end: u64) -> u64 {
-    // 52-bit wrapping sub
-    end.wrapping_sub(start) & 0x000f_ffff_ffff_ffff
 }

@@ -205,7 +205,7 @@ pub(crate) fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
 
     let forever = tick == OSI_FUNCS_TIME_BLOCKING;
     let timeout = tick as u64;
-    let start = crate::timer::systimer_count();
+    let start = crate::time::systimer_count();
 
     let sem = semphr as *mut u32;
 
@@ -226,7 +226,7 @@ pub(crate) fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
             return 1;
         }
 
-        if !forever && crate::timer::elapsed_time_since(start) > timeout {
+        if !forever && crate::time::elapsed_time_since(start) > timeout {
             break 'outer;
         }
 
@@ -375,7 +375,7 @@ pub(crate) fn receive_queued(
 
     let forever = block_time_tick == OSI_FUNCS_TIME_BLOCKING;
     let timeout = block_time_tick as u64;
-    let start = crate::timer::systimer_count();
+    let start = crate::time::systimer_count();
 
     loop {
         if unsafe { (*queue).try_dequeue(item) } {
@@ -383,7 +383,7 @@ pub(crate) fn receive_queued(
             return 1;
         }
 
-        if !forever && crate::timer::elapsed_time_since(start) > timeout {
+        if !forever && crate::time::elapsed_time_since(start) > timeout {
             trace!("queue_recv returns with timeout");
             return -1;
         }

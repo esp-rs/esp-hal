@@ -11,17 +11,6 @@ const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(crate::CONFIG.tick_rate_hz);
 
 use super::TIMER;
 
-// Time keeping
-pub const TICKS_PER_SECOND: u64 = 1_000_000;
-
-/// This function must not be called in a critical section. Doing so may return
-/// an incorrect value.
-pub(crate) fn systimer_count() -> u64 {
-    esp_hal::time::Instant::now()
-        .duration_since_epoch()
-        .as_micros()
-}
-
 pub(crate) fn setup_timer(mut timer1: TimeBase) {
     timer1.set_interrupt_handler(InterruptHandler::new(
         unsafe { core::mem::transmute::<*const (), extern "C" fn()>(handler as *const ()) },
@@ -88,9 +77,4 @@ pub(crate) fn yield_task() {
     unsafe {
         core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack));
     }
-}
-
-// TODO: use an Instance type instead...
-pub(crate) fn time_diff(start: u64, end: u64) -> u64 {
-    end.wrapping_sub(start)
 }

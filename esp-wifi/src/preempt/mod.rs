@@ -1,21 +1,18 @@
 #[cfg_attr(target_arch = "riscv32", path = "preempt_riscv.rs")]
 #[cfg_attr(target_arch = "xtensa", path = "preempt_xtensa.rs")]
 mod arch_specific;
+pub mod timer;
 
 use core::mem::size_of;
 
 use arch_specific::*;
 use esp_hal::sync::Locked;
 use esp_wifi_sys::include::malloc;
+use timer::{disable_multitasking, disable_timer, setup_multitasking, setup_timer};
 //
-pub(crate) use {crate::timer::yield_task, arch_specific::task_create};
+pub(crate) use {arch_specific::task_create, timer::yield_task};
 
-use crate::{
-    compat::malloc::free,
-    hal::trapframe::TrapFrame,
-    memory_fence::memory_fence,
-    timer::{disable_multitasking, disable_timer, setup_multitasking, setup_timer},
-};
+use crate::{compat::malloc::free, hal::trapframe::TrapFrame, memory_fence::memory_fence};
 
 #[repr(transparent)]
 struct ContextWrapper(*mut Context);

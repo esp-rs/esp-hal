@@ -741,8 +741,8 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut crate::binary::c_types::c
 /// *************************************************************************
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    let start_time = crate::timer::systimer_count();
-    while crate::timer::elapsed_time_since(start_time) < tick as u64 {
+    let start_time = crate::time::systimer_count();
+    while crate::time::elapsed_time_since(start_time) < tick as u64 {
         yield_task();
     }
 }
@@ -762,7 +762,7 @@ pub unsafe extern "C" fn task_delay(tick: u32) {
 /// *************************************************************************
 pub unsafe extern "C" fn task_ms_to_tick(ms: u32) -> i32 {
     trace!("task_ms_to_tick ms {}", ms);
-    crate::timer::millis_to_ticks(ms as u64) as i32
+    crate::time::millis_to_ticks(ms as u64) as i32
 }
 
 /// **************************************************************************
@@ -1130,7 +1130,7 @@ pub unsafe extern "C" fn wifi_rtc_disable_iso() {
 #[no_mangle]
 pub unsafe extern "C" fn esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
-    crate::timer::ticks_to_micros(crate::timer::systimer_count()) as i64
+    crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
 }
 
 /// **************************************************************************
