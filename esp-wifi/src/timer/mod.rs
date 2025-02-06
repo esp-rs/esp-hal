@@ -20,24 +20,6 @@ use crate::TimeBase;
 
 pub(crate) static TIMER: Locked<Option<TimeBase>> = Locked::new(None);
 
-pub(crate) fn setup_timer_isr(timebase: TimeBase) {
-    setup_radio_isr();
-
-    setup_timer(timebase);
-
-    setup_multitasking();
-
-    yield_task();
-}
-
-pub(crate) fn shutdown_timer_isr() {
-    shutdown_radio_isr();
-
-    disable_timer();
-
-    disable_multitasking();
-}
-
 #[allow(unused)]
 pub(crate) fn micros_to_ticks(us: u64) -> u64 {
     us * (TICKS_PER_SECOND / 1_000_000)

@@ -125,7 +125,15 @@ use portable_atomic::Ordering;
 use crate::wifi::WifiError;
 use crate::{
     tasks::init_tasks,
-    timer::{setup_timer_isr, shutdown_timer_isr},
+    timer::{
+        disable_multitasking,
+        disable_timer,
+        setup_multitasking,
+        setup_radio_isr,
+        setup_timer,
+        shutdown_radio_isr,
+        yield_task,
+    },
 };
 
 mod binary {
@@ -383,7 +391,11 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
     phy_mem_init();
     init_tasks();
-    setup_timer_isr(unsafe { timer.clone_unchecked() }.timer());
+
+    setup_radio_isr();
+    setup_timer(unsafe { timer.clone_unchecked() }.timer());
+    setup_multitasking();
+    yield_task();
 
     wifi_set_log_verbose();
     init_clocks();
@@ -435,7 +447,10 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
         crate::flags::BLE.store(false, Ordering::Release);
     }
 
-    shutdown_timer_isr();
+    shutdown_radio_isr();
+    disable_timer();
+    disable_multitasking();
+
     crate::preempt::delete_all_tasks();
 
     crate::timer::TIMER.with(|timer| timer.take());
