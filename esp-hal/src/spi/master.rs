@@ -46,7 +46,6 @@ use super::{BitOrder, DataMode, DmaError, Error, Mode};
 use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
-    cpu::Cpu,
     dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{
         interconnect::{OutputConnection, PeripheralInput, PeripheralOutput},
@@ -60,7 +59,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     private::{self, Sealed},
     spi::AnySpi,
-    system::PeripheralGuard,
+    system::{Cpu, PeripheralGuard},
     time::Rate,
     Async,
     Blocking,
@@ -1345,7 +1344,7 @@ mod dma {
         /// Interrupts are not enabled at the peripheral level here.
         fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
             let interrupt = self.driver().info.interrupt;
-            for core in crate::cpu::Cpu::other() {
+            for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
             unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };

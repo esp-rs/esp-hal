@@ -11,8 +11,8 @@ pub(crate) fn setup_radio_isr() {
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     {
-        interrupt::disable(crate::hal::cpu::Cpu::ProCpu, Interrupt::LP_BLE_TIMER);
-        interrupt::disable(crate::hal::cpu::Cpu::ProCpu, Interrupt::BT_MAC);
+        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::LP_BLE_TIMER);
+        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::BT_MAC);
     }
 }
 

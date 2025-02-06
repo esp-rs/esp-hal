@@ -1518,7 +1518,7 @@ mod private {
 
     impl RegisterAccessPrivate for I2S0 {
         fn set_interrupt_handler(&self, handler: InterruptHandler) {
-            for core in crate::cpu::Cpu::other() {
+            for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, Interrupt::I2S0);
             }
             unsafe { crate::peripherals::I2S0::steal() }.bind_i2s0_interrupt(handler.handler());
@@ -1627,7 +1627,7 @@ mod private {
     #[cfg(i2s1)]
     impl RegisterAccessPrivate for I2S1 {
         fn set_interrupt_handler(&self, handler: InterruptHandler) {
-            for core in crate::cpu::Cpu::other() {
+            for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, Interrupt::I2S1);
             }
             unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());

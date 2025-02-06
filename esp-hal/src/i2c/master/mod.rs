@@ -1332,7 +1332,7 @@ impl Info {
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        for core in crate::cpu::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, self.interrupt);
         }
         self.enable_listen(EnumSet::all(), false);
@@ -1342,7 +1342,7 @@ impl Info {
     }
 
     fn disable_interrupts(&self) {
-        crate::interrupt::disable(crate::cpu::Cpu::current(), self.interrupt);
+        crate::interrupt::disable(crate::system::Cpu::current(), self.interrupt);
     }
 }
 

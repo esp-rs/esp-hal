@@ -24,12 +24,11 @@
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
-    cpu::Cpu,
     interrupt::InterruptHandler,
     pac,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, RSA},
-    system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
+    system::{Cpu, GenericPeripheralGuard, Peripheral as PeripheralEnable},
     Async,
     Blocking,
 };
@@ -75,7 +74,7 @@ impl<'d> Rsa<'d, Blocking> {
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::cpu::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::RSA);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::RSA, handler.handler()) };

@@ -717,7 +717,8 @@ pub(crate) fn bind_default_interrupt_handler() {
     }
     // The vector table doesn't contain a custom entry.Still, the
     // peripheral interrupt may already be bound to something else.
-    if interrupt::bound_cpu_interrupt_for(crate::cpu::Cpu::current(), Interrupt::GPIO).is_some() {
+    if interrupt::bound_cpu_interrupt_for(crate::system::Cpu::current(), Interrupt::GPIO).is_some()
+    {
         info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
         return;
     }
@@ -773,7 +774,7 @@ impl Io {
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::cpu::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::GPIO);
         }
         self.set_interrupt_priority(handler.priority());

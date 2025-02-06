@@ -4,8 +4,8 @@ use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 use embassy_executor::SendSpawner;
 use esp_hal::{
-    cpu::Cpu,
     interrupt::{self, software::SoftwareInterrupt, InterruptHandler},
+    system::Cpu,
 };
 use portable_atomic::{AtomicUsize, Ordering};
 

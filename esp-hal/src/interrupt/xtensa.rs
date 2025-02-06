@@ -6,7 +6,7 @@ use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
 use super::InterruptStatus;
-use crate::{cpu::Cpu, pac, peripherals::Interrupt};
+use crate::{pac, peripherals::Interrupt, system::Cpu};
 
 /// Interrupt Error
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

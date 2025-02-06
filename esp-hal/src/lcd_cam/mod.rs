@@ -12,13 +12,12 @@ use core::marker::PhantomData;
 
 use crate::{
     asynch::AtomicWaker,
-    cpu::Cpu,
     handler,
     interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
     peripheral::Peripheral,
     peripherals::{Interrupt, LCD_CAM},
-    system::GenericPeripheralGuard,
+    system::{Cpu, GenericPeripheralGuard},
     Async,
     Blocking,
 };
@@ -71,7 +70,7 @@ impl<'d> LcdCam<'d, Blocking> {
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::cpu::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::LCD_CAM);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::LCD_CAM, handler.handler()) };

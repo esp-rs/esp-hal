@@ -16,7 +16,6 @@ use core::time::Duration;
 
 use esp_backtrace as _;
 use esp_hal::{
-    cpu::Cpu,
     delay::Delay,
     gpio,
     gpio::{Input, InputConfig, Pull},
@@ -28,6 +27,7 @@ use esp_hal::{
         Rtc,
         SocResetReason,
     },
+    system::Cpu,
 };
 use esp_println::println;
 

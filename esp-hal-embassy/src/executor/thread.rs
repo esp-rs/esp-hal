@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use embassy_executor::Spawner;
 #[cfg(all(low_power_wait, multi_core))]
 use esp_hal::interrupt::software::SoftwareInterrupt;
-use esp_hal::{cpu::Cpu, interrupt::Priority};
+use esp_hal::{interrupt::Priority, system::Cpu};
 #[cfg(low_power_wait)]
 use portable_atomic::{AtomicBool, Ordering};
 

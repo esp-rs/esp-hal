@@ -42,7 +42,7 @@ cfg_if::cfg_if! {
     if #[cfg(multi_core)] {
         use core::sync::atomic::{AtomicBool, Ordering};
 
-        use esp_hal::cpu::{CpuControl, Stack};
+        use esp_hal::system::{CpuControl, Stack};
 
         static DONE: AtomicBool = AtomicBool::new(false);
         static mut APP_CORE_STACK: Stack<8192> = Stack::new();

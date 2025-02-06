@@ -140,7 +140,7 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         addr_of_mut!(_rtc_slow_bss_end),
     );
     if matches!(
-        crate::cpu::reset_reason(),
+        crate::system::reset_reason(),
         None | Some(SocResetReason::ChipPowerOn)
     ) {
         xtensa_lx_rt::zero_bss(

@@ -19,8 +19,8 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal}
 use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
-    cpu::{Cpu, CpuControl, Stack},
     gpio::{Level, Output, OutputConfig},
+    system::{Cpu, CpuControl, Stack},
     timer::{timg::TimerGroup, AnyTimer},
 };
 use esp_hal_embassy::Executor;

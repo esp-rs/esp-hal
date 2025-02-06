@@ -122,7 +122,6 @@ use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
 use crate::{
-    cpu::Cpu,
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -132,7 +131,7 @@ use crate::{
     interrupt::InterruptHandler,
     pac::twai0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    system::PeripheralGuard,
+    system::{Cpu, PeripheralGuard},
     twai::filter::SingleStandardFilter,
     Async,
     Blocking,
@@ -987,7 +986,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
 impl<'d> TwaiConfiguration<'d, Async> {
     /// Convert the configuration into a blocking configuration.
     pub fn into_blocking(self) -> TwaiConfiguration<'d, Blocking> {
-        use crate::{cpu::Cpu, interrupt};
+        use crate::{interrupt, system::Cpu};
 
         interrupt::disable(Cpu::current(), self.twai.interrupt());
 

@@ -15,7 +15,7 @@
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(multi_core)]
-use esp_hal::cpu::{CpuControl, Stack};
+use esp_hal::system::{CpuControl, Stack};
 use esp_hal::{
     interrupt::{
         software::{SoftwareInterrupt, SoftwareInterruptControl},

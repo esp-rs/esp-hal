@@ -11,9 +11,9 @@ use core::{
 };
 
 use crate::{
-    cpu::Cpu,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{CPU_CTRL, DPORT, LPWR, SPI0},
+    system::Cpu,
 };
 
 /// Data type for a properly aligned stack of N bytes
@@ -106,7 +106,7 @@ pub enum Error {
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
 /// # use esp_hal::delay::Delay;
-/// # use esp_hal::cpu::{CpuControl, Stack};
+/// # use esp_hal::system::{CpuControl, Stack};
 /// # use core::{cell::RefCell, ptr::addr_of_mut};
 /// # use critical_section::Mutex;
 /// # let delay = Delay::new();

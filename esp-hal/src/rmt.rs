@@ -449,7 +449,7 @@ impl<'d> Rmt<'d, Blocking> {
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        for core in crate::cpu::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::RMT);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::RMT, handler.handler()) };

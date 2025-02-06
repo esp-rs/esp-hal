@@ -175,7 +175,6 @@ pub use self::soc::ulp_core;
 
 #[cfg(any(dport, hp_sys, pcr, system))]
 pub mod clock;
-pub mod cpu;
 #[cfg(gpio)]
 pub mod gpio;
 #[cfg(any(i2c0, i2c1))]

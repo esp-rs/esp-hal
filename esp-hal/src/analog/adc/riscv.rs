@@ -534,7 +534,7 @@ impl<ADCI> crate::private::Sealed for Adc<'_, ADCI, Blocking> {}
 
 impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::cpu::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, InterruptSource);
         }
         unsafe { crate::interrupt::bind_interrupt(InterruptSource, handler.handler()) };
@@ -643,7 +643,7 @@ where
     pub fn into_blocking(self) -> Adc<'d, ADCI, Blocking> {
         if asynch::release_async_adc() {
             // Disable ADC interrupt on all cores if the last async ADC instance is disabled
-            for cpu in crate::cpu::Cpu::all() {
+            for cpu in crate::system::Cpu::all() {
                 crate::interrupt::disable(cpu, InterruptSource);
             }
         }

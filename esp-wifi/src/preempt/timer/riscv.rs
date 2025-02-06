@@ -53,7 +53,7 @@ pub(crate) fn setup_multitasking() {
 }
 
 pub(crate) fn disable_multitasking() {
-    interrupt::disable(crate::hal::cpu::Cpu::ProCpu, Interrupt::FROM_CPU_INTR3);
+    interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::FROM_CPU_INTR3);
 }
 
 extern "C" fn handler(trap_frame: &mut TrapFrame) {
