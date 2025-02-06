@@ -587,7 +587,6 @@ impl Config {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
-        // Maximum supported frequency is 80Mhz, minimum is about 70khz.
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 if self.frequency < Rate::from_khz(70) || self.frequency > Rate::from_mhz(48) {
@@ -629,7 +628,7 @@ impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             ConfigError::UnsupportedFrequency => {
-                write!(f, " The requested frequency is not supported")
+                write!(f, "The requested frequency is not supported")
             }
         }
     }
@@ -1596,7 +1595,10 @@ mod dma {
         /// Change the bus configuration.
         ///
         /// # Errors.
-        /// If frequency passed in config exceeds 80Mhz, a corresponding
+        /// If frequency passed in config exceeds
+        #[cfg_attr(not(esp32h2), doc = " 80MHz")]
+        #[cfg_attr(esp32h2, doc = " 48MHz")]
+        /// or is below 70kHz,
         /// [`ConfigError::UnsupportedFrequency`] error will be returned.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
@@ -2062,7 +2064,10 @@ mod dma {
         /// Change the bus configuration.
         ///
         /// # Errors.
-        /// If frequency passed in config exceeds 80Mhz, a corresponding
+        /// If frequency passed in config exceeds
+        #[cfg_attr(not(esp32h2), doc = " 80MHz")]
+        #[cfg_attr(esp32h2, doc = " 48MHz")]
+        /// or is below 70kHz,
         /// [`ConfigError::UnsupportedFrequency`] error will be returned.
         #[instability::unstable]
         pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {

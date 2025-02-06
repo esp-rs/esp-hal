@@ -352,14 +352,11 @@ impl Config {
     /// Set the baudrate tolerance of the UART configuration.
     #[instability::unstable]
     pub fn with_baudrate_tolerance(mut self, tolerance: BaudrateTolerance) -> Self {
-        self.baudrate_tolerance = match tolerance {
-            BaudrateTolerance::Exact => BaudrateTolerance::Exact,
-            BaudrateTolerance::Closest => BaudrateTolerance::Closest,
-            BaudrateTolerance::ErrorPercent(percentage) => {
-                assert!(percentage > 0 && percentage <= 100);
-                BaudrateTolerance::ErrorPercent(percentage)
-            }
-        };
+        if let BaudrateTolerance::ErrorPercent(percentage) = tolerance {
+            assert!(percentage > 0 && percentage <= 100);
+        }
+
+        self.baudrate_tolerance = tolerance;
 
         self
     }
@@ -2523,28 +2520,6 @@ impl Info {
 
         let actual_baud = self.get_baudrate(clk);
 
-        match config.baudrate_tolerance {
-            BaudrateTolerance::Exact => {
-                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs()
-                    * 100)
-                    / actual_baud as u64;
-                // We tolerate deviation of 1% from the desired baud value, as it never will be
-                // exactly the same
-                if deviation > 1_u64 {
-                    return Err(ConfigError::UnachievableBaudrate);
-                }
-            }
-            BaudrateTolerance::ErrorPercent(percent) => {
-                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs()
-                    * 100)
-                    / actual_baud as u64;
-                if deviation > percent as u64 {
-                    return Err(ConfigError::UnachievableBaudrate);
-                }
-            }
-            _ => {}
-        }
-
         Ok(())
     }
 
@@ -2603,30 +2578,49 @@ impl Info {
         txfifo_rst(self.regs(), false);
     }
 
-    fn get_baudrate(&self, clk: u32) -> u32 {
+    fn verify_baudrate(&self, clk: u32, config: &Config) -> Result<(), ConfigError> {
         // taken from https://github.com/espressif/esp-idf/blob/master/components/hal/esp32c6/include/hal/uart_ll.h#L433-L444
         // (it's different for different chips)
+        let clkdiv_reg = self.regs().clkdiv().read();
+        let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
+        let clkdiv = clkdiv_reg.clkdiv().bits();
+
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
-                let clkdiv_reg = self.regs().clkdiv().read();
-                let clkdiv = clkdiv_reg.clkdiv().bits();
-                let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
-                (clk << 4) / ((clkdiv << 4) | clkdiv_frag)
+                let actual_baud = (clk << 4) / ((clkdiv << 4) | clkdiv_frag);
             } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                let clkdiv_reg = self.regs().clkdiv().read();
-                let clkdiv = clkdiv_reg.clkdiv().bits() as u32;
-                let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
                 let sclk_div_num = self.regs().clk_conf().read().sclk_div_num().bits() as u32;
-                (clk << 4) / (((clkdiv << 4) | clkdiv_frag) * (sclk_div_num + 1))
-            } else if #[cfg(any(esp32c6, esp32h2))] {
+                let actual_baud = (clk << 4) / ((((clkdiv as u32) << 4) | clkdiv_frag) * (sclk_div_num + 1));
+            } else { // esp32c6, esp32h2
                 let pcr = crate::peripherals::PCR::regs();
-                let clkdiv_reg = self.regs().clkdiv().read();
-                let clkdiv = clkdiv_reg.clkdiv().bits() as u32;
-                let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
                 let sclk_div_num = pcr.uart0_sclk_conf().read().uart0_sclk_div_num().bits() as u32;
-                (clk << 4) / (((clkdiv << 4) | clkdiv_frag) * (sclk_div_num + 1))
+                let actual_baud = (clk << 4) / ((((clkdiv as u32) << 4) | clkdiv_frag) * (sclk_div_num + 1));
             }
+        };
+
+        match config.baudrate_tolerance {
+            BaudrateTolerance::Exact => {
+                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs()
+                    * 100)
+                    / actual_baud as u64;
+                // We tolerate deviation of 1% from the desired baud value, as it never will be
+                // exactly the same
+                if deviation > 1_u64 {
+                    return Err(ConfigError::UnachievableBaudrate);
+                }
+            }
+            BaudrateTolerance::ErrorPercent(percent) => {
+                let deviation = ((config.baudrate as i64 - actual_baud as i64).unsigned_abs()
+                    * 100)
+                    / actual_baud as u64;
+                if deviation > percent as u64 {
+                    return Err(ConfigError::UnachievableBaudrate);
+                }
+            }
+            _ => {}
         }
+
+        Ok(())
     }
 }
 
