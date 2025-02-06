@@ -157,3 +157,9 @@ pub(crate) fn task_switch(trap_frame: &mut TrapFrame) {
     next_task();
     restore_task_context(current_task(), trap_frame);
 }
+
+pub(crate) fn current_task_thread_semaphore() -> *mut crate::binary::c_types::c_void {
+    unsafe {
+        &mut ((*current_task()).thread_semaphore) as *mut _ as *mut crate::binary::c_types::c_void
+    }
+}

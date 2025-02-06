@@ -250,7 +250,7 @@ pub(crate) fn sem_give(semphr: *mut c_void) -> i32 {
 
 pub(crate) fn thread_sem_get() -> *mut c_void {
     trace!("wifi_thread_semphr_get");
-    unsafe { &mut ((*current_task()).thread_semaphore) as *mut _ as *mut c_void }
+    crate::preempt::current_task_thread_semaphore()
 }
 
 pub(crate) fn create_recursive_mutex() -> *mut c_void {
