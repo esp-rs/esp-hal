@@ -1,6 +1,6 @@
 use crate::{
     clock::{Clock, PllClock, XtalClock},
-    peripherals::DPORT,
+    peripherals::{APB_CTRL, DPORT, EFUSE, LPWR},
     rom::regi2c_write,
 };
 
@@ -43,11 +43,12 @@ const I2C_BBPLL_OC_DIV_7_0: u32 = 3;
 const I2C_BBPLL_OC_DCUR: u32 = 5;
 
 pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
-    let efuse = crate::peripherals::EFUSE::regs();
-    let rtc_cntl = crate::peripherals::LPWR::regs();
-
-    let rtc_cntl_dbias_hp_volt: u32 =
-        RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5().read().rd_vol_level_hp_inv().bits() as u32;
+    let rtc_cntl_dbias_hp_volt: u32 = RTC_CNTL_DBIAS_1V25
+        - EFUSE::regs()
+            .blk0_rdata5()
+            .read()
+            .rd_vol_level_hp_inv()
+            .bits() as u32;
     let dig_dbias_240_m: u32 = rtc_cntl_dbias_hp_volt;
 
     let div_ref: u32;
@@ -59,7 +60,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 
     if matches!(pll_freq, PllClock::Pll320MHz) {
         // Raise the voltage, if needed
-        rtc_cntl
+        LPWR::regs()
             .reg()
             .modify(|_, w| unsafe { w.dig_dbias_wak().bits(DIG_DBIAS_80M_160M as u8) });
 
@@ -97,7 +98,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
         regi2c_write!(I2C_BBPLL, I2C_BBPLL_BBADC_DSMP, BBPLL_BBADC_DSMP_VAL_320M);
     } else {
         // Raise the voltage
-        rtc_cntl
+        LPWR::regs()
             .reg()
             .modify(|_, w| unsafe { w.dig_dbias_wak().bits(dig_dbias_240_m as u8) });
 
@@ -145,15 +146,11 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
 }
 
 pub(crate) fn esp32_rtc_bbpll_enable() {
-    crate::peripherals::LPWR::regs().options0().modify(|_, w| {
-        w.bias_i2c_force_pd()
-            .clear_bit()
-            .bb_i2c_force_pd()
-            .clear_bit()
-            .bbpll_force_pd()
-            .clear_bit()
-            .bbpll_i2c_force_pd()
-            .clear_bit()
+    LPWR::regs().options0().modify(|_, w| {
+        w.bias_i2c_force_pd().clear_bit();
+        w.bb_i2c_force_pd().clear_bit();
+        w.bbpll_force_pd().clear_bit();
+        w.bbpll_i2c_force_pd().clear_bit()
     });
 
     // reset BBPLL configuration
@@ -169,80 +166,77 @@ pub(crate) fn esp32_rtc_bbpll_enable() {
 }
 
 pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
-    let apb_cntl = crate::peripherals::APB_CTRL::regs();
-    let rtc_cntl = crate::peripherals::LPWR::regs();
+    let value = ((freq.hz() >> 12) & UINT16_MAX) | (((freq.hz() >> 12) & UINT16_MAX) << 16);
+    esp32_update_cpu_freq(freq.hz());
 
-    unsafe {
-        let value = (((freq.hz()) >> 12) & UINT16_MAX) | ((((freq.hz()) >> 12) & UINT16_MAX) << 16);
-        esp32_update_cpu_freq(freq.hz());
+    // set divider from XTAL to APB clock
+    APB_CTRL::regs().sysclk_conf().modify(|_, w| unsafe {
+        w.pre_div_cnt()
+            .bits(((freq.hz()) / REF_CLK_FREQ - 1) as u16)
+    });
 
-        // set divider from XTAL to APB clock
-        apb_cntl.sysclk_conf().modify(|_, w| {
-            w.pre_div_cnt()
-                .bits(((freq.hz()) / REF_CLK_FREQ - 1) as u16)
-        });
+    // adjust ref_tick
+    APB_CTRL::regs().xtal_tick_conf().modify(|_, w| unsafe {
+        w.xtal_tick_num()
+            .bits(((freq.hz()) / REF_CLK_FREQ - 1) as u8)
+    });
 
-        // adjust ref_tick
-        apb_cntl.xtal_tick_conf().modify(|_, w| {
-            w.xtal_tick_num()
-                .bits(((freq.hz()) / REF_CLK_FREQ - 1) as u8)
-        });
+    // switch clock source
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.soc_clk_sel().xtal());
+    LPWR::regs()
+        .store5()
+        .modify(|_, w| unsafe { w.scratch5().bits(value) });
 
-        // switch clock source
-        rtc_cntl.clk_conf().modify(|_, w| w.soc_clk_sel().xtal());
-        rtc_cntl.store5().modify(|_, w| w.scratch5().bits(value));
-
-        // lower the voltage
-        rtc_cntl
-            .reg()
-            .modify(|_, w| w.dig_dbias_wak().bits(DIG_DBIAS_XTAL as u8));
-    }
+    // lower the voltage
+    LPWR::regs()
+        .reg()
+        .modify(|_, w| unsafe { w.dig_dbias_wak().bits(DIG_DBIAS_XTAL as u8) });
 }
 
 pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
-    let efuse = crate::peripherals::EFUSE::regs();
-    let dport = crate::peripherals::DPORT::regs();
-    let rtc_cntl = crate::peripherals::LPWR::regs();
+    let rtc_cntl_dbias_hp_volt: u32 = RTC_CNTL_DBIAS_1V25
+        - EFUSE::regs()
+            .blk0_rdata5()
+            .read()
+            .rd_vol_level_hp_inv()
+            .bits() as u32;
+    let dig_dbias_240_m: u32 = rtc_cntl_dbias_hp_volt;
 
-    unsafe {
-        const RTC_CNTL_DBIAS_1V25: u32 = 7;
+    const CPU_80M: u32 = 0;
+    const CPU_160M: u32 = 1;
+    const CPU_240M: u32 = 2;
 
-        let rtc_cntl_dbias_hp_volt: u32 =
-            RTC_CNTL_DBIAS_1V25 - efuse.blk0_rdata5().read().rd_vol_level_hp_inv().bits() as u32;
-        let dig_dbias_240_m: u32 = rtc_cntl_dbias_hp_volt;
+    let mut dbias = DIG_DBIAS_80M_160M;
+    let per_conf;
 
-        const CPU_80M: u32 = 0;
-        const CPU_160M: u32 = 1;
-        const CPU_240M: u32 = 2;
-
-        let mut dbias = DIG_DBIAS_80M_160M;
-        let per_conf;
-
-        match cpu_freq_mhz {
-            crate::clock::CpuClock::_160MHz => {
-                per_conf = CPU_160M;
-            }
-            crate::clock::CpuClock::_240MHz => {
-                dbias = dig_dbias_240_m;
-                per_conf = CPU_240M;
-            }
-            crate::clock::CpuClock::_80MHz => {
-                per_conf = CPU_80M;
-            }
+    match cpu_freq_mhz {
+        crate::clock::CpuClock::_160MHz => {
+            per_conf = CPU_160M;
         }
-
-        let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
-        dport
-            .cpu_per_conf()
-            .write(|w| w.cpuperiod_sel().bits(per_conf as u8));
-        rtc_cntl
-            .reg()
-            .modify(|_, w| w.dig_dbias_wak().bits(dbias as u8));
-        rtc_cntl.clk_conf().modify(|_, w| w.soc_clk_sel().pll());
-        rtc_cntl.store5().modify(|_, w| w.scratch5().bits(value));
-
-        esp32_update_cpu_freq(cpu_freq_mhz.mhz());
+        crate::clock::CpuClock::_240MHz => {
+            dbias = dig_dbias_240_m;
+            per_conf = CPU_240M;
+        }
+        crate::clock::CpuClock::_80MHz => {
+            per_conf = CPU_80M;
+        }
     }
+
+    let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
+    DPORT::regs()
+        .cpu_per_conf()
+        .write(|w| unsafe { w.cpuperiod_sel().bits(per_conf as u8) });
+    LPWR::regs()
+        .reg()
+        .modify(|_, w| unsafe { w.dig_dbias_wak().bits(dbias as u8) });
+    LPWR::regs().clk_conf().modify(|_, w| w.soc_clk_sel().pll());
+    LPWR::regs()
+        .store5()
+        .modify(|_, w| unsafe { w.scratch5().bits(value) });
+
+    esp32_update_cpu_freq(cpu_freq_mhz.mhz());
 }
 
 /// Pass the CPU clock in MHz so that ets_delay_us
@@ -294,13 +288,12 @@ pub(super) fn enable_wifi(enable: bool) {
 }
 
 pub(super) fn reset_mac() {
-    const SYSTEM_MAC_RST: u8 = 1 << 2;
     DPORT::regs()
-        .core_rst_en()
-        .modify(|r, w| unsafe { w.core_rst().bits(r.core_rst().bits() | SYSTEM_MAC_RST) });
+        .wifi_rst_en()
+        .modify(|_, w| w.mac_rst().set_bit());
     DPORT::regs()
-        .core_rst_en()
-        .modify(|r, w| unsafe { w.core_rst().bits(r.core_rst().bits() & !SYSTEM_MAC_RST) });
+        .wifi_rst_en()
+        .modify(|_, w| w.mac_rst().clear_bit());
 }
 
 pub(super) fn init_clocks() {

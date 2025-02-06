@@ -1,46 +1,44 @@
-use crate::{clock::CpuClock, peripherals::SYSCON};
+use crate::{
+    clock::CpuClock,
+    peripherals::{LPWR, SYSCON, SYSTEM},
+};
 
 const MHZ: u32 = 1000000;
 const UINT16_MAX: u32 = 0xffff;
 
-const RTC_CNTL_DBIAS_1V25: u32 = 7;
+const RTC_CNTL_DBIAS_1V25: u8 = 7;
 
 // when not running with 80MHz Flash frequency we could use RTC_CNTL_DBIAS_1V10
 // for DIG_DBIAS_80M_160M - but RTC_CNTL_DBIAS_1V25 shouldn't hurt
-const DIG_DBIAS_80M_160M: u32 = RTC_CNTL_DBIAS_1V25;
-const DIG_DBIAS_240M: u32 = RTC_CNTL_DBIAS_1V25;
+const DIG_DBIAS_80M_160M: u8 = RTC_CNTL_DBIAS_1V25;
+const DIG_DBIAS_240M: u8 = RTC_CNTL_DBIAS_1V25;
 
 pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
-    let system_control = crate::peripherals::SYSTEM::regs();
-    let rtc_cntl = crate::peripherals::LPWR::regs();
+    SYSTEM::regs()
+        .sysclk_conf()
+        .modify(|_, w| unsafe { w.soc_clk_sel().bits(1) });
+    SYSTEM::regs().cpu_per_conf().modify(|_, w| unsafe {
+        w.pll_freq_sel().set_bit();
+        w.cpuperiod_sel().bits(match cpu_clock_speed {
+            CpuClock::_80MHz => 0,
+            CpuClock::_160MHz => 1,
+            CpuClock::_240MHz => 2,
+        })
+    });
 
-    unsafe {
-        system_control
-            .sysclk_conf()
-            .modify(|_, w| w.soc_clk_sel().bits(1));
-        system_control.cpu_per_conf().modify(|_, w| {
-            w.pll_freq_sel()
-                .set_bit()
-                .cpuperiod_sel()
-                .bits(match cpu_clock_speed {
-                    CpuClock::_80MHz => 0,
-                    CpuClock::_160MHz => 1,
-                    CpuClock::_240MHz => 2,
-                })
-        });
+    LPWR::regs().reg().modify(|_, w| unsafe {
+        w.dig_reg_dbias_wak().bits(match cpu_clock_speed {
+            CpuClock::_80MHz => DIG_DBIAS_80M_160M,
+            CpuClock::_160MHz => DIG_DBIAS_80M_160M,
+            CpuClock::_240MHz => DIG_DBIAS_240M,
+        })
+    });
 
-        rtc_cntl.reg().modify(|_, w| {
-            w.dig_reg_dbias_wak().bits(match cpu_clock_speed {
-                CpuClock::_80MHz => DIG_DBIAS_80M_160M,
-                CpuClock::_160MHz => DIG_DBIAS_80M_160M,
-                CpuClock::_240MHz => DIG_DBIAS_240M,
-            } as u8)
-        });
-
-        // FIXME untangle this
-        let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
-        rtc_cntl.store5().modify(|_, w| w.scratch5().bits(value));
-    }
+    // FIXME untangle this
+    let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
+    LPWR::regs()
+        .store5()
+        .modify(|_, w| unsafe { w.scratch5().bits(value) });
 }
 
 // Mask for clock bits used by both WIFI and Bluetooth, bit 0, 3, 6, 7, 8, 9
@@ -72,13 +70,12 @@ pub(super) fn enable_wifi(enable: bool) {
 }
 
 pub(super) fn reset_mac() {
-    const SYSTEM_MAC_RST: u32 = 1 << 2;
     SYSCON::regs()
         .wifi_rst_en()
-        .modify(|r, w| unsafe { w.wifi_rst().bits(r.wifi_rst().bits() | SYSTEM_MAC_RST) });
+        .modify(|_, w| w.mac_rst().set_bit());
     SYSCON::regs()
         .wifi_rst_en()
-        .modify(|r, w| unsafe { w.wifi_rst().bits(r.wifi_rst().bits() & !SYSTEM_MAC_RST) });
+        .modify(|_, w| w.mac_rst().clear_bit());
 }
 
 pub(super) fn init_clocks() {
