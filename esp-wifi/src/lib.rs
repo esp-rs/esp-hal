@@ -449,10 +449,6 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     // This shuts down the task switcher and timer tick interrupt.
     preempt::disable();
 
-    crate::preempt::delete_all_tasks();
-
-    crate::preempt::timer::TIMER.with(|timer| timer.take());
-
     crate::flags::ESP_WIFI_INITIALIZED.store(false, Ordering::Release);
 
     Ok(())

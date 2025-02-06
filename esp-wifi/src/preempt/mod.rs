@@ -33,6 +33,9 @@ pub(crate) fn setup(timer: crate::TimeBase) {
 pub(crate) fn disable() {
     disable_timer();
     disable_multitasking();
+    delete_all_tasks();
+
+    timer::TIMER.with(|timer| timer.take());
 }
 
 fn allocate_main_task() -> *mut Context {
