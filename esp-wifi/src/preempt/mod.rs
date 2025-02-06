@@ -1,14 +1,21 @@
 #[cfg_attr(target_arch = "riscv32", path = "preempt_riscv.rs")]
 #[cfg_attr(target_arch = "xtensa", path = "preempt_xtensa.rs")]
-pub mod arch_specific;
+mod arch_specific;
 
 use core::mem::size_of;
 
 use arch_specific::*;
 use esp_hal::sync::Locked;
 use esp_wifi_sys::include::malloc;
+//
+pub(crate) use {crate::timer::yield_task, arch_specific::task_create};
 
-use crate::{compat::malloc::free, hal::trapframe::TrapFrame, memory_fence::memory_fence};
+use crate::{
+    compat::malloc::free,
+    hal::trapframe::TrapFrame,
+    memory_fence::memory_fence,
+    timer::{disable_multitasking, disable_timer, setup_multitasking, setup_timer},
+};
 
 #[repr(transparent)]
 struct ContextWrapper(*mut Context);
@@ -19,7 +26,19 @@ static CTX_NOW: Locked<ContextWrapper> = Locked::new(ContextWrapper(core::ptr::n
 
 static mut SCHEDULED_TASK_TO_DELETE: *mut Context = core::ptr::null_mut();
 
-pub(crate) fn allocate_main_task() -> *mut Context {
+pub(crate) fn setup(timer: crate::TimeBase) {
+    // allocate the main task
+    allocate_main_task();
+    setup_timer(timer);
+    setup_multitasking();
+}
+
+pub(crate) fn disable() {
+    disable_timer();
+    disable_multitasking();
+}
+
+fn allocate_main_task() -> *mut Context {
     CTX_NOW.with(|ctx_now| unsafe {
         if !ctx_now.0.is_null() {
             panic!("Tried to allocate main task multiple times");
@@ -114,8 +133,6 @@ pub(crate) fn current_task() -> *mut Context {
 }
 
 pub(crate) fn schedule_task_deletion(task: *mut Context) {
-    use crate::timer::yield_task;
-
     unsafe {
         SCHEDULED_TASK_TO_DELETE = task;
     }

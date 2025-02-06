@@ -14,8 +14,7 @@ use crate::{
     binary::c_types::{c_int, c_void},
     hal::sync::Locked,
     memory_fence::memory_fence,
-    preempt::current_task,
-    timer::yield_task,
+    preempt::{current_task, yield_task},
 };
 
 pub(crate) const OSI_FUNCS_TIME_BLOCKING: u32 = u32::MAX;

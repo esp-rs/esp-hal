@@ -35,7 +35,7 @@ use crate::{
         sync::{Locked, RawMutex},
     },
     memory_fence::memory_fence,
-    timer::yield_task,
+    preempt::yield_task,
 };
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
@@ -665,7 +665,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
         extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
     >(task_func);
 
-    let task = crate::preempt::arch_specific::task_create(task_func, param, stack_depth as usize);
+    let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
     *(task_handle as *mut usize) = task as usize;
 
     1
