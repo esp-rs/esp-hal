@@ -1998,6 +1998,7 @@ where
             accesses_psram: uses_psram,
             burst_transfer: BurstConfig::default(),
             check_owner: Some(false),
+            auto_write_back: true,
         };
         self.do_prepare(preparation, peri)
     }
@@ -2226,6 +2227,8 @@ where
         self.tx_impl.set_burst_mode(preparation.burst_transfer);
         self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);
+        self.tx_impl
+            .set_auto_write_back(preparation.auto_write_back);
 
         compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
@@ -2293,12 +2296,10 @@ where
             accesses_psram: uses_psram,
             burst_transfer: BurstConfig::default(),
             check_owner: Some(false),
+            // enable descriptor write back in circular mode
+            auto_write_back: !(*chain.last()).next.is_null(),
         };
         self.do_prepare(preparation, peri)?;
-
-        // enable descriptor write back in circular mode
-        self.tx_impl
-            .set_auto_write_back(!(*chain.last()).next.is_null());
 
         Ok(())
     }

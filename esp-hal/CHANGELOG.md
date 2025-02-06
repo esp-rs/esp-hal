@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Async support for ADC oneshot reads for ESP32C2, ESP32C3, ESP32C6 and ESP32H2 (#2925, #3082)
 - `ESP_HAL_CONFIG_XTAL_FREQUENCY` configuration. For now, chips other than ESP32 and ESP32-C2 have a single option only. (#3054)
 - Added more validation to UART and SPI. User can now specify the baudrate tolerance of UART config (#3074)
+- Add auto-writeback support to DMA buffers (#3107)
 
 ### Changed
 
