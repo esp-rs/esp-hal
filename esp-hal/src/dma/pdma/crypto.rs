@@ -486,7 +486,7 @@ impl PdmaChannel for CryptoDmaChannel {
         compatible_peripherals.contains(&peripheral)
     }
     fn peripheral_interrupt(&self) -> Interrupt {
-        unreachable!("Crypto DMA has separate interrupts specific to AES and SHA")
+        Interrupt::CRYPTO_DMA
     }
     fn async_handler(&self) -> InterruptHandler {
         pub(crate) extern "C" fn __esp_hal_internal_interrupt_handler() {
