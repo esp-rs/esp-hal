@@ -152,10 +152,6 @@
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_hal_config_table.md"))]
 #![doc = ""]
-//! It's important to note that due to a [bug in cargo](https://github.com/rust-lang/cargo/issues/10358),
-//! any modifications to the environment, local or otherwise will only get
-//! picked up on a full clean build of the project.
-//!
 //! ## Don't use `core::mem::forget`
 //!
 //! You should never use `core::mem::forget` on any type defined in the HAL.
@@ -501,9 +497,7 @@ macro_rules! impl_persistable {
     )+};
 }
 
-impl_persistable!(
-    u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64
-);
+impl_persistable!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64);
 impl_persistable!(atomic AtomicU8, AtomicI8, AtomicU16, AtomicI16, AtomicU32, AtomicI32, AtomicUsize, AtomicIsize);
 
 unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}
