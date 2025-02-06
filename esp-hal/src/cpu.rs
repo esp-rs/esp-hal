@@ -124,47 +124,6 @@ pub enum SleepSource {
     BT,
 }
 
-bitflags::bitflags! {
-    #[allow(unused)]
-    pub(crate) struct WakeupReason: u32 {
-        const NoSleep         = 0;
-        #[cfg(pm_support_ext0_wakeup)]
-        /// EXT0 GPIO wakeup
-        const ExtEvent0Trig   = 1 << 0;
-        #[cfg(pm_support_ext1_wakeup)]
-        /// EXT1 GPIO wakeup
-        const ExtEvent1Trig   = 1 << 1;
-        /// GPIO wakeup (light sleep only)
-        const GpioTrigEn      = 1 << 2;
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        /// Timer wakeup
-        const TimerTrigEn     = 1 << 3;
-        #[cfg(any(esp32c6, esp32h2))]
-        /// Timer wakeup
-        const TimerTrigEn     = 1 << 4;
-        #[cfg(pm_support_wifi_wakeup)]
-        /// MAC wakeup (light sleep only)
-        const WifiTrigEn      = 1 << 5;
-        /// UART0 wakeup (light sleep only)
-        const Uart0TrigEn     = 1 << 6;
-        /// UART1 wakeup (light sleep only)
-        const Uart1TrigEn     = 1 << 7;
-        #[cfg(pm_support_touch_sensor_wakeup)]
-        /// Touch wakeup
-        const TouchTrigEn     = 1 << 8;
-        #[cfg(ulp_supported)]
-        /// ULP wakeup
-        const UlpTrigEn       = 1 << 9;
-        #[cfg(pm_support_bt_wakeup)]
-        /// BT wakeup (light sleep only)
-        const BtTrigEn        = 1 << 10;
-        #[cfg(riscv_coproc_supported)]
-        const CocpuTrigEn     = 1 << 11;
-        #[cfg(riscv_coproc_supported)]
-        const CocpuTrapTrigEn = 1 << 13;
-    }
-}
-
 /// Performs a software reset on the chip.
 #[inline]
 pub fn software_reset() -> ! {
