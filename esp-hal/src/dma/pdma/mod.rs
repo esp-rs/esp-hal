@@ -24,10 +24,14 @@ use crate::{
 };
 
 #[cfg(esp32s2)]
+mod copy;
+#[cfg(esp32s2)]
 mod crypto;
 mod i2s;
 mod spi;
 
+#[cfg(esp32s2)]
+pub use copy::*;
 #[cfg(esp32s2)]
 pub use crypto::*;
 pub use i2s::*;
