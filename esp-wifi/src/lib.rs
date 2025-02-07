@@ -391,12 +391,12 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
 
     setup_radio_isr();
 
-    // This initializes the task switcher
-    preempt::enable();
-
     // Enable timer tick interrupt
     #[cfg(feature = "builtin-scheduler")]
     preempt_builtin::setup_timer(unsafe { timer.clone_unchecked() }.timer());
+
+    // This initializes the task switcher
+    preempt::enable();
 
     init_tasks();
     yield_task();
