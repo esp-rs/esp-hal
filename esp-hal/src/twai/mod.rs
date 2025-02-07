@@ -131,7 +131,7 @@ use crate::{
     interrupt::InterruptHandler,
     pac::twai0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    system::PeripheralGuard,
+    system::{Cpu, PeripheralGuard},
     twai::filter::SingleStandardFilter,
     Async,
     Blocking,
@@ -745,7 +745,7 @@ where
     }
 
     fn internal_set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
+        for core in Cpu::other() {
             crate::interrupt::disable(core, self.twai.interrupt());
         }
         unsafe { crate::interrupt::bind_interrupt(self.twai.interrupt(), handler.handler()) };
@@ -986,7 +986,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
 impl<'d> TwaiConfiguration<'d, Async> {
     /// Convert the configuration into a blocking configuration.
     pub fn into_blocking(self) -> TwaiConfiguration<'d, Blocking> {
-        use crate::{interrupt, Cpu};
+        use crate::{interrupt, system::Cpu};
 
         interrupt::disable(Cpu::current(), self.twai.interrupt());
 

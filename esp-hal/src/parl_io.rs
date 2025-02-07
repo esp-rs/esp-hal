@@ -985,7 +985,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
     let mut peri = unsafe { PARL_IO::steal() };
     #[cfg(esp32c6)]
     {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::PARL_IO);
         }
         internal_listen(EnumSet::all(), false);
@@ -999,7 +999,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
     }
     #[cfg(esp32h2)]
     {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
             crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
         }
@@ -1107,7 +1107,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
 
     /// Convert to an async version.
     pub fn into_async(self) -> ParlIoFullDuplex<'d, Async> {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             #[cfg(esp32c6)]
             {
                 crate::interrupt::disable(core, Interrupt::PARL_IO);
@@ -1244,7 +1244,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
 
     /// Converts to Async mode.
     pub fn into_async(self) -> ParlIoTxOnly<'d, Async> {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             #[cfg(esp32c6)]
             {
                 crate::interrupt::disable(core, Interrupt::PARL_IO);
@@ -1372,7 +1372,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
 
     /// Converts to Async mode.
     pub fn into_async(self) -> ParlIoRxOnly<'d, Async> {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             #[cfg(esp32c6)]
             {
                 crate::interrupt::disable(core, Interrupt::PARL_IO);

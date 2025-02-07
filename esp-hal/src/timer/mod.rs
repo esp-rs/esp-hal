@@ -52,10 +52,10 @@ use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
+    system::Cpu,
     time::{Duration, Instant},
     Async,
     Blocking,
-    Cpu,
     DriverMode,
 };
 

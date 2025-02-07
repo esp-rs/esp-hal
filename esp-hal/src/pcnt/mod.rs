@@ -188,7 +188,7 @@ impl<'d> Pcnt<'d> {
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::PCNT);
         }
         unsafe { interrupt::bind_interrupt(Interrupt::PCNT, handler.handler()) };

@@ -132,10 +132,9 @@ use crate::{
     pac::usb_device::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, USB_DEVICE},
-    system::PeripheralClockControl,
+    system::{Cpu, PeripheralClockControl},
     Async,
     Blocking,
-    Cpu,
     DriverMode,
 };
 
@@ -447,7 +446,7 @@ where
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::USB_DEVICE);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::USB_DEVICE, handler.handler()) };

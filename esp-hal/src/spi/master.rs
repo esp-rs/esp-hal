@@ -59,11 +59,10 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     private::{self, Sealed},
     spi::AnySpi,
-    system::PeripheralGuard,
+    system::{Cpu, PeripheralGuard},
     time::Rate,
     Async,
     Blocking,
-    Cpu,
     DriverMode,
 };
 
@@ -1345,7 +1344,7 @@ mod dma {
         /// Interrupts are not enabled at the peripheral level here.
         fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
             let interrupt = self.driver().info.interrupt;
-            for core in crate::Cpu::other() {
+            for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
             unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };

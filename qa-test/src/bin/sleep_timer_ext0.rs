@@ -22,7 +22,7 @@ use esp_hal::{
         Rtc,
         SocResetReason,
     },
-    Cpu,
+    system::Cpu,
 };
 use esp_println::println;
 

@@ -46,7 +46,7 @@ use crate::{
     gpio::{AlternateFunction, GpioPin},
     pac::io_mux,
     peripherals::{GPIO, IO_MUX},
-    Cpu,
+    system::Cpu,
 };
 
 /// The total number of GPIO pins available.

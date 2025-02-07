@@ -26,9 +26,8 @@ use crate::{
     peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     sync::{lock, RawMutex},
-    system::{Peripheral as PeripheralEnable, PeripheralClockControl},
+    system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
-    Cpu,
 };
 
 /// The configuration of a unit.
@@ -397,7 +396,7 @@ impl Alarm {
             _ => unreachable!(),
         };
 
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
 

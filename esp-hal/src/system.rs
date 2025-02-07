@@ -3,18 +3,8 @@
 use core::cell::RefCell;
 
 use critical_section::{CriticalSection, Mutex};
-use strum::{EnumCount, EnumIter, IntoEnumIterator};
 
 use crate::peripherals::SYSTEM;
-
-pub(crate) const KEEP_ENABLED: &[Peripheral] = &[
-    Peripheral::Uart0,
-    #[cfg(usb_device)]
-    Peripheral::UsbDevice,
-    #[cfg(systimer)]
-    Peripheral::Systimer,
-    Peripheral::Timg0,
-];
 
 /// Peripherals which can be enabled via `PeripheralClockControl`.
 ///
@@ -24,7 +14,7 @@ pub(crate) const KEEP_ENABLED: &[Peripheral] = &[
 // FIXME: This enum needs to be public because it's exposed via a bunch of traits, but it's not
 // useful to users.
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumCount, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Peripheral {
@@ -133,6 +123,90 @@ pub enum Peripheral {
 }
 
 impl Peripheral {
+    const KEEP_ENABLED: &[Peripheral] = &[
+        Peripheral::Uart0,
+        #[cfg(usb_device)]
+        Peripheral::UsbDevice,
+        #[cfg(systimer)]
+        Peripheral::Systimer,
+        Peripheral::Timg0,
+    ];
+
+    const COUNT: usize = Self::ALL.len();
+
+    const ALL: &[Self] = &[
+        #[cfg(spi2)]
+        Self::Spi2,
+        #[cfg(spi3)]
+        Self::Spi3,
+        #[cfg(i2c0)]
+        Self::I2cExt0,
+        #[cfg(i2c1)]
+        Self::I2cExt1,
+        #[cfg(rmt)]
+        Self::Rmt,
+        #[cfg(ledc)]
+        Self::Ledc,
+        #[cfg(mcpwm0)]
+        Self::Mcpwm0,
+        #[cfg(mcpwm1)]
+        Self::Mcpwm1,
+        #[cfg(pcnt)]
+        Self::Pcnt,
+        #[cfg(apb_saradc)]
+        Self::ApbSarAdc,
+        #[cfg(gdma)]
+        Self::Gdma,
+        #[cfg(pdma)]
+        Self::Dma,
+        #[cfg(i2s0)]
+        Self::I2s0,
+        #[cfg(i2s1)]
+        Self::I2s1,
+        #[cfg(usb0)]
+        Self::Usb,
+        #[cfg(aes)]
+        Self::Aes,
+        #[cfg(twai0)]
+        Self::Twai0,
+        #[cfg(twai1)]
+        Self::Twai1,
+        #[cfg(timg0)]
+        Self::Timg0,
+        #[cfg(timg1)]
+        Self::Timg1,
+        #[cfg(sha)]
+        Self::Sha,
+        #[cfg(usb_device)]
+        Self::UsbDevice,
+        #[cfg(uart0)]
+        Self::Uart0,
+        #[cfg(uart1)]
+        Self::Uart1,
+        #[cfg(uart2)]
+        Self::Uart2,
+        #[cfg(rsa)]
+        Self::Rsa,
+        #[cfg(parl_io)]
+        Self::ParlIo,
+        #[cfg(hmac)]
+        Self::Hmac,
+        #[cfg(ecc)]
+        Self::Ecc,
+        #[cfg(soc_etm)]
+        Self::Etm,
+        #[cfg(trace0)]
+        Self::Trace0,
+        #[cfg(lcd_cam)]
+        Self::LcdCam,
+        #[cfg(systimer)]
+        Self::Systimer,
+        #[cfg(tsens)]
+        Self::Tsens,
+    ];
+}
+
+impl Peripheral {
     pub fn try_from(value: u8) -> Option<Peripheral> {
         if value >= Peripheral::COUNT as u8 {
             return None;
@@ -151,11 +225,11 @@ static PERIPHERAL_REF_COUNT: Mutex<RefCell<[usize; Peripheral::COUNT]>> =
 pub(crate) fn disable_peripherals() {
     // Take the critical section up front to avoid taking it multiple times.
     critical_section::with(|cs| {
-        for p in Peripheral::iter() {
-            if KEEP_ENABLED.contains(&p) {
+        for p in Peripheral::ALL {
+            if Peripheral::KEEP_ENABLED.contains(p) {
                 continue;
             }
-            PeripheralClockControl::enable_forced_with_cs(p, false, true, cs);
+            PeripheralClockControl::enable_forced_with_cs(*p, false, true, cs);
         }
     })
 }
@@ -168,7 +242,7 @@ pub(crate) struct PeripheralGuard {
 
 impl PeripheralGuard {
     pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
-        if !KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p) {
+        if !Peripheral::KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p) {
             PeripheralClockControl::reset(p);
             init();
         }
@@ -183,7 +257,7 @@ impl PeripheralGuard {
 
 impl Drop for PeripheralGuard {
     fn drop(&mut self) {
-        if !KEEP_ENABLED.contains(&self.peripheral) {
+        if !Peripheral::KEEP_ENABLED.contains(&self.peripheral) {
             PeripheralClockControl::disable(self.peripheral);
         }
     }
@@ -197,7 +271,7 @@ impl<const P: u8> GenericPeripheralGuard<P> {
     pub(crate) fn new_with(init: fn(CriticalSection<'_>)) -> Self {
         let peripheral = unwrap!(Peripheral::try_from(P));
         critical_section::with(|cs| {
-            if !KEEP_ENABLED.contains(&peripheral)
+            if !Peripheral::KEEP_ENABLED.contains(&peripheral)
                 && PeripheralClockControl::enable_with_cs(peripheral, cs)
             {
                 PeripheralClockControl::reset(peripheral);
@@ -216,7 +290,7 @@ impl<const P: u8> GenericPeripheralGuard<P> {
 impl<const P: u8> Drop for GenericPeripheralGuard<P> {
     fn drop(&mut self) {
         let peripheral = unwrap!(Peripheral::try_from(P));
-        if !KEEP_ENABLED.contains(&peripheral) {
+        if !Peripheral::KEEP_ENABLED.contains(&peripheral) {
             PeripheralClockControl::disable(peripheral);
         }
     }
@@ -1074,4 +1148,156 @@ impl PeripheralClockControl {
 
         true
     }
+}
+
+#[cfg(any(esp32, esp32s3))]
+#[allow(unused_imports)]
+pub use crate::soc::cpu_control::*;
+
+/// Available CPU cores
+///
+/// The actual number of available cores depends on the target.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::FromRepr)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(C)]
+pub enum Cpu {
+    /// The first core
+    ProCpu = 0,
+    /// The second core
+    #[cfg(multi_core)]
+    AppCpu = 1,
+}
+
+impl Cpu {
+    /// The number of available cores.
+    pub const COUNT: usize = 1 + cfg!(multi_core) as usize;
+
+    /// Returns the core the application is currently executing on
+    #[inline(always)]
+    pub fn current() -> Self {
+        // This works for both RISCV and Xtensa because both
+        // get_raw_core functions return zero, _or_ something
+        // greater than zero; 1 in the case of RISCV and 0x2000
+        // in the case of Xtensa.
+        match raw_core() {
+            0 => Cpu::ProCpu,
+            #[cfg(all(multi_core, riscv))]
+            1 => Cpu::AppCpu,
+            #[cfg(all(multi_core, xtensa))]
+            0x2000 => Cpu::AppCpu,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Returns an iterator over the "other" cores.
+    #[inline(always)]
+    pub(crate) fn other() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                match Self::current() {
+                    Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
+                    Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
+                }
+            } else {
+                [].into_iter()
+            }
+        }
+    }
+
+    /// Returns an iterator over all cores.
+    #[inline(always)]
+    pub(crate) fn all() -> impl Iterator<Item = Self> {
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                [Cpu::ProCpu, Cpu::AppCpu].into_iter()
+            } else {
+                [Cpu::ProCpu].into_iter()
+            }
+        }
+    }
+}
+
+/// Returns the raw value of the mhartid register.
+///
+/// On RISC-V, this is the hardware thread ID.
+///
+/// On Xtensa, this returns the result of reading the PRID register logically
+/// ANDed with 0x2000, the 13th bit in the register. Espressif Xtensa chips use
+/// this bit to determine the core id.
+#[inline(always)]
+pub(crate) fn raw_core() -> usize {
+    // This method must never return UNUSED_THREAD_ID_VALUE
+    cfg_if::cfg_if! {
+        if #[cfg(all(multi_core, riscv))] {
+            riscv::register::mhartid::read()
+        } else if #[cfg(all(multi_core, xtensa))] {
+            (xtensa_lx::get_processor_id() & 0x2000) as usize
+        } else {
+            0
+        }
+    }
+}
+
+use crate::rtc_cntl::SocResetReason;
+
+/// Source of the wakeup event
+#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum SleepSource {
+    /// In case of deep sleep, reset was not caused by exit from deep sleep
+    Undefined = 0,
+    /// Not a wakeup cause, used to disable all wakeup sources with
+    /// esp_sleep_disable_wakeup_source
+    All,
+    /// Wakeup caused by external signal using RTC_IO
+    Ext0,
+    /// Wakeup caused by external signal using RTC_CNTL
+    Ext1,
+    /// Wakeup caused by timer
+    Timer,
+    /// Wakeup caused by touchpad
+    TouchPad,
+    /// Wakeup caused by ULP program
+    Ulp,
+    /// Wakeup caused by GPIO (light sleep only on ESP32, S2 and S3)
+    Gpio,
+    /// Wakeup caused by UART (light sleep only)
+    Uart,
+    /// Wakeup caused by WIFI (light sleep only)
+    Wifi,
+    /// Wakeup caused by COCPU int
+    Cocpu,
+    /// Wakeup caused by COCPU crash
+    CocpuTrapTrig,
+    /// Wakeup caused by BT (light sleep only)
+    BT,
+}
+
+/// Performs a software reset on the chip.
+#[inline]
+pub fn software_reset() -> ! {
+    crate::rom::software_reset()
+}
+
+/// Resets the given CPU, leaving peripherals unchanged.
+#[instability::unstable]
+#[inline]
+pub fn software_reset_cpu(cpu: Cpu) {
+    crate::rom::software_reset_cpu(cpu as u32)
+}
+
+/// Retrieves the reason for the last reset as a SocResetReason enum value.
+/// Returns `None` if the reset reason cannot be determined.
+#[instability::unstable]
+#[inline]
+pub fn reset_reason() -> Option<SocResetReason> {
+    crate::rtc_cntl::reset_reason(Cpu::current())
+}
+
+/// Retrieves the cause of the last wakeup event as a SleepSource enum value.
+#[instability::unstable]
+#[inline]
+pub fn wakeup_cause() -> SleepSource {
+    crate::rtc_cntl::wakeup_cause()
 }

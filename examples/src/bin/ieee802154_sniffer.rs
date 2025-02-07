@@ -11,7 +11,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     main,
-    reset::software_reset,
+    system::software_reset,
     uart::{self, Uart},
 };
 use esp_ieee802154::{Config, Ieee802154};

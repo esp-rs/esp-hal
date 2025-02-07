@@ -56,7 +56,7 @@ pub enum WakeupLevel {
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason};
-/// # use esp_hal::Cpu;
+/// # use esp_hal::system::Cpu;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -104,7 +104,7 @@ pub enum Error {
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
-/// # use esp_hal::Cpu;
+/// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull};
 ///
 /// let delay = Delay::new();
@@ -157,7 +157,7 @@ impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
-/// # use esp_hal::Cpu;
+/// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPin};
 /// # use esp_hal::peripheral::Peripheral;
 ///
@@ -214,7 +214,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
-/// # use esp_hal::Cpu;
+/// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPinWithResistors};
 /// # use esp_hal::peripheral::Peripheral;
 ///
@@ -276,7 +276,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::gpio::{self, Input, InputConfig, Pull};
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
-/// # use esp_hal::Cpu;
+/// # use esp_hal::system::Cpu;
 /// # use esp_hal::peripheral::Peripheral;
 ///
 /// let mut rtc = Rtc::new(peripherals.LPWR);
