@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue on ESP32 and S2 where short asynchronous Timer delays would never resolve (#3093)
 - Fixed an issue setting higher UART baud rates (#3104)
 - ESP32-S2: Fixed linker script (#3096)
+- Fix auto writeback on Crypto DMA (#3108)
 
 ### Removed
 

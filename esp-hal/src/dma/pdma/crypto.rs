@@ -143,8 +143,9 @@ impl TxRegisterAccess for CryptoDmaTxChannel {
     }
 
     fn set_auto_write_back(&self, enable: bool) {
-        // there is no `auto_wrback` for SPI
-        assert!(!enable);
+        self.regs()
+            .conf()
+            .modify(|_, w| w.out_auto_wrback().bit(enable));
     }
 
     fn last_dscr_address(&self) -> usize {
