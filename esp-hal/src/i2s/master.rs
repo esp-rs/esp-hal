@@ -463,7 +463,7 @@ impl<Dm> I2sTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
+    fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         self.start_tx_transfer(&data, false)?;
 
         // wait until I2S_TX_IDLE is 1
@@ -505,8 +505,8 @@ where
     }
 
     /// Writes a slice of data to the I2S peripheral.
-    pub fn write(&mut self, words: &[impl AcceptedWord]) -> Result<(), Error> {
-        self.write_bytes(unsafe {
+    pub fn write_words(&mut self, words: &[impl AcceptedWord]) -> Result<(), Error> {
+        self.write(unsafe {
             core::slice::from_raw_parts(words.as_ptr().cast::<u8>(), core::mem::size_of_val(words))
         })
     }
@@ -591,7 +591,7 @@ impl<Dm> I2sRx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn read_bytes(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
+    fn read(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
         self.start_rx_transfer(&mut data, false)?;
 
         // wait until I2S_RX_IDLE is 1
@@ -634,12 +634,12 @@ where
 
     /// Reads a slice of data from the I2S peripheral and stores it in the
     /// provided buffer.
-    pub fn read(&mut self, words: &mut [impl AcceptedWord]) -> Result<(), Error> {
+    pub fn read_words(&mut self, words: &mut [impl AcceptedWord]) -> Result<(), Error> {
         if core::mem::size_of_val(words) > 4096 || words.is_empty() {
             return Err(Error::IllegalArgument);
         }
 
-        self.read_bytes(unsafe {
+        self.read(unsafe {
             core::slice::from_raw_parts_mut(
                 words.as_mut_ptr().cast::<u8>(),
                 core::mem::size_of_val(words),
