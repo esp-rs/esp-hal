@@ -11,7 +11,7 @@ use crate::{
         riscv,
         time::Rate,
     },
-    preempt::task_switch,
+    preempt_builtin::task_switch,
     TimeBase,
 };
 

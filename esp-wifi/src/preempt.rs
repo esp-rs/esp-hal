@@ -1,23 +1,23 @@
-/// This module allows hooking `esp-wifi` into an external scheduler, instead
-/// of using the integrated one as provided by the `preempt` module.
-///
-/// In order to hook up an external scheduler, enable the `preempt-extern`
-/// feature, implement the `Scheduler` trait for a struct, and create the
-/// necessary `extern` functions using the `scheduler_impl!()` macro.
-///
-/// Example:
-///
-/// ```
-/// use esp_wifi::preempt::Scheduler;
-///
-/// struct MyScheduler {}
-///
-/// impl Scheduler for MyScheduler {
-///     // impl goes here
-/// }}
-///
-/// esp_wifi::scheduler_impl!(static SCHEDULER: MyScheduler = MyScheduler {});
-/// ```
+//! This module allows hooking `esp-wifi` into an external scheduler, instead
+//! of using the integrated one as provided by the `preempt` module.
+//!
+//! In order to hook up an external scheduler, enable the `preempt-extern`
+//! feature, implement the `Scheduler` trait for a struct, and create the
+//! necessary `extern` functions using the `scheduler_impl!()` macro.
+//!
+//! Example:
+//!
+//! ```ignore
+//! use esp_wifi::preempt::Scheduler;
+//!
+//! struct MyScheduler {}
+//!
+//! impl Scheduler for MyScheduler {
+//!     // impl goes here
+//! }
+//!
+//! esp_wifi::scheduler_impl!(static SCHEDULER: MyScheduler = MyScheduler {});
+//! ```
 use core::ffi::c_void;
 
 pub trait Scheduler: Send + Sync + 'static {

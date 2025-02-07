@@ -134,11 +134,9 @@ mod binary {
 }
 mod compat;
 
-#[cfg(not(feature = "preempt-extern"))]
-mod preempt;
+#[cfg(feature = "builtin-scheduler")]
+mod preempt_builtin;
 
-#[cfg(feature = "preempt-extern")]
-#[path = "preempt_extern.rs"]
 pub mod preempt;
 
 mod radio;
