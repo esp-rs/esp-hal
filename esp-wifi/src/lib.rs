@@ -412,6 +412,9 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
 
     crate::flags::ESP_WIFI_INITIALIZED.store(true, Ordering::Release);
 
+    #[cfg(not(feature = "builtin-scheduler"))]
+    let _ = timer; // mark used to suppress warning
+
     Ok(EspWifiController {
         _inner: PhantomData,
     })
