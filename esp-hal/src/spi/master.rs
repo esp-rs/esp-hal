@@ -674,8 +674,8 @@ where
 
     /// Write bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
-    pub fn write_bytes(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.driver().write_bytes(words)?;
+    pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+        self.driver().write(words)?;
         self.driver().flush()?;
 
         Ok(())
@@ -683,8 +683,8 @@ where
 
     /// Read bytes from SPI. The provided slice is filled with data received
     /// from the slave.
-    pub fn read_bytes(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.driver().read_bytes(words)
+    pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.driver().read(words)
     }
 
     /// Sends `words` to the slave. Returns the `words` received from the slave.
@@ -1144,7 +1144,7 @@ where
         self.driver().configure_datalen(buffer.len(), 0);
         self.driver().start_operation();
         self.driver().flush()?;
-        self.driver().read_bytes_from_fifo(buffer)
+        self.driver().read_from_fifo(buffer)
     }
 
     /// Half-duplex write.
@@ -1207,7 +1207,7 @@ where
 
         if !buffer.is_empty() {
             // re-using the full-duplex write here
-            self.driver().write_bytes(buffer)?;
+            self.driver().write(buffer)?;
         } else {
             self.driver().start_operation();
         }
@@ -2533,11 +2533,11 @@ mod ehal1 {
         Dm: DriverMode,
     {
         fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.driver().read_bytes(words)
+            self.driver().read(words)
         }
 
         fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.driver().write_bytes(words)
+            self.driver().write(words)
         }
 
         fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
@@ -2577,7 +2577,7 @@ mod ehal1 {
                 if read_inc > 0 {
                     SpiBus::flush(self)?;
                     self.driver()
-                        .read_bytes_from_fifo(&mut read[read_from..read_to])?;
+                        .read_from_fifo(&mut read[read_from..read_to])?;
                 }
 
                 write_from = write_to;
@@ -2600,14 +2600,14 @@ mod ehal1 {
             // We need to flush because the blocking transfer functions may return while a
             // transfer is still in progress.
             self.flush_async().await?;
-            self.driver().read_bytes_async(words).await
+            self.driver().read_async(words).await
         }
 
         async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
             // We need to flush because the blocking transfer functions may return while a
             // transfer is still in progress.
             self.flush_async().await?;
-            self.driver().write_bytes_async(words).await
+            self.driver().write_async(words).await
         }
 
         async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
@@ -2646,7 +2646,7 @@ mod ehal1 {
 
                 if read_inc > 0 {
                     self.driver()
-                        .read_bytes_from_fifo(&mut read[read_from..read_to])?;
+                        .read_from_fifo(&mut read[read_from..read_to])?;
                 }
 
                 write_from = write_to;
@@ -3232,7 +3232,7 @@ impl Driver {
     /// have been sent to the wire. If you must ensure that the whole
     /// messages was written correctly, use [`Self::flush`].
     #[cfg_attr(place_spi_driver_in_ram, ram)]
-    fn write_bytes(&self, words: &[u8]) -> Result<(), Error> {
+    fn write(&self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
 
         // Flush in case previous writes have not completed yet, required as per
@@ -3259,7 +3259,7 @@ impl Driver {
 
     /// Write bytes to SPI.
     #[cfg_attr(place_spi_driver_in_ram, ram)]
-    async fn write_bytes_async(&self, words: &[u8]) -> Result<(), Error> {
+    async fn write_async(&self, words: &[u8]) -> Result<(), Error> {
         // The fifo has a limited fixed size, so the data must be chunked and then
         // transmitted
         for chunk in words.chunks(FIFO_SIZE) {
@@ -3276,13 +3276,13 @@ impl Driver {
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
     #[cfg_attr(place_spi_driver_in_ram, ram)]
-    fn read_bytes(&self, words: &mut [u8]) -> Result<(), Error> {
+    fn read(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_bytes(&empty_array[0..chunk.len()])?;
+            self.write(&empty_array[0..chunk.len()])?;
             self.flush()?;
-            self.read_bytes_from_fifo(chunk)?;
+            self.read_from_fifo(chunk)?;
         }
         Ok(())
     }
@@ -3293,12 +3293,12 @@ impl Driver {
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
     #[cfg_attr(place_spi_driver_in_ram, ram)]
-    async fn read_bytes_async(&self, words: &mut [u8]) -> Result<(), Error> {
+    async fn read_async(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_bytes_async(&empty_array[0..chunk.len()]).await?;
-            self.read_bytes_from_fifo(chunk)?;
+            self.write_async(&empty_array[0..chunk.len()]).await?;
+            self.read_from_fifo(chunk)?;
         }
         Ok(())
     }
@@ -3310,7 +3310,7 @@ impl Driver {
     /// something you have written before, consider using [`Self::transfer`]
     /// instead.
     #[cfg_attr(place_spi_driver_in_ram, ram)]
-    fn read_bytes_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {
+    fn read_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.regs();
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
@@ -3344,9 +3344,9 @@ impl Driver {
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     fn transfer<'w>(&self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_bytes(chunk)?;
+            self.write(chunk)?;
             self.flush()?;
-            self.read_bytes_from_fifo(chunk)?;
+            self.read_from_fifo(chunk)?;
         }
 
         Ok(words)
@@ -3355,8 +3355,8 @@ impl Driver {
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     async fn transfer_in_place_async(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_bytes_async(chunk).await?;
-            self.read_bytes_from_fifo(chunk)?;
+            self.write_async(chunk).await?;
+            self.read_from_fifo(chunk)?;
         }
 
         Ok(())

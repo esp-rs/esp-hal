@@ -49,7 +49,7 @@
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
-//! usb_serial.write_bytes(b"Hello, world!")?;
+//! usb_serial.write(b"Hello, world!")?;
 //! # Ok(())
 //! # }
 //! ```
@@ -66,7 +66,7 @@
 //!
 //! // Each component can be used individually to interact with the USB
 //! // Serial/JTAG:
-//! tx.write_bytes(&[42u8])?;
+//! tx.write(&[42u8])?;
 //! let byte = rx.read_byte()?;
 //! # Ok(())
 //! # }
@@ -176,7 +176,7 @@ where
     }
 
     /// Write data to the serial output in chunks of up to 64 bytes
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
+    pub fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         for chunk in data.chunks(64) {
             for byte in chunk {
                 self.regs()
@@ -395,8 +395,8 @@ where
     }
 
     /// Write data to the serial output in chunks of up to 64 bytes
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
-        self.tx.write_bytes(data)
+    pub fn write(&mut self, data: &[u8]) -> Result<(), Error> {
+        self.tx.write(data)
     }
 
     /// Write data to the serial output in a non-blocking manner
@@ -507,8 +507,7 @@ where
     Dm: DriverMode,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write_bytes(s.as_bytes())
-            .map_err(|_| core::fmt::Error)?;
+        self.write(s.as_bytes()).map_err(|_| core::fmt::Error)?;
         Ok(())
     }
 }
@@ -540,14 +539,14 @@ where
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write_bytes(s.as_bytes())?;
+        self.write(s.as_bytes())?;
         Ok(())
     }
 
     #[inline]
     fn write_char(&mut self, ch: char) -> Result<(), Self::Error> {
         let mut buffer = [0u8; 4];
-        self.write_bytes(ch.encode_utf8(&mut buffer).as_bytes())?;
+        self.write(ch.encode_utf8(&mut buffer).as_bytes())?;
 
         Ok(())
     }
@@ -622,7 +621,7 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_bytes(buf)?;
+        self.write(buf)?;
 
         Ok(buf.len())
     }
@@ -743,7 +742,7 @@ impl<'d> UsbSerialJtag<'d, Async> {
 }
 
 impl UsbSerialJtagTx<'_, Async> {
-    async fn write_bytes_async(&mut self, words: &[u8]) -> Result<(), Error> {
+    async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(64) {
             for byte in chunk {
                 self.regs()
@@ -774,15 +773,15 @@ impl UsbSerialJtagTx<'_, Async> {
 }
 
 impl UsbSerialJtagRx<'_, Async> {
-    async fn read_bytes_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if buf.is_empty() {
             return Ok(0);
         }
 
         loop {
-            let read_bytes = self.drain_rx_fifo(buf);
-            if read_bytes > 0 {
-                return Ok(read_bytes);
+            let read = self.drain_rx_fifo(buf);
+            if read > 0 {
+                return Ok(read);
             }
             UsbSerialJtagReadFuture::new(self.peripheral.reborrow()).await;
         }
@@ -803,7 +802,7 @@ impl embedded_io_async::Write for UsbSerialJtag<'_, Async> {
 #[instability::unstable]
 impl embedded_io_async::Write for UsbSerialJtagTx<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_bytes_async(buf).await?;
+        self.write_async(buf).await?;
 
         Ok(buf.len())
     }
@@ -823,7 +822,7 @@ impl embedded_io_async::Read for UsbSerialJtag<'_, Async> {
 #[instability::unstable]
 impl embedded_io_async::Read for UsbSerialJtagRx<'_, Async> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        self.read_bytes_async(buf).await
+        self.read_async(buf).await
     }
 }
 

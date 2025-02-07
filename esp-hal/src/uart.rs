@@ -427,7 +427,7 @@ where
 /// .with_rx(peripherals.GPIO1)
 /// .with_tx(peripherals.GPIO2);
 ///
-/// uart.write_bytes(b"Hello world!")?;
+/// uart.write(b"Hello world!")?;
 /// # Ok(())
 /// # }
 /// ```
@@ -573,7 +573,7 @@ where
 
     /// Writes bytes
     #[instability::unstable]
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, Error> {
         let count = data.len();
 
         for &byte in data {
@@ -601,7 +601,7 @@ where
 
     /// Flush the transmit buffer of the UART
     #[instability::unstable]
-    pub fn flush(&mut self) {
+    pub fn flush(&mut self) -> Result<(), TxError> {
         while !self.is_tx_idle() {}
         Ok(())
     }
@@ -844,20 +844,16 @@ where
 
     /// Reads bytes from the UART
     #[instability::unstable]
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
-        let buffered = self.read_buffered_bytes(buf)?;
-        let buf = &mut buf[buffered..];
-
-        for byte in buf.iter_mut() {
-            loop {
-                if let Some(b) = self.read_byte() {
-                    *byte = b;
-                    break;
-                }
-                self.check_for_errors()?;
-            }
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        if buf.is_empty() {
+            return Ok(0);
         }
-        Ok(())
+
+        while self.rx_fifo_count() == 0 {
+            // Block until we received at least one byte
+        }
+
+        self.read_buffered_bytes(buf)
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
@@ -1130,9 +1126,9 @@ where
     /// let (mut rx, mut tx) = uart1.split();
     ///
     /// // Each component can be used individually to interact with the UART:
-    /// tx.write_bytes(&[42u8])?;
+    /// tx.write(&[42u8])?;
     /// let mut byte = [0u8; 1];
-    /// rx.read_bytes(&mut byte);
+    /// rx.read(&mut byte);
     /// # Ok(())
     /// # }
     /// ```
@@ -1149,12 +1145,12 @@ where
     /// #     peripherals.UART1,
     /// #     Config::default())?;
     /// // Write bytes out over the UART:
-    /// uart1.write_bytes(b"Hello, world!")?;
+    /// uart1.write(b"Hello, world!")?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, TxError> {
-        self.tx.write_bytes(data)
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
+        self.tx.write(data)
     }
 
     /// Reads and clears errors set by received data.
@@ -1164,14 +1160,14 @@ where
     }
 
     /// Reads bytes from the UART
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
-        self.rx.read_bytes(buf)
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
+        self.rx.read(buf)
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes without blocking.
     #[instability::unstable]
-    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_buffered_bytes(buf)
     }
 
@@ -1456,7 +1452,7 @@ where
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write_bytes(s.as_bytes())?;
+        self.write(s.as_bytes())?;
         Ok(())
     }
 }
@@ -1477,8 +1473,7 @@ where
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write_bytes(s.as_bytes())
-            .map_err(|_| core::fmt::Error)?;
+        self.write(s.as_bytes()).map_err(|_| core::fmt::Error)?;
         Ok(())
     }
 }
@@ -1560,15 +1555,7 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        if buf.is_empty() {
-            return Ok(0);
-        }
-
-        while self.rx_fifo_count() == 0 {
-            // Block until we received at least one byte
-        }
-
-        self.read_buffered_bytes(buf)
+        self.read(buf)
     }
 }
 
@@ -1602,7 +1589,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io::Write::flush(&mut self.tx).map_err(IoError::Tx)
+        self.tx.flush().map_err(IoError::Tx)
     }
 }
 
@@ -1612,7 +1599,7 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_bytes(buf)
+        self.write(buf)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
@@ -1895,7 +1882,7 @@ impl UartRx<'_, Async> {
 
             let events_happened = UartRxFuture::new(self.uart.reborrow(), events).await;
             // always drain the fifo, if an error has occurred the data is lost
-            let read_bytes = self.flush_buffer(buf);
+            let read = self.flush_buffer(buf);
             // check error events
             rx_event_check_for_error(events_happened)?;
             // Unfortunately, the uart's rx-timeout counter counts up whenever there is
@@ -1906,8 +1893,8 @@ impl UartRx<'_, Async> {
                 .int_clr()
                 .write(|w| w.rxfifo_tout().clear_bit_by_one());
 
-            if read_bytes > 0 {
-                return Ok(read_bytes);
+            if read > 0 {
+                return Ok(read);
             }
         }
     }
