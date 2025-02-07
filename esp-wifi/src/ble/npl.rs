@@ -15,7 +15,7 @@ use crate::{
         self,
         common::{str_from_c, ConcurrentQueue},
     },
-    timer::yield_task,
+    preempt::yield_task,
 };
 
 #[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
@@ -403,7 +403,7 @@ unsafe extern "C" fn task_create(
         extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
     >(task_func);
 
-    let task = crate::preempt::arch_specific::task_create(task_func, param, stack_depth as usize);
+    let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
     *(task_handle as *mut usize) = task as usize;
 
     1

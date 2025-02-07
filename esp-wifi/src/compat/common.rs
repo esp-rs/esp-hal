@@ -14,8 +14,7 @@ use crate::{
     binary::c_types::{c_int, c_void},
     hal::sync::Locked,
     memory_fence::memory_fence,
-    preempt::current_task,
-    timer::yield_task,
+    preempt::{current_task, yield_task},
 };
 
 pub(crate) const OSI_FUNCS_TIME_BLOCKING: u32 = u32::MAX;
@@ -206,7 +205,7 @@ pub(crate) fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
 
     let forever = tick == OSI_FUNCS_TIME_BLOCKING;
     let timeout = tick as u64;
-    let start = crate::timer::systimer_count();
+    let start = crate::time::systimer_count();
 
     let sem = semphr as *mut u32;
 
@@ -227,7 +226,7 @@ pub(crate) fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
             return 1;
         }
 
-        if !forever && crate::timer::elapsed_time_since(start) > timeout {
+        if !forever && crate::time::elapsed_time_since(start) > timeout {
             break 'outer;
         }
 
@@ -251,7 +250,7 @@ pub(crate) fn sem_give(semphr: *mut c_void) -> i32 {
 
 pub(crate) fn thread_sem_get() -> *mut c_void {
     trace!("wifi_thread_semphr_get");
-    unsafe { &mut ((*current_task()).thread_semaphore) as *mut _ as *mut c_void }
+    crate::preempt::current_task_thread_semaphore()
 }
 
 pub(crate) fn create_recursive_mutex() -> *mut c_void {
@@ -376,7 +375,7 @@ pub(crate) fn receive_queued(
 
     let forever = block_time_tick == OSI_FUNCS_TIME_BLOCKING;
     let timeout = block_time_tick as u64;
-    let start = crate::timer::systimer_count();
+    let start = crate::time::systimer_count();
 
     loop {
         if unsafe { (*queue).try_dequeue(item) } {
@@ -384,7 +383,7 @@ pub(crate) fn receive_queued(
             return 1;
         }
 
-        if !forever && crate::timer::elapsed_time_since(start) > timeout {
+        if !forever && crate::time::elapsed_time_since(start) > timeout {
             trace!("queue_recv returns with timeout");
             return -1;
         }
