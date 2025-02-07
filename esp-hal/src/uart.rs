@@ -216,6 +216,24 @@ pub enum BaudrateTolerance {
     ErrorPercent(u8),
 }
 
+/// List of exposed UART events.
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum UartInterrupt {
+    /// Indicates that the received has detected the configured
+    /// [`Uart::set_at_cmd`] character.
+    AtCmd,
+
+    /// The transmitter has finished sending out all data from the FIFO.
+    TxDone,
+
+    /// The receiver has received more data than what
+    /// [`RxConfig::fifo_full_threshold`] specifies.
+    RxFifoFull,
+}
+
 /// UART Configuration
 #[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1046,24 +1064,22 @@ impl<'d> Uart<'d, Async> {
             tx: self.tx.into_blocking(),
         }
     }
-}
 
-/// List of exposed UART events.
-#[derive(Debug, EnumSetType)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-#[instability::unstable]
-pub enum UartInterrupt {
-    /// Indicates that the received has detected the configured
-    /// [`Uart::set_at_cmd`] character.
-    AtCmd,
+    /// Asynchronously reads data from the UART receive buffer into the
+    /// provided buffer.
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        self.rx.read_async(buf).await
+    }
 
-    /// The transmitter has finished sending out all data from the FIFO.
-    TxDone,
+    /// Asynchronously writes data to the UART transmit buffer.
+    pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
+        self.tx.write_async(words).await
+    }
 
-    /// The receiver has received more data than what
-    /// [`RxConfig::fifo_full_threshold`] specifies.
-    RxFifoFull,
+    /// Asynchronously flushes the UART transmit buffer.
+    pub async fn flush_async(&mut self) -> Result<(), Error> {
+        self.tx.flush_async().await
+    }
 }
 
 impl<'d, Dm> Uart<'d, Dm>
@@ -1087,34 +1103,6 @@ where
         self.tx.uart.info().regs()
     }
 
-    /// Split the UART into a transmitter and receiver
-    ///
-    /// This is particularly useful when having two tasks correlating to
-    /// transmitting and receiving.
-    /// ## Example
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart1 = Uart::new(
-    /// #     peripherals.UART1,
-    /// #     Config::default())?
-    /// # .with_rx(peripherals.GPIO1)
-    /// # .with_tx(peripherals.GPIO2);
-    /// // The UART can be split into separate Transmit and Receive components:
-    /// let (mut rx, mut tx) = uart1.split();
-    ///
-    /// // Each component can be used individually to interact with the UART:
-    /// tx.write(&[42u8])?;
-    /// let mut byte = [0u8; 1];
-    /// rx.read(&mut byte);
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[instability::unstable]
-    pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
-        (self.rx, self.tx)
-    }
-
     /// Write bytes out over the UART
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
@@ -1131,59 +1119,9 @@ where
         self.tx.write(data)
     }
 
-    /// Reads and clears errors set by received data.
-    #[instability::unstable]
-    pub fn check_for_rx_errors(&mut self) -> Result<(), Error> {
-        self.rx.check_for_errors()
-    }
-
     /// Reads bytes from the UART
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         self.rx.read(buf)
-    }
-
-    /// Read all available bytes from the RX FIFO into the provided buffer and
-    /// returns the number of read bytes without blocking.
-    #[instability::unstable]
-    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-        self.rx.read_buffered_bytes(buf)
-    }
-
-    /// Configures the AT-CMD detection settings
-    #[instability::unstable]
-    pub fn set_at_cmd(&mut self, config: AtCmdConfig) {
-        #[cfg(not(any(esp32, esp32s2)))]
-        self.regs()
-            .clk_conf()
-            .modify(|_, w| w.sclk_en().clear_bit());
-
-        self.regs().at_cmd_char().write(|w| unsafe {
-            w.at_cmd_char().bits(config.cmd_char);
-            w.char_num().bits(config.char_num)
-        });
-
-        if let Some(pre_idle_count) = config.pre_idle_count {
-            self.regs()
-                .at_cmd_precnt()
-                .write(|w| unsafe { w.pre_idle_num().bits(pre_idle_count as _) });
-        }
-
-        if let Some(post_idle_count) = config.post_idle_count {
-            self.regs()
-                .at_cmd_postcnt()
-                .write(|w| unsafe { w.post_idle_num().bits(post_idle_count as _) });
-        }
-
-        if let Some(gap_timeout) = config.gap_timeout {
-            self.regs()
-                .at_cmd_gaptout()
-                .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout as _) });
-        }
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        self.regs().clk_conf().modify(|_, w| w.sclk_en().set_bit());
-
-        sync_regs(self.regs());
     }
 
     /// Flush the transmit buffer of the UART
@@ -1285,13 +1223,83 @@ where
     }
 }
 
-impl crate::private::Sealed for Uart<'_, Blocking> {}
+impl<'d, Dm: DriverMode> Uart<'d, Dm> {
+    /// Split the UART into a transmitter and receiver
+    ///
+    /// This is particularly useful when having two tasks correlating to
+    /// transmitting and receiving.
+    /// ## Example
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// # let mut uart1 = Uart::new(
+    /// #     peripherals.UART1,
+    /// #     Config::default())?
+    /// # .with_rx(peripherals.GPIO1)
+    /// # .with_tx(peripherals.GPIO2);
+    /// // The UART can be split into separate Transmit and Receive components:
+    /// let (mut rx, mut tx) = uart1.split();
+    ///
+    /// // Each component can be used individually to interact with the UART:
+    /// tx.write(&[42u8])?;
+    /// let mut byte = [0u8; 1];
+    /// rx.read(&mut byte);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[instability::unstable]
+    pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
+        (self.rx, self.tx)
+    }
 
-#[instability::unstable]
-impl crate::interrupt::InterruptConfigurable for Uart<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        // `self.tx.uart` and `self.rx.uart` are the same
-        self.tx.uart.info().set_interrupt_handler(handler);
+    /// Reads and clears errors set by received data.
+    #[instability::unstable]
+    pub fn check_for_rx_errors(&mut self) -> Result<(), Error> {
+        self.rx.check_for_errors()
+    }
+
+    /// Read all available bytes from the RX FIFO into the provided buffer and
+    /// returns the number of read bytes without blocking.
+    #[instability::unstable]
+    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        self.rx.read_buffered_bytes(buf)
+    }
+
+    /// Configures the AT-CMD detection settings
+    #[instability::unstable]
+    pub fn set_at_cmd(&mut self, config: AtCmdConfig) {
+        #[cfg(not(any(esp32, esp32s2)))]
+        self.regs()
+            .clk_conf()
+            .modify(|_, w| w.sclk_en().clear_bit());
+
+        self.regs().at_cmd_char().write(|w| unsafe {
+            w.at_cmd_char().bits(config.cmd_char);
+            w.char_num().bits(config.char_num)
+        });
+
+        if let Some(pre_idle_count) = config.pre_idle_count {
+            self.regs()
+                .at_cmd_precnt()
+                .write(|w| unsafe { w.pre_idle_num().bits(pre_idle_count as _) });
+        }
+
+        if let Some(post_idle_count) = config.post_idle_count {
+            self.regs()
+                .at_cmd_postcnt()
+                .write(|w| unsafe { w.post_idle_num().bits(post_idle_count as _) });
+        }
+
+        if let Some(gap_timeout) = config.gap_timeout {
+            self.regs()
+                .at_cmd_gaptout()
+                .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout as _) });
+        }
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        self.regs().clk_conf().modify(|_, w| w.sclk_en().set_bit());
+
+        sync_regs(self.regs());
     }
 }
 
@@ -1400,6 +1408,16 @@ impl Uart<'_, Blocking> {
     #[instability::unstable]
     pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
         self.tx.uart.info().clear_interrupts(interrupts)
+    }
+}
+
+impl crate::private::Sealed for Uart<'_, Blocking> {}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Uart<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        // `self.tx.uart` and `self.rx.uart` are the same
+        self.tx.uart.info().set_interrupt_handler(handler);
     }
 }
 
@@ -1699,24 +1717,6 @@ impl Drop for UartTxFuture {
     }
 }
 
-impl Uart<'_, Async> {
-    /// Asynchronously reads data from the UART receive buffer into the
-    /// provided buffer.
-    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-        self.rx.read_async(buf).await
-    }
-
-    /// Asynchronously writes data to the UART transmit buffer.
-    pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
-        self.tx.write_async(words).await
-    }
-
-    /// Asynchronously flushes the UART transmit buffer.
-    pub async fn flush_async(&mut self) -> Result<(), Error> {
-        self.tx.flush_async().await
-    }
-}
-
 impl UartTx<'_, Async> {
     /// Asynchronously writes data to the UART transmit buffer in chunks.
     ///
@@ -1724,6 +1724,7 @@ impl UartTx<'_, Async> {
     /// the UART. Data is written in chunks to avoid overflowing the
     /// transmit FIFO, and the function waits asynchronously when
     /// necessary for space in the buffer to become available.
+    #[instability::unstable]
     pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
         let mut count = 0;
         let mut offset: usize = 0;
@@ -1754,6 +1755,7 @@ impl UartTx<'_, Async> {
     /// This function ensures that all pending data in the transmit FIFO has
     /// been sent over the UART. If the FIFO contains data, it waits
     /// for the transmission to complete before returning.
+    #[instability::unstable]
     pub async fn flush_async(&mut self) -> Result<(), Error> {
         let count = self.tx_fifo_count();
         if count > 0 {
@@ -1785,6 +1787,7 @@ impl UartRx<'_, Async> {
     /// # Ok
     /// When successful, returns the number of bytes written to buf.
     /// If the passed in buffer is of length 0, Ok(0) is returned.
+    #[instability::unstable]
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if buf.is_empty() {
             return Ok(0);
