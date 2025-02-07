@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added support for using an external scheduler (#3115)
+
 ### Changed
 
 - `esp_wifi::init` now takes an `impl Peripheral` for RNG source (#2992)
