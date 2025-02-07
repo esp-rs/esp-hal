@@ -8,7 +8,8 @@ use core::{ffi::c_void, mem::size_of};
 use arch_specific::*;
 use esp_hal::sync::Locked;
 use esp_wifi_sys::include::malloc;
-use timer::{disable_multitasking, disable_timer, setup_multitasking, setup_timer};
+use timer::{disable_multitasking, setup_multitasking};
+pub(crate) use timer::{disable_timer, setup_timer};
 
 use crate::{compat::malloc::free, hal::trapframe::TrapFrame, memory_fence::memory_fence};
 
@@ -28,15 +29,13 @@ struct BuiltinScheduler {}
 crate::scheduler_impl!(static SCHEDULER: BuiltinScheduler = BuiltinScheduler {});
 
 impl Scheduler for BuiltinScheduler {
-    fn setup(&self, timer: crate::TimeBase) {
+    fn enable(&self) {
         // allocate the main task
         allocate_main_task();
-        setup_timer(timer);
         setup_multitasking();
     }
 
     fn disable(&self) {
-        disable_timer();
         disable_multitasking();
         delete_all_tasks();
 

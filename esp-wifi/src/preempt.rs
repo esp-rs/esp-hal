@@ -22,8 +22,7 @@ use core::ffi::c_void;
 
 pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp-wifi` when starting up the WiFi stack.
-    /// The passed `timer` can be used for e.g., implementing a periodic timer.
-    fn setup(&self, timer: crate::TimeBase);
+    fn enable(&self);
 
     /// This function is called by `esp-wifi` when shutting down the WiFi stack.
     fn disable(&self);
@@ -58,7 +57,7 @@ pub trait Scheduler: Send + Sync + 'static {
 }
 
 extern "Rust" {
-    fn esp_wifi_preempt_setup(timer: crate::TimeBase);
+    fn esp_wifi_preempt_enable();
     fn esp_wifi_preempt_disable();
     fn esp_wifi_preempt_yield_task();
     fn esp_wifi_preempt_current_task() -> *mut c_void;
@@ -71,8 +70,8 @@ extern "Rust" {
     fn esp_wifi_preempt_current_task_thread_semaphore() -> *mut c_void;
 }
 
-pub(crate) fn setup(timer: crate::TimeBase) {
-    unsafe { esp_wifi_preempt_setup(timer) }
+pub(crate) fn enable() {
+    unsafe { esp_wifi_preempt_enable() }
 }
 
 pub(crate) fn disable() {
@@ -112,8 +111,8 @@ macro_rules! scheduler_impl {
         static $name: $t = $val;
 
         #[no_mangle]
-        fn esp_wifi_preempt_setup(timer: $crate::TimeBase) {
-            <$t as $crate::preempt::Scheduler>::setup(&$name, timer)
+        fn esp_wifi_preempt_enable() {
+            <$t as $crate::preempt::Scheduler>::enable(&$name)
         }
         #[no_mangle]
         fn esp_wifi_preempt_disable() {
