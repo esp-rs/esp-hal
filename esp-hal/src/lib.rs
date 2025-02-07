@@ -62,17 +62,19 @@
 //! #![no_std]
 //! #![no_main]
 //!
-//! // You'll need a panic handler e.g. `use esp_backtrace as _;`
-//! # #[panic_handler]
-//! # fn panic(_ : &core::panic::PanicInfo) -> ! {
-//! #     loop {}
-//! # }
 //! use esp_hal::{
 //!     clock::CpuClock,
-//!     delay::Delay,
 //!     gpio::{Io, Level, Output, OutputConfig},
 //!     main,
+//!     time::{Duration, Instant},
 //! };
+//!
+//! // You need a panic handler. Usually, you you would use esp_backtrace, panic-probe, or
+//! // something similar, but you can also bring your own like this:
+//! #[panic_handler]
+//! fn panic(_: &core::panic::PanicInfo) -> ! {
+//!     esp_hal::system::software_reset()
+//! }
 //!
 //! #[main]
 //! fn main() -> ! {
@@ -82,11 +84,11 @@
 //!     // Set GPIO0 as an output, and set its state high initially.
 //!     let mut led = Output::new(peripherals.GPIO0, Level::High, OutputConfig::default());
 //!
-//!     let delay = Delay::new();
-//!
 //!     loop {
 //!         led.toggle();
-//!         delay.delay_millis(1000);
+//!         // Wait for half a second
+//!         let delay_start = Instant::now();
+//!         while delay_start.elapsed() < Duration::from_millis(500) {}
 //!     }
 //! }
 //! ```
@@ -154,7 +156,6 @@ pub use esp_riscv_rt::{self, riscv};
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use xtensa_lx_rt::{self, xtensa_lx};
 
-// TODO what should we reexport stably?
 #[cfg(efuse)]
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
