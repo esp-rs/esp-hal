@@ -134,8 +134,12 @@ mod binary {
 }
 mod compat;
 
-#[cfg_attr(feature = "preempt-extern", path = "preempt_extern.rs")]
+#[cfg(not(feature = "preempt-extern"))]
 mod preempt;
+
+#[cfg(feature = "preempt-extern")]
+#[path = "preempt_extern.rs"]
+pub mod preempt;
 
 mod radio;
 mod time;
