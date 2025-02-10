@@ -191,14 +191,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         Err(_) => chrono::Utc::now(),
     };
-    println!(
-        "cargo::rustc-env=BUILD_TIME={}",
-        ts.format("%H:%M:%S").to_string()
-    );
-    println!(
-        "cargo::rustc-env=BUILD_DATE={}",
-        ts.format("%Y-%m-%d").to_string()
-    );
+    println!("cargo::rustc-env=BUILD_TIME={}", ts.format("%H:%M:%S"));
+    println!("cargo::rustc-env=BUILD_DATE={}", ts.format("%Y-%m-%d"));
 
     Ok(())
 }
