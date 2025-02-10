@@ -13,40 +13,51 @@ PROVIDE(__level_3_interrupt = handle_interrupts);
 
 INCLUDE exception.x
 
-/* ESP32S3 fixups */
 SECTIONS {
-  .rwdata_dummy (NOLOAD) :
+  .rotext_dummy (NOLOAD) :
   {
-    /* This dummy section represents the .rwtext section but in RWDATA.
+    /* This dummy section represents the .rodata section but in ROTEXT.
      * Thus, it must have its alignment and (at least) its size.
      */
 
     /* Start at the same alignment constraint than .flash.text */
 
-    . = ALIGN(ALIGNOF(.rwtext));
+    . = ALIGN(ALIGNOF(.rodata));
+    . = ALIGN(ALIGNOF(.rodata.wifi));
 
-    /*  Create an empty gap as big as .rwtext section - 32k (SRAM0) 
-     *  because SRAM1 is available on the data bus and instruction bus 
+    /* Create an empty gap as big as .text section */
+
+    . = . + SIZEOF(.rodata_desc);
+    . = . + SIZEOF(.rodata);
+    . = . + SIZEOF(.rodata.wifi);
+
+    /* Prepare the alignment of the section above. Few bytes (0x20) must be
+     * added for the mapping header.
      */
-    . = . + MAX(SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + RESERVE_ICACHE + VECTORS_SIZE, 32k) - 32k;
 
-    /* Prepare the alignment of the section above. */
-    . = ALIGN(4);
-    _rwdata_reserved_start = .;
+    . = ALIGN(0x10000) + 0x20;
+    _rotext_reserved_start = .;
+  } > ROTEXT
+}
+INSERT BEFORE .text;
+
+/* Similar to .rotext_dummy this represents .rwtext but in .data */
+SECTIONS {
+  .rwdata_dummy (NOLOAD) : ALIGN(4)
+  {
+    . = . + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.vectors);
   } > RWDATA
 }
 INSERT BEFORE .data;
 
-INCLUDE "fixups/rodata_dummy.x"
-/* End of ESP32S3 fixups */
-
 /* Shared sections - ordering matters */
 SECTIONS {
+  INCLUDE "rodata_desc.x"
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
 }
-INCLUDE "text.x"
 INCLUDE "rodata.x"
+INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
 INCLUDE "stack.x"
