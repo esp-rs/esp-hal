@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added more validation to UART and SPI. User can now specify the baudrate tolerance of UART config (#3074)
 - Add auto-writeback support to DMA buffers (#3107)
 
+- Add the `esp_app_desc` macro to define an esp-idf compatible app-descriptor (#3124)
+
 ### Changed
 
 - LEDC: Derive `Clone` and `Copy` for ledc speed types to make `ledc::channel::Config` derive them too. (#3139)
