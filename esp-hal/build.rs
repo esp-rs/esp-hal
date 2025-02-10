@@ -180,6 +180,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
 
+    // supply build time and date
+    // see https://reproducible-builds.org/docs/source-date-epoch/
+    let ts = match std::env::var("SOURCE_DATE_EPOCH") {
+        Ok(val) => {
+            use chrono::TimeZone;
+            chrono::Utc.timestamp_opt(val.parse::<i64>().unwrap(), 0).unwrap()
+        }
+        Err(_) => chrono::Utc::now(),
+    };
+    println!("cargo::rustc-env=BUILD_TIME={}", ts.format("%H:%M:%S").to_string());
+    println!("cargo::rustc-env=BUILD_DATE={}", ts.format("%Y-%m-%d").to_string());    
+
     Ok(())
 }
 
