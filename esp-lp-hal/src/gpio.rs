@@ -39,7 +39,7 @@ pub struct Input<const PIN: u8>;
 impl<const PIN: u8> Input<PIN> {
     /// Read the input state/level of the pin.
     pub fn input_state(&self) -> bool {
-        unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN & 0x1 != 0
+        (unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN) & 0x1 != 0
     }
 }
 
@@ -49,7 +49,7 @@ pub struct Output<const PIN: u8>;
 impl<const PIN: u8> Output<PIN> {
     /// Read the output state/level of the pin.
     pub fn output_state(&self) -> bool {
-        unsafe { &*LpIo::PTR }.out().read().bits() >> PIN & 0x1 != 0
+        (unsafe { &*LpIo::PTR }.out().read().bits() >> PIN) & 0x1 != 0
     }
 
     /// Set the output state/level of the pin.

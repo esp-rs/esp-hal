@@ -384,7 +384,7 @@ unsafe extern "C" fn task_create(
     task_handle: *const c_void,
     core_id: u32,
 ) -> i32 {
-    let name_str = str_from_c(name as *const u8);
+    let name_str = str_from_c(name as *const _);
     trace!(
         "task_create {:?} {} {} {:?} {} {:?} {}",
         task_func,

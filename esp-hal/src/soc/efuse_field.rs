@@ -71,7 +71,7 @@ impl Efuse {
             }
 
             // get data length in bytes (ceil)
-            let byte_len = (word_bit_len + 7) / 8;
+            let byte_len = word_bit_len.div_ceil(8);
             // represent word as a byte slice
             let word_bytes =
                 unsafe { core::slice::from_raw_parts(&word as *const u32 as *const u8, byte_len) };

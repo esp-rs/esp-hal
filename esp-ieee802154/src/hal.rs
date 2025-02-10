@@ -271,7 +271,7 @@ pub(crate) fn set_multipan_enable_mask(mask: u8) {
     // apparently the REGS are garbage and the struct is right?
     IEEE802154::regs()
         .ctrl_cfg()
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b1111 << 29) | (mask as u32) << 29) });
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b1111 << 29) | ((mask as u32) << 29)) });
 }
 
 #[inline(always)]
