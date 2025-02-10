@@ -14,7 +14,7 @@ PROVIDE(__level_3_interrupt = handle_interrupts);
 
 INCLUDE exception.x
 
-/* Fixups for esp32s2 */
+/* This represents .rwtext but in .data */
 SECTIONS {
   .rwdata_dummy (NOLOAD) : ALIGN(4)
   {
@@ -27,10 +27,11 @@ INCLUDE "fixups/rtc_fast_rwdata_dummy.x"
 /* End of fixups for esp32s2 */
 
 /* Shared sections - ordering matters */
+INCLUDE "rodata_desc.x"
 INCLUDE "rwtext.x"
-INCLUDE "text.x"
 INCLUDE "rwdata.x"
 INCLUDE "rodata.x"
+INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
 INCLUDE "stack.x"

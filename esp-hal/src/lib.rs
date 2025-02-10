@@ -210,7 +210,6 @@ pub const BUILD_TIME: &str = env!("BUILD_TIME");
 #[doc(hidden)]
 pub const BUILD_DATE: &str = env!("BUILD_DATE");
 
-
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
 macro_rules! unstable_module {

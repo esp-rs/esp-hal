@@ -18,5 +18,5 @@ SECTIONS {
     *( .wifiextrairam.* )
     *( .coexiram.* )
     . = ALIGN(4);
-  } > RWTEXT AT > RODATA
+  } > RWTEXT
 }

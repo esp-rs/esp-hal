@@ -184,11 +184,11 @@ macro_rules! esp_app_desc {
             pub date: [core::ffi::c_char; 16], // Compile date
             pub idf_ver: [core::ffi::c_char; 32], // Version IDF
             pub app_elf_sha256: [u8; 32], // sha256 of elf file
-            pub min_efuse_blk_rev_full: u16, // Minimal eFuse block revision supported by image, in format: major * 100 + minor
-            pub max_efuse_blk_rev_full: u16, // Maximal eFuse block revision supported by image, in format: major * 100 + minor
-            pub mmu_page_size: u8,  // MMU page size in log base 2 format
-            pub reserv3: [u8; 3],   // reserv3
-            pub reserv2: [u32; 18], // reserv2
+            pub min_efuse_blk_rev_full: u16, // Minimal eFuse block revision supported by image
+            pub max_efuse_blk_rev_full: u16, // Maximal eFuse block revision supported by image
+            pub mmu_page_size: u8,   // MMU page size in log base 2 format
+            pub reserv3: [u8; 3],    // reserv3
+            pub reserv2: [u32; 18],  // reserv2
         }
 
         #[no_mangle]
