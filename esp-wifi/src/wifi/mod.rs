@@ -1628,6 +1628,7 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
             .copy_from_slice(crate::CONFIG.country_code.as_bytes());
         cntry_code[2] = crate::CONFIG.country_code_operating_class;
 
+        #[allow(clippy::useless_transmute)]
         let country = wifi_country_t {
             cc: core::mem::transmute::<[u8; 3], [core::ffi::c_char; 3]>(cntry_code),
             schan: 1,

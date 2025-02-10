@@ -652,7 +652,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
 ) -> i32 {
     trace!("task_create_pinned_to_core task_func {:?} name {} stack_depth {} param {:?} prio {}, task_handle {:?} core_id {}",
         task_func,
-        str_from_c(name as *const u8),
+        str_from_c(name as *const _),
         stack_depth,
         param,
         prio,
@@ -1024,6 +1024,7 @@ pub unsafe extern "C" fn phy_enable() {
 ///   Don't support
 ///
 /// *************************************************************************
+#[allow(clippy::unnecessary_cast)]
 pub unsafe extern "C" fn phy_update_country_info(
     country: *const crate::binary::c_types::c_char,
 ) -> crate::binary::c_types::c_int {
@@ -1455,7 +1456,7 @@ pub unsafe extern "C" fn log_write(
     format: *const crate::binary::c_types::c_char,
     args: ...
 ) {
-    crate::binary::log::syslog(level, format as *const u8, args);
+    crate::binary::log::syslog(level, format as *const _, args);
 }
 
 /// **************************************************************************
@@ -1484,7 +1485,7 @@ pub unsafe extern "C" fn log_writev(
 ) {
     crate::binary::log::syslog(
         level,
-        format as *const u8,
+        format as *const _,
         core::mem::transmute::<crate::binary::include::va_list, core::ffi::VaListImpl<'_>>(args),
     );
 }
