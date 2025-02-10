@@ -27,7 +27,7 @@ MEMORY
 
     /* External flash */
     /* Instruction and Data ROM */
-    ROM : ORIGIN =   0x42000000, LENGTH = 0x400000
+    ROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x400000 - 0x20
 
     /* RTC fast memory (executable). Persists over deep sleep. */
     RTC_FAST : ORIGIN = 0x50000000, LENGTH = 16K /*- ESP_BOOTLOADER_RESERVE_RTC*/

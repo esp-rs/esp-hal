@@ -185,12 +185,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ts = match std::env::var("SOURCE_DATE_EPOCH") {
         Ok(val) => {
             use chrono::TimeZone;
-            chrono::Utc.timestamp_opt(val.parse::<i64>().unwrap(), 0).unwrap()
+            chrono::Utc
+                .timestamp_opt(val.parse::<i64>().unwrap(), 0)
+                .unwrap()
         }
         Err(_) => chrono::Utc::now(),
     };
-    println!("cargo::rustc-env=BUILD_TIME={}", ts.format("%H:%M:%S").to_string());
-    println!("cargo::rustc-env=BUILD_DATE={}", ts.format("%Y-%m-%d").to_string());    
+    println!(
+        "cargo::rustc-env=BUILD_TIME={}",
+        ts.format("%H:%M:%S").to_string()
+    );
+    println!(
+        "cargo::rustc-env=BUILD_DATE={}",
+        ts.format("%Y-%m-%d").to_string()
+    );
 
     Ok(())
 }
