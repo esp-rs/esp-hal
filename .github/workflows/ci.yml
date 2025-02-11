@@ -43,6 +43,8 @@ jobs:
     name: esp-hal (${{ matrix.device.soc }})
     runs-on: ubuntu-latest
     env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CI: 1
       SSID: SSID
       PASSWORD: PASSWORD
       STATIC_IP: 1.1.1.1
@@ -79,6 +81,9 @@ jobs:
           components: rust-src
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "ci-${{ matrix.device.soc }}"
+          cache-all-crates: true
 
       - name: Build and Check
         uses: ./.github/actions/check-esp-hal

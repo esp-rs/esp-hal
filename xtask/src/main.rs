@@ -2,6 +2,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    time::Instant,
 };
 
 use anyhow::{bail, ensure, Context as _, Result};
@@ -51,6 +52,8 @@ enum Cli {
     RunTests(TestArgs),
     /// Run all ELFs in a folder.
     RunElfs(RunElfArgs),
+    /// Perform (parts of) the checks done in CI
+    Ci(CiArgs),
 }
 
 #[derive(Debug, Args)]
@@ -185,6 +188,13 @@ struct RunElfArgs {
     path: PathBuf,
 }
 
+#[derive(Debug, Args)]
+struct CiArgs {
+    /// Chip to target.
+    #[arg(value_enum)]
+    chip: Chip,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -217,6 +227,7 @@ fn main() -> Result<()> {
         Cli::RunElfs(args) => run_elfs(args),
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
         Cli::RunTests(args) => tests(&workspace, args, CargoAction::Run),
+        Cli::Ci(args) => run_ci_checks(&workspace, args),
     }
 }
 
@@ -788,15 +799,13 @@ fn lint_package(chip: &Chip, path: &Path, args: &[&str], fix: bool) -> Result<()
         builder = builder.arg(arg.to_string());
     }
 
-    // build in release to reuse example artifacts
-    let cargo_args = builder.arg("--release");
-    let cargo_args = if fix {
-        cargo_args.arg("--fix").arg("--lib").arg("--allow-dirty")
+    let builder = if fix {
+        builder.arg("--fix").arg("--lib").arg("--allow-dirty")
     } else {
-        cargo_args.arg("--").arg("-D").arg("warnings")
+        builder.arg("--").arg("-D").arg("warnings").arg("--no-deps")
     };
 
-    let cargo_args = cargo_args.build();
+    let cargo_args = builder.build();
 
     xtask::cargo::run(&cargo_args, path)
 }
@@ -910,6 +919,155 @@ fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
 
     // Execute `cargo doc` from the package root:
     xtask::cargo::run(&args, &package_path)?;
+
+    Ok(())
+}
+
+fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
+    let mut failure = false;
+    let started_at = Instant::now();
+
+    // Clippy and docs checks
+
+    // Clippy
+    lint_packages(
+        workspace,
+        LintPackagesArgs {
+            packages: Package::iter().collect(),
+            chips: vec![args.chip],
+            fix: false,
+        },
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // Check doc-tests
+    run_doc_tests(
+        workspace,
+        ExampleArgs {
+            package: Package::EspHal,
+            chip: args.chip,
+            example: None,
+            debug: true,
+        },
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // Check documentation
+    build_documentation(
+        workspace,
+        BuildDocumentationArgs {
+            packages: vec![Package::EspHal, Package::EspWifi, Package::EspHalEmbassy],
+            chips: vec![args.chip],
+            base_url: None,
+        },
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // for chips with esp-lp-hal: Build all supported examples for the low-power
+    // core first
+    if args.chip.has_lp_core() {
+        // Build prerequisite examples (esp-lp-hal)
+        // `examples` copies the examples to a folder with the chip name as the last
+        // path element then we copy it to the place where the HP core example
+        // expects it
+        examples(
+            workspace,
+            ExampleArgs {
+                package: Package::EspLpHal,
+                chip: args.chip,
+                example: None,
+                debug: false,
+            },
+            CargoAction::Build(PathBuf::from(format!(
+                "./esp-lp-hal/target/{}/release/examples",
+                args.chip.target()
+            ))),
+        )
+        .inspect_err(|_| failure = true)
+        .and_then(|_| {
+            let from_dir = PathBuf::from(format!(
+                "./esp-lp-hal/target/{}/release/examples/{}",
+                args.chip.target(),
+                args.chip.to_string()
+            ));
+            let to_dir = PathBuf::from(format!(
+                "./esp-lp-hal/target/{}/release/examples",
+                args.chip.target()
+            ));
+            from_dir.read_dir()?.for_each(|entry| {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                let to = to_dir.join(entry.file_name());
+                fs::copy(path, to).expect("Failed to copy file");
+            });
+            Ok(())
+        })
+        .ok();
+
+        // Check documentation
+        build_documentation(
+            workspace,
+            BuildDocumentationArgs {
+                packages: vec![Package::EspLpHal],
+                chips: vec![args.chip],
+                base_url: None,
+            },
+        )
+        .inspect_err(|_| failure = true)
+        .ok();
+    }
+
+    // Make sure we're able to build the HAL without the default features enabled
+    build_package(
+        workspace,
+        BuildPackageArgs {
+            package: Package::EspHal,
+            target: Some(args.chip.target().to_string()),
+            features: vec![args.chip.to_string()],
+            toolchain: None,
+            no_default_features: true,
+        },
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // Build (examples)
+    examples(
+        workspace,
+        ExampleArgs {
+            package: Package::Examples,
+            chip: args.chip,
+            example: None,
+            debug: true,
+        },
+        CargoAction::Build(PathBuf::from(format!("./examples/target/"))),
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // Build (qa-test)
+    examples(
+        workspace,
+        ExampleArgs {
+            package: Package::QaTest,
+            chip: args.chip,
+            example: None,
+            debug: true,
+        },
+        CargoAction::Build(PathBuf::from(format!("./qa-test/target/"))),
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    let completed_at = Instant::now();
+    log::debug!("CI checks completed in {:?}", completed_at - started_at);
+
+    if failure {
+        bail!("CI checks failed");
+    }
 
     Ok(())
 }

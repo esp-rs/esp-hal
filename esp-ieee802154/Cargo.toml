@@ -22,7 +22,7 @@ byte              = "0.2.7"
 critical-section  = "1.2.0"
 document-features = "0.2.10"
 esp-hal           = { version = "0.23.0", path = "../esp-hal" }
-esp-wifi-sys      = "0.7.0"
+esp-wifi-sys      = "0.7.1"
 heapless          = "0.8.0"
 ieee802154        = "0.6.1"
 cfg-if            = "1.0.0"
