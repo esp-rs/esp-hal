@@ -44,7 +44,7 @@ pub trait Scheduler: Send + Sync + 'static {
         task_stack_size: usize,
     ) -> *mut c_void;
 
-    /// This function is called to let the scheduler now this thread is not
+    /// This function is called to let the scheduler know this thread is not
     /// needed anymore and should be deleted. After this function is called,
     /// the thread should not be scheduled anymore. The thread stack can be
     /// free'ed.
