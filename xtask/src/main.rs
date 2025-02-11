@@ -5,9 +5,8 @@ use std::{
 };
 
 use anyhow::{bail, ensure, Context as _, Result};
-use clap::{Args, Parser, ValueEnum};
+use clap::{Args, Parser};
 use esp_metadata::{Arch, Chip, Config};
-use minijinja::Value;
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
@@ -223,7 +222,7 @@ fn main() -> Result<()> {
 
 fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:
-    validate_package_chip(&args.package, &args.chip)?;
+    xtask::validate_package_chip(&args.package, &args.chip)?;
 
     // If the 'esp-hal' package is specified, what we *really* want is the
     // 'examples' package instead:
@@ -475,275 +474,14 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
 }
 
 fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Result<()> {
-    let output_path = workspace.join("docs");
-
-    fs::create_dir_all(&output_path)
-        .with_context(|| format!("Failed to create {}", output_path.display()))?;
-
-    args.packages.sort();
-
-    for package in args.packages {
-        // Not all packages need documentation built:
-        if !package.should_document() {
-            continue;
-        }
-
-        // If the package does not have chip features, then just ignore
-        // whichever chip(s) were specified as arguments:
-        let chips = if package.has_chip_features() {
-            // Some packages have chip features, but they have no effect on the public API;
-            // in this case, there's no point building it multiple times, so just build one
-            // copy of the docs. Otherwise, use the provided chip arguments:
-            match package {
-                _ if package.chip_features_matter() => args.chips.clone(),
-                Package::XtensaLxRt => vec![Chip::Esp32s3],
-                _ => vec![Chip::Esp32c6],
-            }
-        } else {
-            log::warn!("Package '{package}' does not have chip features, ignoring argument");
-            vec![]
-        };
-
-        if chips.is_empty() {
-            build_documentation_for_package(workspace, package, None)?;
-        } else {
-            for chip in chips {
-                build_documentation_for_package(workspace, package, Some(chip))?;
-            }
-        }
-    }
-
-    Ok(())
+    xtask::documentation::build_documentation(workspace, &mut args.packages, &mut args.chips)
 }
 
 fn build_documentation_index(
     workspace: &Path,
     mut args: BuildDocumentationIndexArgs,
 ) -> Result<()> {
-    let docs_path = workspace.join("docs");
-    let resources_path = workspace.join("resources");
-
-    args.packages.sort();
-
-    for package in args.packages {
-        // Not all packages have documentation built:
-        if !package.should_document() {
-            continue;
-        }
-
-        // If the chip features are not relevant, then there is no need to generate an
-        // index for the given package's documentation:
-        if !package.chip_features_matter() {
-            log::warn!("Package '{package}' does not have device-specific documentation, no need to generate an index");
-            continue;
-        }
-
-        let package_docs_path = docs_path.join(package.to_string());
-        let mut device_doc_paths = Vec::new();
-
-        // Each path we iterate over should be the directory for a given version of
-        // the package's documentation:
-        for version_path in fs::read_dir(package_docs_path)? {
-            let version_path = version_path?.path();
-            if version_path.is_file() {
-                log::debug!(
-                    "Path is not a directory, skipping: '{}'",
-                    version_path.display()
-                );
-                continue;
-            }
-
-            for path in fs::read_dir(&version_path)? {
-                let path = path?.path();
-                if path.is_dir() {
-                    device_doc_paths.push(path);
-                }
-            }
-
-            let mut chips = device_doc_paths
-                .iter()
-                .map(|path| {
-                    let chip = path
-                        .components()
-                        .last()
-                        .unwrap()
-                        .as_os_str()
-                        .to_string_lossy();
-
-                    let chip = Chip::from_str(&chip, true).unwrap();
-
-                    chip
-                })
-                .collect::<Vec<_>>();
-
-            chips.sort();
-
-            let meta = generate_documentation_meta_for_package(workspace, package, &chips)?;
-            render_template(
-                "package_index.html.jinja",
-                "index.html",
-                &version_path,
-                &resources_path,
-                minijinja::context! { metadata => meta },
-            )?;
-        }
-    }
-
-    // Copy any additional assets to the documentation's output path:
-    fs::copy(
-        resources_path.join("esp-rs.svg"),
-        docs_path.join("esp-rs.svg"),
-    )
-    .context("Failed to copy esp-rs.svg")?;
-
-    let meta = generate_documentation_meta_for_index(&workspace)?;
-
-    render_template(
-        "index.html.jinja",
-        "index.html",
-        &docs_path,
-        &resources_path,
-        minijinja::context! { metadata => meta },
-    )?;
-
-    Ok(())
-}
-
-fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>> {
-    let mut metadata = Vec::new();
-
-    for package in Package::iter() {
-        // Not all packages have documentation built:
-        if !package.should_document() {
-            continue;
-        }
-
-        let version = xtask::package_version(workspace, package)?;
-
-        let url = if package.chip_features_matter() {
-            format!("{package}/{version}/index.html")
-        } else {
-            let crate_name = package.to_string().replace('-', "_");
-            format!("{package}/{version}/{crate_name}/index.html")
-        };
-
-        metadata.push(minijinja::context! {
-            name => package,
-            version => version,
-            url => url,
-        });
-    }
-
-    Ok(metadata)
-}
-
-fn render_template<C>(
-    template: &str,
-    name: &str,
-    path: &Path,
-    resources: &Path,
-    ctx: C,
-) -> Result<()>
-where
-    C: serde::Serialize,
-{
-    let source = fs::read_to_string(resources.join(template))
-        .context(format!("Failed to read {template}"))?;
-
-    let mut env = minijinja::Environment::new();
-    env.add_template(template, &source)?;
-
-    let tmpl = env.get_template(template)?;
-    let html = tmpl.render(ctx)?;
-
-    // Write out the rendered HTML to the desired path:
-    let path = path.join(name);
-    fs::write(&path, html).context(format!("Failed to write {name}"))?;
-    log::info!("Created {}", path.display());
-
-    Ok(())
-}
-
-fn build_documentation_for_package(
-    workspace: &Path,
-    package: Package,
-    chip: Option<Chip>,
-) -> Result<()> {
-    let version = xtask::package_version(workspace, package)?;
-
-    // Ensure that the package/chip combination provided are valid:
-    if let Some(chip) = chip {
-        if let Err(err) = validate_package_chip(&package, &chip) {
-            log::warn!("{err}");
-            return Ok(());
-        }
-    }
-
-    // Build the documentation for the specified package, targeting the
-    // specified chip:
-    let docs_path = xtask::build_documentation(workspace, package, chip)?;
-
-    ensure!(
-        docs_path.exists(),
-        "Documentation not found at {}",
-        docs_path.display()
-    );
-
-    let mut output_path = workspace
-        .join("docs")
-        .join(package.to_string())
-        .join(version.to_string());
-
-    if let Some(chip) = chip {
-        // Sometimes we need to specify a chip feature, but it does not affect the
-        // public API; so, only append the chip name to the path if it is significant:
-        if package.chip_features_matter() {
-            output_path = output_path.join(chip.to_string());
-        }
-    }
-
-    let output_path = xtask::windows_safe_path(&output_path);
-
-    // Create the output directory, and copy the built documentation into it:
-    fs::create_dir_all(&output_path)
-        .with_context(|| format!("Failed to create {}", output_path.display()))?;
-
-    copy_dir_all(&docs_path, &output_path).with_context(|| {
-        format!(
-            "Failed to copy {} to {}",
-            docs_path.display(),
-            output_path.display()
-        )
-    })?;
-
-    Ok(())
-}
-
-fn generate_documentation_meta_for_package(
-    workspace: &Path,
-    package: Package,
-    chips: &[Chip],
-) -> Result<Vec<Value>> {
-    let version = xtask::package_version(workspace, package)?;
-
-    let mut metadata = Vec::new();
-
-    for chip in chips {
-        // Ensure that the package/chip combination provided are valid:
-        validate_package_chip(&package, chip)?;
-
-        // Build the context object required for rendering this particular build's
-        // information on the documentation index:
-        metadata.push(minijinja::context! {
-            name => package,
-            version => version,
-            chip => chip.to_string(),
-            chip_pretty => chip.pretty_name(),
-            package => package.to_string().replace('-', "_"),
-        });
-    }
-
-    Ok(metadata)
+    xtask::documentation::build_documentation_index(workspace, &mut args.packages)
 }
 
 fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
@@ -1164,38 +902,6 @@ fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
 
     // Execute `cargo doc` from the package root:
     xtask::cargo::run(&args, &package_path)?;
-
-    Ok(())
-}
-
-// ----------------------------------------------------------------------------
-// Helper Functions
-
-fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
-    ensure!(
-        *package != Package::EspLpHal || chip.has_lp_core(),
-        "Invalid chip provided for package '{}': '{}'",
-        package,
-        chip
-    );
-
-    Ok(())
-}
-
-// https://stackoverflow.com/a/65192210
-fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
-    fs::create_dir_all(&dst)?;
-
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-
-        if ty.is_dir() {
-            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
-        } else {
-            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
-        }
-    }
 
     Ok(())
 }
