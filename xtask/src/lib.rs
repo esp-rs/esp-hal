@@ -83,7 +83,7 @@ impl Package {
     }
 
     /// Should documentation be built for the package?
-    pub fn should_document(&self) -> bool {
+    pub fn is_published(&self) -> bool {
         !matches!(self, Package::Examples | Package::HilTest | Package::QaTest)
     }
 }
