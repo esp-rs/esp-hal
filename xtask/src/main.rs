@@ -971,7 +971,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!("--features={chip},defmt,sys-logs,esp-hal/unstable");
+                    let mut features = format!(
+                        "--features={chip},defmt,sys-logs,esp-hal/unstable,builtin-scheduler"
+                    );
 
                     if device.contains("wifi") {
                         features.push_str(",esp-now,sniffer")

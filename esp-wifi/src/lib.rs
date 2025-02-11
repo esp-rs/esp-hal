@@ -134,7 +134,10 @@ mod binary {
 }
 mod compat;
 
-mod preempt;
+#[cfg(feature = "builtin-scheduler")]
+mod preempt_builtin;
+
+pub mod preempt;
 
 mod radio;
 mod time;
@@ -239,7 +242,7 @@ const _: () = {
     core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
 };
 
-pub(crate) type TimeBase = PeriodicTimer<'static, Blocking>;
+type TimeBase = PeriodicTimer<'static, Blocking>;
 
 pub(crate) mod flags {
     use portable_atomic::{AtomicBool, AtomicUsize};
@@ -388,8 +391,12 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
 
     setup_radio_isr();
 
-    // This initializes the task switcher and timer tick interrupt.
-    preempt::setup(unsafe { timer.clone_unchecked() }.timer());
+    // Enable timer tick interrupt
+    #[cfg(feature = "builtin-scheduler")]
+    preempt_builtin::setup_timer(unsafe { timer.clone_unchecked() }.timer());
+
+    // This initializes the task switcher
+    preempt::enable();
 
     init_tasks();
     yield_task();
@@ -404,6 +411,9 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     }
 
     crate::flags::ESP_WIFI_INITIALIZED.store(true, Ordering::Release);
+
+    #[cfg(not(feature = "builtin-scheduler"))]
+    let _ = timer; // mark used to suppress warning
 
     Ok(EspWifiController {
         _inner: PhantomData,
@@ -445,6 +455,9 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     }
 
     shutdown_radio_isr();
+
+    #[cfg(feature = "builtin-scheduler")]
+    preempt_builtin::disable_timer();
 
     // This shuts down the task switcher and timer tick interrupt.
     preempt::disable();

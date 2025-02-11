@@ -50,7 +50,7 @@ esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"]
 esp-metadata = { version = "0.5.0", path = "../esp-metadata" }
 
 [features]
-default = ["esp-alloc"]
+default = ["builtin-scheduler", "esp-alloc"]
 
 ## Use `esp-alloc` for dynamic allocations.
 ##
@@ -131,6 +131,8 @@ smoltcp = ["dep:smoltcp"]
 ## Provide utilities for smoltcp initialization. Adds smoltcp dependency
 utils = ["smoltcp"]
 
+## Use builtin scheduler
+builtin-scheduler = []
 
 # Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde", "heapless/serde"]

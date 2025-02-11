@@ -2,7 +2,7 @@ use esp_hal::interrupt::InterruptHandler;
 
 use crate::{
     hal::{interrupt, time::Rate, trapframe::TrapFrame, xtensa_lx, xtensa_lx_rt},
-    preempt::task_switch,
+    preempt_builtin::task_switch,
     TimeBase,
 };
 
