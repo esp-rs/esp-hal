@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 - SPI, UART, I2C: `with_<pin>` functions of peripheral drivers now disconnect the previously assigned pins from the peripheral. (#3012)
 - SPI, UART, I2C: Dropping a driver now disconnects pins from their peripherals. (#3012)
+- TWAI: Async transmission future resolves after successful transmission and can be aborted by dropping the future.
 - Migrate PARL_IO driver to DMA move API (#3033)
 - `Async` drivers are no longer `Send` (#2980)
 - GPIO drivers now take configuration structs (#2990, #3029)
