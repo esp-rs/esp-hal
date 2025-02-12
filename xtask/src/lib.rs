@@ -30,6 +30,7 @@ pub mod firmware;
     Display,
     EnumIter,
     ValueEnum,
+    serde::Deserialize,
     serde::Serialize,
 )]
 #[serde(rename_all = "kebab-case")]

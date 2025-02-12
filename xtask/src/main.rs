@@ -89,6 +89,9 @@ struct BuildDocumentationArgs {
     /// Chip(s) to build documentation for.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
     chips: Vec<Chip>,
+    /// Base URL of the deployed documentation.
+    #[arg(long)]
+    base_url: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -474,7 +477,12 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
 }
 
 fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Result<()> {
-    xtask::documentation::build_documentation(workspace, &mut args.packages, &mut args.chips)
+    xtask::documentation::build_documentation(
+        workspace,
+        &mut args.packages,
+        &mut args.chips,
+        args.base_url,
+    )
 }
 
 fn build_documentation_index(

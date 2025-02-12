@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
 };
@@ -6,7 +7,9 @@ use std::{
 use anyhow::{ensure, Context as _, Result};
 use clap::ValueEnum;
 use esp_metadata::Config;
+use kuchikiki::traits::*;
 use minijinja::Value;
+use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::{cargo::CargoArgsBuilder, Chip, Package};
@@ -14,10 +17,16 @@ use crate::{cargo::CargoArgsBuilder, Chip, Package};
 // ----------------------------------------------------------------------------
 // Build Documentation
 
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+struct Manifest {
+    versions: HashSet<semver::Version>,
+}
+
 pub fn build_documentation(
     workspace: &Path,
     packages: &mut [Package],
     chips: &mut [Chip],
+    base_url: Option<String>,
 ) -> Result<()> {
     let output_path = workspace.join("docs");
 
@@ -31,6 +40,23 @@ pub fn build_documentation(
         if !package.is_published() {
             continue;
         }
+
+        // Download the manifest from the documentation server if able,
+        // otherwise just create a default (empty) manifest:
+        let mut manifest_url = base_url
+            .clone()
+            .unwrap_or_default()
+            .trim_end_matches('/')
+            .to_string();
+        manifest_url.push_str(&format!("/{package}/manifest.json"));
+
+        let mut manifest = match reqwest::blocking::get(manifest_url) {
+            Ok(resp) => resp.json::<Manifest>()?,
+            Err(err) => {
+                log::warn!("Unable to fetch package manifest: {err}");
+                Manifest::default()
+            }
+        };
 
         // If the package does not have chip features, then just ignore
         // whichever chip(s) were specified as arguments:
@@ -48,6 +74,11 @@ pub fn build_documentation(
             vec![]
         };
 
+        // Update the package manifest to include the latest version:
+        let version = crate::package_version(workspace, *package)?;
+        manifest.versions.insert(version.clone());
+
+        // Build the documentation for the package:
         if chips.is_empty() {
             build_documentation_for_package(workspace, package, None)?;
         } else {
@@ -55,6 +86,15 @@ pub fn build_documentation(
                 build_documentation_for_package(workspace, package, Some(chip))?;
             }
         }
+
+        // Write out the package manifest JSON file:
+        fs::write(
+            output_path.join(package.to_string()).join("manifest.json"),
+            serde_json::to_string(&manifest)?,
+        )?;
+
+        // Patch the generated documentation to include a select box for the version:
+        patch_documentation_index_for_package(workspace, package, &version, &base_url)?;
     }
 
     Ok(())
@@ -230,6 +270,56 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
     features
 }
 
+fn patch_documentation_index_for_package(
+    workspace: &Path,
+    package: &Package,
+    version: &semver::Version,
+    base_url: &Option<String>,
+) -> Result<()> {
+    let package_name = package.to_string().replace('-', "_");
+    let package_path = workspace.join("docs").join(package.to_string());
+    let version_path = package_path.join(version.to_string());
+
+    let mut index_paths = Vec::new();
+
+    if package.chip_features_matter() {
+        for chip_path in fs::read_dir(version_path)? {
+            let chip_path = chip_path?.path();
+            if chip_path.is_dir() {
+                let path = chip_path.join(&package_name).join("index.html");
+                index_paths.push((version.clone(), path));
+            }
+        }
+    } else {
+        let path = version_path.join(&package_name).join("index.html");
+        index_paths.push((version.clone(), path));
+    }
+
+    for (version, index_path) in index_paths {
+        let html = fs::read_to_string(&index_path)?;
+        let document = kuchikiki::parse_html().one(html);
+
+        let elem = document
+            .select_first(".sidebar-crate")
+            .expect("Unable to select '.sidebar-crate' element in HTML");
+
+        let base_url = base_url.clone().unwrap_or_default();
+        let resources_path = workspace.join("resources");
+        let html = render_template(
+            &resources_path,
+            "select.html.jinja",
+            minijinja::context! { base_url => base_url, package => package, version => version },
+        )?;
+
+        let node = elem.as_node();
+        node.append(kuchikiki::parse_html().one(html));
+
+        fs::write(&index_path, document.to_string())?;
+    }
+
+    Ok(())
+}
+
 // ----------------------------------------------------------------------------
 // Build Documentation Index
 
@@ -293,13 +383,16 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
             chips.sort();
 
             let meta = generate_documentation_meta_for_package(workspace, *package, &chips)?;
-            render_template(
-                "package_index.html.jinja",
-                "index.html",
-                &version_path,
+
+            // Render the template to HTML and write it out to the desired path:
+            let html = render_template(
                 &resources_path,
+                "package_index.html.jinja",
                 minijinja::context! { metadata => meta },
             )?;
+            let path = version_path.join("index.html");
+            fs::write(&path, html).context(format!("Failed to write index.html"))?;
+            log::info!("Created {}", path.display());
         }
     }
 
@@ -312,13 +405,15 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 
     let meta = generate_documentation_meta_for_index(&workspace)?;
 
-    render_template(
-        "index.html.jinja",
-        "index.html",
-        &docs_path,
+    // Render the template to HTML and write it out to the desired path:
+    let html = render_template(
         &resources_path,
+        "index.html.jinja",
         minijinja::context! { metadata => meta },
     )?;
+    let path = docs_path.join("index.html");
+    fs::write(&path, html).context(format!("Failed to write index.html"))?;
+    log::info!("Created {}", path.display());
 
     Ok(())
 }
@@ -381,13 +476,7 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
 // ----------------------------------------------------------------------------
 // Helper Functions
 
-fn render_template<C>(
-    template: &str,
-    name: &str,
-    path: &Path,
-    resources: &Path,
-    ctx: C,
-) -> Result<()>
+fn render_template<C>(resources: &Path, template: &str, ctx: C) -> Result<String>
 where
     C: serde::Serialize,
 {
@@ -400,10 +489,5 @@ where
     let tmpl = env.get_template(template)?;
     let html = tmpl.render(ctx)?;
 
-    // Write out the rendered HTML to the desired path:
-    let path = path.join(name);
-    fs::write(&path, html).context(format!("Failed to write {name}"))?;
-    log::info!("Created {}", path.display());
-
-    Ok(())
+    Ok(html)
 }
