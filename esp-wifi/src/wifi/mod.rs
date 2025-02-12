@@ -72,8 +72,6 @@ use crate::{
     EspWifiController,
 };
 
-const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
-
 const MTU: usize = crate::CONFIG.mtu;
 
 #[cfg(feature = "utils")]
@@ -945,8 +943,6 @@ impl From<WifiMode> for wifi_mode_t {
         }
     }
 }
-
-const DATA_FRAME_SIZE: usize = MTU + ETHERNET_FRAME_HEADER_SIZE;
 
 const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
 const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
@@ -2711,7 +2707,7 @@ impl<Dm: Sealed> WifiTxToken<Dm> {
         // (safety): creation of multiple WiFi devices with the same mode is impossible
         // in safe Rust, therefore only smoltcp _or_ embassy-net can be used at
         // one time
-        static mut BUFFER: [u8; DATA_FRAME_SIZE] = [0u8; DATA_FRAME_SIZE];
+        static mut BUFFER: [u8; MTU] = [0u8; MTU];
 
         let buffer = unsafe { &mut BUFFER[..len] };
 
