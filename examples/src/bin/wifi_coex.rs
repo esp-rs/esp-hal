@@ -60,7 +60,7 @@ fn main() -> ! {
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
     // COEX needs more RAM - add some more
-    esp_alloc::heap_allocator!(#[link_section = ".dram2_uninit"] size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[link_section = ".dram2_uninit"] size: 64 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
