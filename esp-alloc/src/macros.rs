@@ -14,7 +14,7 @@
 /// ```
 #[macro_export]
 macro_rules! heap_allocator {
-    ($size:expr) => (heap_allocator!(size: $size));
+    ($size:expr) => ($crate::heap_allocator!(size: $size));
     ($(#[$m:meta])* size: $size:expr) => {{
         $(#[$m])*
         static mut HEAP: core::mem::MaybeUninit<[u8; $size]> = core::mem::MaybeUninit::uninit();
