@@ -12,9 +12,7 @@ use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
-    target_triple,
-    Package,
-    Version,
+    target_triple, Package, Version,
 };
 
 // ----------------------------------------------------------------------------
@@ -610,7 +608,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core",
                             "--no-default-features",
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},defmt"),
@@ -638,11 +635,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     lint_package(
                         chip,
                         &path,
-                        &[
-                            "-Zbuild-std=core",
-                            &format!("--target={}", chip.target()),
-                            &features,
-                        ],
+                        &[&format!("--target={}", chip.target()), &features],
                         args.fix,
                     )?;
                 }
@@ -652,7 +645,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},executors,defmt,esp-hal/unstable"),
                         ],
@@ -662,15 +654,11 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
-                        let features = format!("--features={chip},sys-logs,esp-hal/unstable");
+                        let features = format!("--features={chip},esp-hal/unstable");
                         lint_package(
                             chip,
                             &path,
-                            &[
-                                "-Zbuild-std=core",
-                                &format!("--target={}", chip.target()),
-                                &features,
-                            ],
+                            &[&format!("--target={}", chip.target()), &features],
                             args.fix,
                         )?;
                     }
@@ -681,7 +669,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             chip,
                             &path,
                             &[
-                                "-Zbuild-std=core",
                                 &format!("--target={}", chip.lp_target().unwrap()),
                                 &format!("--features={chip},embedded-io"),
                             ],
@@ -695,7 +682,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},defmt-espflash"),
                         ],
@@ -708,7 +694,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         lint_package(
                             chip,
                             &path,
-                            &["-Zbuild-std=core", &format!("--target={}", chip.target())],
+                            &[&format!("--target={}", chip.target())],
                             args.fix,
                         )?;
                     }
@@ -719,7 +705,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},storage,nor-flash,low-level"),
                         ],
@@ -729,7 +714,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspWifi => {
                     let mut features = format!(
-                        "--features={chip},defmt,sys-logs,esp-hal/unstable,builtin-scheduler"
+                        "--features={chip},defmt,esp-hal/unstable,builtin-scheduler"
                     );
 
                     if device.contains("wifi") {
@@ -745,7 +730,6 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core,alloc",
                             &format!("--target={}", chip.target()),
                             "--no-default-features",
                             &features,
@@ -754,13 +738,26 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     )?;
                 }
 
+                Package::XtensaLx => {
+                    if matches!(device.arch(), Arch::Xtensa) {
+                        lint_package(
+                            chip,
+                            &path,
+                            &[
+                                &format!("--target={}", chip.target()),
+                                &format!("--features={chip}"),
+                            ],
+                            args.fix,
+                        )?
+                    }
+                }
+                
                 Package::XtensaLxRt => {
                     if matches!(device.arch(), Arch::Xtensa) {
                         lint_package(
                             chip,
                             &path,
                             &[
-                                "-Zbuild-std=core",
                                 &format!("--target={}", chip.target()),
                                 &format!("--features={chip}"),
                             ],
@@ -1027,11 +1024,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             package: Package::EspHal,
             target: Some(args.chip.target().to_string()),
             features: vec![args.chip.to_string()],
-            toolchain: if args.chip.is_xtensa() {
-                Some(String::from("esp"))
-            } else {
-                Some(String::from("stable"))
-            },
+            toolchain: None,
             no_default_features: true,
         },
     )
@@ -1067,7 +1060,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     .ok();
 
     let completed_at = Instant::now();
-    log::debug!("CI checks completed in {:?}", completed_at - started_at);
+    log::info!("CI checks completed in {:?}", completed_at - started_at);
 
     if failure {
         bail!("CI checks failed");
