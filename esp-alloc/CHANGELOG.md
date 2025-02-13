@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `esp_alloc::heap_allocator!` syntax has been changed to `esp_alloc::heap_allocator!(size: 64000)` (#3135)
+
 ### Fixed
 
 ### Removed
