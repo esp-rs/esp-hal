@@ -87,6 +87,13 @@ impl Package {
     pub fn is_published(&self) -> bool {
         !matches!(self, Package::Examples | Package::HilTest | Package::QaTest)
     }
+
+    /// Build on host
+    pub fn build_on_host(&self) -> bool {
+        use Package::*;
+
+        matches!(self, EspBuild | EspConfig | EspMetadata)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Display, ValueEnum)]

@@ -613,6 +613,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--features={chip},defmt"),
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
@@ -637,6 +638,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         &path,
                         &[&format!("--target={}", chip.target()), &features],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
@@ -649,6 +651,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--features={chip},executors,defmt,esp-hal/unstable"),
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
@@ -660,6 +663,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &path,
                             &[&format!("--target={}", chip.target()), &features],
                             args.fix,
+                            package.build_on_host(),
                         )?;
                     }
                 }
@@ -673,6 +677,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                                 &format!("--features={chip},embedded-io"),
                             ],
                             args.fix,
+                            package.build_on_host(),
                         )?;
                     }
                 }
@@ -686,6 +691,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--features={chip},defmt-espflash"),
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
@@ -696,6 +702,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &path,
                             &[&format!("--target={}", chip.target())],
                             args.fix,
+                            package.build_on_host(),
                         )?;
                     }
                 }
@@ -709,13 +716,13 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &format!("--features={chip},storage,nor-flash,low-level"),
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!(
-                        "--features={chip},defmt,esp-hal/unstable,builtin-scheduler"
-                    );
+                    let mut features =
+                        format!("--features={chip},defmt,esp-hal/unstable,builtin-scheduler");
 
                     if device.contains("wifi") {
                         features.push_str(",esp-now,sniffer")
@@ -735,6 +742,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             &features,
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
@@ -743,15 +751,13 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         lint_package(
                             chip,
                             &path,
-                            &[
-                                &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
-                            ],
+                            &[&format!("--target={}", chip.target())],
                             args.fix,
+                            package.build_on_host(),
                         )?
                     }
                 }
-                
+
                 Package::XtensaLxRt => {
                     if matches!(device.arch(), Arch::Xtensa) {
                         lint_package(
@@ -762,6 +768,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                                 &format!("--features={chip}"),
                             ],
                             args.fix,
+                            package.build_on_host(),
                         )?
                     }
                 }
@@ -771,7 +778,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::Examples | Package::HilTest | Package::QaTest => {}
 
                 // By default, no `clippy` arguments are required:
-                _ => lint_package(chip, &path, &[], args.fix)?,
+                _ => lint_package(chip, &path, &[], args.fix, package.build_on_host())?,
             }
         }
     }
@@ -779,12 +786,24 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     Ok(())
 }
 
-fn lint_package(chip: &Chip, path: &Path, args: &[&str], fix: bool) -> Result<()> {
+fn lint_package(
+    chip: &Chip,
+    path: &Path,
+    args: &[&str],
+    fix: bool,
+    build_on_host: bool,
+) -> Result<()> {
     log::info!("Linting package: {} ({})", path.display(), chip);
 
     let builder = CargoArgsBuilder::default().subcommand("clippy");
 
     let mut builder = if chip.is_xtensa() {
+        let builder = if build_on_host {
+            builder
+        } else {
+            builder.arg("-Zbuild-std=core,alloc")
+        };
+
         // We only overwrite Xtensas so that externally set nightly/stable toolchains
         // are not overwritten.
         builder.toolchain("esp")
