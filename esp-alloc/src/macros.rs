@@ -4,13 +4,11 @@
 /// bytes. This supports attributes.
 ///
 /// # Usage
-/// ```
+/// ```rust, no_run
 /// // Use 64kB in the same region stack uses (dram_seg), for the heap.
-/// heap_allocator(64000)
-/// // Use 64kB in the same region stack uses (dram_seg), for the heap.
-/// heap_allocator(size: 64000)
+/// heap_allocator!(size: 64000);
 /// // Use 64kB in dram2_seg for the heap, which is otherwise unused.
-/// heap_allocator(#[link_section = ".dram2_uninit"] size: 64000)
+/// heap_allocator!(#[link_section = ".dram2_uninit"] size: 64000);
 /// ```
 #[macro_export]
 macro_rules! heap_allocator {
