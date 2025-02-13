@@ -6,15 +6,16 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use cargo::CargoAction;
 use clap::ValueEnum;
-use esp_metadata::{Chip, Config};
+use esp_metadata::Chip;
 use strum::{Display, EnumIter, IntoEnumIterator as _};
 
 use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
 
 pub mod cargo;
+pub mod documentation;
 pub mod firmware;
 
 #[derive(
@@ -29,6 +30,7 @@ pub mod firmware;
     Display,
     EnumIter,
     ValueEnum,
+    serde::Deserialize,
     serde::Serialize,
 )]
 #[serde(rename_all = "kebab-case")]
@@ -82,7 +84,7 @@ impl Package {
     }
 
     /// Should documentation be built for the package?
-    pub fn should_document(&self) -> bool {
+    pub fn is_published(&self) -> bool {
         !matches!(self, Package::Examples | Package::HilTest | Package::QaTest)
     }
 }
@@ -93,127 +95,6 @@ pub enum Version {
     Major,
     Minor,
     Patch,
-}
-
-/// Build the documentation for the specified package and, optionally, a
-/// specific chip.
-pub fn build_documentation(
-    workspace: &Path,
-    package: Package,
-    chip: Option<Chip>,
-) -> Result<PathBuf> {
-    let package_name = package.to_string();
-    let package_path = windows_safe_path(&workspace.join(&package_name));
-
-    if let Some(chip) = chip {
-        log::info!("Building '{package_name}' documentation targeting '{chip}'");
-    } else {
-        log::info!("Building '{package_name}' documentation");
-    }
-
-    // We require some nightly features to build the documentation:
-    let toolchain = if chip.is_some_and(|chip| chip.is_xtensa()) {
-        "esp"
-    } else {
-        "nightly"
-    };
-
-    // Determine the appropriate build target for the given package and chip,
-    // if we're able to:
-    let target = if let Some(ref chip) = chip {
-        Some(target_triple(package, chip)?)
-    } else {
-        None
-    };
-
-    let mut features = vec![];
-    if let Some(chip) = chip {
-        features.push(chip.to_string());
-        features.extend(apply_feature_rules(&package, Config::for_chip(&chip)));
-    }
-
-    // Build up an array of command-line arguments to pass to `cargo`:
-    let mut builder = CargoArgsBuilder::default()
-        .toolchain(toolchain)
-        .subcommand("doc")
-        .features(&features)
-        .arg("-Zrustdoc-map")
-        .arg("--lib")
-        .arg("--no-deps");
-
-    if let Some(target) = target {
-        builder = builder.target(target);
-    }
-
-    // Special case: `esp-metadata` requires `std`, and we get some really confusing
-    // errors if we try to pass `-Zbuild-std=core`:
-    if package != Package::EspMetadata {
-        builder = builder.arg("-Zbuild-std=alloc,core");
-    }
-
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    let mut envs = vec![("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs")];
-    // Special case: `esp-storage` requires the optimization level to be 2 or 3:
-    if package == Package::EspStorage {
-        envs.push(("CARGO_PROFILE_DEBUG_OPT_LEVEL", "3"));
-    }
-
-    // Execute `cargo doc` from the package root:
-    cargo::run_with_env(&args, &package_path, envs, false)?;
-
-    // Build up the path at which the built documentation can be found:
-    let mut docs_path = workspace.join(package.to_string()).join("target");
-    if let Some(target) = target {
-        docs_path = docs_path.join(target);
-    }
-    docs_path = docs_path.join("doc");
-
-    Ok(windows_safe_path(&docs_path))
-}
-
-fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
-    let chip_name = &config.name();
-
-    let mut features = vec![];
-    match package {
-        Package::EspBacktrace => features.push("defmt".to_owned()),
-        Package::EspConfig => features.push("build".to_owned()),
-        Package::EspHal => {
-            features.push("unstable".to_owned());
-            features.push("ci".to_owned());
-            match chip_name.as_str() {
-                "esp32" => features.push("psram".to_owned()),
-                "esp32s2" => features.push("psram".to_owned()),
-                "esp32s3" => features.push("psram".to_owned()),
-                _ => {}
-            };
-        }
-        Package::EspWifi => {
-            features.push("esp-hal/unstable".to_owned());
-            if config.contains("wifi") {
-                features.push("wifi".to_owned());
-                features.push("esp-now".to_owned());
-                features.push("sniffer".to_owned());
-                features.push("utils".to_owned());
-                features.push("smoltcp/proto-ipv4".to_owned());
-                features.push("smoltcp/proto-ipv6".to_owned());
-            }
-            if config.contains("ble") {
-                features.push("ble".to_owned());
-            }
-            if config.contains("wifi") && config.contains("ble") {
-                features.push("coex".to_owned());
-            }
-        }
-        Package::EspHalEmbassy => {
-            features.push("esp-hal/unstable".to_owned());
-        }
-        _ => {}
-    }
-
-    features
 }
 
 /// Run or build the specified test or example for the specified chip.
@@ -584,6 +465,25 @@ pub fn generate_efuse_table(
 // ----------------------------------------------------------------------------
 // Helper Functions
 
+// Copy an entire directory recursively.
+// https://stackoverflow.com/a/65192210
+pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
+    fs::create_dir_all(&dst)?;
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Return a (sorted) list of paths to each valid Cargo package in the
 /// workspace.
 pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
@@ -635,4 +535,16 @@ pub fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
     } else {
         Ok(chip.target())
     }
+}
+
+/// Validate that the specified chip is valid for the specified package.
+pub fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
+    ensure!(
+        *package != Package::EspLpHal || chip.has_lp_core(),
+        "Invalid chip provided for package '{}': '{}'",
+        package,
+        chip
+    );
+
+    Ok(())
 }

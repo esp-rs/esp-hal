@@ -1,0 +1,48 @@
+<div style="margin-top: 0.5rem; width: 100%">
+  <label for="version-select">Version:</label>
+  <select id="version-select" name="version-select" style="text-align: center; width: 100%">
+    <option value="{{ version }}" selected="selected">{{ version }}</option>
+  </select>
+</div>
+
+<script type="text/javascript">
+  const select = document.querySelector("#version-select");
+
+  select.addEventListener("change", (e) => {
+    const selected = select.value;
+
+    // Replace the existing version number in the URL with the newly
+    // selected version:
+    let href = window.location.href;
+    href = href.replace(/[\d]+\.[\d]+\.[\d]+[^\/]*/g, selected);
+
+    // Redirect to the new URL:
+    window.location.href = href;
+  });
+
+  document.addEventListener("DOMContentLoaded", (e) => {
+    const selected = select.value;
+
+    // Remove any options currently present in the select box:
+    for (let child of select.children) {
+      child.remove();
+    }
+
+    // Load the manifest JSON file and re-populate the select box with new
+    // options for all available versions:
+    const manifestUrl = "{{ base_url }}/{{ package }}/manifest.json";
+    fetch(manifestUrl)
+      .then((res) => res.json())
+      .then(({ versions }) => {
+        for (let version of versions) {
+          let option = document.createElement("option");
+          option.text = version;
+          option.value = version;
+          select.appendChild(option);
+        }
+
+        select.value = selected;
+      })
+      .catch((err) => console.error(err));
+  });
+</script>
