@@ -43,20 +43,7 @@ pub fn build_documentation(
 
         // Download the manifest from the documentation server if able,
         // otherwise just create a default (empty) manifest:
-        let mut manifest_url = base_url
-            .clone()
-            .unwrap_or_default()
-            .trim_end_matches('/')
-            .to_string();
-        manifest_url.push_str(&format!("/{package}/manifest.json"));
-
-        let mut manifest = match reqwest::blocking::get(manifest_url) {
-            Ok(resp) => resp.json::<Manifest>()?,
-            Err(err) => {
-                log::warn!("Unable to fetch package manifest: {err}");
-                Manifest::default()
-            }
-        };
+        let mut manifest = fetch_manifest(&base_url, package)?;
 
         // If the package does not have chip features, then just ignore
         // whichever chip(s) were specified as arguments:
@@ -475,6 +462,29 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
 
 // ----------------------------------------------------------------------------
 // Helper Functions
+
+fn fetch_manifest(base_url: &Option<String>, package: &Package) -> Result<Manifest> {
+    let mut manifest_url = base_url
+        .clone()
+        .unwrap_or_default()
+        .trim_end_matches('/')
+        .to_string();
+    manifest_url.push_str(&format!("/{package}/manifest.json"));
+
+    #[cfg(feature = "deploy-docs")]
+    let manifest = match reqwest::blocking::get(manifest_url) {
+        Ok(resp) => resp.json::<Manifest>()?,
+        Err(err) => {
+            log::warn!("Unable to fetch package manifest: {err}");
+            Manifest::default()
+        }
+    };
+
+    #[cfg(not(feature = "deploy-docs"))]
+    let manifest = Manifest::default();
+
+    Ok(manifest)
+}
 
 fn render_template<C>(resources: &Path, template: &str, ctx: C) -> Result<String>
 where
