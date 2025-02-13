@@ -205,7 +205,12 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     crate::cargo::run_with_env(&args, &package_path, envs, false)?;
 
     // Build up the path at which the built documentation can be found:
-    let mut docs_path = workspace.join(package.to_string()).join("target");
+    let mut docs_path = if let Ok(target_path) = std::env::var("CARGO_TARGET_DIR") {
+        PathBuf::from(target_path)
+    } else {
+        workspace.join(package.to_string()).join("target")
+    };
+
     if let Some(target) = target {
         docs_path = docs_path.join(target);
     }

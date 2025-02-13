@@ -2,6 +2,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    time::Instant,
 };
 
 use anyhow::{bail, ensure, Context as _, Result};
@@ -11,9 +12,7 @@ use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
-    target_triple,
-    Package,
-    Version,
+    target_triple, Package, Version,
 };
 
 // ----------------------------------------------------------------------------
@@ -51,6 +50,8 @@ enum Cli {
     RunTests(TestArgs),
     /// Run all ELFs in a folder.
     RunElfs(RunElfArgs),
+    /// Perform (parts of) the checks done in CI
+    Ci(CiArgs),
 }
 
 #[derive(Debug, Args)]
@@ -185,6 +186,13 @@ struct RunElfArgs {
     path: PathBuf,
 }
 
+#[derive(Debug, Args)]
+struct CiArgs {
+    /// Chip to target.
+    #[arg(value_enum)]
+    chip: Chip,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -217,6 +225,7 @@ fn main() -> Result<()> {
         Cli::RunElfs(args) => run_elfs(args),
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
         Cli::RunTests(args) => tests(&workspace, args, CargoAction::Run),
+        Cli::Ci(args) => run_ci_checks(&workspace, args),
     }
 }
 
@@ -599,12 +608,12 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core",
                             "--no-default-features",
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},defmt"),
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
@@ -627,12 +636,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     lint_package(
                         chip,
                         &path,
-                        &[
-                            "-Zbuild-std=core",
-                            &format!("--target={}", chip.target()),
-                            &features,
-                        ],
+                        &[&format!("--target={}", chip.target()), &features],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
@@ -641,26 +647,23 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},executors,defmt,esp-hal/unstable"),
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
-                        let features = format!("--features={chip},sys-logs,esp-hal/unstable");
+                        let features = format!("--features={chip},esp-hal/unstable");
                         lint_package(
                             chip,
                             &path,
-                            &[
-                                "-Zbuild-std=core",
-                                &format!("--target={}", chip.target()),
-                                &features,
-                            ],
+                            &[&format!("--target={}", chip.target()), &features],
                             args.fix,
+                            package.build_on_host(),
                         )?;
                     }
                 }
@@ -670,11 +673,11 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             chip,
                             &path,
                             &[
-                                "-Zbuild-std=core",
                                 &format!("--target={}", chip.lp_target().unwrap()),
                                 &format!("--features={chip},embedded-io"),
                             ],
                             args.fix,
+                            package.build_on_host(),
                         )?;
                     }
                 }
@@ -684,11 +687,11 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},defmt-espflash"),
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
@@ -697,8 +700,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         lint_package(
                             chip,
                             &path,
-                            &["-Zbuild-std=core", &format!("--target={}", chip.target())],
+                            &[&format!("--target={}", chip.target())],
                             args.fix,
+                            package.build_on_host(),
                         )?;
                     }
                 }
@@ -708,18 +712,17 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core",
                             &format!("--target={}", chip.target()),
                             &format!("--features={chip},storage,nor-flash,low-level"),
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
                 }
 
                 Package::EspWifi => {
-                    let mut features = format!(
-                        "--features={chip},defmt,sys-logs,esp-hal/unstable,builtin-scheduler"
-                    );
+                    let mut features =
+                        format!("--features={chip},defmt,esp-hal/unstable,builtin-scheduler");
 
                     if device.contains("wifi") {
                         features.push_str(",esp-now,sniffer")
@@ -734,13 +737,25 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         chip,
                         &path,
                         &[
-                            "-Zbuild-std=core,alloc",
                             &format!("--target={}", chip.target()),
                             "--no-default-features",
                             &features,
                         ],
                         args.fix,
+                        package.build_on_host(),
                     )?;
+                }
+
+                Package::XtensaLx => {
+                    if matches!(device.arch(), Arch::Xtensa) {
+                        lint_package(
+                            chip,
+                            &path,
+                            &[&format!("--target={}", chip.target())],
+                            args.fix,
+                            package.build_on_host(),
+                        )?
+                    }
                 }
 
                 Package::XtensaLxRt => {
@@ -749,11 +764,11 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             chip,
                             &path,
                             &[
-                                "-Zbuild-std=core",
                                 &format!("--target={}", chip.target()),
                                 &format!("--features={chip}"),
                             ],
                             args.fix,
+                            package.build_on_host(),
                         )?
                     }
                 }
@@ -763,7 +778,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::Examples | Package::HilTest | Package::QaTest => {}
 
                 // By default, no `clippy` arguments are required:
-                _ => lint_package(chip, &path, &[], args.fix)?,
+                _ => lint_package(chip, &path, &[], args.fix, package.build_on_host())?,
             }
         }
     }
@@ -771,12 +786,24 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     Ok(())
 }
 
-fn lint_package(chip: &Chip, path: &Path, args: &[&str], fix: bool) -> Result<()> {
+fn lint_package(
+    chip: &Chip,
+    path: &Path,
+    args: &[&str],
+    fix: bool,
+    build_on_host: bool,
+) -> Result<()> {
     log::info!("Linting package: {} ({})", path.display(), chip);
 
     let builder = CargoArgsBuilder::default().subcommand("clippy");
 
     let mut builder = if chip.is_xtensa() {
+        let builder = if build_on_host {
+            builder
+        } else {
+            builder.arg("-Zbuild-std=core,alloc")
+        };
+
         // We only overwrite Xtensas so that externally set nightly/stable toolchains
         // are not overwritten.
         builder.toolchain("esp")
@@ -788,15 +815,13 @@ fn lint_package(chip: &Chip, path: &Path, args: &[&str], fix: bool) -> Result<()
         builder = builder.arg(arg.to_string());
     }
 
-    // build in release to reuse example artifacts
-    let cargo_args = builder.arg("--release");
-    let cargo_args = if fix {
-        cargo_args.arg("--fix").arg("--lib").arg("--allow-dirty")
+    let builder = if fix {
+        builder.arg("--fix").arg("--lib").arg("--allow-dirty")
     } else {
-        cargo_args.arg("--").arg("-D").arg("warnings")
+        builder.arg("--").arg("-D").arg("warnings").arg("--no-deps")
     };
 
-    let cargo_args = cargo_args.build();
+    let cargo_args = builder.build();
 
     xtask::cargo::run(&cargo_args, path)
 }
@@ -910,6 +935,155 @@ fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
 
     // Execute `cargo doc` from the package root:
     xtask::cargo::run(&args, &package_path)?;
+
+    Ok(())
+}
+
+fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
+    let mut failure = false;
+    let started_at = Instant::now();
+
+    // Clippy and docs checks
+
+    // Clippy
+    lint_packages(
+        workspace,
+        LintPackagesArgs {
+            packages: Package::iter().collect(),
+            chips: vec![args.chip],
+            fix: false,
+        },
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // Check doc-tests
+    run_doc_tests(
+        workspace,
+        ExampleArgs {
+            package: Package::EspHal,
+            chip: args.chip,
+            example: None,
+            debug: true,
+        },
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // Check documentation
+    build_documentation(
+        workspace,
+        BuildDocumentationArgs {
+            packages: vec![Package::EspHal, Package::EspWifi, Package::EspHalEmbassy],
+            chips: vec![args.chip],
+            base_url: None,
+        },
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // for chips with esp-lp-hal: Build all supported examples for the low-power
+    // core first
+    if args.chip.has_lp_core() {
+        // Build prerequisite examples (esp-lp-hal)
+        // `examples` copies the examples to a folder with the chip name as the last
+        // path element then we copy it to the place where the HP core example
+        // expects it
+        examples(
+            workspace,
+            ExampleArgs {
+                package: Package::EspLpHal,
+                chip: args.chip,
+                example: None,
+                debug: false,
+            },
+            CargoAction::Build(PathBuf::from(format!(
+                "./esp-lp-hal/target/{}/release/examples",
+                args.chip.target()
+            ))),
+        )
+        .inspect_err(|_| failure = true)
+        .and_then(|_| {
+            let from_dir = PathBuf::from(format!(
+                "./esp-lp-hal/target/{}/release/examples/{}",
+                args.chip.target(),
+                args.chip.to_string()
+            ));
+            let to_dir = PathBuf::from(format!(
+                "./esp-lp-hal/target/{}/release/examples",
+                args.chip.target()
+            ));
+            from_dir.read_dir()?.for_each(|entry| {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                let to = to_dir.join(entry.file_name());
+                fs::copy(path, to).expect("Failed to copy file");
+            });
+            Ok(())
+        })
+        .ok();
+
+        // Check documentation
+        build_documentation(
+            workspace,
+            BuildDocumentationArgs {
+                packages: vec![Package::EspLpHal],
+                chips: vec![args.chip],
+                base_url: None,
+            },
+        )
+        .inspect_err(|_| failure = true)
+        .ok();
+    }
+
+    // Make sure we're able to build the HAL without the default features enabled
+    build_package(
+        workspace,
+        BuildPackageArgs {
+            package: Package::EspHal,
+            target: Some(args.chip.target().to_string()),
+            features: vec![args.chip.to_string()],
+            toolchain: None,
+            no_default_features: true,
+        },
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // Build (examples)
+    examples(
+        workspace,
+        ExampleArgs {
+            package: Package::Examples,
+            chip: args.chip,
+            example: None,
+            debug: true,
+        },
+        CargoAction::Build(PathBuf::from(format!("./examples/target/"))),
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // Build (qa-test)
+    examples(
+        workspace,
+        ExampleArgs {
+            package: Package::QaTest,
+            chip: args.chip,
+            example: None,
+            debug: true,
+        },
+        CargoAction::Build(PathBuf::from(format!("./qa-test/target/"))),
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    let completed_at = Instant::now();
+    log::info!("CI checks completed in {:?}", completed_at - started_at);
+
+    if failure {
+        bail!("CI checks failed");
+    }
 
     Ok(())
 }
