@@ -1,10 +1,20 @@
 //! Macros provided for convenience
 
 /// Initialize a global heap allocator providing a heap of the given size in
-/// bytes
+/// bytes. This supports attributes.
+///
+/// # Usage
+/// ```rust, no_run
+/// // Use 64kB in the same region stack uses (dram_seg), for the heap.
+/// heap_allocator!(size: 64000);
+/// // Use 64kB in dram2_seg for the heap, which is otherwise unused.
+/// heap_allocator!(#[link_section = ".dram2_uninit"] size: 64000);
+/// ```
 #[macro_export]
 macro_rules! heap_allocator {
-    ($size:expr) => {{
+    ($size:expr) => ($crate::heap_allocator!(size: $size));
+    ($(#[$m:meta])* size: $size:expr) => {{
+        $(#[$m])*
         static mut HEAP: core::mem::MaybeUninit<[u8; $size]> = core::mem::MaybeUninit::uninit();
 
         unsafe {
