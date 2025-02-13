@@ -1027,7 +1027,11 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             package: Package::EspHal,
             target: Some(args.chip.target().to_string()),
             features: vec![args.chip.to_string()],
-            toolchain: None,
+            toolchain: if args.chip.is_xtensa() {
+                Some(String::from("esp"))
+            } else {
+                Some(String::from("stable"))
+            },
             no_default_features: true,
         },
     )
