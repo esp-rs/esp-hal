@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `esp_alloc::heap_allocator!` now accepts attributes, e.g., `esp_alloc::heap_allocator!(#[link_section = ".dram2_uninit"] size: 64000)`
+
 ### Changed
 
 ### Fixed
