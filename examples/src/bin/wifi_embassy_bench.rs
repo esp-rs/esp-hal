@@ -73,25 +73,9 @@ async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    static mut HEAP: core::mem::MaybeUninit<[u8; 32 * 1024]> = core::mem::MaybeUninit::uninit();
-
-    #[link_section = ".dram2_uninit"]
-    static mut HEAP2: core::mem::MaybeUninit<[u8; 64 * 1024]> = core::mem::MaybeUninit::uninit();
-
-    unsafe {
-        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-            HEAP.as_mut_ptr() as *mut u8,
-            core::mem::size_of_val(&*core::ptr::addr_of!(HEAP)),
-            esp_alloc::MemoryCapability::Internal.into(),
-        ));
-
-        // add some more RAM
-        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-            HEAP2.as_mut_ptr() as *mut u8,
-            core::mem::size_of_val(&*core::ptr::addr_of!(HEAP2)),
-            esp_alloc::MemoryCapability::Internal.into(),
-        ));
-    }
+    esp_alloc::heap_allocator!(size: 32 * 1024);
+    // add some more RAM
+    esp_alloc::heap_allocator!(#[link_section = ".dram2_uninit"] size: 64 * 1024);
 
     let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
