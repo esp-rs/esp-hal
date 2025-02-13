@@ -15,4 +15,4 @@ runs:
   steps:
     - name: xtask ci
       shell: bash
-      run: cargo ${{ inputs.toolchain }} xtask ci ${{ inputs.device }}
+      run: cargo +${{ inputs.toolchain }} xtask ci ${{ inputs.device }}
