@@ -68,7 +68,7 @@ pub(crate) unsafe fn phy_enable() {
                     [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
 
                 let phy_version = get_phy_version_str();
-                trace!("phy_version {}", str_from_c(phy_version as *const u8));
+                trace!("phy_version {}", str_from_c(phy_version));
 
                 let init_data = &PHY_INIT_DATA_DEFAULT;
 

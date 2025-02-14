@@ -27,3 +27,40 @@ As part of limiting public API changes due to config options, the `csi_enabled` 
 -esp-wifi = { version = "0.12.0", features = ["wifi"] }
 +esp-wifi = { version = "0.12.0", features = ["wifi", "csi"] }
 ```
+
+## Changed the way to get the WiFi controller and interfaces
+
+The network interfaces and the controller are now more separated. This way you can change between STA, AP and AP_STA mode easily without reconstructing the networking stacks.
+
+There is no convenience utility to create a `smoltcp` interface needed by blocking networking stacks anymore. You need your own implementation.
+
+Please note that networking stacks _might_ need to be reset when connecting to a different network interface (i.e. get a new IP address and routings) - `embassy-net` should manage to do that automatically.
+
+```diff
+-    let (iface, device, mut controller) =
+-        create_network_interface(&init, peripherals.WIFI, WifiStaDevice).unwrap();
++    let (mut controller, interfaces) =
++        esp_wifi::wifi::new(&init, peripherals.WIFI).unwrap();
++    let mut device = interfaces.sta;
++    let iface = create_interface(&mut device);
+    ...
++ fn timestamp() -> smoltcp::time::Instant {
++     smoltcp::time::Instant::from_micros(
++         esp_hal::time::Instant::now()
++             .duration_since_epoch()
++             .as_micros() as i64,
++     )
++ }
++ 
++ pub fn create_interface(device: &mut esp_wifi::wifi::WifiDevice) -> smoltcp::iface::Interface {
++     // users could create multiple instances but since they only have one WifiDevice
++     // they probably can't do anything bad with that
++     smoltcp::iface::Interface::new(
++         smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(
++             smoltcp::wire::EthernetAddress::from_bytes(&device.mac_address()),
++         )),
++         device,
++         timestamp(),
++     )
++ }
+```

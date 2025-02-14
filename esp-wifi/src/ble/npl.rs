@@ -384,7 +384,7 @@ unsafe extern "C" fn task_create(
     task_handle: *const c_void,
     core_id: u32,
 ) -> i32 {
-    let name_str = str_from_c(name as *const _);
+    let name_str = str_from_c(name);
     trace!(
         "task_create {:?} {} {} {:?} {} {:?} {}",
         task_func,
@@ -421,7 +421,7 @@ unsafe extern "C" fn task_delete(task: *const c_void) {
 }
 
 unsafe extern "C" fn osi_assert(ln: u32, fn_name: *const c_void, param1: u32, param2: u32) {
-    let name_str = str_from_c(fn_name as *const u8);
+    let name_str = str_from_c(fn_name as _);
     panic!("ASSERT {}:{} {} {}", name_str, ln, param1, param2);
 }
 

@@ -7,7 +7,7 @@ use core::{
     ptr::{self, addr_of, addr_of_mut},
 };
 
-use esp_wifi_sys::include::malloc;
+use esp_wifi_sys::{c_types::c_char, include::malloc};
 
 use super::malloc::free;
 use crate::{
@@ -164,13 +164,13 @@ impl RawQueue {
     }
 }
 
-pub unsafe fn str_from_c<'a>(s: *const u8) -> &'a str {
+pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
     let c_str = core::ffi::CStr::from_ptr(s.cast());
     core::str::from_utf8_unchecked(c_str.to_bytes())
 }
 
 #[no_mangle]
-unsafe extern "C" fn strnlen(chars: *const u8, maxlen: usize) -> usize {
+unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize {
     let mut len = 0;
     loop {
         if chars.offset(len).read_volatile() == 0 {
