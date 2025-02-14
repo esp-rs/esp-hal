@@ -46,12 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `system::RadioClockController` trait has been replaced by the `clock::RadioClockController` struct. (#3100)
 - The `Cpu` struct and contents of the `reset` and `cpu_control` modules have been moved into `cpu`. (#3099)
 - The `software_reset_cpu` now takes which CPU to reset as parameter. (#3099)
-- The `Cpu` struct and contents of the `reset` and `cpu_control` modules have been moved into `cpu`. (#)
-- The `software_reset_cpu` now takes which CPU to reset as parameter. (#)
 - `read_bytes` and `write_bytes` methods on drivers have been renamed to `read` and `write` (#3137)
 - `Uart::write` and `Uart::read` are now blocking and return the number of bytes written/read (#2882)
 - `Uart::flush` is now blocking (#2882)
 - `Uart::split` and the respective split halves have been marked as unstable (#3137)
+- `Uart::{read_async, write_async}` are now cancellation-safe (#3142)
 
 - I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
 
