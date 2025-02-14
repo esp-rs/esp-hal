@@ -108,9 +108,18 @@ The more descriptive `gpio::Level` enum is now used to specify output levels of 
 + let code = PulseCode::new(Level::High, 200, Level::Low, 50);
 ```
 
+## Global driver changes
+
+The `_bytes` postfix of driver methods that take a byte slice have been removed.
+
+```diff
+- uart0.write_bytes(b"Hello world!")?;
++ uart0.write(b"Hello world!")?;
+```
+
 ## UART changes
 
-Uart `write_bytes` is now blocking and return the number of bytes written. `read_bytes` will block until it fills the provided buffer with received bytes, use `read_buffered_bytes` to read the available bytes without blocking.
+Uart `write_bytes` is now blocking and return the number of bytes written. `read_bytes` will block until it fills at least one byte into the buffer with received bytes, use `read_buffered_bytes` to read the available bytes without blocking.
 
 e.g.
 
