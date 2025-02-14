@@ -36,7 +36,7 @@ mod tests {
             .unwrap()
             .with_tx(tx);
 
-        tx.flush().unwrap();
+        tx.flush();
         tx.write(&[0x42]).unwrap();
         let mut byte = [0u8; 1];
         rx.read(&mut byte).unwrap();
