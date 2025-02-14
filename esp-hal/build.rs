@@ -357,19 +357,11 @@ fn generate_idf_app_desc_if_requested(
 
     fn str_to_cstr_array<const C: usize>(s: &str) -> [::core::ffi::c_char; C] {
         let bytes = s.as_bytes();
-        if bytes.len() >= C {
-            assert!(true, "String is too long for the C-string field");
-        }
-
         let mut ret: [::core::ffi::c_char; C] = [0; C];
-        let mut i = 0;
-        loop {
-            ret[i] = bytes[i] as _;
-            i += 1;
-            if i >= bytes.len() {
-                break;
-            }
-        }
+        #[allow(clippy::useless_transmute)]
+        ret[..bytes.len()].copy_from_slice(unsafe {
+            std::mem::transmute::<&[u8], &[::core::ffi::c_char]>(bytes)
+        });
         ret
     }
 
