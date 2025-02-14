@@ -1603,7 +1603,8 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush()
+        self.flush();
+        Ok(())
     }
 }
 
