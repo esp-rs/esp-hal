@@ -1,6 +1,6 @@
 SECTIONS {
     .rodata_desc : ALIGN(4)
     {
-        KEEP(*(.rodata_desc));
+        // this might get replaced with actual data by build.rs
     } > RODATA
 }
