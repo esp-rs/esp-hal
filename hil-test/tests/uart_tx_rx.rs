@@ -42,10 +42,10 @@ mod tests {
     fn test_send_receive(mut ctx: Context) {
         let byte = [0x42];
 
-        ctx.tx.flush();
-        ctx.tx.write_bytes(&byte).unwrap();
+        ctx.tx.flush().unwrap();
+        ctx.tx.write(&byte).unwrap();
         let mut buf = [0u8; 1];
-        ctx.rx.read_bytes(&mut buf).unwrap();
+        ctx.rx.read(&mut buf).unwrap();
 
         assert_eq!(buf[0], 0x42);
     }
@@ -55,10 +55,10 @@ mod tests {
         let bytes = [0x42, 0x43, 0x44];
         let mut buf = [0u8; 3];
 
-        ctx.tx.flush();
-        ctx.tx.write_bytes(&bytes).unwrap();
+        ctx.tx.flush().unwrap();
+        ctx.tx.write(&bytes).unwrap();
 
-        ctx.rx.read_bytes(&mut buf).unwrap();
+        ctx.rx.read(&mut buf).unwrap();
 
         assert_eq!(buf, bytes);
     }
