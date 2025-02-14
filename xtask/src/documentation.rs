@@ -242,7 +242,6 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
                 features.push("wifi".to_owned());
                 features.push("esp-now".to_owned());
                 features.push("sniffer".to_owned());
-                features.push("utils".to_owned());
                 features.push("smoltcp/proto-ipv4".to_owned());
                 features.push("smoltcp/proto-ipv6".to_owned());
             }
