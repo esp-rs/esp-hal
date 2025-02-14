@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `unstable` feature is no longer enabled by default (#3136)
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
 - RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
 - RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
@@ -40,8 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
 - The `esp_hal::time` module no longer reexports `fugit` types (#3083)
 - The `system::RadioClockController` trait has been replaced by the `clock::RadioClockController` struct. (#3100)
-- The `Cpu` struct and contents of the `reset` and `cpu_control` modules have been moved into `cpu`. (#)
-- The `software_reset_cpu` now takes which CPU to reset as parameter. (#)
+- The `Cpu` struct and contents of the `reset` and `cpu_control` modules have been moved into `cpu`. (#3099)
+- The `software_reset_cpu` now takes which CPU to reset as parameter. (#3099)
 
 - I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
 
