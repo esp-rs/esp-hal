@@ -107,6 +107,16 @@ e.g.
 + uart.read_bytes(&mut byte);
 ```
 
+### UART errors have been split into `TxError` and `RxError`.
+
+`read_*` and `write_*` functions now return different types. In practice this means you no longer
+need to check for RX errors that can't be returned by `write_*`.
+
+The error type used by `embedded-io` has been updated to reflect this. A new `IoError` enum has been
+added for `embedded-io` errors associated to the unsplit `Uart` driver. On `Uart` (but not `UartRx`
+or `UartTx`) TX-related trait methods return `IoError::Tx(TxError)`, while RX-related methods return
+`IoError::Rx(RxError)`.
+
 ### UART halves have their configuration split too
 
 `Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
