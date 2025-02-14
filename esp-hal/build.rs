@@ -130,31 +130,25 @@ fn main() -> Result<(), Box<dyn Error>> {
             None
         ),
         (
-            "esp-idf-build-time",
+            "build-time",
             "Build time",
             Value::String(String::from("00:00:00")),
             None
         ),
         (
-            "esp-idf-build-date",
-            "Build data",
+            "build-date",
+            "Build date",
             Value::String(String::from("1970-01-01")),
             None
         ),
         (
-            "esp-idf-build-time",
-            "Build time",
-            Value::String(String::from("00:00:00")),
-            None
-        ),
-        (
-            "esp-idf-app-version",
+            "app-version",
             "Version",
             Value::String(String::from("0.0.0")),
             None
         ),
         (
-            "esp-idf-app-name",
+            "app-name",
             "Project name",
             Value::String(String::from("esp-hal project")),
             None
@@ -369,24 +363,10 @@ fn generate_idf_app_desc_if_requested(
         magic_word: ESP_APP_DESC_MAGIC_WORD,
         secure_version: 0,
         reserv1: [0; 2],
-        version: str_to_cstr_array(
-            cfg["ESP_HAL_CONFIG_ESP_IDF_APP_VERSION"]
-                .as_string()
-                .as_str(),
-        ),
-        project_name: str_to_cstr_array(
-            cfg["ESP_HAL_CONFIG_ESP_IDF_APP_NAME"].as_string().as_str(),
-        ),
-        time: str_to_cstr_array(
-            cfg["ESP_HAL_CONFIG_ESP_IDF_BUILD_TIME"]
-                .as_string()
-                .as_str(),
-        ),
-        date: str_to_cstr_array(
-            cfg["ESP_HAL_CONFIG_ESP_IDF_BUILD_DATE"]
-                .as_string()
-                .as_str(),
-        ),
+        version: str_to_cstr_array(cfg["ESP_HAL_CONFIG_APP_VERSION"].as_string().as_str()),
+        project_name: str_to_cstr_array(cfg["ESP_HAL_CONFIG_APP_NAME"].as_string().as_str()),
+        time: str_to_cstr_array(cfg["ESP_HAL_CONFIG_BUILD_TIME"].as_string().as_str()),
+        date: str_to_cstr_array(cfg["ESP_HAL_CONFIG_BUILD_DATE"].as_string().as_str()),
         // just pretending some esp-idf version here
         idf_ver: str_to_cstr_array("5.3.1"),
         app_elf_sha256: [0; 32],
