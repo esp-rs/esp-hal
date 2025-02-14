@@ -25,5 +25,5 @@ MEMORY
     /* Instruction ROM */
     IROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x200000 - 0x20
     /* Data ROM */
-    DROM : ORIGIN = 0x3C000000, LENGTH = 0x200000
+    DROM : ORIGIN = 0x3C000000 + 0x20, LENGTH = 0x200000 - 0x20
 }
