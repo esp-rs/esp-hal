@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// The ECC Accelerator driver instance
-pub struct Ecc<'d, Dm> {
+pub struct Ecc<'d, Dm: DriverMode> {
     ecc: PeripheralRef<'d, ECC>,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     phantom: PhantomData<Dm>,

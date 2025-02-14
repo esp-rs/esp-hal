@@ -652,7 +652,7 @@ impl core::fmt::Display for ConfigError {
 /// ```
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Spi<'d, Dm> {
+pub struct Spi<'d, Dm: DriverMode> {
     spi: PeripheralRef<'d, AnySpi>,
     _mode: PhantomData<Dm>,
     guard: PeripheralGuard,
@@ -2524,7 +2524,10 @@ mod ehal1 {
 
     use super::*;
 
-    impl<Dm> embedded_hal::spi::ErrorType for Spi<'_, Dm> {
+    impl<Dm> embedded_hal::spi::ErrorType for Spi<'_, Dm>
+    where
+        Dm: DriverMode,
+    {
         type Error = Error;
     }
 

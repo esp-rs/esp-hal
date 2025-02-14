@@ -372,7 +372,7 @@ impl Default for AtCmdConfig {
     }
 }
 
-struct UartBuilder<'d, Dm> {
+struct UartBuilder<'d, Dm: DriverMode> {
     uart: PeripheralRef<'d, AnyUart>,
     phantom: PhantomData<Dm>,
 }
@@ -431,14 +431,14 @@ where
 /// # Ok(())
 /// # }
 /// ```
-pub struct Uart<'d, Dm> {
+pub struct Uart<'d, Dm: DriverMode> {
     rx: UartRx<'d, Dm>,
     tx: UartTx<'d, Dm>,
 }
 
 /// UART (Transmit)
 #[instability::unstable]
-pub struct UartTx<'d, Dm> {
+pub struct UartTx<'d, Dm: DriverMode> {
     uart: PeripheralRef<'d, AnyUart>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
@@ -448,7 +448,7 @@ pub struct UartTx<'d, Dm> {
 
 /// UART (Receive)
 #[instability::unstable]
-pub struct UartRx<'d, Dm> {
+pub struct UartRx<'d, Dm: DriverMode> {
     uart: PeripheralRef<'d, AnyUart>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,

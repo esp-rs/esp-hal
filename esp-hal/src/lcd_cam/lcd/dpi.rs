@@ -130,7 +130,7 @@ pub enum ConfigError {
 }
 
 /// Represents the RGB LCD interface.
-pub struct Dpi<'d, Dm> {
+pub struct Dpi<'d, Dm: DriverMode> {
     lcd_cam: PeripheralRef<'d, LCD_CAM>,
     tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,

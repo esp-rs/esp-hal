@@ -142,19 +142,19 @@ use crate::{
 type Error = Infallible;
 
 /// USB Serial/JTAG (Full-duplex)
-pub struct UsbSerialJtag<'d, Dm> {
+pub struct UsbSerialJtag<'d, Dm: DriverMode> {
     rx: UsbSerialJtagRx<'d, Dm>,
     tx: UsbSerialJtagTx<'d, Dm>,
 }
 
 /// USB Serial/JTAG (Transmit)
-pub struct UsbSerialJtagTx<'d, Dm> {
+pub struct UsbSerialJtagTx<'d, Dm: DriverMode> {
     peripheral: PeripheralRef<'d, USB_DEVICE>,
     phantom: PhantomData<Dm>,
 }
 
 /// USB Serial/JTAG (Receive)
-pub struct UsbSerialJtagRx<'d, Dm> {
+pub struct UsbSerialJtagRx<'d, Dm: DriverMode> {
     peripheral: PeripheralRef<'d, USB_DEVICE>,
     phantom: PhantomData<Dm>,
 }

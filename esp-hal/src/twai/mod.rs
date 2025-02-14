@@ -655,7 +655,7 @@ impl BaudRate {
 }
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
-pub struct TwaiConfiguration<'d, Dm> {
+pub struct TwaiConfiguration<'d, Dm: DriverMode> {
     twai: PeripheralRef<'d, AnyTwai>,
     filter: Option<(FilterType, [u8; 8])>,
     phantom: PhantomData<Dm>,
@@ -1014,7 +1014,7 @@ impl crate::interrupt::InterruptConfigurable for TwaiConfiguration<'_, Blocking>
 ///
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
-pub struct Twai<'d, Dm> {
+pub struct Twai<'d, Dm: DriverMode> {
     twai: PeripheralRef<'d, AnyTwai>,
     tx: TwaiTx<'d, Dm>,
     rx: TwaiRx<'d, Dm>,
@@ -1119,7 +1119,7 @@ where
 }
 
 /// Interface to the TWAI transmitter part.
-pub struct TwaiTx<'d, Dm> {
+pub struct TwaiTx<'d, Dm: DriverMode> {
     twai: PeripheralRef<'d, AnyTwai>,
     phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
@@ -1164,7 +1164,7 @@ where
 }
 
 /// Interface to the TWAI receiver part.
-pub struct TwaiRx<'d, Dm> {
+pub struct TwaiRx<'d, Dm: DriverMode> {
     twai: PeripheralRef<'d, AnyTwai>,
     phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
