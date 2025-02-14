@@ -122,7 +122,43 @@ fn main() -> Result<(), Box<dyn Error>> {
             Some(Validator::Enumeration(
                 vec![String::from("quad"), String::from("octal")]
             )),
-        )
+        ),
+        (
+            "generate-esp-idf-app-desc",
+            "Generate esp-idf compatible app descriptor.",
+            Value::Bool(false),
+            None
+        ),
+        (
+            "esp-idf-build-time",
+            "Build time",
+            Value::String(String::from("00:00:00")),
+            None
+        ),
+        (
+            "esp-idf-build-date",
+            "Build data",
+            Value::String(String::from("1970-01-01")),
+            None
+        ),
+        (
+            "esp-idf-build-time",
+            "Build time",
+            Value::String(String::from("00:00:00")),
+            None
+        ),
+        (
+            "esp-idf-app-version",
+            "Version",
+            Value::String(String::from("0.0.0")),
+            None
+        ),
+        (
+            "esp-idf-app-name",
+            "Project name",
+            Value::String(String::from("esp-hal project")),
+            None
+        ),
     ], true);
 
     // RISC-V and Xtensa devices each require some special handling and processing
@@ -180,19 +216,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     copy_dir_all(&config_symbols, "ld/sections", &out)?;
     copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
 
-    // supply build time and date
-    // see https://reproducible-builds.org/docs/source-date-epoch/
-    let ts = match std::env::var("SOURCE_DATE_EPOCH") {
-        Ok(val) => {
-            use chrono::TimeZone;
-            chrono::Utc
-                .timestamp_opt(val.parse::<i64>().unwrap(), 0)
-                .unwrap()
-        }
-        Err(_) => chrono::Utc::now(),
-    };
-    println!("cargo::rustc-env=BUILD_TIME={}", ts.format("%H:%M:%S"));
-    println!("cargo::rustc-env=BUILD_DATE={}", ts.format("%Y-%m-%d"));
+    if let Some(esp_idf_app_desc) = generate_idf_app_desc_if_requested(&cfg) {
+        File::create(out.join("rodata_desc.x"))?.write_all(&esp_idf_app_desc)?;
+    }
 
     Ok(())
 }
@@ -300,4 +326,100 @@ fn generate_memory_extras() -> Vec<u8> {
     )
     .as_bytes()
     .to_vec()
+}
+
+fn generate_idf_app_desc_if_requested(
+    cfg: &std::collections::HashMap<String, Value>,
+) -> Option<Vec<u8>> {
+    if let Value::Bool(false) = cfg["ESP_HAL_CONFIG_GENERATE_ESP_IDF_APP_DESC"] {
+        return None;
+    }
+
+    const ESP_APP_DESC_MAGIC_WORD: u32 = 0xABCD5432;
+
+    #[repr(C)]
+    struct EspAppDesc {
+        magic_word: u32,                       // Magic word ESP_APP_DESC_MAGIC_WORD
+        secure_version: u32,                   // Secure version
+        reserv1: [u32; 2],                     // reserv1
+        version: [core::ffi::c_char; 32],      // Application version
+        project_name: [core::ffi::c_char; 32], // Project name
+        time: [core::ffi::c_char; 16],         // Compile time
+        date: [core::ffi::c_char; 16],         // Compile date
+        idf_ver: [core::ffi::c_char; 32],      // Version IDF
+        app_elf_sha256: [u8; 32],              // sha256 of elf file
+        min_efuse_blk_rev_full: u16,           // Minimal eFuse block revision supported by image
+        max_efuse_blk_rev_full: u16,           // Maximal eFuse block revision supported by image
+        mmu_page_size: u8,                     // MMU page size in log base 2 format
+        reserv3: [u8; 3],                      // reserv3
+        reserv2: [u32; 18],                    // reserv2
+    }
+
+    fn str_to_cstr_array<const C: usize>(s: &str) -> [::core::ffi::c_char; C] {
+        let bytes = s.as_bytes();
+        if bytes.len() >= C {
+            assert!(true, "String is too long for the C-string field");
+        }
+
+        let mut ret: [::core::ffi::c_char; C] = [0; C];
+        let mut i = 0;
+        loop {
+            ret[i] = bytes[i] as _;
+            i += 1;
+            if i >= bytes.len() {
+                break;
+            }
+        }
+        ret
+    }
+
+    let app_desc = EspAppDesc {
+        magic_word: ESP_APP_DESC_MAGIC_WORD,
+        secure_version: 0,
+        reserv1: [0; 2],
+        version: str_to_cstr_array(
+            cfg["ESP_HAL_CONFIG_ESP_IDF_APP_VERSION"]
+                .as_string()
+                .as_str(),
+        ),
+        project_name: str_to_cstr_array(
+            cfg["ESP_HAL_CONFIG_ESP_IDF_APP_NAME"].as_string().as_str(),
+        ),
+        time: str_to_cstr_array(
+            cfg["ESP_HAL_CONFIG_ESP_IDF_BUILD_TIME"]
+                .as_string()
+                .as_str(),
+        ),
+        date: str_to_cstr_array(
+            cfg["ESP_HAL_CONFIG_ESP_IDF_BUILD_DATE"]
+                .as_string()
+                .as_str(),
+        ),
+        // just pretending some esp-idf version here
+        idf_ver: str_to_cstr_array("5.3.1"),
+        app_elf_sha256: [0; 32],
+        min_efuse_blk_rev_full: 0,
+        max_efuse_blk_rev_full: u16::MAX,
+        mmu_page_size: 0,
+        reserv3: [0; 3],
+        reserv2: [0; 18],
+    };
+
+    let app_desc = unsafe {
+        core::slice::from_raw_parts(
+            &app_desc as *const _ as *const u8,
+            core::mem::size_of::<EspAppDesc>(),
+        )
+    }
+    .to_vec();
+
+    let mut desc_linker_script = String::new();
+
+    desc_linker_script.push_str("SECTIONS { .rodata_desc  : ALIGN(4) {");
+    for byte in app_desc {
+        desc_linker_script.push_str(&format!("BYTE({byte})"));
+    }
+    desc_linker_script.push_str("} > RODATA }");
+
+    Some(desc_linker_script.as_bytes().to_vec())
 }
