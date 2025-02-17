@@ -1202,6 +1202,8 @@ where
     /// This function returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        // Must apply the common settings first, as `rx.apply_config` reads back symbol
+        // size.
         self.rx.uart.info().apply_config(config)?;
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
