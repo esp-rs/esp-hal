@@ -142,7 +142,7 @@ added for `embedded-io` errors associated to the unsplit `Uart` driver. On `Uart
 or `UartTx`) TX-related trait methods return `IoError::Tx(TxError)`, while RX-related methods return
 `IoError::Rx(RxError)`.
 
-### UART halves have their configuration split too
+### UART halves have their configuration split, too
 
 `Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
 

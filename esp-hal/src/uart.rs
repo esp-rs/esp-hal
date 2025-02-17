@@ -175,14 +175,14 @@ const UART_TOUT_THRESH_DEFAULT: u8 = 10;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DataBits {
     /// 5 data bits per frame.
-    _5 = 0,
+    _5,
     /// 6 data bits per frame.
-    _6 = 1,
+    _6,
     /// 7 data bits per frame.
-    _7 = 2,
+    _7,
     /// 8 data bits per frame.
     #[default]
-    _8 = 3,
+    _8,
 }
 
 /// Parity check
@@ -215,11 +215,11 @@ pub enum Parity {
 pub enum StopBits {
     /// 1 stop bit.
     #[default]
-    _1   = 1,
+    _1,
     /// 1.5 stop bits.
-    _1p5 = 2,
+    _1p5,
     /// 2 stop bits.
-    _2   = 3,
+    _2,
 }
 
 /// Defines how strictly the requested baud rate must be met.
@@ -263,17 +263,6 @@ pub struct Config {
     tx: TxConfig,
 }
 
-/// UART Receive part configuration.
-#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct RxConfig {
-    /// Threshold level at which the RX FIFO is considered full.
-    fifo_full_threshold: u16,
-    /// Optional timeout value for RX operations.
-    timeout: Option<u8>,
-}
-
 impl Default for Config {
     fn default() -> Config {
         Config {
@@ -289,43 +278,7 @@ impl Default for Config {
     }
 }
 
-/// UART Transmit part configuration.
-#[derive(Debug, Clone, Copy, Default, procmacros::BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct TxConfig {}
-
-impl Default for RxConfig {
-    fn default() -> RxConfig {
-        RxConfig {
-            fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-            timeout: Some(UART_TOUT_THRESH_DEFAULT),
-        }
-    }
-}
-
 impl Config {
-    /// Calculates the total symbol length in bits based on the configured
-    /// data bits, parity, and stop bits.
-    fn symbol_length(&self) -> u8 {
-        let mut length: u8 = 1; // start bit
-        length += match self.data_bits {
-            DataBits::_5 => 5,
-            DataBits::_6 => 6,
-            DataBits::_7 => 7,
-            DataBits::_8 => 8,
-        };
-        length += match self.parity {
-            Parity::None => 0,
-            _ => 1,
-        };
-        length += match self.stop_bits {
-            StopBits::_1 => 1,
-            _ => 2, // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
-        };
-        length
-    }
-
     fn validate(&self) -> Result<(), ConfigError> {
         if let BaudrateTolerance::ErrorPercent(percentage) = self.baudrate_tolerance {
             assert!(percentage > 0 && percentage <= 100);
@@ -338,6 +291,33 @@ impl Config {
         Ok(())
     }
 }
+
+/// UART Receive part configuration.
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct RxConfig {
+    /// Threshold level at which the RX FIFO is considered full.
+    #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
+    fifo_full_threshold: u16,
+    /// Optional timeout value for RX operations.
+    timeout: Option<u8>,
+}
+
+impl Default for RxConfig {
+    fn default() -> RxConfig {
+        RxConfig {
+            fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
+            timeout: Some(UART_TOUT_THRESH_DEFAULT),
+        }
+    }
+}
+
+/// UART Transmit part configuration.
+#[derive(Debug, Clone, Copy, Default, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct TxConfig {}
 
 /// Configuration for the AT-CMD detection functionality
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
@@ -464,11 +444,25 @@ pub enum ConfigError {
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     UnachievableBaudrate,
     /// The requested baud rate is not supported.
+    ///
+    /// This error is returned if:
+    ///  * the baud rate exceeds 5MBaud or is equal to zero.
+    ///  * the user has specified an exact baud rate or with some percentage of
+    ///    deviation to the desired value, and the driver cannot reach this
+    ///    speed.
     UnsupportedBaudrate,
-    /// The requested timeout is not supported.
+    /// The requested  timeout exceeds the maximum value (
+    #[cfg_attr(esp32, doc = "127")]
+    #[cfg_attr(not(esp32), doc = "1023")]
+    /// ).
     UnsupportedTimeout,
-    /// The requested FIFO threshold is not supported.
-    UnsupportedFifoThreshold,
+    /// The requested RX FIFO threshold exceeds the maximum value (
+    #[cfg_attr(esp32, doc = "127")]
+    #[cfg_attr(any(esp32c6, esp32h2), doc = "255")]
+    #[cfg_attr(any(esp32c2, esp32c3, esp32s2), doc = "511")]
+    #[cfg_attr(esp32s3, doc = "1023")]
+    /// ).
+    UnsupportedRxFifoThreshold,
 }
 
 impl core::error::Error for ConfigError {}
@@ -484,8 +478,8 @@ impl core::fmt::Display for ConfigError {
                 write!(f, "The requested baud rate is not supported")
             }
             ConfigError::UnsupportedTimeout => write!(f, "The requested timeout is not supported"),
-            ConfigError::UnsupportedFifoThreshold => {
-                write!(f, "The requested FIFO threshold is not supported")
+            ConfigError::UnsupportedRxFifoThreshold => {
+                write!(f, "The requested RX FIFO threshold is not supported")
             }
         }
     }
@@ -563,7 +557,8 @@ where
 
     /// Change the configuration.
     ///
-    /// Note that this also changes the configuration of the RX half.
+    /// This function returns a [`ConfigError`] if the configuration is not
+    /// supported by the hardware.
     #[instability::unstable]
     pub fn apply_config(&mut self, _config: &Config) -> Result<(), ConfigError> {
         // Nothing to do so far.
@@ -766,23 +761,10 @@ where
 
     /// Change the configuration.
     ///
-    /// Note that this also changes the configuration of the TX half.
-    ///
     /// # Errors
     ///
-    /// [`ConfigError::UnsupportedFifoThreshold`] will be returned under the
-    /// following conditions:
-    ///   * if the RX FIFO threshold passed in `Config` exceeds the maximum
-    ///     value (
-    #[cfg_attr(esp32, doc = "0x7F")]
-    #[cfg_attr(any(esp32c6, esp32h2), doc = "0xFF")]
-    #[cfg_attr(any(esp32c3, esp32c2, esp32s2), doc = "0x1FF")]
-    #[cfg_attr(esp32h2, doc = "0x3FF")]
-    /// )
-    ///   * if the passed timeout exceeds the maximum value (
-    #[cfg_attr(esp32, doc = "0x7F")]
-    #[cfg_attr(not(esp32), doc = "0x3FF")]
-    /// ).
+    /// This function returns a [`ConfigError`] if the configuration is not
+    /// supported by the hardware.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
@@ -790,7 +772,7 @@ where
             .set_rx_fifo_full_threshold(config.rx.fifo_full_threshold)?;
         self.uart
             .info()
-            .set_rx_timeout(config.rx.timeout, config.symbol_length())?;
+            .set_rx_timeout(config.rx.timeout, self.uart.info().current_symbol_length())?;
 
         self.uart.info().rxfifo_reset();
         Ok(())
@@ -1217,18 +1199,14 @@ where
     ///
     /// # Errors
     ///
-    /// [`ConfigError::UnsupportedFifoThreshold`] will be returned in the cases
-    /// described in [`UartRx::apply_config`].
-    /// [`ConfigError::UnsupportedBaudrate`] will be returned under the
-    /// following conditions:
-    ///   * if baud rate passed in config exceeds 5MBaud or is equal to zero.
-    ///   * if the user has specified in the configuration that they want
-    ///     baudrate to correspond exactly or with some percentage of deviation
-    ///     to the desired value, and the driver cannot reach this speed
+    /// This function returns a [`ConfigError`] if the configuration is not
+    /// supported by the hardware.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        // Must apply the common settings first, as `rx.apply_config` reads back symbol
+        // size.
+        self.rx.uart.info().apply_config(config)?;
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
-        self.rx.uart.info().apply_config(config)?;
         Ok(())
     }
 
@@ -1254,6 +1232,10 @@ where
         self.tx.disable_tx_interrupts();
 
         self.apply_config(&config)?;
+
+        // Reset Tx/Rx FIFOs
+        self.rx.uart.info().rxfifo_reset();
+        self.rx.uart.info().txfifo_reset();
 
         // Don't wait after transmissions by default,
         // so that bytes written to TX FIFO are always immediately transmitted.
@@ -2170,7 +2152,6 @@ pub mod lp_uart {
                 .modify(|_, w| unsafe { w.bit_num().bits(data_bits as u8) });
 
             self.update();
-
             self
         }
 
@@ -2178,7 +2159,7 @@ pub mod lp_uart {
             self.uart
                 .register_block()
                 .conf0()
-                .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+                .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8 + 1) });
 
             self.update();
             self
@@ -2340,10 +2321,6 @@ impl Info {
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
 
-        // Reset Tx/Rx FIFOs
-        self.rxfifo_reset();
-        self.txfifo_reset();
-
         Ok(())
     }
 
@@ -2432,8 +2409,8 @@ impl Info {
     ///
     /// # Errors
     ///
-    /// [`Err(ConfigError::UnsupportedFifoThreshold)`][ConfigError::UnsupportedFifoThreshold] if provided value exceeds maximum value
-    /// for SOC :
+    /// [ConfigError::UnsupportedFifoThreshold] if provided value exceeds
+    /// maximum value for SOC:
     /// - `esp32` **0x7F**
     /// - `esp32c6`, `esp32h2` **0xFF**
     /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
@@ -2452,7 +2429,7 @@ impl Info {
         }
 
         if threshold > MAX_THRHD {
-            return Err(ConfigError::UnsupportedFifoThreshold);
+            return Err(ConfigError::UnsupportedRxFifoThreshold);
         }
 
         self.regs()
@@ -2470,12 +2447,11 @@ impl Info {
     ///
     /// # Errors
     ///
-    /// [`Err(ConfigError::UnsupportedTimeout)`][ConfigError::UnsupportedTimeout] if the provided value exceeds
-    /// the maximum value for SOC :
+    /// [ConfigError::UnsupportedTimeout] if the provided value exceeds
+    /// the maximum value for SOC:
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
     ///   value you pass times the symbol size must be <= **0x3FF**
-    // TODO: the above should be a per-chip doc line.
     fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), ConfigError> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -2646,7 +2622,7 @@ impl Info {
         #[cfg(not(esp32))]
         self.regs()
             .conf0()
-            .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+            .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8 + 1) });
     }
 
     fn rxfifo_reset(&self) {
@@ -2718,6 +2694,27 @@ impl Info {
         }
 
         Ok(())
+    }
+
+    fn current_symbol_length(&self) -> u8 {
+        let conf0 = self.regs().conf0().read();
+        let data_bits = conf0.bit_num().bits() + 5; // 5 data bits are encoded as variant 0
+        let parity = conf0.parity_en().bit() as u8;
+        let mut stop_bits = conf0.stop_bit_num().bits();
+
+        match stop_bits {
+            1 => {
+                // workaround for hardware issue, when UART stop bit set as 2-bit mode.
+                #[cfg(esp32)]
+                if self.regs().rs485_conf().read().dl1_en().bit_is_set() {
+                    stop_bits = 2;
+                }
+            }
+            // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
+            _ => stop_bits = 2,
+        }
+
+        1 + data_bits + parity + stop_bits
     }
 }
 
