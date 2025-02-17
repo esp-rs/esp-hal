@@ -80,9 +80,15 @@ mod tests {
         let written = ctx.uart.write(&data).unwrap();
         assert_eq!(written, BUF_SIZE);
 
+        // Calls to read may not fill the buffer, wait until read returns 0
         let mut buffer = [0; BUF_SIZE];
-
-        ctx.uart.read(&mut buffer).unwrap();
+        let mut n = 0;
+        loop {
+            match ctx.uart.read(&mut buffer[n..]).unwrap() {
+                0 => break,
+                cnt => n += cnt,
+            };
+        }
 
         assert_eq!(data, buffer);
     }
