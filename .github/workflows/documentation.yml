@@ -6,7 +6,7 @@ on:
       packages:
         description: >
           A JSON structure describing the packages to build.
-          E.g: [{"name":"esp-hal","tag":"v0.23.1"},{"name":"esp-wifi","tag":"v0.12"}]
+          E.g: [{"name":"esp-hal","tag":"v0.23.1"},{"name":"esp-wifi","tag":"esp-wifi-v0.12"}]
         required: true
 
 env:
@@ -34,6 +34,23 @@ jobs:
           ldproxy: false
           version: 1.84.0.0
 
+      # TODO: we could build this once and download onto each runner
+      # Build the `xtask` package using the latest commit, and copy the
+      # resulting binary to the `~/.cargo/bin/` directory. We do this to
+      # avoid having to rebuild different versions of the package for
+      # different tags if they do not fall on the same commit, and to
+      # make sure that we take advantage of any subsequent updates to
+      # the xtask which may have happened after a release was tagged.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: esp-rs/esp-hal
+      - name: Build xtask
+        run: |
+          cargo build --release --package=xtask
+          cp target/release/xtask ~/.cargo/bin/hal-xtask
+
+      # Checkout the tag we need to start building the docs
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -41,7 +58,7 @@ jobs:
           ref: ${{ matrix.packages.tag }}
 
       - name: Build documentation
-        run: cargo xtask build-documentation --packages=${{ matrix.packages.name }}
+        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }}
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
