@@ -263,17 +263,6 @@ pub struct Config {
     tx: TxConfig,
 }
 
-/// UART Receive part configuration.
-#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct RxConfig {
-    /// Threshold level at which the RX FIFO is considered full.
-    fifo_full_threshold: u16,
-    /// Optional timeout value for RX operations.
-    timeout: Option<u8>,
-}
-
 impl Default for Config {
     fn default() -> Config {
         Config {
@@ -285,21 +274,6 @@ impl Default for Config {
             parity: Default::default(),
             stop_bits: Default::default(),
             clock_source: Default::default(),
-        }
-    }
-}
-
-/// UART Transmit part configuration.
-#[derive(Debug, Clone, Copy, Default, procmacros::BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct TxConfig {}
-
-impl Default for RxConfig {
-    fn default() -> RxConfig {
-        RxConfig {
-            fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-            timeout: Some(UART_TOUT_THRESH_DEFAULT),
         }
     }
 }
@@ -338,6 +312,32 @@ impl Config {
         Ok(())
     }
 }
+
+/// UART Receive part configuration.
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct RxConfig {
+    /// Threshold level at which the RX FIFO is considered full.
+    fifo_full_threshold: u16,
+    /// Optional timeout value for RX operations.
+    timeout: Option<u8>,
+}
+
+impl Default for RxConfig {
+    fn default() -> RxConfig {
+        RxConfig {
+            fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
+            timeout: Some(UART_TOUT_THRESH_DEFAULT),
+        }
+    }
+}
+
+/// UART Transmit part configuration.
+#[derive(Debug, Clone, Copy, Default, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct TxConfig {}
 
 /// Configuration for the AT-CMD detection functionality
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
