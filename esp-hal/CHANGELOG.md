@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read (#2882)
 - Uart `read_bytes` is now blocking  returns the number of bytes read (#2882)
 - Uart `flush` is now blocking (#2882)
+- Uart errors have been split into `RxError` and `TxError`. A combined `IoError` has been created for embedded-io. (#3138)
+- `{Uart, UartTx}::flush()` is now fallible. (#3138)
 - Removed `embedded-hal-nb` traits (#2882)
 - `timer::wait` is now blocking (#2882)
 - By default, set `tx_idle_num` to 0 so that bytes written to TX FIFO are always immediately transmitted. (#2859)

@@ -133,11 +133,11 @@ use crate::{
 const UART_FIFO_SIZE: u16 = 128;
 const CMD_CHAR_DEFAULT: u8 = 0x2b;
 
-/// UART Error
+/// UART RX Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum Error {
+pub enum RxError {
     /// The RX FIFO overflow happened.
     ///
     /// This error occurs when RX FIFO is full and a new byte is received.
@@ -163,21 +163,42 @@ pub enum Error {
     ParityMismatch,
 }
 
-impl core::error::Error for Error {}
+impl core::error::Error for RxError {}
 
-impl core::fmt::Display for Error {
+impl core::fmt::Display for RxError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::FifoOverflowed => write!(f, "The RX FIFO overflowed"),
-            Error::GlitchOccurred => write!(f, "A glitch was detected on the RX line"),
-            Error::FrameFormatViolated => write!(f, "A framing error was detected on the RX line"),
-            Error::ParityMismatch => write!(f, "A parity error was detected on the RX line"),
+            RxError::FifoOverflowed => write!(f, "The RX FIFO overflowed"),
+            RxError::GlitchOccurred => write!(f, "A glitch was detected on the RX line"),
+            RxError::FrameFormatViolated => {
+                write!(f, "A framing error was detected on the RX line")
+            }
+            RxError::ParityMismatch => write!(f, "A parity error was detected on the RX line"),
         }
     }
 }
 
 #[instability::unstable]
-impl embedded_io::Error for Error {
+impl embedded_io::Error for RxError {
+    fn kind(&self) -> embedded_io::ErrorKind {
+        embedded_io::ErrorKind::Other
+    }
+}
+
+/// UART TX Error
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum TxError {}
+
+impl core::fmt::Display for TxError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Tx error")
+    }
+}
+
+#[instability::unstable]
+impl embedded_io::Error for TxError {
     fn kind(&self) -> embedded_io::ErrorKind {
         embedded_io::ErrorKind::Other
     }
@@ -597,21 +618,23 @@ where
     }
 
     /// Writes bytes
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, TxError> {
         let count = data.len();
 
         for &byte in data {
-            self.write_byte(byte);
+            self.write_byte(byte)?;
         }
 
         Ok(count)
     }
 
-    fn write_byte(&mut self, word: u8) {
+    fn write_byte(&mut self, word: u8) -> Result<(), TxError> {
         while self.tx_fifo_count() >= UART_FIFO_SIZE {}
         self.regs()
             .fifo()
             .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
+
+        Ok(())
     }
 
     #[allow(clippy::useless_conversion)]
@@ -622,8 +645,9 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) {
+    pub fn flush(&mut self) -> Result<(), TxError> {
         while !self.is_tx_idle() {}
+        Ok(())
     }
 
     /// Checks if the TX line is idle for this UART instance.
@@ -813,7 +837,7 @@ where
 
     /// Reads and clears errors.
     #[instability::unstable]
-    pub fn check_for_errors(&mut self) -> Result<(), Error> {
+    pub fn check_for_errors(&mut self) -> Result<(), RxError> {
         let errors = RxEvent::FifoOvf
             | RxEvent::FifoTout
             | RxEvent::GlitchDetected
@@ -858,7 +882,7 @@ where
     }
 
     /// Reads bytes from the UART
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
         let buffered = self.read_buffered_bytes(buf)?;
         let buf = &mut buf[buffered..];
 
@@ -876,7 +900,7 @@ where
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes without blocking.
-    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         let mut count = 0;
         while count < buf.len() {
             if let Some(byte) = self.read_byte() {
@@ -1162,24 +1186,24 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, TxError> {
         self.tx.write_bytes(data)
     }
 
     /// Reads and clears errors set by received data.
     #[instability::unstable]
-    pub fn check_for_rx_errors(&mut self) -> Result<(), Error> {
+    pub fn check_for_rx_errors(&mut self) -> Result<(), RxError> {
         self.rx.check_for_errors()
     }
 
     /// Reads bytes from the UART
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
         self.rx.read_bytes(buf)
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes without blocking.
-    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_buffered_bytes(buf)
     }
 
@@ -1221,7 +1245,7 @@ where
     }
 
     /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) {
+    pub fn flush(&mut self) -> Result<(), TxError> {
         self.tx.flush()
     }
 
@@ -1380,7 +1404,7 @@ impl<Dm> ufmt_write::uWrite for Uart<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = TxError;
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
@@ -1398,7 +1422,7 @@ impl<Dm> ufmt_write::uWrite for UartTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Error = Error;
+    type Error = TxError;
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
@@ -1429,19 +1453,65 @@ where
     }
 }
 
+/// UART Tx or Rx Error
+#[instability::unstable]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum IoError {
+    /// UART TX error
+    Tx(TxError),
+    /// UART RX error
+    Rx(RxError),
+}
+
+#[instability::unstable]
+impl core::error::Error for IoError {}
+
+#[instability::unstable]
+impl core::fmt::Display for IoError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            IoError::Tx(e) => e.fmt(f),
+            IoError::Rx(e) => e.fmt(f),
+        }
+    }
+}
+
+#[instability::unstable]
+impl embedded_io::Error for IoError {
+    fn kind(&self) -> embedded_io::ErrorKind {
+        embedded_io::ErrorKind::Other
+    }
+}
+
+#[instability::unstable]
+impl From<RxError> for IoError {
+    fn from(e: RxError) -> Self {
+        IoError::Rx(e)
+    }
+}
+
+#[instability::unstable]
+impl From<TxError> for IoError {
+    fn from(e: TxError) -> Self {
+        IoError::Tx(e)
+    }
+}
+
 #[instability::unstable]
 impl<Dm> embedded_io::ErrorType for Uart<'_, Dm> {
-    type Error = Error;
+    type Error = IoError;
 }
 
 #[instability::unstable]
 impl<Dm> embedded_io::ErrorType for UartTx<'_, Dm> {
-    type Error = Error;
+    type Error = TxError;
 }
 
 #[instability::unstable]
 impl<Dm> embedded_io::ErrorType for UartRx<'_, Dm> {
-    type Error = Error;
+    type Error = RxError;
 }
 
 #[instability::unstable]
@@ -1450,7 +1520,7 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        self.rx.read(buf)
+        self.rx.read(buf).map_err(IoError::Rx)
     }
 }
 
@@ -1478,7 +1548,7 @@ where
     Dm: DriverMode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        self.rx.read_ready()
+        self.rx.read_ready().map_err(IoError::Rx)
     }
 }
 
@@ -1498,11 +1568,11 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.tx.write(buf)
+        self.tx.write(buf).map_err(IoError::Tx)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io::Write::flush(&mut self.tx)
+        embedded_io::Write::flush(&mut self.tx).map_err(IoError::Tx)
     }
 }
 
@@ -1516,8 +1586,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush();
-        Ok(())
+        self.flush()
     }
 }
 
@@ -1538,13 +1607,13 @@ pub(crate) enum RxEvent {
     ParityError,
 }
 
-fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), Error> {
+fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), RxError> {
     for event in events {
         match event {
-            RxEvent::FifoOvf => return Err(Error::FifoOverflowed),
-            RxEvent::GlitchDetected => return Err(Error::GlitchOccurred),
-            RxEvent::FrameError => return Err(Error::FrameFormatViolated),
-            RxEvent::ParityError => return Err(Error::ParityMismatch),
+            RxEvent::FifoOvf => return Err(RxError::FifoOverflowed),
+            RxEvent::GlitchDetected => return Err(RxError::GlitchOccurred),
+            RxEvent::FrameError => return Err(RxError::FrameFormatViolated),
+            RxEvent::ParityError => return Err(RxError::ParityMismatch),
             RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
         }
     }
@@ -1684,17 +1753,17 @@ impl Drop for UartTxFuture {
 impl Uart<'_, Async> {
     /// Asynchronously reads data from the UART receive buffer into the
     /// provided buffer.
-    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_async(buf).await
     }
 
     /// Asynchronously writes data to the UART transmit buffer.
-    pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
+    pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, TxError> {
         self.tx.write_async(words).await
     }
 
     /// Asynchronously flushes the UART transmit buffer.
-    pub async fn flush_async(&mut self) -> Result<(), Error> {
+    pub async fn flush_async(&mut self) -> Result<(), TxError> {
         self.tx.flush_async().await
     }
 }
@@ -1706,7 +1775,7 @@ impl UartTx<'_, Async> {
     /// the UART. Data is written in chunks to avoid overflowing the
     /// transmit FIFO, and the function waits asynchronously when
     /// necessary for space in the buffer to become available.
-    pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, Error> {
+    pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, TxError> {
         let mut count = 0;
         let mut offset: usize = 0;
         loop {
@@ -1716,7 +1785,7 @@ impl UartTx<'_, Async> {
             }
 
             for byte in &words[offset..next_offset] {
-                self.write_byte(*byte);
+                self.write_byte(*byte)?;
                 count += 1;
             }
 
@@ -1736,7 +1805,7 @@ impl UartTx<'_, Async> {
     /// This function ensures that all pending data in the transmit FIFO has
     /// been sent over the UART. If the FIFO contains data, it waits
     /// for the transmission to complete before returning.
-    pub async fn flush_async(&mut self) -> Result<(), Error> {
+    pub async fn flush_async(&mut self) -> Result<(), TxError> {
         let count = self.tx_fifo_count();
         if count > 0 {
             UartTxFuture::new(self.uart.reborrow(), TxEvent::Done).await;
@@ -1767,7 +1836,7 @@ impl UartRx<'_, Async> {
     /// # Ok
     /// When successful, returns the number of bytes written to buf.
     /// If the passed in buffer is of length 0, Ok(0) is returned.
-    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         if buf.is_empty() {
             return Ok(0);
         }
@@ -1820,7 +1889,7 @@ impl embedded_io_async::Read for Uart<'_, Async> {
     /// method blocks until an uart interrupt occurs.
     /// See UartRx::read_async for more details.
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        self.read_async(buf).await
+        self.read_async(buf).await.map_err(IoError::Rx)
     }
 }
 
@@ -1837,11 +1906,11 @@ impl embedded_io_async::Read for UartRx<'_, Async> {
 #[instability::unstable]
 impl embedded_io_async::Write for Uart<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_async(buf).await
+        self.write_async(buf).await.map_err(IoError::Tx)
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_async().await
+        self.flush_async().await.map_err(IoError::Tx)
     }
 }
 
@@ -1906,7 +1975,7 @@ pub mod lp_uart {
         /// Initialize the UART driver using the provided configuration
         ///
         /// # Panics
-        ///  
+        ///
         /// [`Apb`] is a wrong clock source for LP_UART
         ///
         /// [`Apb`]: super::ClockSource::Apb
