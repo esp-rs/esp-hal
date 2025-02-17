@@ -443,11 +443,25 @@ pub enum ConfigError {
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     UnachievableBaudrate,
     /// The requested baud rate is not supported.
+    ///
+    /// This error is returned if:
+    ///  * the baud rate exceeds 5MBaud or is equal to zero.
+    ///  * the user has specified an exact baud rate or with some percentage of
+    ///    deviation to the desired value, and the driver cannot reach this
+    ///    speed.
     UnsupportedBaudrate,
-    /// The requested timeout is not supported.
+    /// The requested  timeout exceeds the maximum value (
+    #[cfg_attr(esp32, doc = "127")]
+    #[cfg_attr(not(esp32), doc = "1023")]
+    /// ).
     UnsupportedTimeout,
-    /// The requested FIFO threshold is not supported.
-    UnsupportedFifoThreshold,
+    /// The requested RX FIFO threshold exceeds the maximum value (
+    #[cfg_attr(esp32, doc = "127")]
+    #[cfg_attr(any(esp32c6, esp32h2), doc = "255")]
+    #[cfg_attr(any(esp32c2, esp32c3, esp32s2), doc = "511")]
+    #[cfg_attr(esp32s3, doc = "1023")]
+    /// ).
+    UnsupportedRxFifoThreshold,
 }
 
 impl core::error::Error for ConfigError {}
@@ -463,8 +477,8 @@ impl core::fmt::Display for ConfigError {
                 write!(f, "The requested baud rate is not supported")
             }
             ConfigError::UnsupportedTimeout => write!(f, "The requested timeout is not supported"),
-            ConfigError::UnsupportedFifoThreshold => {
-                write!(f, "The requested FIFO threshold is not supported")
+            ConfigError::UnsupportedRxFifoThreshold => {
+                write!(f, "The requested RX FIFO threshold is not supported")
             }
         }
     }
@@ -541,7 +555,10 @@ where
     }
 
     /// Change the configuration.
-        #[instability::unstable]
+    ///
+    /// This function returns a [`ConfigError`] if the configuration is not
+    /// supported by the hardware.
+    #[instability::unstable]
     pub fn apply_config(&mut self, _config: &TxConfig) -> Result<(), ConfigError> {
         // Nothing to do so far.
         self.uart.info().txfifo_reset();
@@ -745,19 +762,8 @@ where
     ///
     /// # Errors
     ///
-    /// [`ConfigError::UnsupportedFifoThreshold`] will be returned under the
-    /// following conditions:
-    ///   * if the RX FIFO threshold passed in `Config` exceeds the maximum
-    ///     value (
-    #[cfg_attr(esp32, doc = "0x7F")]
-    #[cfg_attr(any(esp32c6, esp32h2), doc = "0xFF")]
-    #[cfg_attr(any(esp32c3, esp32c2, esp32s2), doc = "0x1FF")]
-    #[cfg_attr(esp32h2, doc = "0x3FF")]
-    /// )
-    ///   * if the passed timeout exceeds the maximum value (
-    #[cfg_attr(esp32, doc = "0x7F")]
-    #[cfg_attr(not(esp32), doc = "0x3FF")]
-    /// ).
+    /// This function returns a [`ConfigError`] if the configuration is not
+    /// supported by the hardware.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
         self.uart
@@ -1192,14 +1198,8 @@ where
     ///
     /// # Errors
     ///
-    /// [`ConfigError::UnsupportedFifoThreshold`] will be returned in the cases
-    /// described in [`UartRx::apply_config`].
-    /// [`ConfigError::UnsupportedBaudrate`] will be returned under the
-    /// following conditions:
-    ///   * if baud rate passed in config exceeds 5MBaud or is equal to zero.
-    ///   * if the user has specified in the configuration that they want
-    ///     baudrate to correspond exactly or with some percentage of deviation
-    ///     to the desired value, and the driver cannot reach this speed
+    /// This function returns a [`ConfigError`] if the configuration is not
+    /// supported by the hardware.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.uart.info().apply_config(config)?;
         self.rx.apply_config(&config.rx)?;
@@ -2407,8 +2407,8 @@ impl Info {
     ///
     /// # Errors
     ///
-    /// [`Err(ConfigError::UnsupportedFifoThreshold)`][ConfigError::UnsupportedFifoThreshold] if provided value exceeds maximum value
-    /// for SOC :
+    /// [ConfigError::UnsupportedFifoThreshold] if provided value exceeds
+    /// maximum value for SOC:
     /// - `esp32` **0x7F**
     /// - `esp32c6`, `esp32h2` **0xFF**
     /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
@@ -2427,7 +2427,7 @@ impl Info {
         }
 
         if threshold > MAX_THRHD {
-            return Err(ConfigError::UnsupportedFifoThreshold);
+            return Err(ConfigError::UnsupportedRxFifoThreshold);
         }
 
         self.regs()
@@ -2445,12 +2445,11 @@ impl Info {
     ///
     /// # Errors
     ///
-    /// [`Err(ConfigError::UnsupportedTimeout)`][ConfigError::UnsupportedTimeout] if the provided value exceeds
-    /// the maximum value for SOC :
+    /// [ConfigError::UnsupportedTimeout] if the provided value exceeds
+    /// the maximum value for SOC:
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
     ///   value you pass times the symbol size must be <= **0x3FF**
-    // TODO: the above should be a per-chip doc line.
     fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), ConfigError> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
