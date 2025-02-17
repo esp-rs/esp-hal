@@ -36,70 +36,6 @@
 //! available. See the examples below for more information on how to interact
 //! with this driver.
 //!
-//! ## Example
-//!
-//! ### Handling UART Interrupts
-//! Notice, that in practice a proper serial terminal should be used
-//! to connect to the board (espmonitor and espflash won't work)
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! # use esp_hal::delay::Delay;
-//! # use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
-//! # let delay = Delay::new();
-//! # let config = Config::default().with_rx(
-//! #    RxConfig::default().with_fifo_full_threshold(30)
-//! # );
-//! # let mut uart0 = Uart::new(
-//! #    peripherals.UART0,
-//! #    config)?;
-//! uart0.set_interrupt_handler(interrupt_handler);
-//!
-//! critical_section::with(|cs| {
-//!     uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(b'#'));
-//!     uart0.listen(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
-//!
-//!     SERIAL.borrow_ref_mut(cs).replace(uart0);
-//! });
-//!
-//! loop {
-//!     println!("Send `#` character or >=30 characters");
-//!     delay.delay(Duration::from_secs(1));
-//! }
-//! # }
-//!
-//! # use core::cell::RefCell;
-//! # use critical_section::Mutex;
-//! # use esp_hal::uart::Uart;
-//! static SERIAL: Mutex<RefCell<Option<Uart<esp_hal::Blocking>>>> =
-//!     Mutex::new(RefCell::new(None));
-//!
-//! # use esp_hal::uart::UartInterrupt;
-//! # use core::fmt::Write;
-//! #[handler]
-//! fn interrupt_handler() {
-//!     critical_section::with(|cs| {
-//!         let mut serial = SERIAL.borrow_ref_mut(cs);
-//!         if let Some(serial) = serial.as_mut() {
-//!             let mut buf = [0u8; 64];
-//!             if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
-//!                 println!("Read {} bytes", cnt);
-//!             }
-//!
-//!             let pending_interrupts = serial.interrupts();
-//!             println!(
-//!                 "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
-//!                 pending_interrupts.contains(UartInterrupt::AtCmd),
-//!                 pending_interrupts.contains(UartInterrupt::RxFifoFull),
-//!             );
-//!
-//!             serial.clear_interrupts(
-//!                 UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
-//!             );
-//!         }
-//!     });
-//! }
-//! ```
-//! 
 //! [embedded-hal]: embedded_hal
 //! [embedded-io]: embedded_io
 //! [embedded-hal-async]: embedded_hal_async
@@ -436,7 +372,7 @@ impl Default for AtCmdConfig {
     }
 }
 
-struct UartBuilder<'d, Dm> {
+struct UartBuilder<'d, Dm: DriverMode> {
     uart: PeripheralRef<'d, AnyUart>,
     phantom: PhantomData<Dm>,
 }
@@ -481,13 +417,28 @@ where
 }
 
 /// UART (Full-duplex)
-pub struct Uart<'d, Dm> {
+///
+/// ```rust, no_run
+#[doc = crate::before_snippet!()]
+/// # use esp_hal::uart::{Config, Uart};
+/// let mut uart = Uart::new(
+///     peripherals.UART0,
+///     Config::default())?
+/// .with_rx(peripherals.GPIO1)
+/// .with_tx(peripherals.GPIO2);
+///
+/// uart.write(b"Hello world!")?;
+/// # Ok(())
+/// # }
+/// ```
+pub struct Uart<'d, Dm: DriverMode> {
     rx: UartRx<'d, Dm>,
     tx: UartTx<'d, Dm>,
 }
 
 /// UART (Transmit)
-pub struct UartTx<'d, Dm> {
+#[instability::unstable]
+pub struct UartTx<'d, Dm: DriverMode> {
     uart: PeripheralRef<'d, AnyUart>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
@@ -496,7 +447,8 @@ pub struct UartTx<'d, Dm> {
 }
 
 /// UART (Receive)
-pub struct UartRx<'d, Dm> {
+#[instability::unstable]
+pub struct UartRx<'d, Dm: DriverMode> {
     uart: PeripheralRef<'d, AnyUart>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
@@ -583,6 +535,7 @@ where
     Dm: DriverMode,
 {
     /// Configure RTS pin
+    #[instability::unstable]
     pub fn with_rts(mut self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(rts);
         rts.set_to_push_pull_output();
@@ -597,6 +550,7 @@ where
     /// TX signal.
     ///
     /// Disconnects the previous pin that was assigned with `with_tx`.
+    #[instability::unstable]
     pub fn with_tx(mut self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
         crate::into_mapped_ref!(tx);
         // Make sure we don't cause an unexpected low pulse on the pin.
@@ -618,7 +572,8 @@ where
     }
 
     /// Writes bytes
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, TxError> {
+    #[instability::unstable]
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
         let count = data.len();
 
         for &byte in data {
@@ -645,6 +600,7 @@ where
     }
 
     /// Flush the transmit buffer of the UART
+    #[instability::unstable]
     pub fn flush(&mut self) -> Result<(), TxError> {
         while !self.is_tx_idle() {}
         Ok(())
@@ -701,6 +657,7 @@ impl<'d> UartTx<'d, Blocking> {
     /// # Ok(())
     /// # }
     /// ```
+    #[instability::unstable]
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -711,6 +668,7 @@ impl<'d> UartTx<'d, Blocking> {
     }
 
     /// Reconfigures the driver to operate in [`Async`] mode.
+    #[instability::unstable]
     pub fn into_async(self) -> UartTx<'d, Async> {
         if !self.uart.state().is_rx_async.load(Ordering::Acquire) {
             self.uart
@@ -731,6 +689,7 @@ impl<'d> UartTx<'d, Blocking> {
 
 impl<'d> UartTx<'d, Async> {
     /// Reconfigures the driver to operate in [`Blocking`] mode.
+    #[instability::unstable]
     pub fn into_blocking(self) -> UartTx<'d, Blocking> {
         self.uart
             .state()
@@ -779,6 +738,7 @@ where
     }
 
     /// Configure CTS pin
+    #[instability::unstable]
     pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(cts);
         cts.init_input(Pull::None);
@@ -795,6 +755,7 @@ where
     /// configure the driver side (i.e. the TX pin), or ensure that the line is
     /// initially high, to avoid receiving a non-data byte caused by an
     /// initial low signal level.
+    #[instability::unstable]
     pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         crate::into_mapped_ref!(rx);
         rx.init_input(Pull::Up);
@@ -881,25 +842,23 @@ where
         }
     }
 
-    /// Reads bytes from the UART
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
-        let buffered = self.read_buffered_bytes(buf)?;
-        let buf = &mut buf[buffered..];
-
-        for byte in buf.iter_mut() {
-            loop {
-                if let Some(b) = self.read_byte() {
-                    *byte = b;
-                    break;
-                }
-                self.check_for_errors()?;
-            }
+    /// Reads bytes from the UART and returns the amount of bytes read.
+    #[instability::unstable]
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
+        if buf.is_empty() {
+            return Ok(0);
         }
-        Ok(())
+
+        while self.rx_fifo_count() == 0 {
+            // Block until we received at least one byte
+        }
+
+        self.read_buffered_bytes(buf)
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes without blocking.
+    #[instability::unstable]
     pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         let mut count = 0;
         while count < buf.len() {
@@ -998,6 +957,7 @@ impl<'d> UartRx<'d, Blocking> {
     /// # Ok(())
     /// # }
     /// ```
+    #[instability::unstable]
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -1008,6 +968,7 @@ impl<'d> UartRx<'d, Blocking> {
     }
 
     /// Reconfigures the driver to operate in [`Async`] mode.
+    #[instability::unstable]
     pub fn into_async(self) -> UartRx<'d, Async> {
         if !self.uart.state().is_tx_async.load(Ordering::Acquire) {
             self.uart
@@ -1026,6 +987,7 @@ impl<'d> UartRx<'d, Blocking> {
 
 impl<'d> UartRx<'d, Async> {
     /// Reconfigures the driver to operate in [`Blocking`] mode.
+    #[instability::unstable]
     pub fn into_blocking(self) -> UartRx<'d, Blocking> {
         self.uart
             .state()
@@ -1164,12 +1126,13 @@ where
     /// let (mut rx, mut tx) = uart1.split();
     ///
     /// // Each component can be used individually to interact with the UART:
-    /// tx.write_bytes(&[42u8])?;
+    /// tx.write(&[42u8])?;
     /// let mut byte = [0u8; 1];
-    /// rx.read_bytes(&mut byte);
+    /// rx.read(&mut byte);
     /// # Ok(())
     /// # }
     /// ```
+    #[instability::unstable]
     pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
         (self.rx, self.tx)
     }
@@ -1182,12 +1145,12 @@ where
     /// #     peripherals.UART1,
     /// #     Config::default())?;
     /// // Write bytes out over the UART:
-    /// uart1.write_bytes(b"Hello, world!")?;
+    /// uart1.write(b"Hello, world!")?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, TxError> {
-        self.tx.write_bytes(data)
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
+        self.tx.write(data)
     }
 
     /// Reads and clears errors set by received data.
@@ -1196,13 +1159,14 @@ where
         self.rx.check_for_errors()
     }
 
-    /// Reads bytes from the UART
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
-        self.rx.read_bytes(buf)
+    /// Reads bytes from the UART and returns the amount of bytes read.
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
+        self.rx.read(buf)
     }
 
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes without blocking.
+    #[instability::unstable]
     pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_buffered_bytes(buf)
     }
@@ -1375,6 +1339,68 @@ impl Uart<'_, Blocking> {
     }
 
     /// Listen for the given interrupts
+    ///
+    /// ### Example
+    /// **Note**: In practice a proper serial terminal should be used
+    /// to connect to the board (espflash won't work)
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::delay::Delay;
+    /// # use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
+    /// # let delay = Delay::new();
+    /// # let config = Config::default().with_rx(
+    /// #    RxConfig::default().with_fifo_full_threshold(30)
+    /// # );
+    /// # let mut uart0 = Uart::new(
+    /// #    peripherals.UART0,
+    /// #    config)?;
+    /// uart0.set_interrupt_handler(interrupt_handler);
+    ///
+    /// critical_section::with(|cs| {
+    ///     uart0.set_at_cmd(AtCmdConfig::default().with_cmd_char(b'#'));
+    ///     uart0.listen(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
+    ///
+    ///     SERIAL.borrow_ref_mut(cs).replace(uart0);
+    /// });
+    ///
+    /// loop {
+    ///     println!("Send `#` character or >=30 characters");
+    ///     delay.delay(Duration::from_secs(1));
+    /// }
+    /// # }
+    ///
+    /// # use core::cell::RefCell;
+    /// # use critical_section::Mutex;
+    /// # use esp_hal::uart::Uart;
+    /// static SERIAL: Mutex<RefCell<Option<Uart<esp_hal::Blocking>>>> =
+    ///     Mutex::new(RefCell::new(None));
+    ///
+    /// # use esp_hal::uart::UartInterrupt;
+    /// # use core::fmt::Write;
+    /// #[handler]
+    /// fn interrupt_handler() {
+    ///     critical_section::with(|cs| {
+    ///         let mut serial = SERIAL.borrow_ref_mut(cs);
+    ///         if let Some(serial) = serial.as_mut() {
+    ///             let mut buf = [0u8; 64];
+    ///             if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
+    ///                 println!("Read {} bytes", cnt);
+    ///             }
+    ///
+    ///             let pending_interrupts = serial.interrupts();
+    ///             println!(
+    ///                 "Interrupt AT-CMD: {} RX-FIFO-FULL: {}",
+    ///                 pending_interrupts.contains(UartInterrupt::AtCmd),
+    ///                 pending_interrupts.contains(UartInterrupt::RxFifoFull),
+    ///             );
+    ///
+    ///             serial.clear_interrupts(
+    ///                 UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
+    ///             );
+    ///         }
+    ///     });
+    /// }
+    /// ```
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<UartInterrupt>>) {
         self.tx.uart.info().enable_listen(interrupts.into(), true)
@@ -1426,7 +1452,7 @@ where
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write_bytes(s.as_bytes())?;
+        self.write(s.as_bytes())?;
         Ok(())
     }
 }
@@ -1447,8 +1473,7 @@ where
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write_bytes(s.as_bytes())
-            .map_err(|_| core::fmt::Error)?;
+        self.write(s.as_bytes()).map_err(|_| core::fmt::Error)?;
         Ok(())
     }
 }
@@ -1500,17 +1525,17 @@ impl From<TxError> for IoError {
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::ErrorType for Uart<'_, Dm> {
+impl<Dm: DriverMode> embedded_io::ErrorType for Uart<'_, Dm> {
     type Error = IoError;
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::ErrorType for UartTx<'_, Dm> {
+impl<Dm: DriverMode> embedded_io::ErrorType for UartTx<'_, Dm> {
     type Error = TxError;
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::ErrorType for UartRx<'_, Dm> {
+impl<Dm: DriverMode> embedded_io::ErrorType for UartRx<'_, Dm> {
     type Error = RxError;
 }
 
@@ -1530,15 +1555,7 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        if buf.is_empty() {
-            return Ok(0);
-        }
-
-        while self.rx_fifo_count() == 0 {
-            // Block until we received at least one byte
-        }
-
-        self.read_buffered_bytes(buf)
+        self.read(buf)
     }
 }
 
@@ -1572,7 +1589,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io::Write::flush(&mut self.tx).map_err(IoError::Tx)
+        self.tx.flush().map_err(IoError::Tx)
     }
 }
 
@@ -1582,7 +1599,7 @@ where
     Dm: DriverMode,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.write_bytes(buf)
+        self.write(buf)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
@@ -1865,7 +1882,7 @@ impl UartRx<'_, Async> {
 
             let events_happened = UartRxFuture::new(self.uart.reborrow(), events).await;
             // always drain the fifo, if an error has occurred the data is lost
-            let read_bytes = self.flush_buffer(buf);
+            let read = self.flush_buffer(buf);
             // check error events
             rx_event_check_for_error(events_happened)?;
             // Unfortunately, the uart's rx-timeout counter counts up whenever there is
@@ -1876,8 +1893,8 @@ impl UartRx<'_, Async> {
                 .int_clr()
                 .write(|w| w.rxfifo_tout().clear_bit_by_one());
 
-            if read_bytes > 0 {
-                return Ok(read_bytes);
+            if read > 0 {
+                return Ok(read);
             }
         }
     }

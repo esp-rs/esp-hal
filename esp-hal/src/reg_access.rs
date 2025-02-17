@@ -127,13 +127,7 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
 
     // This function is similar to `volatile_set_memory` but will prepend data that
     // was previously ingested and ensure aligned (u32) writes.
-    pub fn volatile_write_bytes(
-        &mut self,
-        dst_ptr: *mut u32,
-        val: u8,
-        count: usize,
-        offset: usize,
-    ) {
+    pub fn volatile_write(&mut self, dst_ptr: *mut u32, val: u8, count: usize, offset: usize) {
         let dst_ptr = unsafe { dst_ptr.add(offset) };
 
         let mut cursor = if self.buf_fill != 0 {

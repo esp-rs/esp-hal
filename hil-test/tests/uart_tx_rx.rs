@@ -43,9 +43,9 @@ mod tests {
         let byte = [0x42];
 
         ctx.tx.flush();
-        ctx.tx.write_bytes(&byte).unwrap();
+        ctx.tx.write(&byte).unwrap();
         let mut buf = [0u8; 1];
-        ctx.rx.read_bytes(&mut buf).unwrap();
+        ctx.rx.read(&mut buf).unwrap();
 
         assert_eq!(buf[0], 0x42);
     }
@@ -56,9 +56,16 @@ mod tests {
         let mut buf = [0u8; 3];
 
         ctx.tx.flush();
-        ctx.tx.write_bytes(&bytes).unwrap();
+        ctx.tx.write(&bytes).unwrap();
 
-        ctx.rx.read_bytes(&mut buf).unwrap();
+        // Calls to read may not fill the buffer, wait until read returns 0
+        let mut n = 0;
+        loop {
+            match ctx.rx.read(&mut buf[n..]).unwrap() {
+                0 => break,
+                cnt => n += cnt,
+            };
+        }
 
         assert_eq!(buf, bytes);
     }

@@ -108,9 +108,18 @@ The more descriptive `gpio::Level` enum is now used to specify output levels of 
 + let code = PulseCode::new(Level::High, 200, Level::Low, 50);
 ```
 
+## Global driver changes
+
+The `_bytes` postfix of driver methods that take a byte slice have been removed.
+
+```diff
+- uart0.write_bytes(b"Hello world!")?;
++ uart0.write(b"Hello world!")?;
+```
+
 ## UART changes
 
-Uart `write_bytes` is now blocking and return the number of bytes written. `read_bytes` will block until it fills the provided buffer with received bytes, use `read_buffered_bytes` to read the available bytes without blocking.
+Uart `write` is now blocking and return the number of bytes written. `read` will block until it fills at least one byte into the buffer with received bytes, use `read_buffered_bytes` to read the available bytes without blocking.
 
 e.g.
 
@@ -118,9 +127,9 @@ e.g.
 - uart.write(0x42).ok();
 - let read = block!(ctx.uart.read());
 + let data: [u8; 1] = [0x42];
-+ uart.write_bytes(&data).unwrap();
++ uart.write(&data).unwrap();
 + let mut byte = [0u8; 1];
-+ uart.read_bytes(&mut byte);
++ uart.read(&mut byte).unwrap();
 ```
 
 ### UART errors have been split into `TxError` and `RxError`.
