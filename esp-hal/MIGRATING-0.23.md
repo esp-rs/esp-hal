@@ -2,7 +2,7 @@
 
 ## Driver stability
 
-Unstable parts of esp-hal are be gated behind the `unstable` feature. Previously, this feature
+Unstable parts of esp-hal are gated behind the `unstable` feature. Previously, this feature
 was enabled by default, but starting with this release, it is no longer the case.
 The `unstable` feature itself is unstable, we might change the way we hide APIs without notice.
 Unstable APIs are not covered by semver guarantees, they may be changed or removed at any time.
