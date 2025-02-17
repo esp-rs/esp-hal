@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- LEDC: Derive `Clone` and `Copy` for ledc speed types to make `ledc::channel::Config` derive them too.
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
 - RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
 - RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
