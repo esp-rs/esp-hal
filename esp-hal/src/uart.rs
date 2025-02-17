@@ -279,27 +279,6 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Calculates the total symbol length in bits based on the configured
-    /// data bits, parity, and stop bits.
-    fn symbol_length(&self) -> u8 {
-        let mut length: u8 = 1; // start bit
-        length += match self.data_bits {
-            DataBits::_5 => 5,
-            DataBits::_6 => 6,
-            DataBits::_7 => 7,
-            DataBits::_8 => 8,
-        };
-        length += match self.parity {
-            Parity::None => 0,
-            _ => 1,
-        };
-        length += match self.stop_bits {
-            StopBits::_1 => 1,
-            _ => 2, // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
-        };
-        length
-    }
-
     fn validate(&self) -> Result<(), ConfigError> {
         if let BaudrateTolerance::ErrorPercent(percentage) = self.baudrate_tolerance {
             assert!(percentage > 0 && percentage <= 100);
@@ -509,7 +488,7 @@ impl<Dm> embassy_embedded_hal::SetConfig for UartRx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Config = Config;
+    type Config = RxConfig;
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
@@ -522,7 +501,7 @@ impl<Dm> embassy_embedded_hal::SetConfig for UartTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Config = Config;
+    type Config = TxConfig;
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
@@ -565,7 +544,7 @@ where
     ///
     /// Note that this also changes the configuration of the RX half.
     #[instability::unstable]
-    pub fn apply_config(&mut self, _config: &Config) -> Result<(), ConfigError> {
+    pub fn apply_config(&mut self, _config: &TxConfig) -> Result<(), ConfigError> {
         // Nothing to do so far.
         self.uart.info().txfifo_reset();
         Ok(())
@@ -784,13 +763,13 @@ where
     #[cfg_attr(not(esp32), doc = "0x3FF")]
     /// ).
     #[instability::unstable]
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+    pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
         self.uart
             .info()
-            .set_rx_fifo_full_threshold(config.rx.fifo_full_threshold)?;
+            .set_rx_fifo_full_threshold(config.fifo_full_threshold)?;
         self.uart
             .info()
-            .set_rx_timeout(config.rx.timeout, config.symbol_length())?;
+            .set_rx_timeout(config.timeout, self.uart.info().current_symbol_length())?;
 
         self.uart.info().rxfifo_reset();
         Ok(())
@@ -1226,9 +1205,9 @@ where
     ///     baudrate to correspond exactly or with some percentage of deviation
     ///     to the desired value, and the driver cannot reach this speed
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.rx.apply_config(config)?;
-        self.tx.apply_config(config)?;
         self.rx.uart.info().apply_config(config)?;
+        self.rx.apply_config(&config.rx)?;
+        self.tx.apply_config(&config.tx)?;
         Ok(())
     }
 
@@ -1254,6 +1233,10 @@ where
         self.tx.disable_tx_interrupts();
 
         self.apply_config(&config)?;
+
+        // Reset Tx/Rx FIFOs
+        self.rx.uart.info().rxfifo_reset();
+        self.rx.uart.info().txfifo_reset();
 
         // Don't wait after transmissions by default,
         // so that bytes written to TX FIFO are always immediately transmitted.
@@ -2340,10 +2323,6 @@ impl Info {
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
 
-        // Reset Tx/Rx FIFOs
-        self.rxfifo_reset();
-        self.txfifo_reset();
-
         Ok(())
     }
 
@@ -2718,6 +2697,27 @@ impl Info {
         }
 
         Ok(())
+    }
+
+    fn current_symbol_length(&self) -> u8 {
+        let conf0 = self.regs().conf0().read();
+        let data_bits = conf0.bit_num().bits();
+        let parity = conf0.parity_en().bit() as u8;
+        let mut stop_bits = conf0.stop_bit_num().bits();
+
+        match stop_bits {
+            1 => {
+                // workaround for hardware issue, when UART stop bit set as 2-bit mode.
+                #[cfg(esp32)]
+                if self.regs().rs485_conf().read().dl1_en().bit_is_set() {
+                    stop_bits = 2;
+                }
+            }
+            // esp-idf also counts 2 bits for settings 1.5 and 2 stop bits
+            _ => stop_bits = 2,
+        }
+
+        1 + data_bits + parity + stop_bits
     }
 }
 
