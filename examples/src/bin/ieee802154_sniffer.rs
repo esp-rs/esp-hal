@@ -77,7 +77,7 @@ fn main() -> ! {
         }
 
         let mut buf = [0u8; 1];
-        if let Ok(_) = uart0.read_buffered_bytes(&mut buf) {
+        if let Ok(_) = uart0.read_buffered(&mut buf) {
             if buf[0] == b'r' {
                 software_reset();
             }
