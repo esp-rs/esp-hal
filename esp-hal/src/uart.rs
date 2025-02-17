@@ -502,7 +502,7 @@ impl<Dm> embassy_embedded_hal::SetConfig for UartRx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Config = RxConfig;
+    type Config = Config;
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
@@ -515,7 +515,7 @@ impl<Dm> embassy_embedded_hal::SetConfig for UartTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Config = TxConfig;
+    type Config = Config;
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
@@ -559,7 +559,7 @@ where
     /// This function returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     #[instability::unstable]
-    pub fn apply_config(&mut self, _config: &TxConfig) -> Result<(), ConfigError> {
+    pub fn apply_config(&mut self, _config: &Config) -> Result<(), ConfigError> {
         // Nothing to do so far.
         self.uart.info().txfifo_reset();
         Ok(())
@@ -765,13 +765,13 @@ where
     /// This function returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     #[instability::unstable]
-    pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
             .info()
-            .set_rx_fifo_full_threshold(config.fifo_full_threshold)?;
+            .set_rx_fifo_full_threshold(config.rx.fifo_full_threshold)?;
         self.uart
             .info()
-            .set_rx_timeout(config.timeout, self.uart.info().current_symbol_length())?;
+            .set_rx_timeout(config.rx.timeout, self.uart.info().current_symbol_length())?;
 
         self.uart.info().rxfifo_reset();
         Ok(())
@@ -1202,8 +1202,8 @@ where
     /// supported by the hardware.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.rx.uart.info().apply_config(config)?;
-        self.rx.apply_config(&config.rx)?;
-        self.tx.apply_config(&config.tx)?;
+        self.rx.apply_config(config)?;
+        self.tx.apply_config(config)?;
         Ok(())
     }
 

@@ -154,9 +154,6 @@ or `UartTx`) TX-related trait methods return `IoError::Tx(TxError)`, while RX-re
 + );
 ```
 
-The `apply_config` functions of `UartRx` and `UartTx` driver halves now take `RxConfig` and
-`TxConfig` respectively.
-
 ## `timer::wait` is now blocking
 
 ```diff
