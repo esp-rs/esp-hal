@@ -573,7 +573,7 @@ where
 
     /// Writes bytes
     #[instability::unstable]
-    pub fn write(&mut self, data: &[u8]) -> Result<usize, Error> {
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
         let count = data.len();
 
         for &byte in data {
@@ -844,7 +844,7 @@ where
 
     /// Reads bytes from the UART and returns the amount of bytes read.
     #[instability::unstable]
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         if buf.is_empty() {
             return Ok(0);
         }
@@ -859,7 +859,7 @@ where
     /// Read all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes without blocking.
     #[instability::unstable]
-    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         let mut count = 0;
         while count < buf.len() {
             if let Some(byte) = self.read_byte() {
@@ -1525,17 +1525,17 @@ impl From<TxError> for IoError {
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::ErrorType for Uart<'_, Dm> {
+impl<Dm: DriverMode> embedded_io::ErrorType for Uart<'_, Dm> {
     type Error = IoError;
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::ErrorType for UartTx<'_, Dm> {
+impl<Dm: DriverMode> embedded_io::ErrorType for UartTx<'_, Dm> {
     type Error = TxError;
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::ErrorType for UartRx<'_, Dm> {
+impl<Dm: DriverMode> embedded_io::ErrorType for UartRx<'_, Dm> {
     type Error = RxError;
 }
 
@@ -1603,8 +1603,7 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush();
-        Ok(())
+        self.flush()
     }
 }
 
