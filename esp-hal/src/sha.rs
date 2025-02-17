@@ -120,8 +120,6 @@ impl crate::interrupt::InterruptConfigurable for Sha<'_> {
 }
 
 // A few notes on this implementation with regards to 'memcpy',
-// - It seems that ptr::write already acts as volatile, while ptr::copy_* does
-//   not (in this case)
 // - The registers are *not* cleared after processing, so padding needs to be
 //   written out
 // - This component uses core::intrinsics::volatile_* which is unstable, but is
