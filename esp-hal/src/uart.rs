@@ -541,9 +541,7 @@ where
     }
 
     /// Change the configuration.
-    ///
-    /// Note that this also changes the configuration of the RX half.
-    #[instability::unstable]
+        #[instability::unstable]
     pub fn apply_config(&mut self, _config: &TxConfig) -> Result<(), ConfigError> {
         // Nothing to do so far.
         self.uart.info().txfifo_reset();
@@ -744,8 +742,6 @@ where
     }
 
     /// Change the configuration.
-    ///
-    /// Note that this also changes the configuration of the TX half.
     ///
     /// # Errors
     ///
