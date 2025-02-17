@@ -175,14 +175,14 @@ const UART_TOUT_THRESH_DEFAULT: u8 = 10;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DataBits {
     /// 5 data bits per frame.
-    _5 = 0,
+    _5,
     /// 6 data bits per frame.
-    _6 = 1,
+    _6,
     /// 7 data bits per frame.
-    _7 = 2,
+    _7,
     /// 8 data bits per frame.
     #[default]
-    _8 = 3,
+    _8,
 }
 
 /// Parity check
@@ -215,11 +215,11 @@ pub enum Parity {
 pub enum StopBits {
     /// 1 stop bit.
     #[default]
-    _1   = 1,
+    _1,
     /// 1.5 stop bits.
-    _1p5 = 2,
+    _1p5,
     /// 2 stop bits.
-    _2   = 3,
+    _2,
 }
 
 /// Defines how strictly the requested baud rate must be met.
@@ -2150,7 +2150,6 @@ pub mod lp_uart {
                 .modify(|_, w| unsafe { w.bit_num().bits(data_bits as u8) });
 
             self.update();
-
             self
         }
 
@@ -2158,7 +2157,7 @@ pub mod lp_uart {
             self.uart
                 .register_block()
                 .conf0()
-                .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+                .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8 + 1) });
 
             self.update();
             self
@@ -2621,7 +2620,7 @@ impl Info {
         #[cfg(not(esp32))]
         self.regs()
             .conf0()
-            .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8) });
+            .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8 + 1) });
     }
 
     fn rxfifo_reset(&self) {
@@ -2697,7 +2696,7 @@ impl Info {
 
     fn current_symbol_length(&self) -> u8 {
         let conf0 = self.regs().conf0().read();
-        let data_bits = conf0.bit_num().bits();
+        let data_bits = conf0.bit_num().bits() + 5; // 5 data bits are encoded as variant 0
         let parity = conf0.parity_en().bit() as u8;
         let mut stop_bits = conf0.stop_bit_num().bits();
 
