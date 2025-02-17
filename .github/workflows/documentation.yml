@@ -3,11 +3,10 @@ name: Documentation
 on:
   workflow_dispatch:
     inputs:
-      esp-hal:
-        description: "esp-hal tag"
-        required: true
-      esp-wifi:
-        description: "esp-wifi tag"
+      packages:
+        description: >
+          A JSON structure describing the packages to build.
+          E.g: [{"name":"esp-hal","tag":"v0.23.1"},{"name":"esp-wifi","tag":"v0.12"}]
         required: true
 
 env:
@@ -17,10 +16,7 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      packages: '[
-            { "name": "esp-hal",  "tag": "${{ github.event.inputs.esp-hal }}" },
-            { "name": "esp-wifi", "tag": "esp-wifi-${{ github.event.inputs.esp-wifi }}" }
-          ]'
+      packages: '${{ github.event.inputs.packages }}'
     steps:
       - run: echo "Setup complete!"
   build:
