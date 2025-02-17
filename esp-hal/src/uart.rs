@@ -298,6 +298,7 @@ impl Config {
 #[non_exhaustive]
 pub struct RxConfig {
     /// Threshold level at which the RX FIFO is considered full.
+    #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
     fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
     timeout: Option<u8>,
