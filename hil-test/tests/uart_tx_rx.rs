@@ -58,7 +58,14 @@ mod tests {
         ctx.tx.flush();
         ctx.tx.write(&bytes).unwrap();
 
-        ctx.rx.read(&mut buf).unwrap();
+        // Calls to read may not fill the buffer, wait until read returns 0
+        let mut n = 0;
+        loop {
+            match ctx.rx.read(&mut buf[n..]).unwrap() {
+                0 => break,
+                cnt => n += cnt,
+            };
+        }
 
         assert_eq!(buf, bytes);
     }
