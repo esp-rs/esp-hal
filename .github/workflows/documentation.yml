@@ -57,8 +57,11 @@ jobs:
           repository: esp-rs/esp-hal
           ref: ${{ matrix.packages.tag }}
 
+      # TODO uncomment
+      # - name: Build documentation
+      #   run: hal-xtask build-documentation --packages=${{ matrix.packages.name }}
       - name: Build documentation
-        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }}
+        run: cargo xtask build-documentation --packages=${{ matrix.packages.name }}
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
