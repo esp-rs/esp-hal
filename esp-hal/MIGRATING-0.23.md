@@ -1,5 +1,21 @@
 # Migration Guide from v0.23.x to v1.0.0-beta.0
 
+## Driver stability
+
+Unstable parts of esp-hal are gated behind the `unstable` feature. Previously, this feature
+was enabled by default, but starting with this release, it is no longer the case.
+The `unstable` feature itself is unstable, we might change the way we hide APIs without notice.
+Unstable APIs are not covered by semver guarantees, they may be changed or removed at any time.
+
+Please refer to the documentation to see which APIs are marked as unstable.
+
+```diff
+ esp-hal = { version = "1.0.0-beta.0" , features = [
+   "esp32c6",
++  "unstable"
+ ]}
+```
+
 ## `Async` drivers can no longer be sent between cores and executors
 
 To work around this limitation, send the blocking driver, and configure it into `Async` mode
