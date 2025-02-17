@@ -842,7 +842,7 @@ where
         }
     }
 
-    /// Reads bytes from the UART
+    /// Reads bytes from the UART and returns the amount of bytes read.
     #[instability::unstable]
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if buf.is_empty() {
@@ -1159,7 +1159,7 @@ where
         self.rx.check_for_errors()
     }
 
-    /// Reads bytes from the UART
+    /// Reads bytes from the UART and returns the amount of bytes read.
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read(buf)
     }
