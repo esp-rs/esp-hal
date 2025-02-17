@@ -1866,6 +1866,23 @@ impl UartTx<'_, Async> {
     /// This function is cancellation safe.
     pub async fn write_async(&mut self, bytes: &[u8]) -> Result<usize, TxError> {
         if self.tx_fifo_count() == UART_FIFO_SIZE {
+            let current = self.uart.info().tx_fifo_empty_threshold();
+            let space_for_current_threshold = UART_FIFO_SIZE - current;
+            let _guard = if space_for_current_threshold > bytes.len() as u16 {
+                // We're ignoring the user configuration here to ensure that this is not waiting
+                // for longer than necessary. We'll restore the original value after the
+                // future resolved.
+                let info = self.uart.info();
+                let data_to_write = u16::try_from(bytes.len())
+                    .unwrap_or(Info::RX_FIFO_MAX_THRHD)
+                    .min(Info::RX_FIFO_MAX_THRHD);
+                unwrap!(info.set_tx_fifo_empty_threshold(UART_FIFO_SIZE - data_to_write));
+                Some(OnDrop::new(|| {
+                    unwrap!(info.set_tx_fifo_empty_threshold(current));
+                }))
+            } else {
+                None
+            };
             UartTxFuture::new(self.uart.reborrow(), TxEvent::FiFoEmpty).await;
         }
 
@@ -1920,6 +1937,24 @@ impl UartRx<'_, Async> {
         }
 
         if self.rx_fifo_count() == 0 {
+            let current = self.uart.info().rx_fifo_full_threshold();
+            let _guard = if current > buf.len() as u16 {
+                // We're ignoring the user configuration here to ensure that this is not waiting
+                // for more data than the buffer. We'll restore the original value after the
+                // future resolved.
+                let info = self.uart.info();
+                unwrap!(info.set_rx_fifo_full_threshold(
+                    u16::try_from(buf.len())
+                        .unwrap_or(Info::RX_FIFO_MAX_THRHD)
+                        .min(Info::RX_FIFO_MAX_THRHD),
+                ));
+                Some(OnDrop::new(|| {
+                    unwrap!(info.set_rx_fifo_full_threshold(current));
+                }))
+            } else {
+                None
+            };
+
             // Wait for space or event
             let mut events = RxEvent::FifoFull
                 | RxEvent::FifoOvf
@@ -2498,13 +2533,19 @@ impl Info {
         Ok(())
     }
 
+    /// Reads the RX-FIFO threshold
+    #[allow(clippy::useless_conversion)]
+    fn rx_fifo_full_threshold(&self) -> u16 {
+        self.regs().conf1().read().rxfifo_full_thrhd().bits().into()
+    }
+
     /// Configures the TX-FIFO threshold
     ///
     /// ## Errors
     ///
     /// [ConfigError::UnsupportedTxFifoThreshold] if the provided value exceeds
     /// [`Info::TX_FIFO_MAX_THRHD`].
-    fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<u16, ConfigError> {
+    fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold > Self::TX_FIFO_MAX_THRHD {
             return Err(ConfigError::UnsupportedTxFifoThreshold);
         }
@@ -2513,7 +2554,18 @@ impl Info {
             .conf1()
             .modify(|_, w| unsafe { w.txfifo_empty_thrhd().bits(threshold as _) });
 
-        Ok(threshold)
+        Ok(())
+    }
+
+    /// Reads the TX-FIFO threshold
+    #[allow(clippy::useless_conversion)]
+    fn tx_fifo_empty_threshold(&self) -> u16 {
+        self.regs()
+            .conf1()
+            .read()
+            .txfifo_empty_thrhd()
+            .bits()
+            .into()
     }
 
     /// Configures the Receive Timeout detection setting
@@ -2891,6 +2943,21 @@ impl Instance for AnyUart {
             AnyUartInner::Uart1(uart) => uart.parts(),
             #[cfg(uart2)]
             AnyUartInner::Uart2(uart) => uart.parts(),
+        }
+    }
+}
+
+struct OnDrop<F: FnOnce()>(Option<F>);
+impl<F: FnOnce()> OnDrop<F> {
+    fn new(cb: F) -> Self {
+        Self(Some(cb))
+    }
+}
+
+impl<F: FnOnce()> Drop for OnDrop<F> {
+    fn drop(&mut self) {
+        if let Some(cb) = self.0.take() {
+            cb();
         }
     }
 }
