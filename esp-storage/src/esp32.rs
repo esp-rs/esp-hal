@@ -145,7 +145,7 @@ pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 
             let block_len = if len - block < 32 { len - block } else { 32 };
             write_register(
                 SPI_ADDR_REG,
-                ((dest_addr + block) & 0xffffff) | block_len << 24,
+                ((dest_addr + block) & 0xffffff) | (block_len << 24),
             );
 
             let data_ptr = unsafe { data.offset((block / 4) as isize) };
@@ -215,7 +215,7 @@ fn spiflash_wait_for_ready() {
 #[link_section = ".rwtext"]
 pub(crate) fn spiflash_unlock() -> i32 {
     let flashchip = FLASH_CHIP_ADDR as *const EspRomSpiflashChipT;
-    if unsafe { (*flashchip).device_id } >> 16 & 0xff == 0x9D {
+    if (unsafe { (*flashchip).device_id } >> 16) & 0xff == 0x9D {
         panic!("ISSI flash is not supported");
     }
 

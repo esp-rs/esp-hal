@@ -442,7 +442,7 @@ fn now() -> Instant {
         };
         let hi = tg0.lacthi().read().bits();
 
-        let ticks = (hi as u64) << 32u64 | lo as u64;
+        let ticks = ((hi as u64) << 32u64) | lo as u64;
         (ticks, 16)
     };
 

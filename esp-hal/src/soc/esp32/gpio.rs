@@ -115,7 +115,7 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
         Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
         // this should be bits 3 & 4 respectively, according to the TRM, but it doesn't seem to
         // work. This does though.
-        Cpu::ProCpu => (int_enable as u8) << 2 | ((nmi_enable as u8) << 3),
+        Cpu::ProCpu => ((int_enable as u8) << 2) | ((nmi_enable as u8) << 3),
     }
 }
 
