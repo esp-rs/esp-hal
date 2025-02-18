@@ -8,6 +8,12 @@ on:
           A JSON structure describing the packages to build.
           E.g: [{"name":"esp-hal","tag":"v0.23.1"},{"name":"esp-wifi","tag":"esp-wifi-v0.12"}]
         required: true
+      server:
+        type: choice
+        description: Which server to deploy to
+        options:
+          - preview
+          - production
 
 env:
   CARGO_TERM_COLOR: always
@@ -58,7 +64,7 @@ jobs:
           ref: ${{ matrix.packages.tag }}
 
       - name: Build documentation
-        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }} --base-url /esp-hal/ # FIXME change, base url will be /rust/ on main server
+        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }} --base-url /rust/
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
@@ -88,28 +94,24 @@ jobs:
       - name: Create index.html
         run: "cargo xtask build-documentation-index --packages=$(echo '${{ needs.setup.outputs.packages }}' | jq -r '[.[].name] | join(\",\")')"
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - if: ${{ github.event.inputs.server == 'preview' }}
+        name: Deploy to preview server
+        uses: appleboy/scp-action@v0.1.7
         with:
-          path: "docs/"
+          host: ${{ secrets.PREVIEW_HOST }}
+          username: ${{ secrets.PREVIEW_USERNAME }}
+          key: ${{ secrets.PREVIEW_KEY }}
+          target: ${{ secrets.PREVIEW_TARGET }}
+          source: "docs/*"
+          overwrite: true
 
-  deploy:
-    # Add a dependency to the assemble job:
-    needs: assemble
-
-    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment:
-    permissions:
-      pages: write # to deploy to Pages
-      id-token: write # to verify the deployment originates from an appropriate source
-
-    # Deploy to the github-pages environment:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    # Specify runner + deployment step:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - if: ${{ github.event.inputs.server == 'production' }}
+        name: Deploy to production server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USERNAME }}
+          key: ${{ secrets.PRODUCTION_KEY }}
+          target: ${{ secrets.PRODUCTION_TARGET }}
+          source: "docs/*"
+          overwrite: true
