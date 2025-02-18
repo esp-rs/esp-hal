@@ -43,6 +43,7 @@
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
+#[cfg(feature = "unstable")]
 use embedded_io::ReadExactError;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
