@@ -105,6 +105,7 @@ jobs:
           key: ${{ secrets.PREVIEW_KEY }}
           target: ${{ secrets.PREVIEW_TARGET }}
           source: "docs/"
+          strip_components: 1 # remove the docs prefix
           overwrite: true
 
       - if: ${{ github.event.inputs.server == 'production' }}
@@ -116,4 +117,5 @@ jobs:
           key: ${{ secrets.PRODUCTION_KEY }}
           target: ${{ secrets.PRODUCTION_TARGET }}
           source: "docs/"
+          strip_components: 1 # remove the docs prefix
           overwrite: true
