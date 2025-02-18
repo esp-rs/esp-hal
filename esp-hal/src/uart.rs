@@ -69,7 +69,6 @@ use crate::{
 };
 
 const UART_FIFO_SIZE: u16 = 128;
-const CMD_CHAR_DEFAULT: u8 = 0x2b;
 
 /// UART RX Error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -358,7 +357,7 @@ impl Default for AtCmdConfig {
             pre_idle_count: None,
             post_idle_count: None,
             gap_timeout: None,
-            cmd_char: CMD_CHAR_DEFAULT,
+            cmd_char: b'+',
             char_num: 1,
         }
     }
