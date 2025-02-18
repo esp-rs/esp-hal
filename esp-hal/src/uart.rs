@@ -1952,6 +1952,7 @@ impl UartRx<'_, Async> {
         &mut self,
         minimum: usize,
         preferred: usize,
+        listen_for_timeout: bool,
     ) -> Result<(), RxError> {
         while self.rx_fifo_count() < (minimum as u16).min(Info::RX_FIFO_MAX_THRHD) {
             let amount = u16::try_from(preferred)
@@ -1990,7 +1991,7 @@ impl UartRx<'_, Async> {
                     let reg_en = self.regs().conf1();
                 }
             };
-            if reg_en.read().rx_tout_en().bit_is_set() {
+            if listen_for_timeout && reg_en.read().rx_tout_en().bit_is_set() {
                 events |= RxEvent::FifoTout;
             }
 
@@ -2024,7 +2025,7 @@ impl UartRx<'_, Async> {
             return Ok(0);
         }
 
-        self.wait_for_buffered_data(1, buf.len()).await?;
+        self.wait_for_buffered_data(1, buf.len(), true).await?;
 
         self.read_buffered(buf)
     }
@@ -2045,7 +2046,11 @@ impl UartRx<'_, Async> {
     /// previously read data may be lost.
     pub async fn read_exact_async(&mut self, mut buf: &mut [u8]) -> Result<(), RxError> {
         while !buf.is_empty() {
-            self.wait_for_buffered_data(buf.len(), buf.len()).await?;
+            // No point in listening for timeouts, as we're waiting for an exact amount of
+            // data. On ESP32 and S2, the timeout interrupt can't be cleared unless the FIFO
+            // is empty, so listening could cause an infinite loop here.
+            self.wait_for_buffered_data(buf.len(), buf.len(), false)
+                .await?;
 
             let read = self.read_buffered(buf)?;
             buf = &mut buf[read..];
