@@ -1865,7 +1865,8 @@ impl UartTx<'_, Async> {
     ///
     /// This function is cancellation safe.
     pub async fn write_async(&mut self, bytes: &[u8]) -> Result<usize, TxError> {
-        if self.tx_fifo_count() == UART_FIFO_SIZE {
+        let current_space = UART_FIFO_SIZE - self.tx_fifo_count();
+        if current_space == 0 {
             let current = self.uart.info().tx_fifo_empty_threshold();
             let space_for_current_threshold = UART_FIFO_SIZE - current;
             let _guard = if space_for_current_threshold > bytes.len() as u16 {
@@ -1886,7 +1887,7 @@ impl UartTx<'_, Async> {
             UartTxFuture::new(self.uart.reborrow(), TxEvent::FiFoEmpty).await;
         }
 
-        let free = (UART_FIFO_SIZE - self.tx_fifo_count()) as usize;
+        let free = (current_space as usize).min(bytes.len());
 
         for &byte in &bytes[..free] {
             self.regs()
