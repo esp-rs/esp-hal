@@ -64,7 +64,7 @@ jobs:
           ref: ${{ matrix.packages.tag }}
 
       - name: Build documentation
-        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }} --base-url /rust/
+        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }} --base-url /projects/rust/
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
@@ -95,11 +95,6 @@ jobs:
       - name: Create index.html
         run: cargo xtask build-documentation-index
 
-      - name: Debug 1
-        run: "ls -la *"
-      - name: Debug 2
-        run: "ls -la docs/*"
-
 
       - if: ${{ github.event.inputs.server == 'preview' }}
         name: Deploy to preview server
@@ -109,7 +104,7 @@ jobs:
           username: ${{ secrets.PREVIEW_USERNAME }}
           key: ${{ secrets.PREVIEW_KEY }}
           target: ${{ secrets.PREVIEW_TARGET }}
-          source: "docs/*"
+          source: "docs/"
           overwrite: true
 
       - if: ${{ github.event.inputs.server == 'production' }}
@@ -120,5 +115,5 @@ jobs:
           username: ${{ secrets.PRODUCTION_USERNAME }}
           key: ${{ secrets.PRODUCTION_KEY }}
           target: ${{ secrets.PRODUCTION_TARGET }}
-          source: "docs/*"
+          source: "docs/"
           overwrite: true
