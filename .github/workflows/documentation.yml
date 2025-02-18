@@ -85,7 +85,7 @@ jobs:
         with:
           toolchain: stable
       - name: Prepare
-        run: mkdir docs
+        run: mkdir docs && mkdir docs/esp-hal && mkdir docs/esp-wifi && mkdir docs/esp-lp-hal
       - name: Download all docs
         uses: actions/download-artifact@v4
         with:
