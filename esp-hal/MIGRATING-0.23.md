@@ -244,7 +244,7 @@ GPIO drivers now take configuration structs.
 
 ```diff
 - Input::new(peripherals.GPIO0, Pull::Up);
-+ Input::new(peripherals.GPIO0, InputConfig::default().with_pull_direction(Pull::Up));
++ Input::new(peripherals.GPIO0, InputConfig::default().with_pull(Pull::Up));
  
 - Output::new(peripherals.GPIO0, Level::Low);
 + Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
