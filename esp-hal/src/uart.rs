@@ -2594,7 +2594,7 @@ impl Info {
 
     fn rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
         let events = events.into();
-        let interrupts_enabled = self.regs().int_st().read();
+        let interrupts_enabled = self.regs().int_raw().read();
         let mut events_triggered = EnumSet::new();
         for event in events {
             let event_triggered = match event {

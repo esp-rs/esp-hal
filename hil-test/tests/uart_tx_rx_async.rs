@@ -25,7 +25,10 @@ mod tests {
         select::{select, Either},
     };
     use embassy_time::{Duration, Timer};
-    use esp_hal::{timer::timg::TimerGroup, uart::RxConfig};
+    use esp_hal::{
+        timer::timg::TimerGroup,
+        uart::{RxConfig, RxError},
+    };
 
     use super::*;
 
@@ -60,6 +63,22 @@ mod tests {
         let _ = ctx.rx.read_async(&mut read).await;
 
         assert_eq!(read, byte);
+    }
+
+    #[test]
+    async fn rx_overflow_is_detected(mut ctx: Context) {
+        let mut to_send: &[u8] = &[0; 250];
+        let mut read = [0u8; 1];
+
+        while !to_send.is_empty() {
+            let written = ctx.tx.write_async(to_send).await.unwrap();
+            to_send = &to_send[written..];
+        }
+        ctx.tx.flush_async().await.unwrap();
+
+        // supposed to panic
+        let res = ctx.rx.read_async(&mut read).await;
+        assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
     }
 
     #[test]
