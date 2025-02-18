@@ -861,7 +861,7 @@ where
     /// ## Errors
     ///
     /// This function returns an [`RxError`] if an error occurred since the last
-    /// call to [`Self::check_for_errors`], [`Self::read_bytes`], or this
+    /// call to [`Self::check_for_errors`], [`Self::read_buffered`], or this
     /// function.
     ///
     /// If the error occurred before this function was called, the contents of
@@ -892,7 +892,7 @@ where
     /// ## Errors
     ///
     /// This function returns an [`RxError`] if an error occurred since the last
-    /// call to [`Self::check_for_errors`], [`Self::read_bytes`], or this
+    /// call to [`Self::check_for_errors`], [`Self::read`], or this
     /// function.
     ///
     /// If the error occurred before this function was called, the contents of
