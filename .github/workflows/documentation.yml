@@ -47,18 +47,18 @@ jobs:
           repository: esp-rs/esp-hal
       - name: Build xtask
         run: |
-          cargo build --release --package=xtask
+          cargo build --release --package=xtask --features=deploy-docs
           cp target/release/xtask ~/.cargo/bin/hal-xtask
 
       # Checkout the tag we need to start building the docs
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          repository: mabezdev/esp-hal # TODO
+          repository: mabezdev/esp-hal # FIXME change
           ref: ${{ matrix.packages.tag }}
 
       - name: Build documentation
-        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }}
+        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }} --base-url /esp-hal/ # FIXME change, base url will be /rust/ on main server
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
