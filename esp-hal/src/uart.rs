@@ -1723,6 +1723,7 @@ struct UartRxFuture {
     events: EnumSet<RxEvent>,
     uart: &'static Info,
     state: &'static State,
+    registered: bool,
 }
 
 impl UartRxFuture {
@@ -1732,6 +1733,7 @@ impl UartRxFuture {
             events: events.into(),
             uart: uart.info(),
             state: uart.state(),
+            registered: false,
         }
     }
 }
@@ -1740,14 +1742,19 @@ impl core::future::Future for UartRxFuture {
     type Output = ();
 
     fn poll(
-        self: core::pin::Pin<&mut Self>,
+        mut self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> core::task::Poll<Self::Output> {
-        if !self.uart.enabled_rx_events(self.events).is_empty() {
-            Poll::Ready(())
-        } else {
+        if !self.registered {
             self.state.rx_waker.register(cx.waker());
             self.uart.enable_listen_rx(self.events, true);
+            self.registered = true;
+        }
+
+        let events = self.uart.enabled_rx_events(self.events);
+        if events != self.events {
+            Poll::Ready(())
+        } else {
             Poll::Pending
         }
     }
@@ -1767,6 +1774,7 @@ struct UartTxFuture {
     events: EnumSet<TxEvent>,
     uart: &'static Info,
     state: &'static State,
+    registered: bool,
 }
 
 impl UartTxFuture {
@@ -1776,31 +1784,8 @@ impl UartTxFuture {
             events: events.into(),
             uart: uart.info(),
             state: uart.state(),
+            registered: false,
         }
-    }
-
-    fn triggered_events(&self) -> bool {
-        let interrupts_enabled = self.uart.regs().int_ena().read();
-        let mut event_triggered = false;
-        for event in self.events {
-            event_triggered |= match event {
-                TxEvent::Done => interrupts_enabled.tx_done().bit_is_clear(),
-                TxEvent::FiFoEmpty => interrupts_enabled.txfifo_empty().bit_is_clear(),
-            }
-        }
-        event_triggered
-    }
-
-    fn enable_listen(&self, enable: bool) {
-        self.uart.regs().int_ena().modify(|_, w| {
-            for event in self.events {
-                match event {
-                    TxEvent::Done => w.tx_done().bit(enable),
-                    TxEvent::FiFoEmpty => w.txfifo_empty().bit(enable),
-                };
-            }
-            w
-        });
     }
 }
 
@@ -1808,14 +1793,19 @@ impl core::future::Future for UartTxFuture {
     type Output = ();
 
     fn poll(
-        self: core::pin::Pin<&mut Self>,
+        mut self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> core::task::Poll<Self::Output> {
-        if self.triggered_events() {
+        if !self.registered {
+            self.state.tx_waker.register(cx.waker());
+            self.uart.enable_listen_tx(self.events, true);
+            self.registered = true;
+        }
+
+        let events = self.uart.enabled_tx_events(self.events);
+        if events != self.events {
             Poll::Ready(())
         } else {
-            self.state.tx_waker.register(cx.waker());
-            self.enable_listen(true);
             Poll::Pending
         }
     }
@@ -1826,7 +1816,7 @@ impl Drop for UartTxFuture {
         // Although the isr disables the interrupt that occurred directly, we need to
         // disable the other interrupts (= the ones that did not occur), as
         // soon as this future goes out of scope.
-        self.enable_listen(false);
+        self.uart.enable_listen_tx(self.events, false);
     }
 }
 
@@ -2036,6 +2026,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
         || interrupts.frm_err().bit_is_set()
         || interrupts.parity_err().bit_is_set();
     let tx_wake = interrupts.tx_done().bit_is_set() || interrupts.txfifo_empty().bit_is_set();
+
     uart.regs()
         .int_clr()
         .write(|w| unsafe { w.bits(interrupt_bits) });
@@ -2435,6 +2426,35 @@ impl Info {
         Ok(())
     }
 
+    fn enable_listen_tx(&self, events: EnumSet<TxEvent>, enable: bool) {
+        self.regs().int_ena().modify(|_, w| {
+            for event in events {
+                match event {
+                    TxEvent::Done => w.tx_done().bit(enable),
+                    TxEvent::FiFoEmpty => w.txfifo_empty().bit(enable),
+                };
+            }
+            w
+        });
+    }
+
+    fn enabled_tx_events(&self, events: impl Into<EnumSet<TxEvent>>) -> EnumSet<TxEvent> {
+        let events = events.into();
+        let interrupts_enabled = self.regs().int_ena().read();
+        let mut events_triggered = EnumSet::new();
+        for event in events {
+            let event_triggered = match event {
+                TxEvent::Done => interrupts_enabled.tx_done().bit_is_set(),
+                TxEvent::FiFoEmpty => interrupts_enabled.txfifo_empty().bit_is_set(),
+            };
+
+            if event_triggered {
+                events_triggered |= event;
+            }
+        }
+        events_triggered
+    }
+
     fn enable_listen_rx(&self, events: EnumSet<RxEvent>, enable: bool) {
         self.regs().int_ena().modify(|_, w| {
             for event in events {
@@ -2459,14 +2479,14 @@ impl Info {
         let mut events_triggered = EnumSet::new();
         for event in events {
             let event_triggered = match event {
-                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
-                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_clear(),
+                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_set(),
+                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_set(),
 
-                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
-                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
-                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
-                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_clear(),
-                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_clear(),
+                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_set(),
+                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_set(),
+                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_set(),
+                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_set(),
+                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_set(),
             };
             if event_triggered {
                 events_triggered |= event;
