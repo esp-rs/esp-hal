@@ -1738,7 +1738,7 @@ impl UartRxFuture {
 }
 
 impl core::future::Future for UartRxFuture {
-    type Output = ();
+    type Output = EnumSet<RxEvent>;
 
     fn poll(
         mut self: core::pin::Pin<&mut Self>,
@@ -1750,9 +1750,9 @@ impl core::future::Future for UartRxFuture {
             self.registered = true;
         }
 
-        let events = self.uart.enabled_rx_events(self.events);
-        if events != self.events {
-            Poll::Ready(())
+        let events = self.events - self.uart.enabled_rx_events(self.events);
+        if !events.is_empty() {
+            Poll::Ready(events)
         } else {
             Poll::Pending
         }
@@ -1992,7 +1992,8 @@ impl UartRx<'_, Async> {
                 events |= RxEvent::FifoTout;
             }
 
-            UartRxFuture::new(self.uart.reborrow(), events).await;
+            let event = UartRxFuture::new(self.uart.reborrow(), events).await;
+            rx_event_check_for_error(event)?;
         }
 
         Ok(())
