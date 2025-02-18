@@ -1911,9 +1911,11 @@ impl UartTx<'_, Async> {
     ///
     /// This function is cancellation safe.
     pub async fn write_async(&mut self, bytes: &[u8]) -> Result<usize, TxError> {
-        let current_space = UART_FIFO_SIZE - self.tx_fifo_count();
+        let mut current_space = UART_FIFO_SIZE - self.tx_fifo_count();
         if current_space == 0 {
             UartTxFuture::new(self.uart.reborrow(), TxEvent::FiFoEmpty).await;
+            // Recalculate available space
+            current_space = UART_FIFO_SIZE - self.tx_fifo_count();
         }
 
         let free = (current_space as usize).min(bytes.len());
