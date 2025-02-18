@@ -1857,23 +1857,6 @@ impl UartTx<'_, Async> {
     pub async fn write_async(&mut self, bytes: &[u8]) -> Result<usize, TxError> {
         let current_space = UART_FIFO_SIZE - self.tx_fifo_count();
         if current_space == 0 {
-            let current = self.uart.info().tx_fifo_empty_threshold();
-            let space_for_current_threshold = UART_FIFO_SIZE - current;
-            let _guard = if space_for_current_threshold > bytes.len() as u16 {
-                // We're ignoring the user configuration here to ensure that this is not waiting
-                // for longer than necessary. We'll restore the original value after the
-                // future resolved.
-                let info = self.uart.info();
-                let data_to_write = u16::try_from(bytes.len())
-                    .unwrap_or(Info::RX_FIFO_MAX_THRHD)
-                    .min(Info::RX_FIFO_MAX_THRHD);
-                unwrap!(info.set_tx_fifo_empty_threshold(UART_FIFO_SIZE - data_to_write));
-                Some(OnDrop::new(|| {
-                    unwrap!(info.set_tx_fifo_empty_threshold(current));
-                }))
-            } else {
-                None
-            };
             UartTxFuture::new(self.uart.reborrow(), TxEvent::FiFoEmpty).await;
         }
 
@@ -1916,6 +1899,9 @@ impl UartRx<'_, Async> {
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer.
     ///
+    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// to ensure that it does not wait for more data than the buffer can hold.
+    ///
     /// Upon an error, the function returns immediately and the contents of the
     /// internal FIFO are not modified.
     ///
@@ -1927,7 +1913,7 @@ impl UartRx<'_, Async> {
             return Ok(0);
         }
 
-        if self.rx_fifo_count() == 0 {
+        while self.rx_fifo_count() == 0 {
             let current = self.uart.info().rx_fifo_full_threshold();
             let _guard = if current > buf.len() as u16 {
                 // We're ignoring the user configuration here to ensure that this is not waiting
@@ -2576,17 +2562,6 @@ impl Info {
             .modify(|_, w| unsafe { w.txfifo_empty_thrhd().bits(threshold as _) });
 
         Ok(())
-    }
-
-    /// Reads the TX-FIFO threshold
-    #[allow(clippy::useless_conversion)]
-    fn tx_fifo_empty_threshold(&self) -> u16 {
-        self.regs()
-            .conf1()
-            .read()
-            .txfifo_empty_thrhd()
-            .bits()
-            .into()
     }
 
     /// Configures the Receive Timeout detection setting
