@@ -54,7 +54,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          repository: esp-rs/esp-hal
+          repository: mabezdev/esp-hal # TODO
           ref: ${{ matrix.packages.tag }}
 
       - name: Build documentation
