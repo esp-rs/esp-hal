@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - SPI: Added support for 3-wire SPI (#2919)
 - UART: Add separate config for Rx and Tx (#2965)
+- UART: `read_exact_async` (unstable) (#3142)
 - Added accessor methods to config structs (#3011)
 - `esp_hal::time::{Rate, Duration, Instant}` (#3083)
 - Async support for ADC oneshot reads for ESP32C2, ESP32C3, ESP32C6 and ESP32H2 (#2925, #3082)

@@ -43,6 +43,7 @@
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
+use embedded_io::ReadExactError;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
@@ -1821,18 +1822,75 @@ impl Drop for UartTxFuture {
 }
 
 impl Uart<'_, Async> {
-    /// Asynchronously reads data from the UART receive buffer into the
-    /// provided buffer.
+    /// Read data asynchronously.
+    ///
+    /// This function reads data from the UART receive buffer into the
+    /// provided buffer. If the buffer is empty, the function waits
+    /// asynchronously for data to become available, or for an error to occur.
+    ///
+    /// The function returns the number of bytes read into the buffer. This may
+    /// be less than the length of the buffer.
+    ///
+    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// to ensure that it does not wait for more data than the buffer can hold.
+    ///
+    /// Upon an error, the function returns immediately and the contents of the
+    /// internal FIFO are not modified.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_async(buf).await
     }
 
-    /// Asynchronously writes data to the UART transmit buffer.
+    /// Fill buffer asynchronously.
+    ///
+    /// This function reads data from the UART receive buffer into the
+    /// provided buffer. If the buffer is empty, the function waits
+    /// asynchronously for data to become available, or for an error to occur.
+    ///
+    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// to ensure that it does not wait for more data than the buffer can hold.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is **not** cancellation safe. If the future is dropped
+    /// before it resolves, or if an error occurs during the read operation,
+    /// previously read data may be lost.
+    #[instability::unstable]
+    pub async fn read_exact_async(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
+        self.rx.read_exact_async(buf).await
+    }
+
+    /// Write data into the TX buffer.
+    ///
+    /// This function writes the provided buffer `bytes` into the UART transmit
+    /// buffer. If the buffer is full, the function waits asynchronously for
+    /// space in the buffer to become available.
+    ///
+    /// The function returns the number of bytes written into the buffer. This
+    /// may be less than the length of the buffer.
+    ///
+    /// Upon an error, the function returns immediately and the contents of the
+    /// internal FIFO are not modified.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
     pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, TxError> {
         self.tx.write_async(words).await
     }
 
     /// Asynchronously flushes the UART transmit buffer.
+    ///
+    /// This function ensures that all pending data in the transmit FIFO has
+    /// been sent over the UART. If the FIFO contains data, it waits for the
+    /// transmission to complete before returning.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
     pub async fn flush_async(&mut self) -> Result<(), TxError> {
         self.tx.flush_async().await
     }
@@ -1890,41 +1948,23 @@ impl UartTx<'_, Async> {
 }
 
 impl UartRx<'_, Async> {
-    /// Read data asynchronously.
-    ///
-    /// This function reads data from the UART receive buffer into the
-    /// provided buffer. If the buffer is empty, the function waits
-    /// asynchronously for data to become available, or for an error to occur.
-    ///
-    /// The function returns the number of bytes read into the buffer. This may
-    /// be less than the length of the buffer.
-    ///
-    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
-    /// to ensure that it does not wait for more data than the buffer can hold.
-    ///
-    /// Upon an error, the function returns immediately and the contents of the
-    /// internal FIFO are not modified.
-    ///
-    /// ## Cancellation
-    ///
-    /// This function is cancellation safe.
-    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
-        if buf.is_empty() {
-            return Ok(0);
-        }
+    async fn wait_for_buffered_data(
+        &mut self,
+        minimum: usize,
+        preferred: usize,
+    ) -> Result<(), RxError> {
+        while self.rx_fifo_count() < (minimum as u16).min(Info::RX_FIFO_MAX_THRHD) {
+            let amount = u16::try_from(preferred)
+                .unwrap_or(Info::RX_FIFO_MAX_THRHD)
+                .min(Info::RX_FIFO_MAX_THRHD);
 
-        while self.rx_fifo_count() == 0 {
             let current = self.uart.info().rx_fifo_full_threshold();
-            let _guard = if current > buf.len() as u16 {
+            let _guard = if current > amount {
                 // We're ignoring the user configuration here to ensure that this is not waiting
                 // for more data than the buffer. We'll restore the original value after the
                 // future resolved.
                 let info = self.uart.info();
-                unwrap!(info.set_rx_fifo_full_threshold(
-                    u16::try_from(buf.len())
-                        .unwrap_or(Info::RX_FIFO_MAX_THRHD)
-                        .min(Info::RX_FIFO_MAX_THRHD),
-                ));
+                unwrap!(info.set_rx_fifo_full_threshold(amount));
                 Some(OnDrop::new(|| {
                     unwrap!(info.set_rx_fifo_full_threshold(current));
                 }))
@@ -1957,7 +1997,60 @@ impl UartRx<'_, Async> {
             UartRxFuture::new(self.uart.reborrow(), events).await;
         }
 
+        Ok(())
+    }
+
+    /// Read data asynchronously.
+    ///
+    /// This function reads data from the UART receive buffer into the
+    /// provided buffer. If the buffer is empty, the function waits
+    /// asynchronously for data to become available, or for an error to occur.
+    ///
+    /// The function returns the number of bytes read into the buffer. This may
+    /// be less than the length of the buffer.
+    ///
+    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// to ensure that it does not wait for more data than the buffer can hold.
+    ///
+    /// Upon an error, the function returns immediately and the contents of the
+    /// internal FIFO are not modified.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        self.wait_for_buffered_data(1, buf.len()).await?;
+
         self.read_buffered(buf)
+    }
+
+    /// Fill buffer asynchronously.
+    ///
+    /// This function reads data from the UART receive buffer into the
+    /// provided buffer. If the buffer is empty, the function waits
+    /// asynchronously for data to become available, or for an error to occur.
+    ///
+    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// to ensure that it does not wait for more data than the buffer can hold.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is **not** cancellation safe. If the future is dropped
+    /// before it resolves, or if an error occurs during the read operation,
+    /// previously read data may be lost.
+    pub async fn read_exact_async(&mut self, mut buf: &mut [u8]) -> Result<(), RxError> {
+        while !buf.is_empty() {
+            self.wait_for_buffered_data(buf.len(), buf.len()).await?;
+
+            let read = self.read_buffered(buf)?;
+            buf = &mut buf[read..];
+        }
+
+        Ok(())
     }
 }
 
@@ -1966,12 +2059,24 @@ impl embedded_io_async::Read for Uart<'_, Async> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.read_async(buf).await.map_err(IoError::Rx)
     }
+
+    async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ReadExactError<Self::Error>> {
+        self.read_exact_async(buf)
+            .await
+            .map_err(|e| ReadExactError::Other(IoError::Rx(e)))
+    }
 }
 
 #[instability::unstable]
 impl embedded_io_async::Read for UartRx<'_, Async> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.read_async(buf).await
+    }
+
+    async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ReadExactError<Self::Error>> {
+        self.read_exact_async(buf)
+            .await
+            .map_err(ReadExactError::Other)
     }
 }
 
