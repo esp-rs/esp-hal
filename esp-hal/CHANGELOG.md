@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue setting higher UART baud rates (#3104)
 - ESP32-S2: Fixed linker script (#3096)
 - Fix auto writeback on Crypto DMA (#3108)
+- `Uart::flush()` now correctly blocks until the TX FIFO is empty (#3151)
 
 ### Removed
 
