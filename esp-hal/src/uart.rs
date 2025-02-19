@@ -880,7 +880,7 @@ where
         self.read_buffered(buf)
     }
 
-    /// Read received bytes.
+    /// Read already received bytes.
     ///
     /// This function reads the already received bytes from the FIFO into the
     /// provided buffer. The function does not wait for the FIFO to actually
@@ -1222,7 +1222,7 @@ where
         self.rx.read(buf)
     }
 
-    /// Read received bytes.
+    /// Read already received bytes.
     ///
     /// This function reads the already received bytes from the FIFO into the
     /// provided buffer. The function does not wait for the FIFO to actually
@@ -2035,9 +2035,9 @@ impl UartRx<'_, Async> {
 
     /// Fill buffer asynchronously.
     ///
-    /// This function reads data from the UART receive buffer into the
-    /// provided buffer. If the buffer is empty, the function waits
-    /// asynchronously for data to become available, or for an error to occur.
+    /// This function reads data into the provided buffer. If the internal FIFO
+    /// does not contain enough data, the function waits asynchronously for data
+    /// to become available, or for an error to occur.
     ///
     /// Note that this function may ignore the `rx_fifo_full_threshold` setting
     /// to ensure that it does not wait for more data than the buffer can hold.
