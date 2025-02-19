@@ -45,31 +45,23 @@ mod tests {
 
     #[test]
     fn test_different_tolerance(mut ctx: Context) {
-        ctx.uart
-            .apply_config(
-                &uart::Config::default()
-                    .with_baudrate(19_200)
-                    .with_baudrate_tolerance(uart::BaudrateTolerance::Exact),
-            )
-            .unwrap();
+        let configs = [
+            uart::Config::default()
+                .with_baudrate(19_200)
+                .with_baudrate_tolerance(uart::BaudrateTolerance::Exact),
+            uart::Config::default()
+                .with_baudrate(9600)
+                .with_baudrate_tolerance(uart::BaudrateTolerance::ErrorPercent(10)),
+        ];
 
-        ctx.uart.write(&[0x42]).unwrap();
-        let mut byte = [0u8; 1];
-        ctx.uart.read(&mut byte).unwrap();
-        assert_eq!(byte[0], 0x42);
+        for config in configs {
+            ctx.uart.apply_config(&config).unwrap();
 
-        ctx.uart
-            .apply_config(
-                &uart::Config::default()
-                    .with_baudrate(9600)
-                    .with_baudrate_tolerance(uart::BaudrateTolerance::ErrorPercent(10)),
-            )
-            .unwrap();
-
-        ctx.uart.write(&[0x42]).unwrap();
-        let mut byte = [0u8; 1];
-        ctx.uart.read(&mut byte).unwrap();
-        assert_eq!(byte[0], 0x42);
+            ctx.uart.write(&[0x42]).unwrap();
+            let mut byte = [0u8; 1];
+            ctx.uart.read(&mut byte).unwrap();
+            assert_eq!(byte[0], 0x42);
+        }
     }
 
     #[test]
