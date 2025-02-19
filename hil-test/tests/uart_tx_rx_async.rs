@@ -86,7 +86,8 @@ mod tests {
         }
         ctx.tx.flush_async().await.unwrap();
 
-        // supposed to panic
+        // The read is supposed to return an error because the FIFO is just 128 bytes
+        // long.
         let res = ctx.rx.read_async(&mut read).await;
         assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
     }
@@ -96,7 +97,7 @@ mod tests {
         let mut data = [0u8; 16];
 
         // We write 4 bytes, but read 16. This should return 4 bytes because the default
-        // RX timeout is not None.
+        // RX timeout is 10 symbols' worth of time.
         let (read, _) = join(ctx.rx.read_async(&mut data), async {
             ctx.tx.write_async(&[1, 2, 3, 4]).await.unwrap();
             ctx.tx.flush_async().await.unwrap();

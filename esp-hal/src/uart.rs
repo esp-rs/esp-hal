@@ -68,8 +68,6 @@ use crate::{
     DriverMode,
 };
 
-const UART_FIFO_SIZE: u16 = 128;
-
 /// UART RX Error
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -468,20 +466,10 @@ pub enum ConfigError {
     /// ).
     UnsupportedTimeout,
 
-    /// The requested RX FIFO threshold exceeds the maximum value (
-    #[cfg_attr(esp32, doc = "127")]
-    #[cfg_attr(any(esp32c6, esp32h2), doc = "255")]
-    #[cfg_attr(any(esp32c2, esp32c3, esp32s2), doc = "511")]
-    #[cfg_attr(esp32s3, doc = "1023")]
-    /// ).
+    /// The requested RX FIFO threshold exceeds the maximum value (127 bytes).
     UnsupportedRxFifoThreshold,
 
-    /// The requested TX FIFO threshold exceeds the maximum value (
-    #[cfg_attr(esp32, doc = "127")]
-    #[cfg_attr(any(esp32c6, esp32h2), doc = "255")]
-    #[cfg_attr(any(esp32c2, esp32c3, esp32s2), doc = "511")]
-    #[cfg_attr(esp32s3, doc = "1023")]
-    /// ).
+    /// The requested TX FIFO threshold exceeds the maximum value (127 bytes).
     UnsupportedTxFifoThreshold,
 }
 
@@ -612,9 +600,9 @@ where
             return Ok(0);
         }
 
-        while self.tx_fifo_count() >= UART_FIFO_SIZE {}
+        while self.tx_fifo_count() >= Info::UART_FIFO_SIZE {}
 
-        let space = ((UART_FIFO_SIZE - self.tx_fifo_count()) as usize).min(data.len());
+        let space = ((Info::UART_FIFO_SIZE - self.tx_fifo_count()) as usize).min(data.len());
         for &byte in &data[..space] {
             self.write_byte(byte)?;
         }
@@ -926,9 +914,9 @@ where
             if wr_addr > rd_addr {
                 wr_addr - rd_addr
             } else if wr_addr < rd_addr {
-                (wr_addr + UART_FIFO_SIZE) - rd_addr
+                (wr_addr + Info::UART_FIFO_SIZE) - rd_addr
             } else if fifo_cnt > 0 {
-                UART_FIFO_SIZE
+                Info::UART_FIFO_SIZE
             } else {
                 0
             }
@@ -1914,7 +1902,7 @@ impl UartTx<'_, Async> {
         // We need to loop in case the TX empty interrupt was fired but not cleared
         // before, but the FIFO itself was filled up by a previous write.
         let space = loop {
-            let space = UART_FIFO_SIZE - self.tx_fifo_count();
+            let space = Info::UART_FIFO_SIZE - self.tx_fifo_count();
             if space != 0 {
                 break space;
             }
@@ -2430,18 +2418,10 @@ pub struct State {
 }
 
 impl Info {
-    const RX_FIFO_MAX_THRHD: u16 = if cfg!(esp32) {
-        0x7F
-    } else if cfg!(any(esp32c6, esp32h2)) {
-        0xFF
-    } else if cfg!(any(esp32c2, esp32c3, esp32s2)) {
-        0x1FF
-    } else if cfg!(esp32s3) {
-        0x3FF
-    } else {
-        ::core::unreachable!()
-    };
-
+    // Currently we don't support merging adjacent FIFO memory, so the max size is
+    // 128 bytes, the max threshold is 127 bytes.
+    const UART_FIFO_SIZE: u16 = 128;
+    const RX_FIFO_MAX_THRHD: u16 = 127;
     const TX_FIFO_MAX_THRHD: u16 = Self::RX_FIFO_MAX_THRHD;
 
     /// Returns the register block for this UART instance.
