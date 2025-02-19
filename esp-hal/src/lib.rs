@@ -467,6 +467,8 @@ pub struct Config {
 /// This function sets up the CPU clock and watchdog, then, returns the
 /// peripherals and clocks.
 pub fn init(config: Config) -> Peripherals {
+    crate::soc::pre_init();
+
     system::disable_peripherals();
 
     let mut peripherals = Peripherals::take();

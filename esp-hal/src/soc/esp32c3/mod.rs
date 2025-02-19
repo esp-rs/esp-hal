@@ -63,3 +63,5 @@ pub(crate) mod constants {
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);
 }
+
+pub(crate) fn pre_init() {}
