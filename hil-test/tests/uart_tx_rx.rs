@@ -58,14 +58,7 @@ mod tests {
         ctx.tx.flush().unwrap();
         ctx.tx.write(&bytes).unwrap();
 
-        // Calls to read may not fill the buffer, wait until read returns 0
-        let mut n = 0;
-        loop {
-            match ctx.rx.read(&mut buf[n..]).unwrap() {
-                0 => break,
-                cnt => n += cnt,
-            };
-        }
+        embedded_io::Read::read_exact(&mut ctx.rx, &mut buf).unwrap();
 
         assert_eq!(buf, bytes);
     }

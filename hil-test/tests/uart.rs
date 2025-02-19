@@ -82,13 +82,7 @@ mod tests {
 
         // Calls to read may not fill the buffer, wait until read returns 0
         let mut buffer = [0; BUF_SIZE];
-        let mut n = 0;
-        loop {
-            match ctx.uart.read(&mut buffer[n..]).unwrap() {
-                0 => break,
-                cnt => n += cnt,
-            };
-        }
+        embedded_io::Read::read_exact(&mut ctx.uart, &mut buffer).unwrap();
 
         assert_eq!(data, buffer);
     }
