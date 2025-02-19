@@ -2538,18 +2538,18 @@ impl Info {
     fn enabled_tx_events(&self, events: impl Into<EnumSet<TxEvent>>) -> EnumSet<TxEvent> {
         let events = events.into();
         let interrupts_enabled = self.regs().int_ena().read();
-        let mut events_triggered = EnumSet::new();
+        let mut enabled_events = EnumSet::new();
         for event in events {
-            let event_triggered = match event {
+            let event_enabled = match event {
                 TxEvent::Done => interrupts_enabled.tx_done().bit_is_set(),
                 TxEvent::FiFoEmpty => interrupts_enabled.txfifo_empty().bit_is_set(),
             };
 
-            if event_triggered {
-                events_triggered |= event;
+            if event_enabled {
+                enabled_events |= event;
             }
         }
-        events_triggered
+        enabled_events
     }
 
     fn enable_listen_rx(&self, events: EnumSet<RxEvent>, enable: bool) {
@@ -2573,9 +2573,9 @@ impl Info {
     fn enabled_rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
         let events = events.into();
         let interrupts_enabled = self.regs().int_ena().read();
-        let mut events_triggered = EnumSet::new();
+        let mut enabled_events = EnumSet::new();
         for event in events {
-            let event_triggered = match event {
+            let event_enabled = match event {
                 RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_set(),
                 RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_set(),
 
@@ -2585,11 +2585,11 @@ impl Info {
                 RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_set(),
                 RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_set(),
             };
-            if event_triggered {
-                events_triggered |= event;
+            if event_enabled {
+                enabled_events |= event;
             }
         }
-        events_triggered
+        enabled_events
     }
 
     fn rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
