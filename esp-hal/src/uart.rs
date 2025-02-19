@@ -840,7 +840,7 @@ where
             | RxEvent::GlitchDetected
             | RxEvent::FrameError
             | RxEvent::ParityError;
-        let events = self.uart.info().rx_events(errors);
+        let events = self.uart.info().rx_events().intersection(errors);
         let result = rx_event_check_for_error(events);
         if result.is_err() {
             self.uart.info().clear_rx_events(errors);
@@ -1744,16 +1744,16 @@ impl core::future::Future for UartRxFuture {
         mut self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> core::task::Poll<Self::Output> {
-        if !self.registered {
-            self.state.rx_waker.register(cx.waker());
-            self.uart.enable_listen_rx(self.events, true);
-            self.registered = true;
-        }
-
-        let events = self.events - self.uart.enabled_rx_events(self.events);
+        let events = self.uart.rx_events().intersection(self.events);
         if !events.is_empty() {
+            self.uart.clear_rx_events(events);
             Poll::Ready(events)
         } else {
+            self.state.rx_waker.register(cx.waker());
+            if !self.registered {
+                self.uart.enable_listen_rx(self.events, true);
+                self.registered = true;
+            }
             Poll::Pending
         }
     }
@@ -1795,16 +1795,16 @@ impl core::future::Future for UartTxFuture {
         mut self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> core::task::Poll<Self::Output> {
-        if !self.registered {
-            self.state.tx_waker.register(cx.waker());
-            self.uart.enable_listen_tx(self.events, true);
-            self.registered = true;
-        }
-
-        let events = self.uart.enabled_tx_events(self.events);
-        if events != self.events {
+        let events = self.uart.tx_events().intersection(self.events);
+        if !events.is_empty() {
+            self.uart.clear_tx_events(events);
             Poll::Ready(())
         } else {
+            self.state.tx_waker.register(cx.waker());
+            if !self.registered {
+                self.uart.enable_listen_tx(self.events, true);
+                self.registered = true;
+            }
             Poll::Pending
         }
     }
@@ -2116,17 +2116,14 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
     let interrupts = uart.regs().int_st().read();
     let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
     let rx_wake = interrupts.rxfifo_full().bit_is_set()
-        || interrupts.rxfifo_ovf().bit_is_set()
-        || interrupts.rxfifo_tout().bit_is_set()
-        || interrupts.at_cmd_char_det().bit_is_set()
-        || interrupts.glitch_det().bit_is_set()
-        || interrupts.frm_err().bit_is_set()
-        || interrupts.parity_err().bit_is_set();
-    let tx_wake = interrupts.tx_done().bit_is_set() || interrupts.txfifo_empty().bit_is_set();
+        | interrupts.rxfifo_ovf().bit_is_set()
+        | interrupts.rxfifo_tout().bit_is_set()
+        | interrupts.at_cmd_char_det().bit_is_set()
+        | interrupts.glitch_det().bit_is_set()
+        | interrupts.frm_err().bit_is_set()
+        | interrupts.parity_err().bit_is_set();
+    let tx_wake = interrupts.tx_done().bit_is_set() | interrupts.txfifo_empty().bit_is_set();
 
-    uart.regs()
-        .int_clr()
-        .write(|w| unsafe { w.bits(interrupt_bits) });
     uart.regs()
         .int_ena()
         .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
@@ -2535,21 +2532,31 @@ impl Info {
         });
     }
 
-    fn enabled_tx_events(&self, events: impl Into<EnumSet<TxEvent>>) -> EnumSet<TxEvent> {
-        let events = events.into();
-        let interrupts_enabled = self.regs().int_ena().read();
-        let mut enabled_events = EnumSet::new();
-        for event in events {
-            let event_enabled = match event {
-                TxEvent::Done => interrupts_enabled.tx_done().bit_is_set(),
-                TxEvent::FiFoEmpty => interrupts_enabled.txfifo_empty().bit_is_set(),
-            };
+    fn tx_events(&self) -> EnumSet<TxEvent> {
+        let interrupts_enabled = self.regs().int_raw().read();
+        let mut active_events = EnumSet::new();
 
-            if event_enabled {
-                enabled_events |= event;
-            }
+        if interrupts_enabled.tx_done().bit_is_set() {
+            active_events |= TxEvent::Done;
         }
-        enabled_events
+        if interrupts_enabled.txfifo_empty().bit_is_set() {
+            active_events |= TxEvent::FiFoEmpty;
+        }
+
+        active_events
+    }
+
+    fn clear_tx_events(&self, events: impl Into<EnumSet<TxEvent>>) {
+        let events = events.into();
+        self.regs().int_clr().write(|w| {
+            for event in events {
+                match event {
+                    TxEvent::FiFoEmpty => w.txfifo_empty().clear_bit_by_one(),
+                    TxEvent::Done => w.tx_done().clear_bit_by_one(),
+                };
+            }
+            w
+        });
     }
 
     fn enable_listen_rx(&self, events: EnumSet<RxEvent>, enable: bool) {
@@ -2570,48 +2577,33 @@ impl Info {
         });
     }
 
-    fn enabled_rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
-        let events = events.into();
-        let interrupts_enabled = self.regs().int_ena().read();
-        let mut enabled_events = EnumSet::new();
-        for event in events {
-            let event_enabled = match event {
-                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_set(),
-                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_set(),
-
-                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_set(),
-                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_set(),
-                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_set(),
-                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_set(),
-                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_set(),
-            };
-            if event_enabled {
-                enabled_events |= event;
-            }
-        }
-        enabled_events
-    }
-
-    fn rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
-        let events = events.into();
+    fn rx_events(&self) -> EnumSet<RxEvent> {
         let interrupts_enabled = self.regs().int_raw().read();
-        let mut events_triggered = EnumSet::new();
-        for event in events {
-            let event_triggered = match event {
-                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_set(),
-                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_set(),
+        let mut active_events = EnumSet::new();
 
-                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_set(),
-                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_set(),
-                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_set(),
-                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_set(),
-                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_set(),
-            };
-            if event_triggered {
-                events_triggered |= event;
-            }
+        if interrupts_enabled.rxfifo_full().bit_is_set() {
+            active_events |= RxEvent::FifoFull;
         }
-        events_triggered
+        if interrupts_enabled.at_cmd_char_det().bit_is_set() {
+            active_events |= RxEvent::CmdCharDetected;
+        }
+        if interrupts_enabled.rxfifo_ovf().bit_is_set() {
+            active_events |= RxEvent::FifoOvf;
+        }
+        if interrupts_enabled.rxfifo_tout().bit_is_set() {
+            active_events |= RxEvent::FifoTout;
+        }
+        if interrupts_enabled.glitch_det().bit_is_set() {
+            active_events |= RxEvent::GlitchDetected;
+        }
+        if interrupts_enabled.frm_err().bit_is_set() {
+            active_events |= RxEvent::FrameError;
+        }
+        if interrupts_enabled.parity_err().bit_is_set() {
+            active_events |= RxEvent::ParityError;
+        }
+
+        active_events
     }
 
     fn clear_rx_events(&self, events: impl Into<EnumSet<RxEvent>>) {
