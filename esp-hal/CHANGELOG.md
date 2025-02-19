@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
 
+- ESP32-H2/ESP32-C6: Don't rely on the bootloader to deconfigure permission control (#3150)
+
 ### Fixed
 
 - `DmaDescriptor` is now `#[repr(C)]` (#2988)
