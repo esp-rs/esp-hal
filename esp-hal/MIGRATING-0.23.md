@@ -117,6 +117,9 @@ The `_bytes` postfix of driver methods that take a byte slice have been removed.
 + uart0.write(b"Hello world!")?;
 ```
 
+The `peripherals::Interrupts` enum is no longer available. Users (mostly third party driver
+developers) will need to use the PAC crates directly.
+
 ## UART changes
 
 Uart `write` is now blocking and return the number of bytes written. `read` will block until it fills at least one byte into the buffer with received bytes, use `read_buffered_bytes` to read the available bytes without blocking.

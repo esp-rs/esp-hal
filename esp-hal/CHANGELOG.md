@@ -72,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The fields of config structs are no longer public (#3011)
 - Removed the dysfunctional `DmaChannel::set_priority` function (#3088)
 - `esp_hal::time::now()`, which has been replaced by `esp_hal::time::Instant::now()` (#3083)
+- `peripherals::Interrupts` (#3152)
 
 ## [0.23.1] - 2025-01-15
 
