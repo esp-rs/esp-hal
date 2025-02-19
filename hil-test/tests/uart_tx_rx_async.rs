@@ -66,6 +66,16 @@ mod tests {
     }
 
     #[test]
+    async fn write_async_does_not_return_0(mut ctx: Context) {
+        let bytes = [0; 200];
+
+        for i in 0..50 {
+            let written = ctx.tx.write_async(&bytes).await.unwrap();
+            assert_ne!(written, 0, "Iteration {}", i);
+        }
+    }
+
+    #[test]
     async fn rx_overflow_is_detected(mut ctx: Context) {
         let mut to_send: &[u8] = &[0; 250];
         let mut read = [0u8; 1];

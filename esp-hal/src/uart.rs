@@ -1911,14 +1911,17 @@ impl UartTx<'_, Async> {
     ///
     /// This function is cancellation safe.
     pub async fn write_async(&mut self, bytes: &[u8]) -> Result<usize, TxError> {
-        let mut current_space = UART_FIFO_SIZE - self.tx_fifo_count();
-        if current_space == 0 {
+        // We need to loop in case the TX empty interrupt was fired but not cleared
+        // before, but the FIFO itself was filled up by a previous write.
+        let space = loop {
+            let space = UART_FIFO_SIZE - self.tx_fifo_count();
+            if space != 0 {
+                break space;
+            }
             UartTxFuture::new(self.uart.reborrow(), TxEvent::FiFoEmpty).await;
-            // Recalculate available space
-            current_space = UART_FIFO_SIZE - self.tx_fifo_count();
-        }
+        };
 
-        let free = (current_space as usize).min(bytes.len());
+        let free = (space as usize).min(bytes.len());
 
         for &byte in &bytes[..free] {
             self.regs()
