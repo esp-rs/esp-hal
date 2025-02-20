@@ -58,6 +58,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     // emit config
+
+    // supply build time and date
+    // see https://reproducible-builds.org/docs/source-date-epoch/
+    let ts = match std::env::var("SOURCE_DATE_EPOCH") {
+        Ok(val) => {
+            use chrono::TimeZone;
+            chrono::Utc
+                .timestamp_opt(val.parse::<i64>().unwrap(), 0)
+                .unwrap()
+        }
+        Err(_) => chrono::Utc::now(),
+    };
+
+    let build_time_default = ts.format("%H:%M:%S").to_string();
+    let build_date_default = ts.format("%Y-%m-%d").to_string();
+
     let cfg = generate_config("esp_hal", &[
         (
             "place-spi-driver-in-ram",
@@ -132,13 +148,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         (
             "build-time",
             "Build time",
-            Value::String(String::from("00:00:00")),
+            Value::String(String::from(build_time_default)),
             None
         ),
         (
             "build-date",
             "Build date",
-            Value::String(String::from("1970-01-01")),
+            Value::String(String::from(build_date_default)),
             None
         ),
         (
