@@ -43,6 +43,8 @@
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
+#[cfg(feature = "unstable")]
+use embedded_io::ReadExactError;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
@@ -65,9 +67,6 @@ use crate::{
     Blocking,
     DriverMode,
 };
-
-const UART_FIFO_SIZE: u16 = 128;
-const CMD_CHAR_DEFAULT: u8 = 0x2b;
 
 /// UART RX Error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -160,11 +159,6 @@ pub enum ClockSource {
     #[cfg(any(esp32, esp32s2))]
     RefTick,
 }
-
-// see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L61>
-const UART_FULL_THRESH_DEFAULT: u16 = 120;
-// see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L63>
-const UART_TOUT_THRESH_DEFAULT: u8 = 10;
 
 /// Number of data bits
 ///
@@ -298,7 +292,6 @@ impl Config {
 #[non_exhaustive]
 pub struct RxConfig {
     /// Threshold level at which the RX FIFO is considered full.
-    #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
     fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
     timeout: Option<u8>,
@@ -307,17 +300,31 @@ pub struct RxConfig {
 impl Default for RxConfig {
     fn default() -> RxConfig {
         RxConfig {
-            fifo_full_threshold: UART_FULL_THRESH_DEFAULT,
-            timeout: Some(UART_TOUT_THRESH_DEFAULT),
+            // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L61>
+            fifo_full_threshold: 120,
+            // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L63>
+            timeout: Some(10),
         }
     }
 }
 
 /// UART Transmit part configuration.
-#[derive(Debug, Clone, Copy, Default, procmacros::BuilderLite)]
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct TxConfig {}
+pub struct TxConfig {
+    /// Threshold level at which the TX FIFO is considered empty.
+    fifo_empty_threshold: u16,
+}
+
+impl Default for TxConfig {
+    fn default() -> TxConfig {
+        TxConfig {
+            // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L59>
+            fifo_empty_threshold: 10,
+        }
+    }
+}
 
 /// Configuration for the AT-CMD detection functionality
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
@@ -346,7 +353,7 @@ impl Default for AtCmdConfig {
             pre_idle_count: None,
             post_idle_count: None,
             gap_timeout: None,
-            cmd_char: CMD_CHAR_DEFAULT,
+            cmd_char: b'+',
             char_num: 1,
         }
     }
@@ -443,6 +450,7 @@ pub enum ConfigError {
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     UnachievableBaudrate,
+
     /// The requested baud rate is not supported.
     ///
     /// This error is returned if:
@@ -451,18 +459,18 @@ pub enum ConfigError {
     ///    deviation to the desired value, and the driver cannot reach this
     ///    speed.
     UnsupportedBaudrate,
+
     /// The requested  timeout exceeds the maximum value (
     #[cfg_attr(esp32, doc = "127")]
     #[cfg_attr(not(esp32), doc = "1023")]
     /// ).
     UnsupportedTimeout,
-    /// The requested RX FIFO threshold exceeds the maximum value (
-    #[cfg_attr(esp32, doc = "127")]
-    #[cfg_attr(any(esp32c6, esp32h2), doc = "255")]
-    #[cfg_attr(any(esp32c2, esp32c3, esp32s2), doc = "511")]
-    #[cfg_attr(esp32s3, doc = "1023")]
-    /// ).
+
+    /// The requested RX FIFO threshold exceeds the maximum value (127 bytes).
     UnsupportedRxFifoThreshold,
+
+    /// The requested TX FIFO threshold exceeds the maximum value (127 bytes).
+    UnsupportedTxFifoThreshold,
 }
 
 impl core::error::Error for ConfigError {}
@@ -480,6 +488,9 @@ impl core::fmt::Display for ConfigError {
             ConfigError::UnsupportedTimeout => write!(f, "The requested timeout is not supported"),
             ConfigError::UnsupportedRxFifoThreshold => {
                 write!(f, "The requested RX FIFO threshold is not supported")
+            }
+            ConfigError::UnsupportedTxFifoThreshold => {
+                write!(f, "The requested TX FIFO threshold is not supported")
             }
         }
     }
@@ -557,29 +568,49 @@ where
 
     /// Change the configuration.
     ///
+    /// ## Errors
+    ///
     /// This function returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     #[instability::unstable]
-    pub fn apply_config(&mut self, _config: &Config) -> Result<(), ConfigError> {
-        // Nothing to do so far.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.uart
+            .info()
+            .set_tx_fifo_empty_threshold(config.tx.fifo_empty_threshold)?;
         self.uart.info().txfifo_reset();
         Ok(())
     }
 
-    /// Writes bytes
+    /// Write bytes.
+    ///
+    /// This function writes data to the internal TX FIFO of the UART
+    /// peripheral. The data is then transmitted over the UART TX line.
+    ///
+    /// The function returns the number of bytes written to the FIFO. This may
+    /// be less than the length of the provided data. The function may only
+    /// return 0 if the provided data is empty.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns a [`TxError`] if an error occurred during the
+    /// write operation.
     #[instability::unstable]
     pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
-        let count = data.len();
+        if data.is_empty() {
+            return Ok(0);
+        }
 
-        for &byte in data {
+        while self.tx_fifo_count() >= Info::UART_FIFO_SIZE {}
+
+        let space = ((Info::UART_FIFO_SIZE - self.tx_fifo_count()) as usize).min(data.len());
+        for &byte in &data[..space] {
             self.write_byte(byte)?;
         }
 
-        Ok(count)
+        Ok(space)
     }
 
     fn write_byte(&mut self, word: u8) -> Result<(), TxError> {
-        while self.tx_fifo_count() >= UART_FIFO_SIZE {}
         self.regs()
             .fifo()
             .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
@@ -594,7 +625,10 @@ where
         self.regs().status().read().txfifo_cnt().bits().into()
     }
 
-    /// Flush the transmit buffer of the UART
+    /// Flush the transmit buffer.
+    ///
+    /// This function blocks until all data in the TX FIFO has been
+    /// transmitted.
     #[instability::unstable]
     pub fn flush(&mut self) -> Result<(), TxError> {
         while !self.is_tx_idle() {}
@@ -642,6 +676,14 @@ where
 
 impl<'d> UartTx<'d, Blocking> {
     /// Create a new UART TX instance in [`Blocking`] mode.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns a [`ConfigError`] if the configuration is not
+    /// supported by the hardware.
+    ///
+    /// ## Example
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, UartTx};
@@ -761,7 +803,7 @@ where
 
     /// Change the configuration.
     ///
-    /// # Errors
+    /// ## Errors
     ///
     /// This function returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
@@ -778,7 +820,7 @@ where
         Ok(())
     }
 
-    /// Reads and clears errors.
+    /// Reads and clears errors set by received data.
     #[instability::unstable]
     pub fn check_for_errors(&mut self) -> Result<(), RxError> {
         let errors = RxEvent::FifoOvf
@@ -786,7 +828,7 @@ where
             | RxEvent::GlitchDetected
             | RxEvent::FrameError
             | RxEvent::ParityError;
-        let events = self.uart.info().rx_events(errors);
+        let events = self.uart.info().rx_events().intersection(errors);
         let result = rx_event_check_for_error(events);
         if result.is_err() {
             self.uart.info().clear_rx_events(errors);
@@ -794,37 +836,24 @@ where
         result
     }
 
-    // Read a byte from the UART
-    fn read_byte(&mut self) -> Option<u8> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
-                let fifo = unsafe {
-                    &*((self.regs().fifo().as_ptr() as *mut u8).add(0x20C00000)
-                        as *mut crate::pac::uart0::FIFO)
-                };
-            } else {
-                let fifo = self.regs().fifo();
-            }
-        }
-
-        if self.rx_fifo_count() > 0 {
-            // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    let byte = crate::interrupt::free(|| fifo.read().rxfifo_rd_byte().bits());
-                } else {
-                    let byte = fifo.read().rxfifo_rd_byte().bits();
-                }
-            }
-
-            Some(byte)
-        } else {
-            None
-        }
-    }
-
-    /// Reads bytes from the UART and returns the amount of bytes read.
+    /// Read bytes.
+    ///
+    /// The UART hardware continuously receives bytes and stores them in the RX
+    /// FIFO. This function reads the bytes from the RX FIFO and returns
+    /// them in the provided buffer, without blocking.
+    ///
+    /// The function returns the number of bytes read into the buffer. This may
+    /// be less than the length of the buffer. This function only returns 0
+    /// if the provided buffer is empty.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns an [`RxError`] if an error occurred since the last
+    /// call to [`Self::check_for_errors`], [`Self::read_buffered`], or this
+    /// function.
+    ///
+    /// If the error occurred before this function was called, the contents of
+    /// the FIFO are not modified.
     #[instability::unstable]
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         if buf.is_empty() {
@@ -833,48 +862,41 @@ where
 
         while self.rx_fifo_count() == 0 {
             // Block until we received at least one byte
+            self.check_for_errors()?;
         }
 
-        self.read_buffered_bytes(buf)
+        self.read_buffered(buf)
     }
 
-    /// Read all available bytes from the RX FIFO into the provided buffer and
-    /// returns the number of read bytes without blocking.
+    /// Read already received bytes.
+    ///
+    /// This function reads the already received bytes from the FIFO into the
+    /// provided buffer. The function does not wait for the FIFO to actually
+    /// contain any bytes.
+    ///
+    /// The function returns the number of bytes read into the buffer. This may
+    /// be less than the length of the buffer, and it may also be 0.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns an [`RxError`] if an error occurred since the last
+    /// call to [`Self::check_for_errors`], [`Self::read`], or this
+    /// function.
+    ///
+    /// If the error occurred before this function was called, the contents of
+    /// the FIFO are not modified.
     #[instability::unstable]
-    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
-        let mut count = 0;
-        while count < buf.len() {
-            if let Some(byte) = self.read_byte() {
-                buf[count] = byte;
-                count += 1;
-            } else {
-                break;
-            }
-        }
-        if let Err(err) = self.check_for_errors() {
-            // Drain the buffer. We don't know where the error occurred, so returning
-            // these bytes would be incorrect. We also don't know if the number of buffered
-            // bytes fit into the buffer.
-            // TODO: make this behaviour configurable using UART_ERR_WR_MASK. If the user
-            // wants to keep the bytes regardless of errors, they should be able to do so.
-            while self.read_byte().is_some() {}
-            return Err(err);
-        }
-        Ok(count)
-    }
+    pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
+        // Get the count first, to avoid accidentally reading a corrupted byte received
+        // after the error check.
+        let to_read = (self.rx_fifo_count() as usize).min(buf.len());
+        self.check_for_errors()?;
 
-    /// Read bytes from the RX FIFO without checking for errors.
-    fn flush_buffer(&mut self, buf: &mut [u8]) -> usize {
-        let mut count = 0;
-        while count < buf.len() {
-            if let Some(byte) = self.read_byte() {
-                buf[count] = byte;
-                count += 1;
-            } else {
-                break;
-            }
+        for byte_into in buf[..to_read].iter_mut() {
+            *byte_into = self.uart.info().read_next_from_fifo();
         }
-        count
+
+        Ok(to_read)
     }
 
     #[allow(clippy::useless_conversion)]
@@ -882,8 +904,7 @@ where
         let fifo_cnt: u16 = self.regs().status().read().rxfifo_cnt().bits().into();
 
         // Calculate the real count based on the FIFO read and write offset address:
-        // https://www.espressif.com/sites/default/files/documentation/esp32_errata_en.pdf
-        // section 3.17
+        // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/uart-fifo-cnt-indicates-data-length-incorrectly.html
         #[cfg(esp32)]
         {
             let status = self.regs().mem_rx_status().read();
@@ -893,9 +914,9 @@ where
             if wr_addr > rd_addr {
                 wr_addr - rd_addr
             } else if wr_addr < rd_addr {
-                (wr_addr + UART_FIFO_SIZE) - rd_addr
+                (wr_addr + Info::UART_FIFO_SIZE) - rd_addr
             } else if fifo_cnt > 0 {
-                UART_FIFO_SIZE
+                Info::UART_FIFO_SIZE
             } else {
                 0
             }
@@ -929,6 +950,12 @@ where
 
 impl<'d> UartRx<'d, Blocking> {
     /// Create a new UART RX instance in [`Blocking`] mode.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns a [`ConfigError`] if the configuration is not
+    /// supported by the hardware.
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, UartRx};
@@ -989,6 +1016,14 @@ impl<'d> UartRx<'d, Async> {
 
 impl<'d> Uart<'d, Blocking> {
     /// Create a new UART instance in [`Blocking`] mode.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns a [`ConfigError`] if the configuration is not
+    /// supported by the hardware.
+    ///
+    /// ## Example
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
@@ -1000,10 +1035,6 @@ impl<'d> Uart<'d, Blocking> {
     /// # Ok(())
     /// # }
     /// ```
-    /// 
-    /// # Errors
-    ///
-    /// See [`Uart::apply_config`].
     pub fn new(
         uart: impl Peripheral<P = impl Instance> + 'd,
         config: Config,
@@ -1095,7 +1126,9 @@ where
     ///
     /// This is particularly useful when having two tasks correlating to
     /// transmitting and receiving.
+    ///
     /// ## Example
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
@@ -1119,7 +1152,22 @@ where
         (self.rx, self.tx)
     }
 
-    /// Write bytes out over the UART
+    /// Writes bytes.
+    ///
+    /// This function writes data to the internal TX FIFO of the UART
+    /// peripheral. The data is then transmitted over the UART TX line.
+    ///
+    /// The function returns the number of bytes written to the FIFO. This may
+    /// be less than the length of the provided data. The function may only
+    /// return 0 if the provided data is empty.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns a [`TxError`] if an error occurred during the
+    /// write operation.
+    ///
+    /// ## Example
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
@@ -1141,16 +1189,46 @@ where
         self.rx.check_for_errors()
     }
 
-    /// Reads bytes from the UART and returns the amount of bytes read.
+    /// Read received bytes.
+    ///
+    /// The UART hardware continuously receives bytes and stores them in the RX
+    /// FIFO. This function reads the bytes from the RX FIFO and returns
+    /// them in the provided buffer, without blocking.
+    ///
+    /// The function returns the number of bytes read into the buffer. This may
+    /// be less than the length of the buffer. This function only returns 0
+    /// if the provided buffer is empty.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns an [`RxError`] if an error occurred since the last
+    /// check for errors.
+    ///
+    /// If the error occurred before this function was called, the contents of
+    /// the FIFO are not modified.
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read(buf)
     }
 
-    /// Read all available bytes from the RX FIFO into the provided buffer and
-    /// returns the number of read bytes without blocking.
+    /// Read already received bytes.
+    ///
+    /// This function reads the already received bytes from the FIFO into the
+    /// provided buffer. The function does not wait for the FIFO to actually
+    /// contain any bytes.
+    ///
+    /// The function returns the number of bytes read into the buffer. This may
+    /// be less than the length of the buffer, and it may also be 0.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns an [`RxError`] if an error occurred since the last
+    /// check for errors.
+    ///
+    /// If the error occurred before this function was called, the contents of
+    /// the FIFO are not modified.
     #[instability::unstable]
-    pub fn read_buffered_bytes(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
-        self.rx.read_buffered_bytes(buf)
+    pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
+        self.rx.read_buffered(buf)
     }
 
     /// Configures the AT-CMD detection settings
@@ -1197,7 +1275,7 @@ where
 
     /// Change the configuration.
     ///
-    /// # Errors
+    /// ## Errors
     ///
     /// This function returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
@@ -1322,9 +1400,11 @@ impl Uart<'_, Blocking> {
 
     /// Listen for the given interrupts
     ///
-    /// ### Example
+    /// ## Example
+    ///
     /// **Note**: In practice a proper serial terminal should be used
     /// to connect to the board (espflash won't work)
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::delay::Delay;
@@ -1365,7 +1445,7 @@ impl Uart<'_, Blocking> {
     ///         let mut serial = SERIAL.borrow_ref_mut(cs);
     ///         if let Some(serial) = serial.as_mut() {
     ///             let mut buf = [0u8; 64];
-    ///             if let Ok(cnt) = serial.read_buffered_bytes(&mut buf) {
+    ///             if let Ok(cnt) = serial.read_buffered(&mut buf) {
     ///                 println!("Read {} bytes", cnt);
     ///             }
     ///
@@ -1652,15 +1732,16 @@ impl core::future::Future for UartRxFuture {
         mut self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> core::task::Poll<Self::Output> {
-        if !self.registered {
-            self.state.rx_waker.register(cx.waker());
-            self.uart.enable_listen_rx(self.events, true);
-            self.registered = true;
-        }
-        let events = self.uart.enabled_rx_events(self.events);
+        let events = self.uart.rx_events().intersection(self.events);
         if !events.is_empty() {
+            self.uart.clear_rx_events(events);
             Poll::Ready(events)
         } else {
+            self.state.rx_waker.register(cx.waker());
+            if !self.registered {
+                self.uart.enable_listen_rx(self.events, true);
+                self.registered = true;
+            }
             Poll::Pending
         }
     }
@@ -1693,30 +1774,6 @@ impl UartTxFuture {
             registered: false,
         }
     }
-
-    fn triggered_events(&self) -> bool {
-        let interrupts_enabled = self.uart.regs().int_ena().read();
-        let mut event_triggered = false;
-        for event in self.events {
-            event_triggered |= match event {
-                TxEvent::Done => interrupts_enabled.tx_done().bit_is_clear(),
-                TxEvent::FiFoEmpty => interrupts_enabled.txfifo_empty().bit_is_clear(),
-            }
-        }
-        event_triggered
-    }
-
-    fn enable_listen(&self, enable: bool) {
-        self.uart.regs().int_ena().modify(|_, w| {
-            for event in self.events {
-                match event {
-                    TxEvent::Done => w.tx_done().bit(enable),
-                    TxEvent::FiFoEmpty => w.txfifo_empty().bit(enable),
-                };
-            }
-            w
-        });
-    }
 }
 
 impl core::future::Future for UartTxFuture {
@@ -1726,15 +1783,16 @@ impl core::future::Future for UartTxFuture {
         mut self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> core::task::Poll<Self::Output> {
-        if !self.registered {
-            self.state.tx_waker.register(cx.waker());
-            self.enable_listen(true);
-            self.registered = true;
-        }
-
-        if self.triggered_events() {
+        let events = self.uart.tx_events().intersection(self.events);
+        if !events.is_empty() {
+            self.uart.clear_tx_events(events);
             Poll::Ready(())
         } else {
+            self.state.tx_waker.register(cx.waker());
+            if !self.registered {
+                self.uart.enable_listen_tx(self.events, true);
+                self.registered = true;
+            }
             Poll::Pending
         }
     }
@@ -1745,68 +1803,134 @@ impl Drop for UartTxFuture {
         // Although the isr disables the interrupt that occurred directly, we need to
         // disable the other interrupts (= the ones that did not occur), as
         // soon as this future goes out of scope.
-        self.enable_listen(false);
+        self.uart.enable_listen_tx(self.events, false);
     }
 }
 
 impl Uart<'_, Async> {
-    /// Asynchronously reads data from the UART receive buffer into the
-    /// provided buffer.
+    /// Read data asynchronously.
+    ///
+    /// This function reads data from the UART receive buffer into the
+    /// provided buffer. If the buffer is empty, the function waits
+    /// asynchronously for data to become available, or for an error to occur.
+    ///
+    /// The function returns the number of bytes read into the buffer. This may
+    /// be less than the length of the buffer.
+    ///
+    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// to ensure that it does not wait for more data than the buffer can hold.
+    ///
+    /// Upon an error, the function returns immediately and the contents of the
+    /// internal FIFO are not modified.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_async(buf).await
     }
 
-    /// Asynchronously writes data to the UART transmit buffer.
+    /// Fill buffer asynchronously.
+    ///
+    /// This function reads data from the UART receive buffer into the
+    /// provided buffer. If the buffer is empty, the function waits
+    /// asynchronously for data to become available, or for an error to occur.
+    ///
+    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// to ensure that it does not wait for more data than the buffer can hold.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is **not** cancellation safe. If the future is dropped
+    /// before it resolves, or if an error occurs during the read operation,
+    /// previously read data may be lost.
+    #[instability::unstable]
+    pub async fn read_exact_async(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
+        self.rx.read_exact_async(buf).await
+    }
+
+    /// Write data into the TX buffer.
+    ///
+    /// This function writes the provided buffer `bytes` into the UART transmit
+    /// buffer. If the buffer is full, the function waits asynchronously for
+    /// space in the buffer to become available.
+    ///
+    /// The function returns the number of bytes written into the buffer. This
+    /// may be less than the length of the buffer.
+    ///
+    /// Upon an error, the function returns immediately and the contents of the
+    /// internal FIFO are not modified.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
     pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, TxError> {
         self.tx.write_async(words).await
     }
 
     /// Asynchronously flushes the UART transmit buffer.
+    ///
+    /// This function ensures that all pending data in the transmit FIFO has
+    /// been sent over the UART. If the FIFO contains data, it waits for the
+    /// transmission to complete before returning.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
     pub async fn flush_async(&mut self) -> Result<(), TxError> {
         self.tx.flush_async().await
     }
 }
 
 impl UartTx<'_, Async> {
-    /// Asynchronously writes data to the UART transmit buffer in chunks.
+    /// Write data into the TX buffer.
     ///
-    /// This function sends the contents of the provided buffer `words` over
-    /// the UART. Data is written in chunks to avoid overflowing the
-    /// transmit FIFO, and the function waits asynchronously when
-    /// necessary for space in the buffer to become available.
-    pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, TxError> {
-        let mut count = 0;
-        let mut offset: usize = 0;
-        loop {
-            let mut next_offset = offset + (UART_FIFO_SIZE - self.tx_fifo_count()) as usize;
-            if next_offset > words.len() {
-                next_offset = words.len();
+    /// This function writes the provided buffer `bytes` into the UART transmit
+    /// buffer. If the buffer is full, the function waits asynchronously for
+    /// space in the buffer to become available.
+    ///
+    /// The function returns the number of bytes written into the buffer. This
+    /// may be less than the length of the buffer.
+    ///
+    /// Upon an error, the function returns immediately and the contents of the
+    /// internal FIFO are not modified.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
+    pub async fn write_async(&mut self, bytes: &[u8]) -> Result<usize, TxError> {
+        // We need to loop in case the TX empty interrupt was fired but not cleared
+        // before, but the FIFO itself was filled up by a previous write.
+        let space = loop {
+            let space = Info::UART_FIFO_SIZE - self.tx_fifo_count();
+            if space != 0 {
+                break space;
             }
-
-            for byte in &words[offset..next_offset] {
-                self.write_byte(*byte)?;
-                count += 1;
-            }
-
-            if next_offset >= words.len() {
-                break;
-            }
-
-            offset = next_offset;
             UartTxFuture::new(self.uart.reborrow(), TxEvent::FiFoEmpty).await;
+        };
+
+        let free = (space as usize).min(bytes.len());
+
+        for &byte in &bytes[..free] {
+            self.regs()
+                .fifo()
+                .write(|w| unsafe { w.rxfifo_rd_byte().bits(byte) });
         }
 
-        Ok(count)
+        Ok(free)
     }
 
     /// Asynchronously flushes the UART transmit buffer.
     ///
     /// This function ensures that all pending data in the transmit FIFO has
-    /// been sent over the UART. If the FIFO contains data, it waits
-    /// for the transmission to complete before returning.
+    /// been sent over the UART. If the FIFO contains data, it waits for the
+    /// transmission to complete before returning.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
     pub async fn flush_async(&mut self) -> Result<(), TxError> {
-        let count = self.tx_fifo_count();
-        if count > 0 {
+        if self.tx_fifo_count() > 0 {
             UartTxFuture::new(self.uart.reborrow(), TxEvent::Done).await;
         }
 
@@ -1815,32 +1939,32 @@ impl UartTx<'_, Async> {
 }
 
 impl UartRx<'_, Async> {
-    /// Read async to buffer slice `buf`.
-    /// Waits until at least one byte is in the Rx FiFo
-    /// and one of the following interrupts occurs:
-    /// - `RXFIFO_FULL`
-    /// - `RXFIFO_OVF`
-    /// - `AT_CMD_CHAR_DET` (only if `set_at_cmd` was called)
-    /// - `RXFIFO_TOUT` (only if `set_rx_timeout` was called)
-    ///
-    /// The interrupts in question are enabled during the body of this
-    /// function. The method immediately returns when the interrupt
-    /// has already occurred before calling this method (e.g. status
-    /// bit set, but interrupt not enabled)
-    ///
-    /// # Params
-    /// - `buf` buffer slice to write the bytes into
-    ///
-    ///
-    /// # Ok
-    /// When successful, returns the number of bytes written to buf.
-    /// If the passed in buffer is of length 0, Ok(0) is returned.
-    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
-        if buf.is_empty() {
-            return Ok(0);
-        }
+    async fn wait_for_buffered_data(
+        &mut self,
+        minimum: usize,
+        preferred: usize,
+        listen_for_timeout: bool,
+    ) -> Result<(), RxError> {
+        while self.rx_fifo_count() < (minimum as u16).min(Info::RX_FIFO_MAX_THRHD) {
+            let amount = u16::try_from(preferred)
+                .unwrap_or(Info::RX_FIFO_MAX_THRHD)
+                .min(Info::RX_FIFO_MAX_THRHD);
 
-        loop {
+            let current = self.uart.info().rx_fifo_full_threshold();
+            let _guard = if current > amount {
+                // We're ignoring the user configuration here to ensure that this is not waiting
+                // for more data than the buffer. We'll restore the original value after the
+                // future resolved.
+                let info = self.uart.info();
+                unwrap!(info.set_rx_fifo_full_threshold(amount));
+                Some(OnDrop::new(|| {
+                    unwrap!(info.set_rx_fifo_full_threshold(current));
+                }))
+            } else {
+                None
+            };
+
+            // Wait for space or event
             let mut events = RxEvent::FifoFull
                 | RxEvent::FifoOvf
                 | RxEvent::FrameError
@@ -1858,47 +1982,98 @@ impl UartRx<'_, Async> {
                     let reg_en = self.regs().conf1();
                 }
             };
-            if reg_en.read().rx_tout_en().bit_is_set() {
+            if listen_for_timeout && reg_en.read().rx_tout_en().bit_is_set() {
                 events |= RxEvent::FifoTout;
             }
 
-            let events_happened = UartRxFuture::new(self.uart.reborrow(), events).await;
-            // always drain the fifo, if an error has occurred the data is lost
-            let read = self.flush_buffer(buf);
-            // check error events
-            rx_event_check_for_error(events_happened)?;
-            // Unfortunately, the uart's rx-timeout counter counts up whenever there is
-            // data in the fifo, even if the interrupt is disabled and the status bit
-            // cleared. Since we do not drain the fifo in the interrupt handler, we need to
-            // reset the counter here, after draining the fifo.
-            self.regs()
-                .int_clr()
-                .write(|w| w.rxfifo_tout().clear_bit_by_one());
-
-            if read > 0 {
-                return Ok(read);
-            }
+            let event = UartRxFuture::new(self.uart.reborrow(), events).await;
+            rx_event_check_for_error(event)?;
         }
+
+        Ok(())
+    }
+
+    /// Read data asynchronously.
+    ///
+    /// This function reads data from the UART receive buffer into the
+    /// provided buffer. If the buffer is empty, the function waits
+    /// asynchronously for data to become available, or for an error to occur.
+    ///
+    /// The function returns the number of bytes read into the buffer. This may
+    /// be less than the length of the buffer.
+    ///
+    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// to ensure that it does not wait for more data than the buffer can hold.
+    ///
+    /// Upon an error, the function returns immediately and the contents of the
+    /// internal FIFO are not modified.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
+    pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        self.wait_for_buffered_data(1, buf.len(), true).await?;
+
+        self.read_buffered(buf)
+    }
+
+    /// Fill buffer asynchronously.
+    ///
+    /// This function reads data into the provided buffer. If the internal FIFO
+    /// does not contain enough data, the function waits asynchronously for data
+    /// to become available, or for an error to occur.
+    ///
+    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// to ensure that it does not wait for more data than the buffer can hold.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is **not** cancellation safe. If the future is dropped
+    /// before it resolves, or if an error occurs during the read operation,
+    /// previously read data may be lost.
+    pub async fn read_exact_async(&mut self, mut buf: &mut [u8]) -> Result<(), RxError> {
+        while !buf.is_empty() {
+            // No point in listening for timeouts, as we're waiting for an exact amount of
+            // data. On ESP32 and S2, the timeout interrupt can't be cleared unless the FIFO
+            // is empty, so listening could cause an infinite loop here.
+            self.wait_for_buffered_data(buf.len(), buf.len(), false)
+                .await?;
+
+            let read = self.read_buffered(buf)?;
+            buf = &mut buf[read..];
+        }
+
+        Ok(())
     }
 }
 
 #[instability::unstable]
 impl embedded_io_async::Read for Uart<'_, Async> {
-    /// In contrast to the documentation of embedded_io_async::Read, this
-    /// method blocks until an uart interrupt occurs.
-    /// See UartRx::read_async for more details.
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.read_async(buf).await.map_err(IoError::Rx)
+    }
+
+    async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ReadExactError<Self::Error>> {
+        self.read_exact_async(buf)
+            .await
+            .map_err(|e| ReadExactError::Other(IoError::Rx(e)))
     }
 }
 
 #[instability::unstable]
 impl embedded_io_async::Read for UartRx<'_, Async> {
-    /// In contrast to the documentation of embedded_io_async::Read, this
-    /// method blocks until an uart interrupt occurs.
-    /// See UartRx::read_async for more details.
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.read_async(buf).await
+    }
+
+    async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ReadExactError<Self::Error>> {
+        self.read_exact_async(buf)
+            .await
+            .map_err(ReadExactError::Other)
     }
 }
 
@@ -1932,16 +2107,14 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
     let interrupts = uart.regs().int_st().read();
     let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
     let rx_wake = interrupts.rxfifo_full().bit_is_set()
-        || interrupts.rxfifo_ovf().bit_is_set()
-        || interrupts.rxfifo_tout().bit_is_set()
-        || interrupts.at_cmd_char_det().bit_is_set()
-        || interrupts.glitch_det().bit_is_set()
-        || interrupts.frm_err().bit_is_set()
-        || interrupts.parity_err().bit_is_set();
-    let tx_wake = interrupts.tx_done().bit_is_set() || interrupts.txfifo_empty().bit_is_set();
-    uart.regs()
-        .int_clr()
-        .write(|w| unsafe { w.bits(interrupt_bits) });
+        | interrupts.rxfifo_ovf().bit_is_set()
+        | interrupts.rxfifo_tout().bit_is_set()
+        | interrupts.at_cmd_char_det().bit_is_set()
+        | interrupts.glitch_det().bit_is_set()
+        | interrupts.frm_err().bit_is_set()
+        | interrupts.parity_err().bit_is_set();
+    let tx_wake = interrupts.tx_done().bit_is_set() | interrupts.txfifo_empty().bit_is_set();
+
     uart.regs()
         .int_ena()
         .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
@@ -2245,6 +2418,12 @@ pub struct State {
 }
 
 impl Info {
+    // Currently we don't support merging adjacent FIFO memory, so the max size is
+    // 128 bytes, the max threshold is 127 bytes.
+    const UART_FIFO_SIZE: u16 = 128;
+    const RX_FIFO_MAX_THRHD: u16 = 127;
+    const TX_FIFO_MAX_THRHD: u16 = Self::RX_FIFO_MAX_THRHD;
+
     /// Returns the register block for this UART instance.
     pub fn regs(&self) -> &RegisterBlock {
         unsafe { &*self.register_block }
@@ -2324,6 +2503,45 @@ impl Info {
         Ok(())
     }
 
+    fn enable_listen_tx(&self, events: EnumSet<TxEvent>, enable: bool) {
+        self.regs().int_ena().modify(|_, w| {
+            for event in events {
+                match event {
+                    TxEvent::Done => w.tx_done().bit(enable),
+                    TxEvent::FiFoEmpty => w.txfifo_empty().bit(enable),
+                };
+            }
+            w
+        });
+    }
+
+    fn tx_events(&self) -> EnumSet<TxEvent> {
+        let pending_interrupts = self.regs().int_raw().read();
+        let mut active_events = EnumSet::new();
+
+        if pending_interrupts.tx_done().bit_is_set() {
+            active_events |= TxEvent::Done;
+        }
+        if pending_interrupts.txfifo_empty().bit_is_set() {
+            active_events |= TxEvent::FiFoEmpty;
+        }
+
+        active_events
+    }
+
+    fn clear_tx_events(&self, events: impl Into<EnumSet<TxEvent>>) {
+        let events = events.into();
+        self.regs().int_clr().write(|w| {
+            for event in events {
+                match event {
+                    TxEvent::FiFoEmpty => w.txfifo_empty().clear_bit_by_one(),
+                    TxEvent::Done => w.tx_done().clear_bit_by_one(),
+                };
+            }
+            w
+        });
+    }
+
     fn enable_listen_rx(&self, events: EnumSet<RxEvent>, enable: bool) {
         self.regs().int_ena().modify(|_, w| {
             for event in events {
@@ -2342,48 +2560,33 @@ impl Info {
         });
     }
 
-    fn enabled_rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
-        let events = events.into();
-        let interrupts_enabled = self.regs().int_ena().read();
-        let mut events_triggered = EnumSet::new();
-        for event in events {
-            let event_triggered = match event {
-                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_clear(),
-                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_clear(),
+    fn rx_events(&self) -> EnumSet<RxEvent> {
+        let pending_interrupts = self.regs().int_raw().read();
+        let mut active_events = EnumSet::new();
 
-                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_clear(),
-                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_clear(),
-                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_clear(),
-                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_clear(),
-                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_clear(),
-            };
-            if event_triggered {
-                events_triggered |= event;
-            }
+        if pending_interrupts.rxfifo_full().bit_is_set() {
+            active_events |= RxEvent::FifoFull;
         }
-        events_triggered
-    }
-
-    fn rx_events(&self, events: impl Into<EnumSet<RxEvent>>) -> EnumSet<RxEvent> {
-        let events = events.into();
-        let interrupts_enabled = self.regs().int_st().read();
-        let mut events_triggered = EnumSet::new();
-        for event in events {
-            let event_triggered = match event {
-                RxEvent::FifoFull => interrupts_enabled.rxfifo_full().bit_is_set(),
-                RxEvent::CmdCharDetected => interrupts_enabled.at_cmd_char_det().bit_is_set(),
-
-                RxEvent::FifoOvf => interrupts_enabled.rxfifo_ovf().bit_is_set(),
-                RxEvent::FifoTout => interrupts_enabled.rxfifo_tout().bit_is_set(),
-                RxEvent::GlitchDetected => interrupts_enabled.glitch_det().bit_is_set(),
-                RxEvent::FrameError => interrupts_enabled.frm_err().bit_is_set(),
-                RxEvent::ParityError => interrupts_enabled.parity_err().bit_is_set(),
-            };
-            if event_triggered {
-                events_triggered |= event;
-            }
+        if pending_interrupts.at_cmd_char_det().bit_is_set() {
+            active_events |= RxEvent::CmdCharDetected;
         }
-        events_triggered
+        if pending_interrupts.rxfifo_ovf().bit_is_set() {
+            active_events |= RxEvent::FifoOvf;
+        }
+        if pending_interrupts.rxfifo_tout().bit_is_set() {
+            active_events |= RxEvent::FifoTout;
+        }
+        if pending_interrupts.glitch_det().bit_is_set() {
+            active_events |= RxEvent::GlitchDetected;
+        }
+        if pending_interrupts.frm_err().bit_is_set() {
+            active_events |= RxEvent::FrameError;
+        }
+        if pending_interrupts.parity_err().bit_is_set() {
+            active_events |= RxEvent::ParityError;
+        }
+
+        active_events
     }
 
     fn clear_rx_events(&self, events: impl Into<EnumSet<RxEvent>>) {
@@ -2407,28 +2610,12 @@ impl Info {
 
     /// Configures the RX-FIFO threshold
     ///
-    /// # Errors
+    /// ## Errors
     ///
-    /// [ConfigError::UnsupportedFifoThreshold] if provided value exceeds
-    /// maximum value for SOC:
-    /// - `esp32` **0x7F**
-    /// - `esp32c6`, `esp32h2` **0xFF**
-    /// - `esp32c3`, `esp32c2`, `esp32s2` **0x1FF**
-    /// - `esp32s3` **0x3FF**
+    /// [ConfigError::UnsupportedRxFifoThreshold] if the provided value exceeds
+    /// [`Info::RX_FIFO_MAX_THRHD`].
     fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                const MAX_THRHD: u16 = 0x7F;
-            } else if #[cfg(any(esp32c6, esp32h2))] {
-                const MAX_THRHD: u16 = 0xFF;
-            } else if #[cfg(any(esp32c3, esp32c2, esp32s2))] {
-                const MAX_THRHD: u16 = 0x1FF;
-            } else if #[cfg(esp32s3)] {
-                const MAX_THRHD: u16 = 0x3FF;
-            }
-        }
-
-        if threshold > MAX_THRHD {
+        if threshold > Self::RX_FIFO_MAX_THRHD {
             return Err(ConfigError::UnsupportedRxFifoThreshold);
         }
 
@@ -2439,13 +2626,38 @@ impl Info {
         Ok(())
     }
 
+    /// Reads the RX-FIFO threshold
+    #[allow(clippy::useless_conversion)]
+    fn rx_fifo_full_threshold(&self) -> u16 {
+        self.regs().conf1().read().rxfifo_full_thrhd().bits().into()
+    }
+
+    /// Configures the TX-FIFO threshold
+    ///
+    /// ## Errors
+    ///
+    /// [ConfigError::UnsupportedTxFifoThreshold] if the provided value exceeds
+    /// [`Info::TX_FIFO_MAX_THRHD`].
+    fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
+        if threshold > Self::TX_FIFO_MAX_THRHD {
+            return Err(ConfigError::UnsupportedTxFifoThreshold);
+        }
+
+        self.regs()
+            .conf1()
+            .modify(|_, w| unsafe { w.txfifo_empty_thrhd().bits(threshold as _) });
+
+        Ok(())
+    }
+
     /// Configures the Receive Timeout detection setting
     ///
-    /// # Arguments
+    /// ## Arguments
+    ///
     /// `timeout` - the number of symbols ("bytes") to wait for before
     /// triggering a timeout. Pass None to disable the timeout.
     ///
-    /// # Errors
+    /// ## Errors
     ///
     /// [ConfigError::UnsupportedTimeout] if the provided value exceeds
     /// the maximum value for SOC:
@@ -2716,6 +2928,34 @@ impl Info {
 
         1 + data_bits + parity + stop_bits
     }
+
+    /// Reads one byte from the RX FIFO.
+    ///
+    /// If the FIFO is empty, the value of the returned byte is not specified.
+    fn read_next_from_fifo(&self) -> u8 {
+        fn access_fifo_register<R>(f: impl Fn() -> R) -> R {
+            // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    crate::interrupt::free(f)
+                } else {
+                    f()
+                }
+            }
+        }
+
+        let fifo_reg = self.regs().fifo();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
+                let fifo_reg = unsafe {
+                    &*fifo_reg.as_ptr().cast::<u8>().add(0x20C00000).cast::<crate::pac::uart0::FIFO>()
+                };
+            }
+        }
+
+        access_fifo_register(|| fifo_reg.read().rxfifo_rd_byte().bits())
+    }
 }
 
 impl PartialEq for Info {
@@ -2785,6 +3025,21 @@ impl Instance for AnyUart {
             AnyUartInner::Uart1(uart) => uart.parts(),
             #[cfg(uart2)]
             AnyUartInner::Uart2(uart) => uart.parts(),
+        }
+    }
+}
+
+struct OnDrop<F: FnOnce()>(Option<F>);
+impl<F: FnOnce()> OnDrop<F> {
+    fn new(cb: F) -> Self {
+        Self(Some(cb))
+    }
+}
+
+impl<F: FnOnce()> Drop for OnDrop<F> {
+    fn drop(&mut self) {
+        if let Some(cb) = self.0.take() {
+            cb();
         }
     }
 }
