@@ -84,7 +84,7 @@ esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"]
 serde        = { version = "1.0.217", features = ["derive"] }
 
 [features]
-default = ["unstable"] # FIXME: Unstable needs to be disabled before 1.0.0-beta.0
+default = []
 
 bluetooth = []
 

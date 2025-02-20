@@ -467,7 +467,10 @@ impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
     }
 }
 
-impl<'d, Dm: DriverMode> I2c<'d, Dm> {
+impl<'d, Dm> I2c<'d, Dm>
+where
+    Dm: DriverMode,
+{
     fn driver(&self) -> Driver<'_> {
         Driver {
             info: self.i2c.info(),

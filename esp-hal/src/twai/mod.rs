@@ -1624,6 +1624,12 @@ mod asynch {
 
     impl Twai<'_, Async> {
         /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
+        ///
+        /// The transmission is aborted if the future is dropped. The technical
+        /// reference manual does not specifiy if aborting the transmission also
+        /// stops it, in case it is activly transmitting. Therefor it could be
+        /// the case that even though the future is dropped, the frame was sent
+        /// anyways.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
             self.tx.transmit_async(frame).await
         }
@@ -1633,29 +1639,76 @@ mod asynch {
         }
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct TransmitFuture<'d, 'f> {
+        twai: PeripheralRef<'d, AnyTwai>,
+        frame: &'f EspTwaiFrame,
+        in_flight: bool,
+    }
+
+    impl<'d, 'f> TransmitFuture<'d, 'f> {
+        pub fn new(twai: impl Peripheral<P = AnyTwai> + 'd, frame: &'f EspTwaiFrame) -> Self {
+            crate::into_ref!(twai);
+            Self {
+                twai,
+                frame,
+                in_flight: false,
+            }
+        }
+    }
+
+    impl core::future::Future for TransmitFuture<'_, '_> {
+        type Output = Result<(), EspTwaiError>;
+
+        fn poll(
+            mut self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> Poll<Self::Output> {
+            self.twai.async_state().tx_waker.register(cx.waker());
+
+            let regs = self.twai.register_block();
+            let status = regs.status().read();
+
+            // Check that the peripheral is not in a bus off state.
+            if status.bus_off_st().bit_is_set() {
+                return Poll::Ready(Err(EspTwaiError::BusOff));
+            }
+
+            // Check that the peripheral is not currently transmitting a packet.
+            if !status.tx_buf_st().bit_is_set() {
+                return Poll::Pending;
+            }
+
+            if !self.in_flight {
+                write_frame(regs, self.frame);
+                self.in_flight = true;
+                return Poll::Pending;
+            }
+
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl Drop for TransmitFuture<'_, '_> {
+        fn drop(&mut self) {
+            self.twai
+                .register_block()
+                .cmd()
+                .write(|w| w.abort_tx().set_bit());
+        }
+    }
+
     impl TwaiTx<'_, Async> {
         /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
+        ///
+        /// The transmission is aborted if the future is dropped. The technical
+        /// reference manual does not specifiy if aborting the transmission also
+        /// stops it, in case it is activly transmitting. Therefor it could be
+        /// the case that even though the future is dropped, the frame was sent
+        /// anyways.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
             self.twai.enable_interrupts();
-            poll_fn(|cx| {
-                self.twai.async_state().tx_waker.register(cx.waker());
-
-                let status = self.regs().status().read();
-
-                // Check that the peripheral is not in a bus off state.
-                if status.bus_off_st().bit_is_set() {
-                    return Poll::Ready(Err(EspTwaiError::BusOff));
-                }
-                // Check that the peripheral is not already transmitting a packet.
-                if !status.tx_buf_st().bit_is_set() {
-                    return Poll::Pending;
-                }
-
-                write_frame(self.regs(), frame);
-
-                Poll::Ready(Ok(()))
-            })
-            .await
+            TransmitFuture::new(self.twai.reborrow(), frame).await
         }
     }
 

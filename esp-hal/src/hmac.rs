@@ -298,7 +298,7 @@ impl<'d> Hmac<'d> {
         // The padding will be spanned over 2 blocks
         if mod_cursor > 56 {
             let pad_len = 64 - mod_cursor;
-            self.alignment_helper.volatile_write_bytes(
+            self.alignment_helper.volatile_write(
                 #[cfg(esp32s2)]
                 self.regs().wr_message_(0).as_ptr(),
                 #[cfg(not(esp32s2))]
@@ -320,7 +320,7 @@ impl<'d> Hmac<'d> {
         let mod_cursor = self.byte_written % 64;
         let pad_len = 64 - mod_cursor - core::mem::size_of::<u64>();
 
-        self.alignment_helper.volatile_write_bytes(
+        self.alignment_helper.volatile_write(
             #[cfg(esp32s2)]
             self.regs().wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]

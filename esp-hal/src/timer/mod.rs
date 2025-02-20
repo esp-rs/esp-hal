@@ -134,7 +134,7 @@ pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<'d, Dm> {
+pub struct OneShotTimer<'d, Dm: DriverMode> {
     inner: PeripheralRef<'d, AnyTimer>,
     _ph: PhantomData<Dm>,
 }
@@ -334,7 +334,7 @@ impl embedded_hal_async::delay::DelayNs for OneShotTimer<'_, Async> {
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<'d, Dm> {
+pub struct PeriodicTimer<'d, Dm: DriverMode> {
     inner: PeripheralRef<'d, AnyTimer>,
     _ph: PhantomData<Dm>,
 }
@@ -406,7 +406,7 @@ where
     }
 }
 
-impl<Dm> crate::private::Sealed for PeriodicTimer<'_, Dm> {}
+impl<Dm> crate::private::Sealed for PeriodicTimer<'_, Dm> where Dm: DriverMode {}
 
 impl<Dm> InterruptConfigurable for PeriodicTimer<'_, Dm>
 where

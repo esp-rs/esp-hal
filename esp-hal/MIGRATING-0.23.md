@@ -1,5 +1,21 @@
 # Migration Guide from v0.23.x to v1.0.0-beta.0
 
+## Driver stability
+
+Unstable parts of esp-hal are gated behind the `unstable` feature. Previously, this feature
+was enabled by default, but starting with this release, it is no longer the case.
+The `unstable` feature itself is unstable, we might change the way we hide APIs without notice.
+Unstable APIs are not covered by semver guarantees, they may be changed or removed at any time.
+
+Please refer to the documentation to see which APIs are marked as unstable.
+
+```diff
+ esp-hal = { version = "1.0.0-beta.0" , features = [
+   "esp32c6",
++  "unstable"
+ ]}
+```
+
 ## `Async` drivers can no longer be sent between cores and executors
 
 To work around this limitation, send the blocking driver, and configure it into `Async` mode
@@ -92,9 +108,21 @@ The more descriptive `gpio::Level` enum is now used to specify output levels of 
 + let code = PulseCode::new(Level::High, 200, Level::Low, 50);
 ```
 
+## Global driver changes
+
+The `_bytes` postfix of driver methods that take a byte slice have been removed.
+
+```diff
+- uart0.write_bytes(b"Hello world!")?;
++ uart0.write(b"Hello world!")?;
+```
+
+The `peripherals::Interrupts` enum is no longer available. Users (mostly third party driver
+developers) will need to use the PAC crates directly.
+
 ## UART changes
 
-Uart `write_bytes` is now blocking and return the number of bytes written. `read_bytes` will block until it fills the provided buffer with received bytes, use `read_buffered_bytes` to read the available bytes without blocking.
+Uart `write` is now blocking and return the number of bytes written. `read` will block until it fills at least one byte into the buffer with received bytes, use `read_buffered_bytes` to read the available bytes without blocking.
 
 e.g.
 
@@ -102,12 +130,22 @@ e.g.
 - uart.write(0x42).ok();
 - let read = block!(ctx.uart.read());
 + let data: [u8; 1] = [0x42];
-+ uart.write_bytes(&data).unwrap();
++ uart.write(&data).unwrap();
 + let mut byte = [0u8; 1];
-+ uart.read_bytes(&mut byte);
++ uart.read(&mut byte).unwrap();
 ```
 
-### UART halves have their configuration split too
+### UART errors have been split into `TxError` and `RxError`.
+
+`read_*` and `write_*` functions now return different types. In practice this means you no longer
+need to check for RX errors that can't be returned by `write_*`.
+
+The error type used by `embedded-io` has been updated to reflect this. A new `IoError` enum has been
+added for `embedded-io` errors associated to the unsplit `Uart` driver. On `Uart` (but not `UartRx`
+or `UartTx`) TX-related trait methods return `IoError::Tx(TxError)`, while RX-related methods return
+`IoError::Rx(RxError)`.
+
+### UART halves have their configuration split, too
 
 `Uart::Config` structure now contains separate `RxConfig` and `TxConfig`:
 
@@ -209,7 +247,7 @@ GPIO drivers now take configuration structs.
 
 ```diff
 - Input::new(peripherals.GPIO0, Pull::Up);
-+ Input::new(peripherals.GPIO0, InputConfig::default().with_pull_direction(Pull::Up));
++ Input::new(peripherals.GPIO0, InputConfig::default().with_pull(Pull::Up));
  
 - Output::new(peripherals.GPIO0, Level::Low);
 + Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
