@@ -64,3 +64,39 @@ Please note that networking stacks _might_ need to be reset when connecting to a
 +     )
 + }
 ```
+
+If you have been using `esp_wifi::wifi::new_with_mode` before:
+
+- You will have to replace `new_with_mode` with `new`, which does not need a device kind parameter.
+- You will have to configure the returned controller into the correct mode.
+
+```diff
+-let (ap_device, controller) = esp_wifi::wifi::new_with_mode(
++let (controller, interfaces) = esp_wifi::wifi::new(
+     &init,
+     wifi,
+-    WifiApDevice
+ ).unwrap();
+
++let ap_device = interfaces.ap;
++controller.set_configuration(&Configuration::AccessPoint(AccessPointConfiguration {
++    ssid: "MyNetwork".try_into().unwrap(),
++    ..Default::default()
++}));
+```
+
+If you are using both the AP and STA interfaces, you will need to apply `Configuration::Mixed`,
+and you will need to make sure you don't accidentally reapply a non-`Mixed` configuration.
+
+## Other API changes
+
+`esp_wifi::wifi::WifiDevice` is no longer generic over the interface mode:
+
+```diff
+-WifiDevice<'static, WifiApDevice>
++WifiDevice<'static>
+```
+
+`WifiController` no longer stores the applied configuration. The `configuration` getter has been
+removed. If you need to access the currently applied settings, you will need to store them yourself
+in your firmware.
