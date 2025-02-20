@@ -10,7 +10,7 @@
 //! - or:
 //!   - connect to the network referenced by the SSID env variable and open the IP address printed by the example
 //! - the example will perform an HTTP get request to some "random" server and return the response
-//! 
+//!
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 //!
 
