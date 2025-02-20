@@ -2516,13 +2516,13 @@ impl Info {
     }
 
     fn tx_events(&self) -> EnumSet<TxEvent> {
-        let interrupts_enabled = self.regs().int_raw().read();
+        let pending_interrupts = self.regs().int_raw().read();
         let mut active_events = EnumSet::new();
 
-        if interrupts_enabled.tx_done().bit_is_set() {
+        if pending_interrupts.tx_done().bit_is_set() {
             active_events |= TxEvent::Done;
         }
-        if interrupts_enabled.txfifo_empty().bit_is_set() {
+        if pending_interrupts.txfifo_empty().bit_is_set() {
             active_events |= TxEvent::FiFoEmpty;
         }
 
@@ -2561,28 +2561,28 @@ impl Info {
     }
 
     fn rx_events(&self) -> EnumSet<RxEvent> {
-        let interrupts_enabled = self.regs().int_raw().read();
+        let pending_interrupts = self.regs().int_raw().read();
         let mut active_events = EnumSet::new();
 
-        if interrupts_enabled.rxfifo_full().bit_is_set() {
+        if pending_interrupts.rxfifo_full().bit_is_set() {
             active_events |= RxEvent::FifoFull;
         }
-        if interrupts_enabled.at_cmd_char_det().bit_is_set() {
+        if pending_interrupts.at_cmd_char_det().bit_is_set() {
             active_events |= RxEvent::CmdCharDetected;
         }
-        if interrupts_enabled.rxfifo_ovf().bit_is_set() {
+        if pending_interrupts.rxfifo_ovf().bit_is_set() {
             active_events |= RxEvent::FifoOvf;
         }
-        if interrupts_enabled.rxfifo_tout().bit_is_set() {
+        if pending_interrupts.rxfifo_tout().bit_is_set() {
             active_events |= RxEvent::FifoTout;
         }
-        if interrupts_enabled.glitch_det().bit_is_set() {
+        if pending_interrupts.glitch_det().bit_is_set() {
             active_events |= RxEvent::GlitchDetected;
         }
-        if interrupts_enabled.frm_err().bit_is_set() {
+        if pending_interrupts.frm_err().bit_is_set() {
             active_events |= RxEvent::FrameError;
         }
-        if interrupts_enabled.parity_err().bit_is_set() {
+        if pending_interrupts.parity_err().bit_is_set() {
             active_events |= RxEvent::ParityError;
         }
 
