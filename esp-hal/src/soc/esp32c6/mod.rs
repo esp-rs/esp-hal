@@ -71,3 +71,23 @@ pub(crate) mod constants {
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: Rate = Rate::from_khz(17_500);
 }
+
+pub(crate) fn pre_init() {
+    // By default, these access path filters are enable and allow the access to
+    // masters only if they are in TEE mode.
+    //
+    // Since all masters except HP CPU boot in REE mode, default setting of these
+    // filters will deny the access by all masters except HP CPU.
+    //
+    // So, disabling these filters early.
+
+    crate::peripherals::LP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0x0) });
+    crate::peripherals::LP_APM0::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0x0) });
+    crate::peripherals::HP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0x0) });
+}

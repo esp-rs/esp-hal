@@ -51,6 +51,7 @@ crate::peripherals! {
         LP_ANA <= LP_ANA,
         LP_AON <= LP_AON,
         LP_APM <= LP_APM,
+        LP_APM0 <= LP_APM0,
         LP_PERI <= LP_PERI,
         LP_TIMER <= LP_TIMER,
         LP_WDT <= LP_WDT,

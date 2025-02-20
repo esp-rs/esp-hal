@@ -209,3 +209,5 @@ pub unsafe fn cache_get_dcache_line_size() -> u32 {
     }
     Cache_Get_DCache_Line_Size()
 }
+
+pub(crate) fn pre_init() {}

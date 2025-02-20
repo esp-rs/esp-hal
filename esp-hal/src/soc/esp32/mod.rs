@@ -131,3 +131,5 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 pub extern "Rust" fn __init_data() -> bool {
     false
 }
+
+pub(crate) fn pre_init() {}
