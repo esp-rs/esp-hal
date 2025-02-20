@@ -4,12 +4,14 @@
 //!
 //! - gets an ip address via DHCP
 //! - creates an open access-point with SSID `esp-wifi`
-//! - you can connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway 192.168.2.1
-//! - open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request to some "random" server
+//! - if you either:
+//!   - connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway 192.168.2.1
+//!   - open http://192.168.2.1:8080/ in your browser
+//! - or:
+//!   - connect to the network referenced by the SSID env variable and open the IP address printed by the example
+//! - the example will perform an HTTP get request to some "random" server and return the response
 //!
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
-//!
-//! Because of the huge task-arena size configured this won't work on ESP32-S2
 //!
 
 //% FEATURES: embassy esp-wifi esp-wifi/wifi esp-hal/unstable
@@ -21,6 +23,7 @@
 use core::net::Ipv4Addr;
 
 use embassy_executor::Spawner;
+use embassy_futures::select::Either;
 use embassy_net::{
     tcp::TcpSocket,
     IpListenEndpoint,
@@ -113,7 +116,7 @@ async fn main(spawner: Spawner) -> ! {
     let (sta_stack, sta_runner) = embassy_net::new(
         wifi_sta_device,
         sta_config,
-        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        mk_static!(StackResources<4>, StackResources::<4>::new()),
         seed,
     );
 
@@ -134,13 +137,15 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(net_task(ap_runner)).ok();
     spawner.spawn(net_task(sta_runner)).ok();
 
-    loop {
-        if sta_stack.is_link_up() {
-            break;
+    let sta_address = loop {
+        if let Some(config) = sta_stack.config_v4() {
+            let address = config.address.address();
+            println!("Got IP: {}", address);
+            break address;
         }
         println!("Waiting for IP...");
         Timer::after(Duration::from_millis(500)).await;
-    }
+    };
     loop {
         if ap_stack.is_link_up() {
             break;
@@ -149,27 +154,53 @@ async fn main(spawner: Spawner) -> ! {
     }
     println!("Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
     println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
+    println!("Or connect to the ap `{SSID}` and point your browser to http://{sta_address}:8080/");
 
-    let mut ap_rx_buffer = [0; 1536];
-    let mut ap_tx_buffer = [0; 1536];
+    let mut ap_server_rx_buffer = [0; 1536];
+    let mut ap_server_tx_buffer = [0; 1536];
+    let mut sta_server_rx_buffer = [0; 1536];
+    let mut sta_server_tx_buffer = [0; 1536];
+    let mut sta_client_rx_buffer = [0; 1536];
+    let mut sta_client_tx_buffer = [0; 1536];
 
-    let mut ap_socket = TcpSocket::new(ap_stack, &mut ap_rx_buffer, &mut ap_tx_buffer);
-    ap_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
+    let mut ap_server_socket =
+        TcpSocket::new(ap_stack, &mut ap_server_rx_buffer, &mut ap_server_tx_buffer);
+    ap_server_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
-    let mut sta_rx_buffer = [0; 1536];
-    let mut sta_tx_buffer = [0; 1536];
+    let mut sta_server_socket = TcpSocket::new(
+        sta_stack,
+        &mut sta_server_rx_buffer,
+        &mut sta_server_tx_buffer,
+    );
+    sta_server_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
-    let mut sta_socket = TcpSocket::new(sta_stack, &mut sta_rx_buffer, &mut sta_tx_buffer);
-    sta_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
+    let mut sta_client_socket = TcpSocket::new(
+        sta_stack,
+        &mut sta_client_rx_buffer,
+        &mut sta_client_tx_buffer,
+    );
+    sta_client_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
     loop {
         println!("Wait for connection...");
-        let r = ap_socket
-            .accept(IpListenEndpoint {
+        // FIXME: If connections are attempted on both sockets at the same time, we might end up
+        // dropping one of them. Might be better to spawn both accept() calls, or use fused futures?
+        // Note that we only attempt to serve one connection at a time, so we don't run out of ram.
+        let either_socket = embassy_futures::select::select(
+            ap_server_socket.accept(IpListenEndpoint {
                 addr: None,
                 port: 8080,
-            })
-            .await;
+            }),
+            sta_server_socket.accept(IpListenEndpoint {
+                addr: None,
+                port: 8080,
+            }),
+        )
+        .await;
+        let (r, server_socket) = match either_socket {
+            Either::First(r) => (r, &mut ap_server_socket),
+            Either::Second(r) => (r, &mut sta_server_socket),
+        };
         println!("Connected...");
 
         if let Err(e) = r {
@@ -178,11 +209,10 @@ async fn main(spawner: Spawner) -> ! {
         }
 
         use embedded_io_async::Write;
-
         let mut buffer = [0u8; 1024];
         let mut pos = 0;
         loop {
-            match ap_socket.read(&mut buffer).await {
+            match server_socket.read(&mut buffer).await {
                 Ok(0) => {
                     println!("AP read EOF");
                     break;
@@ -205,25 +235,24 @@ async fn main(spawner: Spawner) -> ! {
                 }
             };
         }
-
         if sta_stack.is_link_up() {
             let remote_endpoint = (Ipv4Addr::new(142, 250, 185, 115), 80);
             println!("connecting...");
-            let r = sta_socket.connect(remote_endpoint).await;
+            let r = sta_client_socket.connect(remote_endpoint).await;
             if let Err(e) = r {
                 println!("STA connect error: {:?}", e);
                 continue;
             }
 
             use embedded_io_async::Write;
-            let r = sta_socket
+            let r = sta_client_socket
                 .write_all(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
                 .await;
 
             if let Err(e) = r {
                 println!("STA write error: {:?}", e);
 
-                let r = ap_socket
+                let r = server_socket
                     .write_all(
                         b"HTTP/1.0 500 Internal Server Error\r\n\r\n\
                         <html>\
@@ -238,20 +267,20 @@ async fn main(spawner: Spawner) -> ! {
                     println!("AP write error: {:?}", e);
                 }
             } else {
-                let r = sta_socket.flush().await;
+                let r = sta_client_socket.flush().await;
                 if let Err(e) = r {
                     println!("STA flush error: {:?}", e);
                 } else {
                     println!("connected!");
                     let mut buf = [0; 1024];
                     loop {
-                        match sta_socket.read(&mut buf).await {
+                        match sta_client_socket.read(&mut buf).await {
                             Ok(0) => {
                                 println!("STA read EOF");
                                 break;
                             }
                             Ok(n) => {
-                                let r = ap_socket.write_all(&buf[..n]).await;
+                                let r = server_socket.write_all(&buf[..n]).await;
                                 if let Err(e) = r {
                                     println!("AP write error: {:?}", e);
                                     break;
@@ -266,9 +295,9 @@ async fn main(spawner: Spawner) -> ! {
                 }
             }
 
-            sta_socket.close();
+            sta_client_socket.close();
         } else {
-            let r = ap_socket
+            let r = server_socket
                 .write_all(
                     b"HTTP/1.0 200 OK\r\n\r\n\
                     <html>\
@@ -283,17 +312,14 @@ async fn main(spawner: Spawner) -> ! {
                 println!("AP write error: {:?}", e);
             }
         }
-
-        let r = ap_socket.flush().await;
+        let r = server_socket.flush().await;
         if let Err(e) = r {
             println!("AP flush error: {:?}", e);
         }
         Timer::after(Duration::from_millis(1000)).await;
-
-        ap_socket.close();
+        server_socket.close();
         Timer::after(Duration::from_millis(1000)).await;
-
-        ap_socket.abort();
+        server_socket.abort();
     }
 }
 
