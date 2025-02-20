@@ -148,13 +148,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         (
             "build-time",
             "Build time",
-            Value::String(String::from(build_time_default)),
+            Value::String(build_time_default),
             None
         ),
         (
             "build-date",
             "Build date",
-            Value::String(String::from(build_date_default)),
+            Value::String(build_date_default),
             None
         ),
         (
