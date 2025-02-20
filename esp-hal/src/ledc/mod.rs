@@ -96,9 +96,11 @@ pub struct Ledc<'d> {
 }
 
 #[cfg(esp32)]
+#[derive(Clone, Copy)]
 /// Used to specify HighSpeed Timer/Channel
 pub struct HighSpeed {}
 
+#[derive(Clone, Copy)]
 /// Used to specify LowSpeed Timer/Channel
 pub struct LowSpeed {}
 
