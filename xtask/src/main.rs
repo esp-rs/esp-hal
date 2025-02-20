@@ -199,12 +199,13 @@ struct CiArgs {
 
 #[derive(Debug, Args)]
 struct TagReleasesArgs {
-    /// Chip to target.
-    #[arg(value_enum)]
-    chip: Chip,
     /// Package(s) to tag.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
     packages: Vec<Package>,
+
+    /// Actually try and create the tags
+    #[arg(long)]
+    no_dry_run: bool,
 }
 
 // ----------------------------------------------------------------------------
@@ -1106,7 +1107,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
 fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
     args.packages.sort();
 
-    let mut created = 0;
+    let mut created = Vec::new();
     for package in args.packages {
         // If a package does not require documentation, this also means that it is not
         // published (maybe this function needs a better name), so we can skip tagging
@@ -1116,30 +1117,37 @@ fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         }
 
         let version = xtask::package_version(workspace, package)?;
-        let tag = if package == Package::EspHal {
-            format!("v{version}")
-        } else {
-            format!("{package}-v{version}")
-        };
+        let tag = format!("{package}-v{version}");
 
-        let output = Command::new("git")
-            .arg("tag")
-            .arg(&tag)
-            .current_dir(workspace)
-            .output()?;
+        if args.no_dry_run {
+            let output = Command::new("git")
+                .arg("tag")
+                .arg(&tag)
+                .current_dir(workspace)
+                .output()?;
 
-        if output.stderr.is_empty() {
-            created += 1;
-            log::info!("Created tag '{tag}'");
+            if output.stderr.is_empty() {
+                log::info!("Created tag '{tag}'");
+            } else {
+                let err = String::from_utf8_lossy(&output.stderr);
+                let err = err.trim_start_matches("fatal: ");
+                log::warn!("{}", err);
+            }
         } else {
-            let err = String::from_utf8_lossy(&output.stderr);
-            let err = err.trim_start_matches("fatal: ");
-            log::warn!("{}", err);
+            log::info!("Would create '{tag}' if `--no-dry-run` was passed.")
         }
+        created.push(tag);
     }
 
-    log::info!("Created {created} tags");
-    log::info!("IMPORTANT: Don't forget to push the tags to the correct remote!");
+    if args.no_dry_run {
+        log::info!("Created {} tags", created.len());
+        log::info!("IMPORTANT: Don't forget to push the tags to the correct remote!");
+    }
+
+    log::info!(
+        "Documentation workflow input for these packages:\r\n\r\n {:#}",
+        serde_json::to_string(&created)?
+    );
 
     Ok(())
 }
