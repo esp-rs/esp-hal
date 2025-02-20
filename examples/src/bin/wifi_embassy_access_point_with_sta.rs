@@ -4,9 +4,13 @@
 //!
 //! - gets an ip address via DHCP
 //! - creates an open access-point with SSID `esp-wifi`
-//! - you can connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway 192.168.2.1
-//! - open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request to some "random" server
-//!
+//! - if you either:
+//!   - connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway 192.168.2.1
+//!   - open http://192.168.2.1:8080/ in your browser
+//! - or:
+//!   - connect to the network referenced by the SSID env variable and open the IP address printed by the example
+//! - the example will perform an HTTP get request to some "random" server and return the response
+//! 
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the WiFi has no internet connection, Chrome might not want to load the URL - you can use a shell and try `curl` and `ping`
 //!
 
