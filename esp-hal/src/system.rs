@@ -445,7 +445,7 @@ impl PeripheralClockControl {
             }
             #[cfg(all(rsa, esp32))]
             Peripheral::Rsa => {
-                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | (enable as u32) << 2) });
+                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | ((enable as u32) << 2)) });
             }
             #[cfg(all(rsa, any(esp32c3, esp32s2, esp32s3)))]
             Peripheral::Rsa => {
@@ -658,7 +658,7 @@ impl PeripheralClockControl {
             }
             #[cfg(all(rsa, esp32))]
             Peripheral::Rsa => {
-                peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() | 1 << 2) });
+                peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 2)) });
                 peri_rst_en.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
             }
             #[cfg(all(rsa, any(esp32c3, esp32s2, esp32s3)))]

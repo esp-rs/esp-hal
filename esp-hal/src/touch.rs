@@ -468,7 +468,7 @@ fn internal_enable_interrupt(touch_nr: u8) {
 
     SENS::regs().sar_touch_enable().modify(|r, w| unsafe {
         w.touch_pad_outen1()
-            .bits(r.touch_pad_outen1().bits() | 1 << touch_nr)
+            .bits(r.touch_pad_outen1().bits() | (1 << touch_nr))
     });
 }
 

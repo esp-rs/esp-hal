@@ -343,7 +343,7 @@ where
                     w.lcd_cmd().set_bit();
                     w.lcd_cmd_2_cycle_en().set_bit()
                 });
-                let cmd = first.into() as u32 | (second.into() as u32) << 16;
+                let cmd = first.into() as u32 | ((second.into() as u32) << 16);
                 self.regs()
                     .lcd_cmd_val()
                     .write(|w| unsafe { w.lcd_cmd_value().bits(cmd) });

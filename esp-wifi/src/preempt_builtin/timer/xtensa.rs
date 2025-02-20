@@ -35,9 +35,10 @@ pub(crate) fn setup_multitasking() {
     unsafe {
         let enabled = xtensa_lx::interrupt::disable();
         xtensa_lx::interrupt::enable_mask(
-            1 << 29 // Software1
+            (1 << 29)
                 | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask()
-                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask() | enabled,
+                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask()
+                | enabled,
         );
     }
 }

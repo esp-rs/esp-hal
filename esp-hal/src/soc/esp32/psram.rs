@@ -974,7 +974,7 @@ pub(crate) mod utils {
             // DPORT_SET_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
             DPORT::regs()
                 .host_inf_sel()
-                .modify(|r, w| w.bits(r.bits() | 1 << 14));
+                .modify(|r, w| w.bits(r.bits() | (1 << 14)));
 
             // Start send data
             spi.cmd().modify(|_, w| w.usr().set_bit());

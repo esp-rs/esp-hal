@@ -116,7 +116,7 @@ impl Efuse {
     /// Returns the CHIP_VER_PKG eFuse value.
     pub fn chip_type() -> ChipType {
         let chip_ver = Self::read_field_le::<u8>(CHIP_PACKAGE)
-            | Self::read_field_le::<u8>(CHIP_PACKAGE_4BIT) << 4;
+            | (Self::read_field_le::<u8>(CHIP_PACKAGE_4BIT) << 4);
 
         match chip_ver {
             0 => ChipType::Esp32D0wdq6,

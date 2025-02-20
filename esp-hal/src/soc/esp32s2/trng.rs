@@ -287,7 +287,7 @@ pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, l
 
     // Read the i2c bus register
     let mut temp: u32 = ((block as u32 & I2C_RTC_SLAVE_ID_V as u32) << I2C_RTC_SLAVE_ID_S as u32)
-        | (reg_add as u32 & I2C_RTC_ADDR_V as u32) << I2C_RTC_ADDR_S as u32;
+        | ((reg_add as u32 & I2C_RTC_ADDR_V as u32) << I2C_RTC_ADDR_S as u32);
     reg_write(I2C_RTC_CONFIG2, temp);
     while reg_get_bit(I2C_RTC_CONFIG2, I2C_RTC_BUSY) != 0 {}
     temp = reg_get_field(I2C_RTC_CONFIG2, I2C_RTC_DATA_S, I2C_RTC_DATA_V);
