@@ -23,7 +23,9 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
@@ -44,32 +46,43 @@ mod tests {
     }
 
     #[test]
+    fn flush_waits_for_data_to_be_transmitted(mut ctx: Context) {
+        let bauds = [1000, 5000000];
+        for baud in bauds {
+            ctx.uart
+                .apply_config(&uart::Config::default().with_baudrate(baud))
+                .unwrap();
+            for i in 0..10 {
+                let mut byte = [0u8; 1];
+                ctx.uart.write(&[i as u8]).unwrap();
+                ctx.uart.flush().unwrap();
+
+                let read = ctx.uart.read_buffered(&mut byte).unwrap();
+                assert_eq!(read, 1, "Baud rate {}, iteration {}", baud, i);
+                assert_eq!(byte[0], i as u8, "Baud rate {}, iteration {}", baud, i);
+            }
+        }
+    }
+
+    #[test]
     fn test_different_tolerance(mut ctx: Context) {
-        ctx.uart
-            .apply_config(
-                &uart::Config::default()
-                    .with_baudrate(19_200)
-                    .with_baudrate_tolerance(uart::BaudrateTolerance::Exact),
-            )
-            .unwrap();
+        let configs = [
+            uart::Config::default()
+                .with_baudrate(19_200)
+                .with_baudrate_tolerance(uart::BaudrateTolerance::Exact),
+            uart::Config::default()
+                .with_baudrate(9600)
+                .with_baudrate_tolerance(uart::BaudrateTolerance::ErrorPercent(10)),
+        ];
 
-        ctx.uart.write(&[0x42]).unwrap();
-        let mut byte = [0u8; 1];
-        ctx.uart.read(&mut byte).unwrap();
-        assert_eq!(byte[0], 0x42);
+        for config in configs {
+            ctx.uart.apply_config(&config).unwrap();
 
-        ctx.uart
-            .apply_config(
-                &uart::Config::default()
-                    .with_baudrate(9600)
-                    .with_baudrate_tolerance(uart::BaudrateTolerance::ErrorPercent(10)),
-            )
-            .unwrap();
-
-        ctx.uart.write(&[0x42]).unwrap();
-        let mut byte = [0u8; 1];
-        ctx.uart.read(&mut byte).unwrap();
-        assert_eq!(byte[0], 0x42);
+            ctx.uart.write(&[0x42]).unwrap();
+            let mut byte = [0u8; 1];
+            ctx.uart.read(&mut byte).unwrap();
+            assert_eq!(byte[0], 0x42);
+        }
     }
 
     #[test]

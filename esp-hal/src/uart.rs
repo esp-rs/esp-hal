@@ -631,6 +631,11 @@ where
     /// transmitted.
     #[instability::unstable]
     pub fn flush(&mut self) -> Result<(), TxError> {
+        while self.tx_fifo_count() > 0 {}
+        // The FSM is in the Idle state for a short while after the last byte is moved
+        // out of the FIFO. It is unclear how long this takes, but 10us seems to be a
+        // good enough duration to wait, for both fast and slow baud rates.
+        crate::rom::ets_delay_us(10);
         while !self.is_tx_idle() {}
         Ok(())
     }
