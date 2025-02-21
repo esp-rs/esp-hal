@@ -1107,6 +1107,12 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
 fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
     args.packages.sort();
 
+    #[derive(serde::Serialize)]
+    struct DocumentationItem {
+        name: String,
+        tag: String,
+    }
+
     let mut created = Vec::new();
     for package in args.packages {
         // If a package does not require documentation, this also means that it is not
@@ -1136,7 +1142,7 @@ fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         } else {
             log::info!("Would create '{tag}' if `--no-dry-run` was passed.")
         }
-        created.push(tag);
+        created.push(DocumentationItem { name: package.to_string(), tag });
     }
 
     if args.no_dry_run {
