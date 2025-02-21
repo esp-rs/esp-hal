@@ -49,8 +49,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
         ),
         (
             "timer-queue",
-            //"<p>The flavour of the timer queue provided by this crate. Accepts one of `single-integrated`, `multiple-integrated` or `generic`. Integrated queues require the `executors` feature to be enabled.</p><p>If you use embassy-executor, the `single-integrated` queue is recommended for ease of use, while the `multiple-integrated` queue is recommended for performance. The `multiple-integrated` option needs one timer per executor.</p><p>The `generic` queue allows using embassy-time without the embassy executors.</p>",
-            "<p>The flavour of the timer queue provided by this crate. Accepts either `single-integrated` or `generic`. Integrated queues require the `executors` feature to be enabled.</p><p>If you use embassy-executor, the `single-integrated` queue is recommended.</p><p>The `generic` queue allows using embassy-time without the embassy executors.</p>",
+            "<p>The flavour of the timer queue provided by this crate. Accepts one of `single-integrated`, `multiple-integrated` or `generic`. Integrated queues require the `executors` feature to be enabled.</p><p>If you use embassy-executor, the `single-integrated` queue is recommended for ease of use, while the `multiple-integrated` queue is recommended for performance. The `multiple-integrated` option needs one timer per executor.</p><p>The `generic` queue allows using embassy-time without the embassy executors.</p>",
             Value::String(if cfg!(feature = "executors") {
                 String::from("single-integrated")
             } else {
@@ -70,10 +69,9 @@ fn main() -> Result<(), Box<dyn StdError>> {
 
                 match string.as_str() {
                     "single-integrated" => Ok(()), // preferred for ease of use
-                    //"multiple-integrated" => Ok(()), // preferred for performance
+                    "multiple-integrated" => Ok(()), // preferred for performance
                     "generic" => Ok(()), // allows using embassy-time without the embassy executors
-                    //_ => Err(Error::Validation(format!("Expected 'single-integrated', 'multiple-integrated' or 'generic', found {string}")))
-                    _ => Err(Error::Validation(format!("Expected 'single-integrated' or 'generic', found {string}")))
+                    _ => Err(Error::Validation(format!("Expected 'single-integrated', 'multiple-integrated' or 'generic', found {string}")))
                 }
             })))
         ),
@@ -96,9 +94,9 @@ fn main() -> Result<(), Box<dyn StdError>> {
             println!("cargo:rustc-cfg=integrated_timers");
             println!("cargo:rustc-cfg=single_queue");
         }
-        // Value::String(s) if s.as_str() == "multiple-integrated" => {
-        //    println!("cargo:rustc-cfg=integrated_timers");
-        //}
+        Value::String(s) if s.as_str() == "multiple-integrated" => {
+            println!("cargo:rustc-cfg=integrated_timers");
+        }
         Value::String(s) if s.as_str() == "generic" => {
             println!("cargo:rustc-cfg=generic_timers");
             println!("cargo:rustc-cfg=single_queue");
