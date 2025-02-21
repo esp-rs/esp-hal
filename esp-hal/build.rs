@@ -122,7 +122,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Some(Validator::Enumeration(
                 vec![String::from("quad"), String::from("octal")]
             )),
-        )
+        ),
     ], true);
 
     // RISC-V and Xtensa devices each require some special handling and processing
