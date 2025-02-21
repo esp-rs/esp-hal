@@ -63,7 +63,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          repository: mabezdev/esp-hal # FIXME change
+          repository: esp-hal/esp-hal
           ref: ${{ matrix.packages.tag }}
 
       - name: Build documentation
