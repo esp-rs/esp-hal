@@ -31,10 +31,11 @@
 //!
 //! Initialization requires a number of timers to be passed in. The number of
 //! timers required depends on the timer queue flavour used, as well as the
-//! number of executors started. If you use the `multiple-integrated` timer
-//! queue flavour, then you need to pass as many timers as you start executors.
-//! In other cases, you can pass a single timer.
-//!
+//! number of executors started.
+// TODO restore this:
+// If you use the `multiple-integrated` timer
+// queue flavour, then you need to pass as many timers as you start executors.
+// In other cases, you can pass a single timer.
 //! ## Configuration
 //!
 //! You can configure the behaviour of the embassy runtime by using the
@@ -155,11 +156,10 @@ impl_array!(4);
 /// - A mutable static slice of `OneShotTimer` instances
 /// - A mutable static array of `OneShotTimer` instances
 /// - A 2, 3, 4 element array of `AnyTimer` instances
-///
-/// Note that if you use the `multiple-integrated` timer-queue flavour, then
-/// you need to pass as many timers as you start executors. In other cases,
-/// you can pass a single timer.
-///
+// TODO: restore this:
+// /// Note that if you use the `multiple-integrated` timer-queue flavour, then
+// /// you need to pass as many timers as you start executors. In other cases,
+// /// you can pass a single timer.
 /// # Examples
 ///
 /// ```rust, no_run
