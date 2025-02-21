@@ -62,6 +62,8 @@ extern "C" fn timer_tick_handler() {
         timer.clear_interrupt();
     });
 
+    // For unknown reasons, task_switch would end up generating an exception when
+    // called at priority 1, so trigger the level 3 interrupt instead.
     yield_task();
 }
 
