@@ -11,10 +11,17 @@ const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(crate::CONFIG.tick_rate_hz);
 
 use super::TIMER;
 
+// CPU-internal software interrupt, priority 3. For some reason, the task
+// switcher fails when triggered at priority 1, otherwise we could use interrupt
+// number 7 instead at priority 1.
+const SW_INTERRUPT: u32 = 1 << 29;
+
 pub(crate) fn setup_timer(mut timer1: TimeBase) {
+    // The timer needs to tick at Priority 1 to prevent accidentally interrupting
+    // priority 1 limited locks.
     timer1.set_interrupt_handler(InterruptHandler::new(
         unsafe { core::mem::transmute::<*const (), extern "C" fn()>(handler as *const ()) },
-        interrupt::Priority::Priority2,
+        interrupt::Priority::Priority1,
     ));
     unwrap!(timer1.start(TIMESLICE_FREQUENCY.as_duration()));
     TIMER.with(|timer| {
@@ -35,7 +42,7 @@ pub(crate) fn setup_multitasking() {
     unsafe {
         let enabled = xtensa_lx::interrupt::disable();
         xtensa_lx::interrupt::enable_mask(
-            (1 << 29)
+            SW_INTERRUPT
                 | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask()
                 | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask()
                 | enabled,
@@ -44,34 +51,28 @@ pub(crate) fn setup_multitasking() {
 }
 
 pub(crate) fn disable_multitasking() {
-    xtensa_lx::interrupt::disable_mask(
-        1 << 29, // Disable Software1
-    );
+    xtensa_lx::interrupt::disable_mask(SW_INTERRUPT);
 }
 
-extern "C" fn handler(context: &mut TrapFrame) {
+extern "C" fn handler() {
     TIMER.with(|timer| {
         let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
     });
 
-    task_switch(context);
+    yield_task();
 }
 
 #[allow(non_snake_case)]
 #[no_mangle]
 fn Software1(_level: u32, context: &mut TrapFrame) {
-    let intr = 1 << 29;
-    unsafe {
-        core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack));
-    }
+    let intr = SW_INTERRUPT;
+    unsafe { core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack)) };
 
     task_switch(context);
 }
 
 pub(crate) fn yield_task() {
-    let intr = 1 << 29;
-    unsafe {
-        core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack));
-    }
+    let intr = SW_INTERRUPT;
+    unsafe { core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)) };
 }
