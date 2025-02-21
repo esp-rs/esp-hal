@@ -7,6 +7,8 @@ on:
         description: >
           A JSON structure describing the packages to build.
           E.g: [{"name":"esp-hal","tag":"v0.23.1"},{"name":"esp-wifi","tag":"esp-wifi-v0.12"}]
+
+          NOTE: You can run `cargo xtask tag-releases` to get the json output generated for this workflow.
         required: true
       server:
         type: choice
@@ -17,6 +19,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   setup:
