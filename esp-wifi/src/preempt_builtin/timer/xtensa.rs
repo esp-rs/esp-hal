@@ -11,10 +11,7 @@ const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(crate::CONFIG.tick_rate_hz);
 
 use super::TIMER;
 
-// CPU-internal software interrupt, priority 3. For some reason, the task
-// switcher fails when triggered at priority 1, otherwise we could use interrupt
-// number 7 instead at priority 1.
-const SW_INTERRUPT: u32 = 1 << 29;
+const SW_INTERRUPT: u32 = 1 << 7;
 
 pub(crate) fn setup_timer(mut timer1: TimeBase) {
     // The timer needs to tick at Priority 1 to prevent accidentally interrupting
@@ -56,20 +53,18 @@ pub(crate) fn disable_multitasking() {
     xtensa_lx::interrupt::disable_mask(SW_INTERRUPT);
 }
 
-extern "C" fn timer_tick_handler() {
+extern "C" fn timer_tick_handler(context: &mut TrapFrame) {
     TIMER.with(|timer| {
         let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
     });
 
-    // For unknown reasons, task_switch would end up generating an exception when
-    // called at priority 1, so trigger the level 3 interrupt instead.
-    yield_task();
+    task_switch(context);
 }
 
 #[allow(non_snake_case)]
 #[no_mangle]
-fn Software1(_level: u32, context: &mut TrapFrame) {
+fn Software0(_level: u32, context: &mut TrapFrame) {
     let intr = SW_INTERRUPT;
     unsafe { core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack)) };
 
