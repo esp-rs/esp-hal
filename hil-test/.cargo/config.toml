@@ -18,9 +18,7 @@ rustflags = [
 
 [env]
 DEFMT_LOG = "info"
-# TODO restore multiple-integrated
-#ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE="multiple-integrated"
-ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE="single-integrated"
+ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE="multiple-integrated"
 
 [unstable]
 build-std = ["core", "alloc"]

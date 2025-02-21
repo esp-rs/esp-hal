@@ -93,7 +93,7 @@ impl Alarm {
 /// as well as to schedule a wake-up at a certain time.
 ///
 /// We are free to choose how we implement these features, and we provide
-/// two options:
+/// three options:
 ///
 /// - If the `generic` feature is enabled, we implement a single timer queue,
 ///   using the implementation provided by embassy-time-queue-driver.
@@ -101,12 +101,11 @@ impl Alarm {
 ///   queue, using our own integrated timer implementation. Our implementation
 ///   is a copy of the embassy integrated timer queue, with the addition of
 ///   clearing the "owner" information upon dequeueing.
-// TODO: restore this and update the "two options" above:
-// - If the `multiple-integrated` feature is enabled, we provide a separate
-//   timer queue for each executor. We store a separate timer queue for each
-//   executor, and we use the scheduled task's owner to determine which queue to
-//   use. This mode allows us to use less disruptive locks around the timer
-//   queue, but requires more timers - one per timer queue.
+/// - If the `multiple-integrated` feature is enabled, we provide a separate
+///   timer queue for each executor. We store a separate timer queue for each
+///   executor, and we use the scheduled task's owner to determine which queue
+///   to use. This mode allows us to use less disruptive locks around the timer
+///   queue, but requires more timers - one per timer queue.
 pub(super) struct EmbassyTimer {
     /// The timer queue, if we use a single one (single-integrated, or generic).
     #[cfg(single_queue)]
