@@ -49,17 +49,13 @@ pub(crate) fn disable_multitasking() {
     );
 }
 
-fn do_task_switch(context: &mut TrapFrame) {
+extern "C" fn handler(context: &mut TrapFrame) {
     TIMER.with(|timer| {
         let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
     });
 
     task_switch(context);
-}
-
-extern "C" fn handler(context: &mut TrapFrame) {
-    do_task_switch(context);
 }
 
 #[allow(non_snake_case)]
@@ -70,7 +66,7 @@ fn Software1(_level: u32, context: &mut TrapFrame) {
         core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack));
     }
 
-    do_task_switch(context);
+    task_switch(context);
 }
 
 pub(crate) fn yield_task() {
