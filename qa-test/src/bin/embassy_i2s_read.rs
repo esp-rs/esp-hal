@@ -75,11 +75,17 @@ async fn main(_spawner: Spawner) {
         println!("available {}", avail);
 
         let count = transaction.pop(&mut data).await.unwrap();
+
+        #[cfg(not(feature = "esp32s2"))]
         println!(
             "got {} bytes, {:x?}..{:x?}",
             count,
             &data[..10],
             &data[count - 10..count]
         );
+
+        // esp-println is a bit slow on ESP32-S2 - don't run into DMA too late errors
+        #[cfg(feature = "esp32s2")]
+        println!("got {} bytes", count,);
     }
 }
