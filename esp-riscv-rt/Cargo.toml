@@ -1,6 +1,6 @@
 [package]
 name         = "esp-riscv-rt"
-version      = "0.9.1"
+version      = "0.10.0"
 edition      = "2021"
 rust-version = "1.84.0"
 description  = "Minimal runtime / startup for RISC-V CPUs from Espressif"
@@ -10,9 +10,9 @@ repository   = "https://github.com/esp-rs/esp-hal"
 license      = "MIT OR Apache-2.0"
 
 [dependencies]
-document-features = "0.2.10"
+document-features = "0.2.11"
 riscv             = "0.12.1"
-riscv-rt-macros   = "0.2.2"
+riscv-rt-macros   = "0.4.0"
 
 [features]
 ## Indicate that the device supports `mie` and `mip` instructions.

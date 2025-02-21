@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## v1.0.0-beta.0
+
+### Added
+
 - SPI: Added support for 3-wire SPI (#2919)
 - UART: Add separate config for Rx and Tx (#2965)
 - UART: `read_exact_async` (unstable) (#3142)
@@ -51,9 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Uart errors have been split into `RxError` and `TxError`. A combined `IoError` has been created for embedded-io. (#3138)
 - `{Uart, UartTx}::flush()` is now fallible. (#3138)
 - `Uart::{read_async, write_async}` are now cancellation-safe (#3142)
-
 - I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
-
 - ESP32-H2/ESP32-C6: Don't rely on the bootloader to deconfigure permission control (#3150)
 
 ### Fixed
@@ -1136,7 +1144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.23.1...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...HEAD
+[v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/v0.23.1..esp-hal-v1.0.0-beta.0
 [0.23.1]: https://github.com/esp-rs/esp-hal/compare/v0.23.0..v0.23.1
 [0.23.0]: https://github.com/esp-rs/esp-hal/compare/v0.22.0..v0.23.0
 [0.22.0]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...v0.22.0
