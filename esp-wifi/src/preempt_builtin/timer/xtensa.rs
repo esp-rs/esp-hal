@@ -20,7 +20,9 @@ pub(crate) fn setup_timer(mut timer1: TimeBase) {
     // The timer needs to tick at Priority 1 to prevent accidentally interrupting
     // priority 1 limited locks.
     timer1.set_interrupt_handler(InterruptHandler::new(
-        unsafe { core::mem::transmute::<*const (), extern "C" fn()>(handler as *const ()) },
+        unsafe {
+            core::mem::transmute::<*const (), extern "C" fn()>(timer_tick_handler as *const ())
+        },
         interrupt::Priority::Priority1,
     ));
     unwrap!(timer1.start(TIMESLICE_FREQUENCY.as_duration()));
@@ -54,7 +56,7 @@ pub(crate) fn disable_multitasking() {
     xtensa_lx::interrupt::disable_mask(SW_INTERRUPT);
 }
 
-extern "C" fn handler() {
+extern "C" fn timer_tick_handler() {
     TIMER.with(|timer| {
         let timer = unwrap!(timer.as_mut());
         timer.clear_interrupt();
