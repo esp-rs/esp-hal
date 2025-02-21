@@ -1,6 +1,6 @@
 [package]
 name = "esp-storage"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.84.0"
 description  = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
