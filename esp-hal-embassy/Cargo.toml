@@ -26,7 +26,7 @@ esp-config                = { version = "0.3.0", path = "../esp-config" }
 esp-hal                   = { version = "1.0.0-beta.0", path = "../esp-hal" }
 log                       = { version = "0.4.26", optional = true }
 macros                    = { version = "0.17.0", features = ["embassy"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-portable-atomic           = "1.10.0"
+portable-atomic           = "1.11.0"
 static_cell               = "2.1.0"
 
 [build-dependencies]
