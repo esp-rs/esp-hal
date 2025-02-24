@@ -156,8 +156,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     let toolchain = if chip.is_some_and(|chip| chip.is_xtensa()) {
         "esp"
     } else {
-        // TODO: Remove date once https://github.com/taiki-e/portable-atomic/issues/208 is resolved
-        "nightly-2025-02-21"
+        "nightly"
     };
 
     // Determine the appropriate build target for the given package and chip,
