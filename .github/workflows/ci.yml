@@ -73,12 +73,7 @@ jobs:
         with:
           ldproxy: false
           version: 1.85.0.0
-      # TODO: Remove once https://github.com/taiki-e/portable-atomic/issues/208 is resolved
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly-2025-02-21
-          components: clippy,rust-src
+
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:

@@ -46,7 +46,7 @@ instability              = "0.3.7"
 log                      = { version = "0.4.26", optional = true }
 nb                       = "1.1.0"
 paste                    = "1.0.15"
-portable-atomic          = { version = "1.10.0", default-features = false }
+portable-atomic          = { version = "1.11.0", default-features = false }
 procmacros               = { version = "0.17.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
 void                     = { version = "1.0.2", default-features = false }
