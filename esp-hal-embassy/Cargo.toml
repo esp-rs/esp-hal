@@ -32,7 +32,7 @@ static_cell               = "2.1.0"
 [build-dependencies]
 esp-build    = { version = "0.2.0", path = "../esp-build" }
 esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"] }
-esp-metadata = { version = "0.5.0", path = "../esp-metadata" }
+esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
 
 [features]
 default = ["executors"]

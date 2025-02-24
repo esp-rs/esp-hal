@@ -79,7 +79,7 @@ critical-section = { version = "1.2.0", features = ["restore-state-u32"] }
 basic-toml   = "0.1.9"
 cfg-if       = "1.0.0"
 esp-build    = { version = "0.2.0", path = "../esp-build" }
-esp-metadata = { version = "0.5.0", path = "../esp-metadata" }
+esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
 esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"] }
 serde        = { version = "1.0.218", features = ["derive"] }
 
