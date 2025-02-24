@@ -162,6 +162,9 @@ pub fn execute_app(
     if target.starts_with("xtensa") {
         builder = builder.toolchain("esp");
         builder.add_arg("-Zbuild-std=core,alloc");
+    } else {
+        // NOTE: This shouldn't be required, something fishy is going on...
+        builder = builder.toolchain("stable")
     }
 
     if subcommand == "test" && chip == Chip::Esp32c2 {
@@ -225,6 +228,9 @@ pub fn build_package(
 
     if let Some(toolchain) = toolchain {
         builder = builder.toolchain(toolchain);
+    } else {
+        // NOTE: This shouldn't be required, something fishy is going on...
+        builder = builder.toolchain("stable");
     }
 
     if let Some(target) = target {

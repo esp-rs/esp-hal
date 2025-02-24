@@ -824,7 +824,8 @@ fn lint_package(
         // are not overwritten.
         builder.toolchain("esp")
     } else {
-        builder
+        // TODO: Remove toolchain once https://github.com/taiki-e/portable-atomic/issues/208 is resolved
+        builder.toolchain("nightly-2025-02-21")
     };
 
     for arg in args {
@@ -933,7 +934,12 @@ fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
     let features = vec![chip.to_string(), "unstable".to_string()];
 
     // We need `nightly` for building the doc tests, unfortunately:
-    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
+    let toolchain = if chip.is_xtensa() {
+        "esp"
+    } else {
+        // TODO: Remove date once https://github.com/taiki-e/portable-atomic/issues/208 is resolved
+        "nightly-2025-02-21"
+    };
 
     // Build up an array of command-line arguments to pass to `cargo`:
     let builder = CargoArgsBuilder::default()
@@ -1142,7 +1148,10 @@ fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         } else {
             log::info!("Would create '{tag}' if `--no-dry-run` was passed.")
         }
-        created.push(DocumentationItem { name: package.to_string(), tag });
+        created.push(DocumentationItem {
+            name: package.to_string(),
+            tag,
+        });
     }
 
     if args.no_dry_run {
