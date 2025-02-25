@@ -8,43 +8,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- SPI: Added support for 3-wire SPI (#2919)
-- Add separate config for Rx and Tx (UART) #2965
-- Additional interrupt available in `esp_hal::uart::UartInterrupt` - as well as UartRx functions `wait_for_break()` and `wait_for_break_async().await` (#2858)
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## v1.0.0-beta.0
+
+### Added
+
+- SPI: Added support for 3-wire SPI (#2919)
+- UART: Add separate config for Rx and Tx (#2965)
+- UART: `read_exact_async` (unstable) (#3142)
+- UART: `TxConfig::fifo_empty_threshold` (#3142)
+- Added accessor methods to config structs (#3011)
+- `esp_hal::time::{Rate, Duration, Instant}` (#3083)
+- Async support for ADC oneshot reads for ESP32C2, ESP32C3, ESP32C6 and ESP32H2 (#2925, #3082)
+- `ESP_HAL_CONFIG_XTAL_FREQUENCY` configuration. For now, chips other than ESP32 and ESP32-C2 have a single option only. (#3054)
+- Added more validation to UART and SPI. User can now specify the baudrate tolerance of UART config (#3074)
+- Add auto-writeback support to DMA buffers (#3107)
+
+### Changed
+
+- LEDC: Derive `Clone` and `Copy` for ledc speed types to make `ledc::channel::Config` derive them too. (#3139)
+- The `unstable` feature is no longer enabled by default (#3136)
 - RMT: `TxChannelConfig` and `RxChannelConfig` now support the builder-lite pattern (#2978)
 - RMT: Some fields of `TxChannelConfig` and `RxChannelConfig` are now `gpio::Level`-valued instead of `bool` (#2989)
 - RMT: The `PulseCode` trait now uses `gpio::Level` to specify output levels instead of `bool` (#2989)
-- Uart `write_bytes` and `read_bytes` are now blocking and return the number of bytes written/read (#2882)
-- Uart `read_bytes` is now blocking  returns the number of bytes read (#2882)
-- Uart `flush` is now blocking (#2882)
 - Removed `embedded-hal-nb` traits (#2882)
 - `timer::wait` is now blocking (#2882)
 - By default, set `tx_idle_num` to 0 so that bytes written to TX FIFO are always immediately transmitted. (#2859)
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 - SPI, UART, I2C: `with_<pin>` functions of peripheral drivers now disconnect the previously assigned pins from the peripheral. (#3012)
 - SPI, UART, I2C: Dropping a driver now disconnects pins from their peripherals. (#3012)
-
+- TWAI: Async transmission future resolves after successful transmission and can be aborted by dropping the future.
+- Migrate PARL_IO driver to DMA move API (#3033)
 - `Async` drivers are no longer `Send` (#2980)
-- GPIO drivers now take configuration structs, and their constructors are fallible (#2990)
-- `flip-link` feature is now a config option
-- `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`)
-
+- GPIO drivers now take configuration structs (#2990, #3029)
 - `flip-link` feature is now a config option (`ESP_HAL_CONFIG_FLIP_LINK`) (#3001)
-
+- Migrate AES driver to DMA move API (#3084)
 - Removed features `psram-quad` and `psram-octal` - replaced by `psram` and the `ESP_HAL_CONFIG_PSRAM_MODE` (`quad`/`octal`) (#3001)
+- The `esp_hal::time` module no longer reexports `fugit` types (#3083)
+- The `system::RadioClockController` trait has been replaced by the `clock::RadioClockController` struct. (#3100)
+- The `Cpu` struct and contents of the `reset` and `cpu_control` modules have been moved into `cpu`. (#3099)
+- The `software_reset_cpu` now takes which CPU to reset as parameter. (#3099)
+- `read_bytes` and `write_bytes` methods on drivers have been renamed to `read` and `write` (#3137)
+- `Uart::write` and `Uart::read` are now blocking and return the number of bytes written/read (#2882)
+- `Uart::flush` is now blocking (#2882)
+- `Uart::split` and the respective split halves have been marked as unstable (#3137)
+- Uart errors have been split into `RxError` and `TxError`. A combined `IoError` has been created for embedded-io. (#3138)
+- `{Uart, UartTx}::flush()` is now fallible. (#3138)
+- `Uart::{read_async, write_async}` are now cancellation-safe (#3142)
+- I2C: Async functions are postfixed with `_async`, non-async functions are available in async-mode (#3056)
+- ESP32-H2/ESP32-C6: Don't rely on the bootloader to deconfigure permission control (#3150)
 
 ### Fixed
 
 - `DmaDescriptor` is now `#[repr(C)]` (#2988)
 - Fixed an issue that caused LCD_CAM drivers to turn off their clocks unexpectedly (#3007)
 - Fixed an issue where DMA-driver peripherals started transferring before the data was ready (#3003)
+- Fixed an issue on ESP32 and S2 where short asynchronous Timer delays would never resolve (#3093)
+- Fixed an issue setting higher UART baud rates (#3104)
+- ESP32-S2: Fixed linker script (#3096)
+- Fix auto writeback on Crypto DMA (#3108)
+- `Uart::flush()` now correctly blocks until the TX FIFO is empty (#3151)
 
 ### Removed
 
 - Removed `Pin`, `RtcPin` and `RtcPinWithResistors` implementations from `Flex` (#2938)
+- OutputOpenDrain has been removed (#3029)
+- The fields of config structs are no longer public (#3011)
+- Removed the dysfunctional `DmaChannel::set_priority` function (#3088)
+- `esp_hal::time::now()`, which has been replaced by `esp_hal::time::Instant::now()` (#3083)
+- `peripherals::Interrupts` (#3152)
 
 ## [0.23.1] - 2025-01-15
 
@@ -1106,7 +1144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.23.1...HEAD
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...HEAD
+[v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/v0.23.1..esp-hal-v1.0.0-beta.0
 [0.23.1]: https://github.com/esp-rs/esp-hal/compare/v0.23.0..v0.23.1
 [0.23.0]: https://github.com/esp-rs/esp-hal/compare/v0.22.0..v0.23.0
 [0.22.0]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...v0.22.0
