@@ -2091,7 +2091,8 @@ impl embedded_io_async::Read for Uart<'_, Async> {
     }
 
     async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ReadExactError<Self::Error>> {
-        self.rx.read_exact_async(buf)
+        self.rx
+            .read_exact_async(buf)
             .await
             .map_err(|e| ReadExactError::Other(IoError::Rx(e)))
     }
