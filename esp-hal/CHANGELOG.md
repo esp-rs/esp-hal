@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Full-duplex SPI works when mixed with half-duplex SPI (#3176)
+
 ### Removed
 
 ## v1.0.0-beta.0
