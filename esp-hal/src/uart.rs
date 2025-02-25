@@ -315,6 +315,9 @@ impl Default for RxConfig {
 pub struct TxConfig {
     /// Threshold level at which the TX FIFO is considered empty.
     fifo_empty_threshold: u16,
+
+    /// Baud rate for the UART communication.
+    baudrate: u32,
 }
 
 impl Default for TxConfig {
@@ -322,6 +325,7 @@ impl Default for TxConfig {
         TxConfig {
             // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L59>
             fifo_empty_threshold: 10,
+            baudrate: 115_200,
         }
     }
 }
@@ -395,6 +399,7 @@ where
                 guard: tx_guard,
                 rts_pin,
                 tx_pin,
+                baudrate: config.baudrate,
             },
         };
         serial.init(config)?;
@@ -431,6 +436,7 @@ pub struct UartTx<'d, Dm: DriverMode> {
     guard: PeripheralGuard,
     rts_pin: PinGuard,
     tx_pin: PinGuard,
+    baudrate: u32,
 }
 
 /// UART (Receive)
@@ -531,6 +537,7 @@ where
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.baudrate = config.baudrate;
         self.apply_config(config)
     }
 }
@@ -647,9 +654,8 @@ where
         // Invert the TX line
         self.regs().conf0().modify(|_, w| w.txd_inv().bit(true));
 
-        // 1 bit time in microseconds = 1_000_000 / baudrate
-        // TODO: Proper baudrate retrieval!
-        let bit_period_us: u32 = 1_000_000 / 19200;
+        // 1 bit time in microseconds = 1_000_000 / baudrate_bps
+        let bit_period_us: u32 = 1_000_000 / self.baudrate;
         crate::rom::ets_delay_us(bit_period_us * bits);
 
         // Revert the TX line
@@ -741,6 +747,7 @@ impl<'d> UartTx<'d, Blocking> {
             guard: self.guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
+            baudrate: self.baudrate,
         }
     }
 }
@@ -763,6 +770,7 @@ impl<'d> UartTx<'d, Async> {
             guard: self.guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
+            baudrate: self.baudrate,
         }
     }
 }
