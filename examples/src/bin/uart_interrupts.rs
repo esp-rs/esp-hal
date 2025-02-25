@@ -1,10 +1,10 @@
 //! Example of responding to UART interrupts.
 //!
 //! The following wiring is assumed:
-//! - TX => GPIO17
 //! - RX => GPIO16
 
 //% CHIPS: esp32
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -34,8 +34,7 @@ fn main() -> ! {
         .with_rx(RxConfig::default().with_fifo_full_threshold(1));
     let mut uart = Uart::new(peripherals.UART1, uart_config)
         .expect("Failed to initialize UART")
-        .with_rx(peripherals.GPIO16)
-        .with_tx(peripherals.GPIO17);
+        .with_rx(peripherals.GPIO16);
 
     uart.set_interrupt_handler(handler);
 
@@ -60,7 +59,7 @@ fn handler() {
         }
         if serial.interrupts().contains(UartInterrupt::RxFifoFull) {
             let mut byte = [0u8; 1];
-            serial.read_bytes(&mut byte).unwrap();
+            serial.read(&mut byte).unwrap();
             esp_println::print!(" {:02X}", byte[0]);
         }
 
