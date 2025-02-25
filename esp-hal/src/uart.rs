@@ -1727,7 +1727,10 @@ fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), RxError> {
             RxEvent::GlitchDetected => return Err(RxError::GlitchOccurred),
             RxEvent::FrameError => return Err(RxError::FrameFormatViolated),
             RxEvent::ParityError => return Err(RxError::ParityMismatch),
-            RxEvent::FifoFull | RxEvent::BreakDetected | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
+            RxEvent::FifoFull
+            | RxEvent::BreakDetected
+            | RxEvent::CmdCharDetected
+            | RxEvent::FifoTout => continue,
         }
     }
 
