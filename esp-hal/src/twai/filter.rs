@@ -117,6 +117,7 @@ impl SingleStandardFilter {
     ///         b"x",
     ///         [b"xxxxxxxx", b"xxxxxxxx"]
     ///     );
+    /// # Ok(())
     /// # }
     /// ```
     pub const fn new(id: &BitFilter<11>, rtr: &BitFilter<1>, payload: [&BitFilter<8>; 2]) -> Self {
@@ -177,8 +178,8 @@ impl SingleStandardFilter {
     /// frame, with any bytes for the first two payload bytes.
     /// ```rust, ignore
     /// let filter = twai::filter::SingleStandardFilter::new_from_code_mask(
-    ///     StandardId::new(0x000).unwrap(),
-    ///     StandardId::new(0x001).unwrap(),
+    ///     StandardId::new(0x000)?,
+    ///     StandardId::new(0x001)?,
     ///     false,
     ///     true,
     ///     [0x00, 0x00],

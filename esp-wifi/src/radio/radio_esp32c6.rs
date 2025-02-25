@@ -2,18 +2,29 @@
 #[allow(unused_imports)]
 use crate::{
     binary,
-    hal::{interrupt, peripherals::Interrupt},
+    hal::{
+        interrupt,
+        peripherals::{Interrupt, INTERRUPT_CORE0},
+    },
 };
 
 pub(crate) fn setup_radio_isr() {
-    // no-op
+    // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU
+    // interrupt 31 which is masked by default for some reason for this
+    // interrupt, mapping it to 0 doesn't deactivate it
+    INTERRUPT_CORE0::regs()
+        .wifi_bb_intr_map()
+        .write(|w| unsafe { w.wifi_bb_intr_map().bits(31) });
+    INTERRUPT_CORE0::regs()
+        .modem_peri_timeout_intr_map()
+        .write(|w| unsafe { w.modem_peri_timeout_intr_map().bits(31) });
 }
 
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     {
-        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::LP_TIMER);
-        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::BT_MAC);
+        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::LP_TIMER);
+        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::BT_MAC);
     }
 }
 

@@ -3,7 +3,7 @@
 //! Periodically transmits a beacon frame.
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/sniffer esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/sniffer esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -18,9 +18,10 @@ use esp_hal::{
     delay::Delay,
     main,
     rng::Rng,
-    time::ExtU64,
+    time::Duration,
     timer::timg::TimerGroup,
 };
+use esp_println::println;
 use esp_wifi::{init, wifi};
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
@@ -41,23 +42,23 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(72 * 1024);
+    esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
+    let esp_wifi_ctrl = init(
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
     )
     .unwrap();
 
-    let wifi = peripherals.WIFI;
-
     // We must initialize some kind of interface and start it.
-    let (_, mut controller) = wifi::new_with_mode(&init, wifi, wifi::WifiApDevice).unwrap();
+    let (mut controller, _) = esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+
+    controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 
     let mut sniffer = controller.take_sniffer().unwrap();
@@ -112,8 +113,10 @@ fn main() -> ! {
     // Only use the actually written bytes.
     let beacon = &beacon[..length];
 
+    println!("Scan for WiFi networks and find `esp-wifi 802.11 injection`");
+
     loop {
-        sniffer.send_raw_frame(false, beacon, false).unwrap();
-        delay.delay(100.millis());
+        sniffer.send_raw_frame(true, beacon, false).unwrap();
+        delay.delay(Duration::from_millis(100));
     }
 }

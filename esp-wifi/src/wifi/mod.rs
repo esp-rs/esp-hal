@@ -3,17 +3,18 @@
 pub mod event;
 pub(crate) mod os_adapter;
 pub(crate) mod state;
-
 use alloc::collections::vec_deque::VecDeque;
 use core::{
     fmt::Debug,
+    marker::PhantomData,
     mem::{self, MaybeUninit},
     ptr::addr_of,
+    task::Poll,
     time::Duration,
 };
 
 use enumset::{EnumSet, EnumSetType};
-use esp_hal::sync::Locked;
+use esp_hal::{asynch::AtomicWaker, sync::Locked};
 use esp_wifi_sys::include::{
     esp_eap_client_clear_ca_cert,
     esp_eap_client_clear_certificate_and_key,
@@ -61,24 +62,16 @@ use serde::{Deserialize, Serialize};
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 pub use state::*;
 
-#[cfg(not(coex))]
-use crate::config::PowerSaveMode;
 use crate::{
     common_adapter::*,
+    config::PowerSaveMode,
     esp_wifi_result,
-    hal::{
-        peripheral::{Peripheral, PeripheralRef},
-        ram,
-    },
+    hal::ram,
+    wifi::private::EspWifiPacketBuffer,
     EspWifiController,
 };
 
-const ETHERNET_FRAME_HEADER_SIZE: usize = 18;
-
 const MTU: usize = crate::CONFIG.mtu;
-
-#[cfg(feature = "utils")]
-pub mod utils;
 
 #[cfg(coex)]
 use include::{coex_adapter_funcs_t, coex_pre_init, esp_coex_adapter_register};
@@ -947,8 +940,6 @@ impl From<WifiMode> for wifi_mode_t {
     }
 }
 
-const DATA_FRAME_SIZE: usize = MTU + ETHERNET_FRAME_HEADER_SIZE;
-
 const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
 const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
 
@@ -1629,7 +1620,10 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
             .copy_from_slice(crate::CONFIG.country_code.as_bytes());
         cntry_code[2] = crate::CONFIG.country_code_operating_class;
 
+        #[allow(clippy::useless_transmute)]
         let country = wifi_country_t {
+            // FIXME once we bumped the MSRV accordingly (see https://github.com/esp-rs/esp-hal/pull/3027#discussion_r1944718266)
+            #[allow(clippy::useless_transmute)]
             cc: core::mem::transmute::<[u8; 3], [core::ffi::c_char; 3]>(cntry_code),
             schan: 1,
             nchan: 13,
@@ -1784,87 +1778,7 @@ pub(crate) fn wifi_start_scan(
     unsafe { esp_wifi_scan_start(&scan_config, block) }
 }
 
-/// Creates a new [WifiDevice] and [WifiController] in either AP or STA mode
-/// with the given configuration.
-///
-/// This function will panic if the configuration is not
-/// [`Configuration::Client`] or [`Configuration::AccessPoint`].
-///
-/// If you want to use AP-STA mode, use `[new_ap_sta]`.
-pub fn new_with_config<'d, Dm: WifiDeviceMode>(
-    inited: &'d EspWifiController<'d>,
-    device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-    config: Dm::Config,
-) -> Result<(WifiDevice<'d, Dm>, WifiController<'d>), WifiError> {
-    crate::hal::into_ref!(device);
-
-    Ok((
-        WifiDevice::new(unsafe { device.clone_unchecked() }, Dm::new()),
-        WifiController::new_with_config(inited, device, Dm::wrap_config(config))?,
-    ))
-}
-
-/// Creates a new [WifiDevice] and [WifiController] in either AP or STA mode
-/// with a default configuration.
-///
-/// This function will panic if the mode is [`WifiMode::ApSta`].
-/// If you want to use AP-STA mode, use `[new_ap_sta]`.
-pub fn new_with_mode<'d, Dm: WifiDeviceMode>(
-    inited: &'d EspWifiController<'d>,
-    device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-    _mode: Dm,
-) -> Result<(WifiDevice<'d, Dm>, WifiController<'d>), WifiError> {
-    new_with_config(inited, device, <Dm as Sealed>::Config::default())
-}
-
-/// Creates a new [WifiDevice] and [WifiController] in AP-STA mode, with a
-/// default configuration.
-///
-/// Returns a tuple of `(AP device, STA device, controller)`.
-pub fn new_ap_sta<'d>(
-    inited: &'d EspWifiController<'d>,
-    device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-) -> Result<
-    (
-        WifiDevice<'d, WifiApDevice>,
-        WifiDevice<'d, WifiStaDevice>,
-        WifiController<'d>,
-    ),
-    WifiError,
-> {
-    new_ap_sta_with_config(inited, device, Default::default(), Default::default())
-}
-
-/// Creates a new Wifi device and controller in AP-STA mode.
-///
-/// Returns a tuple of `(AP device, STA device, controller)`.
-pub fn new_ap_sta_with_config<'d>(
-    inited: &'d EspWifiController<'d>,
-    device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-    sta_config: crate::wifi::ClientConfiguration,
-    ap_config: crate::wifi::AccessPointConfiguration,
-) -> Result<
-    (
-        WifiDevice<'d, WifiApDevice>,
-        WifiDevice<'d, WifiStaDevice>,
-        WifiController<'d>,
-    ),
-    WifiError,
-> {
-    crate::hal::into_ref!(device);
-
-    Ok((
-        WifiDevice::new(unsafe { device.clone_unchecked() }, WifiApDevice),
-        WifiDevice::new(unsafe { device.clone_unchecked() }, WifiStaDevice),
-        WifiController::new_with_config(
-            inited,
-            device,
-            Configuration::Mixed(sta_config, ap_config),
-        )?,
-    ))
-}
-
-mod sealed {
+mod private {
     use super::*;
 
     #[derive(Debug)]
@@ -1896,193 +1810,125 @@ mod sealed {
             unsafe { core::slice::from_raw_parts_mut(self.buffer as *mut u8, self.len as usize) }
         }
     }
-
-    pub trait Sealed: Copy + Sized {
-        type Config: Default;
-
-        fn new() -> Self;
-
-        fn wrap_config(config: Self::Config) -> Configuration;
-
-        fn data_queue_rx(self) -> &'static Locked<VecDeque<EspWifiPacketBuffer>>;
-
-        fn can_send(self) -> bool {
-            WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE
-        }
-
-        fn increase_in_flight_counter(self) {
-            WIFI_TX_INFLIGHT.fetch_add(1, Ordering::SeqCst);
-        }
-
-        fn tx_token(self) -> Option<WifiTxToken<Self>> {
-            if !self.can_send() {
-                crate::timer::yield_task();
-            }
-
-            if self.can_send() {
-                Some(WifiTxToken { mode: self })
-            } else {
-                None
-            }
-        }
-
-        fn rx_token(self) -> Option<(WifiRxToken<Self>, WifiTxToken<Self>)> {
-            let is_empty = self.data_queue_rx().with(|q| q.is_empty());
-            if is_empty || !self.can_send() {
-                crate::timer::yield_task();
-            }
-
-            let is_empty = is_empty && self.data_queue_rx().with(|q| q.is_empty());
-
-            if !is_empty {
-                self.tx_token().map(|tx| (WifiRxToken { mode: self }, tx))
-            } else {
-                None
-            }
-        }
-
-        fn interface(self) -> wifi_interface_t;
-
-        fn register_transmit_waker(self, cx: &mut core::task::Context<'_>) {
-            embassy::TRANSMIT_WAKER.register(cx.waker())
-        }
-
-        fn register_receive_waker(self, cx: &mut core::task::Context<'_>);
-
-        fn register_link_state_waker(self, cx: &mut core::task::Context<'_>);
-
-        fn link_state(self) -> embassy_net_driver::LinkState;
-    }
-
-    impl Sealed for WifiStaDevice {
-        type Config = ClientConfiguration;
-
-        fn new() -> Self {
-            Self
-        }
-
-        fn wrap_config(config: ClientConfiguration) -> Configuration {
-            Configuration::Client(config)
-        }
-
-        fn data_queue_rx(self) -> &'static Locked<VecDeque<EspWifiPacketBuffer>> {
-            &DATA_QUEUE_RX_STA
-        }
-
-        fn interface(self) -> wifi_interface_t {
-            wifi_interface_t_WIFI_IF_STA
-        }
-
-        fn register_receive_waker(self, cx: &mut core::task::Context<'_>) {
-            embassy::STA_RECEIVE_WAKER.register(cx.waker());
-        }
-
-        fn register_link_state_waker(self, cx: &mut core::task::Context<'_>) {
-            embassy::STA_LINK_STATE_WAKER.register(cx.waker());
-        }
-
-        fn link_state(self) -> embassy_net_driver::LinkState {
-            if matches!(sta_state(), WifiState::StaConnected) {
-                embassy_net_driver::LinkState::Up
-            } else {
-                embassy_net_driver::LinkState::Down
-            }
-        }
-    }
-
-    impl Sealed for WifiApDevice {
-        type Config = AccessPointConfiguration;
-
-        fn new() -> Self {
-            Self
-        }
-
-        fn wrap_config(config: AccessPointConfiguration) -> Configuration {
-            Configuration::AccessPoint(config)
-        }
-
-        fn data_queue_rx(self) -> &'static Locked<VecDeque<EspWifiPacketBuffer>> {
-            &DATA_QUEUE_RX_AP
-        }
-
-        fn interface(self) -> wifi_interface_t {
-            wifi_interface_t_WIFI_IF_AP
-        }
-
-        fn register_receive_waker(self, cx: &mut core::task::Context<'_>) {
-            embassy::AP_RECEIVE_WAKER.register(cx.waker());
-        }
-
-        fn register_link_state_waker(self, cx: &mut core::task::Context<'_>) {
-            embassy::AP_LINK_STATE_WAKER.register(cx.waker());
-        }
-
-        fn link_state(self) -> embassy_net_driver::LinkState {
-            if matches!(ap_state(), WifiState::ApStarted) {
-                embassy_net_driver::LinkState::Up
-            } else {
-                embassy_net_driver::LinkState::Down
-            }
-        }
-    }
 }
-
-use sealed::*;
 
 /// Provides methods for retrieving the Wi-Fi mode and MAC address.
-pub trait WifiDeviceMode: Sealed {
-    /// Returns the currently active Wi-Fi mode.
-    fn mode(self) -> WifiMode;
-
-    /// Returns the MAC address of the Wi-Fi device.
-    fn mac_address(self) -> [u8; 6];
+#[derive(Debug, Clone, Copy)]
+pub enum WifiDeviceMode {
+    Sta,
+    Ap,
 }
 
-/// Wi-Fi station device.
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct WifiStaDevice;
-
-impl WifiDeviceMode for WifiStaDevice {
-    fn mode(self) -> WifiMode {
-        WifiMode::Sta
+impl WifiDeviceMode {
+    fn mac_address(&self) -> [u8; 6] {
+        match self {
+            WifiDeviceMode::Sta => {
+                let mut mac = [0; 6];
+                sta_mac(&mut mac);
+                mac
+            }
+            WifiDeviceMode::Ap => {
+                let mut mac = [0; 6];
+                ap_mac(&mut mac);
+                mac
+            }
+        }
     }
 
-    fn mac_address(self) -> [u8; 6] {
-        let mut mac = [0; 6];
-        sta_mac(&mut mac);
-        mac
-    }
-}
-
-/// Wi-Fi Access Point (AP) device.
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct WifiApDevice;
-
-impl WifiDeviceMode for WifiApDevice {
-    fn mode(self) -> WifiMode {
-        WifiMode::Ap
+    fn data_queue_rx(&self) -> &'static Locked<VecDeque<EspWifiPacketBuffer>> {
+        match self {
+            WifiDeviceMode::Sta => &DATA_QUEUE_RX_STA,
+            WifiDeviceMode::Ap => &DATA_QUEUE_RX_AP,
+        }
     }
 
-    fn mac_address(self) -> [u8; 6] {
-        let mut mac = [0; 6];
-        ap_mac(&mut mac);
-        mac
+    fn can_send(&self) -> bool {
+        WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE
+    }
+
+    fn increase_in_flight_counter(&self) {
+        WIFI_TX_INFLIGHT.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn tx_token(&self) -> Option<WifiTxToken> {
+        if !self.can_send() {
+            crate::preempt::yield_task();
+        }
+
+        if self.can_send() {
+            Some(WifiTxToken { mode: *self })
+        } else {
+            None
+        }
+    }
+
+    fn rx_token(&self) -> Option<(WifiRxToken, WifiTxToken)> {
+        let is_empty = self.data_queue_rx().with(|q| q.is_empty());
+        if is_empty || !self.can_send() {
+            crate::preempt::yield_task();
+        }
+
+        let is_empty = is_empty && self.data_queue_rx().with(|q| q.is_empty());
+
+        if !is_empty {
+            self.tx_token().map(|tx| (WifiRxToken { mode: *self }, tx))
+        } else {
+            None
+        }
+    }
+
+    fn interface(&self) -> wifi_interface_t {
+        match self {
+            WifiDeviceMode::Sta => wifi_interface_t_WIFI_IF_STA,
+            WifiDeviceMode::Ap => wifi_interface_t_WIFI_IF_AP,
+        }
+    }
+
+    fn register_transmit_waker(&self, cx: &mut core::task::Context<'_>) {
+        embassy::TRANSMIT_WAKER.register(cx.waker())
+    }
+
+    fn register_receive_waker(&self, cx: &mut core::task::Context<'_>) {
+        match self {
+            WifiDeviceMode::Sta => embassy::STA_RECEIVE_WAKER.register(cx.waker()),
+            WifiDeviceMode::Ap => embassy::AP_RECEIVE_WAKER.register(cx.waker()),
+        }
+    }
+
+    fn register_link_state_waker(&self, cx: &mut core::task::Context<'_>) {
+        match self {
+            WifiDeviceMode::Sta => embassy::STA_LINK_STATE_WAKER.register(cx.waker()),
+            WifiDeviceMode::Ap => embassy::AP_LINK_STATE_WAKER.register(cx.waker()),
+        }
+    }
+
+    fn link_state(&self) -> embassy_net_driver::LinkState {
+        match self {
+            WifiDeviceMode::Sta => {
+                if matches!(sta_state(), WifiState::StaConnected) {
+                    embassy_net_driver::LinkState::Up
+                } else {
+                    embassy_net_driver::LinkState::Down
+                }
+            }
+            WifiDeviceMode::Ap => {
+                if matches!(ap_state(), WifiState::ApStarted) {
+                    embassy_net_driver::LinkState::Up
+                } else {
+                    embassy_net_driver::LinkState::Down
+                }
+            }
+        }
     }
 }
 
 /// A wifi device implementing smoltcp's Device trait.
-pub struct WifiDevice<'d, Dm: WifiDeviceMode> {
-    _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
-    mode: Dm,
+pub struct WifiDevice<'d> {
+    _phantom: PhantomData<&'d ()>,
+    mode: WifiDeviceMode,
 }
 
-impl<'d, Dm: WifiDeviceMode> WifiDevice<'d, Dm> {
-    pub(crate) fn new(_device: PeripheralRef<'d, crate::hal::peripherals::WIFI>, mode: Dm) -> Self {
-        Self { _device, mode }
-    }
-
+impl WifiDevice<'_> {
     /// Retrieves the MAC address of the Wi-Fi device.
     pub fn mac_address(&self) -> [u8; 6] {
         self.mode.mac_address()
@@ -2091,14 +1937,14 @@ impl<'d, Dm: WifiDeviceMode> WifiDevice<'d, Dm> {
     /// Receives data from the Wi-Fi device (only when `smoltcp` feature is
     /// disabled).
     #[cfg(not(feature = "smoltcp"))]
-    pub fn receive(&mut self) -> Option<(WifiRxToken<Dm>, WifiTxToken<Dm>)> {
+    pub fn receive(&mut self) -> Option<(WifiRxToken, WifiTxToken)> {
         self.mode.rx_token()
     }
 
     /// Transmits data through the Wi-Fi device (only when `smoltcp` feature is
     /// disabled).
     #[cfg(not(feature = "smoltcp"))]
-    pub fn transmit(&mut self) -> Option<WifiTxToken<Dm>> {
+    pub fn transmit(&mut self) -> Option<WifiTxToken> {
         self.mode.tx_token()
     }
 }
@@ -2367,7 +2213,11 @@ impl Sniffer {
     ) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe {
             esp_wifi_80211_tx(
-                if use_sta_interface { 0 } else { 1 } as wifi_interface_t,
+                if use_sta_interface {
+                    wifi_interface_t_WIFI_IF_STA
+                } else {
+                    wifi_interface_t_WIFI_IF_AP
+                } as wifi_interface_t,
                 buffer.as_ptr() as *const _,
                 buffer.len() as i32,
                 use_internal_seq_num,
@@ -2380,251 +2230,15 @@ impl Sniffer {
     }
 }
 
-/// A wifi controller
-pub struct WifiController<'d> {
-    _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
-    config: Configuration,
-    #[cfg(feature = "sniffer")]
-    sniffer_taken: AtomicBool,
-}
-
-impl Drop for WifiController<'_> {
-    fn drop(&mut self) {
-        if unwrap!(
-            crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
-                Some(x.saturating_sub(1))
-            })
-        ) == 0
-        {
-            if let Err(e) = crate::wifi::wifi_deinit() {
-                warn!("Failed to cleanly deinit wifi: {:?}", e);
-            }
-        }
-    }
-}
-
-impl<'d> WifiController<'d> {
-    pub(crate) fn new_with_config(
-        inited: &'d EspWifiController<'d>,
-        _device: PeripheralRef<'d, crate::hal::peripherals::WIFI>,
-        config: Configuration,
-    ) -> Result<Self, WifiError> {
-        if !inited.wifi() {
-            crate::wifi::wifi_init()?;
-        }
-
-        // We set up the controller with the default config because we need to call
-        // `set_configuration` to apply the actual configuration, and it will update the
-        // stored configuration anyway.
-        let mut this = Self {
-            _device,
-            config: Default::default(),
-            #[cfg(feature = "sniffer")]
-            sniffer_taken: AtomicBool::new(false),
-        };
-
-        let mode = WifiMode::try_from(&config)?;
-        esp_wifi_result!(unsafe { esp_wifi_set_mode(mode.into()) })?;
-        debug!("Wifi mode {:?} set", mode);
-
-        this.set_configuration(&config)?;
-        Ok(this)
-    }
-
-    /// Attempts to take the sniffer, returns `Some(Sniffer)` if successful,
-    /// otherwise `None`.
-    #[cfg(feature = "sniffer")]
-    pub fn take_sniffer(&self) -> Option<Sniffer> {
-        if self
-            .sniffer_taken
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            == Ok(false)
-        {
-            Some(Sniffer::new())
-        } else {
-            None
-        }
-    }
-
-    /// Set CSI configuration and register the receiving callback.
-    #[cfg(feature = "csi")]
-    pub fn set_csi(
-        &mut self,
-        mut csi: CsiConfig,
-        cb: impl FnMut(crate::wifi::wifi_csi_info_t) + Send,
-    ) -> Result<(), WifiError> {
-        csi.apply_config()?;
-        csi.set_receive_cb(cb)?;
-        csi.set_csi(true)?;
-
-        Ok(())
-    }
-
-    /// Set the wifi protocol.
-    ///
-    /// This will set the wifi protocol to the desired protocol, the default for
-    /// this is: `WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N`
-    ///
-    /// # Arguments:
-    ///
-    /// * `protocols` - The desired protocols
-    ///
-    /// # Example:
-    ///
-    /// ```
-    /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
-    /// ```
-    pub fn set_protocol(&mut self, protocols: EnumSet<Protocol>) -> Result<(), WifiError> {
-        let mut protocol = 0u8;
-
-        protocols.into_iter().for_each(|v| match v {
-            Protocol::P802D11B => protocol |= WIFI_PROTOCOL_11B as u8,
-            Protocol::P802D11BG => protocol |= WIFI_PROTOCOL_11B as u8 | WIFI_PROTOCOL_11G as u8,
-            Protocol::P802D11BGN => {
-                protocol |=
-                    WIFI_PROTOCOL_11B as u8 | WIFI_PROTOCOL_11G as u8 | WIFI_PROTOCOL_11N as u8
-            }
-            Protocol::P802D11BGNLR => {
-                protocol |= WIFI_PROTOCOL_11B as u8
-                    | WIFI_PROTOCOL_11G as u8
-                    | WIFI_PROTOCOL_11N as u8
-                    | WIFI_PROTOCOL_LR as u8
-            }
-            Protocol::P802D11LR => protocol |= WIFI_PROTOCOL_LR as u8,
-            Protocol::P802D11BGNAX => {
-                protocol |= WIFI_PROTOCOL_11B as u8
-                    | WIFI_PROTOCOL_11G as u8
-                    | WIFI_PROTOCOL_11N as u8
-                    | WIFI_PROTOCOL_11AX as u8
-            }
-        });
-
-        let mut mode = wifi_mode_t_WIFI_MODE_NULL;
-        esp_wifi_result!(unsafe { esp_wifi_get_mode(&mut mode) })?;
-
-        if mode == wifi_mode_t_WIFI_MODE_STA || mode == wifi_mode_t_WIFI_MODE_APSTA {
-            esp_wifi_result!(unsafe {
-                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol)
-            })?;
-        }
-        if mode == wifi_mode_t_WIFI_MODE_AP || mode == wifi_mode_t_WIFI_MODE_APSTA {
-            esp_wifi_result!(unsafe {
-                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol)
-            })?;
-        }
-
-        Ok(())
-    }
-
-    #[cfg(not(coex))]
-    /// Configures modem power saving
-    pub fn set_power_saving(&mut self, ps: PowerSaveMode) -> Result<(), WifiError> {
-        apply_power_saving(ps)
-    }
-
-    /// Checks if Wi-Fi is enabled as a station.
-    pub fn is_sta_enabled(&self) -> Result<bool, WifiError> {
-        WifiMode::try_from(&self.config).map(|m| m.is_sta())
-    }
-
-    /// Checks if Wi-Fi is enabled as an access p.
-    pub fn is_ap_enabled(&self) -> Result<bool, WifiError> {
-        WifiMode::try_from(&self.config).map(|m| m.is_ap())
-    }
-
-    /// A blocking wifi network scan with caller-provided scanning options.
-    pub fn scan_with_config_sync<const N: usize>(
-        &mut self,
-        config: ScanConfig<'_>,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-        esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
-
-        let count = self.scan_result_count()?;
-        let result = self.scan_results()?;
-
-        Ok((result, count))
-    }
-
-    fn scan_result_count(&mut self) -> Result<usize, WifiError> {
-        let mut bss_total: u16 = 0;
-
-        // Prevents memory leak on error
-        let guard = FreeApListOnDrop;
-
-        unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_num(&mut bss_total))? };
-
-        guard.defuse();
-
-        Ok(bss_total as usize)
-    }
-
-    fn scan_results<const N: usize>(
-        &mut self,
-    ) -> Result<heapless::Vec<AccessPointInfo, N>, WifiError> {
-        let mut scanned = heapless::Vec::<AccessPointInfo, N>::new();
-        let mut bss_total: u16 = N as u16;
-
-        let mut records: [MaybeUninit<include::wifi_ap_record_t>; N] = [MaybeUninit::uninit(); N];
-
-        // Prevents memory leak on error
-        let guard = FreeApListOnDrop;
-
-        unsafe {
-            esp_wifi_result!(include::esp_wifi_scan_get_ap_records(
-                &mut bss_total,
-                records[0].as_mut_ptr(),
-            ))?
-        };
-
-        guard.defuse();
-
-        for i in 0..bss_total {
-            let record = unsafe { MaybeUninit::assume_init_ref(&records[i as usize]) };
-            let ap_info = convert_ap_info(record);
-
-            scanned.push(ap_info).ok();
-        }
-
-        Ok(scanned)
-    }
-
-    /// A blocking wifi network scan with default scanning options.
-    pub fn scan_n<const N: usize>(
-        &mut self,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-        self.scan_with_config_sync(Default::default())
-    }
-
-    /// Starts the WiFi controller.
-    pub fn start(&mut self) -> Result<(), WifiError> {
-        crate::wifi::wifi_start()
-    }
-
-    /// Stops the WiFi controller.
-    pub fn stop(&mut self) -> Result<(), WifiError> {
-        self.stop_impl()
-    }
-
-    /// Connects the WiFi controller to a network.
-    pub fn connect(&mut self) -> Result<(), WifiError> {
-        self.connect_impl()
-    }
-
-    /// Disconnects the WiFi controller from a network.
-    pub fn disconnect(&mut self) -> Result<(), WifiError> {
-        self.disconnect_impl()
-    }
-}
-
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
 #[cfg(feature = "smoltcp")]
-impl<Dm: WifiDeviceMode> Device for WifiDevice<'_, Dm> {
+impl Device for WifiDevice<'_> {
     type RxToken<'a>
-        = WifiRxToken<Dm>
+        = WifiRxToken
     where
         Self: 'a;
     type TxToken<'a>
-        = WifiTxToken<Dm>
+        = WifiTxToken
     where
         Self: 'a;
 
@@ -2653,11 +2267,11 @@ impl<Dm: WifiDeviceMode> Device for WifiDevice<'_, Dm> {
 
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct WifiRxToken<Dm: Sealed> {
-    mode: Dm,
+pub struct WifiRxToken {
+    mode: WifiDeviceMode,
 }
 
-impl<Dm: Sealed> WifiRxToken<Dm> {
+impl WifiRxToken {
     /// Consumes the RX token and applies the callback function to the received
     /// data buffer.
     pub fn consume_token<R, F>(self, f: F) -> R
@@ -2685,7 +2299,7 @@ impl<Dm: Sealed> WifiRxToken<Dm> {
 }
 
 #[cfg(feature = "smoltcp")]
-impl<Dm: Sealed> RxToken for WifiRxToken<Dm> {
+impl RxToken for WifiRxToken {
     fn consume<R, F>(self, f: F) -> R
     where
         F: FnOnce(&[u8]) -> R,
@@ -2696,11 +2310,11 @@ impl<Dm: Sealed> RxToken for WifiRxToken<Dm> {
 
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct WifiTxToken<Dm: Sealed> {
-    mode: Dm,
+pub struct WifiTxToken {
+    mode: WifiDeviceMode,
 }
 
-impl<Dm: Sealed> WifiTxToken<Dm> {
+impl WifiTxToken {
     /// Consumes the TX token and applies the callback function to the received
     /// data buffer.
     pub fn consume_token<R, F>(self, len: usize, f: F) -> R
@@ -2712,7 +2326,7 @@ impl<Dm: Sealed> WifiTxToken<Dm> {
         // (safety): creation of multiple WiFi devices with the same mode is impossible
         // in safe Rust, therefore only smoltcp _or_ embassy-net can be used at
         // one time
-        static mut BUFFER: [u8; DATA_FRAME_SIZE] = [0u8; DATA_FRAME_SIZE];
+        static mut BUFFER: [u8; MTU] = [0u8; MTU];
 
         let buffer = unsafe { &mut BUFFER[..len] };
 
@@ -2725,7 +2339,7 @@ impl<Dm: Sealed> WifiTxToken<Dm> {
 }
 
 #[cfg(feature = "smoltcp")]
-impl<Dm: Sealed> TxToken for WifiTxToken<Dm> {
+impl TxToken for WifiTxToken {
     fn consume<R, F>(self, len: usize, f: F) -> R
     where
         F: FnOnce(&mut [u8]) -> R,
@@ -2971,119 +2585,7 @@ fn apply_sta_eap_config(config: &EapClientConfiguration) -> Result<(), WifiError
     }
 }
 
-impl WifiController<'_> {
-    /// Get the supported capabilities of the controller.
-    pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
-        let caps = match self.config {
-            Configuration::None => unreachable!(),
-            Configuration::Client(_) => enumset::enum_set! { Capability::Client },
-            Configuration::AccessPoint(_) => enumset::enum_set! { Capability::AccessPoint },
-            Configuration::Mixed(_, _) => {
-                Capability::Client | Capability::AccessPoint | Capability::Mixed
-            }
-            Configuration::EapClient(_) => enumset::enum_set! { Capability::Client },
-        };
-
-        Ok(caps)
-    }
-
-    /// Get the currently used configuration.
-    pub fn configuration(&self) -> Result<Configuration, WifiError> {
-        Ok(self.config.clone())
-    }
-
-    /// Set the configuration, you need to use Wifi::connect() for connecting to
-    /// an AP.
-    ///
-    /// This will replace any previously set configuration
-    pub fn set_configuration(&mut self, conf: &Configuration) -> Result<(), WifiError> {
-        let wifi_mode = WifiMode::current().unwrap_or(WifiMode::Sta);
-        let sta_enabled = wifi_mode.is_sta();
-        let ap_enabled = wifi_mode.is_ap();
-
-        match conf {
-            Configuration::Client(_) if !sta_enabled => {
-                return Err(WifiError::InternalError(
-                    InternalWifiError::EspErrInvalidArg,
-                ))
-            }
-            Configuration::AccessPoint(_) if !ap_enabled => {
-                return Err(WifiError::InternalError(
-                    InternalWifiError::EspErrInvalidArg,
-                ))
-            }
-            Configuration::EapClient(_) if !sta_enabled => {
-                return Err(WifiError::InternalError(
-                    InternalWifiError::EspErrInvalidArg,
-                ))
-            }
-            _ => (),
-        }
-
-        self.config = conf.clone();
-
-        match conf {
-            Configuration::None => {
-                return Err(WifiError::InternalError(
-                    InternalWifiError::EspErrInvalidArg,
-                ));
-            }
-            Configuration::Client(config) => apply_sta_config(config)?,
-            Configuration::AccessPoint(config) => apply_ap_config(config)?,
-            Configuration::Mixed(sta_config, ap_config) => {
-                apply_ap_config(ap_config)?;
-                apply_sta_config(sta_config)?;
-            }
-            Configuration::EapClient(config) => apply_sta_eap_config(config)?,
-        };
-
-        Ok(())
-    }
-
-    pub(crate) fn stop_impl(&mut self) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_stop() })
-    }
-
-    pub(crate) fn connect_impl(&mut self) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_connect() })
-    }
-
-    pub(crate) fn disconnect_impl(&mut self) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_disconnect() })
-    }
-
-    /// Checks if the WiFi controller has started.
-    ///
-    /// This function should be called after the `start` method to verify if the
-    /// WiFi has started successfully.
-    pub fn is_started(&self) -> Result<bool, WifiError> {
-        if matches!(
-            crate::wifi::sta_state(),
-            WifiState::StaStarted | WifiState::StaConnected | WifiState::StaDisconnected
-        ) {
-            return Ok(true);
-        }
-        if matches!(crate::wifi::ap_state(), WifiState::ApStarted) {
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    /// Checks if the WiFi controller is connected to a configured network.
-    ///
-    /// This function should be called after the `connect` method to verify if
-    /// the connection was successful.
-    pub fn is_connected(&self) -> Result<bool, WifiError> {
-        match crate::wifi::sta_state() {
-            crate::wifi::WifiState::StaConnected => Ok(true),
-            crate::wifi::WifiState::StaDisconnected => Err(WifiError::Disconnected),
-            // FIXME: Should any other enum value trigger an error instead of returning false?
-            _ => Ok(false),
-        }
-    }
-}
-
-fn dump_packet_info(_buffer: &[u8]) {
+fn dump_packet_info(_buffer: &mut [u8]) {
     #[cfg(dump_packets)]
     {
         info!("@WIFIFRAME {:?}", _buffer);
@@ -3123,7 +2625,7 @@ pub(crate) mod embassy {
     pub(crate) static STA_RECEIVE_WAKER: AtomicWaker = AtomicWaker::new();
     pub(crate) static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
 
-    impl<Dm: WifiDeviceMode> RxToken for WifiRxToken<Dm> {
+    impl RxToken for WifiRxToken {
         fn consume<R, F>(self, f: F) -> R
         where
             F: FnOnce(&mut [u8]) -> R,
@@ -3132,7 +2634,7 @@ pub(crate) mod embassy {
         }
     }
 
-    impl<Dm: WifiDeviceMode> TxToken for WifiTxToken<Dm> {
+    impl TxToken for WifiTxToken {
         fn consume<R, F>(self, len: usize, f: F) -> R
         where
             F: FnOnce(&mut [u8]) -> R,
@@ -3141,13 +2643,13 @@ pub(crate) mod embassy {
         }
     }
 
-    impl<Dm: WifiDeviceMode> Driver for WifiDevice<'_, Dm> {
+    impl Driver for WifiDevice<'_> {
         type RxToken<'a>
-            = WifiRxToken<Dm>
+            = WifiRxToken
         where
             Self: 'a;
         type TxToken<'a>
-            = WifiTxToken<Dm>
+            = WifiTxToken
         where
             Self: 'a;
 
@@ -3190,240 +2692,9 @@ pub(crate) mod embassy {
     }
 }
 
-#[cfg(not(coex))]
 pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
     esp_wifi_result!(unsafe { esp_wifi_sys::include::esp_wifi_set_ps(ps.into()) })?;
     Ok(())
-}
-
-mod asynch {
-    use core::task::Poll;
-
-    use esp_hal::asynch::AtomicWaker;
-
-    use super::*;
-
-    // TODO assumes STA mode only
-    impl WifiController<'_> {
-        /// Async version of [`crate::wifi::WifiController`]'s `scan_n` method
-        pub async fn scan_n_async<const N: usize>(
-            &mut self,
-        ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-            self.scan_with_config_async(Default::default()).await
-        }
-
-        /// An async wifi network scan with caller-provided scanning options.
-        pub async fn scan_with_config_async<const N: usize>(
-            &mut self,
-            config: ScanConfig<'_>,
-        ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-            Self::clear_events(WifiEvent::ScanDone);
-            esp_wifi_result!(wifi_start_scan(false, config))?;
-
-            // Prevents memory leak if `scan_n`'s future is dropped.
-            let guard = FreeApListOnDrop;
-            WifiEventFuture::new(WifiEvent::ScanDone).await;
-
-            guard.defuse();
-
-            let count = self.scan_result_count()?;
-            let result = self.scan_results()?;
-
-            Ok((result, count))
-        }
-
-        /// Async version of [`crate::wifi::WifiController`]'s `start` method
-        pub async fn start_async(&mut self) -> Result<(), WifiError> {
-            let mode = WifiMode::try_from(&self.config)?;
-
-            let mut events = enumset::enum_set! {};
-            if mode.is_ap() {
-                events |= WifiEvent::ApStart;
-            }
-            if mode.is_sta() {
-                events |= WifiEvent::StaStart;
-            }
-
-            Self::clear_events(events);
-
-            wifi_start()?;
-
-            self.wait_for_all_events(events, false).await;
-
-            Ok(())
-        }
-
-        /// Async version of [`crate::wifi::WifiController`]'s `stop` method
-        pub async fn stop_async(&mut self) -> Result<(), WifiError> {
-            let mode = WifiMode::try_from(&self.config)?;
-
-            let mut events = enumset::enum_set! {};
-            if mode.is_ap() {
-                events |= WifiEvent::ApStop;
-            }
-            if mode.is_sta() {
-                events |= WifiEvent::StaStop;
-            }
-
-            Self::clear_events(events);
-
-            crate::wifi::WifiController::stop_impl(self)?;
-
-            self.wait_for_all_events(events, false).await;
-
-            reset_ap_state();
-            reset_sta_state();
-
-            Ok(())
-        }
-
-        /// Async version of [`crate::wifi::WifiController`]'s `connect` method
-        pub async fn connect_async(&mut self) -> Result<(), WifiError> {
-            Self::clear_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected);
-
-            let err = crate::wifi::WifiController::connect_impl(self).err();
-
-            if MultiWifiEventFuture::new(WifiEvent::StaConnected | WifiEvent::StaDisconnected)
-                .await
-                .contains(WifiEvent::StaDisconnected)
-            {
-                Err(err.unwrap_or(WifiError::Disconnected))
-            } else {
-                Ok(())
-            }
-        }
-
-        /// Async version of [`crate::wifi::WifiController`]'s `Disconnect`
-        /// method
-        pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
-            // If not connected, this will do nothing.
-            // It will also wait forever for a `StaDisconnected` event that will never come.
-            // Return early instead of hanging.
-            if !matches!(self.is_connected(), Ok(true)) {
-                return Ok(());
-            }
-
-            Self::clear_events(WifiEvent::StaDisconnected);
-            crate::wifi::WifiController::disconnect_impl(self)?;
-            WifiEventFuture::new(WifiEvent::StaDisconnected).await;
-
-            Ok(())
-        }
-
-        fn clear_events(events: impl Into<EnumSet<WifiEvent>>) {
-            WIFI_EVENTS.with(|evts| evts.get_mut().remove_all(events.into()));
-        }
-
-        /// Wait for one [`WifiEvent`].
-        pub async fn wait_for_event(&mut self, event: WifiEvent) {
-            Self::clear_events(event);
-            WifiEventFuture::new(event).await
-        }
-
-        /// Wait for one of multiple [`WifiEvent`]s. Returns the events that
-        /// occurred while waiting.
-        pub async fn wait_for_events(
-            &mut self,
-            events: EnumSet<WifiEvent>,
-            clear_pending: bool,
-        ) -> EnumSet<WifiEvent> {
-            if clear_pending {
-                Self::clear_events(events);
-            }
-            MultiWifiEventFuture::new(events).await
-        }
-
-        /// Wait for multiple [`WifiEvent`]s.
-        pub async fn wait_for_all_events(
-            &mut self,
-            mut events: EnumSet<WifiEvent>,
-            clear_pending: bool,
-        ) {
-            if clear_pending {
-                Self::clear_events(events);
-            }
-
-            while !events.is_empty() {
-                let fired = MultiWifiEventFuture::new(events).await;
-                events -= fired;
-            }
-        }
-    }
-
-    impl WifiEvent {
-        pub(crate) fn waker(&self) -> &'static AtomicWaker {
-            // for now use only one waker for all events
-            // if that ever becomes a problem we might want to pick some events to use their
-            // own
-            static WAKER: AtomicWaker = AtomicWaker::new();
-            &WAKER
-        }
-    }
-
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct WifiEventFuture {
-        event: WifiEvent,
-    }
-
-    impl WifiEventFuture {
-        /// Creates a new `Future` for the specified WiFi event.
-        pub fn new(event: WifiEvent) -> Self {
-            Self { event }
-        }
-    }
-
-    impl core::future::Future for WifiEventFuture {
-        type Output = ();
-
-        fn poll(
-            self: core::pin::Pin<&mut Self>,
-            cx: &mut core::task::Context<'_>,
-        ) -> Poll<Self::Output> {
-            self.event.waker().register(cx.waker());
-            if WIFI_EVENTS.with(|events| events.get_mut().remove(self.event)) {
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
-        }
-    }
-
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct MultiWifiEventFuture {
-        event: EnumSet<WifiEvent>,
-    }
-
-    impl MultiWifiEventFuture {
-        /// Creates a new `Future` for the specified set of WiFi events.
-        pub fn new(event: EnumSet<WifiEvent>) -> Self {
-            Self { event }
-        }
-    }
-
-    impl core::future::Future for MultiWifiEventFuture {
-        type Output = EnumSet<WifiEvent>;
-
-        fn poll(
-            self: core::pin::Pin<&mut Self>,
-            cx: &mut core::task::Context<'_>,
-        ) -> Poll<Self::Output> {
-            let output = WIFI_EVENTS.with(|events| {
-                let events = events.get_mut();
-                let active = events.intersection(self.event);
-                events.remove_all(active);
-                active
-            });
-            if output.is_empty() {
-                for event in self.event.iter() {
-                    event.waker().register(cx.waker());
-                }
-
-                Poll::Pending
-            } else {
-                Poll::Ready(output)
-            }
-        }
-    }
 }
 
 struct FreeApListOnDrop;
@@ -3437,6 +2708,553 @@ impl Drop for FreeApListOnDrop {
     fn drop(&mut self) {
         unsafe {
             include::esp_wifi_clear_ap_list();
+        }
+    }
+}
+
+#[non_exhaustive]
+pub struct Interfaces<'d> {
+    pub sta: WifiDevice<'d>,
+    pub ap: WifiDevice<'d>,
+}
+
+/// Create a WiFi controller and it's associated interfaces.
+///
+/// Dropping the controller will deinitialize / stop WiFi.
+pub fn new<'d>(
+    inited: &'d EspWifiController<'d>,
+    _device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
+) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
+    if !inited.wifi() {
+        crate::wifi::wifi_init()?;
+    }
+    Ok((
+        WifiController {
+            _phantom: Default::default(),
+            #[cfg(feature = "sniffer")]
+            sniffer_taken: AtomicBool::new(false),
+        },
+        Interfaces {
+            sta: WifiDevice {
+                _phantom: Default::default(),
+                mode: WifiDeviceMode::Sta,
+            },
+            ap: WifiDevice {
+                _phantom: Default::default(),
+                mode: WifiDeviceMode::Ap,
+            },
+        },
+    ))
+}
+
+#[non_exhaustive]
+pub struct WifiController<'d> {
+    _phantom: PhantomData<&'d ()>,
+    #[cfg(feature = "sniffer")]
+    sniffer_taken: AtomicBool,
+}
+
+impl Drop for WifiController<'_> {
+    fn drop(&mut self) {
+        if unwrap!(
+            crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+                Some(x.saturating_sub(1))
+            })
+        ) == 0
+        {
+            if let Err(e) = crate::wifi::wifi_deinit() {
+                warn!("Failed to cleanly deinit wifi: {:?}", e);
+            }
+        }
+    }
+}
+
+impl WifiController<'_> {
+    /// Attempts to take the sniffer, returns `Some(Sniffer)` if successful,
+    /// otherwise `None`.
+    #[cfg(feature = "sniffer")]
+    pub fn take_sniffer(&self) -> Option<Sniffer> {
+        if !self.sniffer_taken.fetch_or(true, Ordering::Acquire) {
+            Some(Sniffer::new())
+        } else {
+            None
+        }
+    }
+
+    /// Set CSI configuration and register the receiving callback.
+    #[cfg(feature = "csi")]
+    pub fn set_csi(
+        &mut self,
+        mut csi: CsiConfig,
+        cb: impl FnMut(crate::wifi::wifi_csi_info_t) + Send,
+    ) -> Result<(), WifiError> {
+        csi.apply_config()?;
+        csi.set_receive_cb(cb)?;
+        csi.set_csi(true)?;
+
+        Ok(())
+    }
+
+    /// Set the wifi protocol.
+    ///
+    /// This will set the wifi protocol to the desired protocol, the default for
+    /// this is: `WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N`
+    ///
+    /// # Arguments:
+    ///
+    /// * `protocols` - The desired protocols
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
+    /// ```
+    pub fn set_protocol(&mut self, protocols: EnumSet<Protocol>) -> Result<(), WifiError> {
+        let protocol = protocols
+            .into_iter()
+            .map(|v| match v {
+                Protocol::P802D11B => WIFI_PROTOCOL_11B,
+                Protocol::P802D11BG => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G,
+                Protocol::P802D11BGN => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N,
+                Protocol::P802D11BGNLR => {
+                    WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR
+                }
+                Protocol::P802D11LR => WIFI_PROTOCOL_LR,
+                Protocol::P802D11BGNAX => {
+                    WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_11AX
+                }
+            })
+            .fold(0, |combined, protocol| combined | protocol) as u8;
+
+        let mode = self.mode()?;
+        if mode.is_sta() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol)
+            })?;
+        }
+        if mode.is_ap() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol)
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Configures modem power saving
+    pub fn set_power_saving(&mut self, ps: PowerSaveMode) -> Result<(), WifiError> {
+        apply_power_saving(ps)
+    }
+
+    /// A blocking wifi network scan with caller-provided scanning options.
+    pub fn scan_with_config_sync<const N: usize>(
+        &mut self,
+        config: ScanConfig<'_>,
+    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+        esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
+
+        let count = self.scan_result_count()?;
+        let result = self.scan_results()?;
+
+        Ok((result, count))
+    }
+
+    fn scan_result_count(&mut self) -> Result<usize, WifiError> {
+        let mut bss_total: u16 = 0;
+
+        // Prevents memory leak on error
+        let guard = FreeApListOnDrop;
+
+        unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_num(&mut bss_total))? };
+
+        guard.defuse();
+
+        Ok(bss_total as usize)
+    }
+
+    fn scan_results<const N: usize>(
+        &mut self,
+    ) -> Result<heapless::Vec<AccessPointInfo, N>, WifiError> {
+        let mut scanned = heapless::Vec::<AccessPointInfo, N>::new();
+        let mut bss_total: u16 = N as u16;
+
+        let mut records: [MaybeUninit<include::wifi_ap_record_t>; N] = [MaybeUninit::uninit(); N];
+
+        // Prevents memory leak on error
+        let guard = FreeApListOnDrop;
+
+        unsafe {
+            esp_wifi_result!(include::esp_wifi_scan_get_ap_records(
+                &mut bss_total,
+                records[0].as_mut_ptr(),
+            ))?
+        };
+
+        guard.defuse();
+
+        for i in 0..bss_total {
+            let record = unsafe { MaybeUninit::assume_init_ref(&records[i as usize]) };
+            let ap_info = convert_ap_info(record);
+
+            scanned.push(ap_info).ok();
+        }
+
+        Ok(scanned)
+    }
+
+    /// A blocking wifi network scan with default scanning options.
+    pub fn scan_n<const N: usize>(
+        &mut self,
+    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+        self.scan_with_config_sync(Default::default())
+    }
+
+    /// Starts the WiFi controller.
+    pub fn start(&mut self) -> Result<(), WifiError> {
+        crate::wifi::wifi_start()
+    }
+
+    /// Stops the WiFi controller.
+    pub fn stop(&mut self) -> Result<(), WifiError> {
+        self.stop_impl()
+    }
+
+    /// Connect WiFi station to the AP.
+    ///
+    /// - If station is connected , call [Self::disconnect] to disconnect.
+    /// - Scanning will not be effective until connection between device and the
+    ///   AP is established.
+    /// - If device is scanning and connecting at the same time, it will abort
+    ///   scanning and return a warning message and error
+    pub fn connect(&mut self) -> Result<(), WifiError> {
+        self.connect_impl()
+    }
+
+    /// Disconnect WiFi station from the AP.
+    pub fn disconnect(&mut self) -> Result<(), WifiError> {
+        self.disconnect_impl()
+    }
+
+    /// Get the supported capabilities of the controller.
+    pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
+        let caps =
+            enumset::enum_set! { Capability::Client | Capability::AccessPoint | Capability::Mixed };
+        Ok(caps)
+    }
+
+    /// Set the configuration.
+    ///
+    /// This will set the mode accordingly.
+    /// You need to use Wifi::connect() for connecting to an AP.
+    pub fn set_configuration(&mut self, conf: &Configuration) -> Result<(), WifiError> {
+        let mode = match conf {
+            Configuration::None => {
+                return Err(WifiError::InternalError(
+                    InternalWifiError::EspErrInvalidArg,
+                ));
+            }
+            Configuration::Client(_) => wifi_mode_t_WIFI_MODE_STA,
+            Configuration::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
+            Configuration::Mixed(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
+            Configuration::EapClient(_) => wifi_mode_t_WIFI_MODE_STA,
+        };
+
+        esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
+
+        match conf {
+            Configuration::None => {
+                return Err(WifiError::InternalError(
+                    InternalWifiError::EspErrInvalidArg,
+                ));
+            }
+            Configuration::Client(config) => {
+                apply_sta_config(config)?;
+            }
+            Configuration::AccessPoint(config) => {
+                apply_ap_config(config)?;
+            }
+            Configuration::Mixed(sta_config, ap_config) => {
+                apply_ap_config(ap_config)?;
+                apply_sta_config(sta_config)?;
+            }
+            Configuration::EapClient(config) => {
+                apply_sta_eap_config(config)?;
+            }
+        };
+
+        Ok(())
+    }
+
+    /// Set the WiFi mode.
+    ///
+    /// This will override the mode inferred by [Self::set_configuration].
+    pub fn set_mode(&mut self, mode: WifiMode) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_set_mode(mode.into()) })?;
+        Ok(())
+    }
+
+    fn stop_impl(&mut self) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_stop() })
+    }
+
+    fn connect_impl(&mut self) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_connect() })
+    }
+
+    fn disconnect_impl(&mut self) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_disconnect() })
+    }
+
+    /// Checks if the WiFi controller has started.
+    ///
+    /// This function should be called after the `start` method to verify if the
+    /// WiFi has started successfully.
+    pub fn is_started(&self) -> Result<bool, WifiError> {
+        if matches!(
+            crate::wifi::sta_state(),
+            WifiState::StaStarted | WifiState::StaConnected | WifiState::StaDisconnected
+        ) {
+            return Ok(true);
+        }
+        if matches!(crate::wifi::ap_state(), WifiState::ApStarted) {
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Checks if the WiFi controller is connected to an AP.
+    ///
+    /// This function should be called after the `connect` method to verify if
+    /// the connection was successful.
+    pub fn is_connected(&self) -> Result<bool, WifiError> {
+        match crate::wifi::sta_state() {
+            crate::wifi::WifiState::StaConnected => Ok(true),
+            crate::wifi::WifiState::StaDisconnected => Err(WifiError::Disconnected),
+            // FIXME: Should any other enum value trigger an error instead of returning false?
+            _ => Ok(false),
+        }
+    }
+
+    fn mode(&self) -> Result<WifiMode, WifiError> {
+        WifiMode::current()
+    }
+
+    /// Async version of [`crate::wifi::WifiController`]'s `scan_n` method
+    pub async fn scan_n_async<const N: usize>(
+        &mut self,
+    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+        self.scan_with_config_async(Default::default()).await
+    }
+
+    /// An async wifi network scan with caller-provided scanning options.
+    pub async fn scan_with_config_async<const N: usize>(
+        &mut self,
+        config: ScanConfig<'_>,
+    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+        Self::clear_events(WifiEvent::ScanDone);
+        esp_wifi_result!(wifi_start_scan(false, config))?;
+
+        // Prevents memory leak if `scan_n`'s future is dropped.
+        let guard = FreeApListOnDrop;
+        WifiEventFuture::new(WifiEvent::ScanDone).await;
+
+        guard.defuse();
+
+        let count = self.scan_result_count()?;
+        let result = self.scan_results()?;
+
+        Ok((result, count))
+    }
+
+    /// Async version of [`crate::wifi::WifiController`]'s `start` method
+    pub async fn start_async(&mut self) -> Result<(), WifiError> {
+        let mut events = enumset::enum_set! {};
+
+        let mode = self.mode()?;
+        if mode.is_ap() {
+            events |= WifiEvent::ApStart;
+        }
+        if mode.is_sta() {
+            events |= WifiEvent::StaStart;
+        }
+
+        Self::clear_events(events);
+
+        wifi_start()?;
+
+        self.wait_for_all_events(events, false).await;
+
+        Ok(())
+    }
+
+    /// Async version of [`crate::wifi::WifiController`]'s `stop` method
+    pub async fn stop_async(&mut self) -> Result<(), WifiError> {
+        let mut events = enumset::enum_set! {};
+
+        let mode = self.mode()?;
+        if mode.is_ap() {
+            events |= WifiEvent::ApStop;
+        }
+        if mode.is_sta() {
+            events |= WifiEvent::StaStop;
+        }
+
+        Self::clear_events(events);
+
+        crate::wifi::WifiController::stop_impl(self)?;
+
+        self.wait_for_all_events(events, false).await;
+
+        reset_ap_state();
+        reset_sta_state();
+
+        Ok(())
+    }
+
+    /// Async version of [`crate::wifi::WifiController`]'s `connect` method
+    pub async fn connect_async(&mut self) -> Result<(), WifiError> {
+        Self::clear_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected);
+
+        let err = crate::wifi::WifiController::connect_impl(self).err();
+
+        if MultiWifiEventFuture::new(WifiEvent::StaConnected | WifiEvent::StaDisconnected)
+            .await
+            .contains(WifiEvent::StaDisconnected)
+        {
+            Err(err.unwrap_or(WifiError::Disconnected))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Async version of [`crate::wifi::WifiController`]'s `Disconnect`
+    /// method
+    pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
+        // If not connected, this will do nothing.
+        // It will also wait forever for a `StaDisconnected` event that will never come.
+        // Return early instead of hanging.
+        if !matches!(self.is_connected(), Ok(true)) {
+            return Ok(());
+        }
+
+        Self::clear_events(WifiEvent::StaDisconnected);
+        crate::wifi::WifiController::disconnect_impl(self)?;
+        WifiEventFuture::new(WifiEvent::StaDisconnected).await;
+
+        Ok(())
+    }
+
+    fn clear_events(events: impl Into<EnumSet<WifiEvent>>) {
+        WIFI_EVENTS.with(|evts| evts.get_mut().remove_all(events.into()));
+    }
+
+    /// Wait for one [`WifiEvent`].
+    pub async fn wait_for_event(&mut self, event: WifiEvent) {
+        Self::clear_events(event);
+        WifiEventFuture::new(event).await
+    }
+
+    /// Wait for one of multiple [`WifiEvent`]s. Returns the events that
+    /// occurred while waiting.
+    pub async fn wait_for_events(
+        &mut self,
+        events: EnumSet<WifiEvent>,
+        clear_pending: bool,
+    ) -> EnumSet<WifiEvent> {
+        if clear_pending {
+            Self::clear_events(events);
+        }
+        MultiWifiEventFuture::new(events).await
+    }
+
+    /// Wait for multiple [`WifiEvent`]s.
+    pub async fn wait_for_all_events(
+        &mut self,
+        mut events: EnumSet<WifiEvent>,
+        clear_pending: bool,
+    ) {
+        if clear_pending {
+            Self::clear_events(events);
+        }
+
+        while !events.is_empty() {
+            let fired = MultiWifiEventFuture::new(events).await;
+            events -= fired;
+        }
+    }
+}
+
+impl WifiEvent {
+    pub(crate) fn waker(&self) -> &'static AtomicWaker {
+        // for now use only one waker for all events
+        // if that ever becomes a problem we might want to pick some events to use their
+        // own
+        static WAKER: AtomicWaker = AtomicWaker::new();
+        &WAKER
+    }
+}
+
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub(crate) struct WifiEventFuture {
+    event: WifiEvent,
+}
+
+impl WifiEventFuture {
+    /// Creates a new `Future` for the specified WiFi event.
+    pub fn new(event: WifiEvent) -> Self {
+        Self { event }
+    }
+}
+
+impl core::future::Future for WifiEventFuture {
+    type Output = ();
+
+    fn poll(
+        self: core::pin::Pin<&mut Self>,
+        cx: &mut core::task::Context<'_>,
+    ) -> Poll<Self::Output> {
+        self.event.waker().register(cx.waker());
+        if WIFI_EVENTS.with(|events| events.get_mut().remove(self.event)) {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub(crate) struct MultiWifiEventFuture {
+    event: EnumSet<WifiEvent>,
+}
+
+impl MultiWifiEventFuture {
+    /// Creates a new `Future` for the specified set of WiFi events.
+    pub fn new(event: EnumSet<WifiEvent>) -> Self {
+        Self { event }
+    }
+}
+
+impl core::future::Future for MultiWifiEventFuture {
+    type Output = EnumSet<WifiEvent>;
+
+    fn poll(
+        self: core::pin::Pin<&mut Self>,
+        cx: &mut core::task::Context<'_>,
+    ) -> Poll<Self::Output> {
+        let output = WIFI_EVENTS.with(|events| {
+            let events = events.get_mut();
+            let active = events.intersection(self.event);
+            events.remove_all(active);
+            active
+        });
+        if output.is_empty() {
+            for event in self.event.iter() {
+                event.waker().register(cx.waker());
+            }
+
+            Poll::Pending
+        } else {
+            Poll::Ready(output)
         }
     }
 }

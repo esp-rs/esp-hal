@@ -10,7 +10,6 @@ pub(crate) mod os_adapter_chip_specific;
 use core::{cell::RefCell, ptr::addr_of_mut};
 
 use enumset::EnumSet;
-use esp_hal::sync::{Locked, RawMutex};
 
 use super::WifiEvent;
 use crate::{
@@ -30,9 +29,13 @@ use crate::{
         },
         malloc::calloc,
     },
-    hal::system::{RadioClockController, RadioPeripherals},
+    hal::{
+        clock::RadioClockController,
+        peripherals::RADIO_CLK,
+        sync::{Locked, RawMutex},
+    },
     memory_fence::memory_fence,
-    timer::yield_task,
+    preempt::yield_task,
 };
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
@@ -649,7 +652,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
 ) -> i32 {
     trace!("task_create_pinned_to_core task_func {:?} name {} stack_depth {} param {:?} prio {}, task_handle {:?} core_id {}",
         task_func,
-        str_from_c(name as *const u8),
+        str_from_c(name as _),
         stack_depth,
         param,
         prio,
@@ -662,7 +665,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
         extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
     >(task_func);
 
-    let task = crate::preempt::arch_specific::task_create(task_func, param, stack_depth as usize);
+    let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
     *(task_handle as *mut usize) = task as usize;
 
     1
@@ -738,8 +741,8 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut crate::binary::c_types::c
 /// *************************************************************************
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    let start_time = crate::timer::systimer_count();
-    while crate::timer::elapsed_time_since(start_time) < tick as u64 {
+    let start_time = crate::time::systimer_count();
+    while crate::time::elapsed_time_since(start_time) < tick as u64 {
         yield_task();
     }
 }
@@ -759,7 +762,7 @@ pub unsafe extern "C" fn task_delay(tick: u32) {
 /// *************************************************************************
 pub unsafe extern "C" fn task_ms_to_tick(ms: u32) -> i32 {
     trace!("task_ms_to_tick ms {}", ms);
-    crate::timer::millis_to_ticks(ms as u64) as i32
+    crate::time::millis_to_ticks(ms as u64) as i32
 }
 
 /// **************************************************************************
@@ -1021,11 +1024,12 @@ pub unsafe extern "C" fn phy_enable() {
 ///   Don't support
 ///
 /// *************************************************************************
+#[allow(clippy::unnecessary_cast)]
 pub unsafe extern "C" fn phy_update_country_info(
     country: *const crate::binary::c_types::c_char,
 ) -> crate::binary::c_types::c_int {
     // not implemented in original code
-    trace!("phy_update_country_info {}", *country as u8 as char);
+    trace!("phy_update_country_info {}", str_from_c(country.cast()));
     -1
 }
 
@@ -1046,8 +1050,8 @@ pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
     // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.reset_mac();
+    let radio_clocks = unsafe { RADIO_CLK::steal() };
+    RadioClockController::new(radio_clocks).reset_mac();
 }
 
 /// **************************************************************************
@@ -1067,8 +1071,8 @@ pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
     // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.enable(RadioPeripherals::Wifi);
+    let radio_clocks = unsafe { RADIO_CLK::steal() };
+    RadioClockController::new(radio_clocks).enable_wifi(true);
 }
 
 /// **************************************************************************
@@ -1088,8 +1092,8 @@ pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
     // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.disable(RadioPeripherals::Wifi);
+    let radio_clocks = unsafe { RADIO_CLK::steal() };
+    RadioClockController::new(radio_clocks).enable_wifi(false);
 }
 
 /// **************************************************************************
@@ -1127,7 +1131,7 @@ pub unsafe extern "C" fn wifi_rtc_disable_iso() {
 #[no_mangle]
 pub unsafe extern "C" fn esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
-    crate::timer::ticks_to_micros(crate::timer::systimer_count()) as i64
+    crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
 }
 
 /// **************************************************************************
@@ -1452,7 +1456,7 @@ pub unsafe extern "C" fn log_write(
     format: *const crate::binary::c_types::c_char,
     args: ...
 ) {
-    crate::binary::log::syslog(level, format as *const u8, args);
+    crate::binary::log::syslog(level, format as _, args);
 }
 
 /// **************************************************************************
@@ -1481,7 +1485,7 @@ pub unsafe extern "C" fn log_writev(
 ) {
     crate::binary::log::syslog(
         level,
-        format as *const u8,
+        format as _,
         core::mem::transmute::<crate::binary::include::va_list, core::ffi::VaListImpl<'_>>(args),
     );
 }
@@ -1500,7 +1504,9 @@ pub unsafe extern "C" fn log_writev(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn log_timestamp() -> u32 {
-    esp_hal::time::now().duration_since_epoch().to_millis() as u32
+    esp_hal::time::Instant::now()
+        .duration_since_epoch()
+        .as_millis() as u32
 }
 
 /// **************************************************************************

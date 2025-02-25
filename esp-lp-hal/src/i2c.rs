@@ -206,7 +206,7 @@ impl LpI2c {
         self.add_cmd_lp(&mut cmd_iterator, Command::Start)?;
 
         // Load device address and R/W bit into FIFO
-        self.write_fifo(addr << 1 | OperationType::Write as u8);
+        self.write_fifo((addr << 1) | OperationType::Write as u8);
 
         self.add_cmd_lp(
             &mut cmd_iterator,
@@ -285,7 +285,7 @@ impl LpI2c {
         self.add_cmd_lp(&mut cmd_iterator, Command::Start)?;
 
         // Load device address
-        self.write_fifo(addr << 1 | OperationType::Read as u8);
+        self.write_fifo((addr << 1) | OperationType::Read as u8);
 
         self.add_cmd_lp(
             &mut cmd_iterator,
@@ -297,7 +297,7 @@ impl LpI2c {
         )?;
 
         self.enable_interrupts(
-            1 << LP_I2C_TRANS_COMPLETE_INT_ST_S | 1 << LP_I2C_END_DETECT_INT_ST_S,
+            (1 << LP_I2C_TRANS_COMPLETE_INT_ST_S) | (1 << LP_I2C_END_DETECT_INT_ST_S),
         );
 
         let mut remaining_bytes = buffer.len();

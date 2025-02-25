@@ -60,7 +60,9 @@ impl TimerQueue {
     }
 
     pub fn dispatch(&self) {
-        let now = esp_hal::time::now().ticks();
+        let now = esp_hal::time::Instant::now()
+            .duration_since_epoch()
+            .as_micros();
         self.arm_alarm(now);
     }
 

@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use core::ptr::{addr_of, addr_of_mut};
 
-use esp_wifi_sys::c_types::c_void;
+use esp_wifi_sys::c_types::{c_char, c_void};
 use portable_atomic::{AtomicBool, Ordering};
 
 use super::ReceivedPacket;
@@ -36,7 +36,7 @@ struct VhciHostCallbacks {
 
 extern "C" {
     fn btdm_osi_funcs_register(osi_funcs: *const osi_funcs_s) -> i32;
-    fn btdm_controller_get_compile_version() -> *const u8;
+    fn btdm_controller_get_compile_version() -> *const c_char;
 
     #[cfg(any(esp32c3, esp32s3))]
     fn btdm_controller_init(config_opts: *const esp_bt_controller_config_t) -> i32;
@@ -208,7 +208,7 @@ unsafe extern "C" fn queue_recv_from_isr(
 
 unsafe extern "C" fn task_create(
     func: *mut crate::binary::c_types::c_void,
-    name: *const u8,
+    name: *const c_char,
     stack_depth: u32,
     param: *mut crate::binary::c_types::c_void,
     prio: u32,
@@ -233,7 +233,7 @@ unsafe extern "C" fn task_create(
         extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
     >(func);
 
-    let task = crate::preempt::arch_specific::task_create(task_func, param, stack_depth as usize);
+    let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
     *(handle as *mut usize) = task as usize;
 
     1

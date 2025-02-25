@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>{{ metadata[0].package }} Documentation</title>
+
+  <link rel="icon" href="../../esp-rs.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400;1,600&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    body {
+      background-color: rgb(53, 53, 53);
+      font-family: "Fira Sans", sans-serif;
+      color: white;
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 50px;
+      font-size: 2em;
+      font-weight: 500;
+    }
+
+    .logo img {
+      width: 100px;
+      height: auto;
+      margin-bottom: 20px;
+    }
+
+    .content {
+      width: 900px;
+    }
+
+    h2 {
+      margin-top: 3rem;
+    }
+
+    .crate {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 2px solid #454444;
+    }
+
+    .crate-description {
+      flex: 1;
+      font-family: "Source Serif 4", serif;
+      color: #c0c0c0;
+      text-align: center;
+    }
+
+    .crate-name {
+      color: #d6991d;
+      width: 120px;
+    }
+
+    /* Ensure the link color does not change after being clicked */
+    .crate-name a:link,
+    .crate-name a:visited,
+    .crate-name a:hover,
+    .crate-name a:active,
+    .crate-name a:focus {
+      color: #d6991d;
+    }
+
+    .crate-version {
+      color: #c0c0c0;
+      text-align: center;
+      width: 120px;
+    }
+
+    @media screen and (min-height: 650px) {
+      body {
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="content">
+    <div class="logo">
+      <img src="../../esp-rs.svg" alt="esp-rs logo" />
+      <div>{{ metadata[0].package }} Documentation</div>
+    </div>
+
+    <h2>{{ metadata[0].package }}</h2>
+
+    {%- for meta in metadata %}
+    <div class="crate">
+      <span class="crate-name">
+        <a href="{{ meta.chip }}/{{ meta.package }}/index.html">
+          {{ meta.chip_pretty }}
+        </a>
+      </span>
+      <span class="crate-description">{{ meta.name }} (targeting {{ meta.chip_pretty }})</span>
+      <span class="crate-version">{{ meta.version }}</span>
+    </div>
+    {%- endfor %}
+  </div>
+</body>
+
+</html>

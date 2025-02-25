@@ -7,16 +7,10 @@
 #![no_main]
 
 use esp_hal::{
-    delay::Delay,
-    dma_buffers,
-    gpio::{AnyPin, NoPin, Pin},
-    i2s::{
-        master::{DataFormat, I2s, I2sTx, Standard},
-        parallel::{I2sParallel, TxSixteenBits},
-    },
+    gpio::NoPin,
+    i2s::parallel::{I2sParallel, TxSixteenBits},
     peripherals::I2S0,
-    time::RateExtU32,
-    Async,
+    time::Rate,
 };
 use hil_test as _;
 
@@ -52,7 +46,8 @@ mod tests {
             NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin,
             NoPin, NoPin, NoPin, NoPin,
         );
-        let i2s = I2sParallel::new(ctx.i2s, ctx.dma_channel, 20.MHz(), pins, NoPin).into_async();
+        let i2s = I2sParallel::new(ctx.i2s, ctx.dma_channel, Rate::from_mhz(20), pins, NoPin)
+            .into_async();
 
         // Try sending an empty buffer, as an edge case
         let tx_buf = esp_hal::dma_tx_buffer!(4096).unwrap();

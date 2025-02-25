@@ -20,7 +20,7 @@ use esp_hal::{
         Pull,
     },
     main,
-    time::ExtU64,
+    time::Duration,
     timer::{
         systimer::{etm::Event, SystemTimer},
         PeriodicTimer,
@@ -31,8 +31,7 @@ use esp_hal::{
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let config = OutputConfig::default().with_level(Level::Low);
-    let mut led = Output::new(peripherals.GPIO2, config).unwrap();
+    let mut led = Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default());
     led.set_high();
 
     let syst = SystemTimer::new(peripherals.SYSTIMER);
@@ -59,7 +58,7 @@ fn main() -> ! {
     let _configured_channel = channel0.setup(&timer_event, &led_task);
 
     let mut timer = PeriodicTimer::new(alarm);
-    timer.start(1u64.secs()).unwrap();
+    timer.start(Duration::from_secs(1)).unwrap();
 
     // the LED is controlled by the button without involving the CPU
     loop {}

@@ -12,7 +12,6 @@
 
 crate::unstable_module! {
     pub mod efuse;
-    pub mod radio_clocks;
     pub mod trng;
 }
 pub mod gpio;
@@ -41,6 +40,8 @@ pub(crate) mod registers {
 }
 
 pub(crate) mod constants {
+    use crate::time::Rate;
+
     /// Default clock source for the timer group (TIMG) peripheral.
     pub const TIMG_DEFAULT_CLK_SRC: u8 = 2;
 
@@ -56,7 +57,7 @@ pub(crate) mod constants {
     /// Clock source for the RMT peripheral (false = default source).
     pub const RMT_CLOCK_SRC: bool = false;
     /// Frequency of the RMT clock source, in Hertz.
-    pub const RMT_CLOCK_SRC_FREQ: fugit::HertzU32 = fugit::HertzU32::MHz(32);
+    pub const RMT_CLOCK_SRC_FREQ: Rate = Rate::from_mhz(32);
 
     /// System clock frequency for the parallel I/O (PARL IO) peripheral, in
     /// Hertz.
@@ -68,5 +69,25 @@ pub(crate) mod constants {
     pub const SOC_DRAM_HIGH: usize = 0x4085_0000;
 
     /// RC FAST Clock value (Hertz).
-    pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
+    pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);
+}
+
+pub(crate) fn pre_init() {
+    // By default, these access path filters are enable and allow the access to
+    // masters only if they are in TEE mode.
+    //
+    // Since all masters except HP CPU boot in REE mode, default setting of these
+    // filters will deny the access by all masters except HP CPU.
+    //
+    // So, disabling these filters early.
+
+    crate::peripherals::LP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0x0) });
+    crate::peripherals::LP_APM0::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0x0) });
+    crate::peripherals::HP_APM::regs()
+        .func_ctrl()
+        .write(|w| unsafe { w.bits(0x0) });
 }

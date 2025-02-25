@@ -1,12 +1,7 @@
 use core::{cell::RefCell, ptr::addr_of};
 
 use critical_section::Mutex;
-use esp_hal::{
-    handler,
-    interrupt::Priority,
-    peripherals::RADIO_CLK,
-    system::{RadioClockController, RadioPeripherals},
-};
+use esp_hal::{clock::RadioClockController, handler, interrupt::Priority, peripherals::RADIO_CLK};
 use esp_wifi_sys::include::{
     esp_phy_calibration_data_t,
     esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
@@ -77,9 +72,10 @@ pub struct RawReceived {
 }
 
 pub(crate) fn esp_ieee802154_enable(radio_clock_control: &mut RADIO_CLK) {
+    let mut radio_clock_control = RadioClockController::new(radio_clock_control);
     radio_clock_control.init_clocks();
-    radio_clock_control.enable(RadioPeripherals::Phy);
-    radio_clock_control.enable(RadioPeripherals::Ieee802154);
+    radio_clock_control.enable_phy(true);
+    radio_clock_control.enable_ieee802154(true);
 
     esp_phy_enable();
     esp_btbb_enable();

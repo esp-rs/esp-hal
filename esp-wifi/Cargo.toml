@@ -1,6 +1,6 @@
 [package]
 name = "esp-wifi"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 rust-version  = "1.84.0"
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
@@ -12,10 +12,10 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 defmt = { version = "0.3.10", optional = true }
-log = { version = "0.4.25", optional = true }
-document-features  = "0.2.10"
-esp-alloc = { version = "0.6.0", path = "../esp-alloc", optional = true }
-esp-hal = { version = "0.23.0", path = "../esp-hal", default-features = false }
+log = { version = "0.4.26", optional = true }
+document-features  = "0.2.11"
+esp-alloc = { version = "0.7.0", path = "../esp-alloc", optional = true }
+esp-hal = { version = "1.0.0-beta.0", path = "../esp-hal", default-features = false }
 smoltcp = { version = "0.12.0", default-features = false, features = [
   "medium-ethernet",
   "socket-raw",
@@ -24,34 +24,33 @@ critical-section = "1.2.0"
 enumset = { version = "1.1.5", default-features = false, optional = true }
 embedded-io = { version = "0.6.1", default-features = false }
 embedded-io-async = { version = "0.6.1" }
-fugit = "0.3.7"
 heapless = { version = "0.8.0", default-features = false, features = [
   "portable-atomic",
 ] }
 num-derive = { version = "0.4.2" }
 num-traits = { version = "0.2.19", default-features = false }
 esp-wifi-sys = "0.7.1"
-embassy-sync = { version = "0.6.1", optional = true }
+embassy-sync = { version = "0.6.2", optional = true }
 embassy-net-driver = { version = "0.2.0", optional = true }
 libm = "0.2.11"
 cfg-if = "1.0.0"
-portable-atomic = { version = "1.10.0", default-features = false }
+portable-atomic = { version = "1.11.0", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
 rand_core           = "0.6.4"
 
-bt-hci = { version = "0.2.0", optional = true }
+bt-hci = { version = "0.2.1", optional = true }
 esp-config = { version = "0.3.0", path = "../esp-config" }
 
 xtensa-lx-rt = { version = "0.18.0", path = "../xtensa-lx-rt", optional = true }
-serde = { version = "1.0.217", default-features = false, features = ["derive"], optional = true }
+serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
 
 [build-dependencies]
 esp-build    = { version = "0.2.0", path = "../esp-build" }
 esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"] }
-esp-metadata = { version = "0.5.0", path = "../esp-metadata" }
+esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
 
 [features]
-default = ["esp-alloc"]
+default = ["builtin-scheduler", "esp-alloc"]
 
 ## Use `esp-alloc` for dynamic allocations.
 ##
@@ -129,9 +128,8 @@ csi = []
 ## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
 
-## Provide utilities for smoltcp initialization. Adds smoltcp dependency
-utils = ["smoltcp"]
-
+## Use builtin scheduler
+builtin-scheduler = []
 
 # Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde", "heapless/serde"]

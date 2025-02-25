@@ -121,7 +121,7 @@ pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
 pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
     int_enable as u8
         | ((nmi_enable as u8) << 1)
-        | (int_enable as u8) << 2
+        | ((int_enable as u8) << 2)
         | ((nmi_enable as u8) << 3)
 }
 

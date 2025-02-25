@@ -61,7 +61,8 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "adc",
+    "adc1",
+    "adc2",
     "assist_debug_region_monitor",
     "gdma",
     "phy",

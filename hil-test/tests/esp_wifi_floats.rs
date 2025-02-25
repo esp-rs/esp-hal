@@ -1,7 +1,7 @@
 //! Cp0Disable exception regression test
 
 //% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: unstable esp-wifi esp-alloc
+//% FEATURES: unstable esp-wifi esp-alloc esp-wifi/wifi
 
 #![no_std]
 #![no_main]
@@ -42,11 +42,10 @@ cfg_if::cfg_if! {
     if #[cfg(multi_core)] {
         use core::sync::atomic::{AtomicBool, Ordering};
 
-        use esp_hal::cpu_control::CpuControl;
+        use esp_hal::system::{CpuControl, Stack};
 
         static DONE: AtomicBool = AtomicBool::new(false);
-        static mut APP_CORE_STACK: esp_hal::cpu_control::Stack<8192> =
-            esp_hal::cpu_control::Stack::new();
+        static mut APP_CORE_STACK: Stack<8192> = Stack::new();
     }
 }
 
@@ -57,7 +56,7 @@ mod tests {
 
     #[init]
     fn test_init() -> Peripherals {
-        esp_alloc::heap_allocator!(72 * 1024);
+        esp_alloc::heap_allocator!(size: 72 * 1024);
 
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         esp_hal::init(config)

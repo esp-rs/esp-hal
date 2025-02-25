@@ -42,7 +42,7 @@ pub(crate) fn task_create(
         let stack_ptr = task_stack_ptr - (task_stack_ptr % 16);
         (*ctx).trap_frame.A1 = stack_ptr as u32;
 
-        (*ctx).trap_frame.PS = 0x00040000 | (1 & 3) << 16; // For windowed ABI set WOE and CALLINC (pretend task was 'call4'd).
+        (*ctx).trap_frame.PS = 0x00040000 | ((1 & 3) << 16); // For windowed ABI set WOE and CALLINC (pretend task was 'call4'd).
 
         (*ctx).trap_frame.A0 = 0;
 

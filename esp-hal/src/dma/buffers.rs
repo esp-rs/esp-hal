@@ -402,6 +402,17 @@ pub struct Preparation {
     /// Note: If the DMA channel doesn't support the provided option,
     /// preparation will fail.
     pub check_owner: Option<bool>,
+
+    /// Configures whether the DMA channel automatically clears the
+    /// [DmaDescriptor::owner] bit after it is done with the buffer pointed
+    /// to by a descriptor.
+    ///
+    /// For RX transfers, this is always true and the value specified here is
+    /// ignored.
+    ///
+    /// Note: SPI_DMA on the ESP32 does not support this and will panic if set
+    /// to true.
+    pub auto_write_back: bool,
 }
 
 /// [DmaTxBuffer] is a DMA descriptor + memory combo that can be used for
@@ -633,6 +644,7 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
+            auto_write_back: false,
         }
     }
 
@@ -825,6 +837,7 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
+            auto_write_back: true,
         }
     }
 
@@ -1006,6 +1019,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
+            auto_write_back: false,
         }
     }
 
@@ -1048,6 +1062,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
+            auto_write_back: true,
         }
     }
 
@@ -1189,6 +1204,7 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
             // No descriptor is added back to the end of the stream before it's ready for the DMA
             // to consume it.
             check_owner: None,
+            auto_write_back: true,
         }
     }
 
@@ -1396,6 +1412,9 @@ unsafe impl DmaTxBuffer for EmptyBuf {
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
             // channel does *NOT* check for ownership, otherwise the channel will return an error.
             check_owner: Some(false),
+
+            // The DMA should not write back to the descriptor as it is shared.
+            auto_write_back: false,
         }
     }
 
@@ -1423,6 +1442,7 @@ unsafe impl DmaRxBuffer for EmptyBuf {
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
             // channel does *NOT* check for ownership, otherwise the channel will return an error.
             check_owner: Some(false),
+            auto_write_back: true,
         }
     }
 
@@ -1496,6 +1516,9 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
             burst_transfer: BurstConfig::default(),
             // The DMA must not check the owner bit, as it is never set.
             check_owner: Some(false),
+
+            // Doesn't matter either way but it is set to true for ESP32 SPI_DMA compatibility.
+            auto_write_back: false,
         }
     }
 

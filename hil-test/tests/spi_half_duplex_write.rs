@@ -16,7 +16,7 @@ use esp_hal::{
         DataMode,
         Mode,
     },
-    time::RateExtU32,
+    time::Rate,
     Blocking,
 };
 use hil_test as _;
@@ -129,7 +129,7 @@ mod tests {
         let spi = Spi::new(
             peripherals.SPI2,
             Config::default()
-                .with_frequency(100.kHz())
+                .with_frequency(Rate::from_khz(100))
                 .with_mode(Mode::_0),
         )
         .unwrap()

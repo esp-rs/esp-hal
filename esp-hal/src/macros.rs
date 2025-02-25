@@ -11,7 +11,7 @@ macro_rules! before_snippet {
         r#"
 # #![no_std]
 # use procmacros::handler;
-# use esp_hal::{interrupt::{self, InterruptConfigurable}, time::{RateExtU32 as _, ExtU64 as _}};
+# use esp_hal::{interrupt::{self, InterruptConfigurable}, time::{Duration, Instant, Rate}};
 # macro_rules! println {
 #     ($($tt:tt)*) => { };
 # }
@@ -23,7 +23,16 @@ macro_rules! before_snippet {
 #     loop {}
 # }
 # fn main() {
-#     let mut peripherals = esp_hal::init(esp_hal::Config::default());
+#   let _ = example();
+# }
+# struct ExampleError {}
+# impl <T> From<T> for ExampleError where T: core::fmt::Debug {
+#   fn from(_value: T) -> Self {
+#       Self{}
+#   }
+# }
+# fn example() -> Result<(), ExampleError> {
+#   let mut peripherals = esp_hal::init(esp_hal::Config::default());
 "#
     };
 }

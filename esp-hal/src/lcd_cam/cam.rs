@@ -17,7 +17,6 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::lcd_cam::{cam::{Camera, Config, RxEightBits}, LcdCam};
-//! # use fugit::RateExtU32;
 //! # use esp_hal::dma_rx_stream_buffer;
 //!
 //! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
@@ -37,8 +36,7 @@
 //!     peripherals.GPIO16,
 //! );
 //!
-//! let mut config = Config::default();
-//! config.frequency = 20.MHz();
+//! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 //! let mut camera = Camera::new(
@@ -46,14 +44,14 @@
 //!     peripherals.DMA_CH0,
 //!     data_pins,
 //!     config,
-//! )
-//! .unwrap()
+//! )?
 //! .with_master_clock(mclk_pin) // Remove this for slave mode
 //! .with_pixel_clock(pclk_pin)
 //! .with_ctrl_pins(vsync_pin, href_pin);
 //!
-//! let transfer = camera.receive(dma_buf).map_err(|e| e.0).unwrap();
+//! let transfer = camera.receive(dma_buf).map_err(|e| e.0)?;
 //!
+//! # Ok(())
 //! # }
 //! ```
 
@@ -61,8 +59,6 @@ use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
-
-use fugit::{HertzU32, RateExtU32};
 
 use crate::{
     clock::Clocks,
@@ -78,6 +74,7 @@ use crate::{
     peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
+    time::Rate,
     Blocking,
 };
 
@@ -169,14 +166,19 @@ impl<'d> Camera<'d> {
     }
 
     /// Applies the configuration to the camera interface.
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::Clock`] will be returned if the frequency passed in
+    /// `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let clocks = Clocks::get();
         let (i, divider) = calculate_clkm(
-            config.frequency.to_Hz() as _,
+            config.frequency.as_hz() as _,
             &[
-                clocks.xtal_clock.to_Hz() as _,
-                clocks.cpu_clock.to_Hz() as _,
-                clocks.crypto_pwm_clock.to_Hz() as _,
+                clocks.xtal_clock.as_hz() as _,
+                clocks.cpu_clock.as_hz() as _,
+                clocks.crypto_pwm_clock.as_hz() as _,
             ],
         )
         .map_err(ConfigError::Clock)?;
@@ -599,27 +601,27 @@ pub trait RxPins {
     const BUS_WIDTH: usize;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Configuration settings for the Camera interface.
 pub struct Config {
     /// The pixel clock frequency for the camera interface.
-    pub frequency: HertzU32,
+    frequency: Rate,
 
     /// The byte order for the camera data.
-    pub byte_order: ByteOrder,
+    byte_order: ByteOrder,
 
     /// The bit order for the camera data.
-    pub bit_order: BitOrder,
+    bit_order: BitOrder,
 
     /// The Vsync filter threshold.
-    pub vsync_filter_threshold: Option<VsyncFilterThreshold>,
+    vsync_filter_threshold: Option<VsyncFilterThreshold>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            frequency: 20.MHz(),
+            frequency: Rate::from_mhz(20),
             byte_order: Default::default(),
             bit_order: Default::default(),
             vsync_filter_threshold: None,

@@ -23,6 +23,7 @@
 //!     int0.set_interrupt_handler(swint0_handler);
 //!     SWINT0.borrow_ref_mut(cs).replace(int0);
 //! });
+//! # Ok(())
 //! # }
 //!
 //! # use core::cell::RefCell;
@@ -40,7 +41,9 @@
 //!
 //!     // Clear the interrupt request.
 //!     critical_section::with(|cs| {
-//!         SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
+//!         if let Some(swint) = SWINT0.borrow_ref(cs).as_ref() {
+//!             swint.reset();
+//!         }
 //!     });
 //! }
 //! ```
@@ -53,6 +56,7 @@ pub struct SoftwareInterrupt<const NUM: u8>;
 
 impl<const NUM: u8> SoftwareInterrupt<NUM> {
     /// Sets the interrupt handler for this software-interrupt
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         let interrupt = match NUM {
             0 => crate::peripherals::Interrupt::FROM_CPU_INTR0,
@@ -62,7 +66,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
             _ => unreachable!(),
         };
 
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
         unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };

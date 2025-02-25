@@ -13,7 +13,7 @@ name: CI
 
 on:
   pull_request:
-      types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened]
   push:
     branches-ignore:
       - "gh-readonly-queue/**"
@@ -43,6 +43,8 @@ jobs:
     name: esp-hal (${{ matrix.device.soc }})
     runs-on: ubuntu-latest
     env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CI: 1
       SSID: SSID
       PASSWORD: PASSWORD
       STATIC_IP: 1.1.1.1
@@ -54,14 +56,14 @@ jobs:
       matrix:
         device: [
             # RISC-V devices:
-            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf", toolchain: "stable" },
-            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf", toolchain: "stable" },
-            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf", toolchain: "stable" },
-            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf", toolchain: "stable" },
+            { soc: "esp32c2", toolchain: "stable" },
+            { soc: "esp32c3", toolchain: "stable" },
+            { soc: "esp32c6", toolchain: "stable" },
+            { soc: "esp32h2", toolchain: "stable" },
             # Xtensa devices:
-            { soc: "esp32", target: "xtensa-esp32-none-elf", toolchain: "esp" },
-            { soc: "esp32s2", target: "xtensa-esp32s2-none-elf", toolchain: "esp" },
-            { soc: "esp32s3", target: "xtensa-esp32s3-none-elf", toolchain: "esp" },
+            { soc: "esp32", toolchain: "esp" },
+            { soc: "esp32s2", toolchain: "esp" },
+            { soc: "esp32s3", toolchain: "esp" },
           ]
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +72,8 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           ldproxy: false
-          version: 1.84.0.0
+          version: 1.85.0.0
+
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
@@ -79,16 +82,16 @@ jobs:
           components: rust-src
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "ci-${{ matrix.device.soc }}"
+          cache-all-crates: true
 
       - name: Build and Check
-        uses: ./.github/actions/check-esp-hal
-        with:
-          device: ${{ matrix.device.soc }}
-          target: ${{ matrix.device.target }}
-          toolchain: ${{ matrix.device.toolchain }}
+        shell: bash
+        run: cargo +${{ matrix.device.toolchain }} xtask ci ${{ matrix.device.soc }}
 
   extras:
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
 
     steps:
       - uses: actions/checkout@v4
@@ -97,8 +100,6 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
       # Build the extra crates
       - name: Build the bench-server
         run: cd extras/bench-server && cargo build
@@ -111,9 +112,7 @@ jobs:
   # MSRV
 
   msrv:
-    runs-on: ubuntu-latest
-    env:
-      RUSTC_BOOTSTRAP: 1
+    runs-on: macos-m1-self-hosted
 
     steps:
       - uses: actions/checkout@v4
@@ -166,7 +165,7 @@ jobs:
   # Format
 
   rustfmt:
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
 
     steps:
       - uses: actions/checkout@v4
@@ -185,7 +184,7 @@ jobs:
   # host tests
 
   host-tests:
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
 
     steps:
       - uses: actions/checkout@v4

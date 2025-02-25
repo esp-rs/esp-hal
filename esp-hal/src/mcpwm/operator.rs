@@ -463,11 +463,11 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// true);
 #[cfg_attr(
     esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(40.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;"
 )]
 #[cfg_attr(
     not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(32.MHz()).unwrap();"
+    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
 )]
 /// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 ///
@@ -487,6 +487,7 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// pins.set_deadtime_cfg(bridge_active);
 /// // pin_a: _______-------_____________-------______
 /// // pin_b: ------_________-----------_________-----
+/// # Ok(())
 /// # }
 /// ```
 pub struct LinkedPins<'d, PWM, const OP: u8> {

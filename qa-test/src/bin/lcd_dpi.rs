@@ -48,7 +48,7 @@ use esp_hal::{
     },
     main,
     peripherals::Peripherals,
-    time::RateExtU32,
+    time::Rate,
     Blocking,
 };
 use esp_println::println;
@@ -61,7 +61,7 @@ fn main() -> ! {
 
     let i2c = I2c::new(
         peripherals.I2C0,
-        i2c::master::Config::default().with_frequency(400.kHz()),
+        i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
     )
     .unwrap()
     .with_sda(peripherals.GPIO47)
@@ -116,11 +116,8 @@ fn main() -> ! {
 
     let mut vsync_pin = peripherals.GPIO3;
 
-    let vsync_must_be_high_during_setup = Output::new(
-        &mut vsync_pin,
-        OutputConfig::default().with_level(Level::High),
-    )
-    .unwrap();
+    let vsync_must_be_high_during_setup =
+        Output::new(&mut vsync_pin, Level::High, OutputConfig::default());
     for &init in INIT_CMDS.iter() {
         match init {
             InitCmd::Cmd(cmd, args) => {
@@ -138,34 +135,34 @@ fn main() -> ! {
 
     let mut dma_buf = dma_loop_buffer!(2 * 16);
 
-    let mut config = Config::default();
-    config.clock_mode = ClockMode {
-        polarity: Polarity::IdleLow,
-        phase: Phase::ShiftLow,
-    };
-    config.frequency = 16.MHz();
-    config.format = Format {
-        enable_2byte_mode: true,
-        ..Default::default()
-    };
-    config.timing = FrameTiming {
-        horizontal_active_width: 480,
-        horizontal_total_width: 520,
-        horizontal_blank_front_porch: 10,
+    let config = Config::default()
+        .with_clock_mode(ClockMode {
+            polarity: Polarity::IdleLow,
+            phase: Phase::ShiftLow,
+        })
+        .with_frequency(Rate::from_mhz(16))
+        .with_format(Format {
+            enable_2byte_mode: true,
+            ..Default::default()
+        })
+        .with_timing(FrameTiming {
+            horizontal_active_width: 480,
+            horizontal_total_width: 520,
+            horizontal_blank_front_porch: 10,
 
-        vertical_active_height: 480,
-        vertical_total_height: 510,
-        vertical_blank_front_porch: 10,
+            vertical_active_height: 480,
+            vertical_total_height: 510,
+            vertical_blank_front_porch: 10,
 
-        hsync_width: 10,
-        vsync_width: 10,
+            hsync_width: 10,
+            vsync_width: 10,
 
-        hsync_position: 0,
-    };
-    config.vsync_idle_level = Level::High;
-    config.hsync_idle_level = Level::High;
-    config.de_idle_level = Level::Low;
-    config.disable_black_region = false;
+            hsync_position: 0,
+        })
+        .with_vsync_idle_level(Level::High)
+        .with_hsync_idle_level(Level::High)
+        .with_de_idle_level(Level::Low)
+        .with_disable_black_region(false);
 
     let mut dpi = Dpi::new(lcd_cam.lcd, tx_channel, config)
         .unwrap()

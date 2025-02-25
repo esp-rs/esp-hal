@@ -2,29 +2,19 @@
 #[allow(unused_imports)]
 use crate::{
     binary,
-    hal::{
-        interrupt,
-        peripherals::{Interrupt, INTERRUPT_CORE0},
-    },
+    hal::{interrupt, peripherals::Interrupt},
 };
 
 pub(crate) fn setup_radio_isr() {
-    // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU
-    // interrupt 31 which is masked by default for some reason for this
-    // interrupt, mapping it to 0 doesn't deactivate it
-    INTERRUPT_CORE0::regs()
-        .wifi_bb_intr_map()
-        .write(|w| unsafe { w.wifi_bb_intr_map().bits(31) });
-    INTERRUPT_CORE0::regs()
-        .modem_peri_timeout_intr_map()
-        .write(|w| unsafe { w.modem_peri_timeout_intr_map().bits(31) });
+    // no-op
 }
 
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     {
-        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::LP_TIMER);
-        interrupt::disable(crate::hal::Cpu::ProCpu, Interrupt::BT_MAC);
+        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::RWBT);
+        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::RWBLE);
+        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::BT_BB);
     }
 }
 
@@ -64,44 +54,51 @@ extern "C" fn WIFI_PWR() {
 
 #[cfg(feature = "ble")]
 #[no_mangle]
-extern "C" fn LP_TIMER() {
+extern "C" fn RWBT() {
     unsafe {
-        trace!("LP_TIMER interrupt");
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
 
-        let (fnc, arg) = crate::ble::npl::ble_os_adapter_chip_specific::ISR_INTERRUPT_7;
-
-        trace!("interrupt LP_TIMER {:?} {:?}", fnc, arg);
+        trace!("interrupt RWBT {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            trace!("interrupt LP_TIMER call");
-
             let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
-            trace!("LP_TIMER done");
         }
 
-        trace!("interrupt LP_TIMER done");
+        trace!("interrupt 5 done");
     };
 }
 
 #[cfg(feature = "ble")]
 #[no_mangle]
-extern "C" fn BT_MAC() {
+extern "C" fn RWBLE() {
     unsafe {
-        trace!("BT_MAC interrupt");
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION8;
 
-        let (fnc, arg) = crate::ble::npl::ble_os_adapter_chip_specific::ISR_INTERRUPT_4;
-
-        trace!("interrupt BT_MAC {:?} {:?}", fnc, arg);
+        trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            trace!("interrupt BT_MAC call");
-
             let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
-            trace!("BT_MAC done");
         }
 
-        trace!("interrupt BT_MAC done");
+        trace!("interrupt 5 done");
+    };
+}
+
+#[cfg(feature = "ble")]
+#[no_mangle]
+extern "C" fn BT_BB(_trap_frame: &mut crate::hal::interrupt::TrapFrame) {
+    unsafe {
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
+
+        trace!("interrupt BT_BB {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+        }
+
+        trace!("interrupt 8 done");
     };
 }

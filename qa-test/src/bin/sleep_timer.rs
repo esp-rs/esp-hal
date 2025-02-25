@@ -12,7 +12,7 @@ use esp_hal::{
     delay::Delay,
     main,
     rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason},
-    Cpu,
+    system::Cpu,
 };
 use esp_println::println;
 

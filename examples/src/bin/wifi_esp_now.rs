@@ -2,7 +2,7 @@
 //!
 //! Broadcasts, receives and sends messages via esp-now
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-wifi/esp-now esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/esp-now esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -29,11 +29,11 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(72 * 1024);
+    esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
+    let esp_wifi_ctrl = init(
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
@@ -41,11 +41,11 @@ fn main() -> ! {
     .unwrap();
 
     let wifi = peripherals.WIFI;
-    let mut esp_now = esp_wifi::esp_now::EspNow::new(&init, wifi).unwrap();
+    let mut esp_now = esp_wifi::esp_now::EspNow::new(&esp_wifi_ctrl, wifi).unwrap();
 
     println!("esp-now version {}", esp_now.version().unwrap());
 
-    let mut next_send_time = time::now() + Duration::secs(5);
+    let mut next_send_time = time::Instant::now() + Duration::from_secs(5);
     loop {
         let r = esp_now.receive();
         if let Some(r) = r {
@@ -70,8 +70,8 @@ fn main() -> ! {
             }
         }
 
-        if time::now() >= next_send_time {
-            next_send_time = time::now() + Duration::secs(5);
+        if time::Instant::now() >= next_send_time {
+            next_send_time = time::Instant::now() + Duration::from_secs(5);
             println!("Send");
             let status = esp_now
                 .send(&BROADCAST_ADDRESS, b"0123456789")

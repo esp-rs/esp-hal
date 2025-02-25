@@ -60,6 +60,7 @@
 //! ### TRNG operation
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
+//! # use esp_hal::Blocking;
 //! # use esp_hal::rng::Trng;
 //! # use esp_hal::peripherals::Peripherals;
 //! # use esp_hal::peripherals::ADC1;
@@ -80,11 +81,12 @@
 //!     analog_pin,
 //!     Attenuation::_11dB
 //! );
-//! let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
-//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+//! let mut adc1 = Adc::<ADC1, Blocking>::new(peripherals.ADC1, adc1_config);
+//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
 //! rng.read(&mut buf);
 //! true_rand = rng.random();
-//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
+//! # Ok(())
 //! # }
 //! ```
 use core::marker::PhantomData;

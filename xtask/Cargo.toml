@@ -8,15 +8,27 @@ publish = false
 anyhow       = "1.0.93"
 basic-toml   = "0.1.9"
 chrono       = "0.4.38"
-clap         = { version = "4.5.20",  features = ["derive", "wrap_help"] }
+clap         = { version = "4.5.20", features = ["derive", "wrap_help"] }
 console      = "0.15.10"
 csv          = "1.3.1"
 env_logger   = "0.11.5"
 esp-metadata = { path = "../esp-metadata", features = ["clap"] }
+kuchikiki    = "0.8.2"
 log          = "0.4.22"
 minijinja    = "2.5.0"
-semver       = { version = "1.0.23",  features = ["serde"] }
+semver       = { version = "1.0.23", features = ["serde"] }
 serde        = { version = "1.0.215", features = ["derive"] }
 serde_json   = "1.0.70"
-strum        = { version = "0.26.3",  features = ["derive"] }
+strum        = { version = "0.26.3", features = ["derive"] }
 toml_edit    = "0.22.22"
+walkdir      = "2.5.0"
+
+# Only required when building documentation for deployment:
+reqwest = { version = "0.12.12", features = [
+    "blocking",
+    "json",
+    "native-tls-vendored",
+], optional = true }
+
+[features]
+deploy-docs = ["dep:reqwest"]

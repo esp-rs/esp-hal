@@ -28,7 +28,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     pac,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, ECC},
@@ -118,13 +118,10 @@ impl<'d> Ecc<'d, Blocking> {
 
 impl crate::private::Sealed for Ecc<'_, Blocking> {}
 
-impl InterruptConfigurable for Ecc<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Ecc<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::ECC);
-        }
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::ECC, handler.handler()) };
-        unwrap!(crate::interrupt::enable(Interrupt::ECC, handler.priority()));
+        self.set_interrupt_handler(handler);
     }
 }
 
@@ -987,6 +984,19 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         }
 
         Ok(())
+    }
+
+    /// Register an interrupt handler for the ECC peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for core in crate::system::Cpu::other() {
+            crate::interrupt::disable(core, Interrupt::ECC);
+        }
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::ECC, handler.handler()) };
+        unwrap!(crate::interrupt::enable(Interrupt::ECC, handler.priority()));
     }
 
     fn is_busy(&self) -> bool {

@@ -143,8 +143,9 @@ impl TxRegisterAccess for CryptoDmaTxChannel {
     }
 
     fn set_auto_write_back(&self, enable: bool) {
-        // there is no `auto_wrback` for SPI
-        assert!(!enable);
+        self.regs()
+            .conf()
+            .modify(|_, w| w.out_auto_wrback().bit(enable));
     }
 
     fn last_dscr_address(&self) -> usize {
@@ -486,7 +487,7 @@ impl PdmaChannel for CryptoDmaChannel {
         compatible_peripherals.contains(&peripheral)
     }
     fn peripheral_interrupt(&self) -> Interrupt {
-        unreachable!("Crypto DMA has separate interrupts specific to AES and SHA")
+        Interrupt::CRYPTO_DMA
     }
     fn async_handler(&self) -> InterruptHandler {
         pub(crate) extern "C" fn __esp_hal_internal_interrupt_handler() {

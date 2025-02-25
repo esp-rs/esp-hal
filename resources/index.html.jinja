@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>esp-rs docs</title>
+  <title>esp-rs Documentation</title>
 
   <link rel="icon" href="esp-rs.svg" />
   <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500&display=swap" rel="stylesheet" />
@@ -93,23 +93,19 @@
   <div class="content">
     <div class="logo">
       <img src="esp-rs.svg" alt="esp-rs logo" />
-      <div>esp-rs docs</div>
+      <div>esp-rs Documentation</div>
     </div>
 
-    {%- for (package, metadata) in packages|items %}
-    <h2>{{ package }}</h2>
+    <h2>Packages</h2>
 
     {%- for meta in metadata %}
     <div class="crate">
       <span class="crate-name">
-        <a href="{{ meta.name }}/{{ meta.version }}/{{ meta.chip }}/{{ meta.package }}">
-          {{ meta.chip_pretty }}
-        </a>
+        <a href="{{ meta.url }}">{{ meta.name }}</a>
       </span>
-      <span class="crate-description">{{ meta.name }} (targeting {{ meta.chip_pretty }})</span>
+      <span class="crate-description">Documentation for <code>{{ meta.name }}</code> crate</span>
       <span class="crate-version">{{ meta.version }}</span>
     </div>
-    {%- endfor %}
     {%- endfor %}
   </div>
 </body>

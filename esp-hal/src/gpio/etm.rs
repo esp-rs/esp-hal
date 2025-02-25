@@ -47,6 +47,7 @@
 //! let button_event = gpio_ext
 //!     .channel0_event
 //!     .falling_edge(button, InputConfig { pull: Pull::Down });
+//! # Ok(())
 //! # }
 //! ```
 

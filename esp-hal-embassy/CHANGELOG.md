@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
 
 ### Added
 
@@ -13,9 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+### Removed
+
+## [0.7.0] - 2025-02-24
+
+### Fixed
+
 - Fixed an issue where the `ESP_HAL_EMBASSY_CONFIG_LOW_POWER_WAIT` option was not possible to disable (#2975)
 
 ### Removed
+
+- The `multiple-integrated` timer queue flavour has been temporarily removed (#3159)
 
 ## 0.6.0 - 2025-01-15
 
@@ -90,4 +98,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.0 - 2024-06-04
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-hal-embassy?since=2025-01-15
+[0.7.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-embassy-v0.7.0

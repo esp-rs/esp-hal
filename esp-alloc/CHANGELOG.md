@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
 
 ### Added
 
@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Removed
+
+## [0.7.0] - 2025-02-24
+
+### Added
+
+- `esp_alloc::heap_allocator!` now accepts attributes, e.g., `esp_alloc::heap_allocator!(#[link_section = ".dram2_uninit"] size: 64000)` (#3133)
+
+### Changed
+
+- `esp_alloc::heap_allocator!` syntax has been changed to `esp_alloc::heap_allocator!(size: 64000)` (#3135)
 
 ## 0.6.0 - 2025-01-15
 
@@ -41,4 +51,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.0 - 2022-07-25
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-alloc?since=2025-01-15
+[0.7.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-alloc-v0.7.0

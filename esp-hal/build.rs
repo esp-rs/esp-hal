@@ -77,6 +77,28 @@ fn main() -> Result<(), Box<dyn Error>> {
             Value::Bool(false),
             None
         ),
+        // Ideally, we should be able to set any clock frequency for any chip. However, currently
+        // only the 32 and C2 implements any sort of configurability, and the rest have a fixed
+        // clock frequeny.
+        // TODO: only show this configuration for chips that have multiple valid options.
+        (
+            "xtal-frequency",
+            "The frequency of the crystal oscillator, in MHz. Set to `auto` to automatically detect the frequency. `auto` may not be able to identify the clock frequency in some cases. Also, configuring a specific frequency may increase performance slightly.",
+            Value::String(match device_name {
+                "esp32" | "esp32c2" => String::from("auto"),
+                // The rest has only one option
+                "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => String::from("40"),
+                "esp32h2" => String::from("32"),
+                _ => unreachable!(),
+            }),
+            Some(Validator::Enumeration(match device_name {
+                "esp32" | "esp32c2" => vec![String::from("auto"), String::from("26"), String::from("40")],
+                // The rest has only one option
+                "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => vec![String::from("40")],
+                "esp32h2" => vec![String::from("32")],
+                _ => unreachable!(),
+            })),
+        ),
         // ideally we should only offer this for ESP32 but the config system doesn't
         // support per target configs, yet
         (
@@ -98,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "(ESP32, ESP32-S2 and ESP32-S3 only, `octal` is only supported for ESP32-S3) SPIRAM chip mode",
             Value::String(String::from("quad")),
             Some(Validator::Enumeration(
-                    vec![String::from("quad"), String::from("octal")]
+                vec![String::from("quad"), String::from("octal")]
             )),
         )
     ], true);

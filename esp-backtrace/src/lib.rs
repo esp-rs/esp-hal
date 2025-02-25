@@ -60,7 +60,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     println!("{}", info);
 
     #[cfg(feature = "defmt")]
-    println!("{}", defmt::Display2Format(info));
+    println!("{}", info);
 
     println!("");
     println!("Backtrace:");

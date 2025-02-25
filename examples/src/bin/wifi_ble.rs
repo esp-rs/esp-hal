@@ -41,11 +41,11 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(72 * 1024);
+    esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = init(
+    let esp_wifi_ctrl = init(
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
@@ -55,9 +55,9 @@ fn main() -> ! {
     let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = Input::new(peripherals.GPIO0, config).unwrap();
+            let button = Input::new(peripherals.GPIO0, config);
         } else {
-            let button = Input::new(peripherals.GPIO9, config).unwrap();
+            let button = Input::new(peripherals.GPIO9, config);
         }
     }
 
@@ -65,9 +65,9 @@ fn main() -> ! {
 
     let mut bluetooth = peripherals.BT;
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
     loop {
-        let connector = BleConnector::new(&init, &mut bluetooth);
+        let connector = BleConnector::new(&esp_wifi_ctrl, &mut bluetooth);
         let hci = HciConnector::new(connector, now);
         let mut ble = Ble::new(&hci);
 

@@ -44,13 +44,14 @@
 //! while !source_data.is_empty() {
 //!     // All the HW Sha functions are infallible so unwrap is fine to use if
 //!     // you use block!
-//!     source_data = block!(hasher.update(source_data)).unwrap();
+//!     source_data = block!(hasher.update(source_data))?;
 //! }
 //!
 //! // Finish can be called as many times as desired to get multiple copies of
 //! // the output.
-//! block!(hasher.finish(output.as_mut_slice())).unwrap();
+//! block!(hasher.finish(output.as_mut_slice()))?;
 //!
+//! # Ok(())
 //! # }
 //! ```
 //! ## Implementation State
@@ -107,9 +108,10 @@ impl<'d> Sha<'d> {
 impl crate::private::Sealed for Sha<'_> {}
 
 #[cfg(not(esp32))]
+#[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for Sha<'_> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::SHA);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::SHA, handler.handler()) };
@@ -118,8 +120,6 @@ impl crate::interrupt::InterruptConfigurable for Sha<'_> {
 }
 
 // A few notes on this implementation with regards to 'memcpy',
-// - It seems that ptr::write_bytes already acts as volatile, while ptr::copy_*
-//   does not (in this case)
 // - The registers are *not* cleared after processing, so padding needs to be
 //   written out
 // - This component uses core::intrinsics::volatile_* which is unstable, but is
@@ -254,7 +254,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
             // Zero out remaining data if buffer is almost full (>=448/896), and process
             // buffer
             let pad_len = A::CHUNK_LENGTH - mod_cursor;
-            self.alignment_helper.volatile_write_bytes(
+            self.alignment_helper.volatile_write(
                 m_mem(&self.sha.borrow().sha, 0),
                 0_u8,
                 pad_len / self.alignment_helper.align_size(),
@@ -272,7 +272,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         let mod_cursor = self.cursor % A::CHUNK_LENGTH; // Should be zero if branched above
         let pad_len = A::CHUNK_LENGTH - mod_cursor - size_of::<u64>();
 
-        self.alignment_helper.volatile_write_bytes(
+        self.alignment_helper.volatile_write(
             m_mem(&self.sha.borrow().sha, 0),
             0,
             pad_len / self.alignment_helper.align_size(),

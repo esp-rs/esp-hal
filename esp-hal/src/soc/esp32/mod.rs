@@ -13,7 +13,6 @@ crate::unstable_module! {
     pub mod efuse;
     #[cfg(feature = "psram")]
     pub mod psram;
-    pub mod radio_clocks;
     pub mod trng;
 }
 pub mod cpu_control;
@@ -38,6 +37,8 @@ macro_rules! trm_link {
 pub use chip;
 
 pub(crate) mod constants {
+    use crate::time::Rate;
+
     /// The base clock frequency for the I2S peripheral (Hertz).
     pub const I2S_SCLK: u32 = 160_000_000;
     /// The default clock source for I2S operations.
@@ -51,7 +52,7 @@ pub(crate) mod constants {
     /// The upper bound of the system's DRAM (Data RAM) address space.
     pub const SOC_DRAM_HIGH: usize = 0x4000_0000;
     /// A reference clock tick of 1 MHz.
-    pub const REF_TICK: fugit::HertzU32 = fugit::HertzU32::MHz(1);
+    pub const REF_TICK: Rate = Rate::from_mhz(1);
 }
 
 /// Function initializes ESP32 specific memories (RTC slow and fast) and
@@ -96,7 +97,7 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
         addr_of_mut!(_rtc_slow_bss_end),
     );
     if matches!(
-        crate::reset::reset_reason(),
+        crate::system::reset_reason(),
         None | Some(SocResetReason::ChipPowerOn)
     ) {
         xtensa_lx_rt::zero_bss(
@@ -130,3 +131,5 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 pub extern "Rust" fn __init_data() -> bool {
     false
 }
+
+pub(crate) fn pre_init() {}

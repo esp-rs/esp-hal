@@ -5,21 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
 
 ### Added
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## [0.13.0] - 2025-02-24
+
+### Added
+
+- Added support for using an external scheduler (#3115)
+
+### Changed
+
 - `esp_wifi::init` now takes an `impl Peripheral` for RNG source (#2992)
+- `set_power_saving` is now also available when the `coex` feature is activated (#3081)
+- Network interfaces and the controller are now more separated (#3027)
 
 ### Fixed
 
 - Fixed a problem using BLE on ESP32-C6 when connected via Serial-JTAG (#2981)
-
 - Fix a possible dead-lock when the rx-queue is overrun (#3015)
-
-### Removed
 
 ## 0.12.0 - 2025-01-15
 
@@ -221,4 +232,4 @@ Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2
 
 Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/esp-wifi?since=2025-01-15
+[0.13.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-wifi-v0.13.0

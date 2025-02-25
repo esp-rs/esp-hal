@@ -20,7 +20,6 @@ use esp_hal::{
     delay::Delay,
     gpio::GpioPin,
     handler,
-    interrupt::InterruptConfigurable,
     main,
     ram,
     rtc_cntl::Rtc,

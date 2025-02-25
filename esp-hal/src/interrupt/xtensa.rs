@@ -6,7 +6,7 @@ use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
 use super::InterruptStatus;
-use crate::{pac, peripherals::Interrupt, Cpu};
+use crate::{pac, peripherals::Interrupt, system::Cpu};
 
 /// Interrupt Error
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -157,7 +157,7 @@ pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Resul
         map(Cpu::current(), interrupt, cpu_interrupt);
 
         xtensa_lx::interrupt::enable_mask(
-            xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
+            xtensa_lx::interrupt::get_mask() | (1 << cpu_interrupt as u32),
         );
     }
     Ok(())
@@ -491,7 +491,7 @@ mod vectored {
             map(Cpu::current(), interrupt, cpu_interrupt);
 
             xtensa_lx::interrupt::enable_mask(
-                xtensa_lx::interrupt::get_mask() | 1 << cpu_interrupt as u32,
+                xtensa_lx::interrupt::get_mask() | (1 << cpu_interrupt as u32),
             );
         }
         Ok(())

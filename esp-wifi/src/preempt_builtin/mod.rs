@@ -1,12 +1,15 @@
 #[cfg_attr(target_arch = "riscv32", path = "preempt_riscv.rs")]
 #[cfg_attr(target_arch = "xtensa", path = "preempt_xtensa.rs")]
-pub mod arch_specific;
+mod arch_specific;
+pub mod timer;
 
-use core::mem::size_of;
+use core::{ffi::c_void, mem::size_of};
 
 use arch_specific::*;
 use esp_hal::sync::Locked;
 use esp_wifi_sys::include::malloc;
+use timer::{disable_multitasking, setup_multitasking};
+pub(crate) use timer::{disable_timer, setup_timer};
 
 use crate::{compat::malloc::free, hal::trapframe::TrapFrame, memory_fence::memory_fence};
 
@@ -19,7 +22,56 @@ static CTX_NOW: Locked<ContextWrapper> = Locked::new(ContextWrapper(core::ptr::n
 
 static mut SCHEDULED_TASK_TO_DELETE: *mut Context = core::ptr::null_mut();
 
-pub(crate) fn allocate_main_task() -> *mut Context {
+use crate::preempt::Scheduler;
+
+struct BuiltinScheduler {}
+
+crate::scheduler_impl!(static SCHEDULER: BuiltinScheduler = BuiltinScheduler {});
+
+impl Scheduler for BuiltinScheduler {
+    fn enable(&self) {
+        // allocate the main task
+        allocate_main_task();
+        setup_multitasking();
+    }
+
+    fn disable(&self) {
+        disable_multitasking();
+        delete_all_tasks();
+
+        timer::TIMER.with(|timer| timer.take());
+    }
+
+    fn yield_task(&self) {
+        timer::yield_task()
+    }
+
+    fn task_create(
+        &self,
+        task: extern "C" fn(*mut c_void),
+        param: *mut c_void,
+        task_stack_size: usize,
+    ) -> *mut c_void {
+        arch_specific::task_create(task, param, task_stack_size) as *mut c_void
+    }
+
+    fn current_task(&self) -> *mut c_void {
+        current_task() as *mut c_void
+    }
+
+    fn schedule_task_deletion(&self, task_handle: *mut c_void) {
+        schedule_task_deletion(task_handle as *mut Context)
+    }
+
+    fn current_task_thread_semaphore(&self) -> *mut crate::binary::c_types::c_void {
+        unsafe {
+            &mut ((*current_task()).thread_semaphore) as *mut _
+                as *mut crate::binary::c_types::c_void
+        }
+    }
+}
+
+fn allocate_main_task() -> *mut Context {
     CTX_NOW.with(|ctx_now| unsafe {
         if !ctx_now.0.is_null() {
             panic!("Tried to allocate main task multiple times");
@@ -56,7 +108,7 @@ fn next_task() {
 /// Delete the given task.
 ///
 /// This will also free the memory (stack and context) allocated for it.
-pub(crate) fn delete_task(task: *mut Context) {
+fn delete_task(task: *mut Context) {
     CTX_NOW.with(|ctx_now| unsafe {
         let mut ptr = ctx_now.0;
         let initial = ptr;
@@ -80,7 +132,7 @@ pub(crate) fn delete_task(task: *mut Context) {
     });
 }
 
-pub(crate) fn delete_all_tasks() {
+fn delete_all_tasks() {
     CTX_NOW.with(|ctx_now| unsafe {
         let current_task = ctx_now.0;
 
@@ -109,20 +161,18 @@ pub(crate) fn delete_all_tasks() {
     });
 }
 
-pub(crate) fn current_task() -> *mut Context {
+fn current_task() -> *mut Context {
     CTX_NOW.with(|ctx_now| ctx_now.0)
 }
 
-pub(crate) fn schedule_task_deletion(task: *mut Context) {
-    use crate::timer::yield_task;
-
+fn schedule_task_deletion(task: *mut Context) {
     unsafe {
         SCHEDULED_TASK_TO_DELETE = task;
     }
 
     if task == current_task() {
         loop {
-            yield_task();
+            timer::yield_task();
         }
     }
 }

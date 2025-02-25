@@ -29,14 +29,9 @@ pub fn run(args: &[String], cwd: &Path) -> Result<()> {
 }
 
 /// Execute cargo with the given arguments and from the specified directory.
-pub fn run_and_capture(args: &[String], cwd: &Path) -> Result<String> {
-    run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [], true)
-}
-
-/// Execute cargo with the given arguments and from the specified directory.
 pub fn run_with_env<I, K, V>(args: &[String], cwd: &Path, envs: I, capture: bool) -> Result<String>
 where
-    I: IntoIterator<Item = (K, V)>,
+    I: IntoIterator<Item = (K, V)> + core::fmt::Debug,
     K: AsRef<OsStr>,
     V: AsRef<OsStr>,
 {
@@ -49,6 +44,13 @@ where
     // While it's fixed in `rustversion` it's not fixed for other crates we are
     // using now or in future!
     let cwd = windows_safe_path(cwd);
+
+    log::debug!(
+        "Running `cargo {}` in {:?} - Environment {:?}",
+        args.join(" "),
+        cwd,
+        envs
+    );
 
     let output = Command::new(get_cargo())
         .args(args)

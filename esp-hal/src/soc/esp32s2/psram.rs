@@ -238,7 +238,7 @@ pub(crate) mod utils {
             const PSRAM_EID_SIZE_M: u32 = 0x07;
             const PSRAM_EID_SIZE_S: u32 = 5;
 
-            let size_id = (((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S
+            let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
                 & PSRAM_EID_SIZE_M;
 
             const PSRAM_EID_SIZE_32MBITS: u32 = 1;

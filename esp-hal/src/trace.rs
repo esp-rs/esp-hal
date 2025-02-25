@@ -28,8 +28,9 @@
 //! // traced code
 //!
 //! // end traced code
-//! let res = trace.stop_trace().unwrap();
+//! let res = trace.stop_trace()?;
 //! // transfer the trace result to the host and decode it there
+//! # Ok(())
 //! # }
 //! ```
 

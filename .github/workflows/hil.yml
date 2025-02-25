@@ -29,17 +29,8 @@ env:
 
 jobs:
   build-xtasks:
-    name: Build xtasks | ${{ matrix.host.arch }}
+    name: Build xtasks
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        host:
-          - arch: armv7
-            rust-target: armv7-unknown-linux-gnueabihf
-          - arch: aarch64
-            rust-target: aarch64-unknown-linux-gnu
 
     steps:
       - uses: actions/checkout@v4
@@ -60,13 +51,21 @@ jobs:
         run: cargo install cross
 
       - name: Build xtasks
-        run: cross build --release --target ${{ matrix.host.rust-target }} -p xtask
+        run: |
+          cross build --release --target armv7-unknown-linux-gnueabihf -p xtask
+          cross build --release --target aarch64-unknown-linux-gnu -p xtask
 
-      - name: Upload artifact
+      - name: Upload artifact | armv7-unknown-linux-gnueabihf
         uses: actions/upload-artifact@v4
         with:
-          name: xtask-${{ matrix.host.arch }}
-          path: target/${{ matrix.host.rust-target }}/release/xtask
+          name: xtask-armv7
+          path: target/armv7-unknown-linux-gnueabihf/release/xtask
+
+      - name: Upload artifact | aarch64-unknown-linux-gnu
+        uses: actions/upload-artifact@v4
+        with:
+          name: xtask-aarch64
+          path: target/aarch64-unknown-linux-gnu/release/xtask
 
   build-tests:
     name: Build HIL Tests | ${{ matrix.target.soc }}
@@ -116,15 +115,9 @@ jobs:
           buildtargets: ${{ matrix.target.soc }}
           default: true
           ldproxy: false
-          version: 1.84.0.0
-
-      # remove once we have a proper solution for target specific configs
-      - name: Build tests ESP32S3
-        if: ${{ matrix.target.soc == 'esp32s3'}}
-        run: ESP_HAL_CONFIG_PSRAM_MODE="octal" cargo xtask build-tests ${{ matrix.target.soc }}
+          version: 1.85.0.0
 
       - name: Build tests
-        if: ${{ matrix.target.soc != 'esp32s3'}}
         run: cargo xtask build-tests ${{ matrix.target.soc }}
 
       - uses: actions/upload-artifact@v4

@@ -1,10 +1,10 @@
-use esp_wifi_sys::include::timeval;
-use hal::ram;
+use esp_wifi_sys::{c_types::c_char, include::timeval};
+use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
     compat::{common::*, timer_compat::*},
-    hal,
+    hal::{self, clock::RadioClockController, peripherals::RADIO_CLK, ram},
 };
 
 #[cfg_attr(esp32c3, path = "common_adapter_esp32c3.rs")]
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
     trace!("random");
 
     // stealing RNG is safe since we own it (passed into `init`)
-    let mut rng = esp_hal::rng::Rng::new(unsafe { esp_hal::peripherals::RNG::steal() });
+    let mut rng = hal::rng::Rng::new(unsafe { hal::peripherals::RNG::steal() });
     rng.random()
 }
 
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
 pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int {
     trace!("read_mac {:?} {}", mac, type_);
 
-    let base_mac = crate::hal::efuse::Efuse::mac_address();
+    let base_mac = hal::efuse::Efuse::mac_address();
 
     for (i, &byte) in base_mac.iter().enumerate() {
         mac.add(i).write_volatile(byte);
@@ -193,7 +193,7 @@ pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *cons
 
 // other functions
 #[no_mangle]
-pub unsafe extern "C" fn puts(s: *const u8) {
+pub unsafe extern "C" fn puts(s: *const c_char) {
     let cstr = str_from_c(s);
     info!("{}", cstr);
 }
@@ -205,10 +205,10 @@ static mut WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 // stuff needed by wpa-supplicant
 #[no_mangle]
 pub unsafe extern "C" fn __assert_func(
-    file: *const u8,
+    file: *const c_char,
     line: u32,
-    func: *const u8,
-    failed_expr: *const u8,
+    func: *const c_char,
+    failed_expr: *const c_char,
 ) {
     let file = str_from_c(file);
     let (func_pre, func) = if func.is_null() {
@@ -306,4 +306,29 @@ pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
 #[no_mangle]
 pub unsafe extern "C" fn floor(v: f64) -> f64 {
     libm::floor(v)
+}
+
+static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
+
+pub(crate) unsafe fn phy_enable_clock() {
+    let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::Acquire);
+    if count == 0 {
+        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+        // value) into `init`
+        let radio_clocks = unsafe { RADIO_CLK::steal() };
+        RadioClockController::new(radio_clocks).enable_phy(true);
+        trace!("phy_enable_clock done!");
+    }
+}
+
+#[allow(unused)]
+pub(crate) unsafe fn phy_disable_clock() {
+    let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::Release);
+    if count == 1 {
+        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+        // value) into `init`
+        let radio_clocks = unsafe { RADIO_CLK::steal() };
+        RadioClockController::new(radio_clocks).enable_phy(false);
+        trace!("phy_disable_clock done!");
+    }
 }

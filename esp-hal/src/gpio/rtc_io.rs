@@ -25,6 +25,7 @@
 //! # use esp_hal::gpio::rtc_io::LowPowerOutput;
 //! // configure GPIO 1 as ULP output pin
 //! let lp_pin = LowPowerOutput::<'static, 1>::new(peripherals.GPIO1);
+//! # Ok(())
 //! # }
 //! ```
 
