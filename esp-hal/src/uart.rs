@@ -640,6 +640,22 @@ where
         Ok(())
     }
 
+    /// Sends a break signal for a specified duration in bit time, i.e. the time
+    /// it takes to transfer one bit at the current baud rate. The delay during
+    /// the break is just is busy-waiting.
+    pub fn send_break(&mut self, bits: u32) {
+        // Invert the TX line
+        self.regs().conf0().modify(|_, w| w.txd_inv().bit(true));
+
+        // 1 bit time in microseconds = 1_000_000 / baudrate
+        // TODO: Proper baudrate retrieval!
+        let bit_period_us: u32 = 1_000_000 / 19200;
+        crate::rom::ets_delay_us(bit_period_us * bits);
+
+        // Revert the TX line
+        self.regs().conf0().modify(|_, w| w.txd_inv().bit(false));
+    }
+
     /// Checks if the TX line is idle for this UART instance.
     ///
     /// Returns `true` if the transmit line is idle, meaning no data is
@@ -1276,6 +1292,11 @@ where
     /// Flush the transmit buffer of the UART
     pub fn flush(&mut self) -> Result<(), TxError> {
         self.tx.flush()
+    }
+
+    /// Sends a break signal for a specified duration
+    pub fn send_break(&mut self, bits: u32) {
+        self.tx.send_break(bits)
     }
 
     /// Change the configuration.
