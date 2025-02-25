@@ -785,4 +785,59 @@ mod tests {
         transfer.cancel();
         _ = transfer.wait();
     }
+
+    #[test]
+    #[cfg(feature = "unstable")]
+    fn transfer_works_after_half_duplex_operation(ctx: Context) {
+        let mut spi = ctx.spi;
+
+        let mut buffer = [0u8; 4];
+        spi.half_duplex_read(
+            esp_hal::spi::DataMode::Dual,
+            esp_hal::spi::master::Command::_8Bit(0x92, esp_hal::spi::DataMode::SingleTwoDataLines),
+            esp_hal::spi::master::Address::_32Bit(0x000000_00, esp_hal::spi::DataMode::Dual),
+            0,
+            &mut buffer,
+        )
+        .unwrap();
+
+        const DATA: &[u8] = &[0xde, 0xad, 0xbe, 0xef];
+        let mut buffer: [u8; 4] = [0x00u8; 4];
+        buffer.copy_from_slice(DATA);
+
+        spi.transfer(&mut buffer)
+            .expect("Symmetric transfer failed");
+        assert_eq!(buffer, DATA);
+    }
+
+    #[test]
+    #[cfg(feature = "unstable")]
+    fn dma_transfer_works_after_half_duplex_operation(ctx: Context) {
+        let mut spi = ctx.spi;
+
+        let mut buffer = [0u8; 4];
+        spi.half_duplex_read(
+            esp_hal::spi::DataMode::Dual,
+            esp_hal::spi::master::Command::_8Bit(0x92, esp_hal::spi::DataMode::SingleTwoDataLines),
+            esp_hal::spi::master::Address::_32Bit(0x000000_00, esp_hal::spi::DataMode::Dual),
+            0,
+            &mut buffer,
+        )
+        .unwrap();
+
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+        let mut spi = spi
+            .with_dma(ctx.dma_channel)
+            .with_buffers(dma_rx_buf, dma_tx_buf);
+
+        let tx_buf = [0xde, 0xad, 0xbe, 0xef];
+        let mut rx_buf = [0; 4];
+
+        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
+
+        assert_eq!(tx_buf, rx_buf);
+    }
 }
