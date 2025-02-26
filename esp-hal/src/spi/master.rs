@@ -49,7 +49,10 @@ use crate::{
     dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{
         interconnect::{OutputConnection, PeripheralInput, PeripheralOutput},
-        InputSignal, NoPin, OutputSignal, PinGuard,
+        InputSignal,
+        NoPin,
+        OutputSignal,
+        PinGuard,
     },
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
@@ -58,7 +61,9 @@ use crate::{
     spi::AnySpi,
     system::{Cpu, PeripheralGuard},
     time::Rate,
-    Async, Blocking, DriverMode,
+    Async,
+    Blocking,
+    DriverMode,
 };
 
 /// Enumeration of possible SPI interrupt events.
@@ -1225,7 +1230,11 @@ mod dma {
     use super::*;
     use crate::dma::{
         asynch::{DmaRxFuture, DmaTxFuture},
-        Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel,
+        Channel,
+        DmaRxBuf,
+        DmaTxBuf,
+        EmptyBuf,
+        PeripheralDmaChannel,
     };
 
     /// A DMA capable SPI instance.
