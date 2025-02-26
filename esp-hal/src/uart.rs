@@ -315,9 +315,6 @@ impl Default for RxConfig {
 pub struct TxConfig {
     /// Threshold level at which the TX FIFO is considered empty.
     fifo_empty_threshold: u16,
-
-    /// Baud rate for the UART communication.
-    baudrate: u32,
 }
 
 impl Default for TxConfig {
@@ -325,7 +322,6 @@ impl Default for TxConfig {
         TxConfig {
             // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L59>
             fifo_empty_threshold: 10,
-            baudrate: 115_200,
         }
     }
 }
