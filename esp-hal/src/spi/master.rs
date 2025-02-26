@@ -675,6 +675,7 @@ where
     /// Write bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+        self.driver().setup_full_duplex()?;
         self.driver().write(words)?;
         self.driver().flush()?;
 
@@ -684,11 +685,13 @@ where
     /// Read bytes from SPI. The provided slice is filled with data received
     /// from the slave.
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.driver().setup_full_duplex()?;
         self.driver().read(words)
     }
 
     /// Sends `words` to the slave. Returns the `words` received from the slave.
     pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
+        self.driver().setup_full_duplex()?;
         self.driver().transfer(words)
     }
 }
@@ -880,6 +883,7 @@ impl<'d> Spi<'d, Async> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
         self.flush_async().await?;
+        self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place_async(words).await
     }
 }
@@ -1747,7 +1751,9 @@ mod dma {
             mut buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
             self.wait_for_idle();
-
+            if let Err(e) = self.driver().setup_full_duplex() {
+                return Err((e, self, buffer));
+            };
             match unsafe { self.start_dma_write(bytes_to_write, &mut buffer) } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
@@ -1781,6 +1787,9 @@ mod dma {
             mut buffer: RX,
         ) -> Result<SpiDmaTransfer<'d, Dm, RX>, (Error, Self, RX)> {
             self.wait_for_idle();
+            if let Err(e) = self.driver().setup_full_duplex() {
+                return Err((e, self, buffer));
+            };
             match unsafe { self.start_dma_read(bytes_to_read, &mut buffer) } {
                 Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
                 Err(e) => Err((e, self, buffer)),
@@ -1818,6 +1827,9 @@ mod dma {
             mut tx_buffer: TX,
         ) -> Result<SpiDmaTransfer<'d, Dm, (RX, TX)>, (Error, Self, RX, TX)> {
             self.wait_for_idle();
+            if let Err(e) = self.driver().setup_full_duplex() {
+                return Err((e, self, rx_buffer, tx_buffer));
+            };
             match unsafe {
                 self.start_dma_transfer(
                     bytes_to_read,
@@ -2081,6 +2093,7 @@ mod dma {
         #[instability::unstable]
         pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
             self.wait_for_idle();
+            self.spi_dma.driver().setup_full_duplex()?;
             for chunk in words.chunks_mut(self.rx_buf.capacity()) {
                 self.rx_buf.set_length(chunk.len());
 
@@ -2106,6 +2119,7 @@ mod dma {
         #[instability::unstable]
         pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
             self.wait_for_idle();
+            self.spi_dma.driver().setup_full_duplex()?;
             for chunk in words.chunks(self.tx_buf.capacity()) {
                 self.tx_buf.fill(chunk);
 
@@ -2128,6 +2142,7 @@ mod dma {
         #[instability::unstable]
         pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
             self.wait_for_idle();
+            self.spi_dma.driver().setup_full_duplex()?;
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
 
             let common_length = min(read.len(), write.len());
@@ -2168,6 +2183,7 @@ mod dma {
         #[instability::unstable]
         pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
             self.wait_for_idle();
+            self.spi_dma.driver().setup_full_duplex()?;
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
 
             for chunk in words.chunks_mut(chunk_size) {
@@ -2325,6 +2341,7 @@ mod dma {
             #[instability::unstable]
             pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
+                self.spi_dma.driver().setup_full_duplex()?;
                 let chunk_size = self.rx_buf.capacity();
 
                 for chunk in words.chunks_mut(chunk_size) {
@@ -2351,6 +2368,7 @@ mod dma {
             #[instability::unstable]
             pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
+                self.spi_dma.driver().setup_full_duplex()?;
 
                 let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
                 let chunk_size = self.tx_buf.capacity();
@@ -2378,6 +2396,7 @@ mod dma {
                 write: &[u8],
             ) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
+                self.spi_dma.driver().setup_full_duplex()?;
 
                 let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
                 let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
@@ -2423,6 +2442,7 @@ mod dma {
             #[instability::unstable]
             pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
                 self.spi_dma.wait_for_idle_async().await;
+                self.spi_dma.driver().setup_full_duplex()?;
 
                 let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
                 for chunk in words.chunks_mut(self.tx_buf.capacity()) {
@@ -2603,6 +2623,7 @@ mod ehal1 {
             // We need to flush because the blocking transfer functions may return while a
             // transfer is still in progress.
             self.flush_async().await?;
+            self.driver().setup_full_duplex()?;
             self.driver().read_async(words).await
         }
 
@@ -2610,6 +2631,7 @@ mod ehal1 {
             // We need to flush because the blocking transfer functions may return while a
             // transfer is still in progress.
             self.flush_async().await?;
+            self.driver().setup_full_duplex()?;
             self.driver().write_async(words).await
         }
 
@@ -3377,6 +3399,23 @@ impl Driver {
         let future = SpiFuture::setup(self).await;
         self.start_operation();
         future.await;
+    }
+
+    fn setup_full_duplex(&self) -> Result<(), Error> {
+        self.regs().user().modify(|_, w| {
+            w.usr_miso().set_bit();
+            w.usr_mosi().set_bit();
+            w.doutdin().set_bit();
+            w.usr_dummy().clear_bit();
+            w.sio().clear_bit()
+        });
+
+        self.init_spi_data_mode(
+            DataMode::SingleTwoDataLines,
+            DataMode::SingleTwoDataLines,
+            DataMode::SingleTwoDataLines,
+        )?;
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
