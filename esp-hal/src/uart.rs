@@ -1935,7 +1935,10 @@ impl UartTx<'_, Async> {
     ///
     /// This function is cancellation safe.
     pub async fn flush_async(&mut self) -> Result<(), TxError> {
-        if self.tx_fifo_count() > 0 {
+        // Nothing is guaranteed to clear the Done status, so let's loop here in case Tx
+        // was Done before the last write operation that pushed data into the
+        // FIFO.
+        while self.tx_fifo_count() > 0 {
             UartTxFuture::new(self.uart.reborrow(), TxEvent::Done).await;
         }
 
