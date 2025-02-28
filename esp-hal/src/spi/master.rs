@@ -2987,6 +2987,8 @@ impl Driver {
         match address_mode {
             DataMode::Single | DataMode::SingleTwoDataLines => {
                 self.regs().ctrl().modify(|_, w| {
+                    w.fastrd_mode()
+                        .bit(matches!(data_mode, DataMode::Dual | DataMode::Quad));
                     w.fread_dio().clear_bit();
                     w.fread_qio().clear_bit();
                     w.fread_dual().bit(data_mode == DataMode::Dual);
@@ -3002,7 +3004,8 @@ impl Driver {
             }
             address_mode if address_mode == data_mode => {
                 self.regs().ctrl().modify(|_, w| {
-                    w.fastrd_mode().set_bit();
+                    w.fastrd_mode()
+                        .bit(matches!(data_mode, DataMode::Dual | DataMode::Quad));
                     w.fread_dio().bit(address_mode == DataMode::Dual);
                     w.fread_qio().bit(address_mode == DataMode::Quad);
                     w.fread_dual().clear_bit();
