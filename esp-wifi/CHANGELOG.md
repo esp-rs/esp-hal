@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The scheduler now runs at interrupt priority 1 on Xtensa chips, too. (#3164)
+
 ### Fixed
 
 ### Removed
