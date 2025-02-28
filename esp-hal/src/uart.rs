@@ -632,12 +632,18 @@ where
     #[instability::unstable]
     pub fn flush(&mut self) -> Result<(), TxError> {
         while self.tx_fifo_count() > 0 {}
-        // The FSM is in the Idle state for a short while after the last byte is moved
-        // out of the FIFO. It is unclear how long this takes, but 10us seems to be a
-        // good enough duration to wait, for both fast and slow baud rates.
+        self.flush_last_byte();
+        Ok(())
+    }
+
+    fn flush_last_byte(&mut self) {
+        // This function handles an edge case that happens when the TX FIFO count
+        // changes to 0. The FSM is in the Idle state for a short while after
+        // the last byte is moved out of the FIFO. It is unclear how long this
+        // takes, but 10us seems to be a good enough duration to wait, for both
+        // fast and slow baud rates.
         crate::rom::ets_delay_us(10);
         while !self.is_tx_idle() {}
-        Ok(())
     }
 
     /// Checks if the TX line is idle for this UART instance.
@@ -1941,6 +1947,8 @@ impl UartTx<'_, Async> {
         while self.tx_fifo_count() > 0 {
             UartTxFuture::new(self.uart.reborrow(), TxEvent::Done).await;
         }
+
+        self.flush_last_byte();
 
         Ok(())
     }
