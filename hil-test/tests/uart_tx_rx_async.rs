@@ -76,6 +76,43 @@ mod tests {
     }
 
     #[test]
+    async fn flush_async_does_not_return_prematurely(mut ctx: Context) {
+        // Force TX_DONE to be set
+        ctx.tx.write_async(&[0u8; 10]).await.unwrap();
+
+        let mut read = [0u8; 10];
+        ctx.rx.read_exact_async(&mut read).await.unwrap();
+
+        // The flush should not return until the data is actually sent, regardless of
+        // previous TX_DONE status.
+        for _ in 0..10 {
+            ctx.tx.write_async(&[1u8; 10]).await.unwrap();
+            ctx.tx.flush_async().await.unwrap();
+
+            let read_count = ctx.rx.read_buffered(&mut read).unwrap();
+
+            assert_eq!(read_count, 10);
+            assert_eq!(&read, &[1u8; 10]);
+        }
+    }
+
+    #[test]
+    async fn flush_async_does_not_return_prematurely_even_for_short_writes(mut ctx: Context) {
+        let mut read = [0u8; 2];
+        // The flush should not return until the data is actually sent, regardless of
+        // previous TX_DONE status.
+        for i in 0..10 {
+            ctx.tx.write_async(&[i as u8]).await.unwrap();
+            ctx.tx.flush_async().await.unwrap();
+
+            let read_count = ctx.rx.read_buffered(&mut read).unwrap();
+
+            assert_eq!(read_count, 1);
+            assert_eq!(read[0], i as u8);
+        }
+    }
+
+    #[test]
     async fn rx_overflow_is_detected(mut ctx: Context) {
         let mut to_send: &[u8] = &[0; 250];
         let mut read = [0u8; 1];
