@@ -843,17 +843,12 @@ where
             | RxEvent::FrameError
             | RxEvent::ParityError;
         let events = self.uart.info().rx_events().intersection(errors);
-        let result = self.handle_rx_events(events);
+        let result = rx_event_check_for_error(events);
         if result.is_err() {
             self.uart.info().clear_rx_events(errors);
-        }
-        result
-    }
-
-    fn handle_rx_events(&self, events: EnumSet<RxEvent>) -> Result<(), RxError> {
-        let result = rx_event_check_for_error(events);
-        if result.is_err() && events.contains(RxEvent::FifoOvf) {
-            self.uart.info().rxfifo_reset();
+            if events.contains(RxEvent::FifoOvf) {
+                self.uart.info().rxfifo_reset();
+            }
         }
         result
     }
@@ -2014,7 +2009,14 @@ impl UartRx<'_, Async> {
             }
 
             let events = UartRxFuture::new(self.uart.reborrow(), events).await;
-            self.handle_rx_events(events)?;
+
+            let result = rx_event_check_for_error(events);
+            if let Err(error) = result {
+                if error == RxError::FifoOverflowed {
+                    self.uart.info().rxfifo_reset();
+                }
+                return Err(error);
+            }
         }
 
         Ok(())
