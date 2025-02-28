@@ -25,6 +25,7 @@ mod tests {
         select::{select, Either},
     };
     use embassy_time::{Duration, Timer};
+    use embedded_io_async::Write;
     use esp_hal::{
         timer::timg::TimerGroup,
         uart::{RxConfig, RxError},
@@ -127,6 +128,30 @@ mod tests {
         // long.
         let res = ctx.rx.read_async(&mut read).await;
         assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
+    }
+
+    #[test]
+    async fn flushing_after_overflow_remains_consistent(mut ctx: Context) {
+        let mut read = [0u8; 1];
+
+        ctx.tx.write_all(&[0; 200]).await.unwrap();
+        ctx.tx.flush_async().await.unwrap();
+
+        // The read is supposed to return an error because the FIFO is just 128 bytes
+        // long.
+        let res = ctx.rx.read_async(&mut read).await;
+        assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
+
+        while ctx.rx.read_buffered(&mut [0]).unwrap() > 0 {}
+
+        // Now we should be able to write and read back the same data.
+
+        ctx.tx.write_all(&[1, 2, 3, 4]).await.unwrap();
+
+        let mut read = [0u8; 4];
+        ctx.rx.read_exact_async(&mut read).await.unwrap();
+
+        assert_eq!(&read, &[1, 2, 3, 4]);
     }
 
     #[test]
