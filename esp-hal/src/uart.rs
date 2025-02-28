@@ -76,7 +76,7 @@ pub enum RxError {
     /// An RX FIFO overflow happened.
     ///
     /// This error occurs when RX FIFO is full and a new byte is received. The
-    /// RX FIFO is then automatically reset.
+    /// RX FIFO is then automatically reset by the driver.
     FifoOverflowed,
 
     /// A glitch was detected on the RX line.
