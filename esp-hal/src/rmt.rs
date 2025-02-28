@@ -470,7 +470,7 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
     pin: impl Peripheral<P = P> + 'd,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
-    if config.filter_threshold > 0b111_1111 {
+    if config.filter_threshold > 0b1111_1111 {
         return Err(Error::InvalidArgument);
     }
 
