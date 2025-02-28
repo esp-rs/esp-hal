@@ -39,7 +39,15 @@ pub struct Input<const PIN: u8>;
 impl<const PIN: u8> Input<PIN> {
     /// Read the input state/level of the pin.
     pub fn input_state(&self) -> bool {
-        (unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32c6")] {
+                (unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN) & 0x1 != 0
+            } else if #[cfg(feature = "esp32s2")] {
+                (unsafe { &*LpIo::PTR }.in_().read().gpio_in_next().bits() >> PIN) & 0x1 != 0
+            } else if #[cfg(feature = "esp32s3")] {
+                (unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0
+            }
+        }
     }
 }
 
@@ -49,7 +57,15 @@ pub struct Output<const PIN: u8>;
 impl<const PIN: u8> Output<PIN> {
     /// Read the output state/level of the pin.
     pub fn output_state(&self) -> bool {
-        (unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32c6")] {
+                (unsafe { &*LpIo::PTR }.out().read().bits() >> PIN) & 0x1 != 0
+            } else if #[cfg(feature = "esp32s2")] {
+                (unsafe { &*LpIo::PTR }.out().read().gpio_out_data().bits() >> PIN) & 0x1 != 0
+            } else if #[cfg(feature = "esp32s3")] {
+                (unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0
+            }
+        }
     }
 
     /// Set the output state/level of the pin.
