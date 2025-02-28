@@ -75,7 +75,13 @@ use crate::{
 pub enum RxError {
     /// The RX FIFO overflow happened.
     ///
-    /// This error occurs when RX FIFO is full and a new byte is received.
+    /// This error occurs when RX FIFO is full and a new byte is received. The
+    /// user is responsible for clearing the FIFO after receiving this
+    /// error, e.g. by calling [`Uart::read_buffered`] until it returns 0 bytes.
+    ///
+    /// The number of bytes that need to be flushed after a FIFO overflow is
+    /// undefined and may be more than the FIFO's capacity. In that case the
+    /// same bytes may be returned multiple times.
     FifoOverflowed,
 
     /// A glitch was detected on the RX line.

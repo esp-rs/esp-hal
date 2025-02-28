@@ -134,7 +134,7 @@ mod tests {
     async fn flushing_after_overflow_remains_consistent(mut ctx: Context) {
         let mut read = [0u8; 1];
 
-        ctx.tx.write_all(&[0; 200]).await.unwrap();
+        ctx.tx.write_all(&[0; 350]).await.unwrap();
         ctx.tx.flush_async().await.unwrap();
 
         // The read is supposed to return an error because the FIFO is just 128 bytes
@@ -145,7 +145,7 @@ mod tests {
         while ctx.rx.read_buffered(&mut [0]).unwrap() > 0 {}
 
         // Now we should be able to write and read back the same data.
-        for _ in 0..10 {
+        for _ in 0..5 {
             ctx.tx.write_all(&[1, 2, 3, 4]).await.unwrap();
 
             let mut read = [0u8; 4];
@@ -155,11 +155,21 @@ mod tests {
         }
 
         // Can we still handle a full FIFO?
-
-        ctx.tx.write_all(&[1; 128]).await.unwrap();
+        // Join two futures to ensure that `read_async` is called first, which should
+        // set up waiting for the FIFO full interrupt.
         let mut read = [0u8; 128];
-        ctx.rx.read_exact_async(&mut read).await.unwrap();
-        assert_eq!(&read, &[1; 128]);
+        let read = async {
+            // This read should return as many bytes as the FIFO threshold, which is 120
+            // bytes by default.
+            let read_count = ctx.rx.read_async(&mut read).await.unwrap();
+            assert_eq!(read_count, 120);
+
+            ctx.rx.read_exact_async(&mut read[120..]).await.unwrap();
+            assert_eq!(&read, &[1; 128]);
+        };
+        let write = async { ctx.tx.write_all(&[1; 128]).await.unwrap() };
+
+        embassy_futures::join::join(read, write).await;
     }
 
     #[test]
