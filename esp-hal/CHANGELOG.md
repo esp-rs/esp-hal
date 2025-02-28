@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Full-duplex SPI works when mixed with half-duplex SPI (#3176)
 - `Uart::flush_async` should no longer return prematurely (#3186)
-- Reading after an UART overflow should now return bytes until the FIFO is empty. (#3190)
+- Detecting a UART overflow now clears the RX FIFO. (#3190)
 
 ### Removed
 

@@ -142,8 +142,6 @@ mod tests {
         let res = ctx.rx.read_async(&mut read).await;
         assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
 
-        while ctx.rx.read_buffered(&mut [0]).unwrap() > 0 {}
-
         // Now we should be able to write and read back the same data.
         for _ in 0..5 {
             ctx.tx.write_all(&[1, 2, 3, 4]).await.unwrap();

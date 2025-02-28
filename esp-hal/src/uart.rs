@@ -76,12 +76,7 @@ pub enum RxError {
     /// An RX FIFO overflow happened.
     ///
     /// This error occurs when RX FIFO is full and a new byte is received. The
-    /// user is responsible for clearing the FIFO after receiving this
-    /// error, e.g. by calling [`Uart::read_buffered`] until it returns 0 bytes.
-    ///
-    /// The number of bytes that need to be flushed after a FIFO overflow is
-    /// undefined and may be more than the FIFO's capacity. In that case the
-    /// same bytes may be returned multiple times.
+    /// RX FIFO is then automatically reset.
     FifoOverflowed,
 
     /// A glitch was detected on the RX line.
@@ -838,6 +833,8 @@ where
     }
 
     /// Reads and clears errors set by received data.
+    ///
+    /// If a FIFO overflow is detected, the RX FIFO is reset.
     #[instability::unstable]
     pub fn check_for_errors(&mut self) -> Result<(), RxError> {
         let errors = RxEvent::FifoOvf
@@ -848,6 +845,9 @@ where
         let events = self.uart.info().rx_events().intersection(errors);
         let result = rx_event_check_for_error(events);
         if result.is_err() {
+            if events.contains(RxEvent::FifoOvf) {
+                self.uart.info().rxfifo_reset();
+            }
             self.uart.info().clear_rx_events(errors);
         }
         result
@@ -916,26 +916,21 @@ where
         Ok(to_read)
     }
 
+    #[cfg(not(esp32))]
+    #[allow(clippy::unnecessary_cast)]
+    fn rx_fifo_count(&self) -> u16 {
+        self.regs().status().read().rxfifo_cnt().bits() as u16
+    }
+
+    #[cfg(esp32)]
     fn rx_fifo_count(&self) -> u16 {
         let fifo_cnt = self.regs().status().read().rxfifo_cnt().bits();
-        let status = self.regs().mem_rx_status().read();
 
-        // Calculate the real count based on the FIFO read and write offset address.
-        // This is prescribed for ESP32 by <https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/uart-fifo-cnt-indicates-data-length-incorrectly.html>
-        // but also necessary on other chips because the hardware read/write pointers
-        // may become out of sync with the FIFO count after an overflow.
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                let rd_addr: u16 = status.mem_rx_rd_addr().bits();
-                let wr_addr: u16 = status.mem_rx_wr_addr().bits();
-            } else if #[cfg(any(esp32c6, esp32h2))] {
-                let rd_addr: u16 = status.rx_sram_raddr().bits().into();
-                let wr_addr: u16 = status.rx_sram_waddr().bits().into();
-            } else {
-                let rd_addr: u16 = status.apb_rx_raddr().bits();
-                let wr_addr: u16 = status.rx_waddr().bits();
-            }
-        };
+        // Calculate the real count based on the FIFO read and write offset address:
+        // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/uart-fifo-cnt-indicates-data-length-incorrectly.html
+        let status = self.regs().mem_rx_status().read();
+        let rd_addr: u16 = status.mem_rx_rd_addr().bits();
+        let wr_addr: u16 = status.mem_rx_wr_addr().bits();
 
         if wr_addr > rd_addr {
             wr_addr - rd_addr
