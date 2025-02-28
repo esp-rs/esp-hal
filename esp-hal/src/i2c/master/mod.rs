@@ -60,12 +60,17 @@ cfg_if::cfg_if! {
     }
 }
 
-// Chunk writes/reads by this size
+// this is the real size of the FIFO
 #[cfg(any(esp32, esp32s2))]
-const I2C_CHUNK_SIZE: usize = 32;
+const I2C_FIFO_SIZE: usize = 32;
 
+// this is somewhat made up - it's not the FIFO size but we are able write/read
+// while the transmission is in progress
 #[cfg(not(any(esp32, esp32s2)))]
-const I2C_CHUNK_SIZE: usize = 254;
+const I2C_FIFO_SIZE: usize = 255;
+
+// Chunk writes/reads by this size
+const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
 
 // on ESP32 there is a chance to get trapped in `wait_for_completion` forever
 const MAX_ITERATIONS: u32 = 1_000_000;
@@ -336,7 +341,7 @@ impl embedded_hal::i2c::Error for Error {
 }
 
 /// A generic I2C Command
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Debug)]
 enum Command {
     Start,
     Stop,
@@ -346,15 +351,15 @@ enum Command {
         ack_exp: Ack,
         /// Enables checking the ACK value received against the ack_exp value.
         ack_check_en: bool,
-        /// Length of data (in bytes) to be written. The maximum length is 255,
-        /// while the minimum is 1.
+        /// Length of data (in bytes) to be written. The maximum length is
+        /// 32/255, while the minimum is 1.
         length: u8,
     },
     Read {
         /// Indicates whether the receiver will send an ACK after this byte has
         /// been received.
         ack_value: Ack,
-        /// Length of data (in bytes) to be read. The maximum length is 255,
+        /// Length of data (in bytes) to be read. The maximum length is 32/255,
         /// while the minimum is 1.
         length: u8,
     },
@@ -365,8 +370,7 @@ enum OperationType {
     Read  = 1,
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 enum Ack {
     Ack  = 0,
     Nack = 1,
@@ -1647,7 +1651,7 @@ impl Driver<'_> {
 
     #[cfg(any(esp32, esp32s2))]
     async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
-        if buffer.len() > 32 {
+        if buffer.len() > I2C_FIFO_SIZE {
             return Err(Error::FifoExceeded);
         }
 
@@ -1683,7 +1687,11 @@ impl Driver<'_> {
     {
         // if start is true we can only send 254 additional bytes with the address as
         // the first
-        let max_len = if start { 254usize } else { 255usize };
+        let max_len = if start {
+            I2C_CHUNK_SIZE
+        } else {
+            I2C_CHUNK_SIZE + 1
+        };
         if bytes.len() > max_len {
             // we could support more by adding multiple write operations
             return Err(Error::FifoExceeded);
@@ -1739,9 +1747,9 @@ impl Driver<'_> {
             return Err(Error::ZeroLengthInvalid);
         }
         let (max_len, initial_len) = if will_continue {
-            (255usize, buffer.len())
+            (I2C_CHUNK_SIZE + 1, buffer.len())
         } else {
-            (254usize, buffer.len() - 1)
+            (I2C_CHUNK_SIZE, buffer.len() - 1)
         };
         if buffer.len() > max_len {
             // we could support more by adding multiple read operations
@@ -1825,7 +1833,7 @@ impl Driver<'_> {
         // FIFO apparently it would be possible by using non-fifo mode
         // see https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
-        if buffer.len() > 32 {
+        if buffer.len() > I2C_FIFO_SIZE {
             return Err(Error::FifoExceeded);
         }
 
@@ -1973,14 +1981,30 @@ impl Driver<'_> {
         // NOTE: on esp32 executing the end command generates the end_detect interrupt
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
-        for cmd_reg in self.regs().comd_iter() {
-            let cmd = cmd_reg.read();
+        let mut cnt = MAX_ITERATIONS;
+        loop {
+            let mut not_done = false;
+            for cmd_reg in self.regs().comd_iter() {
+                let cmd = cmd_reg.read();
 
-            if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
+                if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
+                    not_done = true;
+                }
+
+                if cmd.opcode().is_end() || cmd.opcode().is_stop() {
+                    break;
+                }
+            }
+
+            if !not_done {
+                break;
+            }
+
+            cnt -= 1;
+            if cnt == 0 {
                 return Err(Error::ExecutionIncomplete);
             }
         }
-
         Ok(())
     }
 
@@ -2110,7 +2134,7 @@ impl Driver<'_> {
         // FIFO apparently it would be possible by using non-fifo mode
         // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
-        if bytes.len() > 31 {
+        if bytes.len() > I2C_FIFO_SIZE {
             return Err(Error::FifoExceeded);
         }
 
