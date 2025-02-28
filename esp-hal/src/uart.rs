@@ -73,7 +73,7 @@ use crate::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum RxError {
-    /// The RX FIFO overflow happened.
+    /// An RX FIFO overflow happened.
     ///
     /// This error occurs when RX FIFO is full and a new byte is received. The
     /// user is responsible for clearing the FIFO after receiving this
