@@ -910,31 +910,36 @@ where
         Ok(to_read)
     }
 
-    #[allow(clippy::useless_conversion)]
     fn rx_fifo_count(&self) -> u16 {
-        let fifo_cnt: u16 = self.regs().status().read().rxfifo_cnt().bits().into();
+        let fifo_cnt = self.regs().status().read().rxfifo_cnt().bits();
+        let status = self.regs().mem_rx_status().read();
 
-        // Calculate the real count based on the FIFO read and write offset address:
-        // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/uart-fifo-cnt-indicates-data-length-incorrectly.html
-        #[cfg(esp32)]
-        {
-            let status = self.regs().mem_rx_status().read();
-            let rd_addr = status.mem_rx_rd_addr().bits();
-            let wr_addr = status.mem_rx_wr_addr().bits();
-
-            if wr_addr > rd_addr {
-                wr_addr - rd_addr
-            } else if wr_addr < rd_addr {
-                (wr_addr + Info::UART_FIFO_SIZE) - rd_addr
-            } else if fifo_cnt > 0 {
-                Info::UART_FIFO_SIZE
+        // Calculate the real count based on the FIFO read and write offset address.
+        // This is prescribed for ESP32 by <https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/uart-fifo-cnt-indicates-data-length-incorrectly.html>
+        // but also necessary on other chips because the hardware read/write pointers
+        // may become out of sync with the FIFO count after an overflow.
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let rd_addr: u16 = status.mem_rx_rd_addr().bits();
+                let wr_addr: u16 = status.mem_rx_wr_addr().bits();
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                let rd_addr: u16 = status.rx_sram_raddr().bits().into();
+                let wr_addr: u16 = status.rx_sram_waddr().bits().into();
             } else {
-                0
+                let rd_addr: u16 = status.apb_rx_raddr().bits();
+                let wr_addr: u16 = status.rx_waddr().bits();
             }
-        }
+        };
 
-        #[cfg(not(esp32))]
-        fifo_cnt
+        if wr_addr > rd_addr {
+            wr_addr - rd_addr
+        } else if wr_addr < rd_addr {
+            (wr_addr + Info::UART_FIFO_SIZE) - rd_addr
+        } else if fifo_cnt > 0 {
+            Info::UART_FIFO_SIZE
+        } else {
+            0
+        }
     }
 
     /// Disables all RX-related interrupts for this UART instance.

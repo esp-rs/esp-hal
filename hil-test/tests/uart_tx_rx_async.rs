@@ -145,13 +145,21 @@ mod tests {
         while ctx.rx.read_buffered(&mut [0]).unwrap() > 0 {}
 
         // Now we should be able to write and read back the same data.
+        for _ in 0..10 {
+            ctx.tx.write_all(&[1, 2, 3, 4]).await.unwrap();
 
-        ctx.tx.write_all(&[1, 2, 3, 4]).await.unwrap();
+            let mut read = [0u8; 4];
+            ctx.rx.read_exact_async(&mut read).await.unwrap();
 
-        let mut read = [0u8; 4];
+            assert_eq!(&read, &[1, 2, 3, 4]);
+        }
+
+        // Can we still handle a full FIFO?
+
+        ctx.tx.write_all(&[1; 128]).await.unwrap();
+        let mut read = [0u8; 128];
         ctx.rx.read_exact_async(&mut read).await.unwrap();
-
-        assert_eq!(&read, &[1, 2, 3, 4]);
+        assert_eq!(&read, &[1; 128]);
     }
 
     #[test]
