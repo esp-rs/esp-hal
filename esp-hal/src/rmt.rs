@@ -470,10 +470,6 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
     pin: impl Peripheral<P = P> + 'd,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
-    if config.filter_threshold > 0b1111_1111 {
-        return Err(Error::InvalidArgument);
-    }
-
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s2))] {
             let threshold = 0b111_1111_1111_1111;
