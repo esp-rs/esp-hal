@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - RMT now uses correct max filter threshold of 255 instead of 127 (#3192)
+- RMT fix filter threshold, value check no longer required (#3192)
 - Full-duplex SPI works when mixed with half-duplex SPI (#3176)
 - `Uart::flush_async` should no longer return prematurely (#3186)
 - Detecting a UART overflow now clears the RX FIFO. (#3190)
