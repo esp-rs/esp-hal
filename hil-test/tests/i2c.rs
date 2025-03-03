@@ -71,7 +71,7 @@ mod tests {
             }
         }
 
-        assert_eq!(ctx.i2c.write(DUT_ADDRESS, &[0xaa]), Ok(()));
+        assert_eq!(ctx.i2c.write(DUT_ADDRESS, &[]), Ok(()));
     }
 
     #[test]
