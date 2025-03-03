@@ -713,10 +713,15 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    /// 
+    ///
+    #[cfg_attr(
+        any(esp32, esp32s2),
+        doc = "\n\nOn ESP32 and ESP32-S2 there might be issues combining large read/write operations with small (<3 bytes) read/write operations.\n\n"
+    )]
     /// # Errors
     ///
-    /// The corresponding error variant from [`Error`] will be returned if the buffer passed to an [`Operation`] has zero length.
+    /// The corresponding error variant from [`Error`] will be returned if the
+    /// buffer passed to an [`Operation`] has zero length.
     pub fn transaction<'a, A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -1031,7 +1036,10 @@ impl<'d> I2c<'d, Async> {
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    ///
+    #[cfg_attr(
+        any(esp32, esp32s2),
+        doc = "\n\nOn ESP32 and ESP32-S2 there might be issues combining large read/write operations with small (<3 bytes) read/write operations.\n\n"
+    )]
     /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
