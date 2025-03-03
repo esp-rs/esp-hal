@@ -1693,22 +1693,78 @@ impl Driver<'_> {
             I2C_CHUNK_SIZE + 1
         };
         if bytes.len() > max_len {
-            // we could support more by adding multiple write operations
             return Err(Error::FifoExceeded);
         }
 
         let write_len = if start { bytes.len() + 1 } else { bytes.len() };
         // don't issue write if there is no data to write
         if write_len > 0 {
-            // WRITE command
-            add_cmd(
-                cmd_iterator,
-                Command::Write {
-                    ack_exp: Ack::Ack,
-                    ack_check_en: true,
-                    length: write_len as u8,
-                },
-            )?;
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32,esp32s2))] {
+                    // try to place END at the same index
+                    if write_len < 2 {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: write_len as u8,
+                            },
+                        )?;
+                    } else if start {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: (write_len as u8) - 1,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: 1,
+                            },
+                        )?;
+                    } else {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: (write_len as u8) - 2,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: 1,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: 1,
+                            },
+                        )?;
+                    }
+                } else {
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Write {
+                            ack_exp: Ack::Ack,
+                            ack_check_en: true,
+                            length: write_len as u8,
+                        },
+                    )?;
+                }
+            }
         }
 
         self.update_config();
@@ -1752,7 +1808,6 @@ impl Driver<'_> {
             (I2C_CHUNK_SIZE, buffer.len() - 1)
         };
         if buffer.len() > max_len {
-            // we could support more by adding multiple read operations
             return Err(Error::FifoExceeded);
         }
 
@@ -1769,14 +1824,65 @@ impl Driver<'_> {
         }
 
         if initial_len > 0 {
-            // READ command
-            add_cmd(
-                cmd_iterator,
-                Command::Read {
-                    ack_value: Ack::Ack,
-                    length: initial_len as u8,
-                },
-            )?;
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32,esp32s2))] {
+                    // try to place END at the same index
+                    if initial_len < 2 || start {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: initial_len as u8,
+                            },
+                        )?;
+                    } else if !will_continue {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: (initial_len as u8) - 1,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: 1,
+                            },
+                        )?;
+                    } else {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: (initial_len as u8) - 2,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: 1,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: 1,
+                            },
+                        )?;
+                    }
+                } else {
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Read {
+                            ack_value: Ack::Ack,
+                            length: initial_len as u8,
+                        },
+                    )?;
+                }
+            }
         }
 
         if !will_continue {
@@ -2224,7 +2330,6 @@ impl Driver<'_> {
         address: I2cAddress,
         bytes: &[u8],
         start: bool,
-        stop: bool,
     ) -> Result<usize, Error> {
         self.reset_fifo();
         self.reset_command_list();
@@ -2236,10 +2341,7 @@ impl Driver<'_> {
 
         self.setup_write(address, bytes, start, cmd_iterator)?;
 
-        add_cmd(
-            cmd_iterator,
-            if stop { Command::Stop } else { Command::End },
-        )?;
+        add_cmd(cmd_iterator, Command::End)?;
         let index = self.fill_tx_fifo(bytes)?;
         self.start_transmission();
 
@@ -2261,7 +2363,6 @@ impl Driver<'_> {
         address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
-        stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
         self.reset_fifo();
@@ -2275,10 +2376,7 @@ impl Driver<'_> {
 
         self.setup_read(address, buffer, start, will_continue, cmd_iterator)?;
 
-        add_cmd(
-            cmd_iterator,
-            if stop { Command::Stop } else { Command::End },
-        )?;
+        add_cmd(cmd_iterator, Command::End)?;
         self.start_transmission();
         Ok(())
     }
@@ -2306,10 +2404,15 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let index = self.start_write_operation(address, bytes, start, stop)?;
+        let index = self.start_write_operation(address, bytes, start)?;
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo_blocking(index, bytes)?;
         self.wait_for_completion_blocking(!stop)?;
+
+        if stop {
+            self.stop_operation_blocking()?;
+        }
+
         Ok(())
     }
 
@@ -2339,9 +2442,22 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        self.start_read_operation(address, buffer, start, stop, will_continue)?;
+        self.start_read_operation(address, buffer, start, will_continue)?;
         self.read_all_from_fifo_blocking(buffer)?;
-        self.wait_for_completion_blocking(!stop)?;
+        self.wait_for_completion_blocking(true)?;
+
+        if stop {
+            self.stop_operation_blocking()?;
+        }
+        Ok(())
+    }
+
+    /// Perform a single STOP
+    fn stop_operation_blocking(&self) -> Result<(), Error> {
+        let cmd_iterator = &mut self.regs().comd_iter();
+        add_cmd(cmd_iterator, Command::Stop)?;
+        self.start_transmission();
+        self.wait_for_completion_blocking(false)?;
         Ok(())
     }
 
@@ -2368,10 +2484,15 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let index = self.start_write_operation(address, bytes, start, stop)?;
+        let index = self.start_write_operation(address, bytes, start)?;
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo(index, bytes).await?;
         self.wait_for_completion(!stop).await?;
+
+        if stop {
+            self.stop_operation().await?;
+        }
+
         Ok(())
     }
 
@@ -2401,9 +2522,23 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        self.start_read_operation(address, buffer, start, stop, will_continue)?;
+        self.start_read_operation(address, buffer, start, will_continue)?;
         self.read_all_from_fifo(buffer).await?;
         self.wait_for_completion(!stop).await?;
+
+        if stop {
+            self.stop_operation().await?;
+        }
+
+        Ok(())
+    }
+
+    /// Perform a single STOP
+    async fn stop_operation(&self) -> Result<(), Error> {
+        let cmd_iterator = &mut self.regs().comd_iter();
+        add_cmd(cmd_iterator, Command::Stop)?;
+        self.start_transmission();
+        self.wait_for_completion(false).await?;
         Ok(())
     }
 
@@ -2415,8 +2550,13 @@ impl Driver<'_> {
         stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
-        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
-        for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+        let chunk_size = if buffer.len() % I2C_CHUNK_SIZE < 2 {
+            I2C_CHUNK_SIZE - 2
+        } else {
+            I2C_CHUNK_SIZE
+        };
+        let chunk_count = buffer.len().div_ceil(chunk_size);
+        for (idx, chunk) in buffer.chunks_mut(chunk_size).enumerate() {
             self.read_operation_blocking(
                 address,
                 chunk,
@@ -2439,8 +2579,13 @@ impl Driver<'_> {
         if buffer.is_empty() {
             return self.write_operation_blocking(address, &[], start, stop);
         }
-        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
-        for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+        let chunk_size = if buffer.len() % I2C_CHUNK_SIZE < 2 {
+            I2C_CHUNK_SIZE - 2
+        } else {
+            I2C_CHUNK_SIZE
+        };
+        let chunk_count = buffer.len().div_ceil(chunk_size);
+        for (idx, chunk) in buffer.chunks(chunk_size).enumerate() {
             self.write_operation_blocking(
                 address,
                 chunk,
@@ -2460,8 +2605,13 @@ impl Driver<'_> {
         stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
-        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
-        for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+        let chunk_size = if buffer.len() % I2C_CHUNK_SIZE < 2 {
+            I2C_CHUNK_SIZE - 2
+        } else {
+            I2C_CHUNK_SIZE
+        };
+        let chunk_count = buffer.len().div_ceil(chunk_size);
+        for (idx, chunk) in buffer.chunks_mut(chunk_size).enumerate() {
             self.read_operation(
                 address,
                 chunk,
@@ -2485,8 +2635,13 @@ impl Driver<'_> {
         if buffer.is_empty() {
             return self.write_operation(address, &[], start, stop).await;
         }
-        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
-        for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+        let chunk_size = if buffer.len() % I2C_CHUNK_SIZE < 2 {
+            I2C_CHUNK_SIZE - 2
+        } else {
+            I2C_CHUNK_SIZE
+        };
+        let chunk_count = buffer.len().div_ceil(chunk_size);
+        for (idx, chunk) in buffer.chunks(chunk_size).enumerate() {
             self.write_operation(
                 address,
                 chunk,
