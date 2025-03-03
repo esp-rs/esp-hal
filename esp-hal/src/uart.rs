@@ -73,9 +73,10 @@ use crate::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum RxError {
-    /// The RX FIFO overflow happened.
+    /// An RX FIFO overflow happened.
     ///
-    /// This error occurs when RX FIFO is full and a new byte is received.
+    /// This error occurs when RX FIFO is full and a new byte is received. The
+    /// RX FIFO is then automatically reset by the driver.
     FifoOverflowed,
 
     /// A glitch was detected on the RX line.
@@ -832,6 +833,8 @@ where
     }
 
     /// Reads and clears errors set by received data.
+    ///
+    /// If a FIFO overflow is detected, the RX FIFO is reset.
     #[instability::unstable]
     pub fn check_for_errors(&mut self) -> Result<(), RxError> {
         let errors = RxEvent::FifoOvf
@@ -843,6 +846,9 @@ where
         let result = rx_event_check_for_error(events);
         if result.is_err() {
             self.uart.info().clear_rx_events(errors);
+            if events.contains(RxEvent::FifoOvf) {
+                self.uart.info().rxfifo_reset();
+            }
         }
         result
     }
@@ -910,31 +916,31 @@ where
         Ok(to_read)
     }
 
-    #[allow(clippy::useless_conversion)]
+    #[cfg(not(esp32))]
+    #[allow(clippy::unnecessary_cast)]
     fn rx_fifo_count(&self) -> u16 {
-        let fifo_cnt: u16 = self.regs().status().read().rxfifo_cnt().bits().into();
+        self.regs().status().read().rxfifo_cnt().bits() as u16
+    }
+
+    #[cfg(esp32)]
+    fn rx_fifo_count(&self) -> u16 {
+        let fifo_cnt = self.regs().status().read().rxfifo_cnt().bits();
 
         // Calculate the real count based on the FIFO read and write offset address:
         // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/uart-fifo-cnt-indicates-data-length-incorrectly.html
-        #[cfg(esp32)]
-        {
-            let status = self.regs().mem_rx_status().read();
-            let rd_addr = status.mem_rx_rd_addr().bits();
-            let wr_addr = status.mem_rx_wr_addr().bits();
+        let status = self.regs().mem_rx_status().read();
+        let rd_addr: u16 = status.mem_rx_rd_addr().bits();
+        let wr_addr: u16 = status.mem_rx_wr_addr().bits();
 
-            if wr_addr > rd_addr {
-                wr_addr - rd_addr
-            } else if wr_addr < rd_addr {
-                (wr_addr + Info::UART_FIFO_SIZE) - rd_addr
-            } else if fifo_cnt > 0 {
-                Info::UART_FIFO_SIZE
-            } else {
-                0
-            }
+        if wr_addr > rd_addr {
+            wr_addr - rd_addr
+        } else if wr_addr < rd_addr {
+            (wr_addr + Info::UART_FIFO_SIZE) - rd_addr
+        } else if fifo_cnt > 0 {
+            Info::UART_FIFO_SIZE
+        } else {
+            0
         }
-
-        #[cfg(not(esp32))]
-        fifo_cnt
     }
 
     /// Disables all RX-related interrupts for this UART instance.
@@ -2002,8 +2008,15 @@ impl UartRx<'_, Async> {
                 events |= RxEvent::FifoTout;
             }
 
-            let event = UartRxFuture::new(self.uart.reborrow(), events).await;
-            rx_event_check_for_error(event)?;
+            let events = UartRxFuture::new(self.uart.reborrow(), events).await;
+
+            let result = rx_event_check_for_error(events);
+            if let Err(error) = result {
+                if error == RxError::FifoOverflowed {
+                    self.uart.info().rxfifo_reset();
+                }
+                return Err(error);
+            }
         }
 
         Ok(())
