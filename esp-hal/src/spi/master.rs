@@ -1134,6 +1134,7 @@ where
         }
 
         if buffer.is_empty() {
+            error!("Half-duplex mode does not support empty buffer");
             return Err(Error::Unsupported);
         }
 
@@ -1196,6 +1197,7 @@ where
 
                 if dummy > 0 {
                     // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                    error!("Dummy bits are not supported without data");
                     return Err(Error::Unsupported);
                 }
             }
@@ -1541,6 +1543,7 @@ mod dma {
         ) -> Result<(), Error> {
             if dummy > 0 {
                 // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                error!("Dummy bits are not supported when there is no data to write");
                 return Err(Error::Unsupported);
             }
 
@@ -2983,7 +2986,10 @@ impl Driver {
             DataMode::Single => (),
             DataMode::SingleTwoDataLines => (),
             // FIXME: more detailed error - Only 1-bit commands are supported.
-            _ => return Err(Error::Unsupported),
+            _ => {
+                error!("Commands must be single bit wide");
+                return Err(Error::Unsupported);
+            }
         }
 
         match address_mode {
@@ -3021,8 +3027,11 @@ impl Driver {
                     w.fwrite_quad().clear_bit()
                 });
             }
-            // FIXME: more detailed error - Unsupported combination of data-modes,
-            _ => return Err(Error::Unsupported),
+            _ => {
+                // FIXME: more detailed error - Unsupported combination of data-modes
+                error!("Address mode must be single bit wide or equal to the data mode");
+                return Err(Error::Unsupported);
+            }
         }
 
         Ok(())
@@ -3502,6 +3511,7 @@ impl Driver {
                 || (address != Address::None && address.mode() != DataMode::Single)
                 || data_mode != DataMode::Single)
         {
+            error!("Three-wire mode is only supported for single data line mode");
             return Err(Error::Unsupported);
         }
 
