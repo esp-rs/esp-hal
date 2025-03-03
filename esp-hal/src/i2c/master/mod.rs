@@ -2415,7 +2415,7 @@ impl Driver<'_> {
         let index = self.start_write_operation(address, bytes, start)?;
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo_blocking(index, bytes)?;
-        self.wait_for_completion_blocking(!stop)?;
+        self.wait_for_completion_blocking(false)?;
 
         if stop {
             self.stop_operation_blocking()?;
@@ -2466,6 +2466,17 @@ impl Driver<'_> {
         add_cmd(cmd_iterator, Command::Stop)?;
         self.start_transmission();
         self.wait_for_completion_blocking(false)?;
+
+        #[cfg(esp32)]
+        loop {
+            // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
+            // empty write
+            if self.regs().sr().read().scl_state_last() == 0b110 {
+                self.check_errors()?;
+                break;
+            }
+        }
+
         Ok(())
     }
 
@@ -2495,7 +2506,7 @@ impl Driver<'_> {
         let index = self.start_write_operation(address, bytes, start)?;
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo(index, bytes).await?;
-        self.wait_for_completion(!stop).await?;
+        self.wait_for_completion(true).await?;
 
         if stop {
             self.stop_operation().await?;
@@ -2532,7 +2543,7 @@ impl Driver<'_> {
 
         self.start_read_operation(address, buffer, start, will_continue)?;
         self.read_all_from_fifo(buffer).await?;
-        self.wait_for_completion(!stop).await?;
+        self.wait_for_completion(true).await?;
 
         if stop {
             self.stop_operation().await?;
@@ -2547,6 +2558,18 @@ impl Driver<'_> {
         add_cmd(cmd_iterator, Command::Stop)?;
         self.start_transmission();
         self.wait_for_completion(false).await?;
+
+        #[cfg(esp32)]
+        loop {
+            // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
+            // empty write
+            if self.regs().sr().read().scl_state_last() == 0b110 {
+                self.check_errors()?;
+                embassy_futures::yield_now().await;
+                break;
+            }
+        }
+
         Ok(())
     }
 
