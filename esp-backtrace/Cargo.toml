@@ -1,20 +1,21 @@
 [package]
-name         = "esp-backtrace"
-version      = "0.15.1"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Bare-metal backtrace support for Espressif devices"
-keywords     = ["backtrace", "embedded", "esp32", "espressif"]
-categories   = ["embedded", "hardware-support", "no-std"]
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-backtrace"
+version       = "0.15.1"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "Bare-metal backtrace support for Espressif devices"
+documentation = "https://docs.espressif.com/projects/rust/"
+keywords      = ["backtrace", "embedded", "esp32", "espressif"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imc-unknown-none-elf"
 features       = ["esp32c3", "panic-handler", "exception-handler", "println", "esp-println/uart"]
 
 [dependencies]
-defmt       = { version = "0.3.10",  optional = true }
+defmt       = { version = "0.3.10", optional = true }
 esp-println = { version = "0.13.0", optional = true, default-features = false, path = "../esp-println" }
 semihosting = { version = "0.1.18", optional = true }
 
@@ -24,7 +25,6 @@ esp-build = { version = "0.2.0", path = "../esp-build" }
 [features]
 default = ["colors"]
 
-# You must enable exactly one of the below features to support the correct chip:
 esp32   = ["esp-println?/esp32", "semihosting?/openocd-semihosting", "print-float-registers"]
 esp32c2 = ["esp-println?/esp32c2"]
 esp32c3 = ["esp-println?/esp32c3"]

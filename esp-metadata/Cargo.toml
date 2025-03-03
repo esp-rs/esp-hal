@@ -1,15 +1,16 @@
 [package]
-name         = "esp-metadata"
-version      = "0.6.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Metadata for Espressif devices"
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-metadata"
+version       = "0.6.0"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "Metadata for Espressif devices"
+documentation = "https://docs.espressif.com/projects/rust/"
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow     = "1.0.95"
 clap       = { version = "4.5.26", features = ["derive"], optional = true }
-basic-toml  = "0.1.9"
-serde       = { version = "1.0.217", features = ["derive"] }
-strum       = { version = "0.26.3",  features = ["derive"] }
+basic-toml = "0.1.9"
+serde      = { version = "1.0.217", features = ["derive"] }
+strum      = { version = "0.26.3", features = ["derive"] }
