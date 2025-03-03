@@ -594,11 +594,6 @@ pub(crate) mod utils {
                 .modify(|_, w| w.cache_sram_usr_wr_cmd_bitlen().bits(7));
 
             spi.sram_dwr_cmd().modify(|_, w| {
-                w.cache_sram_usr_wr_cmd_bitlen()
-                    .bits(PSRAM_QUAD_WRITE as u8)
-            });
-
-            spi.sram_dwr_cmd().modify(|_, w| {
                 w.cache_sram_usr_wr_cmd_value()
                     .bits(PSRAM_QUAD_WRITE as u16)
             });
