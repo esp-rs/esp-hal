@@ -34,6 +34,8 @@
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: embassy_embedded_hal::shared_bus
 
+#[cfg(esp32)]
+use core::cell::Cell;
 use core::marker::PhantomData;
 
 #[instability::unstable]
@@ -3150,7 +3152,58 @@ impl Driver {
         self.ch_bus_freq(config)?;
         self.set_bit_order(config.read_bit_order, config.write_bit_order);
         self.set_data_mode(config.mode);
+
+        #[cfg(esp32)]
+        self.calculate_half_duplex_values(config);
+
         Ok(())
+    }
+
+    #[cfg(esp32)]
+    fn calculate_half_duplex_values(&self, config: &Config) {
+        let f_apb = 80_000_000;
+        let source_freq_hz = match config.clock_source {
+            ClockSource::Apb => f_apb,
+        };
+
+        let clock_reg = self.regs().clock().read();
+        let eff_clk = if clock_reg.clk_equ_sysclk().bit_is_set() {
+            f_apb
+        } else {
+            let pre = clock_reg.clkdiv_pre().bits() as i32 + 1;
+            let n = clock_reg.clkcnt_n().bits() as i32 + 1;
+            f_apb / (pre * n)
+        };
+
+        let apbclk_khz = source_freq_hz / 1000;
+        // how many apb clocks a period has
+        let spiclk_apb_n = source_freq_hz / eff_clk;
+
+        // How many apb clocks the delay is, the 1 is to compensate in case
+        // ``input_delay_ns`` is rounded off. Change from esp-idf: we use
+        // `input_delay_ns` to also represent the GPIO matrix delay.
+        let input_delay_ns = 25; // TODO: allow configuring input delay.
+        let delay_apb_n = (1 + input_delay_ns) * apbclk_khz / 1000 / 1000;
+
+        let dummy_required = delay_apb_n / spiclk_apb_n;
+        let timing_miso_delay = if dummy_required > 0 {
+            // due to the clock delay between master and slave, there's a range in which
+            // data is random give MISO a delay if needed to make sure we
+            // sample at the time MISO is stable
+            Some(((dummy_required + 1) * spiclk_apb_n - delay_apb_n - 1) as u8)
+        } else if delay_apb_n * 4 <= spiclk_apb_n {
+            // if the dummy is not required, maybe we should also delay half a SPI clock if
+            // the data comes too early
+            None
+        } else {
+            Some(0)
+        };
+
+        self.state.esp32_hack.extra_dummy.set(dummy_required as u8);
+        self.state
+            .esp32_hack
+            .timing_miso_delay
+            .set(timing_miso_delay);
     }
 
     fn set_data_mode(&self, data_mode: Mode) {
@@ -3418,6 +3471,14 @@ impl Driver {
             DataMode::SingleTwoDataLines,
             DataMode::SingleTwoDataLines,
         )?;
+
+        // For full-duplex, we don't need compensation according to esp-idf.
+        #[cfg(esp32)]
+        self.regs().ctrl2().modify(|_, w| unsafe {
+            w.miso_delay_mode().bits(0);
+            w.miso_delay_num().bits(0)
+        });
+
         Ok(())
     }
 
@@ -3445,6 +3506,35 @@ impl Driver {
         }
 
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
+
+        #[cfg(esp32)]
+        let mut dummy = dummy;
+
+        #[cfg(esp32)]
+        self.regs().ctrl2().modify(|_, w| {
+            let mut delay_mode = 0;
+            let mut delay_num = 0;
+
+            if !is_write {
+                // Values are set up in apply_config
+                let timing_miso_delay = self.state.esp32_hack.timing_miso_delay.get();
+                let extra_dummy = self.state.esp32_hack.extra_dummy.get();
+                dummy += extra_dummy;
+
+                if let Some(delay) = timing_miso_delay {
+                    delay_num = if extra_dummy > 0 { delay } else { 0 };
+                } else {
+                    let out_edge = self.regs().user().read().ck_out_edge().bit_is_set();
+                    // SPI modes 1 and 2 need delay mode 1 according to esp-idf.
+                    delay_mode = if out_edge { 1 } else { 2 };
+                }
+            }
+
+            unsafe {
+                w.miso_delay_mode().bits(delay_mode);
+                w.miso_delay_num().bits(delay_num)
+            }
+        });
 
         let reg_block = self.regs();
         reg_block.user().modify(|_, w| {
@@ -3655,7 +3745,19 @@ impl QspiInstance for super::AnySpi {}
 #[doc(hidden)]
 pub struct State {
     waker: AtomicWaker,
+
+    #[cfg(esp32)]
+    esp32_hack: Esp32Hack,
 }
+
+#[cfg(esp32)]
+struct Esp32Hack {
+    timing_miso_delay: Cell<Option<u8>>,
+    extra_dummy: Cell<u8>,
+}
+
+#[cfg(esp32)]
+unsafe impl Sync for Esp32Hack {}
 
 #[cfg_attr(place_spi_driver_in_ram, ram)]
 fn handle_async<I: Instance>(instance: I) {
@@ -3681,6 +3783,11 @@ macro_rules! master_instance {
             fn state(&self) -> &'static State {
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
+                    #[cfg(esp32)]
+                    esp32_hack: Esp32Hack {
+                        timing_miso_delay: Cell::new(None),
+                        extra_dummy: Cell::new(0),
+                    },
                 };
 
                 &STATE
