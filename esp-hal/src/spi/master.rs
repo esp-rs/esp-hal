@@ -3720,7 +3720,7 @@ cfg_if::cfg_if! {
 #[cfg(spi3)]
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0, HSPIWP, HSPIHD);
+        spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0, VSPIWP, VSPIHD);
     } else if #[cfg(esp32s3)] {
         spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0, SPI3_WP, SPI3_HD);
     } else {
