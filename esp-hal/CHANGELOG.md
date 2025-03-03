@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Uart::flush_async` should no longer return prematurely (#3186)
 - ESP32-S2: Fixed PSRAM initialization (#3196)
 
+- ESP32/ESP32-S2: Avoid running into timeouts with reads/writes larger than the FIFO (#3199)
+
 ### Removed
 
 ## v1.0.0-beta.0
