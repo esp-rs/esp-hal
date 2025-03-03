@@ -1101,6 +1101,10 @@ pub enum DriveMode {
     /// logical [`Level`], but leaves the high level floating, which is then
     /// determined by external hardware, or internal pull-up/pull-down
     /// resistors.
+    #[cfg_attr(
+        feature = "unstable",
+        doc = "\n\nEnable the input related functionality by using [Output::into_flex] and enabling input via [Flex::enable_input]"
+    )]
     OpenDrain,
 }
 
