@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32/ESP32-S2: Avoid running into timeouts with reads/writes larger than the FIFO (#3199)
 
 - ESP32-C6: Keep ADC enabled to improve radio signal strength (#3249)
+- ESP32-S2: Fixed PSRAM initialization (#3196)
 
 ### Removed
 
