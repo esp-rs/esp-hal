@@ -30,7 +30,7 @@
 //!
 //! loop {
 //!     // Print the current RTC time in milliseconds
-//!     let time_ms = rtc.current_time().and_utc().timestamp_millis();
+//!     let time_ms = rtc.current_time().as_millisecond();
 //!     delay.delay_millis(1000);
 //!
 //!     // Set the time to half a second in the past
@@ -102,7 +102,7 @@
 //!
 //! loop {
 //!     // Get the current RTC time in milliseconds
-//!     let time_ms = rtc.current_time().and_utc().timestamp_millis();
+//!     let time_ms = rtc.current_time().as_millisecond();
 //!     delay.delay_millis(1000);
 //!
 //!     // Set the time to half a second in the past
@@ -112,7 +112,7 @@
 //! # }
 //! ```
 
-use chrono::{DateTime, NaiveDateTime};
+use jiff::Timestamp;
 
 pub use self::rtc::SocResetReason;
 #[cfg(not(any(esp32c6, esp32h2)))]
@@ -401,7 +401,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Get the current time.
-    pub fn current_time(&self) -> NaiveDateTime {
+    pub fn current_time(&self) -> Timestamp {
         // Current time is boot time + time since boot
 
         let rtc_time_us = self.time_since_boot().as_micros();
@@ -417,9 +417,7 @@ impl<'d> Rtc<'d> {
             boot_time_us + rtc_time_us
         };
 
-        DateTime::from_timestamp_micros(current_time_us as i64)
-            .unwrap()
-            .naive_utc()
+        Timestamp::from_microsecond(current_time_us as i64)
     }
 
     /// Set the current time.
@@ -428,13 +426,11 @@ impl<'d> Rtc<'d> {
     ///
     /// Panics if `current_time` is before the Unix epoch (meaning the
     /// underlying timestamp is negative).
-    pub fn set_current_time(&self, current_time: NaiveDateTime) {
+    pub fn set_current_time(&self, current_time: Timestamp) {
         let current_time_us: u64 = current_time
-            .and_utc()
-            .timestamp_micros()
+            .as_microsecond()
             .try_into()
             .expect("current_time is negative");
-
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
 
