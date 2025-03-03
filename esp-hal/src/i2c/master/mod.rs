@@ -352,7 +352,7 @@ enum Command {
         /// Enables checking the ACK value received against the ack_exp value.
         ack_check_en: bool,
         /// Length of data (in bytes) to be written. The maximum length is
-        /// 32/255, while the minimum is 1.
+        /// 32 for ESP32/ESP32-S2 and 255 for others, while the minimum is 1.
         length: u8,
     },
     Read {
@@ -2096,15 +2096,18 @@ impl Driver<'_> {
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
         let mut cnt = MAX_ITERATIONS;
+        // loop until commands are actually done
         loop {
             let mut not_done = false;
             for cmd_reg in self.regs().comd_iter() {
                 let cmd = cmd_reg.read();
 
+                // if there is a valid command which is not END, check if it's marked as done
                 if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
                     not_done = true;
                 }
 
+                // once we hit END or STOP we can break the loop
                 if cmd.opcode().is_end() || cmd.opcode().is_stop() {
                     break;
                 }
