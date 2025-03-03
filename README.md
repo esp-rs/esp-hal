@@ -45,7 +45,7 @@ For information about the HAL and how to use it in your own projects, please ref
 When browsing the examples, we recommend viewing the tag for the `esp-hal` release you are using to ensure compatibility, e.g. [esp-hal-v1.0.0-beta.0], as the `main` branch is used for development and APIs may have changed in the meantime.
 
 [The Rust on ESP Book]: https://esp-rs.github.io/book/
-[documentation]: https://docs.esp-rs.org/esp-hal/
+[documentation]: https://docs.espressif.com/projects/rust/
 [esp-hal-v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0-beta.0/examples
 
 ## Resources
