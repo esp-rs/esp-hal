@@ -1,13 +1,14 @@
 [package]
-name         = "esp-ieee802154"
-version      = "0.6.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Low-level IEEE 802.15.4 driver for the ESP32-C6 and ESP32-H2"
-keywords     = ["embedded", "ieee802154", "esp32", "espressif", "wpan"]
-categories   = ["embedded", "network-programming", "no-std"]
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-ieee802154"
+version       = "0.6.0"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "Low-level IEEE 802.15.4 driver for the ESP32-C6 and ESP32-H2"
+documentation = "https://docs.espressif.com/projects/rust/"
+keywords      = ["embedded", "esp32", "espressif", "ieee802154", "wpan"]
+categories    = ["embedded", "network-programming", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
