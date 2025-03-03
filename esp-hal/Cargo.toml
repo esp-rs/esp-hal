@@ -21,7 +21,6 @@ bitflags                 = "2.8.0"
 bytemuck                 = "1.21.0"
 bitfield                 = "0.18.1"
 cfg-if                   = "1.0.0"
-chrono                   = { version = "0.4.39", default-features = false }
 critical-section         = "1.2.0"
 defmt                    = { version = "0.3.10", optional = true }
 delegate                 = "0.13.2"
@@ -43,6 +42,7 @@ esp-config               = { version = "0.3.0", path = "../esp-config" }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                    = "0.3.7"
 instability              = "0.3.7"
+jiff                     = { version = "0.2", default-features = false }
 log                      = { version = "0.4.26", optional = true }
 nb                       = "1.1.0"
 paste                    = "1.0.15"

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replaced `chrono::NaiveDateTime` by `jiff::Timestamp` on the RTC API (#3185)
+
 ### Fixed
 
 - Full-duplex SPI works when mixed with half-duplex SPI (#3176)
