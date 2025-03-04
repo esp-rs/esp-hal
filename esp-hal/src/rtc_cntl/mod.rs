@@ -35,7 +35,7 @@
 //!
 //!     // Set the time to half a second in the past
 //!     let new_time = rtc.current_time_us() - 500_000;
-//!     rtc.set_current_time(new_time);
+//!     rtc.set_current_time_us(new_time);
 //! }
 //! # }
 //! ```
@@ -106,8 +106,8 @@
 //!     delay.delay_millis(1000);
 //!
 //!     // Set the time to half a second in the past
-//!     let new_time = rtc.current_time() - 500_000;
-//!     rtc.set_current_time(new_time);
+//!     let new_time = rtc.current_time_us() - 500_000;
+//!     rtc.set_current_time_us(new_time);
 //! }
 //! # }
 //! ```
@@ -399,6 +399,16 @@ impl<'d> Rtc<'d> {
     }
 
     /// Get the current time in microseconds.
+    /// 
+    /// # Example
+    /// ```
+    /// use jiff::Timestamp;
+    /// 
+    /// let rtc = Rtc::new(peripherals.LPWR);
+    /// 
+    /// let now = Timestamp::from_microsecond(rtc.current_time_us() as i64);
+    /// let weekday_in_japan = now.in_tz("Asia/Tokyo").unwrap().weekday();
+    /// ```
     pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
 
@@ -419,7 +429,18 @@ impl<'d> Rtc<'d> {
     }
 
     /// Set the current time in microseconds.
-    pub fn set_current_time(&self, current_time_us: u64) {
+    /// 
+    /// # Example
+    /// ```no_run
+    /// use jiff::Timestamp;
+    /// 
+    /// let rtc = Rtc::new(peripherals.LPWR);
+    /// 
+    /// # fn ntp() -> Timestamp { Timestamp::UNIX_EPOCH };
+    /// let now: Timestamp = ntp();
+    /// 
+    /// rtc.set_current_time_us(now.as_microsecond() as u64);
+    pub fn set_current_time_us(&self, current_time_us: u64) {
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
 
