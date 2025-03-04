@@ -30,12 +30,12 @@
 //!
 //! loop {
 //!     // Print the current RTC time in milliseconds
-//!     let time_ms = rtc.current_time().and_utc().timestamp_millis();
+//!     let time_ms = rtc.current_time_us() / 1000;
 //!     delay.delay_millis(1000);
 //!
 //!     // Set the time to half a second in the past
-//!     let new_time = rtc.current_time() - Duration::from_millis(500);
-//!     rtc.set_current_time(new_time);
+//!     let new_time = rtc.current_time_us() - 500_000;
+//!     rtc.set_current_time_us(new_time);
 //! }
 //! # }
 //! ```
@@ -102,17 +102,15 @@
 //!
 //! loop {
 //!     // Get the current RTC time in milliseconds
-//!     let time_ms = rtc.current_time().and_utc().timestamp_millis();
+//!     let time_ms = rtc.current_time_us() * 1000;
 //!     delay.delay_millis(1000);
 //!
 //!     // Set the time to half a second in the past
-//!     let new_time = rtc.current_time() - Duration::from_millis(500);
-//!     rtc.set_current_time(new_time);
+//!     let new_time = rtc.current_time_us() - 500_000;
+//!     rtc.set_current_time_us(new_time);
 //! }
 //! # }
 //! ```
-
-use chrono::{DateTime, NaiveDateTime};
 
 pub use self::rtc::SocResetReason;
 #[cfg(not(any(esp32c6, esp32h2)))]
@@ -400,8 +398,8 @@ impl<'d> Rtc<'d> {
         h.write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
     }
 
-    /// Get the current time.
-    pub fn current_time(&self) -> NaiveDateTime {
+    /// Get the current time in microseconds.
+    pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
 
         let rtc_time_us = self.time_since_boot().as_micros();
@@ -410,31 +408,16 @@ impl<'d> Rtc<'d> {
 
         // We can detect if we wrapped the boot time by checking if rtc time is greater
         // than the amount of time we would've wrapped.
-        let current_time_us = if rtc_time_us > wrapped_boot_time_us {
+        if rtc_time_us > wrapped_boot_time_us {
             // We also just checked that this won't overflow
             rtc_time_us - wrapped_boot_time_us
         } else {
             boot_time_us + rtc_time_us
-        };
-
-        DateTime::from_timestamp_micros(current_time_us as i64)
-            .unwrap()
-            .naive_utc()
+        }
     }
 
-    /// Set the current time.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `current_time` is before the Unix epoch (meaning the
-    /// underlying timestamp is negative).
-    pub fn set_current_time(&self, current_time: NaiveDateTime) {
-        let current_time_us: u64 = current_time
-            .and_utc()
-            .timestamp_micros()
-            .try_into()
-            .expect("current_time is negative");
-
+    /// Set the current time in microseconds.
+    pub fn set_current_time_us(&self, current_time_us: u64) {
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
 
