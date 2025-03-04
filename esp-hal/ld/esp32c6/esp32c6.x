@@ -55,8 +55,17 @@ SECTIONS {
     KEEP(*(.trap));
     *(.trap.*);
   } > RWTEXT
+
+  /* Shared sections - ordering matters */
+  INCLUDE "rwtext.x"
+  INCLUDE "rwdata.x"
+  /* End of Shared sections */
 }
-INSERT BEFORE .rwtext;
+#IF ESP_HAL_CONFIG_FLIP_LINK
+/* INSERT BEFORE does not seem to work for the .stack section. Instead, we place every RAM
+  section after .stack if `flip_link` is enabled. */
+INSERT AFTER .stack;
+#ENDIF
 
 SECTIONS {
   /**
@@ -71,15 +80,13 @@ SECTIONS {
 INSERT BEFORE .rodata;
 /* end of esp32c6 fixups */
 
-/* Shared sections - ordering matters */
-INCLUDE "rwtext.x"
+/* Shared sections #2 - ordering matters */
 INCLUDE "text.x"
-INCLUDE "rwdata.x"
 INCLUDE "rodata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
-/* End of Shared sections */
+/* End of Shared sections #2 */
 
 INCLUDE "debug.x"
 
