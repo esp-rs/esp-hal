@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Uart::flush_async` should no longer return prematurely (#3186)
 - Detecting a UART overflow now clears the RX FIFO. (#3190)
 - ESP32-S2: Fixed PSRAM initialization (#3196)
+- ESP32: Fixed SPI3 QSPI signals (#3201)
 
 ### Removed
 
