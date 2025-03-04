@@ -218,6 +218,8 @@ fn preprocess_file(
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> std::io::Result<()> {
+    println!("cargo:rerun-if-changed={}", src.as_ref().display());
+
     let file = File::open(src)?;
     let mut out_file = File::create(dst)?;
 
