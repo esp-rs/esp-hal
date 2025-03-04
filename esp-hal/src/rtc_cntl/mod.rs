@@ -421,14 +421,12 @@ impl<'d> Rtc<'d> {
 
         // We can detect if we wrapped the boot time by checking if rtc time is greater
         // than the amount of time we would've wrapped.
-        let current_time_us = if rtc_time_us > wrapped_boot_time_us {
+        if rtc_time_us > wrapped_boot_time_us {
             // We also just checked that this won't overflow
             rtc_time_us - wrapped_boot_time_us
         } else {
             boot_time_us + rtc_time_us
-        };
-
-        current_time_us
+        }
     }
 
     /// Set the current time in microseconds.
