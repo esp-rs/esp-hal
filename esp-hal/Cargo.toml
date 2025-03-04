@@ -21,7 +21,6 @@ bitflags                 = "2.8.0"
 bytemuck                 = "1.21.0"
 bitfield                 = "0.18.1"
 cfg-if                   = "1.0.0"
-chrono                   = { version = "0.4.39", default-features = false }
 critical-section         = "1.2.0"
 defmt                    = { version = "0.3.10", optional = true }
 delegate                 = "0.13.2"
