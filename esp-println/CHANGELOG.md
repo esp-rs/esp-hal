@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added new `_esp_println_timestamp()` hook, gated by the `timestamp` feature to provide timestamp for logging (#3194)
+
 ### Changed
 
 ### Fixed
