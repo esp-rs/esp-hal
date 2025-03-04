@@ -410,6 +410,7 @@ impl<'d> Rtc<'d> {
     ///
     /// let now = Timestamp::from_microsecond(rtc.current_time_us() as i64);
     /// let weekday_in_japan = now.in_tz("Asia/Tokyo").unwrap().weekday();
+    /// # }
     /// ```
     pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
@@ -444,6 +445,7 @@ impl<'d> Rtc<'d> {
     /// let now: Timestamp = ntp();
     ///
     /// rtc.set_current_time_us(now.as_microsecond() as u64);
+    /// # }
     pub fn set_current_time_us(&self, current_time_us: u64) {
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
