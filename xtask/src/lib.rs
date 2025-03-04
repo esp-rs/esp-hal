@@ -359,7 +359,7 @@ pub fn generate_efuse_table(
     let out_path = out_path.as_ref();
 
     // We will put the date of generation in the file header:
-    let date = jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date();
+    let date = chrono::Utc::now().date_naive();
 
     // Determine the commit (short) hash of the HEAD commit in the
     // provided ESP-IDF repository:
