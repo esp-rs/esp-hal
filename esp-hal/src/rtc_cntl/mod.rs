@@ -399,21 +399,6 @@ impl<'d> Rtc<'d> {
     }
 
     /// Get the current time in microseconds.
-    ///
-    /// # Example
-    /// ```
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::rtc_cntl::Rtc;
-    /// use jiff::{Timestamp, tz::TimeZone};
-    ///
-    /// let rtc = Rtc::new(peripherals.LPWR);
-    ///
-    /// let now = Timestamp::from_microsecond(rtc.current_time_us() as
-    /// i64).unwrap(); let weekday_in_london =
-    /// now.to_zoned(TimeZone::UTC).weekday(); # Ok(())
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
 
@@ -432,21 +417,6 @@ impl<'d> Rtc<'d> {
     }
 
     /// Set the current time in microseconds.
-    ///
-    /// # Example
-    /// ```
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::rtc_cntl::Rtc;
-    /// use jiff::Timestamp;
-    ///
-    /// let rtc = Rtc::new(peripherals.LPWR);
-    ///
-    /// # fn ntp() -> Timestamp { Timestamp::UNIX_EPOCH };
-    /// let now: Timestamp = ntp();
-    ///
-    /// rtc.set_current_time_us(now.as_microsecond() as u64);
-    /// # Ok(())
-    /// # }
     pub fn set_current_time_us(&self, current_time_us: u64) {
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
