@@ -66,6 +66,10 @@ const I2C_FIFO_SIZE: usize = 32;
 
 // this is somewhat made up - it's not the FIFO size but we are able write/read
 // while the transmission is in progress
+//
+// TODO: check if using the real FIFO size will make the driver less prone to
+// problems resulting from interruptions (e.g. cause by esp-wifi's scheduler or
+// general interrupts)
 #[cfg(not(any(esp32, esp32s2)))]
 const I2C_FIFO_SIZE: usize = 255;
 
