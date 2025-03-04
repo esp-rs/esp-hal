@@ -60,18 +60,11 @@ cfg_if::cfg_if! {
     }
 }
 
-// this is the real size of the FIFO
-#[cfg(any(esp32, esp32s2))]
+#[cfg(not(esp32c2))]
 const I2C_FIFO_SIZE: usize = 32;
 
-// this is somewhat made up - it's not the FIFO size but we are able write/read
-// while the transmission is in progress
-//
-// TODO: check if using the real FIFO size will make the driver less prone to
-// problems resulting from interruptions (e.g. cause by esp-wifi's scheduler or
-// general interrupts)
-#[cfg(not(any(esp32, esp32s2)))]
-const I2C_FIFO_SIZE: usize = 255;
+#[cfg(esp32c2)]
+const I2C_FIFO_SIZE: usize = 16;
 
 // Chunk writes/reads by this size
 const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
@@ -356,15 +349,15 @@ enum Command {
         /// Enables checking the ACK value received against the ack_exp value.
         ack_check_en: bool,
         /// Length of data (in bytes) to be written. The maximum length is
-        /// 32 for ESP32/ESP32-S2 and 255 for others, while the minimum is 1.
+        /// 32 (16 for ESP32-C2), while the minimum is 1.
         length: u8,
     },
     Read {
         /// Indicates whether the receiver will send an ACK after this byte has
         /// been received.
         ack_value: Ack,
-        /// Length of data (in bytes) to be read. The maximum length is 32/255,
-        /// while the minimum is 1.
+        /// Length of data (in bytes) to be written. The maximum length is
+        /// 32 (16 for ESP32-C2), while the minimum is 1.
         length: u8,
     },
 }
