@@ -57,6 +57,10 @@ name    = "get_time"
 harness = false
 
 [[test]]
+name    = "flip_link"
+harness = false
+
+[[test]]
 name    = "gpio"
 harness = false
 
