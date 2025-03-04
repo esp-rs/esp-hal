@@ -349,7 +349,9 @@ enum Command {
         /// Enables checking the ACK value received against the ack_exp value.
         ack_check_en: bool,
         /// Length of data (in bytes) to be written. The maximum length is
-        /// 32 (16 for ESP32-C2), while the minimum is 1.
+        #[cfg_attr(esp32c2, doc = "16")]
+        #[cfg_attr(not(esp32c2), doc = "32")]
+        /// , while the minimum is 1.
         length: u8,
     },
     Read {
@@ -357,7 +359,9 @@ enum Command {
         /// been received.
         ack_value: Ack,
         /// Length of data (in bytes) to be written. The maximum length is
-        /// 32 (16 for ESP32-C2), while the minimum is 1.
+        #[cfg_attr(esp32c2, doc = "16")]
+        #[cfg_attr(not(esp32c2), doc = "32")]
+        /// , while the minimum is 1.
         length: u8,
     },
 }
@@ -713,7 +717,7 @@ where
     ///
     #[cfg_attr(
         any(esp32, esp32s2),
-        doc = "\n\nOn ESP32 and ESP32-S2 there might be issues combining large read/write operations with small (<3 bytes) read/write operations.\n\n"
+        doc = "\n\nOn ESP32 and ESP32-S2 it is advisable to not combine large read/write operations with small (<3 bytes) read/write operations.\n\n"
     )]
     /// # Errors
     ///
