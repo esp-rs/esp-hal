@@ -83,7 +83,7 @@ esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"]
 serde        = { version = "1.0.218", features = ["derive"] }
 
 [dev-dependencies]
-jiff = { version = "0.2", default-features = false, features = ["alloc", "tzdb-bundle-always"] }
+jiff = { version = "0.2", default-features = false }
 
 [features]
 default = []

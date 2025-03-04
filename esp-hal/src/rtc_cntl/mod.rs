@@ -404,12 +404,12 @@ impl<'d> Rtc<'d> {
     /// ```
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::rtc_cntl::Rtc;
-    /// use jiff::Timestamp;
+    /// use jiff::{Timestamp, tz::TimeZone};
     ///
     /// let rtc = Rtc::new(peripherals.LPWR);
     ///
     /// let now = Timestamp::from_microsecond(rtc.current_time_us() as i64);
-    /// let weekday_in_japan = now.in_tz("Asia/Tokyo").unwrap().weekday();
+    /// let weekday_in_london = now.to_zoned(TimeZone::UTC).weekday();
     /// # }
     /// ```
     pub fn current_time_us(&self) -> u64 {
