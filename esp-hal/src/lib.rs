@@ -320,10 +320,39 @@ WARNING: use --release
 pub trait DriverMode: crate::private::Sealed {}
 
 /// Driver initialized in blocking mode.
+///
+/// Drivers are constructed in blocking mode by default. To learn about the
+/// differences between blocking and async drivers, see the [`Async`] mode
+/// documentation.
 #[derive(Debug)]
 pub struct Blocking;
 
 /// Driver initialized in async mode.
+///
+/// Drivers are constructed in blocking mode by default. To set up an async
+/// driver, a [`Blocking`] driver must be converted to an `Async` driver using
+/// the `into_async` method. Drivers can be converted back to `Blocking` mode
+/// using the `into_blocking` method.
+///
+/// Async mode drivers offer most of the same features as blocking drivers, but
+/// with the addition of async APIs. Interrupt-related functions are not
+/// available in async mode, as they are handled by the driver's interrupt
+/// handlers.
+///
+/// Note that async functions usually take up more space than their blocking
+/// counterparts, and they are generally slower. This is because async functions
+/// are implemented using a state machine that is driven by interrupts and is
+/// polled by a runtime. For short operations, the overhead of the state machine
+/// can be significant.
+///
+/// When initializing an Async driver, the driver disables user-specified
+/// interrupt handlers, and sets up internal interrupt handlers that drive the
+/// driver's async API. The driver's interrupt handlers run on the same core as
+/// the driver was initialized on. This means that the driver can not be sent
+/// across threads, to prevent incorrect concurrent access to the peripheral.
+///
+/// Switching back to Blocking mode will disable the interrupt handlers and
+/// return the driver to a state where it can be sent across threads.
 #[derive(Debug)]
 pub struct Async(PhantomData<*const ()>);
 
