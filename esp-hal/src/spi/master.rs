@@ -449,7 +449,7 @@ pub struct Config {
     frequency: Rate,
 
     /// The clock source
-    #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
+    #[builder_lite(unstable)]
     #[builder_lite(skip_setter)]
     clock_source: ClockSource,
 
