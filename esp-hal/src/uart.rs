@@ -1066,28 +1066,6 @@ impl<'d> Uart<'d, Blocking> {
             tx: self.tx.into_async(),
         }
     }
-
-    /// Assign the RX pin for UART instance.
-    ///
-    /// Sets the specified pin to input and connects it to the UART RX signal.
-    ///
-    /// Note: when you listen for the output of the UART peripheral, you should
-    /// configure the driver side (i.e. the TX pin), or ensure that the line is
-    /// initially high, to avoid receiving a non-data byte caused by an
-    /// initial low signal level.
-    pub fn with_rx(mut self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
-        self.rx = self.rx.with_rx(rx);
-        self
-    }
-
-    /// Assign the TX pin for UART instance.
-    ///
-    /// Sets the specified pin to push-pull output and connects it to the UART
-    /// TX signal.
-    pub fn with_tx(mut self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        self.tx = self.tx.with_tx(tx);
-        self
-    }
 }
 
 impl<'d> Uart<'d, Async> {
@@ -1122,6 +1100,28 @@ impl<'d, Dm> Uart<'d, Dm>
 where
     Dm: DriverMode,
 {
+    /// Assign the RX pin for UART instance.
+    ///
+    /// Sets the specified pin to input and connects it to the UART RX signal.
+    ///
+    /// Note: when you listen for the output of the UART peripheral, you should
+    /// configure the driver side (i.e. the TX pin), or ensure that the line is
+    /// initially high, to avoid receiving a non-data byte caused by an
+    /// initial low signal level.
+    pub fn with_rx(mut self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+        self.rx = self.rx.with_rx(rx);
+        self
+    }
+
+    /// Assign the TX pin for UART instance.
+    ///
+    /// Sets the specified pin to push-pull output and connects it to the UART
+    /// TX signal.
+    pub fn with_tx(mut self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+        self.tx = self.tx.with_tx(tx);
+        self
+    }
+
     /// Configure CTS pin
     pub fn with_cts(mut self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
         self.rx = self.rx.with_cts(cts);

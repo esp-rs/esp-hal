@@ -25,6 +25,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 
 - Drivers must take peripherals via the `PeripheralRef` pattern - they don't consume peripherals directly.
 - If a driver requires pins, those pins should be configured using `fn with_signal_name(self, pin: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self` or `fn with_signal_name(self, pin: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self`
+  - The `with_signal_name` functions should be placed in an `impl` block that is generic over the driver mode (i.e. they shouldn't be constrained to just `Blocking` or just `Async`) unless there is a technical reason to do otherwise.
 - If a driver supports multiple peripheral instances (for example, I2C0 is one such instance):
   - The driver should not be generic over the peripheral instance.
   - The author must to use `crate::any_peripheral` to define the "any" peripheral instance type.
