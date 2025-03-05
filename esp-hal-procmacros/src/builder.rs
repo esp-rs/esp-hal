@@ -25,6 +25,8 @@ const KNOWN_HELPERS: &[&str] = &[
     "skip_setter",
     // Do not generate a getter
     "skip_getter",
+    // Mark generated setters and getters as feature gated by the "unstable" feature
+    "unstable",
 ];
 
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
@@ -52,6 +54,14 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
         if helper_attributes.iter().any(|h| h == "skip") {
             continue;
         }
+
+        let docsrs_hint = if helper_attributes.iter().any(|h| h == "unstable") {
+            quote! {
+                #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            }
+        } else {
+            quote! {}
+        };
 
         let field_ident = field.ident.as_ref().unwrap();
         let field_type = &field.ty;
@@ -86,6 +96,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
         if !helper_attributes.iter().any(|h| h == "skip_setter") {
             fns.push(quote! {
                 #[doc = concat!(" Assign the given value to the `", stringify!(#field_ident) ,"` field.")]
+                #docsrs_hint
                 #[must_use]
                 pub fn #function_ident(mut self, #field_ident: #field_setter_type) -> Self {
                     self.#field_ident = #field_assigns;
@@ -97,6 +108,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
                 let function_ident = format_ident!("with_{}_none", field_ident);
                 fns.push(quote! {
                     #[doc = concat!(" Set the value of `", stringify!(#field_ident), "` to `None`.")]
+                    #docsrs_hint
                     #[must_use]
                     pub fn #function_ident(mut self) -> Self {
                         self.#field_ident = None;
@@ -121,6 +133,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
             });
             fns.push(quote! {
                 #(#docs)*
+                #docsrs_hint
                 pub fn #field_ident(&self) -> #field_type {
                     self.#field_ident
                 }
