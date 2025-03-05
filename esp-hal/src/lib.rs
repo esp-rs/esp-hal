@@ -325,6 +325,7 @@ pub trait DriverMode: crate::private::Sealed {}
 /// differences between blocking and async drivers, see the [`Async`] mode
 /// documentation.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Blocking;
 
 /// Marker type signalling that a driver is initialized in async mode.
@@ -355,6 +356,7 @@ pub struct Blocking;
 /// Switching back to blocking mode will disable the interrupt handlers and
 /// return the driver to a state where it can be sent across threads.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Async(PhantomData<*const ()>);
 
 unsafe impl Sync for Async {}
