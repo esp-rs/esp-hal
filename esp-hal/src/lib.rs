@@ -312,14 +312,14 @@ WARNING: use --release
   peripherals and/or devices.
 "}
 
-/// A marker trait for initializing drivers in a specific mode.
+/// A marker trait for driver modes.
 ///
 /// Different driver modes offer different features and different API. Using
 /// this trait as a generic parameter ensures that the driver is initialized in
 /// the correct mode.
 pub trait DriverMode: crate::private::Sealed {}
 
-/// Driver initialized in blocking mode.
+/// Marker type signalling that a driver is initialized in blocking mode.
 ///
 /// Drivers are constructed in blocking mode by default. To learn about the
 /// differences between blocking and async drivers, see the [`Async`] mode
@@ -327,11 +327,11 @@ pub trait DriverMode: crate::private::Sealed {}
 #[derive(Debug)]
 pub struct Blocking;
 
-/// Driver initialized in async mode.
+/// Marker type signalling that a driver is initialized in async mode.
 ///
 /// Drivers are constructed in blocking mode by default. To set up an async
 /// driver, a [`Blocking`] driver must be converted to an `Async` driver using
-/// the `into_async` method. Drivers can be converted back to `Blocking` mode
+/// the `into_async` method. Drivers can be converted back to blocking mode
 /// using the `into_blocking` method.
 ///
 /// Async mode drivers offer most of the same features as blocking drivers, but
@@ -346,13 +346,13 @@ pub struct Blocking;
 /// can be significant. Consider using the blocking functions on the async
 /// driver for small transfers.
 ///
-/// When initializing an Async driver, the driver disables user-specified
+/// When initializing an async driver, the driver disables user-specified
 /// interrupt handlers, and sets up internal interrupt handlers that drive the
 /// driver's async API. The driver's interrupt handlers run on the same core as
 /// the driver was initialized on. This means that the driver can not be sent
 /// across threads, to prevent incorrect concurrent access to the peripheral.
 ///
-/// Switching back to Blocking mode will disable the interrupt handlers and
+/// Switching back to blocking mode will disable the interrupt handlers and
 /// return the driver to a state where it can be sent across threads.
 #[derive(Debug)]
 pub struct Async(PhantomData<*const ()>);
