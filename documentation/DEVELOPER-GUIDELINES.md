@@ -102,6 +102,11 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 - When marking an API as `unstable`:
   - Prefer to use `#[instability::unstable]`.
   - Use the attribute on each public function instead of inherent impl blocks.
+- The documentation should contain no more than three primary impl blocks (excluding trait implementations):
+  - Blocking: Should be listed first, as it serves as the entry point for creating most drivers.
+  - Async: Should appear second in the documentation.
+  - Both: A combined impl block for both Blocking and Async.
+- Methods inside the impl blocks should be grouped by functionality.
 
 ## Driver implementation
 
