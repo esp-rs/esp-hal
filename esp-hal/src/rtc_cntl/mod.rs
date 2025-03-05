@@ -31,15 +31,18 @@
 //! loop {
 //!     // Print the current RTC time in milliseconds
 //!     let time_ms = rtc.current_time_us() / 1000;
+//!     let time_ms = rtc.current_time_us() / 1000;
 //!     delay.delay_millis(1000);
 //!
 //!     // Set the time to half a second in the past
 //!     let new_time = rtc.current_time_us() - 500_000;
 //!     rtc.set_current_time_us(new_time);
+//!     let new_time = rtc.current_time_us() - 500_000;
+//!     rtc.set_current_time_us(new_time);
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ### RWDT usage
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -90,7 +93,7 @@
 //!     });
 //! }
 //! ```
-//! 
+//!
 //! ### Get time in ms from the RTC Timer
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -103,9 +106,12 @@
 //! loop {
 //!     // Get the current RTC time in milliseconds
 //!     let time_ms = rtc.current_time_us() * 1000;
+//!     let time_ms = rtc.current_time_us() * 1000;
 //!     delay.delay_millis(1000);
 //!
 //!     // Set the time to half a second in the past
+//!     let new_time = rtc.current_time_us() - 500_000;
+//!     rtc.set_current_time_us(new_time);
 //!     let new_time = rtc.current_time_us() - 500_000;
 //!     rtc.set_current_time_us(new_time);
 //! }
@@ -399,28 +405,6 @@ impl<'d> Rtc<'d> {
     }
 
     /// Get the current time in microseconds.
-    ///
-    /// # Example
-    ///
-    /// This example shows how to get the weekday of the current time in
-    /// New York using the `jiff` crate. This example works in core-only
-    /// environments without dynamic memory allocation.
-    ///
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::rtc_cntl::Rtc;
-    /// use jiff::{Timestamp, tz::{self, TimeZone}};
-    ///
-    /// static TZ: TimeZone = tz::get!("America/New_York");
-    ///
-    /// let rtc = Rtc::new(peripherals.LPWR);
-    /// let now = Timestamp::from_microsecond(
-    ///     rtc.current_time_us() as i64,
-    /// )?;
-    /// let weekday_in_new_york = now.to_zoned(TZ.clone()).weekday();
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
 
@@ -431,13 +415,17 @@ impl<'d> Rtc<'d> {
         // We can detect if we wrapped the boot time by checking if rtc time is greater
         // than the amount of time we would've wrapped.
         if rtc_time_us > wrapped_boot_time_us {
+        if rtc_time_us > wrapped_boot_time_us {
             // We also just checked that this won't overflow
             rtc_time_us - wrapped_boot_time_us
         } else {
             boot_time_us + rtc_time_us
         }
+        }
     }
 
+    /// Set the current time in microseconds.
+    pub fn set_current_time_us(&self, current_time_us: u64) {
     /// Set the current time in microseconds.
     pub fn set_current_time_us(&self, current_time_us: u64) {
         // Current time is boot time + time since boot (rtc time)
