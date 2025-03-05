@@ -242,6 +242,7 @@ pub struct Config {
     baudrate: u32,
     /// Determines how close to the desired baud rate value the driver should
     /// set the baud rate.
+    #[builder_lite(unstable)]
     baudrate_tolerance: BaudrateTolerance,
     /// Number of data bits in each frame (5, 6, 7, or 8 bits).
     data_bits: DataBits,
@@ -250,7 +251,7 @@ pub struct Config {
     /// Number of stop bits in each frame (1, 1.5, or 2 bits).
     stop_bits: StopBits,
     /// Clock source used by the UART peripheral.
-    #[cfg_attr(not(feature = "unstable"), builder_lite(skip))]
+    #[builder_lite(unstable)]
     clock_source: ClockSource,
     /// UART Receive part configuration.
     rx: RxConfig,
