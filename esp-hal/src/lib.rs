@@ -343,7 +343,8 @@ pub struct Blocking;
 /// counterparts, and they are generally slower. This is because async functions
 /// are implemented using a state machine that is driven by interrupts and is
 /// polled by a runtime. For short operations, the overhead of the state machine
-/// can be significant.
+/// can be significant. Consider using the blocking functions on the async
+/// driver for small transfers.
 ///
 /// When initializing an Async driver, the driver disables user-specified
 /// interrupt handlers, and sets up internal interrupt handlers that drive the
