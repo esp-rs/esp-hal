@@ -26,6 +26,19 @@ Options:
   -h, --help  Print help
 ```
 
+You can get help for subcommands, too!
+
+```text
+cargo xtask build-examples --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running `target\debug\xtask.exe build-examples --help`
+Build all examples for the specified chip
+
+Usage: xtask.exe build-examples [OPTIONS] <PACKAGE> <CHIP> [EXAMPLE]
+
+...
+```
+
 ## Test/example metadata use
 
 Each test and example can specify metadata. This metadata is read, interpreted and used by the
