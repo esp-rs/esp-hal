@@ -17,4 +17,4 @@
   *( .wifiextrairam.* )
   *( .coexiram.* )
   . = ALIGN(4);
-} > RWTEXT
+} > RWTEXT AT > RODATA

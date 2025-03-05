@@ -54,10 +54,10 @@ INSERT BEFORE .data;
 
 /* Shared sections - ordering matters */
 SECTIONS {
-  INCLUDE "rodata_desc.x"
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
 }
+INCLUDE "text.x"
 INCLUDE "rodata.x"
 INCLUDE "text.x"
 INCLUDE "rtc_fast.x"

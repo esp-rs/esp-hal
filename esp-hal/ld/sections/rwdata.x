@@ -18,6 +18,12 @@
   *(.data1)
   _data_end = ABSOLUTE(.);
   . = ALIGN(4);
+} > RWDATA AT > RODATA
+  *(.sdata .sdata.* .sdata2 .sdata2.*);
+  *(.data .data.*);
+  *(.data1)
+  _data_end = ABSOLUTE(.);
+  . = ALIGN(4);
 } > RWDATA
 
 /* LMA of .data */
@@ -56,4 +62,4 @@ _sidata = LOADADDR(.data);
   . = ALIGN(4);
   *( .dram1 .dram1.*)
   . = ALIGN(4);
-} > RWDATA
+} > RWDATA AT > RODATA
