@@ -14,7 +14,7 @@ use hil_test as _;
 extern crate alloc;
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 2)]
+#[embedded_test::tests]
 mod tests {
     #[init]
     fn init() {
@@ -32,6 +32,21 @@ mod tests {
 
         for i in 0..10000 {
             assert_eq!(vec[i], i);
+        }
+    }
+
+    #[test]
+    fn all_psram_is_usable() {
+        let free = esp_alloc::HEAP.free();
+        defmt::info!("Free: {}", free);
+        let mut vec = alloc::vec::Vec::with_capacity(free);
+
+        for i in 0..free {
+            vec.push((i % 256) as u8);
+        }
+
+        for i in 0..free {
+            assert_eq!(vec[i], (i % 256) as u8);
         }
     }
 }
