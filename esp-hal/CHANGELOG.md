@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Replaced `chrono::NaiveDateTime` on the RTC API by raw `u64` timestamps (#3185)
+- Replaced `chrono::NaiveDateTime` on the RTC API by raw `u64` timestamps (#3200)
 
 ### Fixed
 
