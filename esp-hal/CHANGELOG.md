@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ESP32-C6: Keep ADC enabled to improve radio signal strength (#3249)
 - ESP32-S2: Fixed PSRAM initialization (#3196)
+- ESP32: Fixed SPI3 QSPI signals (#3201)
 
 ### Removed
 
