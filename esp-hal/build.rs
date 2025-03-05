@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env,
     error::Error,
     fs::{self, File},
@@ -179,10 +180,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         // RISC-V devices:
 
-        preprocess_file(&config_symbols, "ld/riscv/asserts.x", out.join("asserts.x"))?;
-        preprocess_file(&config_symbols, "ld/riscv/debug.x", out.join("debug.x"))?;
         preprocess_file(
             &config_symbols,
+            &cfg,
+            "ld/riscv/asserts.x",
+            out.join("asserts.x"),
+        )?;
+        preprocess_file(
+            &config_symbols,
+            &cfg,
+            "ld/riscv/debug.x",
+            out.join("debug.x"),
+        )?;
+        preprocess_file(
+            &config_symbols,
+            &cfg,
             "ld/riscv/hal-defaults.x",
             out.join("hal-defaults.x"),
         )?;
@@ -190,8 +202,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // With the architecture-specific linker scripts taken care of, we can copy all
     // remaining linker scripts which are common to all devices:
-    copy_dir_all(&config_symbols, "ld/sections", &out)?;
-    copy_dir_all(&config_symbols, format!("ld/{device_name}"), &out)?;
+    copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
+    copy_dir_all(&config_symbols, &cfg, format!("ld/{device_name}"), &out)?;
 
     Ok(())
 }
@@ -201,6 +213,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn copy_dir_all(
     config_symbols: &[&str],
+    cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> std::io::Result<()> {
@@ -211,12 +224,14 @@ fn copy_dir_all(
         if ty.is_dir() {
             copy_dir_all(
                 config_symbols,
+                cfg,
                 entry.path(),
                 dst.as_ref().join(entry.file_name()),
             )?;
         } else {
             preprocess_file(
                 config_symbols,
+                cfg,
                 entry.path(),
                 dst.as_ref().join(entry.file_name()),
             )?;
@@ -228,6 +243,7 @@ fn copy_dir_all(
 /// A naive pre-processor for linker scripts
 fn preprocess_file(
     config: &[&str],
+    cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
 ) -> std::io::Result<()> {
@@ -240,7 +256,7 @@ fn preprocess_file(
     take.push(true);
 
     for line in std::io::BufReader::new(file).lines() {
-        let line = line?;
+        let line = substitute_config(cfg, &line?);
         let trimmed = line.trim();
 
         if let Some(condition) = trimmed.strip_prefix("#IF ") {
@@ -265,6 +281,43 @@ fn preprocess_file(
         }
     }
     Ok(())
+}
+
+fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
+    let mut result = String::new();
+    let mut chars = line.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c != '$' {
+            result.push(c);
+            continue;
+        }
+
+        let Some('{') = chars.peek() else {
+            result.push(c);
+            continue;
+        };
+        chars.next();
+
+        let mut key = String::new();
+        for c in chars.by_ref() {
+            if c == '}' {
+                break;
+            }
+            key.push(c);
+        }
+        match cfg
+            .get(&key)
+            .unwrap_or_else(|| panic!("missing config key: {key}"))
+        {
+            Value::Bool(true) => result.push('1'),
+            Value::Bool(false) => result.push('0'),
+            Value::Integer(value) => result.push_str(&value.to_string()),
+            Value::String(value) => result.push_str(value),
+        }
+    }
+
+    result
 }
 
 #[cfg(feature = "esp32")]
