@@ -2585,13 +2585,8 @@ impl Driver<'_> {
         stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
-        let chunk_size = if buffer.len() % I2C_CHUNK_SIZE < 2 {
-            I2C_CHUNK_SIZE - 2
-        } else {
-            I2C_CHUNK_SIZE
-        };
-        let chunk_count = buffer.len().div_ceil(chunk_size);
-        for (idx, chunk) in buffer.chunks_mut(chunk_size).enumerate() {
+        let chunk_count = VariableChunkIterMut::new(buffer).count();
+        for (idx, chunk) in VariableChunkIterMut::new(buffer).enumerate() {
             self.read_operation_blocking(
                 address,
                 chunk,
@@ -2614,13 +2609,9 @@ impl Driver<'_> {
         if buffer.is_empty() {
             return self.write_operation_blocking(address, &[], start, stop);
         }
-        let chunk_size = if buffer.len() % I2C_CHUNK_SIZE < 2 {
-            I2C_CHUNK_SIZE - 2
-        } else {
-            I2C_CHUNK_SIZE
-        };
-        let chunk_count = buffer.len().div_ceil(chunk_size);
-        for (idx, chunk) in buffer.chunks(chunk_size).enumerate() {
+
+        let chunk_count = VariableChunkIter::new(buffer).count();
+        for (idx, chunk) in VariableChunkIter::new(buffer).enumerate() {
             self.write_operation_blocking(
                 address,
                 chunk,
@@ -2640,13 +2631,8 @@ impl Driver<'_> {
         stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
-        let chunk_size = if buffer.len() % I2C_CHUNK_SIZE < 2 {
-            I2C_CHUNK_SIZE - 2
-        } else {
-            I2C_CHUNK_SIZE
-        };
-        let chunk_count = buffer.len().div_ceil(chunk_size);
-        for (idx, chunk) in buffer.chunks_mut(chunk_size).enumerate() {
+        let chunk_count = VariableChunkIterMut::new(buffer).count();
+        for (idx, chunk) in VariableChunkIterMut::new(buffer).enumerate() {
             self.read_operation(
                 address,
                 chunk,
@@ -2670,13 +2656,9 @@ impl Driver<'_> {
         if buffer.is_empty() {
             return self.write_operation(address, &[], start, stop).await;
         }
-        let chunk_size = if buffer.len() % I2C_CHUNK_SIZE < 2 {
-            I2C_CHUNK_SIZE - 2
-        } else {
-            I2C_CHUNK_SIZE
-        };
-        let chunk_count = buffer.len().div_ceil(chunk_size);
-        for (idx, chunk) in buffer.chunks(chunk_size).enumerate() {
+
+        let chunk_count = VariableChunkIter::new(buffer).count();
+        for (idx, chunk) in VariableChunkIter::new(buffer).enumerate() {
             self.write_operation(
                 address,
                 chunk,
@@ -2695,6 +2677,70 @@ fn check_timeout(v: u32, max: u32) -> Result<u32, ConfigError> {
         Ok(v)
     } else {
         Err(ConfigError::TimeoutInvalid)
+    }
+}
+
+/// Chunks a slice by I2C_CHUNK_SIZE in a way to avoid the last chunk being
+/// sized smaller than 2
+struct VariableChunkIterMut<'a, T> {
+    buffer: &'a mut [T],
+}
+
+impl<'a, T> VariableChunkIterMut<'a, T> {
+    fn new(buffer: &'a mut [T]) -> Self {
+        Self { buffer }
+    }
+}
+
+impl<'a, T> Iterator for VariableChunkIterMut<'a, T> {
+    type Item = &'a mut [T];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.buffer.is_empty() {
+            return None;
+        }
+
+        let s = calculate_chunk_size(self.buffer.len());
+        let (chunk, remaining) = core::mem::take(&mut self.buffer).split_at_mut(s);
+        self.buffer = remaining;
+        Some(chunk)
+    }
+}
+
+/// Chunks a slice by I2C_CHUNK_SIZE in a way to avoid the last chunk being
+/// sized smaller than 2
+struct VariableChunkIter<'a, T> {
+    buffer: &'a [T],
+}
+
+impl<'a, T> VariableChunkIter<'a, T> {
+    fn new(buffer: &'a [T]) -> Self {
+        Self { buffer }
+    }
+}
+
+impl<'a, T> Iterator for VariableChunkIter<'a, T> {
+    type Item = &'a [T];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.buffer.is_empty() {
+            return None;
+        }
+
+        let s = calculate_chunk_size(self.buffer.len());
+        let (chunk, remaining) = core::mem::take(&mut self.buffer).split_at(s);
+        self.buffer = remaining;
+        Some(chunk)
+    }
+}
+
+fn calculate_chunk_size(remaining: usize) -> usize {
+    if remaining <= I2C_CHUNK_SIZE {
+        remaining
+    } else if remaining > I2C_CHUNK_SIZE + 2 {
+        I2C_CHUNK_SIZE
+    } else {
+        I2C_CHUNK_SIZE - 2
     }
 }
 
