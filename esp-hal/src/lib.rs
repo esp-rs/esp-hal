@@ -313,6 +313,10 @@ WARNING: use --release
 "}
 
 /// A marker trait for initializing drivers in a specific mode.
+///
+/// Different driver modes offer different features and different API. Using
+/// this trait as a generic parameter ensures that the driver is initialized in
+/// the correct mode.
 pub trait DriverMode: crate::private::Sealed {}
 
 /// Driver initialized in blocking mode.
