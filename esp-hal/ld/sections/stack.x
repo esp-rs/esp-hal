@@ -5,12 +5,8 @@ SECTIONS {
     _stack_end = ABSOLUTE(.);
     _stack_end_cpu0 = ABSOLUTE(.);
 
-    /*
-    Provide the stack_guard for `stack-protector`
-
-    TODO: Ideally the offset should be configurable - should be done once we have https://github.com/esp-rs/esp-hal/issues/1111
-    */
-    __stack_chk_guard = _stack_end + 4096;
+    /* The stack_guard for `stack-protector` mitigation - https://doc.rust-lang.org/rustc/exploit-mitigations.html#stack-smashing-protection */
+    __stack_chk_guard = _stack_end + ESP_HAL_CONFIG_STACK_GUARD_OFFSET;
 
 /* no Xtensa chip is supported - so we can assume RISC-V */
 #IF ESP_HAL_CONFIG_FLIP_LINK

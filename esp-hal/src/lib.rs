@@ -418,7 +418,10 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
         let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
         // we _should_ use a random value but we don't have a good source for random
         // numbers here
-        stack_chk_guard.write_volatile(0xdeadbabe);
+        stack_chk_guard.write_volatile(esp_config::esp_config_int!(
+            u32,
+            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+        ));
 
         main(a0, a1, a2);
     }

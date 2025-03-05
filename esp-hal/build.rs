@@ -122,6 +122,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             Some(Validator::Enumeration(
                 vec![String::from("quad"), String::from("octal")]
             )),
+        ),
+        // Rust's stack smashing protection configuration
+        (
+            "stack-guard-offset",
+            "The stack guard variable will be placed this many bytes from the stack's end.",
+            Value::Integer(4096),
+            None
+        ),
+        (
+            "stack-guard-value",
+            "The value to be written to the stack guard variable.",
+            Value::Integer(0xDEED_BAAD),
+            None
         )
     ], true);
 
