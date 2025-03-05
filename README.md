@@ -60,7 +60,7 @@ When browsing the examples, we recommend viewing the tag for the `esp-hal` relea
 
 We have a number of living documents to aid contributing to the project, please give these a read before modifying code:
 
-- [API-GUIDELINES](https://github.com/esp-rs/esp-hal/blob/main/documentation/API-GUIDELINES.md)
+- [DEVELOPER-GUIDELINES](https://github.com/esp-rs/esp-hal/blob/main/documentation/DEVELOPER-GUIDELINES.md)
 - [CONTRIBUTING-GUIDE](https://github.com/esp-rs/esp-hal/blob/main/documentation/CONTRIBUTING.md)
 
 ## License
