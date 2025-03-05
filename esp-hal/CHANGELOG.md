@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for `rand_core` 0.9 (#3211)
+- `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` and `ESP_HAL_CONFIG_STACK_GUARD_VALUE` to configure Rust's [Stack smashing protection](https://doc.rust-lang.org/rustc/exploit-mitigations.html#stack-smashing-protection) (#3203)
 
 ### Changed
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: Fixed PSRAM initialization (#3196)
 - `Uart::{with_tx, with_rx}` can now be called on the async driver as well (#3212)
 - ESP32: Fixed SPI3 QSPI signals (#3201)
+- ESP32-C6/H2: The `flip_link` feature should no longer crash (#3203)
 
 ### Removed
 

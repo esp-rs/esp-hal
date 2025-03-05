@@ -41,9 +41,11 @@ INCLUDE "fixups/rodata_dummy.x"
 /* End of ESP32S3 fixups */
 
 /* Shared sections - ordering matters */
-INCLUDE "rwtext.x"
+SECTIONS {
+  INCLUDE "rwtext.x"
+  INCLUDE "rwdata.x"
+}
 INCLUDE "text.x"
-INCLUDE "rwdata.x"
 INCLUDE "rodata.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
