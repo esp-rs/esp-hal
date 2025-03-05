@@ -41,7 +41,7 @@ Before adding or changing code, review the [esp-rs API guidelines].
 [Setting Up Git]: https://docs.github.com/en/get-started/quickstart/set-up-git
 [GitHub Flow]: https://docs.github.com/en/get-started/quickstart/github-flow
 [Pull Requests]: https://docs.github.com/en/github/collaborating-with-pull-requests
-[esp-rs API guidelines]: ./documentation/API-GUIDELINES.md
+[esp-rs developer guidelines]: ./documentation/DEVELOPER-GUIDELINES.md
 
 ## Getting Started
 

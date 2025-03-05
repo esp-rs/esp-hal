@@ -1,13 +1,14 @@
 [package]
-name         = "esp-riscv-rt"
-version      = "0.10.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Minimal runtime / startup for RISC-V CPUs from Espressif"
-keywords     = ["esp32", "espressif", "riscv", "runtime", "startup"]
-categories   = ["embedded", "hardware-support", "no-std"]
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-riscv-rt"
+version       = "0.10.0"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "Minimal runtime / startup for RISC-V CPUs from Espressif"
+documentation = "https://docs.espressif.com/projects/rust/"
+keywords      = ["esp32", "espressif", "riscv", "runtime", "startup"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [dependencies]
 document-features = "0.2.11"
@@ -21,7 +22,4 @@ has-mie-mip = []
 rtc-ram = []
 
 # This feature is intended for testing; you probably don't want to enable it:
-ci = [
-    "has-mie-mip",
-    "rtc-ram",
-]
+ci = ["has-mie-mip", "rtc-ram"]

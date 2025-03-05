@@ -1,13 +1,14 @@
 [package]
-name         = "esp-hal-embassy"
-version      = "0.7.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Embassy support for esp-hal"
-keywords     = ["async", "embedded", "esp32", "espressif"]
-categories   = ["asynchronous", "embedded", "hardware-support", "no-std"]
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-hal-embassy"
+version       = "0.7.0"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "Embassy support for esp-hal"
+documentation = "https://docs.espressif.com/projects/rust/"
+keywords      = ["async", "embedded", "esp32", "espressif"]
+categories    = ["asynchronous", "embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"

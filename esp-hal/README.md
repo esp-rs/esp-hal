@@ -17,7 +17,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 ## [Documentation]
 
-[documentation]: https://docs.esp-rs.org/esp-hal/
+[documentation]: https://docs.espressif.com/projects/rust/
 
 ## Supported Devices
 

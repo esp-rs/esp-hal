@@ -1,13 +1,14 @@
 [package]
-name         = "xtensa-lx-rt"
-version      = "0.18.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Minimal startup/runtime for Xtensa LX CPUs"
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
-keywords     = ["xtensa", "lx", "register", "peripheral"]
-categories   = ["embedded", "hardware-support", "no-std"]
+name          = "xtensa-lx-rt"
+version       = "0.18.0"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "Minimal startup/runtime for Xtensa LX CPUs"
+documentation = "https://docs.espressif.com/projects/rust/"
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+keywords      = ["lx", "peripheral", "register", "xtensa"]
+categories    = ["embedded", "hardware-support", "no-std"]
 
 [package.metadata.docs.rs]
 features = ["esp32"]
