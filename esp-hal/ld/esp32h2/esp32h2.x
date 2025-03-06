@@ -86,7 +86,9 @@ SECTIONS {
 INSERT BEFORE .text;
 
 /* Shared sections #2 - ordering matters */
-INCLUDE "text.x"
+SECTIONS {
+  INCLUDE "rodata_desc.x"
+}
 INCLUDE "rodata.x"
 INCLUDE "text.x"
 INCLUDE "rtc_fast.x"

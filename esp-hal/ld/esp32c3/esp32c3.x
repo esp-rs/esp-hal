@@ -91,10 +91,10 @@ PROVIDE(__global_pointer$ = _data_start + 0x800);
 
 /* Shared sections - ordering matters */
 SECTIONS {
+  INCLUDE "rodata_desc.x"
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
 }
-INCLUDE "text.x"
 INCLUDE "rodata.x"
 INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
