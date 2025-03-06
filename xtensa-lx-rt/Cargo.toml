@@ -15,7 +15,7 @@ features = ["esp32"]
 
 [dependencies]
 document-features = "0.2.10"
-macros            = { version = "0.2.2", package = "xtensa-lx-rt-proc-macros", path = "../xtensa-lx-rt-procmacros" }
+macros            = { version = "0.2.2", package = "xtensa-lx-rt-proc-macros", path = "../xtensa-lx-rt-proc-macros" }
 r0                = "1.0.0"
 xtensa-lx         = { version = "0.10.0", path = "../xtensa-lx" }
 

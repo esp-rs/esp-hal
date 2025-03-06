@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
-    fs,
+    fs::{self, create_dir_all},
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -139,6 +140,35 @@ fn build_documentation_for_package(
         )
     })?;
 
+    // create "/latest" redirect - assuming that the current version is the latest
+    let latest_path = if package.chip_features_matter() {
+        output_path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("latest")
+    } else {
+        output_path.parent().unwrap().join("latest")
+    };
+    log::info!("Creating latest version redirect at {:?}", latest_path);
+    create_dir_all(latest_path.clone())?;
+    std::fs::File::create(latest_path.clone().join("index.html"))?.write_all(
+        format!(
+            "<meta http-equiv=\"refresh\" content=\"0; url=./{}/\" />",
+            if package.chip_features_matter() {
+                version.to_string()
+            } else {
+                format!(
+                    "{}/{}",
+                    version.to_string(),
+                    package.to_string().replace('-', "_")
+                )
+            }
+        )
+        .as_bytes(),
+    )?;
+
     Ok(())
 }
 
@@ -255,6 +285,9 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
         Package::EspHalEmbassy => {
             features.push("esp-hal/unstable".to_owned());
         }
+        Package::EspIeee802154 => {
+            features.push("esp-hal/unstable".to_owned());
+        }
         _ => {}
     }
 
@@ -337,7 +370,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
         let mut device_doc_paths = Vec::new();
 
         // Each path we iterate over should be the directory for a given version of
-        // the package's documentation:
+        // the package's documentation: (except latest)
         for version_path in fs::read_dir(package_docs_path)? {
             let version_path = version_path?.path();
             if version_path.is_file() {
@@ -345,6 +378,10 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                     "Path is not a directory, skipping: '{}'",
                     version_path.display()
                 );
+                continue;
+            }
+
+            if version_path.file_name().unwrap() == "latest" {
                 continue;
             }
 
