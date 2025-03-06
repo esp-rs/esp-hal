@@ -225,7 +225,7 @@ defmt              = "0.3.8"
 defmt-rtt          = { version = "0.4.1", optional = true }
 embassy-executor   = "0.7.0"
 embassy-futures    = "0.1.1"
-embedded-storage   = { version = "0.3.1", optional = true }
+embedded-storage   = "0.3.1"
 embassy-sync       = "0.6.0"
 embassy-time       = "0.4.0"
 embedded-hal       = "1.0.0"
