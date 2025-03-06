@@ -16,9 +16,11 @@ INCLUDE exception.x
 SECTIONS {
   .rotext_dummy (NOLOAD) :
   {
-    /* This dummy section represents the .rodata section but in ROTEXT.
-     * Thus, it must have its alignment and (at least) its size.
-     */
+    /* This dummy section represents the .rodata section within ROTEXT.
+    * Since the same physical memory is mapped to both DROM and IROM,
+    * we need to make sure the .rodata and .text sections don't overlap.
+    * We skip the amount of memory taken by .rodata* in .text
+    */
 
     /* Start at the same alignment constraint than .flash.text */
 
