@@ -47,30 +47,40 @@ SECTIONS {
 INSERT BEFORE .rwtext;
 
 SECTIONS {
-  /**
-   * This dummy section represents the .text section but in rodata.
-   * Thus, it must have its alignement and (at least) its size.
-   */
-  .text_dummy (NOLOAD):
+  .rotext_dummy (NOLOAD) :
   {
-    /* Start at the same alignement constraint than .text */
-    . = ALIGN(4);
-    /* Create an empty gap as big as .text section */
-    . = . + SIZEOF(.text);
-    /* Prepare the alignement of the section above. Few bytes (0x20) must be
-     * added for the mapping header. */
-    . = ALIGN(0x10000) + 0x20;
-  } > RODATA
-}
-INSERT BEFORE .rodata;
+    /* This dummy section represents the .rodata section within ROTEXT.
+    * Since the same physical memory is mapped to both DROM and IROM,
+    * we need to make sure the .rodata and .text sections don't overlap.
+    * We skip the amount of memory taken by .rodata* in .text
+    */
 
+    /* Start at the same alignment constraint than .flash.text */
+
+    . = ALIGN(ALIGNOF(.rodata));
+    . = ALIGN(ALIGNOF(.rodata.wifi));
+
+    /* Create an empty gap as big as .text section */
+
+    . = . + SIZEOF(.rodata_desc);
+    . = . + SIZEOF(.rodata);
+    . = . + SIZEOF(.rodata.wifi);
+
+    /* Prepare the alignment of the section above. Few bytes (0x20) must be
+     * added for the mapping header.
+     */
+
+    . = ALIGN(0x10000) + 0x20;
+    _rotext_reserved_start = .;
+  } > ROTEXT
+}
+INSERT BEFORE .text;
+
+/* Similar to .rotext_dummy this represents .rwtext but in .data */
 SECTIONS {
-  /* similar as text_dummy */
-  .rwdata_dummy (NOLOAD) : {
-    . = ALIGN(ALIGNOF(.rwtext));
-    . = . + SIZEOF(.rwtext);
-    . = . + SIZEOF(.rwtext.wifi);
-    . = . + SIZEOF(.trap);
+  .rwdata_dummy (NOLOAD) : ALIGN(4)
+  {
+    . = . + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.trap);
   } > RWDATA
 }
 INSERT BEFORE .data;
@@ -81,11 +91,12 @@ PROVIDE(__global_pointer$ = _data_start + 0x800);
 
 /* Shared sections - ordering matters */
 SECTIONS {
+  INCLUDE "rodata_desc.x"
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
 }
-INCLUDE "text.x"
 INCLUDE "rodata.x"
+INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"

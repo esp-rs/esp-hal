@@ -72,11 +72,14 @@ SECTIONS {
     . = ALIGN(4) + 0x20;
   } > ROM
 }
-INSERT BEFORE .rodata;
+INSERT BEFORE .text;
 
 /* Shared sections #2 - ordering matters */
-INCLUDE "text.x"
+SECTIONS {
+  INCLUDE "rodata_desc.x"
+}
 INCLUDE "rodata.x"
+INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
