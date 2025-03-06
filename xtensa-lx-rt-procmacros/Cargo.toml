@@ -1,0 +1,20 @@
+[package]
+name = "xtensa-lx-rt-proc-macros"
+version = "0.2.2"
+edition = "2021"
+rust-version = "1.84.0"
+description = "Attributes re-exported in `xtensa-lx-rt`"
+documentation = "https://docs.espressif.com/projects/rust/xtensa-lx-rt-proc-macros/latest/"
+repository = "https://github.com/esp-rs/esp-hal"
+license = "MIT OR Apache-2.0"
+keywords = ["esp32", "xtensa-lx-rt", "runtime", "startup"]
+categories = ["embedded", "no-std"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling = "0.20"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["extra-traits", "full"] }
