@@ -56,7 +56,7 @@ jobs:
           sudo apt-get install gh -y
           ISSUE_NAME=$(gh issue list --state open --search "Nightly CI Failure in:title" --json number --jq '.[0].number')
 
-          if [[ -n "$ISSUE_NAME" ]];
+          if [[ -z "$ISSUE_NAME" ]];
           then
             gh issue create \
               --title "Nightly CI Failure" \
