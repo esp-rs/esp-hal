@@ -839,7 +839,9 @@ fn lint_package(
 
     let cargo_args = builder.build();
 
-    xtask::cargo::run(&cargo_args, path)
+    xtask::cargo::run_with_env(&cargo_args, path, [("CI", "1")], false)?;
+
+    Ok(())
 }
 
 fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
