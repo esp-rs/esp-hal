@@ -1694,8 +1694,8 @@ impl Driver<'_> {
     where
         I: Iterator<Item = &'a COMD>,
     {
-        // if start is true we can only send 254 additional bytes with the address as
-        // the first
+        // If start is true we need to send the address, too, which takes up a data
+        // byte.
         let max_len = if start {
             I2C_CHUNK_SIZE
         } else {
@@ -1709,7 +1709,7 @@ impl Driver<'_> {
         // don't issue write if there is no data to write
         if write_len > 0 {
             cfg_if::cfg_if! {
-                if #[cfg(any(esp32,esp32s2))] {
+                if #[cfg(any(esp32, esp32s2))] {
                     // try to place END at the same index
                     if write_len < 2 {
                         add_cmd(
@@ -1786,6 +1786,10 @@ impl Driver<'_> {
                 }
             }
         }
+        for b in bytes {
+            write_fifo(self.regs(), *b);
+        }
+
         Ok(())
     }
 
@@ -1974,43 +1978,6 @@ impl Driver<'_> {
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
     }
 
-    #[cfg(any(esp32, esp32s2))]
-    async fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
-        if start_index >= bytes.len() {
-            return Ok(());
-        }
-
-        for b in bytes {
-            write_fifo(self.regs(), *b);
-            self.check_errors()?;
-        }
-
-        Ok(())
-    }
-
-    #[cfg(not(any(esp32, esp32s2)))]
-    async fn write_remaining_tx_fifo(&self, start_index: usize, bytes: &[u8]) -> Result<(), Error> {
-        let mut index = start_index;
-        loop {
-            self.check_errors()?;
-
-            I2cFuture::new(Event::TxFifoWatermark, self.info, self.state).await?;
-
-            self.regs()
-                .int_clr()
-                .write(|w| w.txfifo_wm().clear_bit_by_one());
-
-            I2cFuture::new(Event::TxFifoWatermark, self.info, self.state).await?;
-
-            if index >= bytes.len() {
-                break Ok(());
-            }
-
-            write_fifo(self.regs(), bytes[index]);
-            index += 1;
-        }
-    }
-
     #[cfg(not(esp32))]
     async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
         self.check_errors()?;
@@ -2195,100 +2162,6 @@ impl Driver<'_> {
         self.regs().ctr().modify(|_, w| w.trans_start().set_bit());
     }
 
-    #[cfg(not(any(esp32, esp32s2)))]
-    /// Fills the TX FIFO with data from the provided slice.
-    fn fill_tx_fifo(&self, bytes: &[u8]) -> Result<usize, Error> {
-        let mut index = 0;
-        while index < bytes.len() && !self.regs().int_raw().read().txfifo_ovf().bit_is_set() {
-            write_fifo(self.regs(), bytes[index]);
-            index += 1;
-        }
-        if self.regs().int_raw().read().txfifo_ovf().bit_is_set() {
-            index -= 1;
-            self.regs()
-                .int_clr()
-                .write(|w| w.txfifo_ovf().clear_bit_by_one());
-        }
-        Ok(index)
-    }
-
-    #[cfg(not(any(esp32, esp32s2)))]
-    /// Writes remaining data from byte slice to the TX FIFO from the specified
-    /// index.
-    fn write_remaining_tx_fifo_blocking(
-        &self,
-        start_index: usize,
-        bytes: &[u8],
-    ) -> Result<(), Error> {
-        let mut index = start_index;
-        loop {
-            self.check_errors()?;
-
-            while !self.regs().int_raw().read().txfifo_wm().bit_is_set() {
-                self.check_errors()?;
-            }
-
-            self.regs()
-                .int_clr()
-                .write(|w| w.txfifo_wm().clear_bit_by_one());
-
-            while !self.regs().int_raw().read().txfifo_wm().bit_is_set() {
-                self.check_errors()?;
-            }
-
-            if index >= bytes.len() {
-                break Ok(());
-            }
-
-            write_fifo(self.regs(), bytes[index]);
-            index += 1;
-        }
-    }
-
-    #[cfg(any(esp32, esp32s2))]
-    /// Fills the TX FIFO with data from the provided slice.
-    fn fill_tx_fifo(&self, bytes: &[u8]) -> Result<usize, Error> {
-        // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
-        // FIFO apparently it would be possible by using non-fifo mode
-        // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
-
-        if bytes.len() > I2C_FIFO_SIZE {
-            return Err(Error::FifoExceeded);
-        }
-
-        for b in bytes {
-            write_fifo(self.regs(), *b);
-        }
-
-        Ok(bytes.len())
-    }
-
-    #[cfg(any(esp32, esp32s2))]
-    /// Writes remaining data from byte slice to the TX FIFO from the specified
-    /// index.
-    fn write_remaining_tx_fifo_blocking(
-        &self,
-        start_index: usize,
-        bytes: &[u8],
-    ) -> Result<(), Error> {
-        // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
-        // FIFO apparently it would be possible by using non-fifo mode
-        // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
-
-        if start_index >= bytes.len() {
-            return Ok(());
-        }
-
-        // this is only possible when writing the I2C address in release mode
-        // from [perform_write_read]
-        for b in bytes {
-            write_fifo(self.regs(), *b);
-            self.check_errors()?;
-        }
-
-        Ok(())
-    }
-
     /// Resets the transmit and receive FIFO buffers
     #[cfg(not(esp32))]
     fn reset_fifo(&self) {
@@ -2342,7 +2215,7 @@ impl Driver<'_> {
         address: I2cAddress,
         bytes: &[u8],
         start: bool,
-    ) -> Result<usize, Error> {
+    ) -> Result<(), Error> {
         self.reset_fifo();
         self.reset_command_list();
         let cmd_iterator = &mut self.regs().comd_iter();
@@ -2354,10 +2227,9 @@ impl Driver<'_> {
         self.setup_write(address, bytes, start, cmd_iterator)?;
 
         add_cmd(cmd_iterator, Command::End)?;
-        let index = self.fill_tx_fifo(bytes)?;
         self.start_transmission();
 
-        Ok(index)
+        Ok(())
     }
 
     /// Executes an I2C read operation.
@@ -2416,9 +2288,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let index = self.start_write_operation(address, bytes, start)?;
-        // Fill the FIFO with the remaining bytes:
-        self.write_remaining_tx_fifo_blocking(index, bytes)?;
+        self.start_write_operation(address, bytes, start)?;
         self.wait_for_completion_blocking(false)?;
 
         if stop {
@@ -2507,9 +2377,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let index = self.start_write_operation(address, bytes, start)?;
-        // Fill the FIFO with the remaining bytes:
-        self.write_remaining_tx_fifo(index, bytes).await?;
+        self.start_write_operation(address, bytes, start)?;
         self.wait_for_completion(true).await?;
 
         if stop {
