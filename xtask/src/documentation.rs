@@ -155,7 +155,7 @@ fn build_documentation_for_package(
     create_dir_all(latest_path.clone())?;
     std::fs::File::create(latest_path.clone().join("index.html"))?.write_all(
         format!(
-            "<meta http-equiv=\"refresh\" content=\"0; url=./{}/\" />",
+            "<meta http-equiv=\"refresh\" content=\"0; url=../{}/\" />",
             if package.chip_features_matter() {
                 version.to_string()
             } else {
