@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Replaced `chrono::NaiveDateTime` on the RTC API by raw `u64` timestamps (#3200)
-- `AnyI2s` has been moved to `esp_hal::i2s::AnyI2s` (#3226)
-- `AnyI2c` has been moved to `esp_hal::i2c::AnyI2c` (#3226)
+- `esp_hal::i2s::master::AnyI2s` has been moved to `esp_hal::i2s::AnyI2s` (#3226)
+- `esp_hal::i2c::master::AnyI2c` has been moved to `esp_hal::i2c::AnyI2c` (#3226)
 
 ### Fixed
 
