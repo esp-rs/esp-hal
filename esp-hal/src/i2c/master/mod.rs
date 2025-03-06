@@ -60,12 +60,14 @@ cfg_if::cfg_if! {
     }
 }
 
-// Chunk writes/reads by this size
-#[cfg(any(esp32, esp32s2))]
-const I2C_CHUNK_SIZE: usize = 32;
+#[cfg(not(esp32c2))]
+const I2C_FIFO_SIZE: usize = 32;
 
-#[cfg(not(any(esp32, esp32s2)))]
-const I2C_CHUNK_SIZE: usize = 254;
+#[cfg(esp32c2)]
+const I2C_FIFO_SIZE: usize = 16;
+
+// Chunk writes/reads by this size
+const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
 
 // on ESP32 there is a chance to get trapped in `wait_for_completion` forever
 const MAX_ITERATIONS: u32 = 1_000_000;
@@ -336,7 +338,7 @@ impl embedded_hal::i2c::Error for Error {
 }
 
 /// A generic I2C Command
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Debug)]
 enum Command {
     Start,
     Stop,
@@ -346,16 +348,20 @@ enum Command {
         ack_exp: Ack,
         /// Enables checking the ACK value received against the ack_exp value.
         ack_check_en: bool,
-        /// Length of data (in bytes) to be written. The maximum length is 255,
-        /// while the minimum is 1.
+        /// Length of data (in bytes) to be written. The maximum length is
+        #[cfg_attr(esp32c2, doc = "16")]
+        #[cfg_attr(not(esp32c2), doc = "32")]
+        /// , while the minimum is 1.
         length: u8,
     },
     Read {
         /// Indicates whether the receiver will send an ACK after this byte has
         /// been received.
         ack_value: Ack,
-        /// Length of data (in bytes) to be read. The maximum length is 255,
-        /// while the minimum is 1.
+        /// Length of data (in bytes) to be written. The maximum length is
+        #[cfg_attr(esp32c2, doc = "16")]
+        #[cfg_attr(not(esp32c2), doc = "32")]
+        /// , while the minimum is 1.
         length: u8,
     },
 }
@@ -365,8 +371,7 @@ enum OperationType {
     Read  = 1,
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 enum Ack {
     Ack  = 0,
     Nack = 1,
@@ -709,10 +714,15 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    /// 
+    ///
+    #[cfg_attr(
+        any(esp32, esp32s2),
+        doc = "\n\nOn ESP32 and ESP32-S2 it is advisable to not combine large read/write operations with small (<3 bytes) read/write operations.\n\n"
+    )]
     /// # Errors
     ///
-    /// The corresponding error variant from [`Error`] will be returned if the buffer passed to an [`Operation`] has zero length.
+    /// The corresponding error variant from [`Error`] will be returned if the
+    /// buffer passed to an [`Operation`] has zero length.
     pub fn transaction<'a, A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -1027,7 +1037,10 @@ impl<'d> I2c<'d, Async> {
     ///   to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
-    ///
+    #[cfg_attr(
+        any(esp32, esp32s2),
+        doc = "\n\nOn ESP32 and ESP32-S2 there might be issues combining large read/write operations with small (<3 bytes) read/write operations.\n\n"
+    )]
     /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
@@ -1647,7 +1660,7 @@ impl Driver<'_> {
 
     #[cfg(any(esp32, esp32s2))]
     async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
-        if buffer.len() > 32 {
+        if buffer.len() > I2C_FIFO_SIZE {
             return Err(Error::FifoExceeded);
         }
 
@@ -1683,24 +1696,84 @@ impl Driver<'_> {
     {
         // if start is true we can only send 254 additional bytes with the address as
         // the first
-        let max_len = if start { 254usize } else { 255usize };
+        let max_len = if start {
+            I2C_CHUNK_SIZE
+        } else {
+            I2C_CHUNK_SIZE + 1
+        };
         if bytes.len() > max_len {
-            // we could support more by adding multiple write operations
             return Err(Error::FifoExceeded);
         }
 
         let write_len = if start { bytes.len() + 1 } else { bytes.len() };
         // don't issue write if there is no data to write
         if write_len > 0 {
-            // WRITE command
-            add_cmd(
-                cmd_iterator,
-                Command::Write {
-                    ack_exp: Ack::Ack,
-                    ack_check_en: true,
-                    length: write_len as u8,
-                },
-            )?;
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32,esp32s2))] {
+                    // try to place END at the same index
+                    if write_len < 2 {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: write_len as u8,
+                            },
+                        )?;
+                    } else if start {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: (write_len as u8) - 1,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: 1,
+                            },
+                        )?;
+                    } else {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: (write_len as u8) - 2,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: 1,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Write {
+                                ack_exp: Ack::Ack,
+                                ack_check_en: true,
+                                length: 1,
+                            },
+                        )?;
+                    }
+                } else {
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Write {
+                            ack_exp: Ack::Ack,
+                            ack_check_en: true,
+                            length: write_len as u8,
+                        },
+                    )?;
+                }
+            }
         }
 
         self.update_config();
@@ -1739,12 +1812,11 @@ impl Driver<'_> {
             return Err(Error::ZeroLengthInvalid);
         }
         let (max_len, initial_len) = if will_continue {
-            (255usize, buffer.len())
+            (I2C_CHUNK_SIZE + 1, buffer.len())
         } else {
-            (254usize, buffer.len() - 1)
+            (I2C_CHUNK_SIZE, buffer.len() - 1)
         };
         if buffer.len() > max_len {
-            // we could support more by adding multiple read operations
             return Err(Error::FifoExceeded);
         }
 
@@ -1761,14 +1833,65 @@ impl Driver<'_> {
         }
 
         if initial_len > 0 {
-            // READ command
-            add_cmd(
-                cmd_iterator,
-                Command::Read {
-                    ack_value: Ack::Ack,
-                    length: initial_len as u8,
-                },
-            )?;
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32,esp32s2))] {
+                    // try to place END at the same index
+                    if initial_len < 2 || start {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: initial_len as u8,
+                            },
+                        )?;
+                    } else if !will_continue {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: (initial_len as u8) - 1,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: 1,
+                            },
+                        )?;
+                    } else {
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: (initial_len as u8) - 2,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: 1,
+                            },
+                        )?;
+                        add_cmd(
+                            cmd_iterator,
+                            Command::Read {
+                                ack_value: Ack::Ack,
+                                length: 1,
+                            },
+                        )?;
+                    }
+                } else {
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Read {
+                            ack_value: Ack::Ack,
+                            length: initial_len as u8,
+                        },
+                    )?;
+                }
+            }
         }
 
         if !will_continue {
@@ -1825,7 +1948,7 @@ impl Driver<'_> {
         // FIFO apparently it would be possible by using non-fifo mode
         // see https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
-        if buffer.len() > 32 {
+        if buffer.len() > I2C_FIFO_SIZE {
             return Err(Error::FifoExceeded);
         }
 
@@ -1973,14 +2096,33 @@ impl Driver<'_> {
         // NOTE: on esp32 executing the end command generates the end_detect interrupt
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
-        for cmd_reg in self.regs().comd_iter() {
-            let cmd = cmd_reg.read();
+        let mut cnt = MAX_ITERATIONS;
+        // loop until commands are actually done
+        loop {
+            let mut not_done = false;
+            for cmd_reg in self.regs().comd_iter() {
+                let cmd = cmd_reg.read();
 
-            if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
+                // if there is a valid command which is not END, check if it's marked as done
+                if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
+                    not_done = true;
+                }
+
+                // once we hit END or STOP we can break the loop
+                if cmd.opcode().is_end() || cmd.opcode().is_stop() {
+                    break;
+                }
+            }
+
+            if !not_done {
+                break;
+            }
+
+            cnt -= 1;
+            if cnt == 0 {
                 return Err(Error::ExecutionIncomplete);
             }
         }
-
         Ok(())
     }
 
@@ -2110,7 +2252,7 @@ impl Driver<'_> {
         // FIFO apparently it would be possible by using non-fifo mode
         // see  https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
 
-        if bytes.len() > 31 {
+        if bytes.len() > I2C_FIFO_SIZE {
             return Err(Error::FifoExceeded);
         }
 
@@ -2200,7 +2342,6 @@ impl Driver<'_> {
         address: I2cAddress,
         bytes: &[u8],
         start: bool,
-        stop: bool,
     ) -> Result<usize, Error> {
         self.reset_fifo();
         self.reset_command_list();
@@ -2212,10 +2353,7 @@ impl Driver<'_> {
 
         self.setup_write(address, bytes, start, cmd_iterator)?;
 
-        add_cmd(
-            cmd_iterator,
-            if stop { Command::Stop } else { Command::End },
-        )?;
+        add_cmd(cmd_iterator, Command::End)?;
         let index = self.fill_tx_fifo(bytes)?;
         self.start_transmission();
 
@@ -2237,7 +2375,6 @@ impl Driver<'_> {
         address: I2cAddress,
         buffer: &mut [u8],
         start: bool,
-        stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
         self.reset_fifo();
@@ -2251,10 +2388,7 @@ impl Driver<'_> {
 
         self.setup_read(address, buffer, start, will_continue, cmd_iterator)?;
 
-        add_cmd(
-            cmd_iterator,
-            if stop { Command::Stop } else { Command::End },
-        )?;
+        add_cmd(cmd_iterator, Command::End)?;
         self.start_transmission();
         Ok(())
     }
@@ -2282,10 +2416,15 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let index = self.start_write_operation(address, bytes, start, stop)?;
+        let index = self.start_write_operation(address, bytes, start)?;
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo_blocking(index, bytes)?;
-        self.wait_for_completion_blocking(!stop)?;
+        self.wait_for_completion_blocking(false)?;
+
+        if stop {
+            self.stop_operation_blocking()?;
+        }
+
         Ok(())
     }
 
@@ -2315,9 +2454,33 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        self.start_read_operation(address, buffer, start, stop, will_continue)?;
+        self.start_read_operation(address, buffer, start, will_continue)?;
         self.read_all_from_fifo_blocking(buffer)?;
-        self.wait_for_completion_blocking(!stop)?;
+        self.wait_for_completion_blocking(true)?;
+
+        if stop {
+            self.stop_operation_blocking()?;
+        }
+        Ok(())
+    }
+
+    /// Perform a single STOP
+    fn stop_operation_blocking(&self) -> Result<(), Error> {
+        let cmd_iterator = &mut self.regs().comd_iter();
+        add_cmd(cmd_iterator, Command::Stop)?;
+        self.start_transmission();
+        self.wait_for_completion_blocking(false)?;
+
+        #[cfg(esp32)]
+        loop {
+            // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
+            // empty write
+            if self.regs().sr().read().scl_state_last() == 0b110 {
+                self.check_errors()?;
+                break;
+            }
+        }
+
         Ok(())
     }
 
@@ -2344,10 +2507,15 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        let index = self.start_write_operation(address, bytes, start, stop)?;
+        let index = self.start_write_operation(address, bytes, start)?;
         // Fill the FIFO with the remaining bytes:
         self.write_remaining_tx_fifo(index, bytes).await?;
-        self.wait_for_completion(!stop).await?;
+        self.wait_for_completion(true).await?;
+
+        if stop {
+            self.stop_operation().await?;
+        }
+
         Ok(())
     }
 
@@ -2377,9 +2545,35 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        self.start_read_operation(address, buffer, start, stop, will_continue)?;
+        self.start_read_operation(address, buffer, start, will_continue)?;
         self.read_all_from_fifo(buffer).await?;
-        self.wait_for_completion(!stop).await?;
+        self.wait_for_completion(true).await?;
+
+        if stop {
+            self.stop_operation().await?;
+        }
+
+        Ok(())
+    }
+
+    /// Perform a single STOP
+    async fn stop_operation(&self) -> Result<(), Error> {
+        let cmd_iterator = &mut self.regs().comd_iter();
+        add_cmd(cmd_iterator, Command::Stop)?;
+        self.start_transmission();
+        self.wait_for_completion(false).await?;
+
+        #[cfg(esp32)]
+        loop {
+            // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
+            // empty write
+            if self.regs().sr().read().scl_state_last() == 0b110 {
+                self.check_errors()?;
+                embassy_futures::yield_now().await;
+                break;
+            }
+        }
+
         Ok(())
     }
 
@@ -2391,8 +2585,8 @@ impl Driver<'_> {
         stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
-        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
-        for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+        let chunk_count = VariableChunkIterMut::new(buffer).count();
+        for (idx, chunk) in VariableChunkIterMut::new(buffer).enumerate() {
             self.read_operation_blocking(
                 address,
                 chunk,
@@ -2415,8 +2609,9 @@ impl Driver<'_> {
         if buffer.is_empty() {
             return self.write_operation_blocking(address, &[], start, stop);
         }
-        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
-        for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+
+        let chunk_count = VariableChunkIter::new(buffer).count();
+        for (idx, chunk) in VariableChunkIter::new(buffer).enumerate() {
             self.write_operation_blocking(
                 address,
                 chunk,
@@ -2436,8 +2631,8 @@ impl Driver<'_> {
         stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
-        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
-        for (idx, chunk) in buffer.chunks_mut(I2C_CHUNK_SIZE).enumerate() {
+        let chunk_count = VariableChunkIterMut::new(buffer).count();
+        for (idx, chunk) in VariableChunkIterMut::new(buffer).enumerate() {
             self.read_operation(
                 address,
                 chunk,
@@ -2461,8 +2656,9 @@ impl Driver<'_> {
         if buffer.is_empty() {
             return self.write_operation(address, &[], start, stop).await;
         }
-        let chunk_count = buffer.len().div_ceil(I2C_CHUNK_SIZE);
-        for (idx, chunk) in buffer.chunks(I2C_CHUNK_SIZE).enumerate() {
+
+        let chunk_count = VariableChunkIter::new(buffer).count();
+        for (idx, chunk) in VariableChunkIter::new(buffer).enumerate() {
             self.write_operation(
                 address,
                 chunk,
@@ -2481,6 +2677,70 @@ fn check_timeout(v: u32, max: u32) -> Result<u32, ConfigError> {
         Ok(v)
     } else {
         Err(ConfigError::TimeoutInvalid)
+    }
+}
+
+/// Chunks a slice by I2C_CHUNK_SIZE in a way to avoid the last chunk being
+/// sized smaller than 2
+struct VariableChunkIterMut<'a, T> {
+    buffer: &'a mut [T],
+}
+
+impl<'a, T> VariableChunkIterMut<'a, T> {
+    fn new(buffer: &'a mut [T]) -> Self {
+        Self { buffer }
+    }
+}
+
+impl<'a, T> Iterator for VariableChunkIterMut<'a, T> {
+    type Item = &'a mut [T];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.buffer.is_empty() {
+            return None;
+        }
+
+        let s = calculate_chunk_size(self.buffer.len());
+        let (chunk, remaining) = core::mem::take(&mut self.buffer).split_at_mut(s);
+        self.buffer = remaining;
+        Some(chunk)
+    }
+}
+
+/// Chunks a slice by I2C_CHUNK_SIZE in a way to avoid the last chunk being
+/// sized smaller than 2
+struct VariableChunkIter<'a, T> {
+    buffer: &'a [T],
+}
+
+impl<'a, T> VariableChunkIter<'a, T> {
+    fn new(buffer: &'a [T]) -> Self {
+        Self { buffer }
+    }
+}
+
+impl<'a, T> Iterator for VariableChunkIter<'a, T> {
+    type Item = &'a [T];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.buffer.is_empty() {
+            return None;
+        }
+
+        let s = calculate_chunk_size(self.buffer.len());
+        let (chunk, remaining) = core::mem::take(&mut self.buffer).split_at(s);
+        self.buffer = remaining;
+        Some(chunk)
+    }
+}
+
+fn calculate_chunk_size(remaining: usize) -> usize {
+    if remaining <= I2C_CHUNK_SIZE {
+        remaining
+    } else if remaining > I2C_CHUNK_SIZE + 2 {
+        I2C_CHUNK_SIZE
+    } else {
+        I2C_CHUNK_SIZE - 2
     }
 }
 
