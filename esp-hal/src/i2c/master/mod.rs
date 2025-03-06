@@ -40,6 +40,7 @@ use crate::{
         PinGuard,
         Pull,
     },
+    i2c::{AnyI2c, AnyI2cInner},
     interrupt::InterruptHandler,
     pac::i2c0::{RegisterBlock, COMD},
     peripheral::{Peripheral, PeripheralRef},
@@ -2890,16 +2891,6 @@ macro_rules! instance {
 instance!(I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA, I2C_EXT0);
 #[cfg(i2c1)]
 instance!(I2C1, I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA, I2C_EXT1);
-
-crate::any_peripheral! {
-    /// Represents any I2C peripheral.
-    pub peripheral AnyI2c {
-        #[cfg(i2c0)]
-        I2c0(crate::peripherals::I2C0),
-        #[cfg(i2c1)]
-        I2c1(crate::peripherals::I2C1),
-    }
-}
 
 impl Instance for AnyI2c {
     delegate::delegate! {
