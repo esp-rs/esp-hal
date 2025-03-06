@@ -644,8 +644,10 @@ impl core::fmt::Display for ConfigError {
 /// # use esp_hal::spi::master::{Config, Spi};
 /// let mut spi = Spi::new(
 ///     peripherals.SPI2,
-///     Config::default().with_frequency(Rate::from_khz(100)).
-/// with_mode(Mode::_0) )?
+///     Config::default()
+///         .with_frequency(Rate::from_khz(100))
+///         .with_mode(Mode::_0),
+/// )?
 /// .with_sck(peripherals.GPIO0)
 /// .with_mosi(peripherals.GPIO1)
 /// .with_miso(peripherals.GPIO2);
@@ -760,8 +762,10 @@ impl<'d> Spi<'d, Blocking> {
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
-    ///     Config::default().with_frequency(Rate::from_khz(100)).
-    /// with_mode(Mode::_0) )?
+    ///     Config::default()
+    ///         .with_frequency(Rate::from_khz(100))
+    ///         .with_mode(Mode::_0),
+    /// )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
     /// # Ok(())
@@ -1262,8 +1266,10 @@ mod dma {
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
-    ///     Config::default().with_frequency(Rate::from_khz(100)).
-    /// with_mode(Mode::_0) )?
+    ///     Config::default()
+    ///         .with_frequency(Rate::from_khz(100))
+    ///         .with_mode(Mode::_0),
+    /// )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
     /// # Ok(())
