@@ -110,7 +110,6 @@ use crate::{
         DmaChannelFor,
         DmaEligible,
         DmaError,
-        DmaPeripheral,
         DmaTxBuffer,
         PeripheralTxChannel,
         Tx,
@@ -119,6 +118,7 @@ use crate::{
         interconnect::{OutputConnection, PeripheralOutput},
         OutputSignal,
     },
+    i2s::{AnyI2s, AnyI2sInner},
     pac::i2s0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{I2S0, I2S1},
@@ -756,25 +756,6 @@ impl Instance for I2S1 {
             22 => OutputSignal::I2S1O_DATA_22,
             23 => OutputSignal::I2S1O_DATA_23,
             other => panic!("Invalid I2S1 Dout pin {}", other),
-        }
-    }
-}
-
-crate::any_peripheral! {
-    /// Any SPI peripheral.
-    pub peripheral AnyI2s {
-        I2s0(crate::peripherals::I2S0),
-        I2s1(crate::peripherals::I2S1),
-    }
-}
-
-impl DmaEligible for AnyI2s {
-    type Dma = crate::dma::AnyI2sDmaChannel;
-
-    fn dma_peripheral(&self) -> DmaPeripheral {
-        match &self.0 {
-            AnyI2sInner::I2s0(_) => DmaPeripheral::I2s0,
-            AnyI2sInner::I2s1(_) => DmaPeripheral::I2s1,
         }
     }
 }

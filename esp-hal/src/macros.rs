@@ -95,9 +95,18 @@ macro_rules! any_peripheral {
     }) => {
         paste::paste! {
             $(#[$meta])*
+            ///
+            /// This struct is a type-erased version of a peripheral singleton. It is useful
+            /// for creating arrays of peripherals, or avoiding generics. Peripheral singletons
+            /// can be type erased by calling `degrade` on them.
+            ///
+            /// ```rust,ignore
+            /// let any_peripheral = peripheral.degrade();
+            /// ```
             #[derive(Debug)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             $vis struct $name([< $name Inner >]);
+
             impl $crate::private::Sealed for $name {}
 
             impl $crate::peripheral::Peripheral for $name {
@@ -139,6 +148,14 @@ macro_rules! any_peripheral {
                 impl From<$inner> for $name {
                     fn from(inner: $inner) -> Self {
                         Self([< $name Inner >]::$variant(inner))
+                    }
+                }
+
+                $(#[cfg($variant_meta)])*
+                impl $inner {
+                    #[doc = concat!("Type-erase this peripheral into an [`", stringify!($name), "`].")]
+                    pub fn degrade(self) -> $name {
+                        $name::from(self)
                     }
                 }
             )*
