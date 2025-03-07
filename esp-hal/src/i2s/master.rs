@@ -98,6 +98,7 @@ use crate::{
         WriteBuffer,
     },
     gpio::interconnect::PeripheralOutput,
+    i2s::AnyI2s,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralGuard,
@@ -693,6 +694,7 @@ mod private {
             InputSignal,
             OutputSignal,
         },
+        i2s::AnyI2sInner,
         interrupt::InterruptHandler,
         peripheral::{Peripheral, PeripheralRef},
         peripherals::{Interrupt, I2S0},
@@ -1690,17 +1692,17 @@ mod private {
     impl RegBlock for super::AnyI2s {
         fn regs(&self) -> &RegisterBlock {
             match &self.0 {
-                super::AnyI2sInner::I2s0(i2s) => RegBlock::regs(i2s),
+                AnyI2sInner::I2s0(i2s) => RegBlock::regs(i2s),
                 #[cfg(i2s1)]
-                super::AnyI2sInner::I2s1(i2s) => RegBlock::regs(i2s),
+                AnyI2sInner::I2s1(i2s) => RegBlock::regs(i2s),
             }
         }
 
         delegate::delegate! {
             to match &self.0 {
-                super::AnyI2sInner::I2s0(i2s) => i2s,
+                AnyI2sInner::I2s0(i2s) => i2s,
                 #[cfg(i2s1)]
-                super::AnyI2sInner::I2s1(i2s) => i2s,
+                AnyI2sInner::I2s1(i2s) => i2s,
             } {
                 fn peripheral(&self) -> crate::system::Peripheral;
             }
@@ -1710,9 +1712,9 @@ mod private {
     impl RegisterAccessPrivate for super::AnyI2s {
         delegate::delegate! {
             to match &self.0 {
-                super::AnyI2sInner::I2s0(i2s) => i2s,
+                AnyI2sInner::I2s0(i2s) => i2s,
                 #[cfg(i2s1)]
-                super::AnyI2sInner::I2s1(i2s) => i2s,
+                AnyI2sInner::I2s1(i2s) => i2s,
             } {
                 fn set_interrupt_handler(&self, handler: InterruptHandler);
             }
@@ -1722,9 +1724,9 @@ mod private {
     impl Signals for super::AnyI2s {
         delegate::delegate! {
             to match &self.0 {
-                super::AnyI2sInner::I2s0(i2s) => i2s,
+                AnyI2sInner::I2s0(i2s) => i2s,
                 #[cfg(i2s1)]
-                super::AnyI2sInner::I2s1(i2s) => i2s,
+                AnyI2sInner::I2s1(i2s) => i2s,
             } {
                 fn mclk_signal(&self) -> OutputSignal;
                 fn bclk_signal(&self) -> OutputSignal;
@@ -2025,31 +2027,6 @@ pub mod asynch {
             let avail = self.available().await?;
             let to_rcv = usize::min(avail, data.len());
             Ok(self.state.pop(&mut data[..to_rcv])?)
-        }
-    }
-}
-
-crate::any_peripheral! {
-    /// Any SPI peripheral.
-    pub peripheral AnyI2s {
-        #[cfg(i2s0)]
-        I2s0(crate::peripherals::I2S0),
-        #[cfg(i2s1)]
-        I2s1(crate::peripherals::I2S1),
-    }
-}
-
-impl DmaEligible for AnyI2s {
-    #[cfg(gdma)]
-    type Dma = crate::dma::AnyGdmaChannel;
-    #[cfg(pdma)]
-    type Dma = crate::dma::AnyI2sDmaChannel;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            AnyI2sInner::I2s0(_) => crate::dma::DmaPeripheral::I2s0,
-            #[cfg(i2s1)]
-            AnyI2sInner::I2s1(_) => crate::dma::DmaPeripheral::I2s1,
         }
     }
 }

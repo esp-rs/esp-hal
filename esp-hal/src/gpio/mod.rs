@@ -405,11 +405,11 @@ pub trait Pin: Sealed {
     /// GPIO number
     fn number(&self) -> u8;
 
-    /// Type-erase (degrade) this pin into an [`AnyPin`].
+    /// Type-erase this pin into an [`AnyPin`].
     ///
-    /// This converts pin singletons (`GpioPin<0>`, …), which are all different
-    /// types, into the same type. It is useful for creating arrays of pins,
-    /// or avoiding generics.
+    /// This function converts pin singletons (`GpioPin<0>`, …), which are all
+    /// different types, into the same type. It is useful for creating
+    /// arrays of pins, or avoiding generics.
     ///
     /// ## Example
     ///
@@ -620,7 +620,7 @@ impl GpioBank {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct GpioPin<const GPIONUM: u8>;
 
-/// Type-erased GPIO pin
+/// Any GPIO pin.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyPin(pub(crate) u8);
