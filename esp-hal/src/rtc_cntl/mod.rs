@@ -405,6 +405,28 @@ impl<'d> Rtc<'d> {
     }
 
     /// Get the current time in microseconds.
+    ///
+    /// # Example
+    ///
+    /// This example shows how to get the weekday of the current time in
+    /// New York using the `jiff` crate. This example works in core-only
+    /// environments without dynamic memory allocation.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::rtc_cntl::Rtc;
+    /// use jiff::{Timestamp, tz::{self, TimeZone}};
+    ///
+    /// static TZ: TimeZone = tz::get!("America/New_York");
+    ///
+    /// let rtc = Rtc::new(peripherals.LPWR);
+    /// let now = Timestamp::from_microsecond(
+    ///     rtc.current_time_us() as i64,
+    /// ).unwrap();
+    /// let weekday_in_new_york = now.to_zoned(TZ.clone()).weekday();
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
 
