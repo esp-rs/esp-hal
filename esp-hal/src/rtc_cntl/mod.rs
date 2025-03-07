@@ -416,7 +416,7 @@ impl<'d> Rtc<'d> {
     /// let rtc = Rtc::new(peripherals.LPWR);
     /// let now = Timestamp::from_microsecond(
     ///     rtc.current_time_us() as i64,
-    /// ).unwrap();
+    /// )?;
     /// let weekday_in_new_york = now.to_zoned(TZ.clone()).weekday();
     /// # Ok(())
     /// # }
