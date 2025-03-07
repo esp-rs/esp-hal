@@ -55,7 +55,7 @@ pub enum Package {
     QaTest,
     XtensaLx,
     XtensaLxRt,
-    XtensaLxRtProcmacros,
+    XtensaLxRtProcMacros,
 }
 
 impl Package {
