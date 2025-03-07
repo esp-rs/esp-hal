@@ -1,5 +1,5 @@
 [package]
-name    = "xtask"
+name = "xtask"
 version = "0.0.0"
 edition = "2021"
 publish = false
@@ -16,6 +16,8 @@ esp-metadata = { path = "../esp-metadata", features = ["clap"] }
 kuchikiki    = "0.8.2"
 log          = "0.4.22"
 minijinja    = "2.5.0"
+opener       = { version = "0.7.2", optional = true }
+rocket       = { version = "0.5.1", optional = true }
 semver       = { version = "1.0.23", features = ["serde"] }
 serde        = { version = "1.0.215", features = ["derive"] }
 serde_json   = "1.0.70"
@@ -32,3 +34,4 @@ reqwest = { version = "0.12.12", features = [
 
 [features]
 deploy-docs = ["dep:reqwest"]
+preview-docs = ["dep:rocket", "dep:opener"]

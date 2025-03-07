@@ -4,7 +4,7 @@ version       = "0.2.0"
 edition       = "2021"
 rust-version  = "1.84.0"
 description   = "Build utilities for esp-hal"
-documentation = "https://docs.espressif.com/projects/rust/"
+documentation = "https://docs.espressif.com/projects/rust/esp-build/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 

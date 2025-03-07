@@ -4,7 +4,7 @@ version       = "0.17.0"
 edition       = "2021"
 rust-version  = "1.84.0"
 description   = "Procedural macros for esp-hal"
-documentation = "https://docs.espressif.com/projects/rust/"
+documentation = "https://docs.espressif.com/projects/rust/esp-hal-procmacros/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
