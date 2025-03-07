@@ -12,9 +12,7 @@ use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
-    target_triple,
-    Package,
-    Version,
+    target_triple, Package, Version,
 };
 
 // ----------------------------------------------------------------------------
@@ -104,6 +102,9 @@ struct BuildDocumentationIndexArgs {
     /// Package(s) to build documentation index for.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
     packages: Vec<Package>,
+    #[cfg(feature = "preview-docs")]
+    #[arg(long)]
+    serve: bool,
 }
 
 #[derive(Debug, Args)]
@@ -514,7 +515,32 @@ fn build_documentation_index(
     workspace: &Path,
     mut args: BuildDocumentationIndexArgs,
 ) -> Result<()> {
-    xtask::documentation::build_documentation_index(workspace, &mut args.packages)
+    xtask::documentation::build_documentation_index(workspace, &mut args.packages)?;
+
+    #[cfg(feature = "preview-docs")]
+    if args.serve {
+        std::thread::spawn(|| {
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+            opener::open_browser("http://127.0.0.1:8000/").ok();
+        });
+
+        rocket::async_main(
+            {
+                rocket::build().mount(
+                    "/",
+                    rocket::fs::FileServer::new(
+                        "docs",
+                        rocket::fs::Options::Index
+                            | rocket::fs::Options::IndexFile
+                            | rocket::fs::Options::DotFiles,
+                    ),
+                )
+            }
+            .launch(),
+        )?;
+    }
+
+    Ok(())
 }
 
 fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {

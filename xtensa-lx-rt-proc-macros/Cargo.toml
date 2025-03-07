@@ -4,6 +4,7 @@ version = "0.2.2"
 edition = "2021"
 rust-version = "1.84.0"
 description = "Attributes re-exported in `xtensa-lx-rt`"
+documentation = "https://docs.espressif.com/projects/rust/xtensa-lx-rt-proc-macros/latest/"
 repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 keywords = ["esp32", "xtensa-lx-rt", "runtime", "startup"]
