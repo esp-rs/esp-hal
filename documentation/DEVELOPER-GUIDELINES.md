@@ -137,7 +137,10 @@ Modules should have the following documentation format:
 //! ### Name of the Example
 //! Small description of the example if needed
 //! ```rust, no_run
+#[doc = crate::before_snippet!()]
 //! ...
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Implementation State
@@ -154,6 +157,9 @@ Modules should have the following documentation format:
   - But must also provide value beyond what the rustdoc generated docs show
     - Showing a snippet of a slightly more complex interaction, for example inverting the signals for a driver
     - Showing construction if it is more complex, or requires some non-obvious precursor steps. Think about this for drivers that take a generic instance to construct, rustdoc doesn't do a good job of showing what concrete things can be passed into a constructor.
+  - they are `no_run` - we cannot run them on a target but we can make sure the contained code compiles
+  - avoid `unwrap` etc. - use the `?` operator where possible
+  - the `before_snippet!()` provides some necessary boiler plate for you
   - For more complex scenarios, create an example.
 - Use rustdoc syntax for linking to other documentation items instead of markdown links where possible
   - https://doc.rust-lang.org/rustdoc/write-documentation/linking-to-items-by-name.html
