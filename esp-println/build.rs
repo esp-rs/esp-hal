@@ -81,6 +81,7 @@ fn generate_filter_snippet() {
             snippet
                 .push_str("pub(crate) fn is_enabled(level: log::Level, _target: &str) -> bool {");
 
+            let mut global_level = None;
             for directive in res.directives {
                 let level = match directive.level {
                     log::LevelFilter::Off => "Off",
@@ -92,18 +93,25 @@ fn generate_filter_snippet() {
                 };
 
                 if let Some(name) = directive.name {
+                    // If a prefix matches, don't continue to the next directive
                     snippet.push_str(&format!(
-                "if _target.starts_with(\"{}\") && level <= log::LevelFilter::{} {{ return true; }}",
-                &name, level
-            ));
-                } else {
-                    snippet.push_str(&format!(
-                        "if level <= log::LevelFilter::{} {{ return true; }}",
-                        level
+                        "if _target.starts_with(\"{}\") {{ return level <= log::LevelFilter::{}; }}",
+                        &name, level
                     ));
+                } else {
+                    if global_level.is_some() {
+                        panic!("Multiple globel log levels specified in `ESP_LOG`");
+                    }
+                    global_level = Some(level);
                 }
             }
-            snippet.push_str(" false");
+
+            // Place the fallback rule at the end
+            if let Some(level) = global_level {
+                snippet.push_str(&format!("level <= log::LevelFilter::{}", level));
+            } else {
+                snippet.push_str(" false");
+            }
             snippet.push('}');
             snippet
         }
@@ -182,6 +190,14 @@ fn parse_spec(spec: &str) -> ParseResult {
             });
         }
     }
+
+    // Sort by length so that the most specific prefixes come first
+    result
+        .directives
+        .sort_by(|a, b| match (a.name.as_ref(), b.name.as_ref()) {
+            (Some(a), Some(b)) => b.len().cmp(&a.len()),
+            _ => std::cmp::Ordering::Equal,
+        });
 
     result
 }
