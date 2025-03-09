@@ -7,8 +7,6 @@ include!(concat!(env!("OUT_DIR"), "/log_filter.rs"));
 include!(concat!(env!("OUT_DIR"), "\\log_filter.rs"));
 
 /// Initialize the logger with the given maximum log level.
-///
-/// `ESP_LOG` environment variable will still be honored if set.
 pub fn init_logger(level: log::LevelFilter) {
     unsafe {
         log::set_logger_racy(&EspLogger).unwrap();
