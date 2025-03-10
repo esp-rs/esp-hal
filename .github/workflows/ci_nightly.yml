@@ -13,9 +13,10 @@ env:
 
 jobs:
   esp-hal-nightly:
-    name: esp-hal | nightly (${{ matrix.device.soc }})
+    name: esp-hal | nightly (${{ matrix.device }})
     runs-on: ubuntu-latest
     env:
+      CI: 1
       SSID: SSID
       PASSWORD: PASSWORD
       STATIC_IP: 1.1.1.1
@@ -25,13 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: [
-            # RISC-V devices:
-            { soc: "esp32c2", target: "riscv32imc-unknown-none-elf" },
-            { soc: "esp32c3", target: "riscv32imc-unknown-none-elf" },
-            { soc: "esp32c6", target: "riscv32imac-unknown-none-elf" },
-            { soc: "esp32h2", target: "riscv32imac-unknown-none-elf" },
-          ]
+        device: [ "esp32c2", "esp32c3", "esp32c6", "esp32h2" ]
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +41,7 @@ jobs:
 
       - name: Build and Check
         shell: bash
-        run: cargo +nightly xtask ci ${{ matrix.device.soc }}
+        run: cargo +nightly xtask ci ${{ matrix.device }}
 
       - if: failure()
         name: Create or Update GitHub Issue
