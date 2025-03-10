@@ -59,7 +59,7 @@ use crate::{
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    private::{self, Sealed},
+    private::{self, OnDrop, Sealed},
     spi::AnySpi,
     system::{Cpu, PeripheralGuard},
     time::Rate,
@@ -880,7 +880,12 @@ impl<'d> Spi<'d, Async> {
         Ok(())
     }
 
-    /// Sends `words` to the slave. Returns the `words` received from the slave
+    /// Sends `words` to the slave. Returns the `words` received from the slave.
+    ///
+    /// This function aborts the transfer when its Future is dropped. Some
+    /// amount of data may have been transferred before the Future is
+    /// dropped. Dropping the future may block for a short while to ensure
+    /// the transfer is aborted.
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
@@ -2900,6 +2905,22 @@ impl Driver {
         unsafe { &*self.info.register_block }
     }
 
+    fn abort_transfer(&self) {
+        // Note(danielb): This method came later than DmaDriver::abort_transfer. That
+        // function works for DMA so I have left it unchanged, but does not work
+        // for CPU-controlled transfers on the ESP32. Toggling slave mode works on
+        // ESP32, but not on later chips.
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().slave().modify(|_, w| w.mode().set_bit());
+                self.regs().slave().modify(|_, w| w.mode().clear_bit());
+            } else {
+                self.configure_datalen(1, 1);
+            }
+        }
+        self.update();
+    }
+
     /// Initialize for full-duplex 1 bit mode
     fn init(&self) {
         self.regs().user().modify(|_, w| {
@@ -3419,8 +3440,7 @@ impl Driver {
     }
 
     fn busy(&self) -> bool {
-        let reg_block = self.regs();
-        reg_block.cmd().read().usr().bit_is_set()
+        self.regs().cmd().read().usr().bit_is_set()
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
@@ -3445,7 +3465,16 @@ impl Driver {
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     async fn transfer_in_place_async(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_async(chunk).await?;
+            // Cut the transfer short if the future is dropped. We'll block for a short
+            // while to ensure the peripheral is idle.
+            let cancel_on_drop = OnDrop::new(|| {
+                self.abort_transfer();
+                while self.busy() {}
+            });
+            let res = self.write_async(chunk).await;
+            cancel_on_drop.defuse();
+            res?;
+
             self.read_from_fifo(chunk)?;
         }
 

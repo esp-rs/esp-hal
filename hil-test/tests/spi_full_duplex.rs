@@ -12,6 +12,8 @@
 use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
+    gpio::Input,
+    peripheral::Peripheral,
     spi::master::{Config, Spi},
     time::Rate,
     Blocking,
@@ -26,10 +28,7 @@ cfg_if::cfg_if! {
             gpio::{Level, NoPin},
         };
         #[cfg(pcnt)]
-        use esp_hal::{
-            gpio::interconnect::InputSignal,
-            pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
-        };
+        use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
     }
 }
 
@@ -53,8 +52,7 @@ struct Context {
     tx_buffer: &'static mut [u8],
     #[cfg(feature = "unstable")]
     tx_descriptors: &'static mut [DmaDescriptor],
-    #[cfg(all(pcnt, feature = "unstable"))]
-    pcnt_source: InputSignal,
+    miso_input: Input<'static>,
     #[cfg(all(pcnt, feature = "unstable"))]
     pcnt_unit: Unit<'static, 0>,
 }
@@ -70,7 +68,13 @@ mod tests {
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
 
-        let (_, mosi) = hil_test::common_test_pins!(peripherals);
+        let (_, miso) = hil_test::common_test_pins!(peripherals);
+
+        // A bit ugly but the peripheral interconnect APIs aren't yet stable.
+        let mosi = unsafe { miso.clone_unchecked() };
+        let miso_input = unsafe { miso.clone_unchecked() };
+        // Will be used later to detect edges directly or through PCNT.
+        let miso_input = Input::new(miso_input, Default::default());
 
         #[cfg(feature = "unstable")]
         cfg_if::cfg_if! {
@@ -83,16 +87,8 @@ mod tests {
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "unstable")] {
-                let (miso, mosi) = mosi.split();
-
-                #[cfg(pcnt)]
-                let mosi_loopback_pcnt = miso.clone();
-
                 let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
             } else {
-                use esp_hal::peripheral::Peripheral;
-                let miso = unsafe { mosi.clone_unchecked() };
-
                 static mut TX_BUFFER: [u8; 4096] = [0; 4096];
                 static mut RX_BUFFER: [u8; 4096] = [0; 4096];
 
@@ -121,11 +117,10 @@ mod tests {
                     spi,
                     rx_buffer,
                     tx_buffer,
+                    miso_input,
                     dma_channel,
                     rx_descriptors,
                     tx_descriptors,
-                    #[cfg(pcnt)]
-                    pcnt_source: mosi_loopback_pcnt,
                     #[cfg(pcnt)]
                     pcnt_unit: pcnt.unit0,
                 }
@@ -134,6 +129,7 @@ mod tests {
                     spi,
                     rx_buffer,
                     tx_buffer,
+                    miso_input,
                 }
             }
         }
@@ -192,7 +188,8 @@ mod tests {
 
         let unit = ctx.pcnt_unit;
 
-        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -210,7 +207,8 @@ mod tests {
 
         let unit = ctx.pcnt_unit;
 
-        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -229,7 +227,8 @@ mod tests {
 
         let unit = ctx.pcnt_unit;
 
-        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -254,7 +253,8 @@ mod tests {
 
         let unit = ctx.pcnt_unit;
 
-        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -272,7 +272,8 @@ mod tests {
 
         let unit = ctx.pcnt_unit;
 
-        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -356,7 +357,8 @@ mod tests {
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
-        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -396,7 +398,8 @@ mod tests {
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
-        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -500,7 +503,9 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
+        ctx.pcnt_unit
+            .channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         ctx.pcnt_unit
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -601,7 +606,9 @@ mod tests {
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();
 
-        ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
+        ctx.pcnt_unit
+            .channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         ctx.pcnt_unit
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -635,7 +642,9 @@ mod tests {
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();
 
-        ctx.pcnt_unit.channel0.set_edge_signal(ctx.pcnt_source);
+        ctx.pcnt_unit
+            .channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
         ctx.pcnt_unit
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -702,8 +711,51 @@ mod tests {
     }
 
     #[test]
+    async fn cancel_stops_basic_async_spi_transfer(mut ctx: Context) {
+        // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
+        // We don't rely on the transfer speed much, just that it's slow enough
+        // that we can detect pulses if
+        ctx.spi
+            .apply_config(&Config::default().with_frequency(Rate::from_khz(800)))
+            .unwrap();
+
+        let mut spi = ctx.spi.into_async();
+
+        for i in 0..ctx.tx_buffer.len() {
+            ctx.tx_buffer[i] = (i % 256) as u8;
+        }
+
+        let transfer = spi.transfer_in_place_async(ctx.tx_buffer);
+
+        // Wait for a bit before cancelling
+        let cancel = async {
+            for _ in 0..100 {
+                embassy_futures::yield_now().await;
+            }
+        };
+
+        embassy_futures::select::select(transfer, cancel).await;
+
+        // Listen for a while to see if the SPI peripheral correctly stopped.
+        let detect_edge = ctx.miso_input.wait_for_any_edge();
+        let wait = async {
+            for _ in 0..10000 {
+                embassy_futures::yield_now().await;
+            }
+        };
+
+        let result = embassy_futures::select::select(detect_edge, wait).await;
+
+        // Assert that we timed out - we should not have detected any edges
+        assert!(
+            matches!(result, embassy_futures::select::Either::Second(_)),
+            "Detected edge after cancellation"
+        );
+    }
+
+    #[test]
     #[cfg(feature = "unstable")]
-    fn cancel_stops_transaction(mut ctx: Context) {
+    fn cancel_stops_dma_transaction(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         // This means that without working cancellation, the test case should
         // fail.
