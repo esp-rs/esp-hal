@@ -29,6 +29,7 @@
 pub mod crc;
 #[cfg(any(rom_md5_bsd, rom_md5_mbedtls))]
 pub mod md5;
+pub(crate) mod regi2c;
 
 #[allow(unused)]
 extern "C" {
