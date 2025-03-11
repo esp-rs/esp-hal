@@ -1,7 +1,7 @@
 # esp-config
 
 [![Crates.io](https://img.shields.io/crates/v/esp-config?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-config)
-[![docs.rs](https://img.shields.io/docsrs/esp-config?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-config)
+[![docs.rs](https://img.shields.io/docsrs/esp-config?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-config/latest/)
 ![MSRV](https://img.shields.io/badge/MSRV-1.84-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-config?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
