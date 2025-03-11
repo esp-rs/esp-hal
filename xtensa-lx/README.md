@@ -8,7 +8,7 @@
 
 Low level access to Xtensa LX processors.
 
-## [Documentation](https://docs.rs/crate/xtensa-lx)
+## [Documentation](https://docs.espressif.com/projects/rust/xtensa-lx/latest/)
 
 ## Minimum Supported Rust Version (MSRV)
 

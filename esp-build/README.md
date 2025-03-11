@@ -10,7 +10,7 @@ Build utilities for use with `esp-hal` and other related packages, intended for 
 
 [build scripts]: https://doc.rust-lang.org/cargo/reference/build-scripts.html
 
-## [Documentation](https://docs.rs/crate/esp-build)
+## [Documentation](https://docs.espressif.com/projects/rust/esp-build/latest/)
 
 ## Minimum Supported Rust Version (MSRV)
 

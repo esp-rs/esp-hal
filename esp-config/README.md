@@ -6,7 +6,7 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-config?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-## [Documentation](https://docs.rs/crate/esp-config)
+## [Documentation](https://docs.espressif.com/projects/rust/esp-config/latest/)
 
 ## Usage
 
@@ -22,9 +22,9 @@
 The possible configuration values are output as a markdown table in the crates `OUT_DIR` with the format `{prefix}_config_table.md`, this can then be included into the crates top level documentation. Here is an example of the output:
 
 
-| Name | Description | Default value |
-|------|-------------|---------------|
-|**ESP_HAL_PLACE_SPI_DRIVER_IN_RAM**|Places the SPI driver in RAM for better performance|false|
+| Name                                | Description                                         | Default value |
+| ----------------------------------- | --------------------------------------------------- | ------------- |
+| **ESP_HAL_PLACE_SPI_DRIVER_IN_RAM** | Places the SPI driver in RAM for better performance | false         |
 
 ### Setting configuration options
 

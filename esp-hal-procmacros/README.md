@@ -8,9 +8,8 @@
 
 Procedural macros for use with `esp-hal` and other related packages.
 
-## [Documentation]
+## [Documentation](https://docs.espressif.com/projects/rust/esp-hal-procmacros/latest/)
 
-[documentation]: https://docs.rs/esp-hal-procmacros/
 
 ## Minimum Supported Rust Version (MSRV)
 

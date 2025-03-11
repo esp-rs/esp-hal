@@ -10,7 +10,7 @@ Metadata for Espressif devices, intended for use in [build scripts].
 
 [build scripts]: https://doc.rust-lang.org/cargo/reference/build-scripts.html
 
-## [Documentation](https://docs.rs/crate/esp-metadata)
+## [Documentation](https://docs.espressif.com/projects/rust/esp-metadata/latest/)
 
 ## Minimum Supported Rust Version (MSRV)
 

@@ -12,7 +12,7 @@ Implements the PHY/MAC layers of the IEEE802.15.4 protocol stack, and supports s
 
 [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 
-## [Documentation](https://docs.rs/crate/esp-ieee802154)
+## [Documentation](https://docs.espressif.com/projects/rust/esp-ieee802154/latest/)
 
 ## Minimum Supported Rust Version (MSRV)
 

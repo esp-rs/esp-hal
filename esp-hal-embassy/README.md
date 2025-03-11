@@ -12,9 +12,7 @@ Note that this crate currently requires you to enable the `unstable` feature on 
 
 [embassy]: https://github.com/embassy-rs/embassy
 
-## [Documentation]
-
-[documentation]: https://docs.rs/esp-hal-embassy/
+## [Documentation](https://docs.espressif.com/projects/rust/esp-hal-embassy/latest/)
 
 ## Minimum Supported Rust Version (MSRV)
 
