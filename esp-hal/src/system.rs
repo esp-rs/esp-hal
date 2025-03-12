@@ -130,6 +130,9 @@ impl Peripheral {
         #[cfg(systimer)]
         Peripheral::Systimer,
         Peripheral::Timg0,
+        #[cfg(esp32c6)] // used by some wifi calibration steps.
+        // TODO: We should probably automatically enable this when needed.
+        Peripheral::ApbSarAdc,
     ];
 
     const COUNT: usize = Self::ALL.len();
