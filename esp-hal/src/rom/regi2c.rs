@@ -12,10 +12,12 @@ impl RegI2cMaster {
         Self { master, host_id }
     }
 
+    #[allow(unused)]
     pub fn write(&self, reg: u8, data: u8) {
         regi2c_write(self.master, self.host_id, reg, data);
     }
 
+    #[allow(unused)]
     pub fn read(&self, reg: u8) -> u8 {
         regi2c_read(self.master, self.host_id, reg)
     }
@@ -33,10 +35,12 @@ impl RegI2cRegister {
         Self { master, reg_add }
     }
 
+    #[allow(unused)]
     pub fn write_reg(&self, data: u8) {
         self.master.write(self.reg_add, data);
     }
 
+    #[allow(unused)]
     pub fn read(&self) -> u8 {
         self.master.read(self.reg_add)
     }
@@ -51,16 +55,19 @@ pub(crate) struct RawRegI2cField {
 }
 
 impl RawRegI2cField {
+    #[allow(unused)]
     pub const fn new(register: RegI2cRegister, msb: u8, lsb: u8) -> Self {
         ::core::assert!(msb < 8 + lsb);
         Self { register, msb, lsb }
     }
 
+    #[allow(unused)]
     pub fn read(&self) -> u8 {
         let reg_raw = self.register.read();
         (reg_raw >> self.lsb) & !(u8::MAX << (self.msb - self.lsb + 1))
     }
 
+    #[allow(unused)]
     pub fn write_field(&self, data: u8) {
         let bits = self.register.read();
 
