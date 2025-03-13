@@ -42,7 +42,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
         // Raise the voltage, if needed
         LPWR::regs()
             .reg()
-            .modify(|_, w| unsafe { w.dig_dbias_wak().bits(DIG_DBIAS_80M_160M as u8) });
+            .modify(|_, w| unsafe { w.dig_dbias_wak().bits(DIG_DBIAS_80M_160M) });
 
         // Configure 320M PLL
         match xtal_freq {
@@ -80,7 +80,7 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
         // Raise the voltage
         LPWR::regs()
             .reg()
-            .modify(|_, w| unsafe { w.dig_dbias_wak().bits(dig_dbias_240_m as u8) });
+            .modify(|_, w| unsafe { w.dig_dbias_wak().bits(dig_dbias_240_m) });
 
         // Configure 480M PLL
         match xtal_freq {
@@ -167,7 +167,7 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
     // lower the voltage
     LPWR::regs()
         .reg()
-        .modify(|_, w| unsafe { w.dig_dbias_wak().bits(DIG_DBIAS_XTAL as u8) });
+        .modify(|_, w| unsafe { w.dig_dbias_wak().bits(DIG_DBIAS_XTAL) });
 }
 
 pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
@@ -175,9 +175,9 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
 
     let dig_dbias_240_m = rtc_cntl_dbias_hp_volt;
 
-    const CPU_80M: u32 = 0;
-    const CPU_160M: u32 = 1;
-    const CPU_240M: u32 = 2;
+    const CPU_80M: u8 = 0;
+    const CPU_160M: u8 = 1;
+    const CPU_240M: u8 = 2;
 
     let mut dbias = DIG_DBIAS_80M_160M;
     let per_conf = match cpu_freq_mhz {
@@ -192,10 +192,10 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
     let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
     DPORT::regs()
         .cpu_per_conf()
-        .write(|w| unsafe { w.cpuperiod_sel().bits(per_conf as u8) });
+        .write(|w| unsafe { w.cpuperiod_sel().bits(per_conf) });
     LPWR::regs()
         .reg()
-        .modify(|_, w| unsafe { w.dig_dbias_wak().bits(dbias as u8) });
+        .modify(|_, w| unsafe { w.dig_dbias_wak().bits(dbias) });
     LPWR::regs().clk_conf().modify(|_, w| w.soc_clk_sel().pll());
     LPWR::regs()
         .store5()
