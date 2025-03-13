@@ -79,15 +79,15 @@ macro_rules! define_regi2c {
         })*
     })+) => {
         $(
-            #[allow(unused, reason = "We're defining everything.")]
+            #[allow(unused)]
             pub(crate) const $master_name: RegI2cMaster = RegI2cMaster::new($master, $hostid);
 
             $(
-                #[allow(unused, reason = "We're defining everything.")]
+                #[allow(unused)]
                 pub(crate) const $register_name: RegI2cRegister = RegI2cRegister::new($master_name, $register);
 
                 $(
-                    #[allow(unused, reason = "We're defining everything.")]
+                    #[allow(unused)]
                     pub(crate) const $field_name: RawRegI2cField = RawRegI2cField::new($register_name, $msb, $lsb);
                 )*
             )*

@@ -8,6 +8,7 @@ use crate::efuse::Efuse;
 use crate::{
     peripheral::PeripheralRef,
     peripherals::{APB_SARADC, SENS},
+    soc::regi2c,
     system::{GenericPeripheralGuard, Peripheral},
 };
 
@@ -15,62 +16,11 @@ mod calibration;
 
 pub(super) const NUM_ATTENS: usize = 10;
 
-// Constants taken from:
-// https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32s2/include/soc/regi2c_saradc.h
-// https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32s3/include/soc/regi2c_saradc.h
-
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32s2, esp32s3))] {
-        const I2C_SAR_ADC: u8 = 0x69;
-        const I2C_SAR_ADC_HOSTID: u8 = 1;
-
-        const ADC_SAR1_INITIAL_CODE_HIGH_ADDR: u8 = 0x1;
-        const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
-        const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR1_INITIAL_CODE_LOW_ADDR: u8 = 0x0;
-        const ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
-        const ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR2_INITIAL_CODE_HIGH_ADDR: u8 = 0x4;
-        const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
-        const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR2_INITIAL_CODE_LOW_ADDR: u8 = 0x3;
-        const ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
-        const ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
-    }
-}
-
 cfg_if::cfg_if! {
     if #[cfg(esp32s3)] {
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
         const ADC_CAL_CHANNEL: u16 = 15;
-
-        const ADC_SAR1_ENCAL_GND_ADDR: u8 = 0x7;
-        const ADC_SAR1_ENCAL_GND_ADDR_MSB: u8 = 5;
-        const ADC_SAR1_ENCAL_GND_ADDR_LSB: u8 = 5;
-
-        const ADC_SAR1_DREF_ADDR: u8 = 0x2;
-        const ADC_SAR1_DREF_ADDR_MSB: u8 = 0x6;
-        const ADC_SAR1_DREF_ADDR_LSB: u8 = 0x4;
-
-        const ADC_SARADC1_ENCAL_REF_ADDR: u8 = 0x7;
-        const ADC_SARADC1_ENCAL_REF_ADDR_MSB: u8 = 4;
-        const ADC_SARADC1_ENCAL_REF_ADDR_LSB: u8 = 4;
-
-        const ADC_SAR2_ENCAL_GND_ADDR: u8 = 0x7;
-        const ADC_SAR2_ENCAL_GND_ADDR_MSB: u8 = 5;
-        const ADC_SAR2_ENCAL_GND_ADDR_LSB: u8 = 5;
-
-        const ADC_SAR2_DREF_ADDR: u8 = 0x5;
-        const ADC_SAR2_DREF_ADDR_MSB: u8 = 0x6;
-        const ADC_SAR2_DREF_ADDR_LSB: u8 = 0x4;
-
-        const ADC_SARADC2_ENCAL_REF_ADDR: u8 = 0x7;
-        const ADC_SARADC2_ENCAL_REF_ADDR_MSB: u8 = 4;
-        const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 4;
     }
 }
 
@@ -228,8 +178,8 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_HIGH_ADDR, msb as u32);
-        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_INITIAL_CODE_LOW_ADDR, lsb as u32);
+        regi2c::ADC_SAR1_INITIAL_CODE_HIGH.write_field(msb);
+        regi2c::ADC_SAR1_INITIAL_CODE_LOW.write_field(lsb);
     }
 
     fn reset() {
@@ -251,20 +201,16 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_DREF_ADDR, enable as u8);
+        regi2c::ADC_SAR1_DREF.write_field(enable as u8);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
             AdcCalSource::Gnd => {
-                crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR1_ENCAL_GND_ADDR, enable as u8);
+                regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as u8);
             }
             AdcCalSource::Ref => {
-                crate::rom::regi2c_write_mask!(
-                    I2C_SAR_ADC,
-                    ADC_SARADC1_ENCAL_REF_ADDR,
-                    enable as u8
-                );
+                regi2c::ADC_SARADC1_ENCAL_REF.write_field(enable as u8);
             }
         }
     }
@@ -339,8 +285,8 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_HIGH_ADDR, msb as u32);
-        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_INITIAL_CODE_LOW_ADDR, lsb as u32);
+        regi2c::ADC_SAR2_INITIAL_CODE_HIGH.write_field(msb);
+        regi2c::ADC_SAR2_INITIAL_CODE_LOW.write_field(lsb);
     }
 
     fn reset() {
