@@ -215,6 +215,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
             AdcCalSource::Gnd => regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as _),
+            #[cfg(not(esp32h2))]
             AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_REF.write_field(enable as _),
         }
     }
