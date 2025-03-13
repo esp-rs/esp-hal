@@ -206,12 +206,8 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
-            AdcCalSource::Gnd => {
-                regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as u8);
-            }
-            AdcCalSource::Ref => {
-                regi2c::ADC_SARADC1_ENCAL_REF.write_field(enable as u8);
-            }
+            AdcCalSource::Gnd => regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as u8),
+            AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_REF.write_field(enable as u8),
         }
     }
 }
@@ -308,21 +304,13 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_DREF_ADDR, enable as u8);
+        regi2c::ADC_SAR2_DREF.write_field(enable as u8);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
-            AdcCalSource::Gnd => {
-                crate::rom::regi2c_write_mask!(I2C_SAR_ADC, ADC_SAR2_ENCAL_GND_ADDR, enable as u8);
-            }
-            AdcCalSource::Ref => {
-                crate::rom::regi2c_write_mask!(
-                    I2C_SAR_ADC,
-                    ADC_SARADC2_ENCAL_REF_ADDR,
-                    enable as u8
-                );
-            }
+            AdcCalSource::Gnd => regi2c::ADC_SAR2_ENCAL_GND.write_field(enable as u8),
+            AdcCalSource::Ref => regi2c::ADC_SAR2_ENCAL_REF.write_field(enable as u8),
         }
     }
 }

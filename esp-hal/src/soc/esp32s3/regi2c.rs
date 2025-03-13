@@ -34,6 +34,24 @@ define_regi2c! {
             field: ADC_SAR_DTEST_RTC(1..0)
         }
     }
+    master: I2C_DIG_REG(0x6d, 1) {
+        reg: I2C_DIG_REG4(4) {
+            field: I2C_DIG_REG_EXT_RTC_DREG(4..0)
+        }
+        reg: I2C_DIG_REG5(5) {
+            field: I2C_DIG_REG_EXT_RTC_DREG_SLEEP(4..0)
+        }
+        reg: I2C_DIG_REG6(6) {
+            field: I2C_DIG_REG_EXT_DIG_DREG(4..0)
+        }
+        reg: I2C_DIG_REG7(7) {
+            field: I2C_DIG_REG_EXT_DIG_DREG_SLEEP(4..0)
+        }
+        reg: I2C_DIG_REG13(13) {
+            field: I2C_DIG_REG_XPD_DIG_REG(3..3),
+            field: I2C_DIG_REG_XPD_RTC_REG(2..2)
+        }
+    }
 }
 
 pub(crate) fn regi2c_read(block: u8, host_id: u8, reg_add: u8) -> u8 {
