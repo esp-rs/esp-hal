@@ -100,7 +100,7 @@ fn generate_filter_snippet() {
                     ));
                 } else {
                     if global_level.is_some() {
-                        panic!("Multiple globel log levels specified in `ESP_LOG`");
+                        panic!("Multiple global log levels specified in `ESP_LOG`");
                     }
                     global_level = Some(level);
                 }
