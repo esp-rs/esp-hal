@@ -82,20 +82,17 @@ fn print_log_record(record: &log::Record) {
     #[cfg(not(feature = "colors"))]
     let reset = "";
 
-        #[cfg(feature = "timestamp")]
-        println!(
-            "{}{} ({}) - {}{}",
-            color,
-            record.level(),
-            unsafe { _esp_println_timestamp() },
-            record.args(),
-            reset
-        );
-        #[cfg(not(feature = "timestamp"))]
-        println!("{}{} - {}{}", color, record.level(), record.args(), reset);
-    }
-
-    fn flush(&self) {}
+    #[cfg(feature = "timestamp")]
+    println!(
+        "{}{} ({}) - {}{}",
+        color,
+        record.level(),
+        unsafe { _esp_println_timestamp() },
+        record.args(),
+        reset
+    );
+    #[cfg(not(feature = "timestamp"))]
+    println!("{}{} - {}{}", color, record.level(), record.args(), reset);
 }
 
 /// A user-provided hook to supply a timestamp in milliseconds for logging.
