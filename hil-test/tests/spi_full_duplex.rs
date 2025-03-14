@@ -712,10 +712,9 @@ mod tests {
 
     #[test]
     async fn cancel_stops_basic_async_spi_transfer(mut ctx: Context) {
-        // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
-        // We don't rely on the transfer speed much, just that it's slow enough
-        // that we can detect pulses if cancelling the future leaves the transfer
-        // running.
+        // Slow down. We don't rely on the transfer speed much, just that it's slow
+        // enough that we can detect pulses if cancelling the future leaves the
+        // transfer running.
         ctx.spi
             .apply_config(&Config::default().with_frequency(Rate::from_khz(800)))
             .unwrap();
