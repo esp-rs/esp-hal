@@ -12,7 +12,9 @@ use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
-    target_triple, Package, Version,
+    target_triple,
+    Package,
+    Version,
 };
 
 // ----------------------------------------------------------------------------
