@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Manually setting a log level now correctly ignores `ESP_LOG`. (#3240)
+- Fixed logging rules being order-dependent. (#3240)
+
 ### Removed
 
 ## [0.13.1] - 2025-02-24
