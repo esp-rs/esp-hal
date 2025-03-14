@@ -62,6 +62,7 @@ use crate::{
     pac::uart0::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
+    private::OnDrop,
     system::{PeripheralClockControl, PeripheralGuard},
     Async,
     Blocking,
@@ -3049,21 +3050,6 @@ impl Instance for AnyUart {
             AnyUartInner::Uart1(uart) => uart.parts(),
             #[cfg(uart2)]
             AnyUartInner::Uart2(uart) => uart.parts(),
-        }
-    }
-}
-
-struct OnDrop<F: FnOnce()>(Option<F>);
-impl<F: FnOnce()> OnDrop<F> {
-    fn new(cb: F) -> Self {
-        Self(Some(cb))
-    }
-}
-
-impl<F: FnOnce()> Drop for OnDrop<F> {
-    fn drop(&mut self) {
-        if let Some(cb) = self.0.take() {
-            cb();
         }
     }
 }
