@@ -11,8 +11,6 @@ cfg_if::cfg_if! {
 #[cfg(not(esp32h2))]
 pub use self::calibration::*;
 use super::{AdcCalSource, AdcConfig, Attenuation};
-#[cfg(any(esp32c6, esp32h2))]
-use crate::clock::clocks_ll::regi2c_write_mask;
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
 use crate::efuse::Efuse;
 use crate::{
@@ -20,28 +18,13 @@ use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::PeripheralRef,
     peripherals::{Interrupt, APB_SARADC},
+    soc::regi2c,
     system::{GenericPeripheralGuard, Peripheral},
     Async,
     Blocking,
 };
 
 mod calibration;
-
-// polyfill for c2 and c3
-#[cfg(any(esp32c2, esp32c3))]
-#[inline(always)]
-fn regi2c_write_mask(block: u8, host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
-    unsafe {
-        crate::rom::rom_i2c_writeReg_Mask(
-            block as _,
-            host_id as _,
-            reg_add as _,
-            msb as _,
-            lsb as _,
-            data as _,
-        );
-    }
-}
 
 // Constants taken from:
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c2/include/soc/regi2c_saradc.h
@@ -51,56 +34,9 @@ fn regi2c_write_mask(block: u8, host_id: u8, reg_add: u8, msb: u8, lsb: u8, data
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h4/include/soc/regi2c_saradc.h
 cfg_if::cfg_if! {
     if #[cfg(adc1)] {
-        const I2C_SAR_ADC: u8 = 0x69;
-        const I2C_SAR_ADC_HOSTID: u8 = 0;
-
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
         const ADC_CAL_CHANNEL: u16 = 15;
-
-        const ADC_SAR1_ENCAL_GND_ADDR: u8 = 0x7;
-        const ADC_SAR1_ENCAL_GND_ADDR_MSB: u8 = 5;
-        const ADC_SAR1_ENCAL_GND_ADDR_LSB: u8 = 5;
-
-        const ADC_SAR1_INITIAL_CODE_HIGH_ADDR: u8 = 0x1;
-        const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
-        const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR1_INITIAL_CODE_LOW_ADDR: u8 = 0x0;
-        const ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
-        const ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR1_DREF_ADDR: u8 = 0x2;
-        const ADC_SAR1_DREF_ADDR_MSB: u8 = 0x6;
-        const ADC_SAR1_DREF_ADDR_LSB: u8 = 0x4;
-
-        const ADC_SARADC1_ENCAL_REF_ADDR: u8 = 0x7;
-        const ADC_SARADC1_ENCAL_REF_ADDR_MSB: u8 = 4;
-        const ADC_SARADC1_ENCAL_REF_ADDR_LSB: u8 = 4;
-    }
-}
-
-cfg_if::cfg_if! {
-    if #[cfg(adc2)] {
-        const ADC_SAR2_ENCAL_GND_ADDR: u8 = 0x7;
-        const ADC_SAR2_ENCAL_GND_ADDR_MSB: u8 = 7;
-        const ADC_SAR2_ENCAL_GND_ADDR_LSB: u8 = 7;
-
-        const ADC_SAR2_INITIAL_CODE_HIGH_ADDR: u8 = 0x4;
-        const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
-        const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR2_INITIAL_CODE_LOW_ADDR: u8 = 0x3;
-        const ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
-        const ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR2_DREF_ADDR: u8 = 0x5;
-        const ADC_SAR2_DREF_ADDR_MSB: u8 = 0x6;
-        const ADC_SAR2_DREF_ADDR_LSB: u8 = 0x4;
-
-        const ADC_SARADC2_ENCAL_REF_ADDR: u8 = 0x7;
-        const ADC_SARADC2_ENCAL_REF_ADDR_MSB: u8 = 6;
-        const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 6;
     }
 }
 
@@ -237,22 +173,8 @@ impl RegisterAccess for crate::peripherals::ADC1 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR1_INITIAL_CODE_HIGH_ADDR,
-            ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB,
-            ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB,
-            msb as _,
-        );
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR1_INITIAL_CODE_LOW_ADDR,
-            ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB,
-            ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB,
-            lsb as _,
-        );
+        regi2c::ADC_SAR1_INITIAL_CODE_HIGH.write_field(msb);
+        regi2c::ADC_SAR1_INITIAL_CODE_LOW.write_field(lsb);
     }
 }
 
@@ -263,36 +185,14 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        let value = enable as _;
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR1_DREF_ADDR,
-            ADC_SAR1_DREF_ADDR_MSB,
-            ADC_SAR1_DREF_ADDR_LSB,
-            value,
-        );
+        regi2c::ADC_SAR1_DREF.write_field(enable as _);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
-        let value = enable as _;
         match source {
-            AdcCalSource::Gnd => regi2c_write_mask(
-                I2C_SAR_ADC,
-                I2C_SAR_ADC_HOSTID,
-                ADC_SAR1_ENCAL_GND_ADDR,
-                ADC_SAR1_ENCAL_GND_ADDR_MSB,
-                ADC_SAR1_ENCAL_GND_ADDR_LSB,
-                value,
-            ),
-            AdcCalSource::Ref => regi2c_write_mask(
-                I2C_SAR_ADC,
-                I2C_SAR_ADC_HOSTID,
-                ADC_SARADC1_ENCAL_REF_ADDR,
-                ADC_SARADC1_ENCAL_REF_ADDR_MSB,
-                ADC_SARADC1_ENCAL_REF_ADDR_LSB,
-                value,
-            ),
+            AdcCalSource::Gnd => regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as _),
+            #[cfg(not(esp32h2))]
+            AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_REF.write_field(enable as _),
         }
     }
 }
@@ -339,22 +239,8 @@ impl RegisterAccess for crate::peripherals::ADC2 {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR2_INITIAL_CODE_HIGH_ADDR,
-            ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB,
-            ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB,
-            msb as _,
-        );
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR2_INITIAL_CODE_LOW_ADDR,
-            ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB,
-            ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB,
-            lsb as _,
-        );
+        regi2c::ADC_SAR2_INITIAL_CODE_HIGH.write_field(msb as _);
+        regi2c::ADC_SAR2_INITIAL_CODE_LOW.write_field(lsb as _);
     }
 }
 
@@ -365,36 +251,13 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        let value = enable as _;
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR2_DREF_ADDR,
-            ADC_SAR2_DREF_ADDR_MSB,
-            ADC_SAR2_DREF_ADDR_LSB,
-            value,
-        );
+        regi2c::ADC_SAR2_DREF.write_field(enable as _);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
-        let value = enable as _;
         match source {
-            AdcCalSource::Gnd => regi2c_write_mask(
-                I2C_SAR_ADC,
-                I2C_SAR_ADC_HOSTID,
-                ADC_SAR2_ENCAL_GND_ADDR,
-                ADC_SAR2_ENCAL_GND_ADDR_MSB,
-                ADC_SAR2_ENCAL_GND_ADDR_LSB,
-                value,
-            ),
-            AdcCalSource::Ref => regi2c_write_mask(
-                I2C_SAR_ADC,
-                I2C_SAR_ADC_HOSTID,
-                ADC_SARADC2_ENCAL_REF_ADDR,
-                ADC_SARADC2_ENCAL_REF_ADDR_MSB,
-                ADC_SARADC2_ENCAL_REF_ADDR_LSB,
-                value,
-            ),
+            AdcCalSource::Gnd => regi2c::ADC_SAR2_ENCAL_GND.write_field(enable as _),
+            AdcCalSource::Ref => regi2c::ADC_SAR2_ENCAL_REF.write_field(enable as _),
         }
     }
 }
