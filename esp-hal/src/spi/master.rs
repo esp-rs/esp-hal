@@ -2059,7 +2059,7 @@ mod dma {
             let chunk_size = self.tx_buf.capacity();
 
             for chunk in words.chunks(chunk_size) {
-                self.tx_buf.as_mut_slice()[..chunk_size].copy_from_slice(chunk);
+                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
                 unsafe { spi.start_dma_transfer(0, chunk.len(), &mut EmptyBuf, &mut self.tx_buf)? };
 
@@ -2088,7 +2088,7 @@ mod dma {
                 .chunks_mut(chunk_size)
                 .zip(write_common.chunks(chunk_size))
             {
-                self.tx_buf.as_mut_slice()[..chunk_size].copy_from_slice(write_chunk);
+                self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
                 unsafe {
                     spi.start_dma_transfer(
@@ -2247,7 +2247,7 @@ mod dma {
                 .chunks_mut(chunk_size)
                 .zip(write_common.chunks(chunk_size))
             {
-                self.tx_buf.as_mut_slice()[..chunk_size].copy_from_slice(write_chunk);
+                self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
                 unsafe {
                     self.spi_dma.start_dma_transfer(
