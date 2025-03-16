@@ -259,6 +259,12 @@ pub enum Error {
     TransmissionError,
     /// No transmission end marker found
     EndMarkerMissing,
+    /// Memsize is not correct,
+    InvalidMemsize,
+    /// The data length is invalid
+    InvalidDataLength,
+    /// Receiver error most likely RMT memory overflow
+    ReceiverError,
 }
 
 ///  Convenience trait to work with pulse codes.
@@ -335,6 +341,8 @@ pub struct TxChannelConfig {
     carrier_low: u16,
     /// Level of the carrier
     carrier_level: Level,
+    /// The amount of memory blocks allocated to this channel
+    memsize: u8,
 }
 
 impl Default for TxChannelConfig {
@@ -347,6 +355,7 @@ impl Default for TxChannelConfig {
             carrier_high: Default::default(),
             carrier_low: Default::default(),
             carrier_level: Level::Low,
+            memsize: 1u8,
         }
     }
 }
@@ -369,6 +378,8 @@ pub struct RxChannelConfig {
     filter_threshold: u8,
     /// Idle threshold in ticks
     idle_threshold: u16,
+    /// The amount of memory blocks allocted to this channel
+    memsize: u8,
 }
 
 impl Default for RxChannelConfig {
@@ -381,6 +392,7 @@ impl Default for RxChannelConfig {
             carrier_level: Level::Low,
             filter_threshold: Default::default(),
             idle_threshold: Default::default(),
+            memsize: 1,
         }
     }
 }
@@ -482,6 +494,14 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
         return Err(Error::InvalidArgument);
     }
 
+    if config.memsize > NUM_CHANNELS as u8 {
+        return Err(Error::InvalidMemsize);
+    }
+
+    if config.memsize > NUM_CHANNELS as u8 - T::CHANNEL {
+        return Err(Error::InvalidMemsize);
+    }
+
     crate::into_mapped_ref!(pin);
     pin.init_input(crate::gpio::Pull::None);
     T::input_signal().connect_to(pin);
@@ -495,6 +515,7 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
     );
     T::set_filter_threshold(config.filter_threshold);
     T::set_idle_threshold(config.idle_threshold);
+    T::set_memsize(config.memsize);
 
     Ok(T::new())
 }
@@ -503,6 +524,13 @@ fn configure_tx_channel<'d, P: PeripheralOutput, T: TxChannelInternal>(
     pin: impl Peripheral<P = P> + 'd,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
+    if config.memsize > NUM_CHANNELS as u8 {
+        return Err(Error::InvalidMemsize);
+    }
+
+    if config.memsize > NUM_CHANNELS as u8 - T::CHANNEL {
+        return Err(Error::InvalidMemsize);
+    }
     crate::into_mapped_ref!(pin);
     pin.set_to_push_pull_output();
     T::output_signal().connect_to(pin);
@@ -515,6 +543,7 @@ fn configure_tx_channel<'d, P: PeripheralOutput, T: TxChannelInternal>(
         config.carrier_level,
     );
     T::set_idle_output(config.idle_output, config.idle_output_level);
+    T::set_memsize(config.memsize);
 
     Ok(T::new())
 }
@@ -625,10 +654,14 @@ where
             <C as TxChannelInternal>::reset_threshold_set();
 
             // re-fill TX RAM
-            let ram_index = (((self.index - constants::RMT_CHANNEL_RAM_SIZE)
-                / (constants::RMT_CHANNEL_RAM_SIZE / 2))
+            let ram_index = (((self.index
+                - constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize)
+                / (constants::RMT_CHANNEL_RAM_SIZE
+                    * <C as TxChannelInternal>::memsize() as usize
+                    / 2))
                 % 2)
-                * (constants::RMT_CHANNEL_RAM_SIZE / 2);
+                * (constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
+                    / 2);
 
             let ptr = (constants::RMT_RAM_START
                 + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4
@@ -643,7 +676,8 @@ where
                 }
             }
 
-            self.index += constants::RMT_CHANNEL_RAM_SIZE / 2;
+            self.index +=
+                constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize / 2;
         }
 
         loop {
@@ -698,7 +732,8 @@ where
         let ptr = (constants::RMT_RAM_START
             + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
             as *mut u32;
-        for idx in 0..constants::RMT_CHANNEL_RAM_SIZE {
+        for idx in 0..constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
+        {
             unsafe {
                 ptr.add(idx).write_volatile(0);
             }
@@ -1226,7 +1261,7 @@ pub trait TxChannel: TxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE {
+        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
             return Err(Error::Overflow);
         }
 
@@ -1252,7 +1287,7 @@ where
     pub fn wait(self) -> Result<C, (Error, C)> {
         loop {
             if <C as RxChannelInternal>::is_error() {
-                return Err((Error::TransmissionError, self.channel));
+                return Err((Error::ReceiverError, self.channel));
             }
 
             if <C as RxChannelInternal>::is_done() {
@@ -1286,8 +1321,8 @@ pub trait RxChannel: RxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE {
-            return Err(Error::InvalidArgument);
+        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+            return Err(Error::InvalidDataLength);
         }
 
         Self::start_receive_raw();
@@ -1351,8 +1386,8 @@ pub trait TxChannelAsync: TxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE {
-            return Err(Error::InvalidArgument);
+        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+            return Err(Error::InvalidDataLength);
         }
 
         Self::clear_interrupts();
@@ -1413,8 +1448,8 @@ pub trait RxChannelAsync: RxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE {
-            return Err(Error::InvalidArgument);
+        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+            return Err(Error::InvalidDataLength);
         }
 
         Self::clear_interrupts();
@@ -1424,7 +1459,7 @@ pub trait RxChannelAsync: RxChannelInternal {
         RmtRxFuture::new(self).await;
 
         if Self::is_error() {
-            Err(Error::TransmissionError)
+            Err(Error::ReceiverError)
         } else {
             Self::stop();
             Self::clear_interrupts();
@@ -1555,6 +1590,8 @@ pub trait TxChannelInternal {
 
     fn set_memsize(memsize: u8);
 
+    fn memsize() -> u8;
+
     fn start_tx();
 
     fn is_done() -> bool;
@@ -1585,7 +1622,7 @@ pub trait TxChannelInternal {
             as *mut u32;
         for (idx, entry) in data
             .iter()
-            .take(constants::RMT_CHANNEL_RAM_SIZE)
+            .take(constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize)
             .enumerate()
         {
             unsafe {
@@ -1593,17 +1630,16 @@ pub trait TxChannelInternal {
             }
         }
 
-        Self::set_threshold((constants::RMT_CHANNEL_RAM_SIZE / 2) as u8);
+        Self::set_threshold((constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize / 2) as u8);
         Self::set_continuous(continuous);
         Self::set_generate_repeat_interrupt(repeat);
         Self::set_wrap_mode(true);
-        Self::set_memsize(1);
         Self::update();
         Self::start_tx();
         Self::update();
 
-        if data.len() >= constants::RMT_CHANNEL_RAM_SIZE {
-            Ok(constants::RMT_CHANNEL_RAM_SIZE)
+        if data.len() >= constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+            Ok(constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize)
         } else {
             Ok(data.len())
         }
@@ -1640,7 +1676,9 @@ pub trait RxChannelInternal {
 
     fn set_carrier(carrier: bool, high: u16, low: u16, level: Level);
 
-    fn set_memsize(memsize: u8);
+    fn set_memsize(value: u8);
+
+    fn memsize() -> u8;
 
     fn start_rx();
 
@@ -1651,7 +1689,6 @@ pub trait RxChannelInternal {
     fn start_receive_raw() {
         Self::clear_interrupts();
         Self::set_wrap_mode(false);
-        Self::set_memsize(1);
         Self::start_rx();
         Self::update();
     }
@@ -1854,11 +1891,16 @@ mod chip_specific {
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
-                fn set_memsize(memsize: u8) {
+                fn set_memsize(value: u8) {
                     let rmt = crate::peripherals::RMT::regs();
 
                     rmt.ch_tx_conf0($ch_num)
-                        .modify(|_, w| unsafe { w.mem_size().bits(memsize) });
+                        .modify(|_, w| unsafe { w.mem_size().bits(value) });
+                }
+
+                fn memsize() -> u8 {
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_tx_conf0($ch_num).read().mem_size().bits()
                 }
 
                 fn start_tx() {
@@ -2000,18 +2042,27 @@ mod chip_specific {
                     });
                 }
 
-                fn set_memsize(memsize: u8) {
+                fn set_memsize(value: u8) {
                     let rmt = crate::peripherals::RMT::regs();
                     rmt.ch_rx_conf0($ch_index)
-                        .modify(|_, w| unsafe { w.mem_size().bits(memsize) });
+                        .modify(|_, w| unsafe { w.mem_size().bits(value) });
+                }
+
+                fn memsize() -> u8 {
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.ch_rx_conf0($ch_index).read().mem_size().bits()
                 }
 
                 fn start_rx() {
                     let rmt = crate::peripherals::RMT::regs();
+
+                    for i in 0..Self::memsize() {
+                        rmt.ch_rx_conf1(($ch_index + i).into())
+                            .modify(|_, w| w.mem_owner().set_bit());
+                    }
                     rmt.ch_rx_conf1($ch_index).modify(|_, w| {
                         w.mem_wr_rst().set_bit();
                         w.apb_mem_rst().set_bit();
-                        w.mem_owner().set_bit();
                         w.rx_en().set_bit()
                     });
                 }
@@ -2235,11 +2286,16 @@ mod chip_specific {
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
-                fn set_memsize(memsize: u8) {
+                fn set_memsize(value: u8) {
                     let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chconf0($ch_num)
-                        .modify(|_, w| unsafe { w.mem_size().bits(memsize) });
+                        .modify(|_, w| unsafe { w.mem_size().bits(value) });
+                }
+
+                fn memsize() -> u8 {
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.chconf0($ch_num).read().mem_size().bits()
                 }
 
                 fn start_tx() {
@@ -2380,20 +2436,29 @@ mod chip_specific {
                     });
                 }
 
-                fn set_memsize(memsize: u8) {
+                fn set_memsize(value: u8) {
                     let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chconf0($ch_num)
-                        .modify(|_, w| unsafe { w.mem_size().bits(memsize) });
+                        .modify(|_, w| unsafe { w.mem_size().bits(value) });
+                }
+
+                fn memsize() -> u8 {
+                    let rmt = crate::peripherals::RMT::regs();
+                    rmt.chconf0($ch_num).read().mem_size().bits()
                 }
 
                 fn start_rx() {
                     let rmt = crate::peripherals::RMT::regs();
 
+                    for i in 0..Self::memsize() {
+                        rmt.chconf1(($ch_num + i).into())
+                            .modify(|_, w| w.mem_owner().set_bit());
+                    }
+
                     rmt.chconf1($ch_num).modify(|_, w| {
                         w.mem_wr_rst().set_bit();
                         w.apb_mem_rst().set_bit();
-                        w.mem_owner().set_bit();
                         w.rx_en().set_bit()
                     });
                 }
