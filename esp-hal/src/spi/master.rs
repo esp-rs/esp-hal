@@ -1228,7 +1228,7 @@ mod dma {
     use super::*;
     use crate::{
         dma::{
-            asynch::{DmaRxFuture, DmaTxFuture},
+            asynch::DmaRxFuture,
             Channel,
             DmaRxBuf,
             DmaTxBuf,
