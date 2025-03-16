@@ -1227,14 +1227,7 @@ mod dma {
 
     use super::*;
     use crate::{
-        dma::{
-            asynch::DmaRxFuture,
-            Channel,
-            DmaRxBuf,
-            DmaTxBuf,
-            EmptyBuf,
-            PeripheralDmaChannel,
-        },
+        dma::{asynch::DmaRxFuture, Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel},
         spi::master::dma::asynch::DropGuard,
     };
 
