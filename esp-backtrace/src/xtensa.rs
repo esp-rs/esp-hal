@@ -375,21 +375,15 @@ pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], sp: u32, suppress
 
     let mut fp = sp;
     let mut suppress = suppress;
-    let mut old_address = 0;
 
     loop {
         unsafe {
-            let address = sanitize_address((fp as *const u32).offset(-4).read_volatile()); // RA/PC
+            let return_addr = sanitize_address((fp as *const u32).offset(-4).read_volatile()); // RA/PC
             fp = (fp as *const u32).offset(-3).read_volatile(); // next FP
 
-            if old_address == address {
-                break;
-            }
-
-            old_address = address;
-
-            // the address is 0 but we sanitized the address - then 0 becomes 0x40000000
-            if address == 0x40000000 {
+            // the return address is 0 but we sanitized the address - then 0 becomes
+            // 0x40000000
+            if return_addr == 0x40000000 {
                 break;
             }
 
@@ -402,7 +396,7 @@ pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], sp: u32, suppress
             }
 
             if suppress == 0 {
-                frames[index] = Some(address as usize);
+                frames[index] = Some(return_addr as usize);
                 index += 1;
 
                 if index >= frames.len() {
