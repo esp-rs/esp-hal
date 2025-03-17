@@ -9,6 +9,7 @@ use defmt as _;
 #[cfg(feature = "println")]
 use esp_println as _;
 
+#[cfg(any(feature = "panic-handler", feature = "exception-handler"))]
 const MAX_BACKTRACE_ADDRESSES: usize =
     esp_config::esp_config_int!(usize, "ESP_BACKTRACE_CONFIG_BACKTRACE_FRAMES");
 
