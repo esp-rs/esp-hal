@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     gpio::{RtcFunction, RtcPin},
-    peripherals::{APB_CTRL, EXTMEM, LPWR, RTC_IO, SPI0, SPI1, SYSCON, SYSTEM},
+    peripherals::{/* APB_CTRL, */ EXTMEM, LPWR, RTC_IO, SPI0, SPI1, SYSCON, SYSTEM},
     rom::regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
 };
@@ -358,12 +358,15 @@ const SYSCON_SRAM_POWER_UP: u16 = 0x7FF;
 const SYSCON_ROM_POWER_UP: u8 = 0x7;
 
 fn rtc_sleep_pd(power_down: bool) {
+    // Checked: OK
     let val = !power_down;
-    // TODO: nrx, fe, fe2?? https://github.com/espressif/esp-idf/blob/dd2bde0/components/esp_hw_support/port/esp32s2/rtc_sleep.c#L45
     let rtc_cntl = LPWR::regs();
     let syscon = unsafe { &*esp32s2::SYSCON::ptr() };
     let bb = unsafe { &*esp32s2::BB::ptr() };
     let i2s = unsafe { &*esp32s2::I2S0::ptr() };
+    let nrx = unsafe { &*esp32s2::NRX::ptr() };
+    let fe = unsafe { &*esp32s2::FE::ptr() };
+    let fe2 = unsafe { &*esp32s2::FE2::ptr() };
 
     rtc_cntl
         .dig_pwc()
@@ -388,19 +391,19 @@ fn rtc_sleep_pd(power_down: bool) {
     bb.bbpd_ctrl()
         .modify(|_r, w| w.fft_force_pu().bit(val).dc_est_force_pu().bit(val));
 
-    // nrx.nrxpd_ctrl().modify(|_, w| {
-    // w.rx_rot_force_pu()
-    // .bit(val)
-    // .vit_force_pu()
-    // .bit(val)
-    // .demap_force_pu()
-    // .bit(val)
-    // });
-    //
-    // fe.gen_ctrl().modify(|_, w| w.iq_est_force_pu().bit(val));
-    //
-    // fe2.tx_interp_ctrl()
-    // .modify(|_, w| w.tx_inf_force_pu().bit(val));
+    nrx.nrxpd_ctrl().modify(|_, w| {
+        w.rx_rot_force_pu()
+            .bit(val)
+            .vit_force_pu()
+            .bit(val)
+            .demap_force_pu()
+            .bit(val)
+    });
+
+    fe.gen_ctrl().modify(|_, w| w.iq_est_force_pu().bit(val));
+
+    fe2.tx_interp_ctrl()
+        .modify(|_, w| w.tx_inf_force_pu().bit(val));
 }
 
 impl RtcSleepConfig {
@@ -862,6 +865,7 @@ impl RtcSleepConfig {
                 w.sdio_reg_pd_en().bit(self.vddsdio_pd_en())
             });
 
+            // Moved here from idf's rtc_deep_sleep_start because it fits here better
             rtc_cntl.slp_reject_conf().modify(|_, w| {
                 w.deep_slp_reject_en().bit(self.deep_slp_reject());
                 w.light_slp_reject_en().bit(self.light_slp_reject())
@@ -886,6 +890,7 @@ impl RtcSleepConfig {
     }
 
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+        // Note: OK. Parts moved to apply
         unsafe {
             LPWR::regs()
                 .reset_state()
