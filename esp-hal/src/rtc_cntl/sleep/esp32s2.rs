@@ -294,6 +294,7 @@ impl Drop for RtcioWakeupSource<'_, '_> {
 }
 
 bitfield::bitfield! {
+    //TODO: Check and compact
     /// Configuration for the RTC sleep behavior.
     #[derive(Clone, Copy)]
     pub struct RtcSleepConfig(u64);
@@ -308,42 +309,38 @@ bitfield::bitfield! {
     pub rtc_slowmem_pd_en, set_rtc_slowmem_pd_en: 3;
     /// power down RTC peripherals
     pub rtc_peri_pd_en, set_rtc_peri_pd_en: 4;
-    /// power down Modem(wifi and ble)
-    pub modem_pd_en, set_modem_pd_en: 5;
-    /// power down CPU, but not restart when lightsleep.
-    pub cpu_pd_en, set_cpu_pd_en: 6;
+    /// power down Wifi
+    pub wifi_pd_en, set_wifi_pd_en: 5;
     /// Power down Internal 8M oscillator
-    pub int_8m_pd_en, set_int_8m_pd_en: 7;
-    /// power down digital peripherals
-    pub dig_peri_pd_en, set_dig_peri_pd_en: 8;
+    pub int_8m_pd_en, set_int_8m_pd_en: 6;
     /// power down digital domain
-    pub deep_slp, set_deep_slp: 9;
+    pub deep_slp, set_deep_slp: 8;
     /// enable WDT flashboot mode
-    pub wdt_flashboot_mod_en, set_wdt_flashboot_mod_en: 10;
+    pub wdt_flashboot_mod_en, set_wdt_flashboot_mod_en: 9;
     /// set bias for digital domain, in sleep mode
-    pub u32, dig_dbias_slp, set_dig_dbias_slp: 15, 11;
+    pub u32, dig_dbias_slp, set_dig_dbias_slp: 12, 10;
     /// set bias for RTC domain, in sleep mode
-    pub u32, rtc_dbias_slp, set_rtc_dbias_slp: 20, 16;
+    pub u32, rtc_dbias_slp, set_rtc_dbias_slp: 16, 13;
     /// circuit control parameter, in monitor mode
-    pub bias_sleep_monitor, set_bias_sleep_monitor: 21;
+    pub bias_sleep_monitor, set_bias_sleep_monitor: 17;
     /// voltage parameter, in sleep mode
-    pub u8, dbg_atten_slp, set_dbg_atten_slp: 25, 22;
+    pub u8, dbg_atten_slp, set_dbg_atten_slp: 22, 18;
     /// circuit control parameter, in sleep mode
-    pub bias_sleep_slp, set_bias_sleep_slp: 26;
+    pub bias_sleep_slp, set_bias_sleep_slp: 23;
     /// circuit control parameter, in monitor mode
-    pub pd_cur_monitor, set_pd_cur_monitor: 27;
+    pub pd_cur_monitor, set_pd_cur_monitor: 24;
     /// circuit control parameter, in sleep mode
-    pub pd_cur_slp, set_pd_cur_slp: 28;
+    pub pd_cur_slp, set_pd_cur_slp: 25;
     /// power down VDDSDIO regulator
-    pub vddsdio_pd_en, set_vddsdio_pd_en: 29;
+    pub vddsdio_pd_en, set_vddsdio_pd_en: 26;
     /// keep main XTAL powered up in sleep
-    pub xtal_fpu, set_xtal_fpu: 30;
+    pub xtal_fpu, set_xtal_fpu: 27;
     /// keep rtc regulator powered up in sleep
-    pub rtc_regulator_fpu, set_rtc_regulator_fpu: 31;
+    pub rtc_regulator_fpu, set_rtc_regulator_fpu: 28;
     /// enable deep sleep reject
-    pub deep_slp_reject, set_deep_slp_reject: 32;
+    pub deep_slp_reject, set_deep_slp_reject: 29;
     /// enable light sleep reject
-    pub light_slp_reject, set_light_slp_reject: 33;
+    pub light_slp_reject, set_light_slp_reject: 30;
 }
 
 impl Default for RtcSleepConfig {
@@ -360,36 +357,37 @@ impl Default for RtcSleepConfig {
 const SYSCON_SRAM_POWER_UP: u16 = 0x7FF;
 const SYSCON_ROM_POWER_UP: u8 = 0x7;
 
-fn rtc_sleep_pu(val: bool) {
-    // let rtc_cntl = LPWR::regs();
-    // let syscon = unsafe { &*esp32s2::SYSCON::ptr() };
-    // let bb = unsafe { &*esp32s2::BB::ptr() };
-    // TODO
-    // let nrx = unsafe { &*esp32s2::NRX::ptr() };
-    // let fe = unsafe { &*esp32s2::FE::ptr() };
-    // let fe2 = unsafe { &*esp32s2::FE2::ptr() };
-    //
-    // rtc_cntl
-    // .dig_pwc()
-    // .modify(|_, w| w.lslp_mem_force_pu().bit(val));
-    //
-    // rtc_cntl
-    // .pwc()
-    // .modify(|_, w|
-    // w.slowmem_force_lpu().bit(val).fastmem_force_lpu().bit(val));
-    //
-    // syscon.front_end_mem_pd().modify(|_r, w| {
-    // w.dc_mem_force_pu()
-    // .bit(val)
-    // .pbus_mem_force_pu()
-    // .bit(val)
-    // .agc_mem_force_pu()
-    // .bit(val)
-    // });
-    //
-    // bb.bbpd_ctrl()
-    // .modify(|_r, w| w.fft_force_pu().bit(val).dc_est_force_pu().bit(val));
-    //
+fn rtc_sleep_pd(power_down: bool) {
+    let val = !power_down;
+    // TODO: nrx, fe, fe2?? https://github.com/espressif/esp-idf/blob/dd2bde0/components/esp_hw_support/port/esp32s2/rtc_sleep.c#L45
+    let rtc_cntl = LPWR::regs();
+    let syscon = unsafe { &*esp32s2::SYSCON::ptr() };
+    let bb = unsafe { &*esp32s2::BB::ptr() };
+    let i2s = unsafe { &*esp32s2::I2S0::ptr() };
+
+    rtc_cntl
+        .dig_pwc()
+        .modify(|_, w| w.lslp_mem_force_pu().bit(val));
+
+    rtc_cntl
+        .pwc()
+        .modify(|_, w| w.slowmem_force_lpu().bit(val).fastmem_force_lpu().bit(val));
+
+    i2s.pd_conf()
+        .write(|w| w.plc_mem_force_pu().bit(val).fifo_force_pu().bit(val));
+
+    syscon.front_end_mem_pd().modify(|_r, w| {
+        w.dc_mem_force_pu()
+            .bit(val)
+            .pbus_mem_force_pu()
+            .bit(val)
+            .agc_mem_force_pu()
+            .bit(val)
+    });
+
+    bb.bbpd_ctrl()
+        .modify(|_r, w| w.fft_force_pu().bit(val).dc_est_force_pu().bit(val));
+
     // nrx.nrxpd_ctrl().modify(|_, w| {
     // w.rx_rot_force_pu()
     // .bit(val)
@@ -403,13 +401,6 @@ fn rtc_sleep_pu(val: bool) {
     //
     // fe2.tx_interp_ctrl()
     // .modify(|_, w| w.tx_inf_force_pu().bit(val));
-    //
-    // syscon.mem_power_up().modify(|_r, w| unsafe {
-    // w.sram_power_up()
-    // .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 })
-    // .rom_power_up()
-    // .bits(if val { SYSCON_ROM_POWER_UP } else { 0 })
-    // });
 }
 
 impl RtcSleepConfig {
@@ -423,8 +414,7 @@ impl RtcSleepConfig {
         cfg.set_rtc_fastmem_pd_en(true);
         cfg.set_rtc_slowmem_pd_en(true);
         cfg.set_rtc_peri_pd_en(true);
-        cfg.set_modem_pd_en(true);
-        cfg.set_cpu_pd_en(true);
+        cfg.set_wifi_pd_en(true);
         cfg.set_int_8m_pd_en(true);
 
         cfg.set_dig_peri_pd_en(true);
@@ -729,13 +719,15 @@ impl RtcSleepConfig {
 
     pub(crate) fn apply(&self) {
         // like esp-idf rtc_sleep_init() and deep_sleep_start()
+        let rtc_cntl = LPWR::regs();
+
         if self.deep_slp() {
             // "Due to hardware limitations, on S2 the brownout detector
             // sometimes trigger during deep sleep to circumvent
             // this we disable the brownout detector before sleeping' - from
             // idf's deep_sleep_start()
+            rtc_cntl.brown_out().modify(|_, w| w.ena().clear_bit());
         }
-        let rtc_cntl = LPWR::regs();
 
         if self.lslp_mem_inf_fpu() {
             rtc_sleep_pu(true);
