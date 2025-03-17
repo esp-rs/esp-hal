@@ -356,21 +356,25 @@ F15=0x{:08x}",
 }
 
 /// Get an array of backtrace addresses.
-pub fn backtrace(frames: &mut [Option<usize>]) {
+pub fn backtrace() -> [Option<usize>; super::MAX_BACKTRACE_ADDRESSES] {
     let sp = unsafe {
         let mut _tmp: u32;
         asm!("mov {0}, a1", out(reg) _tmp);
         _tmp
     };
 
-    backtrace_internal(frames, sp, 1)
+    backtrace_internal(sp, 1)
 }
 
 pub(crate) fn sanitize_address(address: u32) -> u32 {
     (address & 0x3fff_ffff) | 0x4000_0000
 }
 
-pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], sp: u32, suppress: u32) {
+pub(crate) fn backtrace_internal(
+    sp: u32,
+    suppress: u32,
+) -> [Option<usize>; super::MAX_BACKTRACE_ADDRESSES] {
+    let mut frames = [None; super::MAX_BACKTRACE_ADDRESSES];
     let mut index = 0;
 
     let mut fp = sp;
@@ -378,7 +382,7 @@ pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], sp: u32, suppress
 
     if !crate::is_valid_ram_address(fp) {
         println!("Current stack pointer (0x{}) is invalid", fp);
-        return;
+        return frames;
     }
 
     while index < frames.len() {
@@ -404,4 +408,6 @@ pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], sp: u32, suppress
             }
         }
     }
+
+    frames
 }

@@ -161,17 +161,23 @@ MTVAL=0x{:08x}
 /// Get an array of backtrace addresses.
 ///
 /// This needs `force-frame-pointers` enabled.
-pub fn backtrace(frames: &mut [Option<usize>]) {
+#[inline(never)]
+#[cold]
+pub fn backtrace() -> [Option<usize>; super::MAX_BACKTRACE_ADDRESSES] {
     let fp = unsafe {
         let mut _tmp: u32;
         asm!("mv {0}, x8", out(reg) _tmp);
         _tmp
     };
 
-    backtrace_internal(frames, fp, 2)
+    backtrace_internal(fp, 2)
 }
 
-pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], fp: u32, suppress: u32) {
+pub(crate) fn backtrace_internal(
+    fp: u32,
+    suppress: u32,
+) -> [Option<usize>; super::MAX_BACKTRACE_ADDRESSES] {
+    let mut frames = [None; super::MAX_BACKTRACE_ADDRESSES];
     let mut index = 0;
 
     let mut fp = fp;
@@ -179,7 +185,7 @@ pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], fp: u32, suppress
 
     if !crate::is_valid_ram_address(fp) {
         println!("Current stack pointer (0x{}) is invalid", fp);
-        return;
+        return frames;
     }
 
     while index < frames.len() {
@@ -203,4 +209,6 @@ pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], fp: u32, suppress
             }
         }
     }
+
+    frames
 }
