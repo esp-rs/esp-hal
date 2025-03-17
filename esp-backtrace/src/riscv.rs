@@ -171,12 +171,13 @@ pub fn backtrace(frames: &mut [Option<usize>]) {
     backtrace_internal(frames, fp, 2)
 }
 
-pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], fp: u32, suppress: i32) {
+pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], fp: u32, suppress: u32) {
     let mut index = 0;
 
     let mut fp = fp;
     let mut suppress = suppress;
-    loop {
+
+    while index < frames.len() {
         unsafe {
             let return_addr = (fp as *const u32).offset(-1).read_volatile(); // RA/PC
             fp = (fp as *const u32).offset(-2).read_volatile(); // next FP
@@ -192,10 +193,6 @@ pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], fp: u32, suppress
             if suppress == 0 {
                 frames[index] = Some(return_addr as usize);
                 index += 1;
-
-                if index >= frames.len() {
-                    break;
-                }
             } else {
                 suppress -= 1;
             }
