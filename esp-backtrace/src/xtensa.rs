@@ -381,7 +381,7 @@ pub(crate) fn backtrace_internal(
     let mut suppress = suppress;
 
     if !crate::is_valid_ram_address(fp) {
-        println!("Current stack pointer (0x{}) is invalid", fp);
+        println!("Current stack pointer (0x{:x}) is invalid", fp);
         return frames;
     }
 
