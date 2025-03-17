@@ -18,9 +18,6 @@ const RED: &str = "\u{001B}[31m";
 
 #[cfg(feature = "defmt")]
 macro_rules! println {
-    ("") => {
-        // Do nothing if the string is just a space
-    };
     ($($arg:tt)*) => {
         defmt::error!($($arg)*);
     };
