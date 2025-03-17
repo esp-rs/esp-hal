@@ -20,17 +20,9 @@ const I2C_DIG_REG_EXT_RTC_DREG: u32 = 4;
 const I2C_DIG_REG_EXT_RTC_DREG_MSB: u32 = 4;
 const I2C_DIG_REG_EXT_RTC_DREG_LSB: u32 = 0;
 
-const I2C_DIG_REG_EXT_RTC_DREG_SLEEP: u32 = 5;
-const I2C_DIG_REG_EXT_RTC_DREG_SLEEP_MSB: u32 = 4;
-const I2C_DIG_REG_EXT_RTC_DREG_SLEEP_LSB: u32 = 0;
-
 const I2C_DIG_REG_EXT_DIG_DREG: u32 = 6;
 const I2C_DIG_REG_EXT_DIG_DREG_MSB: u32 = 4;
 const I2C_DIG_REG_EXT_DIG_DREG_LSB: u32 = 0;
-
-const I2C_DIG_REG_EXT_DIG_DREG_SLEEP: u32 = 7;
-const I2C_DIG_REG_EXT_DIG_DREG_SLEEP_MSB: u32 = 4;
-const I2C_DIG_REG_EXT_DIG_DREG_SLEEP_LSB: u32 = 0;
 
 const I2C_DIG_REG_XPD_RTC_REG: u32 = 13;
 const I2C_DIG_REG_XPD_RTC_REG_MSB: u32 = 2;
@@ -294,7 +286,6 @@ impl Drop for RtcioWakeupSource<'_, '_> {
 }
 
 bitfield::bitfield! {
-    //TODO: Check and compact
     /// Configuration for the RTC sleep behavior.
     #[derive(Clone, Copy)]
     pub struct RtcSleepConfig(u64);
@@ -318,9 +309,9 @@ bitfield::bitfield! {
     /// enable WDT flashboot mode
     pub wdt_flashboot_mod_en, set_wdt_flashboot_mod_en: 9;
     /// set bias for digital domain, in sleep mode
-    pub u32, dig_dbias_slp, set_dig_dbias_slp: 12, 10;
+    pub u8, dig_dbias_slp, set_dig_dbias_slp: 12, 10;
     /// set bias for RTC domain, in sleep mode
-    pub u32, rtc_dbias_slp, set_rtc_dbias_slp: 16, 13;
+    pub u8, rtc_dbias_slp, set_rtc_dbias_slp: 16, 13;
     /// circuit control parameter, in monitor mode
     pub bias_sleep_monitor, set_bias_sleep_monitor: 17;
     /// voltage parameter, in sleep mode
@@ -357,9 +348,9 @@ impl Default for RtcSleepConfig {
 const SYSCON_SRAM_POWER_UP: u16 = 0x7FF;
 const SYSCON_ROM_POWER_UP: u8 = 0x7;
 
-fn rtc_sleep_pd(power_down: bool) {
-    // Checked: OK
-    let val = !power_down;
+fn rtc_sleep_pu(val: bool) {
+    // Called rtc_sleep_pd in idf, but makes more sense like this with the single
+    // boolean argument Checked: OK TODO: Remove comment
     let rtc_cntl = LPWR::regs();
     let syscon = unsafe { &*esp32s2::SYSCON::ptr() };
     let bb = unsafe { &*esp32s2::BB::ptr() };
@@ -736,13 +727,42 @@ impl RtcSleepConfig {
             rtc_sleep_pu(true);
         }
 
-        if self.modem_pd_en() {
-            rtc_cntl.dig_iso().modify(|_, w| {
-                w.wifi_force_noiso()
+        if self.rtc_mem_inf_follow_cpu() {
+            rtc_cntl
+                .pwc()
+                .modify(|_, w| w.slowmem_folw_cpu().set_bit().fastmem_folw_cpu().set_bit());
+        }
+
+        if self.rtc_fastmem_pd_en() {
+            rtc_cntl.pwc().modify(|_, w| {
+                w.fastmem_pd_en()
+                    .set_bit()
+                    .fastmem_force_pu()
                     .clear_bit()
-                    .wifi_force_iso()
+                    .fastmem_force_noiso()
                     .clear_bit()
             });
+        }
+
+        if self.rtc_slowmem_pd_en() {
+            rtc_cntl.pwc().modify(|_, w| {
+                w.slowmem_pd_en()
+                    .set_bit()
+                    .slowmem_force_pu()
+                    .clear_bit()
+                    .slowmem_force_noiso()
+                    .clear_bit()
+            });
+        }
+
+        if self.rtc_peri_pd_en() {
+            rtc_cntl.pwc().modify(|_, w| w.pd_en().set_bit());
+        }
+
+        if self.wifi_pd_en() {
+            rtc_cntl
+                .dig_iso()
+                .modify(|_, w| w.wifi_force_noiso().clear_bit());
 
             rtc_cntl
                 .dig_pwc()
@@ -751,72 +771,20 @@ impl RtcSleepConfig {
             rtc_cntl.dig_pwc().modify(|_, w| w.wifi_pd_en().clear_bit());
         }
 
-        if self.cpu_pd_en() {
-            rtc_cntl.dig_iso().modify(|_, w| {
-                w.cpu_top_force_noiso()
-                    .clear_bit()
-                    .cpu_top_force_iso()
-                    .clear_bit()
-            });
-
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.cpu_top_force_pu().clear_bit().cpu_top_pd_en().set_bit());
-        } else {
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.cpu_top_pd_en().clear_bit());
-        }
-
-        if self.dig_peri_pd_en() {
-            rtc_cntl.dig_iso().modify(|_, w| {
-                w.dg_peri_force_noiso()
-                    .clear_bit()
-                    .dg_peri_force_iso()
-                    .clear_bit()
-            });
-
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.dg_peri_force_pu().clear_bit().dg_peri_pd_en().set_bit());
-        } else {
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.dg_peri_pd_en().clear_bit());
-        }
-
-        if self.rtc_peri_pd_en() {
-            rtc_cntl.pwc().modify(|_, w| {
-                w.force_noiso().clear_bit();
-                w.force_iso().clear_bit();
-                w.force_pu().clear_bit();
-                w.pd_en().set_bit()
-            });
-        } else {
-            rtc_cntl.pwc().modify(|_, w| w.pd_en().clear_bit());
-        }
-
         unsafe {
-            regi2c_write_mask!(
-                I2C_DIG_REG,
-                I2C_DIG_REG_EXT_RTC_DREG_SLEEP,
-                self.rtc_dbias_slp()
-            );
-
-            regi2c_write_mask!(
-                I2C_DIG_REG,
-                I2C_DIG_REG_EXT_DIG_DREG_SLEEP,
-                self.dig_dbias_slp()
-            );
+            rtc_cntl.reg().modify(|_, w| {
+                w.dbias_slp().bits(self.rtc_dbias_slp());
+                w.dig_reg_dbias_slp().bits(self.dig_dbias_slp())
+            });
 
             rtc_cntl.bias_conf().modify(|_, w| {
-                w.dbg_atten_deep_slp().bits(self.dbg_atten_slp());
-                w.bias_sleep_deep_slp().bit(self.bias_sleep_slp());
-                w.pd_cur_deep_slp().bit(self.pd_cur_slp());
                 w.dbg_atten_monitor()
                     .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT);
                 w.bias_sleep_monitor().bit(self.bias_sleep_monitor());
-                w.pd_cur_monitor().bit(self.pd_cur_monitor())
+                w.bias_sleep_deep_slp().bit(self.bias_sleep_slp());
+                w.pd_cur_monitor().bit(self.pd_cur_monitor());
+                w.pd_cur_deep_slp().bit(self.pd_cur_slp());
+                w.dbg_atten_deep_slp().bits(self.dbg_atten_slp())
             });
 
             if self.deep_slp() {
@@ -836,22 +804,12 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.bb_i2c_force_pu().clear_bit());
             } else {
                 rtc_cntl
-                    .regulator_drv_ctrl()
-                    .modify(|_, w| w.dg_vdd_drv_b_slp().bits(0xF));
-
-                rtc_cntl
                     .dig_pwc()
                     .modify(|_, w| w.dg_wrap_pd_en().clear_bit());
             }
 
-            // mem force pu
-
             rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.lslp_mem_force_pu().set_bit());
-
-            rtc_cntl
-                .rtc()
+                .reg()
                 .modify(|_, w| w.regulator_force_pu().bit(self.rtc_regulator_fpu()));
 
             rtc_cntl
@@ -859,13 +817,11 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.ck8m_force_pu().bit(!self.int_8m_pd_en()));
 
             // enable VDDSDIO control by state machine
-
             rtc_cntl.sdio_conf().modify(|_, w| {
                 w.sdio_force().clear_bit();
                 w.sdio_reg_pd_en().bit(self.vddsdio_pd_en())
             });
 
-            // Moved here from idf's rtc_deep_sleep_start because it fits here better
             rtc_cntl.slp_reject_conf().modify(|_, w| {
                 w.deep_slp_reject_en().bit(self.deep_slp_reject());
                 w.light_slp_reject_en().bit(self.light_slp_reject())
@@ -882,10 +838,6 @@ impl RtcSleepConfig {
             rtc_cntl
                 .options0()
                 .modify(|_, w| w.xtl_force_pu().bit(self.xtal_fpu()));
-
-            rtc_cntl
-                .clk_conf()
-                .modify(|_, w| w.xtal_global_force_nogating().bit(self.xtal_fpu()));
         }
     }
 
