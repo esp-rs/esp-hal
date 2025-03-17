@@ -56,10 +56,6 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     println!("");
     println!("====================== PANIC ======================");
 
-    #[cfg(not(feature = "defmt"))]
-    println!("{}", info);
-
-    #[cfg(feature = "defmt")]
     println!("{}", info);
 
     println!("");
@@ -98,12 +94,7 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
     #[cfg(feature = "colors")]
     set_color_code(RED);
 
-    // Unfortunately, a different formatter string is used
-    #[cfg(not(feature = "defmt"))]
-    esp_println::println!("\n\nException occurred '{}'", cause);
-
-    #[cfg(feature = "defmt")]
-    defmt::error!("\n\nException occurred '{}'", cause);
+    println!("\n\nException occurred '{}'", cause);
 
     println!("{:?}", context);
 
@@ -171,10 +162,7 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
             "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}",
             code, mepc, mtval
         );
-        #[cfg(not(feature = "defmt"))]
-        println!("{:x?}", context);
 
-        #[cfg(feature = "defmt")]
         println!("{:?}", context);
 
         let backtrace = crate::arch::backtrace_internal(context.s0 as u32, 0);
