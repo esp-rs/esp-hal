@@ -170,7 +170,7 @@ pub fn backtrace() -> [Option<usize>; super::MAX_BACKTRACE_ADDRESSES] {
         _tmp
     };
 
-    backtrace_internal(fp, 2)
+    backtrace_internal(fp, 1)
 }
 
 pub(crate) fn backtrace_internal(
