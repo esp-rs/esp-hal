@@ -250,6 +250,7 @@ fn halt() -> ! {
         }
     }
 
+    #[allow(clippy::empty_loop)]
     loop {}
 }
 
