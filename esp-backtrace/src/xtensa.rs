@@ -376,7 +376,7 @@ pub(crate) fn backtrace_internal(
     sp: u32,
     suppress: i32,
 ) -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let mut result = [None; 10];
+    let mut result = [None; MAX_BACKTRACE_ADDRESSES];
     let mut index = 0;
 
     let mut fp = sp;

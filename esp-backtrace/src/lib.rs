@@ -9,7 +9,8 @@ use defmt as _;
 #[cfg(feature = "println")]
 use esp_println as _;
 
-const MAX_BACKTRACE_ADDRESSES: usize = 10;
+const MAX_BACKTRACE_ADDRESSES: usize =
+    esp_config::esp_config_int!(usize, "ESP_BACKTRACE_CONFIG_BACKTRACE_FRAMES");
 
 const RESET: &str = "\u{001B}[0m";
 const RED: &str = "\u{001B}[31m";
