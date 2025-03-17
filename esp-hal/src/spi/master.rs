@@ -540,7 +540,7 @@ impl Config {
             // Start at n = 2. We need to be able to set h/l so we have at least
             // one high and one low pulse.
 
-            for n in 2..64 {
+            for n in 2..=64 {
                 // Effectively, this does:
                 // pre = round((APB_CLK_FREQ / n) / frequency)
 
