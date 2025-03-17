@@ -55,7 +55,8 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     println!("Backtrace:");
     println!("");
 
-    let backtrace = crate::arch::backtrace();
+    let mut backtrace = [None; MAX_BACKTRACE_ADDRESSES];
+    crate::arch::backtrace(&mut backtrace);
     #[cfg(target_arch = "riscv32")]
     if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
         println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
@@ -76,7 +77,8 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
     println!("\n\nException occurred '{}'", cause);
     println!("{:?}", context);
 
-    let backtrace = crate::arch::backtrace_internal(context.A1, 0);
+    let mut backtrace = [None; MAX_BACKTRACE_ADDRESSES];
+    crate::arch::backtrace_internal(&mut backtrace, context.A1, 0);
     for e in backtrace {
         if let Some(addr) = e {
             println!("0x{:x}", addr);
@@ -130,7 +132,8 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
 
         println!("{:?}", context);
 
-        let backtrace = crate::arch::backtrace_internal(context.s0 as u32, 0);
+        let mut backtrace = [None; MAX_BACKTRACE_ADDRESSES];
+        crate::arch::backtrace_internal(&mut backtrace, context.s0 as u32, 0);
         if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
             println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
         }

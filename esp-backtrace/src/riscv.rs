@@ -1,7 +1,5 @@
 use core::arch::asm;
 
-use crate::MAX_BACKTRACE_ADDRESSES;
-
 // subtract 4 from the return address
 // the return address is the address following the JALR
 // we get better results (especially if the caller was the last instruction in
@@ -163,21 +161,17 @@ MTVAL=0x{:08x}
 /// Get an array of backtrace addresses.
 ///
 /// This needs `force-frame-pointers` enabled.
-pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
+pub fn backtrace(frames: &mut [Option<usize>]) {
     let fp = unsafe {
         let mut _tmp: u32;
         asm!("mv {0}, x8", out(reg) _tmp);
         _tmp
     };
 
-    backtrace_internal(fp, 2)
+    backtrace_internal(frames, fp, 2)
 }
 
-pub(crate) fn backtrace_internal(
-    fp: u32,
-    suppress: i32,
-) -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let mut result = [None; MAX_BACKTRACE_ADDRESSES];
+pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], fp: u32, suppress: i32) {
     let mut index = 0;
 
     let mut fp = fp;
@@ -203,10 +197,10 @@ pub(crate) fn backtrace_internal(
             }
 
             if suppress == 0 {
-                result[index] = Some(address as usize);
+                frames[index] = Some(address as usize);
                 index += 1;
 
-                if index >= MAX_BACKTRACE_ADDRESSES {
+                if index >= frames.len() {
                     break;
                 }
             } else {
@@ -214,6 +208,4 @@ pub(crate) fn backtrace_internal(
             }
         }
     }
-
-    result
 }

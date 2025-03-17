@@ -1,7 +1,5 @@
 use core::{arch::asm, fmt::Display};
 
-use crate::MAX_BACKTRACE_ADDRESSES;
-
 // subtract 3 from the return address
 // the return address is the address following the callxN
 // we get better results (especially if the caller was the last function in the
@@ -358,25 +356,21 @@ F15=0x{:08x}",
 }
 
 /// Get an array of backtrace addresses.
-pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
+pub fn backtrace(frames: &mut [Option<usize>]) {
     let sp = unsafe {
         let mut _tmp: u32;
         asm!("mov {0}, a1", out(reg) _tmp);
         _tmp
     };
 
-    backtrace_internal(sp, 1)
+    backtrace_internal(frames, sp, 1)
 }
 
 pub(crate) fn sanitize_address(address: u32) -> u32 {
     (address & 0x3fff_ffff) | 0x4000_0000
 }
 
-pub(crate) fn backtrace_internal(
-    sp: u32,
-    suppress: i32,
-) -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let mut result = [None; MAX_BACKTRACE_ADDRESSES];
+pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], sp: u32, suppress: i32) {
     let mut index = 0;
 
     let mut fp = sp;
@@ -408,10 +402,10 @@ pub(crate) fn backtrace_internal(
             }
 
             if suppress == 0 {
-                result[index] = Some(address as usize);
+                frames[index] = Some(address as usize);
                 index += 1;
 
-                if index >= MAX_BACKTRACE_ADDRESSES {
+                if index >= frames.len() {
                     break;
                 }
             } else {
@@ -419,6 +413,4 @@ pub(crate) fn backtrace_internal(
             }
         }
     }
-
-    result
 }
