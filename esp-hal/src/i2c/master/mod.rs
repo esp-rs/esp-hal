@@ -701,7 +701,7 @@ impl<'d> I2c<'d, Async> {
         }
     }
 
-    /// Writes bytes to slave with address `address`
+    /// Writes bytes to slave with given `address`
     pub async fn write_async<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -730,7 +730,7 @@ impl<'d> I2c<'d, Async> {
             .inspect_err(|_| self.internal_recover())
     }
 
-    /// Writes bytes to slave with address `address` and then reads enough
+    /// Writes bytes to slave with given `address` and then reads enough
     /// bytes to fill `buffer` *in a single transaction*
     ///
     /// # Errors
@@ -957,7 +957,7 @@ where
         *guard = OutputConnection::connect_with_guard(pin, output);
     }
 
-    /// Writes bytes to slave with address `address`
+    /// Writes bytes to slave with given `address`
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::i2c::master::{Config, I2c};
@@ -1004,7 +1004,7 @@ where
             .inspect_err(|_| self.internal_recover())
     }
 
-    /// Writes bytes to slave with address `address` and then reads enough bytes
+    /// Writes bytes to slave with given `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
