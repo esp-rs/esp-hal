@@ -376,6 +376,11 @@ pub(crate) fn backtrace_internal(frames: &mut [Option<usize>], sp: u32, suppress
     let mut fp = sp;
     let mut suppress = suppress;
 
+    if !crate::is_valid_ram_address(fp) {
+        println!("Current stack pointer (0x{}) is invalid", fp);
+        return;
+    }
+
     while index < frames.len() {
         unsafe {
             let return_addr = sanitize_address((fp as *const u32).offset(-4).read_volatile()); // RA/PC
