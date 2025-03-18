@@ -352,29 +352,29 @@ impl<ADC1> Adc<'_, ADC1, crate::Blocking> {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<36>, 0), // Alt. name: SENSOR_VP
-            (GpioPin<37>, 1), // Alt. name: SENSOR_CAPP
-            (GpioPin<38>, 2), // Alt. name: SENSOR_CAPN
-            (GpioPin<39>, 3), // Alt. name: SENSOR_VN
-            (GpioPin<33>, 4), // Alt. name: 32K_XP
-            (GpioPin<32>, 5), // Alt. name: 32K_XN
-            (GpioPin<34>, 6), // Alt. name: VDET_1
-            (GpioPin<35>, 7), // Alt. name: VDET_2
+            (GPIO36, 0), // Alt. name: SENSOR_VP
+            (GPIO37, 1), // Alt. name: SENSOR_CAPP
+            (GPIO38, 2), // Alt. name: SENSOR_CAPN
+            (GPIO39, 3), // Alt. name: SENSOR_VN
+            (GPIO33, 4), // Alt. name: 32K_XP
+            (GPIO32, 5), // Alt. name: 32K_XN
+            (GPIO34, 6), // Alt. name: VDET_1
+            (GPIO35, 7), // Alt. name: VDET_2
         ]
     }
 
     crate::analog::adc::impl_adc_interface! {
         ADC2 [
-            (GpioPin<4>,  0),
-            (GpioPin<0>,  1),
-            (GpioPin<2>,  2),
-            (GpioPin<15>, 3), // Alt. name: MTDO
-            (GpioPin<13>, 4), // Alt. name: MTCK
-            (GpioPin<12>, 5), // Alt. name: MTDI
-            (GpioPin<14>, 6), // Alt. name: MTMS
-            (GpioPin<27>, 7),
-            (GpioPin<25>, 8),
-            (GpioPin<26>, 9),
+            (GPIO4,  0),
+            (GPIO0,  1),
+            (GPIO2,  2),
+            (GPIO15, 3), // Alt. name: MTDO
+            (GPIO13, 4), // Alt. name: MTCK
+            (GPIO12, 5), // Alt. name: MTDI
+            (GPIO14, 6), // Alt. name: MTMS
+            (GPIO27, 7),
+            (GPIO25, 8),
+            (GPIO26, 9),
         ]
     }
 }

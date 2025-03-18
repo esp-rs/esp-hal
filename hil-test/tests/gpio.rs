@@ -376,7 +376,7 @@ mod tests {
     #[cfg(esp32)]
     #[test]
     fn can_configure_rtcio_pins_as_input() {
-        let pin = unsafe { esp_hal::gpio::GpioPin::<37>::steal() };
+        let pin = unsafe { esp_hal::peripherals::GPIO37::steal() };
 
         _ = Input::new(pin, InputConfig::default().with_pull(Pull::Down));
     }

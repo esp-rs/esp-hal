@@ -592,31 +592,31 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<1>,  0),
-            (GpioPin<2>,  1),
-            (GpioPin<3>,  2),
-            (GpioPin<4>,  3),
-            (GpioPin<5>,  4),
-            (GpioPin<6>,  5),
-            (GpioPin<7>,  6),
-            (GpioPin<8>,  7),
-            (GpioPin<9>,  8),
-            (GpioPin<10>, 9),
+            (GPIO1,  0),
+            (GPIO2,  1),
+            (GPIO3,  2),
+            (GPIO4,  3),
+            (GPIO5,  4),
+            (GPIO6,  5),
+            (GPIO7,  6),
+            (GPIO8,  7),
+            (GPIO9,  8),
+            (GPIO10, 9),
         ]
     }
 
     crate::analog::adc::impl_adc_interface! {
         ADC2 [
-            (GpioPin<11>, 0),
-            (GpioPin<12>, 1),
-            (GpioPin<13>, 2),
-            (GpioPin<14>, 3),
-            (GpioPin<15>, 4),
-            (GpioPin<16>, 5),
-            (GpioPin<17>, 6),
-            (GpioPin<18>, 7),
-            (GpioPin<19>, 8),
-            (GpioPin<20>, 9),
+            (GPIO11, 0),
+            (GPIO12, 1),
+            (GPIO13, 2),
+            (GPIO14, 3),
+            (GPIO15, 4),
+            (GPIO16, 5),
+            (GPIO17, 6),
+            (GPIO18, 7),
+            (GPIO19, 8),
+            (GPIO20, 9),
         ]
     }
 }
