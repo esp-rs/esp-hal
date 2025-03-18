@@ -32,7 +32,6 @@ num-traits = { version = "0.2.19", default-features = false }
 esp-wifi-sys = "0.7.1"
 embassy-sync = { version = "0.6.2", optional = true }
 embassy-net-driver = { version = "0.2.0", optional = true }
-libm = "0.2.11"
 cfg-if = "1.0.0"
 portable-atomic = { version = "1.11.0", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
