@@ -1532,6 +1532,11 @@ where
         self.tx.write(data)
     }
 
+    /// Flush the transmit buffer of the UART
+    pub fn flush(&mut self) -> Result<(), TxError> {
+        self.tx.flush()
+    }
+
     /// Read received bytes.
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
@@ -1551,11 +1556,6 @@ where
     /// the FIFO are not modified.
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read(buf)
-    }
-
-    /// Flush the transmit buffer of the UART
-    pub fn flush(&mut self) -> Result<(), TxError> {
-        self.tx.flush()
     }
 
     /// Change the configuration.
