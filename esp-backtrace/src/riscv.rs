@@ -163,6 +163,8 @@ MTVAL=0x{:08x}
 /// Get an array of backtrace addresses.
 ///
 /// This needs `force-frame-pointers` enabled.
+#[inline(never)]
+#[cold]
 pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
     let fp = unsafe {
         let mut _tmp: u32;
@@ -175,43 +177,44 @@ pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
 
 pub(crate) fn backtrace_internal(
     fp: u32,
-    suppress: i32,
+    suppress: u32,
 ) -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let mut result = [None; 10];
+    let mut result = [None; MAX_BACKTRACE_ADDRESSES];
     let mut index = 0;
 
     let mut fp = fp;
     let mut suppress = suppress;
+
+    if !crate::is_valid_ram_address(fp) {
+        return result;
+    }
+
     let mut old_address = 0;
-    loop {
-        unsafe {
-            let address = (fp as *const u32).offset(-1).read_volatile(); // RA/PC
-            fp = (fp as *const u32).offset(-2).read_volatile(); // next FP
+    while index < result.len() {
+        // RA/PC
+        let address = unsafe { (fp as *const u32).offset(-1).read_volatile() };
+        // next FP
+        fp = unsafe { (fp as *const u32).offset(-2).read_volatile() };
 
-            if old_address == address {
-                break;
-            }
+        if old_address == address {
+            break;
+        }
 
-            old_address = address;
+        old_address = address;
 
-            if address == 0 {
-                break;
-            }
+        if address == 0 {
+            break;
+        }
 
-            if !crate::is_valid_ram_address(fp) {
-                break;
-            }
+        if !crate::is_valid_ram_address(fp) {
+            break;
+        }
 
-            if suppress == 0 {
-                result[index] = Some(address as usize);
-                index += 1;
-
-                if index >= MAX_BACKTRACE_ADDRESSES {
-                    break;
-                }
-            } else {
-                suppress -= 1;
-            }
+        if suppress == 0 {
+            result[index] = Some(address as usize);
+            index += 1;
+        } else {
+            suppress -= 1;
         }
     }
 

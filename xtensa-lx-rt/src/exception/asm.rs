@@ -716,7 +716,7 @@ _WindowOverflow8:
         s32e    a6, a0, -24
         s32e    a7, a0, -20
         rfwo
-    
+
     .section .WindowUnderflow8.text,\"ax\",@progbits
     .global _WindowUnderflow8
     .p2align 2
