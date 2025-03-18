@@ -13,7 +13,7 @@ macro_rules! log_format {
         #[link_section = ".espressif.metadata.espflash"]
         #[used]
         #[no_mangle] // prevent invoking the macro multiple times
-        static _ESPFLASH_LOG_FORMAT: [u8; $val.len()] = *$val;
+        static _METADATA_ESPFLASH_LOG_FORMAT: [u8; $val.len()] = *$val;
     };
 }
 

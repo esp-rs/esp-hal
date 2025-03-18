@@ -185,3 +185,27 @@ macro_rules! if_set {
 macro_rules! ignore {
     ($($item:tt)*) => {};
 }
+
+/// Define a piece of (Espressif-specific) metadata that external tools may
+/// parse.
+///
+/// This metadata is zero cost.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! metadata {
+    ($section:literal, $symbol:ident, $value:expr) => {
+        #[link_section = concat!(".espressif.metadata.", $section)]
+        #[used]
+        #[no_mangle] // prevent invoking the macro multiple times with the same symbol name
+        static $symbol: [u8; $value.len()] = const {
+            let val_bytes = $value.as_bytes();
+            let mut val_bytes_array = [0; $value.len()];
+            let mut i = 0;
+            while i < val_bytes.len() {
+                val_bytes_array[i] = val_bytes[i];
+                i += 1;
+            }
+            val_bytes_array
+        };
+    };
+}
