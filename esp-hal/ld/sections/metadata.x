@@ -1,6 +1,6 @@
 SECTIONS {
-  .metadata (INFO):
+  .espressif.metadata (INFO):
   {
-    KEEP(*(.metadata.*));
+    KEEP(*(.espressif.metadata.*));
   }
 }

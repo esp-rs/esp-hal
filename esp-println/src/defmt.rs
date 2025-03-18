@@ -8,7 +8,7 @@ use super::{LockToken, PrinterImpl};
 
 macro_rules! log_format {
     ($val:literal) => {
-        #[link_section = ".metadata.espflash"]
+        #[link_section = ".espressif.metadata.espflash"]
         #[used]
         #[no_mangle] // prevent invoking the macro multiple times
         static _ESPFLASH_LOG_FORMAT: [u8; $val.len()] = *$val;
