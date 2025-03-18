@@ -386,19 +386,12 @@ pub(crate) fn backtrace_internal(
         return result;
     }
 
-    let mut old_address = 0;
     while index < result.len() {
         // RA/PC
         let address = unsafe { (fp as *const u32).offset(-4).read_volatile() };
         let address = remove_window_increment(address);
         // next FP
         fp = unsafe { (fp as *const u32).offset(-3).read_volatile() };
-
-        if old_address == address {
-            break;
-        }
-
-        old_address = address;
 
         // the return address is 0 but we sanitized the address - then 0 becomes
         // 0x40000000
