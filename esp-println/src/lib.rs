@@ -8,6 +8,21 @@ pub mod defmt;
 #[cfg(feature = "log")]
 pub mod logger;
 
+macro_rules! log_format {
+    ($val:literal) => {
+        #[link_section = ".espressif.metadata.espflash"]
+        #[used]
+        #[no_mangle] // prevent invoking the macro multiple times
+        static _ESPFLASH_LOG_FORMAT: [u8; $val.len()] = *$val;
+    };
+}
+
+#[cfg(feature = "defmt-espflash")]
+log_format!(b"defmt-espflash");
+
+#[cfg(not(feature = "defmt-espflash"))]
+log_format!(b"serial");
+
 /// Prints to the selected output, with a newline.
 #[cfg(not(feature = "no-op"))]
 #[macro_export]
