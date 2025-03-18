@@ -423,14 +423,16 @@ fn write_config_json(
         })
     }
 
-    let json = serde_json::to_string(&to_write).unwrap();
-
-    let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    let out_file = out_dir
-        .join(format!("{crate_name}_config_data.json"))
-        .display()
-        .to_string();
-    fs::write(out_file, json).unwrap();
+    #[cfg(not(test))]
+    {
+        let json = serde_json::to_string(&to_write).unwrap();
+        let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+        let out_file = out_dir
+            .join(format!("{crate_name}_config_data.json"))
+            .display()
+            .to_string();
+        fs::write(out_file, json).unwrap();
+    }
 }
 
 // A work-around for https://github.com/rust-lang/cargo/issues/10358
