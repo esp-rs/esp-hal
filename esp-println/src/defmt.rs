@@ -6,6 +6,17 @@ use critical_section::RestoreState;
 
 use super::{LockToken, PrinterImpl};
 
+macro_rules! log_format {
+    ($val:literal) => {
+        #[link_section = ".metadata.espflash"]
+        #[used]
+        #[no_mangle] // prevent invoking the macro multiple times
+        static _ESPFLASH_LOG_FORMAT: [u8; $val.len()] = *$val;
+    };
+}
+
+log_format!(b"defmt-espflash");
+
 /// Global logger lock.
 #[cfg(feature = "critical-section")]
 static mut TAKEN: bool = false;
