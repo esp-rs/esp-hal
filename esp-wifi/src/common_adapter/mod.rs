@@ -299,15 +299,6 @@ pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
     todo!("strrchr");
 }
 
-// this will result in a duplicate symbol error once `floor` is available
-// ideally we would use weak linkage but that is not stabilized
-// see https://github.com/esp-rs/esp-wifi/pull/191
-#[cfg(feature = "esp32c6")]
-#[no_mangle]
-pub unsafe extern "C" fn floor(v: f64) -> f64 {
-    libm::floor(v)
-}
-
 static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
 pub(crate) unsafe fn phy_enable_clock() {
