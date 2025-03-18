@@ -720,6 +720,7 @@ impl RtcSleepConfig {
             // sometimes trigger during deep sleep to circumvent
             // this we disable the brownout detector before sleeping' - from
             // idf's deep_sleep_start()
+            // TODO: Check
             rtc_cntl.brown_out().modify(|_, w| w.ena().clear_bit());
         }
 
@@ -727,46 +728,38 @@ impl RtcSleepConfig {
             rtc_sleep_pu(true);
         }
 
-        if self.rtc_mem_inf_follow_cpu() {
-            rtc_cntl
-                .pwc()
-                .modify(|_, w| w.slowmem_folw_cpu().set_bit().fastmem_folw_cpu().set_bit());
-        }
+        let mem_folw_cpu = self.rtc_mem_inf_follow_cpu();
+        rtc_cntl.pwc().modify(|_, w| {
+            w.slowmem_folw_cpu().bit(mem_folw_cpu);
+            w.fastmem_folw_cpu().bit(mem_folw_cpu)
+        });
 
-        if self.rtc_fastmem_pd_en() {
-            rtc_cntl.pwc().modify(|_, w| {
-                w.fastmem_pd_en()
-                    .set_bit()
-                    .fastmem_force_pu()
-                    .clear_bit()
-                    .fastmem_force_noiso()
-                    .clear_bit()
-            });
-        }
+        let rtc_fastmem_pd_en = self.rtc_fastmem_pd_en();
+        rtc_cntl.pwc().modify(|_, w| {
+            w.fastmem_pd_en().bit(rtc_fastmem_pd_en);
+            w.fastmem_force_pu().bit(!rtc_fastmem_pd_en);
+            w.fastmem_force_noiso().bit(!rtc_fastmem_pd_en)
+        });
 
-        if self.rtc_slowmem_pd_en() {
-            rtc_cntl.pwc().modify(|_, w| {
-                w.slowmem_pd_en()
-                    .set_bit()
-                    .slowmem_force_pu()
-                    .clear_bit()
-                    .slowmem_force_noiso()
-                    .clear_bit()
-            });
-        }
+        let rtc_slowmem_pd_en = self.rtc_slowmem_pd_en();
+        rtc_cntl.pwc().modify(|_, w| {
+            w.slowmem_pd_en().bit(rtc_slowmem_pd_en);
+            w.slowmem_force_pu().bit(!rtc_slowmem_pd_en);
+            w.slowmem_force_noiso().bit(!rtc_slowmem_pd_en)
+        });
 
-        if self.rtc_peri_pd_en() {
-            rtc_cntl.pwc().modify(|_, w| w.pd_en().set_bit());
-        }
+        let rtc_peri_pd_en = self.rtc_peri_pd_en();
+        rtc_cntl.pwc().modify(|_, w| w.pd_en().bit(rtc_peri_pd_en));
 
         if self.wifi_pd_en() {
             rtc_cntl
                 .dig_iso()
                 .modify(|_, w| w.wifi_force_noiso().clear_bit());
 
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.wifi_force_pu().clear_bit().wifi_pd_en().set_bit());
+            rtc_cntl.dig_pwc().modify(|_, w| {
+                w.wifi_force_pu().clear_bit();
+                w.wifi_pd_en().set_bit()
+            });
         } else {
             rtc_cntl.dig_pwc().modify(|_, w| w.wifi_pd_en().clear_bit());
         }
@@ -808,13 +801,15 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.dg_wrap_pd_en().clear_bit());
             }
 
+            let rtc_regulator_fpu = self.rtc_regulator_fpu();
             rtc_cntl
                 .reg()
-                .modify(|_, w| w.regulator_force_pu().bit(self.rtc_regulator_fpu()));
+                .modify(|_, w| w.regulator_force_pu().bit(rtc_regulator_fpu));
 
+            let int_8m_pd_en = self.int_8m_pd_en();
             rtc_cntl
                 .clk_conf()
-                .modify(|_, w| w.ck8m_force_pu().bit(!self.int_8m_pd_en()));
+                .modify(|_, w| w.ck8m_force_pu().bit(!int_8m_pd_en));
 
             // enable VDDSDIO control by state machine
             rtc_cntl.sdio_conf().modify(|_, w| {
