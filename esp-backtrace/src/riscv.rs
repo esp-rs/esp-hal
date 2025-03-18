@@ -189,18 +189,11 @@ pub(crate) fn backtrace_internal(
         return result;
     }
 
-    let mut old_address = 0;
     while index < result.len() {
         // RA/PC
         let address = unsafe { (fp as *const u32).offset(-1).read_volatile() };
         // next FP
         fp = unsafe { (fp as *const u32).offset(-2).read_volatile() };
-
-        if old_address == address {
-            break;
-        }
-
-        old_address = address;
 
         if address == 0 {
             break;
