@@ -8,6 +8,8 @@ use std::{
     path::PathBuf,
 };
 
+use serde::Serialize;
+
 const DOC_TABLE_HEADER: &str = r#"
 | Name | Description | Default value | Allowed value |
 |------|-------------|---------------|---------------|
@@ -55,7 +57,7 @@ impl fmt::Display for Error {
 }
 
 /// Supported configuration value types.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum Value {
     /// Booleans.
     Bool(bool),
@@ -146,6 +148,7 @@ impl fmt::Display for Value {
 }
 
 /// Configuration value validation functions.
+#[derive(Serialize)]
 pub enum Validator {
     /// Only allow negative integers, i.e. any values less than 0.
     NegativeInteger,
@@ -159,7 +162,19 @@ pub enum Validator {
     /// String-Enumeration. Only allows one of the given Strings.
     Enumeration(Vec<String>),
     /// A custom validation function to run against any supported value type.
+    #[serde(serialize_with = "serialize_custom")]
+    #[serde(untagged)]
     Custom(Box<dyn Fn(&Value) -> Result<(), Error>>),
+}
+
+fn serialize_custom<S>(
+    _: &Box<dyn Fn(&Value) -> Result<(), Error>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str("Unknown")
 }
 
 impl Validator {
@@ -363,12 +378,59 @@ pub fn generate_config_internal<W: Write>(
 
     emit_configuration(stdout, &prefix, &configs, &validators, &mut selected_config);
 
+    write_config_json(snake_case(crate_name), config, &configs);
+
     if emit_md_tables {
         let file_name = snake_case(crate_name);
         write_config_tables(&file_name, doc_table, selected_config);
     }
 
     configs
+}
+
+fn write_config_json(
+    crate_name: String,
+    config: &[(&str, &str, Value, Option<Validator>)],
+    selected_config: &HashMap<String, Value>,
+) {
+    #[derive(Serialize)]
+    struct Item<'a> {
+        name: String,
+        description: String,
+        default_value: Value,
+        actual_value: Value,
+        constraint: &'a Option<Validator>,
+    }
+
+    let mut to_write: Vec<Item<'_>> = Vec::new();
+    for item in config.iter() {
+        let option_name = format!(
+            "{}_CONFIG_{}",
+            screaming_snake_case(&crate_name),
+            screaming_snake_case(&item.0)
+        );
+        let val = match selected_config.get(&option_name) {
+            Some(val) => val.clone(),
+            None => item.2.clone(),
+        };
+
+        to_write.push(Item {
+            name: item.0.to_string(),
+            description: item.1.to_string(),
+            default_value: item.2.clone(),
+            actual_value: val,
+            constraint: &item.3,
+        })
+    }
+
+    let json = serde_json::to_string(&to_write).unwrap();
+
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    let out_file = out_dir
+        .join(format!("{crate_name}_config_data.json"))
+        .display()
+        .to_string();
+    fs::write(out_file, json).unwrap();
 }
 
 // A work-around for https://github.com/rust-lang/cargo/issues/10358
