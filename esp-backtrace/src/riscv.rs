@@ -165,7 +165,7 @@ MTVAL=0x{:08x}
 /// This needs `force-frame-pointers` enabled.
 #[inline(never)]
 #[cold]
-pub fn backtrace() -> Backtrace {
+pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
     let fp = unsafe {
         let mut _tmp: u32;
         asm!("mv {0}, x8", out(reg) _tmp);
@@ -175,8 +175,12 @@ pub fn backtrace() -> Backtrace {
     backtrace_internal(fp, 2)
 }
 
-pub(crate) fn backtrace_internal(fp: u32, suppress: u32) -> Backtrace {
-    let mut result = Backtrace(heapless::Vec::new());
+pub(crate) fn backtrace_internal(
+    fp: u32,
+    suppress: u32,
+) -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
+    let mut result = [None; MAX_BACKTRACE_ADDRESSES];
+    let mut index = 0;
 
     let mut fp = fp;
     let mut suppress = suppress;
@@ -185,11 +189,18 @@ pub(crate) fn backtrace_internal(fp: u32, suppress: u32) -> Backtrace {
         return result;
     }
 
-    while !result.0.is_full() {
+    let mut old_address = 0;
+    while index < result.len() {
         // RA/PC
         let address = unsafe { (fp as *const u32).offset(-1).read_volatile() };
         // next FP
         fp = unsafe { (fp as *const u32).offset(-2).read_volatile() };
+
+        if old_address == address {
+            break;
+        }
+
+        old_address = address;
 
         if address == 0 {
             break;
@@ -200,9 +211,8 @@ pub(crate) fn backtrace_internal(fp: u32, suppress: u32) -> Backtrace {
         }
 
         if suppress == 0 {
-            _ = result.0.push(BacktraceFrame {
-                pc: address as usize,
-            });
+            result[index] = Some(address as usize);
+            index += 1;
         } else {
             suppress -= 1;
         }
