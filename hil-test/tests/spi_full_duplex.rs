@@ -14,6 +14,7 @@ use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
     gpio::Input,
     peripheral::Peripheral,
+    peripherals::SPI2,
     spi::master::{Config, Spi},
     time::Rate,
     Blocking,
@@ -891,5 +892,39 @@ mod tests {
         spi.transfer(&mut rx_buf, &tx_buf).unwrap();
 
         assert_eq!(tx_buf, rx_buf);
+    }
+
+    #[test]
+    #[cfg(feature = "unstable")] // Needed for register access
+    fn test_clock_calculation_accuracy(mut ctx: Context) {
+        let lowest = if cfg!(esp32h2) { 78048 } else { 78125 };
+
+        let f_mst = if cfg!(esp32c2) {
+            40_000_000
+        } else if cfg!(esp32h2) {
+            48_000_000
+        } else {
+            80_000_000
+        };
+        let inputs = [lowest, 100_000, 1_000_000, f_mst];
+        let expected_outputs = [lowest, 100_000, 1_000_000, f_mst];
+
+        for (input, expectation) in inputs.into_iter().zip(expected_outputs.into_iter()) {
+            ctx.spi
+                .apply_config(&Config::default().with_frequency(Rate::from_hz(input)))
+                .unwrap();
+
+            // Read back effective SCLK
+            let spi2 = unsafe { SPI2::steal() };
+
+            let clock = spi2.register_block().clock().read();
+
+            let n = clock.clkcnt_n().bits() as u32;
+            let pre = clock.clkdiv_pre().bits() as u32;
+
+            let actual = f_mst / ((n + 1) * (pre + 1));
+
+            assert_eq!(actual, expectation);
+        }
     }
 }
