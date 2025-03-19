@@ -763,6 +763,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                                 &format!("--target={}", chip.target()),
                             ],
                             args.fix,
+                            package.build_on_host(),
                         )?;
                     }
                 }

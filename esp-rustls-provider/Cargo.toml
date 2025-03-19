@@ -31,7 +31,7 @@ x25519-dalek = "2"
 # should this be a feature? - not really needed by this crate but re-exported for convenience
 webpki-roots = "0.26.1"
 
-esp-hal = { path = "../esp-hal", version = "0.23.1", default-features = false }
+esp-hal = { path = "../esp-hal", version = "1.0.0-beta.0", default-features = false }
 embedded-io = { version = "0.6.1", default-features = false }
 log = "0.4.20"
 
