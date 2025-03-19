@@ -49,8 +49,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let chip = Chip::from_str(device_name)?;
     if chip.target() != std::env::var("TARGET").unwrap_or_default().as_str() {
         panic!("
-        Seems you are building for an unsupported target (e.g. the host environment).
-        Maybe you are missing the the `target` in `.cargo/config.toml` or you have configs overriding it?
+        Seems you are building for an unsupported or wrong target (e.g. the host environment).
+        Maybe you are missing the `target` in `.cargo/config.toml` or you have configs overriding it?
         
         See https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure
         ");
