@@ -6,7 +6,7 @@
 //!
 //! This gets an ip address via DHCP then runs an HTTPS server on port 4443
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable esp-rustls-provider ntp-nostd
+//% FEATURES: esp-wifi esp-wifi/wifi esp-hal/unstable esp-wifi/smoltcp esp-rustls-provider ntp-nostd
 //% CHIPS: esp32 esp32s3 esp32c6
 
 #![no_std]
@@ -19,20 +19,12 @@ use alloc::sync::Arc;
 use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_backtrace as _;
-use esp_hal::{clock::CpuClock, main, rng::Rng, time::Duration, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, main, rng::Rng, time, time::Duration, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_rustls_provider::{adapter::server::ServerConnection, rustls, EspTimeProvider};
 use esp_wifi::{
     config::PowerSaveMode,
-    wifi::{
-        utils::create_network_interface,
-        AccessPointInfo,
-        ClientConfiguration,
-        Configuration,
-        WifiDevice,
-        WifiError,
-        WifiStaDevice,
-    },
+    wifi::{AccessPointInfo, ClientConfiguration, Configuration, WifiError},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
@@ -79,9 +71,9 @@ fn main() -> ! {
 
     let init = esp_wifi::init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
-    let mut wifi = peripherals.WIFI;
-    let (iface, device, mut controller) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+    let (mut controller, interfaces) = esp_wifi::wifi::new(&init, peripherals.WIFI).unwrap();
+    let mut device = interfaces.sta;
+    let iface = create_interface(&mut device);
     controller.set_power_saving(PowerSaveMode::None).unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
@@ -94,7 +86,7 @@ fn main() -> ! {
     }]);
     socket_set.add(dhcp_socket);
 
-    let now = || esp_hal::time::now().duration_since_epoch().to_millis();
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
@@ -215,7 +207,7 @@ fn main() -> ! {
                     let mut time_out = false;
                     let mut err = false;
                     let mut got_data = false;
-                    let deadline = esp_hal::time::now() + Duration::secs(4);
+                    let deadline = time::Instant::now() + Duration::from_secs(4);
                     let mut buffer = [0u8; 1024];
                     let mut pos = 0;
                     loop {
@@ -245,7 +237,7 @@ fn main() -> ! {
                             break;
                         }
 
-                        if esp_hal::time::now() > deadline {
+                        if time::Instant::now() > deadline {
                             println!("Timeout");
                             time_out = true;
                             break;
@@ -274,8 +266,8 @@ fn main() -> ! {
                 }
             }
 
-            let deadline = esp_hal::time::now() + Duration::secs(1);
-            while esp_hal::time::now() < deadline {
+            let deadline = time::Instant::now() + Duration::from_secs(1);
+            while time::Instant::now() < deadline {
                 socket.work();
             }
 
@@ -288,9 +280,33 @@ fn main() -> ! {
     }
 }
 
-fn get_current_unix_ts<'s, 'n, 'd>(
-    udp_socket: &mut blocking_network_stack::UdpSocket<'s, 'n, WifiDevice<'d, WifiStaDevice>>,
-) -> u32 {
+// some smoltcp boilerplate
+fn timestamp() -> smoltcp::time::Instant {
+    smoltcp::time::Instant::from_micros(
+        esp_hal::time::Instant::now()
+            .duration_since_epoch()
+            .as_micros() as i64,
+    )
+}
+
+pub fn create_interface(device: &mut esp_wifi::wifi::WifiDevice) -> smoltcp::iface::Interface {
+    // users could create multiple instances but since they only have one WifiDevice
+    // they probably can't do anything bad with that
+    smoltcp::iface::Interface::new(
+        smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(
+            smoltcp::wire::EthernetAddress::from_bytes(&device.mac_address()),
+        )),
+        device,
+        timestamp(),
+    )
+}
+
+fn get_current_unix_ts<'s, 'n, 'd, D>(
+    udp_socket: &mut blocking_network_stack::UdpSocket<'s, 'n, D>,
+) -> u32
+where
+    D: smoltcp::phy::Device,
+{
     let req_data = ntp_nostd::get_client_request();
     let mut rcvd_data = [0_u8; 1536];
 
@@ -307,8 +323,8 @@ fn get_current_unix_ts<'s, 'n, 'd>(
             break;
         }
 
-        let deadline = esp_hal::time::now() + Duration::secs(1);
-        while esp_hal::time::now() < deadline {}
+        let deadline = time::Instant::now() + Duration::from_secs(1);
+        while time::Instant::now() < deadline {}
 
         if count > 10 {
             udp_socket

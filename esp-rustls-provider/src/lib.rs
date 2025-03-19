@@ -9,6 +9,7 @@ mod fmt;
 
 use alloc::sync::Arc;
 
+use esp_hal::time::Instant;
 use rand_core::RngCore;
 use rustls::{crypto::CryptoProvider, pki_types::PrivateKeyDer};
 
@@ -75,7 +76,7 @@ impl EspTimeProvider {
 
 impl rustls::time_provider::TimeProvider for EspTimeProvider {
     fn current_time(&self) -> Option<rustls::pki_types::UnixTime> {
-        let now = esp_hal::time::now().duration_since_epoch().to_secs();
+        let now = Instant::now().duration_since_epoch().as_secs();
         Some(rustls::pki_types::UnixTime::since_unix_epoch(
             core::time::Duration::from_secs(self.offset as u64 + now),
         ))
