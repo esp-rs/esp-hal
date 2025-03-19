@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Stack traces no longer stop at recursive functions (#3270)
+- ESP32/S2/S3: Fixed an issue where the backtrace wasn't correctly captured in some cases (#3272)
 
 ### Removed
 
