@@ -357,15 +357,40 @@ F15=0x{:08x}",
     }
 }
 
-/// Get an array of backtrace addresses.
-pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let sp = unsafe {
-        let mut _tmp: u32;
-        asm!("mov {0}, a1", out(reg) _tmp);
-        _tmp
-    };
+/// This function returns the caller's frame pointer.
+#[inline(never)]
+#[cold]
+fn sp() -> u32 {
+    let mut sp: u32;
+    unsafe {
+        asm!(
+            "mov {0}, a1", // current stack pointer
+            // Spill registers, otherwise `sp - 12` will not contain the previous stack pointer
+            "add a12,a12,a12",
+            "rotw 3",
+            "add a12,a12,a12",
+            "rotw 3",
+            "add a12,a12,a12",
+            "rotw 3",
+            "add a12,a12,a12",
+            "rotw 3",
+            "add a12,a12,a12",
+            "rotw 4",
+            out(reg) sp
+        );
+    }
 
-    backtrace_internal(sp, 1)
+    // current frame pointer, caller's stack pointer
+    unsafe { ((sp - 12) as *const u32).read_volatile() }
+}
+
+/// Get an array of backtrace addresses.
+#[inline(never)]
+#[cold]
+pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
+    let sp = sp();
+
+    backtrace_internal(sp, 0)
 }
 
 pub(crate) fn remove_window_increment(address: u32) -> u32 {
