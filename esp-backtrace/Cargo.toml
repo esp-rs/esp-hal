@@ -17,11 +17,13 @@ features       = ["esp32c3", "panic-handler", "exception-handler", "println", "e
 [dependencies]
 cfg-if      = "1.0.0"
 defmt       = { version = "0.3.10", optional = true }
+esp-config  = { version = "0.3.0", path = "../esp-config" }
 esp-println = { version = "0.13.0", optional = true, default-features = false, path = "../esp-println" }
 semihosting = { version = "0.1.18", optional = true }
 
 [build-dependencies]
 esp-build = { version = "0.2.0", path = "../esp-build" }
+esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"] }
 
 [features]
 default = ["colors"]
