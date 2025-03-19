@@ -174,7 +174,7 @@ fn serialize_custom<S>(
 where
     S: serde::Serializer,
 {
-    serializer.serialize_str("Unknown")
+    serializer.serialize_str("Custom")
 }
 
 impl Validator {
