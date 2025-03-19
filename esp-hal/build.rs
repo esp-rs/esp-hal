@@ -13,6 +13,23 @@ use esp_config::{generate_config, Validator, Value};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
+    if ![
+        "xtensa-esp32-none-elf",
+        "xtensa-esp32s2-none-elf",
+        "xtensa-esp32s3-none-elf",
+        "riscv32imc-unknown-none-elf",
+        "riscv32imac-unknown-none-elf",
+    ]
+    .contains(&std::env::var("TARGET").unwrap_or_default().as_str())
+    {
+        panic!("
+        Seems you are building for an unsupported targe (e.g. the host environment).
+        Maybe you are missing the the `target` in `.cargo/config.toml` or you have configs overriding it?
+        
+        See https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure
+        ");
+    }
+
     println!("cargo:rustc-check-cfg=cfg(is_debug_build)");
     if let Ok(level) = std::env::var("OPT_LEVEL") {
         if level == "0" || level == "1" {
