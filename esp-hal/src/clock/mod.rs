@@ -40,13 +40,16 @@
 //! // Initialize with the highest possible frequency for this chip
 //! let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //! let peripherals = esp_hal::init(config);
+//! # Ok(())
 //! # }
 //! ```
 
-use fugit::HertzU32;
-
 #[cfg(any(esp32, esp32c2))]
 use crate::rtc_cntl::RtcClock;
+use crate::{
+    peripheral::{Peripheral, PeripheralRef},
+    time::Rate,
+};
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
@@ -60,17 +63,17 @@ pub(crate) mod clocks_ll;
 /// Clock properties
 #[doc(hidden)]
 pub trait Clock {
-    /// Frequency of the clock in [Hertz](fugit::HertzU32), using [fugit] types.
-    fn frequency(&self) -> HertzU32;
+    /// Frequency of the clock in [Rate].
+    fn frequency(&self) -> Rate;
 
     /// Frequency of the clock in Megahertz
     fn mhz(&self) -> u32 {
-        self.frequency().to_MHz()
+        self.frequency().as_mhz()
     }
 
     /// Frequency of the clock in Hertz
     fn hz(&self) -> u32 {
-        self.frequency().to_Hz()
+        self.frequency().as_hz()
     }
 }
 
@@ -135,8 +138,8 @@ impl CpuClock {
 }
 
 impl Clock for CpuClock {
-    fn frequency(&self) -> HertzU32 {
-        HertzU32::MHz(*self as u32)
+    fn frequency(&self) -> Rate {
+        Rate::from_mhz(*self as u32)
     }
 }
 
@@ -159,15 +162,15 @@ pub enum XtalClock {
 }
 
 impl Clock for XtalClock {
-    fn frequency(&self) -> HertzU32 {
+    fn frequency(&self) -> Rate {
         match self {
             #[cfg(any(esp32, esp32c2))]
-            XtalClock::_26M => HertzU32::MHz(26),
+            XtalClock::_26M => Rate::from_mhz(26),
             #[cfg(any(esp32c3, esp32h2, esp32s3))]
-            XtalClock::_32M => HertzU32::MHz(32),
+            XtalClock::_32M => Rate::from_mhz(32),
             #[cfg(not(esp32h2))]
-            XtalClock::_40M => HertzU32::MHz(40),
-            XtalClock::Other(mhz) => HertzU32::MHz(*mhz),
+            XtalClock::_40M => Rate::from_mhz(40),
+            XtalClock::Other(mhz) => Rate::from_mhz(*mhz),
         }
     }
 }
@@ -198,28 +201,28 @@ pub(crate) enum PllClock {
 }
 
 impl Clock for PllClock {
-    fn frequency(&self) -> HertzU32 {
+    fn frequency(&self) -> Rate {
         match self {
             #[cfg(esp32h2)]
-            Self::Pll8MHz => HertzU32::MHz(8),
+            Self::Pll8MHz => Rate::from_mhz(8),
             #[cfg(any(esp32c6, esp32h2))]
-            Self::Pll48MHz => HertzU32::MHz(48),
+            Self::Pll48MHz => Rate::from_mhz(48),
             #[cfg(esp32h2)]
-            Self::Pll64MHz => HertzU32::MHz(64),
+            Self::Pll64MHz => Rate::from_mhz(64),
             #[cfg(esp32c6)]
-            Self::Pll80MHz => HertzU32::MHz(80),
+            Self::Pll80MHz => Rate::from_mhz(80),
             #[cfg(esp32h2)]
-            Self::Pll96MHz => HertzU32::MHz(96),
+            Self::Pll96MHz => Rate::from_mhz(96),
             #[cfg(esp32c6)]
-            Self::Pll120MHz => HertzU32::MHz(120),
+            Self::Pll120MHz => Rate::from_mhz(120),
             #[cfg(esp32c6)]
-            Self::Pll160MHz => HertzU32::MHz(160),
+            Self::Pll160MHz => Rate::from_mhz(160),
             #[cfg(esp32c6)]
-            Self::Pll240MHz => HertzU32::MHz(240),
+            Self::Pll240MHz => Rate::from_mhz(240),
             #[cfg(not(any(esp32c2, esp32c6, esp32h2)))]
-            Self::Pll320MHz => HertzU32::MHz(320),
+            Self::Pll320MHz => Rate::from_mhz(320),
             #[cfg(not(esp32h2))]
-            Self::Pll480MHz => HertzU32::MHz(480),
+            Self::Pll480MHz => Rate::from_mhz(480),
         }
     }
 }
@@ -237,15 +240,15 @@ pub(crate) enum ApbClock {
 }
 
 impl Clock for ApbClock {
-    fn frequency(&self) -> HertzU32 {
+    fn frequency(&self) -> Rate {
         match self {
             #[cfg(esp32h2)]
-            ApbClock::ApbFreq32MHz => HertzU32::MHz(32),
+            ApbClock::ApbFreq32MHz => Rate::from_mhz(32),
             #[cfg(not(esp32h2))]
-            ApbClock::ApbFreq40MHz => HertzU32::MHz(40),
+            ApbClock::ApbFreq40MHz => Rate::from_mhz(40),
             #[cfg(not(esp32h2))]
-            ApbClock::ApbFreq80MHz => HertzU32::MHz(80),
-            ApbClock::ApbFreqOther(mhz) => HertzU32::MHz(*mhz),
+            ApbClock::ApbFreq80MHz => Rate::from_mhz(80),
+            ApbClock::ApbFreqOther(mhz) => Rate::from_mhz(*mhz),
         }
     }
 }
@@ -257,37 +260,37 @@ impl Clock for ApbClock {
 #[doc(hidden)]
 pub struct Clocks {
     /// CPU clock frequency
-    pub cpu_clock: HertzU32,
+    pub cpu_clock: Rate,
 
     /// APB clock frequency
-    pub apb_clock: HertzU32,
+    pub apb_clock: Rate,
 
     /// XTAL clock frequency
-    pub xtal_clock: HertzU32,
+    pub xtal_clock: Rate,
 
     /// I2C clock frequency
     #[cfg(esp32)]
-    pub i2c_clock: HertzU32,
+    pub i2c_clock: Rate,
 
     /// PWM clock frequency
     #[cfg(esp32)]
-    pub pwm_clock: HertzU32,
+    pub pwm_clock: Rate,
 
     /// Crypto PWM  clock frequency
     #[cfg(esp32s3)]
-    pub crypto_pwm_clock: HertzU32,
+    pub crypto_pwm_clock: Rate,
 
     /// Crypto clock frequency
     #[cfg(any(esp32c6, esp32h2))]
-    pub crypto_clock: HertzU32,
+    pub crypto_clock: Rate,
 
     /// PLL 48M clock frequency (fixed)
     #[cfg(esp32h2)]
-    pub pll_48m_clock: HertzU32,
+    pub pll_48m_clock: Rate,
 
     /// PLL 96M clock frequency (fixed)
     #[cfg(esp32h2)]
-    pub pll_96m_clock: HertzU32,
+    pub pll_96m_clock: Rate,
 }
 
 static mut ACTIVE_CLOCKS: Option<Clocks> = None;
@@ -317,22 +320,36 @@ impl Clocks {
     /// This function will run the frequency estimation if called before
     /// [`crate::init()`].
     #[cfg(systimer)]
-    pub(crate) fn xtal_freq() -> HertzU32 {
-        if let Some(clocks) = Self::try_get() {
-            clocks.xtal_clock
-        } else {
-            Self::measure_xtal_frequency().frequency()
+    #[inline]
+    pub(crate) fn xtal_freq() -> Rate {
+        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
+            if let Some(clocks) = Self::try_get() {
+                return clocks.xtal_clock;
+            }
         }
+
+        Self::measure_xtal_frequency().frequency()
     }
 }
 
 #[cfg(esp32)]
 impl Clocks {
     fn measure_xtal_frequency() -> XtalClock {
-        if RtcClock::estimate_xtal_frequency() > 33 {
-            XtalClock::_40M
+        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
+            if RtcClock::estimate_xtal_frequency() > 33 {
+                XtalClock::_40M
+            } else {
+                XtalClock::_26M
+            }
         } else {
-            XtalClock::_26M
+            const {
+                match esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY").as_bytes() {
+                    b"auto" => XtalClock::Other(0), // Can't be `unreachable!` due to const eval.
+                    b"26" => XtalClock::_26M,
+                    b"40" => XtalClock::_40M,
+                    other => XtalClock::Other(esp_config::esp_config_int_parse!(u32, other)),
+                }
+            }
         }
     }
 
@@ -355,13 +372,13 @@ impl Clocks {
 
         Self {
             cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: HertzU32::MHz(80),
-            xtal_clock: HertzU32::MHz(xtal_freq.mhz()),
-            i2c_clock: HertzU32::MHz(80),
+            apb_clock: Rate::from_mhz(80),
+            xtal_clock: Rate::from_mhz(xtal_freq.mhz()),
+            i2c_clock: Rate::from_mhz(80),
             // The docs are unclear here. pwm_clock seems to be tied to clocks.apb_clock
             // while simultaneously being fixed at 160 MHz.
             // Testing showed 160 MHz to be correct for current clock configurations.
-            pwm_clock: HertzU32::MHz(160),
+            pwm_clock: Rate::from_mhz(160),
         }
     }
 }
@@ -369,10 +386,21 @@ impl Clocks {
 #[cfg(esp32c2)]
 impl Clocks {
     fn measure_xtal_frequency() -> XtalClock {
-        if RtcClock::estimate_xtal_frequency() > 33 {
-            XtalClock::_40M
+        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
+            if RtcClock::estimate_xtal_frequency() > 33 {
+                XtalClock::_40M
+            } else {
+                XtalClock::_26M
+            }
         } else {
-            XtalClock::_26M
+            const {
+                match esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY").as_bytes() {
+                    b"auto" => XtalClock::Other(0), // Can't be `unreachable!` due to const eval.
+                    b"26" => XtalClock::_26M,
+                    b"40" => XtalClock::_40M,
+                    other => XtalClock::Other(esp_config::esp_config_int_parse!(u32, other)),
+                }
+            }
         }
     }
 
@@ -475,7 +503,7 @@ impl Clocks {
             cpu_clock: cpu_clock_speed.frequency(),
             apb_clock: apb_freq.frequency(),
             xtal_clock: xtal_freq.frequency(),
-            crypto_clock: HertzU32::MHz(160),
+            crypto_clock: Rate::from_mhz(160),
         }
     }
 }
@@ -512,9 +540,9 @@ impl Clocks {
             cpu_clock: cpu_clock_speed.frequency(),
             apb_clock: apb_freq.frequency(),
             xtal_clock: xtal_freq.frequency(),
-            pll_48m_clock: HertzU32::MHz(48),
-            crypto_clock: HertzU32::MHz(96),
-            pll_96m_clock: HertzU32::MHz(96),
+            pll_48m_clock: Rate::from_mhz(48),
+            crypto_clock: Rate::from_mhz(96),
+            pll_96m_clock: Rate::from_mhz(96),
         }
     }
 }
@@ -535,7 +563,7 @@ impl Clocks {
 
         Self {
             cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: HertzU32::MHz(80),
+            apb_clock: Rate::from_mhz(80),
             xtal_clock: xtal_freq.frequency(),
         }
     }
@@ -557,9 +585,86 @@ impl Clocks {
 
         Self {
             cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: HertzU32::MHz(80),
+            apb_clock: Rate::from_mhz(80),
             xtal_clock: xtal_freq.frequency(),
-            crypto_pwm_clock: HertzU32::MHz(160),
+            crypto_pwm_clock: Rate::from_mhz(160),
         }
+    }
+}
+
+/// Control the radio peripheral clocks
+#[cfg(any(bt, ieee802154, wifi))]
+#[instability::unstable]
+pub struct RadioClockController<'d> {
+    _rcc: PeripheralRef<'d, crate::peripherals::RADIO_CLK>,
+}
+
+#[cfg(any(bt, ieee802154, wifi))]
+impl<'d> RadioClockController<'d> {
+    /// Create a new instance of the radio clock controller
+    #[instability::unstable]
+    pub fn new(rcc: impl Peripheral<P = crate::peripherals::RADIO_CLK> + 'd) -> Self {
+        crate::into_ref!(rcc);
+        Self { _rcc: rcc }
+    }
+
+    /// Enable the PHY clocks
+    #[instability::unstable]
+    #[cfg(phy)]
+    #[inline]
+    pub fn enable_phy(&mut self, enable: bool) {
+        clocks_ll::enable_phy(enable);
+    }
+
+    /// Enable the Bluetooth clocks
+    #[instability::unstable]
+    #[cfg(bt)]
+    #[inline]
+    pub fn enable_bt(&mut self, enable: bool) {
+        clocks_ll::enable_bt(enable);
+    }
+
+    /// Enable the WiFi clocks
+    #[instability::unstable]
+    #[cfg(wifi)]
+    #[inline]
+    pub fn enable_wifi(&mut self, enable: bool) {
+        clocks_ll::enable_wifi(enable);
+    }
+
+    /// Enable the IEEE 802.15.4 peripheral clocks
+    #[instability::unstable]
+    #[cfg(ieee802154)]
+    #[inline]
+    pub fn enable_ieee802154(&mut self, enable: bool) {
+        clocks_ll::enable_ieee802154(enable);
+    }
+
+    /// Reset the MAC
+    #[instability::unstable]
+    #[inline]
+    pub fn reset_mac(&mut self) {
+        clocks_ll::reset_mac();
+    }
+
+    /// Do any common initial initialization needed
+    #[instability::unstable]
+    #[inline]
+    pub fn init_clocks(&mut self) {
+        clocks_ll::init_clocks();
+    }
+
+    /// Initialize BLE RTC clocks
+    #[instability::unstable]
+    #[inline]
+    pub fn ble_rtc_clk_init(&mut self) {
+        clocks_ll::ble_rtc_clk_init();
+    }
+
+    /// Reset the Resolvable Private Address (RPA).
+    #[instability::unstable]
+    #[inline]
+    pub fn reset_rpa(&mut self) {
+        clocks_ll::reset_rpa();
     }
 }

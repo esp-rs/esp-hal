@@ -17,11 +17,13 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma::DmaRxBuf;
 //! # use esp_hal::gpio::NoPin;
 //! # use esp_hal::parl_io::{BitPackOrder, ParlIoRxOnly, RxFourBits};
 //!
 //! // Initialize DMA buffer and descriptors for data reception
 //! let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
+//! let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
 //! let dma_channel = peripherals.DMA_CH0;
 //!
 //! // Configure the 4-bit input pins and clock pin
@@ -38,10 +40,8 @@
 //!  let parl_io = ParlIoRxOnly::new(
 //!     peripherals.PARL_IO,
 //!     dma_channel,
-//!     rx_descriptors,
-//!     1.MHz(),
-//! )
-//! .unwrap();
+//!     Rate::from_mhz(1),
+//! )?;
 //!
 //! let mut parl_io_rx = parl_io
 //!     .rx
@@ -50,18 +50,16 @@
 //!         &mut rx_clk_pin,
 //!         BitPackOrder::Msb,
 //!         Some(0xfff),
-//!     )
-//!     .unwrap();
+//!     )?;
 //!
 //! // Initialize the buffer and delay
-//! let mut buffer = rx_buffer;
-//! buffer.fill(0u8);
+//! dma_rx_buf.as_mut_slice().fill(0u8);
 //! let delay = Delay::new();
 //!
 //! loop {
 //!     // Read data via DMA and print received values
-//!     let transfer = parl_io_rx.read_dma(&mut buffer).unwrap();
-//!     transfer.wait().unwrap();
+//!     let transfer = parl_io_rx.read(Some(dma_rx_buf.len()), dma_rx_buf)?;
+//!     (_, parl_io_rx, dma_rx_buf) = transfer.wait();
 //!
 //!     delay.delay_millis(500);
 //! }
@@ -72,11 +70,11 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::parl_io::{BitPackOrder, ParlIoTxOnly, TxFourBits, SampleEdge, ClkOutPin, TxPinConfigWithValidPin};
 //!
 //! // Initialize DMA buffer and descriptors for data reception
-//! let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
+//! let mut dma_tx_buf = dma_tx_buffer!(32000).unwrap();
 //! let dma_channel = peripherals.DMA_CH0;
 //!
 //! // Configure the 4-bit input pins and clock pin
@@ -94,10 +92,8 @@
 //!  let parl_io = ParlIoTxOnly::new(
 //!     peripherals.PARL_IO,
 //!     dma_channel,
-//!     tx_descriptors,
-//!     1.MHz(),
-//! )
-//! .unwrap();
+//!     Rate::from_mhz(1),
+//! )?;
 //!
 //! let mut clock_pin = ClkOutPin::new(peripherals.GPIO6);
 //! let mut parl_io_tx = parl_io
@@ -108,58 +104,57 @@
 //!         0,
 //!         SampleEdge::Normal,
 //!         BitPackOrder::Msb,
-//!     )
-//! .unwrap();
+//!     )?;
 //!
-//! let buffer = tx_buffer;
-//! for i in 0..buffer.len() {
-//!      buffer[i] = (i % 255) as u8;
+//! for i in 0..dma_tx_buf.len() {
+//!      dma_tx_buf.as_mut_slice()[i] = (i % 255) as u8;
 //! }
 //!
 //! let delay = Delay::new();
 //! loop {
-//!     let transfer = parl_io_tx.write_dma(&buffer).unwrap();
-//!     transfer.wait().unwrap();
+//!     let transfer = parl_io_tx.write(dma_tx_buf.len(), dma_tx_buf)?;
+//!     (_, parl_io_tx, dma_tx_buf) = transfer.wait();
 //!     delay.delay_millis(500);
 //! }
 //! # }
 //! ```
 
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
+
 use enumset::{EnumSet, EnumSetType};
-use fugit::HertzU32;
 use peripheral::PeripheralRef;
 use private::*;
 
 use crate::{
     dma::{
-        dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
         ChannelRx,
         ChannelTx,
-        DescriptorChain,
         DmaChannelFor,
-        DmaDescriptor,
         DmaError,
         DmaPeripheral,
-        DmaTransferRx,
-        DmaTransferTx,
+        DmaRxBuffer,
+        DmaTxBuffer,
         PeripheralRxChannel,
         PeripheralTxChannel,
-        ReadBuffer,
         Rx,
         RxChannelFor,
         Tx,
         TxChannelFor,
-        WriteBuffer,
     },
     gpio::{
         interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
         NoPin,
     },
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
+    parl_io::asynch::interrupt_handler,
     peripheral::{self, Peripheral},
     peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
+    time::Rate,
     Async,
     Blocking,
     DriverMode,
@@ -353,16 +348,6 @@ impl EnableMode {
             _ => Some(self::private::SampleMode::ExternalPulse),
         }
     }
-}
-
-/// Generation of GDMA SUC EOF
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum EofMode {
-    /// Generate GDMA SUC EOF by data byte length
-    ByteLen,
-    /// Generate GDMA SUC EOF by the external enable signal
-    EnableSignal,
 }
 
 /// Used to configure no pin as clock output
@@ -609,6 +594,7 @@ impl FullDuplex for TxOneBit<'_> {}
 impl FullDuplex for TxTwoBits<'_> {}
 impl FullDuplex for TxFourBits<'_> {}
 impl FullDuplex for TxEightBits<'_> {}
+impl FullDuplex for TxPinConfigWithValidPin<'_, TxFourBits<'_>> {}
 
 impl NotContainsValidSignalPin for TxOneBit<'_> {}
 impl NotContainsValidSignalPin for TxTwoBits<'_> {}
@@ -631,7 +617,6 @@ where
     rx_pins: P,
     valid_pin: PeripheralRef<'d, InputConnection>,
     enable_mode: EnableMode,
-    eof_mode: EofMode,
 }
 
 impl<'d, P> RxPinConfigWithValidPin<'d, P>
@@ -643,14 +628,12 @@ where
         rx_pins: P,
         valid_pin: impl Peripheral<P = impl PeripheralInput> + 'd,
         enable_mode: EnableMode,
-        eof_mode: EofMode,
     ) -> Self {
         crate::into_mapped_ref!(valid_pin);
         Self {
             rx_pins,
             valid_pin,
             enable_mode,
-            eof_mode,
         }
     }
 }
@@ -678,7 +661,6 @@ where
         if let Some(sel) = self.enable_mode.smp_model_sel() {
             Instance::set_rx_sample_mode(sel);
         }
-        Instance::set_eof_gen_sel(self.eof_mode);
 
         Ok(())
     }
@@ -691,7 +673,6 @@ where
 {
     rx_pins: P,
     enable_mode: EnableMode,
-    eof_mode: EofMode,
 }
 
 impl<P> RxPinConfigIncludingValidPin<P>
@@ -699,11 +680,10 @@ where
     P: ContainsValidSignalPin + RxPins + ConfigurePins,
 {
     /// Create a new [RxPinConfigIncludingValidPin]
-    pub fn new(rx_pins: P, enable_mode: EnableMode, eof_mode: EofMode) -> Self {
+    pub fn new(rx_pins: P, enable_mode: EnableMode) -> Self {
         Self {
             rx_pins,
             enable_mode,
-            eof_mode,
         }
     }
 }
@@ -729,7 +709,6 @@ where
         if let Some(sel) = self.enable_mode.smp_model_sel() {
             Instance::set_rx_sample_mode(sel);
         }
-        Instance::set_eof_gen_sel(self.eof_mode);
 
         Ok(())
     }
@@ -827,6 +806,7 @@ impl FullDuplex for RxOneBit<'_> {}
 impl FullDuplex for RxTwoBits<'_> {}
 impl FullDuplex for RxFourBits<'_> {}
 impl FullDuplex for RxEightBits<'_> {}
+impl FullDuplex for RxPinConfigWithValidPin<'_, RxFourBits<'_>> {}
 
 impl NotContainsValidSignalPin for RxOneBit<'_> {}
 impl NotContainsValidSignalPin for RxTwoBits<'_> {}
@@ -867,7 +847,6 @@ where
 
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
-            tx_chain: DescriptorChain::new(self.descriptors),
             _guard: self._guard,
         })
     }
@@ -899,7 +878,6 @@ where
 
         Ok(ParlIoTx {
             tx_channel: self.tx_channel,
-            tx_chain: DescriptorChain::new(self.descriptors),
             _guard: self._guard,
         })
     }
@@ -912,7 +890,6 @@ where
     Dm: DriverMode,
 {
     tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
-    tx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -951,7 +928,6 @@ where
 
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
-            rx_chain: DescriptorChain::new(self.descriptors),
             _guard: guard,
         })
     }
@@ -981,7 +957,6 @@ where
 
         Ok(ParlIoRx {
             rx_channel: self.rx_channel,
-            rx_chain: DescriptorChain::new(self.descriptors),
             _guard: self._guard,
         })
     }
@@ -994,7 +969,6 @@ where
     Dm: DriverMode,
 {
     rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
-    rx_chain: DescriptorChain,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1011,7 +985,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
     let mut peri = unsafe { PARL_IO::steal() };
     #[cfg(esp32c6)]
     {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::PARL_IO);
         }
         internal_listen(EnumSet::all(), false);
@@ -1025,7 +999,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
     }
     #[cfg(esp32h2)]
     {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
             crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
         }
@@ -1109,9 +1083,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = PARL_IO> + 'd,
         dma_channel: impl Peripheral<P = CH> + 'd,
-        tx_descriptors: &'static mut [DmaDescriptor],
-        rx_descriptors: &'static mut [DmaDescriptor],
-        frequency: HertzU32,
+        frequency: Rate,
     ) -> Result<Self, Error>
     where
         CH: DmaChannelFor<PARL_IO>,
@@ -1124,12 +1096,10 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
         Ok(Self {
             tx: TxCreatorFullDuplex {
                 tx_channel: dma_channel.tx,
-                descriptors: tx_descriptors,
                 _guard: tx_guard,
             },
             rx: RxCreatorFullDuplex {
                 rx_channel: dma_channel.rx,
-                descriptors: rx_descriptors,
                 _guard: rx_guard,
             },
         })
@@ -1137,7 +1107,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
 
     /// Convert to an async version.
     pub fn into_async(self) -> ParlIoFullDuplex<'d, Async> {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             #[cfg(esp32c6)]
             {
                 crate::interrupt::disable(core, Interrupt::PARL_IO);
@@ -1148,15 +1118,38 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
                 crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
             }
         }
+
+        #[cfg(esp32c6)]
+        {
+            unsafe {
+                crate::interrupt::bind_interrupt(Interrupt::PARL_IO, interrupt_handler.handler());
+            }
+            unwrap!(crate::interrupt::enable(
+                Interrupt::PARL_IO,
+                interrupt_handler.priority()
+            ));
+        }
+        #[cfg(esp32h2)]
+        {
+            unsafe {
+                crate::interrupt::bind_interrupt(
+                    Interrupt::PARL_IO_TX,
+                    interrupt_handler.handler(),
+                );
+            }
+            unwrap!(crate::interrupt::enable(
+                Interrupt::PARL_IO_TX,
+                interrupt_handler.priority()
+            ));
+        }
+
         ParlIoFullDuplex {
             tx: TxCreatorFullDuplex {
                 tx_channel: self.tx.tx_channel.into_async(),
-                descriptors: self.tx.descriptors,
                 _guard: self.tx._guard,
             },
             rx: RxCreatorFullDuplex {
                 rx_channel: self.rx.rx_channel.into_async(),
-                descriptors: self.rx.descriptors,
                 _guard: self.rx._guard,
             },
         }
@@ -1166,6 +1159,7 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     /// [crate::interrupt::Priority::min()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         internal_set_interrupt_handler(handler);
     }
@@ -1193,7 +1187,8 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
 
 impl crate::private::Sealed for ParlIoFullDuplex<'_, Blocking> {}
 
-impl InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for ParlIoFullDuplex<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoFullDuplex::set_interrupt_handler(self, handler);
     }
@@ -1205,12 +1200,10 @@ impl<'d> ParlIoFullDuplex<'d, Async> {
         ParlIoFullDuplex {
             tx: TxCreatorFullDuplex {
                 tx_channel: self.tx.tx_channel.into_blocking(),
-                descriptors: self.tx.descriptors,
                 _guard: self.tx._guard,
             },
             rx: RxCreatorFullDuplex {
                 rx_channel: self.rx.rx_channel.into_blocking(),
-                descriptors: self.rx.descriptors,
                 _guard: self.rx._guard,
             },
         }
@@ -1232,8 +1225,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = PARL_IO> + 'd,
         dma_channel: impl Peripheral<P = CH> + 'd,
-        descriptors: &'static mut [DmaDescriptor],
-        frequency: HertzU32,
+        frequency: Rate,
     ) -> Result<Self, Error>
     where
         CH: TxChannelFor<PARL_IO>,
@@ -1245,7 +1237,6 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
         Ok(Self {
             tx: TxCreator {
                 tx_channel,
-                descriptors,
                 _guard: guard,
             },
         })
@@ -1253,7 +1244,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
 
     /// Converts to Async mode.
     pub fn into_async(self) -> ParlIoTxOnly<'d, Async> {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             #[cfg(esp32c6)]
             {
                 crate::interrupt::disable(core, Interrupt::PARL_IO);
@@ -1264,10 +1255,33 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
                 crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
             }
         }
+        #[cfg(esp32c6)]
+        {
+            unsafe {
+                crate::interrupt::bind_interrupt(Interrupt::PARL_IO, interrupt_handler.handler());
+            }
+            unwrap!(crate::interrupt::enable(
+                Interrupt::PARL_IO,
+                interrupt_handler.priority()
+            ));
+        }
+        #[cfg(esp32h2)]
+        {
+            unsafe {
+                crate::interrupt::bind_interrupt(
+                    Interrupt::PARL_IO_TX,
+                    interrupt_handler.handler(),
+                );
+            }
+            unwrap!(crate::interrupt::enable(
+                Interrupt::PARL_IO_TX,
+                interrupt_handler.priority()
+            ));
+        }
+
         ParlIoTxOnly {
             tx: TxCreator {
                 tx_channel: self.tx.tx_channel.into_async(),
-                descriptors: self.tx.descriptors,
                 _guard: self.tx._guard,
             },
         }
@@ -1277,6 +1291,7 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     /// [crate::interrupt::Priority::min()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         internal_set_interrupt_handler(handler);
     }
@@ -1308,7 +1323,6 @@ impl<'d> ParlIoTxOnly<'d, Async> {
         ParlIoTxOnly {
             tx: TxCreator {
                 tx_channel: self.tx.tx_channel.into_blocking(),
-                descriptors: self.tx.descriptors,
                 _guard: self.tx._guard,
             },
         }
@@ -1317,7 +1331,8 @@ impl<'d> ParlIoTxOnly<'d, Async> {
 
 impl crate::private::Sealed for ParlIoTxOnly<'_, Blocking> {}
 
-impl InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for ParlIoTxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoTxOnly::set_interrupt_handler(self, handler);
     }
@@ -1338,8 +1353,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     pub fn new<CH>(
         _parl_io: impl Peripheral<P = PARL_IO> + 'd,
         dma_channel: impl Peripheral<P = CH> + 'd,
-        descriptors: &'static mut [DmaDescriptor],
-        frequency: HertzU32,
+        frequency: Rate,
     ) -> Result<Self, Error>
     where
         CH: RxChannelFor<PARL_IO>,
@@ -1351,7 +1365,6 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
         Ok(Self {
             rx: RxCreator {
                 rx_channel,
-                descriptors,
                 _guard: guard,
             },
         })
@@ -1359,7 +1372,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
 
     /// Converts to Async mode.
     pub fn into_async(self) -> ParlIoRxOnly<'d, Async> {
-        for core in crate::Cpu::other() {
+        for core in crate::system::Cpu::other() {
             #[cfg(esp32c6)]
             {
                 crate::interrupt::disable(core, Interrupt::PARL_IO);
@@ -1370,11 +1383,33 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
                 crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
             }
         }
+        #[cfg(esp32c6)]
+        {
+            unsafe {
+                crate::interrupt::bind_interrupt(Interrupt::PARL_IO, interrupt_handler.handler());
+            }
+            unwrap!(crate::interrupt::enable(
+                Interrupt::PARL_IO,
+                interrupt_handler.priority()
+            ));
+        }
+        #[cfg(esp32h2)]
+        {
+            unsafe {
+                crate::interrupt::bind_interrupt(
+                    Interrupt::PARL_IO_TX,
+                    interrupt_handler.handler(),
+                );
+            }
+            unwrap!(crate::interrupt::enable(
+                Interrupt::PARL_IO_TX,
+                interrupt_handler.priority()
+            ));
+        }
 
         ParlIoRxOnly {
             rx: RxCreator {
                 rx_channel: self.rx.rx_channel.into_async(),
-                descriptors: self.rx.descriptors,
                 _guard: self.rx._guard,
             },
         }
@@ -1384,6 +1419,7 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     /// [crate::interrupt::Priority::min()]
     ///
     /// Interrupts are not enabled at the peripheral level here.
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         internal_set_interrupt_handler(handler);
     }
@@ -1415,7 +1451,6 @@ impl<'d> ParlIoRxOnly<'d, Async> {
         ParlIoRxOnly {
             rx: RxCreator {
                 rx_channel: self.rx.rx_channel.into_blocking(),
-                descriptors: self.rx.descriptors,
                 _guard: self.rx._guard,
             },
         }
@@ -1424,18 +1459,19 @@ impl<'d> ParlIoRxOnly<'d, Async> {
 
 impl crate::private::Sealed for ParlIoRxOnly<'_, Blocking> {}
 
-impl InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         ParlIoRxOnly::set_interrupt_handler(self, handler);
     }
 }
 
-fn internal_init(frequency: HertzU32) -> Result<(), Error> {
-    if frequency.raw() > 40_000_000 {
+fn internal_init(frequency: Rate) -> Result<(), Error> {
+    if frequency.as_hz() > 40_000_000 {
         return Err(Error::UnreachableClockRate);
     }
 
-    let divider = crate::soc::constants::PARL_IO_SCLK / frequency.raw();
+    let divider = crate::soc::constants::PARL_IO_SCLK / frequency.as_hz();
     if divider > 0xffff {
         return Err(Error::UnreachableClockRate);
     }
@@ -1458,48 +1494,41 @@ fn internal_init(frequency: HertzU32) -> Result<(), Error> {
     Ok(())
 }
 
-impl<Dm> ParlIoTx<'_, Dm>
+impl<'d, Dm> ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
     /// Perform a DMA write.
     ///
-    /// This will return a [DmaTransferTx]
+    /// This will return a [ParlIoTxTransfer]
     ///
     /// The maximum amount of data to be sent is 32736 bytes.
-    pub fn write_dma<'t, TXBUF>(
-        &'t mut self,
-        words: &'t TXBUF,
-    ) -> Result<DmaTransferTx<'t, Self>, Error>
+    pub fn write<BUF>(
+        mut self,
+        number_of_bytes: usize,
+        mut buffer: BUF,
+    ) -> Result<ParlIoTxTransfer<'d, BUF, Dm>, (Error, Self, BUF)>
     where
-        TXBUF: ReadBuffer,
+        BUF: DmaTxBuffer,
     {
-        let (ptr, len) = unsafe { words.read_buffer() };
-
-        if len > MAX_DMA_SIZE {
-            return Err(Error::MaxDmaTransferSizeExceeded);
+        if number_of_bytes > MAX_DMA_SIZE {
+            return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
         }
 
-        self.start_write_bytes_dma(ptr, len)?;
-
-        Ok(DmaTransferTx::new(self))
-    }
-
-    fn start_write_bytes_dma(&mut self, ptr: *const u8, len: usize) -> Result<(), Error> {
         PCR::regs()
             .parl_clk_tx_conf()
             .modify(|_, w| w.parl_tx_rst_en().set_bit());
 
         Instance::clear_tx_interrupts();
-        Instance::set_tx_bytes(len as u16);
+        Instance::set_tx_bytes(number_of_bytes as u16);
 
-        self.tx_channel.is_done();
-
-        unsafe {
-            self.tx_chain.fill_for_tx(false, ptr, len)?;
+        let result = unsafe {
             self.tx_channel
-                .prepare_transfer_without_start(DmaPeripheral::ParlIo, &self.tx_chain)
-                .and_then(|_| self.tx_channel.start_transfer())?;
+                .prepare_transfer(DmaPeripheral::ParlIo, &mut buffer)
+                .and_then(|_| self.tx_channel.start_transfer())
+        };
+        if let Err(err) = result {
+            return Err((Error::DmaError(err), self, buffer));
         }
 
         while !Instance::is_tx_ready() {}
@@ -1510,37 +1539,86 @@ where
             .parl_clk_tx_conf()
             .modify(|_, w| w.parl_tx_rst_en().clear_bit());
 
-        Ok(())
+        Ok(ParlIoTxTransfer {
+            parl_io: ManuallyDrop::new(self),
+            buf_view: ManuallyDrop::new(buffer.into_view()),
+        })
     }
 }
 
-impl<Dm> DmaSupport for ParlIoTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        while !Instance::is_tx_eof() {}
+/// Represents an ongoing (or potentially finished) transfer using the PARL_IO
+/// TX.
+pub struct ParlIoTxTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
+    parl_io: ManuallyDrop<ParlIoTx<'d, Dm>>,
+    buf_view: ManuallyDrop<BUF::View>,
+}
+
+impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> ParlIoTxTransfer<'d, BUF, Dm> {
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        Instance::is_tx_eof()
+    }
+
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub fn wait(mut self) -> (Result<(), DmaError>, ParlIoTx<'d, Dm>, BUF) {
+        while !self.is_done() {}
 
         Instance::set_tx_start(false);
+        Instance::clear_is_tx_done();
+
+        // Stop the DMA as it doesn't know that the parl io has stopped.
+        self.parl_io.tx_channel.stop_transfer();
+
+        let (parl_io, view) = self.release();
+
+        let result = if parl_io.tx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            Ok(())
+        };
+
+        (result, parl_io, BUF::from_view(view))
     }
 
-    fn peripheral_dma_stop(&mut self) {
-        unreachable!("unsupported")
+    fn release(mut self) -> (ParlIoTx<'d, Dm>, BUF::View) {
+        let (parl_io, view) = unsafe {
+            (
+                ManuallyDrop::take(&mut self.parl_io),
+                ManuallyDrop::take(&mut self.buf_view),
+            )
+        };
+        core::mem::forget(self);
+        (parl_io, view)
     }
 }
 
-impl<'d, Dm> DmaSupportTx for ParlIoTx<'d, Dm>
-where
-    Dm: DriverMode,
-{
-    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>;
+impl<BUF: DmaTxBuffer, Dm: DriverMode> Deref for ParlIoTxTransfer<'_, BUF, Dm> {
+    type Target = BUF::View;
 
-    fn tx(&mut self) -> &mut Self::TX {
-        &mut self.tx_channel
+    fn deref(&self) -> &Self::Target {
+        &self.buf_view
     }
+}
 
-    fn chain(&mut self) -> &mut DescriptorChain {
-        &mut self.tx_chain
+impl<BUF: DmaTxBuffer, Dm: DriverMode> DerefMut for ParlIoTxTransfer<'_, BUF, Dm> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf_view
+    }
+}
+
+impl<BUF: DmaTxBuffer, Dm: DriverMode> Drop for ParlIoTxTransfer<'_, BUF, Dm> {
+    fn drop(&mut self) {
+        // There's no documented way to cancel the PARL IO transfer, so we'll just stop
+        // the DMA to stop the memory access.
+        self.parl_io.tx_channel.stop_transfer();
+
+        // SAFETY: This is Drop, we know that self.parl_io and self.buf_view
+        // won't be touched again.
+        let view = unsafe {
+            ManuallyDrop::drop(&mut self.parl_io);
+            ManuallyDrop::take(&mut self.buf_view)
+        };
+        let _ = BUF::from_view(view);
     }
 }
 
@@ -1550,36 +1628,23 @@ where
 {
     /// Perform a DMA read.
     ///
-    /// This will return a [DmaTransferRx]
+    /// This will return a [ParlIoRxTransfer]
     ///
-    /// The maximum amount of data is 32736 bytes when using [EofMode::ByteLen].
+    /// When the number of bytes is specified, the maximum amount of data is
+    /// 32736 bytes and the transfer ends when the number of specified bytes
+    /// is received.
     ///
-    /// It's only limited by the size of the DMA buffer when using
-    /// [EofMode::EnableSignal].
-    pub fn read_dma<'t, RXBUF>(
-        &'t mut self,
-        words: &'t mut RXBUF,
-    ) -> Result<DmaTransferRx<'t, Self>, Error>
+    /// When the number of bytes is unspecified, there's no limit the amount of
+    /// data transferred and the transfer ends when the enable signal
+    /// signals the end or the DMA buffer runs out of space.
+    pub fn read<BUF>(
+        mut self,
+        number_of_bytes: Option<usize>,
+        mut buffer: BUF,
+    ) -> Result<ParlIoRxTransfer<'d, BUF, Dm>, (Error, Self, BUF)>
     where
-        RXBUF: WriteBuffer,
+        BUF: DmaRxBuffer,
     {
-        let (ptr, len) = unsafe { words.write_buffer() };
-
-        if !Instance::is_suc_eof_generated_externally() && len > MAX_DMA_SIZE {
-            return Err(Error::MaxDmaTransferSizeExceeded);
-        }
-
-        Self::start_receive_bytes_dma(&mut self.rx_channel, &mut self.rx_chain, ptr, len)?;
-
-        Ok(DmaTransferRx::new(self))
-    }
-
-    fn start_receive_bytes_dma(
-        rx_channel: &mut ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
-        rx_chain: &mut DescriptorChain,
-        ptr: *mut u8,
-        len: usize,
-    ) -> Result<(), Error> {
         PCR::regs()
             .parl_clk_rx_conf()
             .modify(|_, w| w.parl_rx_rst_en().set_bit());
@@ -1588,56 +1653,116 @@ where
             .modify(|_, w| w.parl_rx_rst_en().clear_bit());
 
         Instance::clear_rx_interrupts();
-        Instance::set_rx_bytes(len as u16);
+        if let Some(number_of_bytes) = number_of_bytes {
+            if number_of_bytes > MAX_DMA_SIZE {
+                return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
+            }
+            Instance::set_rx_bytes(number_of_bytes as u16);
+            Instance::set_eof_gen_sel(EofMode::ByteLen);
+        } else {
+            Instance::set_eof_gen_sel(EofMode::EnableSignal);
+        }
 
-        unsafe {
-            rx_chain.fill_for_rx(false, ptr, len)?;
-            rx_channel
-                .prepare_transfer_without_start(DmaPeripheral::ParlIo, rx_chain)
-                .and_then(|_| rx_channel.start_transfer())?;
+        let result = unsafe {
+            self.rx_channel
+                .prepare_transfer(DmaPeripheral::ParlIo, &mut buffer)
+                .and_then(|_| self.rx_channel.start_transfer())
+        };
+        if let Err(err) = result {
+            return Err((Error::DmaError(err), self, buffer));
         }
 
         Instance::set_rx_reg_update();
 
         Instance::set_rx_start(true);
-        Ok(())
+
+        Ok(ParlIoRxTransfer {
+            parl_io: ManuallyDrop::new(self),
+            buf_view: ManuallyDrop::new(buffer.into_view()),
+            dma_result: None,
+        })
     }
 }
 
-impl<Dm> DmaSupport for ParlIoRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        loop {
-            if self.rx_channel.is_done()
-                || self.rx_channel.has_eof_error()
-                || self.rx_channel.has_dscr_empty_error()
-            {
-                break;
-            }
+/// Represents an ongoing (or potentially finished) transfer using the PARL_IO
+/// TX.
+pub struct ParlIoRxTransfer<'d, BUF: DmaRxBuffer, Dm: DriverMode> {
+    parl_io: ManuallyDrop<ParlIoRx<'d, Dm>>,
+    buf_view: ManuallyDrop<BUF::View>,
+    // Needed to use DmaRxFuture, which clear the bits we check in is_done()
+    dma_result: Option<Result<(), DmaError>>,
+}
+
+impl<'d, BUF: DmaRxBuffer, Dm: DriverMode> ParlIoRxTransfer<'d, BUF, Dm> {
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        if self.dma_result.is_some() {
+            return true;
         }
+        let ch = &self.parl_io.rx_channel;
+        ch.is_done() || ch.has_eof_error() || ch.has_dscr_empty_error()
+    }
+
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub fn wait(mut self) -> (Result<(), DmaError>, ParlIoRx<'d, Dm>, BUF) {
+        while !self.is_done() {}
 
         Instance::set_rx_start(false);
+
+        // Stop the DMA as it doesn't know that the parl io has stopped.
+        self.parl_io.rx_channel.stop_transfer();
+
+        let dma_result = self.dma_result.take();
+        let (parl_io, view) = self.release();
+
+        let result = if parl_io.rx_channel.has_error() {
+            Err(DmaError::DescriptorError)
+        } else {
+            dma_result.unwrap_or(Ok(()))
+        };
+
+        (result, parl_io, BUF::from_view(view))
     }
 
-    fn peripheral_dma_stop(&mut self) {
-        unreachable!("unsupported")
+    fn release(mut self) -> (ParlIoRx<'d, Dm>, BUF::View) {
+        let (parl_io, view) = unsafe {
+            (
+                ManuallyDrop::take(&mut self.parl_io),
+                ManuallyDrop::take(&mut self.buf_view),
+            )
+        };
+        core::mem::forget(self);
+        (parl_io, view)
     }
 }
 
-impl<'d, Dm> DmaSupportRx for ParlIoRx<'d, Dm>
-where
-    Dm: DriverMode,
-{
-    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>;
+impl<BUF: DmaRxBuffer, Dm: DriverMode> Deref for ParlIoRxTransfer<'_, BUF, Dm> {
+    type Target = BUF::View;
 
-    fn rx(&mut self) -> &mut Self::RX {
-        &mut self.rx_channel
+    fn deref(&self) -> &Self::Target {
+        &self.buf_view
     }
+}
 
-    fn chain(&mut self) -> &mut DescriptorChain {
-        &mut self.rx_chain
+impl<BUF: DmaRxBuffer, Dm: DriverMode> DerefMut for ParlIoRxTransfer<'_, BUF, Dm> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf_view
+    }
+}
+
+impl<BUF: DmaRxBuffer, Dm: DriverMode> Drop for ParlIoRxTransfer<'_, BUF, Dm> {
+    fn drop(&mut self) {
+        // There's no documented way to cancel the PARL IO transfer, so we'll just stop
+        // the DMA to stop the memory access.
+        self.parl_io.rx_channel.stop_transfer();
+
+        // SAFETY: This is Drop, we know that self.parl_io and self.buf_view
+        // won't be touched again.
+        let view = unsafe {
+            ManuallyDrop::drop(&mut self.parl_io);
+            ManuallyDrop::take(&mut self.buf_view)
+        };
+        let _ = BUF::from_view(view);
     }
 }
 
@@ -1647,7 +1772,6 @@ where
     Dm: DriverMode,
 {
     tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
-    descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1657,7 +1781,6 @@ where
     Dm: DriverMode,
 {
     rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
-    descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1667,7 +1790,6 @@ where
     Dm: DriverMode,
 {
     tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
-    descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1677,7 +1799,6 @@ where
     Dm: DriverMode,
 {
     rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
-    descriptors: &'static mut [DmaDescriptor],
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1687,11 +1808,10 @@ pub mod asynch {
 
     use procmacros::handler;
 
-    use super::{private::Instance, Error, ParlIoRx, ParlIoTx, MAX_DMA_SIZE};
+    use super::{private::Instance, ParlIoRxTransfer, ParlIoTxTransfer};
     use crate::{
         asynch::AtomicWaker,
-        dma::{asynch::DmaRxFuture, ReadBuffer, WriteBuffer},
-        peripherals::{Interrupt, PARL_IO},
+        dma::{asynch::DmaRxFuture, DmaRxBuffer, DmaTxBuffer},
     };
 
     static TX_WAKER: AtomicWaker = AtomicWaker::new();
@@ -1701,26 +1821,6 @@ pub mod asynch {
 
     impl TxDoneFuture {
         pub fn new() -> Self {
-            Instance::listen_tx_done();
-            let mut parl_io = unsafe { PARL_IO::steal() };
-
-            #[cfg(esp32c6)]
-            {
-                parl_io.bind_parl_io_interrupt(interrupt_handler.handler());
-                unwrap!(crate::interrupt::enable(
-                    Interrupt::PARL_IO,
-                    interrupt_handler.priority()
-                ));
-            }
-            #[cfg(esp32h2)]
-            {
-                parl_io.bind_parl_io_tx_interrupt(interrupt_handler.handler());
-                unwrap!(crate::interrupt::enable(
-                    Interrupt::PARL_IO_TX,
-                    interrupt_handler.priority()
-                ));
-            }
-
             Self {}
         }
     }
@@ -1732,74 +1832,52 @@ pub mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            TX_WAKER.register(cx.waker());
-            if Instance::is_listening_tx_done() {
-                Poll::Pending
-            } else {
+            if Instance::is_tx_done_set() {
                 Poll::Ready(())
+            } else {
+                TX_WAKER.register(cx.waker());
+                Instance::listen_tx_done();
+                Poll::Pending
             }
         }
     }
 
+    impl Drop for TxDoneFuture {
+        fn drop(&mut self) {
+            Instance::unlisten_tx_done();
+        }
+    }
+
     #[handler]
-    fn interrupt_handler() {
+    pub(super) fn interrupt_handler() {
         if Instance::is_tx_done_set() {
-            Instance::clear_is_tx_done();
             Instance::unlisten_tx_done();
             TX_WAKER.wake()
         }
     }
 
-    impl ParlIoTx<'_, crate::Async> {
-        /// Perform a DMA write.
-        ///
-        /// The maximum amount of data to be sent is 32736 bytes.
-        pub async fn write_dma_async<TXBUF>(&mut self, words: &TXBUF) -> Result<(), Error>
-        where
-            TXBUF: ReadBuffer,
-        {
-            let (ptr, len) = unsafe { words.read_buffer() };
-
-            if len > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
-            }
-
+    impl<BUF: DmaTxBuffer> ParlIoTxTransfer<'_, BUF, crate::Async> {
+        /// Waits for [Self::is_done] to return true.
+        pub async fn wait_for_done(&mut self) {
             let future = TxDoneFuture::new();
-            self.start_write_bytes_dma(ptr, len)?;
             future.await;
-
-            Ok(())
         }
     }
 
-    impl ParlIoRx<'_, crate::Async> {
-        /// Perform a DMA write.
-        ///
-        /// The maximum amount of data to be sent is 32736 bytes.
-        pub async fn read_dma_async<'t, RXBUF>(
-            &'t mut self,
-            words: &'t mut RXBUF,
-        ) -> Result<(), Error>
-        where
-            RXBUF: WriteBuffer,
-        {
-            let (ptr, len) = unsafe { words.write_buffer() };
-
-            if !Instance::is_suc_eof_generated_externally() && len > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
+    impl<BUF: DmaRxBuffer> ParlIoRxTransfer<'_, BUF, crate::Async> {
+        /// Waits for [Self::is_done] to return true.
+        pub async fn wait_for_done(&mut self) {
+            if self.dma_result.is_some() {
+                return;
             }
-
-            let future = DmaRxFuture::new(&mut self.rx_channel);
-            Self::start_receive_bytes_dma(future.rx, &mut self.rx_chain, ptr, len)?;
-            future.await?;
-
-            Ok(())
+            let future = DmaRxFuture::new(&mut self.parl_io.rx_channel);
+            self.dma_result = Some(future.await);
         }
     }
 }
 
 mod private {
-    use super::{BitPackOrder, EofMode, Error, SampleEdge};
+    use super::{BitPackOrder, Error, SampleEdge};
     use crate::peripherals::PARL_IO;
 
     pub trait FullDuplex {}
@@ -1845,6 +1923,14 @@ mod private {
         ExternalLevel          = 0,
         ExternalPulse          = 1,
         InternalSoftwareEnable = 2,
+    }
+
+    /// Generation of GDMA SUC EOF
+    pub(super) enum EofMode {
+        /// Generate GDMA SUC EOF by data byte length
+        ByteLen,
+        /// Generate GDMA SUC EOF by the external enable signal
+        EnableSignal,
     }
 
     pub(super) struct Instance;
@@ -1974,9 +2060,10 @@ mod private {
         pub fn set_eof_gen_sel(mode: EofMode) {
             let reg_block = PARL_IO::regs();
 
-            reg_block
-                .rx_cfg0()
-                .modify(|_, w| w.rx_eof_gen_sel().bit(mode == EofMode::EnableSignal));
+            reg_block.rx_cfg0().modify(|_, w| {
+                w.rx_eof_gen_sel()
+                    .bit(matches!(mode, EofMode::EnableSignal))
+            });
         }
 
         pub fn set_rx_pulse_submode_sel(sel: u8) {
@@ -2034,12 +2121,6 @@ mod private {
             });
         }
 
-        pub fn is_suc_eof_generated_externally() -> bool {
-            let reg_block = PARL_IO::regs();
-
-            reg_block.rx_cfg0().read().rx_eof_gen_sel().bit_is_set()
-        }
-
         pub fn listen_tx_done() {
             let reg_block = PARL_IO::regs();
 
@@ -2050,12 +2131,6 @@ mod private {
             let reg_block = PARL_IO::regs();
 
             reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
-        }
-
-        pub fn is_listening_tx_done() -> bool {
-            let reg_block = PARL_IO::regs();
-
-            reg_block.int_ena().read().tx_eof().bit()
         }
 
         pub fn is_tx_done_set() -> bool {
@@ -2203,9 +2278,10 @@ mod private {
         pub fn set_eof_gen_sel(mode: EofMode) {
             let reg_block = PARL_IO::regs();
 
-            reg_block
-                .rx_genrl_cfg()
-                .modify(|_, w| w.rx_eof_gen_sel().bit(mode == EofMode::EnableSignal));
+            reg_block.rx_genrl_cfg().modify(|_, w| {
+                w.rx_eof_gen_sel()
+                    .bit(matches!(mode, EofMode::EnableSignal))
+            });
         }
 
         pub fn set_rx_pulse_submode_sel(sel: u8) {
@@ -2264,16 +2340,6 @@ mod private {
             });
         }
 
-        pub fn is_suc_eof_generated_externally() -> bool {
-            let reg_block = PARL_IO::regs();
-
-            reg_block
-                .rx_genrl_cfg()
-                .read()
-                .rx_eof_gen_sel()
-                .bit_is_set()
-        }
-
         pub fn listen_tx_done() {
             let reg_block = PARL_IO::regs();
 
@@ -2284,12 +2350,6 @@ mod private {
             let reg_block = PARL_IO::regs();
 
             reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
-        }
-
-        pub fn is_listening_tx_done() -> bool {
-            let reg_block = PARL_IO::regs();
-
-            reg_block.int_ena().read().tx_eof().bit()
         }
 
         pub fn is_tx_done_set() -> bool {

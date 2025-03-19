@@ -53,11 +53,11 @@ async fn main(_spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(72 * 1024);
+    esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let init = &*mk_static!(
+    let esp_wifi_ctrl = &*mk_static!(
         EspWifiController<'static>,
         init(
             timg0.timer0,
@@ -70,9 +70,9 @@ async fn main(_spawner: Spawner) -> ! {
     let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = Input::new(peripherals.GPIO0, config).unwrap();
+            let button = Input::new(peripherals.GPIO0, config);
         } else {
-            let button = Input::new(peripherals.GPIO9, config).unwrap();
+            let button = Input::new(peripherals.GPIO9, config);
         }
     }
 
@@ -89,9 +89,9 @@ async fn main(_spawner: Spawner) -> ! {
 
     let mut bluetooth = peripherals.BT;
 
-    let connector = BleConnector::new(&init, &mut bluetooth);
+    let connector = BleConnector::new(&esp_wifi_ctrl, &mut bluetooth);
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut ble = Ble::new(connector, now);
     println!("Connector created");
 

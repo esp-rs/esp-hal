@@ -3,24 +3,29 @@ name: Documentation
 on:
   workflow_dispatch:
     inputs:
-      esp-hal:
-        description: "esp-hal tag"
+      packages:
+        description: >
+          A JSON structure describing the packages to build.
+          E.g: [{"name":"esp-hal","tag":"v0.23.1"},{"name":"esp-wifi","tag":"esp-wifi-v0.12"}]
+
+          NOTE: You can run `cargo xtask tag-releases` to get the json output generated for this workflow.
         required: true
-      esp-wifi:
-        description: "esp-wifi tag"
-        required: true
+      server:
+        type: choice
+        description: Which server to deploy to
+        options:
+          - preview
+          - production
 
 env:
   CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      packages: '[
-            { "name": "esp-hal",  "tag": "${{ github.event.inputs.esp-hal }}" },
-            { "name": "esp-wifi", "tag": "esp-wifi-${{ github.event.inputs.esp-wifi }}" }
-          ]'
+      packages: '${{ github.event.inputs.packages }}'
     steps:
       - run: echo "Setup complete!"
   build:
@@ -36,16 +41,33 @@ jobs:
         with:
           default: true
           ldproxy: false
-          version: 1.84.0.0
+          version: 1.85.0.0
 
+      # TODO: we could build this once and download onto each runner
+      # Build the `xtask` package using the latest commit, and copy the
+      # resulting binary to the `~/.cargo/bin/` directory. We do this to
+      # avoid having to rebuild different versions of the package for
+      # different tags if they do not fall on the same commit, and to
+      # make sure that we take advantage of any subsequent updates to
+      # the xtask which may have happened after a release was tagged.
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           repository: esp-rs/esp-hal
+      - name: Build xtask
+        run: |
+          cargo build --release --package=xtask --features=deploy-docs
+          cp target/release/xtask ~/.cargo/bin/hal-xtask
+
+      # Checkout the tag we need to start building the docs
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: esp-hal/esp-hal
           ref: ${{ matrix.packages.tag }}
 
       - name: Build documentation
-        run: cargo xtask build-documentation --packages=${{ matrix.packages.name }}
+        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }} --base-url /projects/rust/
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
@@ -66,37 +88,37 @@ jobs:
         with:
           toolchain: stable
       - name: Prepare
-        run: mkdir docs
+        run: mkdir docs && mkdir docs/esp-hal && mkdir docs/esp-wifi && mkdir docs/esp-lp-hal
       - name: Download all docs
         uses: actions/download-artifact@v4
         with:
           path: "docs/"
 
+      # Create an index for _all_ packages.
       - name: Create index.html
-        run: "cargo xtask build-documentation-index --packages=$(echo '${{ needs.setup.outputs.packages }}' | jq -r '[.[].name] | join(\",\")')"
+        run: cargo xtask build-documentation-index
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+
+      - if: ${{ github.event.inputs.server == 'preview' }}
+        name: Deploy to preview server
+        uses: appleboy/scp-action@v0.1.7
         with:
-          path: "docs/"
+          host: preview-docs.espressif.com
+          username: ${{ secrets.PREVIEW_USERNAME }}
+          key: ${{ secrets.PREVIEW_KEY }}
+          target: ${{ secrets.PREVIEW_TARGET }}
+          source: "docs/"
+          strip_components: 1 # remove the docs prefix
+          overwrite: true
 
-  deploy:
-    # Add a dependency to the assemble job:
-    needs: assemble
-
-    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment:
-    permissions:
-      pages: write # to deploy to Pages
-      id-token: write # to verify the deployment originates from an appropriate source
-
-    # Deploy to the github-pages environment:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    # Specify runner + deployment step:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - if: ${{ github.event.inputs.server == 'production' }}
+        name: Deploy to production server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: docs.espressif.com
+          username: ${{ secrets.PRODUCTION_USERNAME }}
+          key: ${{ secrets.PRODUCTION_KEY }}
+          target: ${{ secrets.PRODUCTION_TARGET }}
+          source: "docs/"
+          strip_components: 1 # remove the docs prefix
+          overwrite: true

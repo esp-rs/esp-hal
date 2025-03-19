@@ -10,6 +10,7 @@
 
 pub(crate) use esp32c3 as pac;
 // We need to export this for users to use
+#[doc(hidden)]
 pub use pac::Interrupt;
 
 // Note that certain are marked with `virtual` in the invocation of the
@@ -19,7 +20,6 @@ pub use pac::Interrupt;
 crate::peripherals! {
     peripherals: [
         I2C0 <= I2C0,
-        IO_MUX <= IO_MUX,
         SPI2 <= SPI2 (SPI2),
         UART0 <= UART0,
         UART1 <= UART1,
@@ -42,8 +42,10 @@ crate::peripherals! {
         GPIO <= GPIO,
         GPIO_SD <= GPIO_SD,
         HMAC <= HMAC,
+        I2C_ANA_MST <= I2C_ANA_MST,
         I2S0 <= I2S0 (I2S0),
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
+        IO_MUX <= IO_MUX,
         LEDC <= LEDC,
         LPWR <= RTC_CNTL,
         NRX <= NRX,

@@ -1,7 +1,9 @@
 //! SPI Half Duplex Write Test
 
 //% CHIPS: esp32s3
-//% FEATURES: unstable octal-psram
+//% FEATURES: unstable psram
+// The dev kit in the HIL-tester has octal PSRAM.
+//% ENV: ESP_HAL_CONFIG_PSRAM_MODE=octal
 
 #![no_std]
 #![no_main]
@@ -18,7 +20,7 @@ use esp_hal::{
         DataMode,
         Mode,
     },
-    time::RateExtU32,
+    time::Rate,
     Blocking,
 };
 use hil_test as _;
@@ -68,7 +70,7 @@ mod tests {
         let spi = Spi::new(
             peripherals.SPI2,
             Config::default()
-                .with_frequency(100.kHz())
+                .with_frequency(Rate::from_khz(100))
                 .with_mode(Mode::_0),
         )
         .unwrap()

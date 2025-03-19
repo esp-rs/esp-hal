@@ -7,7 +7,6 @@
 
 crate::unstable_module! {
     pub mod efuse;
-    pub mod radio_clocks;
     pub mod trng;
 }
 pub mod gpio;
@@ -36,11 +35,15 @@ pub(crate) mod registers {
 }
 
 pub(crate) mod constants {
+    use crate::time::Rate;
+
     /// The lower bound of the system's DRAM (Data RAM) address space.
     pub const SOC_DRAM_LOW: usize = 0x3FCA_0000;
     /// The upper bound of the system's DRAM (Data RAM) address space.
     pub const SOC_DRAM_HIGH: usize = 0x3FCE_0000;
 
     /// RC FAST Clock value (Hertz).
-    pub const RC_FAST_CLK: fugit::HertzU32 = fugit::HertzU32::kHz(17500);
+    pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);
 }
+
+pub(crate) fn pre_init() {}

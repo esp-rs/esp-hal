@@ -33,7 +33,7 @@ use esp_hal::{
         LcdCam,
     },
     main,
-    time::RateExtU32,
+    time::Rate,
     Blocking,
 };
 use esp_println::println;
@@ -53,10 +53,9 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let config = OutputConfig::default().with_level(Level::Low);
-    let mut backlight = Output::new(lcd_backlight, config).unwrap();
-    let mut reset = Output::new(lcd_reset, config).unwrap();
-    let tear_effect = Input::new(lcd_te, InputConfig::default().with_pull(Pull::None)).unwrap();
+    let mut backlight = Output::new(lcd_backlight, Level::Low, OutputConfig::default());
+    let mut reset = Output::new(lcd_reset, Level::Low, OutputConfig::default());
+    let tear_effect = Input::new(lcd_te, InputConfig::default().with_pull(Pull::None));
 
     let tx_pins = TxEightBits::new(
         peripherals.GPIO9,
@@ -70,11 +69,14 @@ fn main() -> ! {
     );
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let mut i8080_config = Config::default();
-    i8080_config.frequency = 20.MHz();
-    let i8080 = I8080::new(lcd_cam.lcd, peripherals.DMA_CH0, tx_pins, i8080_config)
-        .unwrap()
-        .with_ctrl_pins(lcd_rs, lcd_wr);
+    let i8080 = I8080::new(
+        lcd_cam.lcd,
+        peripherals.DMA_CH0,
+        tx_pins,
+        Config::default().with_frequency(Rate::from_mhz(20)),
+    )
+    .unwrap()
+    .with_ctrl_pins(lcd_rs, lcd_wr);
 
     // Note: This isn't provided in the HAL since different drivers may require
     // different considerations, like how to manage the CS pin, the CD pin,

@@ -5,7 +5,7 @@ use core::{cell::UnsafeCell, mem::MaybeUninit};
 use embassy_executor::SendSpawner;
 use esp_hal::{
     interrupt::{self, software::SoftwareInterrupt, InterruptHandler},
-    Cpu,
+    system::Cpu,
 };
 use portable_atomic::{AtomicUsize, Ordering};
 

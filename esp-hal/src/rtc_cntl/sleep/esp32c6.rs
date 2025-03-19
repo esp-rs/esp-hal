@@ -41,7 +41,7 @@ impl WakeSource for TimerWakeupSource {
         let clock_freq = RtcClock::slow_freq();
         // TODO: maybe add sleep time adjustment like idf
         // TODO: maybe add check to prevent overflow?
-        let clock_hz = clock_freq.frequency().to_Hz() as u64;
+        let clock_hz = clock_freq.frequency().as_hz() as u64;
         let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
@@ -74,7 +74,7 @@ impl Ext1WakeupSource<'_, '_> {
     fn wake_io_reset() {
         use crate::gpio::{GpioPin, RtcPin};
 
-        fn uninit_pin(mut pin: impl RtcPin, wakeup_pins: u8) {
+        fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
             if wakeup_pins & (1 << pin.number()) != 0 {
                 pin.rtcio_pad_hold(false);
                 pin.rtc_set_config(false, false, RtcFunction::Rtc);

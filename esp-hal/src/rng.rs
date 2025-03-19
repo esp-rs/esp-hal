@@ -60,6 +60,7 @@
 //! ### TRNG operation
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
+//! # use esp_hal::Blocking;
 //! # use esp_hal::rng::Trng;
 //! # use esp_hal::peripherals::Peripherals;
 //! # use esp_hal::peripherals::ADC1;
@@ -80,11 +81,12 @@
 //!     analog_pin,
 //!     Attenuation::_11dB
 //! );
-//! let mut adc1 = Adc::<ADC1>::new(peripherals.ADC1, adc1_config);
-//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+//! let mut adc1 = Adc::<ADC1, Blocking>::new(peripherals.ADC1, adc1_config);
+//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
 //! rng.read(&mut buf);
 //! true_rand = rng.random();
-//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin)).unwrap();
+//! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
+//! # Ok(())
 //! # }
 //! ```
 use core::marker::PhantomData;
@@ -145,7 +147,8 @@ impl Peripheral for Rng {
     }
 }
 
-impl rand_core::RngCore for Rng {
+#[instability::unstable]
+impl rand_core06::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
         self.random()
     }
@@ -161,9 +164,25 @@ impl rand_core::RngCore for Rng {
         self.read(dest);
     }
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core06::Error> {
         self.read(dest);
         Ok(())
+    }
+}
+
+#[instability::unstable]
+impl rand_core09::RngCore for Rng {
+    fn next_u32(&mut self) -> u32 {
+        self.random()
+    }
+    fn next_u64(&mut self) -> u64 {
+        let upper = self.random() as u64;
+        let lower = self.random() as u64;
+
+        (upper << 32) | lower
+    }
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.read(dest);
     }
 }
 
@@ -227,7 +246,8 @@ impl Drop for Trng<'_> {
 }
 
 /// Implementing RngCore trait from rand_core for `Trng` structure
-impl rand_core::RngCore for Trng<'_> {
+#[instability::unstable]
+impl rand_core06::RngCore for Trng<'_> {
     fn next_u32(&mut self) -> u32 {
         self.rng.next_u32()
     }
@@ -240,14 +260,30 @@ impl rand_core::RngCore for Trng<'_> {
         self.rng.fill_bytes(dest)
     }
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core06::Error> {
         self.rng.try_fill_bytes(dest)
+    }
+}
+
+#[instability::unstable]
+impl rand_core09::RngCore for Trng<'_> {
+    fn next_u32(&mut self) -> u32 {
+        self.rng.next_u32()
+    }
+    fn next_u64(&mut self) -> u64 {
+        self.rng.next_u64()
+    }
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.rng.fill_bytes(dest)
     }
 }
 
 /// Implementing a CryptoRng marker trait that indicates that the generator is
 /// cryptographically secure.
-impl rand_core::CryptoRng for Trng<'_> {}
+#[instability::unstable]
+impl rand_core06::CryptoRng for Trng<'_> {}
+#[instability::unstable]
+impl rand_core09::CryptoRng for Trng<'_> {}
 
 impl Sealed for Trng<'_> {}
 

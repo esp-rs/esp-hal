@@ -43,7 +43,7 @@
 //!     peripherals.I2S0,
 //!     Standard::Philips,
 //!     DataFormat::Data16Channel16,
-//!     44100.Hz(),
+//!     Rate::from_hz(44100),
 //!     dma_channel,
 //!     rx_descriptors,
 //!     tx_descriptors,
@@ -55,14 +55,14 @@
 //!     .with_din(peripherals.GPIO5)
 //!     .build();
 //!
-//! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer).unwrap();
+//! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer)?;
 //!
 //! loop {
-//!     let avail = transfer.available().unwrap();
+//!     let avail = transfer.available()?;
 //!
 //!     if avail > 0 {
 //!         let mut rcv = [0u8; 5000];
-//!         transfer.pop(&mut rcv[..avail]).unwrap();
+//!         transfer.pop(&mut rcv[..avail])?;
 //!     }
 //! }
 //! # }
@@ -98,9 +98,11 @@ use crate::{
         WriteBuffer,
     },
     gpio::interconnect::PeripheralOutput,
+    i2s::AnyI2s,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     system::PeripheralGuard,
+    time::Rate,
     Async,
     Blocking,
     DriverMode,
@@ -332,7 +334,7 @@ impl<'d> I2s<'d, Blocking> {
         i2s: impl Peripheral<P = impl RegisterAccess> + 'd,
         standard: Standard,
         data_format: DataFormat,
-        sample_rate: impl Into<fugit::HertzU32>,
+        sample_rate: Rate,
         channel: impl Peripheral<P = CH> + 'd,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
@@ -462,7 +464,7 @@ impl<Dm> I2sTx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn write_bytes(&mut self, data: &[u8]) -> Result<(), Error> {
+    fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         self.start_tx_transfer(&data, false)?;
 
         // wait until I2S_TX_IDLE is 1
@@ -504,8 +506,8 @@ where
     }
 
     /// Writes a slice of data to the I2S peripheral.
-    pub fn write(&mut self, words: &[impl AcceptedWord]) -> Result<(), Error> {
-        self.write_bytes(unsafe {
+    pub fn write_words(&mut self, words: &[impl AcceptedWord]) -> Result<(), Error> {
+        self.write(unsafe {
             core::slice::from_raw_parts(words.as_ptr().cast::<u8>(), core::mem::size_of_val(words))
         })
     }
@@ -590,7 +592,7 @@ impl<Dm> I2sRx<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn read_bytes(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
+    fn read(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
         self.start_rx_transfer(&mut data, false)?;
 
         // wait until I2S_RX_IDLE is 1
@@ -633,12 +635,12 @@ where
 
     /// Reads a slice of data from the I2S peripheral and stores it in the
     /// provided buffer.
-    pub fn read(&mut self, words: &mut [impl AcceptedWord]) -> Result<(), Error> {
+    pub fn read_words(&mut self, words: &mut [impl AcceptedWord]) -> Result<(), Error> {
         if core::mem::size_of_val(words) > 4096 || words.is_empty() {
             return Err(Error::IllegalArgument);
         }
 
-        self.read_bytes(unsafe {
+        self.read(unsafe {
             core::slice::from_raw_parts_mut(
                 words.as_mut_ptr().cast::<u8>(),
                 core::mem::size_of_val(words),
@@ -681,7 +683,6 @@ impl<T> RegisterAccess for T where T: RegisterAccessPrivate {}
 
 mod private {
     use enumset::EnumSet;
-    use fugit::HertzU32;
 
     use super::*;
     #[cfg(not(i2s1))]
@@ -693,6 +694,7 @@ mod private {
             InputSignal,
             OutputSignal,
         },
+        i2s::AnyI2sInner,
         interrupt::InterruptHandler,
         peripheral::{Peripheral, PeripheralRef},
         peripherals::{Interrupt, I2S0},
@@ -1518,7 +1520,7 @@ mod private {
 
     impl RegisterAccessPrivate for I2S0 {
         fn set_interrupt_handler(&self, handler: InterruptHandler) {
-            for core in crate::Cpu::other() {
+            for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, Interrupt::I2S0);
             }
             unsafe { crate::peripherals::I2S0::steal() }.bind_i2s0_interrupt(handler.handler());
@@ -1627,7 +1629,7 @@ mod private {
     #[cfg(i2s1)]
     impl RegisterAccessPrivate for I2S1 {
         fn set_interrupt_handler(&self, handler: InterruptHandler) {
-            for core in crate::Cpu::other() {
+            for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, Interrupt::I2S1);
             }
             unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
@@ -1690,17 +1692,17 @@ mod private {
     impl RegBlock for super::AnyI2s {
         fn regs(&self) -> &RegisterBlock {
             match &self.0 {
-                super::AnyI2sInner::I2s0(i2s) => RegBlock::regs(i2s),
+                AnyI2sInner::I2s0(i2s) => RegBlock::regs(i2s),
                 #[cfg(i2s1)]
-                super::AnyI2sInner::I2s1(i2s) => RegBlock::regs(i2s),
+                AnyI2sInner::I2s1(i2s) => RegBlock::regs(i2s),
             }
         }
 
         delegate::delegate! {
             to match &self.0 {
-                super::AnyI2sInner::I2s0(i2s) => i2s,
+                AnyI2sInner::I2s0(i2s) => i2s,
                 #[cfg(i2s1)]
-                super::AnyI2sInner::I2s1(i2s) => i2s,
+                AnyI2sInner::I2s1(i2s) => i2s,
             } {
                 fn peripheral(&self) -> crate::system::Peripheral;
             }
@@ -1710,9 +1712,9 @@ mod private {
     impl RegisterAccessPrivate for super::AnyI2s {
         delegate::delegate! {
             to match &self.0 {
-                super::AnyI2sInner::I2s0(i2s) => i2s,
+                AnyI2sInner::I2s0(i2s) => i2s,
                 #[cfg(i2s1)]
-                super::AnyI2sInner::I2s1(i2s) => i2s,
+                AnyI2sInner::I2s1(i2s) => i2s,
             } {
                 fn set_interrupt_handler(&self, handler: InterruptHandler);
             }
@@ -1722,9 +1724,9 @@ mod private {
     impl Signals for super::AnyI2s {
         delegate::delegate! {
             to match &self.0 {
-                super::AnyI2sInner::I2s0(i2s) => i2s,
+                AnyI2sInner::I2s0(i2s) => i2s,
                 #[cfg(i2s1)]
-                super::AnyI2sInner::I2s1(i2s) => i2s,
+                AnyI2sInner::I2s1(i2s) => i2s,
             } {
                 fn mclk_signal(&self) -> OutputSignal;
                 fn bclk_signal(&self) -> OutputSignal;
@@ -1744,11 +1746,7 @@ mod private {
         numerator: u32,
     }
 
-    pub fn calculate_clock(
-        sample_rate: impl Into<fugit::HertzU32>,
-        channels: u8,
-        data_bits: u8,
-    ) -> I2sClockDividers {
+    pub fn calculate_clock(sample_rate: Rate, channels: u8, data_bits: u8) -> I2sClockDividers {
         // this loosely corresponds to `i2s_std_calculate_clock` and
         // `i2s_ll_tx_set_mclk` in esp-idf
         //
@@ -1759,8 +1757,7 @@ mod private {
         let mclk_multiple = if data_bits == 24 { 192 } else { 256 };
         let sclk = crate::soc::constants::I2S_SCLK; // for now it's fixed 160MHz and 96MHz (just H2)
 
-        let rate_hz: HertzU32 = sample_rate.into();
-        let rate = rate_hz.raw();
+        let rate = sample_rate.as_hz();
 
         let bclk = rate * channels as u32 * data_bits as u32;
         let mclk = rate * mclk_multiple;
@@ -2030,31 +2027,6 @@ pub mod asynch {
             let avail = self.available().await?;
             let to_rcv = usize::min(avail, data.len());
             Ok(self.state.pop(&mut data[..to_rcv])?)
-        }
-    }
-}
-
-crate::any_peripheral! {
-    /// Any SPI peripheral.
-    pub peripheral AnyI2s {
-        #[cfg(i2s0)]
-        I2s0(crate::peripherals::I2S0),
-        #[cfg(i2s1)]
-        I2s1(crate::peripherals::I2S1),
-    }
-}
-
-impl DmaEligible for AnyI2s {
-    #[cfg(gdma)]
-    type Dma = crate::dma::AnyGdmaChannel;
-    #[cfg(pdma)]
-    type Dma = crate::dma::AnyI2sDmaChannel;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            AnyI2sInner::I2s0(_) => crate::dma::DmaPeripheral::I2s0,
-            #[cfg(i2s1)]
-            AnyI2sInner::I2s1(_) => crate::dma::DmaPeripheral::I2s1,
         }
     }
 }

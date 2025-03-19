@@ -23,7 +23,9 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
@@ -37,10 +39,50 @@ mod tests {
 
     #[test]
     fn test_send_receive(mut ctx: Context) {
-        ctx.uart.write_bytes(&[0x42]).unwrap();
+        ctx.uart.write(&[0x42]).unwrap();
         let mut byte = [0u8; 1];
-        ctx.uart.read_bytes(&mut byte).unwrap();
+        ctx.uart.read(&mut byte).unwrap();
         assert_eq!(byte[0], 0x42);
+    }
+
+    #[test]
+    fn flush_waits_for_data_to_be_transmitted(mut ctx: Context) {
+        let bauds = [1000, 5000000];
+        for baud in bauds {
+            ctx.uart
+                .apply_config(&uart::Config::default().with_baudrate(baud))
+                .unwrap();
+            for i in 0..10 {
+                let mut byte = [0u8; 1];
+                ctx.uart.write(&[i as u8]).unwrap();
+                ctx.uart.flush().unwrap();
+
+                let read = ctx.uart.read_buffered(&mut byte).unwrap();
+                assert_eq!(read, 1, "Baud rate {}, iteration {}", baud, i);
+                assert_eq!(byte[0], i as u8, "Baud rate {}, iteration {}", baud, i);
+            }
+        }
+    }
+
+    #[test]
+    fn test_different_tolerance(mut ctx: Context) {
+        let configs = [
+            uart::Config::default()
+                .with_baudrate(19_200)
+                .with_baudrate_tolerance(uart::BaudrateTolerance::Exact),
+            uart::Config::default()
+                .with_baudrate(9600)
+                .with_baudrate_tolerance(uart::BaudrateTolerance::ErrorPercent(10)),
+        ];
+
+        for config in configs {
+            ctx.uart.apply_config(&config).unwrap();
+
+            ctx.uart.write(&[0x42]).unwrap();
+            let mut byte = [0u8; 1];
+            ctx.uart.read(&mut byte).unwrap();
+            assert_eq!(byte[0], 0x42);
+        }
     }
 
     #[test]
@@ -48,12 +90,12 @@ mod tests {
         const BUF_SIZE: usize = 128; // UART_FIFO_SIZE
 
         let data = [13; BUF_SIZE];
-        let written = ctx.uart.write_bytes(&data).unwrap();
+        let written = ctx.uart.write(&data).unwrap();
         assert_eq!(written, BUF_SIZE);
 
+        // Calls to read may not fill the buffer, wait until read returns 0
         let mut buffer = [0; BUF_SIZE];
-
-        ctx.uart.read_bytes(&mut buffer).unwrap();
+        embedded_io::Read::read_exact(&mut ctx.uart, &mut buffer).unwrap();
 
         assert_eq!(data, buffer);
     }
@@ -72,6 +114,9 @@ mod tests {
             #[cfg(esp32s2)]
             (9600, ClockSource::RefTick),
             (921_600, ClockSource::Apb),
+            (2_000_000, ClockSource::Apb),
+            (3_500_000, ClockSource::Apb),
+            (5_000_000, ClockSource::Apb),
         ];
 
         let mut byte_to_write = 0xA5;
@@ -83,9 +128,9 @@ mod tests {
                         .with_clock_source(clock_source),
                 )
                 .unwrap();
-            ctx.uart.write_bytes(&[byte_to_write]).unwrap();
+            ctx.uart.write(&[byte_to_write]).unwrap();
             let mut byte = [0u8; 1];
-            ctx.uart.read_bytes(&mut byte).unwrap();
+            ctx.uart.read(&mut byte).unwrap();
 
             assert_eq!(byte[0], byte_to_write);
             byte_to_write = !byte_to_write;

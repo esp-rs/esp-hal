@@ -11,14 +11,14 @@
 //!
 //! We can also run code from RTC memory.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![allow(static_mut_refs)]
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, main, ram, rtc_cntl::Rtc, time::ExtU64};
+use esp_hal::{delay::Delay, main, ram, rtc_cntl::Rtc, time::Duration};
 use esp_println::println;
 
 #[ram(rtc_fast)]
@@ -76,7 +76,7 @@ fn main() -> ! {
         assert_eq!(42, function_in_rtc_ram());
         function_in_ram(i);
         i = i.saturating_sub(1);
-        delay.delay(1.secs());
+        delay.delay(Duration::from_secs(1));
     }
 }
 

@@ -1,20 +1,21 @@
 [package]
-name         = "xtensa-lx-rt"
-version      = "0.18.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Minimal startup/runtime for Xtensa LX CPUs"
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
-keywords     = ["xtensa", "lx", "register", "peripheral"]
-categories   = ["embedded", "hardware-support", "no-std"]
+name          = "xtensa-lx-rt"
+version       = "0.18.0"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "Minimal startup/runtime for Xtensa LX CPUs"
+documentation = "https://docs.espressif.com/projects/rust/xtensa-lx-rt/latest/"
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+keywords      = ["lx", "peripheral", "register", "xtensa"]
+categories    = ["embedded", "hardware-support", "no-std"]
 
 [package.metadata.docs.rs]
 features = ["esp32"]
 
 [dependencies]
 document-features = "0.2.10"
-macros            = { version = "0.2.2", package = "xtensa-lx-rt-proc-macros", path = "./procmacros" }
+macros            = { version = "0.2.2", package = "xtensa-lx-rt-proc-macros", path = "../xtensa-lx-rt-proc-macros" }
 r0                = "1.0.0"
 xtensa-lx         = { version = "0.10.0", path = "../xtensa-lx" }
 

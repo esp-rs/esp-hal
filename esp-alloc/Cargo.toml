@@ -1,13 +1,14 @@
 [package]
-name         = "esp-alloc"
-version      = "0.6.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "A heap allocator for Espressif devices"
-keywords     = ["allocator", "embedded", "esp32", "espressif", "memory"]
-categories   = ["embedded", "memory-management", "no-std"]
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-alloc"
+version       = "0.7.0"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "A heap allocator for Espressif devices"
+documentation = "https://docs.espressif.com/projects/rust/esp-alloc/latest/"
+keywords      = ["allocator", "embedded", "esp32", "espressif", "memory"]
+categories    = ["embedded", "memory-management", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imc-unknown-none-elf"
@@ -19,7 +20,7 @@ cfg-if                = "1.0.0"
 critical-section      = "1.2.0"
 enumset               = "1.1.5"
 linked_list_allocator = { version = "0.10.5", default-features = false, features = ["const_mut_refs"] }
-document-features     = "0.2.10"
+document-features     = "0.2.11"
 
 [features]
 default = []

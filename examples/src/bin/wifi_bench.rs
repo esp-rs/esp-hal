@@ -8,7 +8,7 @@
 //! Ensure you have set the IP of your local machine in the `HOST_IP` env variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env variable before running this example.
 //!
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/utils esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -31,14 +31,7 @@ use esp_hal::{
 use esp_println::println;
 use esp_wifi::{
     init,
-    wifi::{
-        utils::create_network_interface,
-        AccessPointInfo,
-        ClientConfiguration,
-        Configuration,
-        WifiError,
-        WifiStaDevice,
-    },
+    wifi::{AccessPointInfo, ClientConfiguration, Configuration, WifiError},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
@@ -49,7 +42,7 @@ const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 const HOST_IP: &str = env!("HOST_IP");
 
-const TEST_DURATION: Duration = Duration::secs(15);
+const TEST_DURATION: Duration = Duration::from_secs(15);
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
 const IO_BUFFER_SIZE: usize = 1024;
@@ -63,7 +56,7 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(72 * 1024);
+    esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
@@ -71,11 +64,17 @@ fn main() -> ! {
 
     let mut rng = Rng::new(peripherals.RNG);
 
-    let init = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
-    let mut wifi = peripherals.WIFI;
-    let (iface, device, mut controller) =
-        create_network_interface(&init, &mut wifi, WifiStaDevice).unwrap();
+    let (mut controller, interfaces) =
+        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+
+    let mut device = interfaces.sta;
+    let iface = create_interface(&mut device);
+
+    controller
+        .set_power_saving(esp_wifi::config::PowerSaveMode::None)
+        .unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let mut socket_set = SocketSet::new(&mut socket_set_entries[..]);
@@ -87,7 +86,7 @@ fn main() -> ! {
     }]);
     socket_set.add(dhcp_socket);
 
-    let now = || time::now().duration_since_epoch().to_millis();
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
@@ -170,7 +169,7 @@ fn test_download<'a, D: smoltcp::phy::Device>(
     let mut buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let deadline = time::now() + TEST_DURATION;
+    let deadline = time::Instant::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Ok(len) = socket.read(&mut buf) {
@@ -179,12 +178,12 @@ fn test_download<'a, D: smoltcp::phy::Device>(
             break;
         }
 
-        if time::now() > deadline {
+        if time::Instant::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
+    let kbps = (total + 512) / 1024 / TEST_DURATION.as_secs();
     println!("download: {} kB/s", kbps);
 
     socket.disconnect();
@@ -204,7 +203,7 @@ fn test_upload<'a, D: smoltcp::phy::Device>(
     let buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let deadline = time::now() + TEST_DURATION;
+    let deadline = time::Instant::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Ok(len) = socket.write(&buf) {
@@ -213,12 +212,12 @@ fn test_upload<'a, D: smoltcp::phy::Device>(
             break;
         }
 
-        if time::now() > deadline {
+        if time::Instant::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
+    let kbps = (total + 512) / 1024 / TEST_DURATION.as_secs();
     println!("upload: {} kB/s", kbps);
 
     socket.disconnect();
@@ -239,7 +238,7 @@ fn test_upload_download<'a, D: smoltcp::phy::Device>(
     let mut rx_buf = [0; IO_BUFFER_SIZE];
 
     let mut total = 0;
-    let deadline = time::now() + TEST_DURATION;
+    let deadline = time::Instant::now() + TEST_DURATION;
     loop {
         socket.work();
         if let Err(_) = socket.write(&tx_buf) {
@@ -254,13 +253,34 @@ fn test_upload_download<'a, D: smoltcp::phy::Device>(
             break;
         }
 
-        if time::now() > deadline {
+        if time::Instant::now() > deadline {
             break;
         }
     }
 
-    let kbps = (total + 512) / 1024 / TEST_DURATION.to_secs();
+    let kbps = (total + 512) / 1024 / TEST_DURATION.as_secs();
     println!("upload+download: {} kB/s", kbps);
 
     socket.disconnect();
+}
+
+// some smoltcp boilerplate
+fn timestamp() -> smoltcp::time::Instant {
+    smoltcp::time::Instant::from_micros(
+        esp_hal::time::Instant::now()
+            .duration_since_epoch()
+            .as_micros() as i64,
+    )
+}
+
+pub fn create_interface(device: &mut esp_wifi::wifi::WifiDevice) -> smoltcp::iface::Interface {
+    // users could create multiple instances but since they only have one WifiDevice
+    // they probably can't do anything bad with that
+    smoltcp::iface::Interface::new(
+        smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(
+            smoltcp::wire::EthernetAddress::from_bytes(&device.mac_address()),
+        )),
+        device,
+        timestamp(),
+    )
 }

@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, dma::Mem2Mem, dma_buffers, main, time::ExtU64};
+use esp_hal::{delay::Delay, dma::Mem2Mem, dma_buffers, main, time::Duration};
 use log::{error, info};
 
 const DATA_SIZE: usize = 1024 * 10;
@@ -71,6 +71,6 @@ fn main() -> ! {
     }
 
     loop {
-        delay.delay(2.secs());
+        delay.delay(Duration::from_secs(2));
     }
 }

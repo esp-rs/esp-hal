@@ -1,14 +1,11 @@
 use crate::{
     compat::timer_compat::TIMERS,
-    preempt::arch_specific::task_create,
-    timer::{systimer_count, yield_task},
+    preempt::{task_create, yield_task},
+    time::systimer_count,
 };
 
-/// Initializes the `main` and `timer` tasks for the Wi-Fi driver.
+/// Initializes the `timer` task for the Wi-Fi driver.
 pub(crate) fn init_tasks() {
-    // allocate the main task
-    crate::preempt::allocate_main_task();
-
     // schedule the timer task
     task_create(timer_task, core::ptr::null_mut(), 8192);
 }

@@ -1,6 +1,6 @@
 #![cfg_attr(
     all(docsrs, not(not_really_docsrs)),
-    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.esp-rs.org/esp-hal/'>browse the <code>esp-hal</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C6, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs change depending on the chip.</p></div>\n\n<br/>\n\n"
+    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.espressif.com/projects/rust/'>browse the <code>esp-hal</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C6, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
 //! # Bare-metal (`no_std`) HAL for all Espressif ESP32 devices.
 //!
@@ -62,17 +62,19 @@
 //! #![no_std]
 //! #![no_main]
 //!
-//! // You'll need a panic handler e.g. `use esp_backtrace as _;`
-//! # #[panic_handler]
-//! # fn panic(_ : &core::panic::PanicInfo) -> ! {
-//! #     loop {}
-//! # }
 //! use esp_hal::{
 //!     clock::CpuClock,
-//!     delay::Delay,
 //!     gpio::{Io, Level, Output, OutputConfig},
 //!     main,
+//!     time::{Duration, Instant},
 //! };
+//!
+//! // You need a panic handler. Usually, you you would use esp_backtrace, panic-probe, or
+//! // something similar, but you can also bring your own like this:
+//! #[panic_handler]
+//! fn panic(_: &core::panic::PanicInfo) -> ! {
+//!     esp_hal::system::software_reset()
+//! }
 //!
 //! #[main]
 //! fn main() -> ! {
@@ -80,14 +82,13 @@
 //!     let peripherals = esp_hal::init(config);
 //!
 //!     // Set GPIO0 as an output, and set its state high initially.
-//!     let config = OutputConfig::default().with_level(Level::High);
-//!     let mut led = Output::new(peripherals.GPIO0, config).unwrap();
-//!
-//!     let delay = Delay::new();
+//!     let mut led = Output::new(peripherals.GPIO0, Level::High, OutputConfig::default());
 //!
 //!     loop {
 //!         led.toggle();
-//!         delay.delay_millis(1000);
+//!         // Wait for half a second
+//!         let delay_start = Instant::now();
+//!         while delay_start.elapsed() < Duration::from_millis(500) {}
 //!     }
 //! }
 //! ```
@@ -155,9 +156,6 @@ pub use esp_riscv_rt::{self, riscv};
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use xtensa_lx_rt::{self, xtensa_lx};
 
-// TODO what should we reexport stably?
-#[cfg(any(esp32, esp32s3))]
-pub use self::soc::cpu_control;
 #[cfg(efuse)]
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
@@ -169,7 +167,7 @@ pub use self::soc::lp_core;
 pub use self::soc::peripherals;
 pub(crate) use self::soc::peripherals::pac;
 #[instability::unstable]
-#[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+#[cfg(feature = "psram")]
 pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
 #[instability::unstable]
@@ -187,6 +185,8 @@ pub mod peripheral;
 mod reg_access;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
+pub mod system;
+pub mod time;
 #[cfg(any(uart0, uart1, uart2))]
 pub mod uart;
 
@@ -229,7 +229,7 @@ pub(crate) use unstable_module;
 unstable_module! {
     #[cfg(aes)]
     pub mod aes;
-    #[cfg(any(adc, dac))]
+    #[cfg(any(adc1, adc2, dac))]
     pub mod analog;
     pub mod asynch;
     #[cfg(assist_debug)]
@@ -262,8 +262,6 @@ unstable_module! {
     pub mod parl_io;
     #[cfg(pcnt)]
     pub mod pcnt;
-    #[cfg(any(lp_clkrst, rtc_cntl))]
-    pub mod reset;
     #[cfg(rmt)]
     pub mod rmt;
     #[cfg(rng)]
@@ -277,9 +275,6 @@ unstable_module! {
     pub mod sha;
     #[doc(hidden)]
     pub mod sync;
-    #[cfg(any(dport, hp_sys, pcr, system))]
-    pub mod system;
-    pub mod time;
     #[cfg(any(systimer, timg0, timg1))]
     pub mod timer;
     #[cfg(touch)]
@@ -295,6 +290,8 @@ unstable_module! {
 }
 
 /// State of the CPU saved when entering exception or interrupt
+#[instability::unstable]
+#[allow(unused_imports)]
 pub mod trapframe {
     #[cfg(riscv)]
     pub use esp_riscv_rt::TrapFrame;
@@ -315,15 +312,51 @@ WARNING: use --release
   peripherals and/or devices.
 "}
 
-/// A marker trait for initializing drivers in a specific mode.
+/// A marker trait for driver modes.
+///
+/// Different driver modes offer different features and different API. Using
+/// this trait as a generic parameter ensures that the driver is initialized in
+/// the correct mode.
 pub trait DriverMode: crate::private::Sealed {}
 
-/// Driver initialized in blocking mode.
+/// Marker type signalling that a driver is initialized in blocking mode.
+///
+/// Drivers are constructed in blocking mode by default. To learn about the
+/// differences between blocking and async drivers, see the [`Async`] mode
+/// documentation.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Blocking;
 
-/// Driver initialized in async mode.
+/// Marker type signalling that a driver is initialized in async mode.
+///
+/// Drivers are constructed in blocking mode by default. To set up an async
+/// driver, a [`Blocking`] driver must be converted to an `Async` driver using
+/// the `into_async` method. Drivers can be converted back to blocking mode
+/// using the `into_blocking` method.
+///
+/// Async mode drivers offer most of the same features as blocking drivers, but
+/// with the addition of async APIs. Interrupt-related functions are not
+/// available in async mode, as they are handled by the driver's interrupt
+/// handlers.
+///
+/// Note that async functions usually take up more space than their blocking
+/// counterparts, and they are generally slower. This is because async functions
+/// are implemented using a state machine that is driven by interrupts and is
+/// polled by a runtime. For short operations, the overhead of the state machine
+/// can be significant. Consider using the blocking functions on the async
+/// driver for small transfers.
+///
+/// When initializing an async driver, the driver disables user-specified
+/// interrupt handlers, and sets up internal interrupt handlers that drive the
+/// driver's async API. The driver's interrupt handlers run on the same core as
+/// the driver was initialized on. This means that the driver can not be sent
+/// across threads, to prevent incorrect concurrent access to the peripheral.
+///
+/// Switching back to blocking mode will disable the interrupt handlers and
+/// return the driver to a state where it can be sent across threads.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Async(PhantomData<*const ()>);
 
 unsafe impl Sync for Async {}
@@ -334,6 +367,8 @@ impl crate::private::Sealed for Blocking {}
 impl crate::private::Sealed for Async {}
 
 pub(crate) mod private {
+    use core::mem::ManuallyDrop;
+
     pub trait Sealed {}
 
     #[non_exhaustive]
@@ -355,6 +390,23 @@ pub(crate) mod private {
         /// need for this function.
         pub unsafe fn conjure() -> Self {
             Self
+        }
+    }
+
+    pub(crate) struct OnDrop<F: FnOnce()>(ManuallyDrop<F>);
+    impl<F: FnOnce()> OnDrop<F> {
+        pub fn new(cb: F) -> Self {
+            Self(ManuallyDrop::new(cb))
+        }
+
+        pub fn defuse(self) {
+            core::mem::forget(self);
+        }
+    }
+
+    impl<F: FnOnce()> Drop for OnDrop<F> {
+        fn drop(&mut self) {
+            unsafe { (ManuallyDrop::take(&mut self.0))() }
         }
     }
 }
@@ -405,97 +457,6 @@ pub mod __macro_implementation {
     pub use xtensa_lx_rt::entry as __entry;
 }
 
-/// Available CPU cores
-///
-/// The actual number of available cores depends on the target.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::FromRepr)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[repr(C)]
-pub enum Cpu {
-    /// The first core
-    ProCpu = 0,
-    /// The second core
-    #[cfg(multi_core)]
-    AppCpu = 1,
-}
-
-impl Cpu {
-    /// The number of available cores.
-    pub const COUNT: usize = 1 + cfg!(multi_core) as usize;
-
-    /// Returns the core the application is currently executing on
-    #[inline(always)]
-    pub fn current() -> Self {
-        // This works for both RISCV and Xtensa because both
-        // get_raw_core functions return zero, _or_ something
-        // greater than zero; 1 in the case of RISCV and 0x2000
-        // in the case of Xtensa.
-        match raw_core() {
-            0 => Cpu::ProCpu,
-            #[cfg(all(multi_core, riscv))]
-            1 => Cpu::AppCpu,
-            #[cfg(all(multi_core, xtensa))]
-            0x2000 => Cpu::AppCpu,
-            _ => unreachable!(),
-        }
-    }
-
-    /// Returns an iterator over the "other" cores.
-    #[inline(always)]
-    pub(crate) fn other() -> impl Iterator<Item = Self> {
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
-                match Self::current() {
-                    Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
-                    Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
-                }
-            } else {
-                [].into_iter()
-            }
-        }
-    }
-
-    /// Returns an iterator over all cores.
-    #[inline(always)]
-    pub(crate) fn all() -> impl Iterator<Item = Self> {
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
-                [Cpu::ProCpu, Cpu::AppCpu].into_iter()
-            } else {
-                [Cpu::ProCpu].into_iter()
-            }
-        }
-    }
-}
-
-/// Returns the raw value of the mhartid register.
-///
-/// Safety: This method should never return UNUSED_THREAD_ID_VALUE
-#[cfg(riscv)]
-#[inline(always)]
-fn raw_core() -> usize {
-    #[cfg(multi_core)]
-    {
-        riscv::register::mhartid::read()
-    }
-
-    #[cfg(not(multi_core))]
-    0
-}
-
-/// Returns the result of reading the PRID register logically ANDed with 0x2000,
-/// the 13th bit in the register. Espressif Xtensa chips use this bit to
-/// determine the core id.
-///
-/// Returns either 0 or 0x2000
-///
-/// Safety: This method should never return UNUSED_THREAD_ID_VALUE
-#[cfg(xtensa)]
-#[inline(always)]
-fn raw_core() -> usize {
-    (xtensa_lx::get_processor_id() & 0x2000) as usize
-}
-
 #[cfg(riscv)]
 #[export_name = "hal_main"]
 fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
@@ -512,7 +473,10 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
         let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
         // we _should_ use a random value but we don't have a good source for random
         // numbers here
-        stack_chk_guard.write_volatile(0xdeadbabe);
+        stack_chk_guard.write_volatile(esp_config::esp_config_int!(
+            u32,
+            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+        ));
 
         main(a0, a1, a2);
     }
@@ -539,21 +503,21 @@ use crate::{
 ///
 /// For usage examples, see the [config module documentation](crate::config).
 #[non_exhaustive]
-#[derive(Default, procmacros::BuilderLite)]
+#[derive(Default, Clone, Copy, procmacros::BuilderLite)]
 pub struct Config {
     /// The CPU clock configuration.
-    pub cpu_clock: CpuClock,
+    cpu_clock: CpuClock,
 
     /// Enable watchdog timer(s).
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    pub watchdog: WatchdogConfig,
+    watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
     #[cfg(any(doc, feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
-    pub psram: psram::PsramConfig,
+    #[cfg(feature = "psram")]
+    psram: psram::PsramConfig,
 }
 
 /// Initialize the system.
@@ -561,6 +525,8 @@ pub struct Config {
 /// This function sets up the CPU clock and watchdog, then, returns the
 /// peripherals and clocks.
 pub fn init(config: Config) -> Peripherals {
+    crate::soc::pre_init();
+
     system::disable_peripherals();
 
     let mut peripherals = Peripherals::take();
@@ -573,13 +539,13 @@ pub fn init(config: Config) -> Peripherals {
         if #[cfg(feature = "unstable")]
         {
             #[cfg(not(any(esp32, esp32s2)))]
-            if config.watchdog.swd {
+            if config.watchdog.swd() {
                 rtc.swd.enable();
             } else {
                 rtc.swd.disable();
             }
 
-            match config.watchdog.rwdt {
+            match config.watchdog.rwdt() {
                 WatchdogStatus::Enabled(duration) => {
                     rtc.rwdt.enable();
                     rtc.rwdt
@@ -590,7 +556,7 @@ pub fn init(config: Config) -> Peripherals {
                 }
             }
 
-            match config.watchdog.timg0 {
+            match config.watchdog.timg0() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new();
                     timg0_wd.enable();
@@ -602,7 +568,7 @@ pub fn init(config: Config) -> Peripherals {
             }
 
             #[cfg(timg1)]
-            match config.watchdog.timg1 {
+            match config.watchdog.timg1() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new();
                     timg1_wd.enable();
@@ -634,7 +600,7 @@ pub fn init(config: Config) -> Peripherals {
 
     crate::gpio::bind_default_interrupt_handler();
 
-    #[cfg(any(feature = "quad-psram", feature = "octal-psram"))]
+    #[cfg(feature = "psram")]
     crate::psram::init_psram(config.psram);
 
     peripherals

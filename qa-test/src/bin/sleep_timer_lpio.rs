@@ -23,7 +23,7 @@ use esp_hal::{
         Rtc,
         SocResetReason,
     },
-    Cpu,
+    system::Cpu,
 };
 use esp_println::println;
 
@@ -35,7 +35,7 @@ fn main() -> ! {
 
     let mut pin2 = peripherals.GPIO2;
     let mut pin3 = peripherals.GPIO3;
-    let input = Input::new(&mut pin2, InputConfig::default().with_pull(Pull::None)).unwrap();
+    let input = Input::new(&mut pin2, InputConfig::default().with_pull(Pull::None));
 
     println!("up and runnning!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);

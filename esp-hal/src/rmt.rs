@@ -56,9 +56,9 @@
 //! # use esp_hal::rmt::TxChannelConfig;
 //! # use esp_hal::rmt::Rmt;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
-#![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
-#![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+#![cfg_attr(esp32h2, doc = "let freq = Rate::from_mhz(32);")]
+#![cfg_attr(not(esp32h2), doc = "let freq = Rate::from_mhz(80);")]
+//! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure(
@@ -71,8 +71,8 @@
 //!             .with_carrier_high(1)
 //!             .with_carrier_low(1)
 //!             .with_carrier_level(Level::Low),
-//!     )
-//!     .unwrap();
+//!     )?;
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -84,16 +84,15 @@
 //! # use esp_hal::rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator};
 //!
 //! // Configure frequency based on chip type
-#![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
-#![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+#![cfg_attr(esp32h2, doc = "let freq = Rate::from_mhz(32);")]
+#![cfg_attr(not(esp32h2), doc = "let freq = Rate::from_mhz(80);")]
+//! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //!
 //! let tx_config = TxChannelConfig::default().with_clk_divider(255);
 //!
 //! let mut channel = rmt
 //!     .channel0
-//!     .configure(peripherals.GPIO4, tx_config)
-//!     .unwrap();
+//!     .configure(peripherals.GPIO4, tx_config)?;
 //!
 //! let delay = Delay::new();
 //!
@@ -102,8 +101,8 @@
 //! data[data.len() - 1] = PulseCode::empty();
 //!
 //! loop {
-//!     let transaction = channel.transmit(&data).unwrap();
-//!     channel = transaction.wait().unwrap();
+//!     let transaction = channel.transmit(&data)?;
+//!     channel = transaction.wait()?;
 //!     delay.delay_millis(500);
 //! }
 //! # }
@@ -118,28 +117,31 @@
 //!
 //! const WIDTH: usize = 80;
 //!
-//! let config = OutputConfig::default().with_level(Level::Low);
-//! let mut out = Output::new(peripherals.GPIO5, config).unwrap();
+//! let mut out = Output::new(
+//!     peripherals.GPIO5,
+//!     Level::Low,
+//!     OutputConfig::default(),
+//! );
 //!
 //! // Configure frequency based on chip type
-#![cfg_attr(esp32h2, doc = "let freq = 32.MHz();")]
-#![cfg_attr(not(esp32h2), doc = "let freq = 80.MHz();")]
-//! let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+#![cfg_attr(esp32h2, doc = "let freq = Rate::from_mhz(32);")]
+#![cfg_attr(not(esp32h2), doc = "let freq = Rate::from_mhz(80);")]
+//! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //!
 //! let rx_config = RxChannelConfig::default()
 //!     .with_clk_divider(1)
 //!     .with_idle_threshold(10000);
 #![cfg_attr(
     any(esp32, esp32s2),
-    doc = "let mut channel = rmt.channel0.configure(peripherals.GPIO4, rx_config).unwrap();"
+    doc = "let mut channel = rmt.channel0.configure(peripherals.GPIO4, rx_config)?;"
 )]
 #![cfg_attr(
     esp32s3,
-    doc = "let mut channel = rmt.channel7.configure(peripherals.GPIO4, rx_config).unwrap();"
+    doc = "let mut channel = rmt.channel7.configure(peripherals.GPIO4, rx_config)?;"
 )]
 #![cfg_attr(
     not(any(esp32, esp32s2, esp32s3)),
-    doc = "let mut channel = rmt.channel2.configure(peripherals.GPIO4, rx_config).unwrap();"
+    doc = "let mut channel = rmt.channel2.configure(peripherals.GPIO4, rx_config)?;"
 )]
 //! let delay = Delay::new();
 //! let mut data: [u32; 48] = [PulseCode::empty(); 48];
@@ -149,7 +151,7 @@
 //!         x.reset()
 //!     }
 //!
-//!     let transaction = channel.receive(&mut data).unwrap();
+//!     let transaction = channel.receive(&mut data)?;
 //!
 //!     // Simulate input
 //!     for i in 0u32..5u32 {
@@ -225,7 +227,6 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use fugit::HertzU32;
 
 use crate::{
     asynch::AtomicWaker,
@@ -234,11 +235,11 @@ use crate::{
         Level,
     },
     handler,
-    interrupt::InterruptConfigurable,
     peripheral::Peripheral,
     peripherals::{Interrupt, RMT},
     soc::constants,
     system::{self, GenericPeripheralGuard},
+    time::Rate,
     Async,
     Blocking,
 };
@@ -321,19 +322,19 @@ impl PulseCode for u32 {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TxChannelConfig {
     /// Channel's clock divider
-    pub clk_divider: u8,
+    clk_divider: u8,
     /// Set the idle output level to low/high
-    pub idle_output_level: Level,
+    idle_output_level: Level,
     /// Enable idle output
-    pub idle_output: bool,
+    idle_output: bool,
     /// Enable carrier modulation
-    pub carrier_modulation: bool,
+    carrier_modulation: bool,
     /// Carrier high phase in ticks
-    pub carrier_high: u16,
+    carrier_high: u16,
     /// Carrier low phase in ticks
-    pub carrier_low: u16,
+    carrier_low: u16,
     /// Level of the carrier
-    pub carrier_level: Level,
+    carrier_level: Level,
 }
 
 impl Default for TxChannelConfig {
@@ -355,19 +356,19 @@ impl Default for TxChannelConfig {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxChannelConfig {
     /// Channel's clock divider
-    pub clk_divider: u8,
+    clk_divider: u8,
     /// Enable carrier demodulation
-    pub carrier_modulation: bool,
+    carrier_modulation: bool,
     /// Carrier high phase in ticks
-    pub carrier_high: u16,
+    carrier_high: u16,
     /// Carrier low phase in ticks
-    pub carrier_low: u16,
+    carrier_low: u16,
     /// Level of the carrier
-    pub carrier_level: Level,
+    carrier_level: Level,
     /// Filter threshold in ticks
-    pub filter_threshold: u8,
+    filter_threshold: u8,
     /// Idle threshold in ticks
-    pub idle_threshold: u16,
+    idle_threshold: u16,
 }
 
 impl Default for RxChannelConfig {
@@ -392,7 +393,7 @@ where
 {
     pub(crate) fn new_internal(
         peripheral: impl Peripheral<P = RMT> + 'd,
-        frequency: HertzU32,
+        frequency: Rate,
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
         me.configure_clock(frequency)?;
@@ -400,8 +401,8 @@ where
     }
 
     #[cfg(any(esp32, esp32s2))]
-    fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
-        if frequency != HertzU32::MHz(80) {
+    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
+        if frequency != Rate::from_mhz(80) {
             return Err(Error::UnreachableTargetFrequency);
         }
 
@@ -411,7 +412,7 @@ where
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
-    fn configure_clock(&self, frequency: HertzU32) -> Result<(), Error> {
+    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
 
         if frequency > src_clock {
@@ -432,10 +433,7 @@ where
 
 impl<'d> Rmt<'d, Blocking> {
     /// Create a new RMT instance
-    pub fn new(
-        peripheral: impl Peripheral<P = RMT> + 'd,
-        frequency: HertzU32,
-    ) -> Result<Self, Error> {
+    pub fn new(peripheral: impl Peripheral<P = RMT> + 'd, frequency: Rate) -> Result<Self, Error> {
         Self::new_internal(peripheral, frequency)
     }
 
@@ -444,13 +442,14 @@ impl<'d> Rmt<'d, Blocking> {
         self.set_interrupt_handler(async_interrupt_handler);
         Rmt::create(self.peripheral)
     }
-}
 
-impl crate::private::Sealed for Rmt<'_, Blocking> {}
-
-impl InterruptConfigurable for Rmt<'_, Blocking> {
-    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        for core in crate::Cpu::other() {
+    /// Registers an interrupt handler for the RMT peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::RMT);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::RMT, handler.handler()) };
@@ -458,14 +457,19 @@ impl InterruptConfigurable for Rmt<'_, Blocking> {
     }
 }
 
+impl crate::private::Sealed for Rmt<'_, Blocking> {}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.set_interrupt_handler(handler);
+    }
+}
+
 fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
     pin: impl Peripheral<P = P> + 'd,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
-    if config.filter_threshold > 0b111_1111 {
-        return Err(Error::InvalidArgument);
-    }
-
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s2))] {
             let threshold = 0b111_1111_1111_1111;
@@ -495,11 +499,7 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
     Ok(T::new())
 }
 
-fn configure_tx_channel<
-    'd,
-    P: PeripheralOutput,
-    T: TxChannelInternal,
->(
+fn configure_tx_channel<'d, P: PeripheralOutput, T: TxChannelInternal>(
     pin: impl Peripheral<P = P> + 'd,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
@@ -1478,72 +1478,40 @@ fn async_interrupt_handler() {
     };
     match channel {
         0 => {
-            <Channel<Async, 0> as TxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
-            <Channel<Async, 0> as RxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
+            <Channel<Async, 0> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
+            <Channel<Async, 0> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
         1 => {
-            <Channel<Async, 1> as TxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
-            <Channel<Async, 1> as RxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
+            <Channel<Async, 1> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
+            <Channel<Async, 1> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
         2 => {
-            <Channel<Async, 2> as TxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
-            <Channel<Async, 2> as RxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
+            <Channel<Async, 2> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
+            <Channel<Async, 2> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
         3 => {
-            <Channel<Async, 3> as TxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
-            <Channel<Async, 3> as RxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
+            <Channel<Async, 3> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
+            <Channel<Async, 3> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
         #[cfg(esp32)]
         4 => {
-            <Channel<Async, 4> as TxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
-            <Channel<Async, 4> as RxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
+            <Channel<Async, 4> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
+            <Channel<Async, 4> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
         #[cfg(any(esp32, esp32s3))]
         5 => {
-            <Channel<Async, 5> as TxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
-            <Channel<Async, 5> as RxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
+            <Channel<Async, 5> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
+            <Channel<Async, 5> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
         #[cfg(any(esp32, esp32s3))]
         6 => {
-            <Channel<Async, 6> as TxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
-            <Channel<Async, 6> as RxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
+            <Channel<Async, 6> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
+            <Channel<Async, 6> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
         #[cfg(any(esp32, esp32s3))]
         7 => {
-            <Channel<Async, 7> as TxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
-            <Channel<Async, 7> as RxChannelInternal>::unlisten_interrupt(
-                Event::End | Event::Error,
-            );
+            <Channel<Async, 7> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
+            <Channel<Async, 7> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
 
         _ => unreachable!(),
@@ -1792,7 +1760,10 @@ mod chip_specific {
 
     macro_rules! impl_tx_channel {
         ($signal:ident, $ch_num:literal) => {
-            impl<Dm> $crate::rmt::TxChannelInternal for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
+            impl<Dm> $crate::rmt::TxChannelInternal for $crate::rmt::Channel<Dm, $ch_num>
+            where
+                Dm: $crate::DriverMode,
+            {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -1967,7 +1938,10 @@ mod chip_specific {
 
     macro_rules! impl_rx_channel {
         ($signal:ident, $ch_num:literal, $ch_index:literal) => {
-            impl<Dm> $crate::rmt::RxChannelInternal for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
+            impl<Dm> $crate::rmt::RxChannelInternal for $crate::rmt::Channel<Dm, $ch_num>
+            where
+                Dm: $crate::DriverMode,
+            {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -2173,7 +2147,10 @@ mod chip_specific {
 
     macro_rules! impl_tx_channel {
         ($signal:ident, $ch_num:literal) => {
-            impl<Dm> super::TxChannelInternal for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
+            impl<Dm> super::TxChannelInternal for $crate::rmt::Channel<Dm, $ch_num>
+            where
+                Dm: $crate::DriverMode,
+            {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {
@@ -2339,7 +2316,10 @@ mod chip_specific {
 
     macro_rules! impl_rx_channel {
         ($signal:ident, $ch_num:literal) => {
-            impl<Dm> super::RxChannelInternal for $crate::rmt::Channel<Dm, $ch_num> where Dm: $crate::DriverMode {
+            impl<Dm> super::RxChannelInternal for $crate::rmt::Channel<Dm, $ch_num>
+            where
+                Dm: $crate::DriverMode,
+            {
                 const CHANNEL: u8 = $ch_num;
 
                 fn new() -> Self {

@@ -59,7 +59,7 @@ pub(super) struct osi_funcs_s {
     task_create: Option<
         unsafe extern "C" fn(
             *mut crate::binary::c_types::c_void,
-            *const u8,
+            *const crate::binary::c_types::c_char,
             u32,
             *mut crate::binary::c_types::c_void,
             u32,

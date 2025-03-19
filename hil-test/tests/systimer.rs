@@ -14,7 +14,7 @@ use embedded_hal::delay::DelayNs;
 use esp_hal::{
     delay::Delay,
     handler,
-    time::ExtU64,
+    time::Duration,
     timer::{
         systimer::{Alarm, SystemTimer},
         OneShotTimer,
@@ -111,7 +111,7 @@ mod tests {
         critical_section::with(|cs| {
             alarm0.set_interrupt_handler(pass_test_if_called);
             alarm0.enable_interrupt(true);
-            alarm0.schedule(10_u64.millis()).unwrap();
+            alarm0.schedule(Duration::from_millis(10)).unwrap();
 
             ALARM_TARGET.borrow_ref_mut(cs).replace(alarm0);
         });
@@ -130,11 +130,11 @@ mod tests {
         critical_section::with(|cs| {
             alarm0.set_interrupt_handler(target_fail_test_if_called_twice);
             alarm0.enable_interrupt(true);
-            alarm0.schedule(10_u64.millis()).unwrap();
+            alarm0.schedule(Duration::from_millis(10)).unwrap();
 
             alarm1.set_interrupt_handler(handle_periodic_interrupt);
             alarm1.enable_interrupt(true);
-            alarm1.start(100u64.millis()).unwrap();
+            alarm1.start(Duration::from_millis(100)).unwrap();
 
             ALARM_TARGET.borrow_ref_mut(cs).replace(alarm0);
             ALARM_PERIODIC.borrow_ref_mut(cs).replace(alarm1);
@@ -153,7 +153,7 @@ mod tests {
         critical_section::with(|cs| {
             alarm1.set_interrupt_handler(pass_test_if_called_twice);
             alarm1.enable_interrupt(true);
-            alarm1.start(100u64.millis()).unwrap();
+            alarm1.start(Duration::from_millis(100)).unwrap();
 
             ALARM_PERIODIC.borrow_ref_mut(cs).replace(alarm1);
         });

@@ -26,7 +26,7 @@ use esp_hal::{
     delay::Delay,
     i2c::master::{Config, I2c},
     main,
-    time::ExtU64,
+    time::Duration,
 };
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
@@ -86,7 +86,7 @@ fn main() -> ! {
         display.clear(BinaryColor::Off).unwrap();
 
         // Wait 5 seconds
-        delay.delay(5.secs());
+        delay.delay(Duration::from_secs(5));
 
         // Write single-line centered text "Hello World" to buffer
         Text::with_alignment(
@@ -104,6 +104,6 @@ fn main() -> ! {
         display.clear(BinaryColor::Off).unwrap();
 
         // Wait 5 seconds
-        delay.delay(5.secs());
+        delay.delay(Duration::from_secs(5));
     }
 }

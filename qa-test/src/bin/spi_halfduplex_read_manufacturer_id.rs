@@ -9,7 +9,7 @@
 //! - CS          =>  GPIO5
 //!
 //! The following wiring is assumed for ESP32:
-//! - SCLK        =>  GPIO0
+//! - SCLK        =>  GPIO12
 //! - MISO/IO0    =>  GPIO2
 //! - MOSI/IO1    =>  GPIO4
 //! - IO2         =>  GPIO5
@@ -37,17 +37,18 @@ use esp_hal::{
         DataMode,
         Mode,
     },
-    time::RateExtU32,
+    time::Rate,
 };
 use esp_println::println;
 
 #[main]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let sclk = peripherals.GPIO0;
+            let sclk = peripherals.GPIO12;
             let miso = peripherals.GPIO2;
             let mosi = peripherals.GPIO4;
             let sio2 = peripherals.GPIO5;
@@ -66,7 +67,7 @@ fn main() -> ! {
     let mut spi = Spi::new(
         peripherals.SPI2,
         Config::default()
-            .with_frequency(100.kHz())
+            .with_frequency(Rate::from_khz(100))
             .with_mode(Mode::_0),
     )
     .unwrap()

@@ -36,10 +36,10 @@ mod tests {
             .unwrap()
             .with_tx(tx);
 
-        tx.flush();
-        tx.write_bytes(&[0x42]).unwrap();
+        tx.flush().unwrap();
+        tx.write(&[0x42]).unwrap();
         let mut byte = [0u8; 1];
-        rx.read_bytes(&mut byte).unwrap();
+        rx.read(&mut byte).unwrap();
 
         assert_eq!(byte[0], 0x42);
     }

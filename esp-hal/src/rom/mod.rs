@@ -113,21 +113,21 @@ pub(crate) fn rtc_get_reset_reason(cpu_num: u32) -> u32 {
 }
 
 #[inline(always)]
-pub(crate) fn software_reset_cpu() {
+pub(crate) fn software_reset_cpu(cpu_num: u32) {
     extern "C" {
-        fn software_reset_cpu();
+        fn software_reset_cpu(cpu_num: u32);
     }
 
-    unsafe { software_reset_cpu() };
+    unsafe { software_reset_cpu(cpu_num) };
 }
 
 #[inline(always)]
-pub(crate) fn software_reset() {
+pub(crate) fn software_reset() -> ! {
     extern "C" {
-        fn software_reset();
+        fn software_reset() -> !;
     }
 
-    unsafe { software_reset() };
+    unsafe { software_reset() }
 }
 
 #[cfg(esp32s3)]

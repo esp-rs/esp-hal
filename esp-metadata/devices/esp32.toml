@@ -52,7 +52,8 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "adc",
+    "adc1",
+    "adc2",
     "dac",
     "pdma",
     "phy",

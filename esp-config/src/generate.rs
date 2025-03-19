@@ -3,13 +3,16 @@ use std::{
     env,
     fmt::{self, Write as _},
     fs,
+    io::Write,
     ops::Range,
     path::PathBuf,
 };
 
+use serde::Serialize;
+
 const DOC_TABLE_HEADER: &str = r#"
-| Name | Description | Default value |
-|------|-------------|---------------|
+| Name | Description | Default value | Allowed value |
+|------|-------------|---------------|---------------|
 "#;
 
 const SELECTED_TABLE_HEADER: &str = r#"
@@ -54,7 +57,7 @@ impl fmt::Display for Error {
 }
 
 /// Supported configuration value types.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum Value {
     /// Booleans.
     Bool(bool),
@@ -145,6 +148,7 @@ impl fmt::Display for Value {
 }
 
 /// Configuration value validation functions.
+#[derive(Serialize)]
 pub enum Validator {
     /// Only allow negative integers, i.e. any values less than 0.
     NegativeInteger,
@@ -155,8 +159,22 @@ pub enum Validator {
     PositiveInteger,
     /// Ensure that an integer value falls within the specified range.
     IntegerInRange(Range<i128>),
+    /// String-Enumeration. Only allows one of the given Strings.
+    Enumeration(Vec<String>),
     /// A custom validation function to run against any supported value type.
+    #[serde(serialize_with = "serialize_custom")]
+    #[serde(untagged)]
     Custom(Box<dyn Fn(&Value) -> Result<(), Error>>),
+}
+
+fn serialize_custom<S>(
+    _: &Box<dyn Fn(&Value) -> Result<(), Error>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str("Custom")
 }
 
 impl Validator {
@@ -166,10 +184,58 @@ impl Validator {
             Validator::NonNegativeInteger => non_negative_integer(value)?,
             Validator::PositiveInteger => positive_integer(value)?,
             Validator::IntegerInRange(range) => integer_in_range(range, value)?,
+            Validator::Enumeration(values) => enumeration(values, value)?,
             Validator::Custom(validator_fn) => validator_fn(value)?,
         }
 
         Ok(())
+    }
+
+    fn description(&self) -> Option<String> {
+        match self {
+            Validator::NegativeInteger => Some(String::from("Negative integer")),
+            Validator::NonNegativeInteger => Some(String::from("Positive integer or 0")),
+            Validator::PositiveInteger => Some(String::from("Positive integer")),
+            Validator::IntegerInRange(range) => {
+                Some(format!("Integer in range {}..{}", range.start, range.end))
+            }
+            Validator::Enumeration(values) => Some(format!("Any of {:?}", values)),
+            Validator::Custom(_) => None,
+        }
+    }
+
+    fn emit_cargo_extras<W: Write>(&self, stdout: &mut W, config_key: &str) {
+        match self {
+            Validator::Enumeration(values) => {
+                let config_key = snake_case(config_key);
+                for value in values {
+                    writeln!(
+                        stdout,
+                        "cargo:rustc-check-cfg=cfg({config_key}_{})",
+                        snake_case(value)
+                    )
+                    .ok();
+                }
+            }
+            _ => (),
+        }
+    }
+}
+
+fn enumeration(values: &Vec<String>, value: &Value) -> Result<(), Error> {
+    if let Value::String(value) = value {
+        if !values.contains(value) {
+            return Err(Error::validation(format!(
+                "Expected one of {:?}, found '{}'",
+                values, value
+            )));
+        }
+
+        Ok(())
+    } else {
+        return Err(Error::parse(
+            "Validator::Enumeration can only be used with string values",
+        ));
     }
 }
 
@@ -253,12 +319,21 @@ pub fn generate_config(
     config: &[(&str, &str, Value, Option<Validator>)],
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
+    generate_config_internal(&mut std::io::stdout(), crate_name, config, emit_md_tables)
+}
+
+pub fn generate_config_internal<W: Write>(
+    stdout: &mut W,
+    crate_name: &str,
+    config: &[(&str, &str, Value, Option<Validator>)],
+    emit_md_tables: bool,
+) -> HashMap<String, Value> {
     // Only rebuild if `build.rs` changed. Otherwise, Cargo will rebuild if any
     // other file changed.
-    println!("cargo:rerun-if-changed=build.rs");
+    writeln!(stdout, "cargo:rerun-if-changed=build.rs").ok();
 
     #[cfg(not(test))]
-    env_change_work_around();
+    env_change_work_around(stdout);
 
     let mut doc_table = String::from(DOC_TABLE_HEADER);
     let mut selected_config = String::from(SELECTED_TABLE_HEADER);
@@ -281,7 +356,7 @@ pub fn generate_config(
         })
         .collect::<HashMap<_, _>>();
 
-    let mut configs = create_config(&prefix, config, &mut doc_table);
+    let mut configs = create_config(stdout, &prefix, config, &mut doc_table);
     capture_from_env(&prefix, &mut configs);
 
     for (name, value) in configs.iter() {
@@ -290,7 +365,20 @@ pub fn generate_config(
         }
     }
 
-    emit_configuration(&prefix, &configs, &mut selected_config);
+    let validators: HashMap<String, &Validator> = config
+        .iter()
+        .filter_map(|(name, _, _, validator)| {
+            if validator.is_some() {
+                Some((snake_case(name), validator.as_ref().unwrap()))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    emit_configuration(stdout, &prefix, &configs, &validators, &mut selected_config);
+
+    write_config_json(snake_case(crate_name), config, &configs);
 
     if emit_md_tables {
         let file_name = snake_case(crate_name);
@@ -300,11 +388,58 @@ pub fn generate_config(
     configs
 }
 
+fn write_config_json(
+    crate_name: String,
+    config: &[(&str, &str, Value, Option<Validator>)],
+    selected_config: &HashMap<String, Value>,
+) {
+    #[derive(Serialize)]
+    struct Item<'a> {
+        name: String,
+        description: String,
+        default_value: Value,
+        actual_value: Value,
+        constraint: &'a Option<Validator>,
+    }
+
+    let mut to_write: Vec<Item<'_>> = Vec::new();
+    for item in config.iter() {
+        let option_name = format!(
+            "{}_CONFIG_{}",
+            screaming_snake_case(&crate_name),
+            screaming_snake_case(&item.0)
+        );
+        let val = match selected_config.get(&option_name) {
+            Some(val) => val.clone(),
+            None => item.2.clone(),
+        };
+
+        to_write.push(Item {
+            name: item.0.to_string(),
+            description: item.1.to_string(),
+            default_value: item.2.clone(),
+            actual_value: val,
+            constraint: &item.3,
+        })
+    }
+
+    #[cfg(not(test))]
+    {
+        let json = serde_json::to_string(&to_write).unwrap();
+        let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+        let out_file = out_dir
+            .join(format!("{crate_name}_config_data.json"))
+            .display()
+            .to_string();
+        fs::write(out_file, json).unwrap();
+    }
+}
+
 // A work-around for https://github.com/rust-lang/cargo/issues/10358
 // This can be removed when https://github.com/rust-lang/cargo/pull/14058 is merged.
 // Unlikely to work on projects in workspaces
 #[cfg(not(test))]
-fn env_change_work_around() {
+fn env_change_work_around<W: Write>(stdout: &mut W) {
     let mut out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
     // We clean out_dir by removing all trailing directories, until it ends with
@@ -319,37 +454,53 @@ fn env_change_work_around() {
     let dotcargo = out_dir.join(".cargo/");
     if dotcargo.exists() {
         if dotcargo.join("config.toml").exists() {
-            println!(
+            writeln!(
+                stdout,
                 "cargo:rerun-if-changed={}",
                 dotcargo.join("config.toml").display()
-            );
+            )
+            .ok();
         }
         if dotcargo.join("config").exists() {
-            println!(
+            writeln!(
+                stdout,
                 "cargo:rerun-if-changed={}",
                 dotcargo.join("config").display()
-            );
+            )
+            .ok();
         }
     }
 }
 
-fn create_config(
+fn create_config<W: Write>(
+    stdout: &mut W,
     prefix: &str,
     config: &[(&str, &str, Value, Option<Validator>)],
     doc_table: &mut String,
 ) -> HashMap<String, Value> {
     let mut configs = HashMap::new();
 
-    for (name, description, default, _validator) in config {
+    for (name, description, default, validator) in config {
         let name = format!("{prefix}{}", screaming_snake_case(name));
+        let allowed_values = if let Some(validator) = validator {
+            validator.description()
+        } else {
+            None
+        }
+        .unwrap_or(String::from("-"));
+
         configs.insert(name.clone(), default.clone());
 
         // Write documentation table line:
         let default = default.to_string();
-        writeln!(doc_table, "|**{name}**|{description}|{default}|").unwrap();
+        writeln!(
+            doc_table,
+            "|**{name}**|{description}|{default}|{allowed_values}"
+        )
+        .unwrap();
 
         // Rebuild if config environment variable changed:
-        println!("cargo:rerun-if-env-changed={name}");
+        writeln!(stdout, "cargo:rerun-if-env-changed={name}").ok();
     }
 
     configs
@@ -382,24 +533,37 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
     }
 }
 
-fn emit_configuration(
+fn emit_configuration<W: Write>(
+    stdout: &mut W,
     prefix: &str,
     configs: &HashMap<String, Value>,
+    validators: &HashMap<String, &Validator>,
     selected_config: &mut String,
 ) {
     for (name, value) in configs.iter() {
         let cfg_name = snake_case(name.trim_start_matches(prefix));
-        println!("cargo:rustc-check-cfg=cfg({cfg_name})");
+        writeln!(stdout, "cargo:rustc-check-cfg=cfg({cfg_name})").ok();
 
         if let Value::Bool(true) = value {
-            println!("cargo:rustc-cfg={cfg_name}");
+            writeln!(stdout, "cargo:rustc-cfg={cfg_name}").ok();
+        }
+
+        if let Value::String(value) = value {
+            if let Some(Validator::Enumeration(_)) = validators.get(&cfg_name) {
+                let value = format!("{}_{}", cfg_name, snake_case(value));
+                writeln!(stdout, "cargo:rustc-cfg={value}").ok();
+            }
         }
 
         let value = value.to_string();
 
         // Values that haven't been seen will be output here with the default value:
-        println!("cargo:rustc-env={}={}", name, value);
+        writeln!(stdout, "cargo:rustc-env={}={}", name, value).ok();
         writeln!(selected_config, "|**{name}**|{value}|").unwrap();
+    }
+
+    for (name, validator) in validators {
+        validator.emit_cargo_extras(stdout, &name);
     }
 }
 
@@ -695,5 +859,34 @@ mod test {
                 );
             },
         );
+    }
+
+    #[test]
+    fn enumeration_validator() {
+        let mut stdout = Vec::new();
+        temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
+            generate_config_internal(
+                &mut stdout,
+                "esp-test",
+                &[(
+                    "some-key",
+                    "NA",
+                    Value::String("variant-0".to_string()),
+                    Some(Validator::Enumeration(vec![
+                        "variant-0".to_string(),
+                        "variant-1".to_string(),
+                    ])),
+                )],
+                false,
+            );
+        });
+
+        let cargo_lines: Vec<&str> = std::str::from_utf8(&stdout).unwrap().lines().collect();
+        println!("{:#?}", cargo_lines);
+        assert!(cargo_lines.contains(&"cargo:rustc-check-cfg=cfg(some_key)"));
+        assert!(cargo_lines.contains(&"cargo:rustc-env=ESP_TEST_CONFIG_SOME_KEY=variant-0"));
+        assert!(cargo_lines.contains(&"cargo:rustc-check-cfg=cfg(some_key_variant_0)"));
+        assert!(cargo_lines.contains(&"cargo:rustc-check-cfg=cfg(some_key_variant_1)"));
+        assert!(cargo_lines.contains(&"cargo:rustc-cfg=some_key_variant_0"));
     }
 }

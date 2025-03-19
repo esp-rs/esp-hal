@@ -513,16 +513,16 @@ __default_naked_exception:
 .Ldefault_naked_exception_start:
     SAVE_CONTEXT 1
 
+    l32i    a6, sp, +XT_STK_EXCCAUSE  // put cause in a6 = a2 in callee
+    mov     a7, sp                    // put address of save frame in a7=a3 in callee
+
+    beqi    a6, 4, .Level1Interrupt   // Handle Level1 interrupt
+
     movi    a0, (PS_INTLEVEL_EXCM | PS_WOE)
     wsr     a0, PS
     rsync
 
-    l32i    a6, sp, +XT_STK_EXCCAUSE  // put cause in a6 = a2 in callee
-    beqi    a6, 4, .Level1Interrupt
-
-    mov     a7, sp                    // put address of save frame in a7=a3 in callee
     call4   __exception               // call handler <= actual call!
-
     j       .RestoreContext
 
 .Level1Interrupt:
@@ -531,7 +531,6 @@ __default_naked_exception:
     rsync
 
     movi    a6, 1                     // put interrupt level in a6 = a2 in callee
-    mov     a7, sp                    // put address of save frame in a7=a3 in callee
     call4   __level_1_interrupt       // call handler <= actual call!
 
 .RestoreContext:
@@ -717,7 +716,7 @@ _WindowOverflow8:
         s32e    a6, a0, -24
         s32e    a7, a0, -20
         rfwo
-    
+
     .section .WindowUnderflow8.text,\"ax\",@progbits
     .global _WindowUnderflow8
     .p2align 2

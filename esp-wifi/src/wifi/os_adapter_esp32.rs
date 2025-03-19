@@ -9,11 +9,11 @@ pub(crate) fn chip_ints_off(mask: u32) {
 }
 
 pub(crate) unsafe extern "C" fn phy_common_clock_disable() {
-    crate::common_adapter::chip_specific::phy_disable_clock();
+    crate::common_adapter::phy_disable_clock();
 }
 
 pub(crate) unsafe extern "C" fn phy_common_clock_enable() {
-    crate::common_adapter::chip_specific::phy_enable_clock();
+    crate::common_adapter::phy_enable_clock();
 }
 
 pub(crate) unsafe extern "C" fn set_intr(

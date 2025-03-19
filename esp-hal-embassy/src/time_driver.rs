@@ -10,7 +10,7 @@ use embassy_time_driver::Driver;
 use esp_hal::{
     interrupt::{InterruptHandler, Priority},
     sync::Locked,
-    time::{now, ExtU64},
+    time::{Duration, Instant},
     timer::OneShotTimer,
     Blocking,
 };
@@ -92,8 +92,8 @@ impl Alarm {
 /// which we do here. This trait needs us to be able to tell the current time,
 /// as well as to schedule a wake-up at a certain time.
 ///
-/// We are free to choose how we implement these features, and we provide three
-/// options:
+/// We are free to choose how we implement these features, and we provide
+/// three options:
 ///
 /// - If the `generic` feature is enabled, we implement a single timer queue,
 ///   using the implementation provided by embassy-time-queue-driver.
@@ -203,11 +203,10 @@ impl EmbassyTimer {
     /// Returns `true` if the timer was armed, `false` if the timestamp is in
     /// the past.
     fn arm(timer: &mut Timer, timestamp: u64) -> bool {
-        let now = now().duration_since_epoch();
-        let ts = timestamp.micros();
+        let now = Instant::now().duration_since_epoch().as_micros();
 
-        if ts > now {
-            let timeout = ts - now;
+        if timestamp > now {
+            let timeout = Duration::from_micros(timestamp - now);
             unwrap!(timer.schedule(timeout));
             true
         } else {
@@ -295,7 +294,7 @@ impl EmbassyTimer {
 
 impl Driver for EmbassyTimer {
     fn now(&self) -> u64 {
-        now().ticks()
+        Instant::now().duration_since_epoch().as_micros()
     }
 
     fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {

@@ -22,8 +22,8 @@ use esp_hal::{
         LcdCam,
     },
     peripherals::Peripherals,
+    time::Rate,
 };
-use fugit::RateExtU32;
 use hil_test as _;
 
 struct Context {
@@ -73,34 +73,34 @@ mod tests {
         let (d6_in, d6_out) = peripherals.GPIO17.split();
         let (d7_in, d7_out) = peripherals.GPIO16.split();
 
-        let mut config = dpi::Config::default();
-        config.clock_mode = ClockMode {
-            polarity: Polarity::IdleHigh,
-            phase: Phase::ShiftLow,
-        };
-        config.frequency = 500u32.kHz();
-        config.format = Format {
-            enable_2byte_mode: false,
-            ..Default::default()
-        };
-        // Send a 50x50 video
-        config.timing = FrameTiming {
-            horizontal_total_width: 65,
-            hsync_width: 5,
-            horizontal_blank_front_porch: 10,
-            horizontal_active_width: 50,
+        let config = dpi::Config::default()
+            .with_clock_mode(ClockMode {
+                polarity: Polarity::IdleHigh,
+                phase: Phase::ShiftLow,
+            })
+            .with_frequency(Rate::from_khz(500))
+            .with_format(Format {
+                enable_2byte_mode: false,
+                ..Default::default()
+            })
+            // Send a 50x50 video
+            .with_timing(FrameTiming {
+                horizontal_total_width: 65,
+                hsync_width: 5,
+                horizontal_blank_front_porch: 10,
+                horizontal_active_width: 50,
 
-            vertical_total_height: 65,
-            vsync_width: 5,
-            vertical_blank_front_porch: 10,
-            vertical_active_height: 50,
+                vertical_total_height: 65,
+                vsync_width: 5,
+                vertical_blank_front_porch: 10,
+                vertical_active_height: 50,
 
-            hsync_position: 0,
-        };
-        config.vsync_idle_level = Level::High;
-        config.hsync_idle_level = Level::High;
-        config.de_idle_level = Level::Low;
-        config.disable_black_region = false;
+                hsync_position: 0,
+            })
+            .with_vsync_idle_level(Level::High)
+            .with_hsync_idle_level(Level::High)
+            .with_de_idle_level(Level::Low)
+            .with_disable_black_region(false);
 
         let dpi = Dpi::new(lcd_cam.lcd, tx_channel, config)
             .unwrap()
@@ -117,14 +117,11 @@ mod tests {
             .with_data6(d6_out)
             .with_data7(d7_out);
 
-        let mut cam_config = cam::Config::default();
-        cam_config.frequency = 1u32.MHz();
-
         let camera = Camera::new(
             lcd_cam.cam,
             rx_channel,
             RxEightBits::new(d0_in, d1_in, d2_in, d3_in, d4_in, d5_in, d6_in, d7_in),
-            cam_config,
+            cam::Config::default().with_frequency(Rate::from_mhz(1)),
         )
         .unwrap()
         .with_ctrl_pins_and_de(vsync_in, hsync_in, de_in)

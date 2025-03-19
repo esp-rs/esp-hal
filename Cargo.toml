@@ -25,5 +25,5 @@ exclude  = [
     "qa-test",
     "xtensa-lx",
     "xtensa-lx-rt",
-    "xtensa-lx-rt/procmacros",
+    "xtensa-lx-rt-proc-macros",
 ]

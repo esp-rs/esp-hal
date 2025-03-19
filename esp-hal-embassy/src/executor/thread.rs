@@ -3,9 +3,9 @@
 use core::marker::PhantomData;
 
 use embassy_executor::Spawner;
-#[cfg(multi_core)]
+#[cfg(all(low_power_wait, multi_core))]
 use esp_hal::interrupt::software::SoftwareInterrupt;
-use esp_hal::{interrupt::Priority, Cpu};
+use esp_hal::{interrupt::Priority, system::Cpu};
 #[cfg(low_power_wait)]
 use portable_atomic::{AtomicBool, Ordering};
 
@@ -55,7 +55,7 @@ pub struct Executor {
 impl Executor {
     /// Create a new Executor.
     #[cfg_attr(
-        multi_core,
+        all(multi_core, low_power_wait),
         doc = r#"
 
 This will use software-interrupt 3 which isn't available for anything else to wake the other core(s)."#
@@ -63,6 +63,9 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     pub fn new() -> Self {
         Self {
             inner: InnerExecutor::new(
+                // Priority 1 means the timer queue can be accessed at interrupt priority 1 - for
+                // the thread mode executor it needs to be one higher than the base run level, to
+                // allow alarm interrupts to be handled.
                 Priority::Priority1,
                 (THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut (),
             ),
@@ -91,6 +94,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
+        #[cfg(all(multi_core, low_power_wait))]
         unwrap!(esp_hal::interrupt::enable(
             esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
             Priority::min(),

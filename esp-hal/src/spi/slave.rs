@@ -45,10 +45,10 @@
 //! let mut send = tx_buffer;
 //!
 //! let transfer = spi
-//!     .transfer(&mut receive, &mut send)
-//!     .unwrap();
+//!     .transfer(&mut receive, &mut send)?;
 //!
-//! transfer.wait().unwrap();
+//! transfer.wait()?;
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -85,6 +85,7 @@ use crate::{
     spi::AnySpi,
     system::PeripheralGuard,
     Blocking,
+    DriverMode,
 };
 
 const MAX_DMA_SIZE: usize = 32768 - 32;
@@ -93,7 +94,7 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 ///
 /// See the [module-level documentation][self] for more details.
 #[instability::unstable]
-pub struct Spi<'d, Dm> {
+pub struct Spi<'d, Dm: DriverMode> {
     spi: PeripheralRef<'d, AnySpi>,
     #[allow(dead_code)]
     data_mode: Mode,

@@ -6,12 +6,11 @@
 
 use core::marker::PhantomData;
 
-use fugit::HertzU32;
-
 use super::PeripheralGuard;
 use crate::{
     mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral},
     pac,
+    time::Rate,
 };
 
 /// A MCPWM timer
@@ -120,7 +119,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 /// [`PeripheralClockConfig::timer_clock_with_frequency`](super::PeripheralClockConfig::timer_clock_with_frequency) to it.
 #[derive(Copy, Clone)]
 pub struct TimerClockConfig {
-    frequency: HertzU32,
+    frequency: Rate,
     period: u16,
     period_updating_method: PeriodUpdatingMethod,
     prescaler: u8,
@@ -154,7 +153,7 @@ impl TimerClockConfig {
         clock: &PeripheralClockConfig,
         period: u16,
         mode: PwmWorkingMode,
-        target_freq: HertzU32,
+        target_freq: Rate,
     ) -> Result<Self, FrequencyError> {
         let cycle_period = match mode {
             PwmWorkingMode::Increase | PwmWorkingMode::Decrease => period as u32 + 1,
@@ -162,13 +161,13 @@ impl TimerClockConfig {
             PwmWorkingMode::UpDown => period as u32 * 2,
         };
         let target_timer_frequency = target_freq
-            .raw()
+            .as_hz()
             .checked_mul(cycle_period)
             .ok_or(FrequencyError)?;
         if target_timer_frequency == 0 || target_freq > clock.frequency {
             return Err(FrequencyError);
         }
-        let prescaler = clock.frequency.raw() / target_timer_frequency - 1;
+        let prescaler = clock.frequency.as_hz() / target_timer_frequency - 1;
         if prescaler > u8::MAX as u32 {
             return Err(FrequencyError);
         }
@@ -195,7 +194,7 @@ impl TimerClockConfig {
     ///
     /// ### Note:
     /// The actual value is rounded down to the nearest `u32` value
-    pub fn frequency(&self) -> HertzU32 {
+    pub fn frequency(&self) -> Rate {
         self.frequency
     }
 }

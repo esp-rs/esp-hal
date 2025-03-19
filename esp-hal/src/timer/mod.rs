@@ -22,6 +22,7 @@
 //! let mut one_shot = OneShotTimer::new(timg0.timer0);
 //!
 //! one_shot.delay_millis(500);
+//! # Ok(())
 //! # }
 //! ```
 //! 
@@ -33,24 +34,28 @@
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut periodic = PeriodicTimer::new(timg0.timer0);
 //!
-//! periodic.start(1.secs());
+//! periodic.start(Duration::from_secs(1));
 //! loop {
 //!    periodic.wait();
 //! }
 //! # }
 //! ```
 
-use core::marker::PhantomData;
-
-use fugit::{ExtU64, Instant, MicrosDurationU64};
+use core::{
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use crate::{
+    asynch::AtomicWaker,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
+    system::Cpu,
+    time::{Duration, Instant},
     Async,
     Blocking,
-    Cpu,
     DriverMode,
 };
 
@@ -74,29 +79,37 @@ pub enum Error {
 }
 
 /// Functionality provided by any timer peripheral.
-pub trait Timer: Into<AnyTimer> + InterruptConfigurable + 'static + crate::private::Sealed {
+pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
     /// Start the timer.
+    #[doc(hidden)]
     fn start(&self);
 
     /// Stop the timer.
+    #[doc(hidden)]
     fn stop(&self);
 
     /// Reset the timer value to 0.
+    #[doc(hidden)]
     fn reset(&self);
 
     /// Is the timer running?
+    #[doc(hidden)]
     fn is_running(&self) -> bool;
 
     /// The current timer value.
-    fn now(&self) -> Instant<u64, 1, 1_000_000>;
+    #[doc(hidden)]
+    fn now(&self) -> Instant;
 
     /// Load a target value into the timer.
-    fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
+    #[doc(hidden)]
+    fn load_value(&self, value: Duration) -> Result<(), Error>;
 
     /// Enable auto reload of the loaded value.
+    #[doc(hidden)]
     fn enable_auto_reload(&self, auto_reload: bool);
 
     /// Enable or disable the timer's interrupt.
+    #[doc(hidden)]
     fn enable_interrupt(&self, state: bool);
 
     /// Clear the timer's interrupt.
@@ -105,21 +118,23 @@ pub trait Timer: Into<AnyTimer> + InterruptConfigurable + 'static + crate::priva
     /// Has the timer triggered?
     fn is_interrupt_set(&self) -> bool;
 
-    /// Asynchronously wait for the timer interrupt to fire.
-    ///
-    /// Requires the correct `InterruptHandler` to be installed to function
-    /// correctly.
-    async fn wait(&self);
-
     /// Returns the HAL provided async interrupt handler
+    #[doc(hidden)]
     fn async_interrupt_handler(&self) -> InterruptHandler;
 
     /// Returns the interrupt source for the underlying timer
     fn peripheral_interrupt(&self) -> Interrupt;
+
+    /// Configures the interrupt handler.
+    #[doc(hidden)]
+    fn set_interrupt_handler(&self, handler: InterruptHandler);
+
+    #[doc(hidden)]
+    fn waker(&self) -> &AtomicWaker;
 }
 
 /// A one-shot timer.
-pub struct OneShotTimer<'d, Dm> {
+pub struct OneShotTimer<'d, Dm: DriverMode> {
     inner: PeripheralRef<'d, AnyTimer>,
     _ph: PhantomData<Dm>,
 }
@@ -137,7 +152,7 @@ impl<'d> OneShotTimer<'d, Blocking> {
 
 impl<'d> OneShotTimer<'d, Blocking> {
     /// Converts the driver to [`Async`] mode.
-    pub fn into_async(mut self) -> OneShotTimer<'d, Async> {
+    pub fn into_async(self) -> OneShotTimer<'d, Async> {
         let handler = self.inner.async_interrupt_handler();
         self.inner.set_interrupt_handler(handler);
         OneShotTimer {
@@ -159,25 +174,69 @@ impl OneShotTimer<'_, Async> {
 
     /// Delay for *at least* `ns` nanoseconds.
     pub async fn delay_nanos_async(&mut self, ns: u32) {
-        self.delay_async(MicrosDurationU64::from_ticks(ns.div_ceil(1000) as u64))
+        self.delay_async(Duration::from_micros(ns.div_ceil(1000) as u64))
             .await
     }
 
     /// Delay for *at least* `ms` milliseconds.
     pub async fn delay_millis_async(&mut self, ms: u32) {
-        self.delay_async((ms as u64).millis()).await;
+        self.delay_async(Duration::from_millis(ms as u64)).await;
     }
 
     /// Delay for *at least* `us` microseconds.
     pub async fn delay_micros_async(&mut self, us: u32) {
-        self.delay_async((us as u64).micros()).await;
+        self.delay_async(Duration::from_micros(us as u64)).await;
     }
 
-    async fn delay_async(&mut self, us: MicrosDurationU64) {
+    async fn delay_async(&mut self, us: Duration) {
         unwrap!(self.schedule(us));
-        self.inner.wait().await;
+
+        WaitFuture::new(self.inner.reborrow()).await;
+
         self.stop();
         self.clear_interrupt();
+    }
+}
+
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+struct WaitFuture<'d> {
+    timer: PeripheralRef<'d, AnyTimer>,
+}
+
+impl<'d> WaitFuture<'d> {
+    fn new(timer: impl Peripheral<P = AnyTimer> + 'd) -> Self {
+        crate::into_ref!(timer);
+        // For some reason, on the S2 we need to enable the interrupt before we
+        // read its status. Doing so in the other order causes the interrupt
+        // request to never be fired.
+        timer.enable_interrupt(true);
+        Self { timer }
+    }
+
+    fn is_done(&self) -> bool {
+        self.timer.is_interrupt_set()
+    }
+}
+
+impl core::future::Future for WaitFuture<'_> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Interrupts are enabled, so we need to register the waker before we check for
+        // done. Otherwise we might miss the interrupt that would wake us.
+        self.timer.waker().register(ctx.waker());
+
+        if self.is_done() {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+impl Drop for WaitFuture<'_> {
+    fn drop(&mut self) {
+        self.timer.enable_interrupt(false);
     }
 }
 
@@ -187,20 +246,20 @@ where
 {
     /// Delay for *at least* `ms` milliseconds.
     pub fn delay_millis(&mut self, ms: u32) {
-        self.delay((ms as u64).millis());
+        self.delay(Duration::from_millis(ms as u64));
     }
 
     /// Delay for *at least* `us` microseconds.
     pub fn delay_micros(&mut self, us: u32) {
-        self.delay((us as u64).micros());
+        self.delay(Duration::from_micros(us as u64));
     }
 
     /// Delay for *at least* `ns` nanoseconds.
     pub fn delay_nanos(&mut self, ns: u32) {
-        self.delay((ns.div_ceil(1000) as u64).micros())
+        self.delay(Duration::from_micros(ns.div_ceil(1000) as u64))
     }
 
-    fn delay(&mut self, us: MicrosDurationU64) {
+    fn delay(&mut self, us: Duration) {
         self.schedule(us).unwrap();
 
         while !self.inner.is_interrupt_set() {
@@ -212,7 +271,7 @@ where
     }
 
     /// Start counting until the given timeout and raise an interrupt
-    pub fn schedule(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
+    pub fn schedule(&mut self, timeout: Duration) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();
         }
@@ -235,6 +294,7 @@ where
     /// Set the interrupt handler
     ///
     /// Note that this will replace any previously set interrupt handler
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }
@@ -274,7 +334,7 @@ impl embedded_hal_async::delay::DelayNs for OneShotTimer<'_, Async> {
 }
 
 /// A periodic timer.
-pub struct PeriodicTimer<'d, Dm> {
+pub struct PeriodicTimer<'d, Dm: DriverMode> {
     inner: PeripheralRef<'d, AnyTimer>,
     _ph: PhantomData<Dm>,
 }
@@ -295,7 +355,7 @@ where
     Dm: DriverMode,
 {
     /// Start a new count down.
-    pub fn start(&mut self, timeout: MicrosDurationU64) -> Result<(), Error> {
+    pub fn start(&mut self, period: Duration) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();
         }
@@ -304,7 +364,7 @@ where
         self.inner.reset();
 
         self.inner.enable_auto_reload(true);
-        self.inner.load_value(timeout)?;
+        self.inner.load_value(period)?;
         self.inner.start();
 
         Ok(())
@@ -330,6 +390,7 @@ where
     /// Set the interrupt handler
     ///
     /// Note that this will replace any previously set interrupt handler
+    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }
@@ -345,7 +406,7 @@ where
     }
 }
 
-impl<Dm> crate::private::Sealed for PeriodicTimer<'_, Dm> {}
+impl<Dm> crate::private::Sealed for PeriodicTimer<'_, Dm> where Dm: DriverMode {}
 
 impl<Dm> InterruptConfigurable for PeriodicTimer<'_, Dm>
 where
@@ -376,27 +437,16 @@ impl Timer for AnyTimer {
             fn stop(&self);
             fn reset(&self);
             fn is_running(&self) -> bool;
-            fn now(&self) -> Instant<u64, 1, 1_000_000>;
-            fn load_value(&self, value: MicrosDurationU64) -> Result<(), Error>;
+            fn now(&self) -> Instant;
+            fn load_value(&self, value: Duration) -> Result<(), Error>;
             fn enable_auto_reload(&self, auto_reload: bool);
             fn enable_interrupt(&self, state: bool);
             fn clear_interrupt(&self);
             fn is_interrupt_set(&self) -> bool;
-            async fn wait(&self);
             fn async_interrupt_handler(&self) -> InterruptHandler;
             fn peripheral_interrupt(&self) -> Interrupt;
-        }
-    }
-}
-
-impl InterruptConfigurable for AnyTimer {
-    delegate::delegate! {
-        to match &mut self.0 {
-            AnyTimerInner::TimgTimer(inner) => inner,
-            #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarm(inner) => inner,
-        } {
-            fn set_interrupt_handler(&mut self, handler: InterruptHandler);
+            fn set_interrupt_handler(&self, handler: InterruptHandler);
+            fn waker(&self) -> &AtomicWaker;
         }
     }
 }

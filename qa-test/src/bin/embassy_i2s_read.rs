@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{
     dma_buffers,
     i2s::master::{DataFormat, I2s, Standard},
-    time::RateExtU32,
+    time::Rate,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -48,7 +48,7 @@ async fn main(_spawner: Spawner) {
         peripherals.I2S0,
         Standard::Philips,
         DataFormat::Data16Channel16,
-        44100u32.Hz(),
+        Rate::from_hz(44100),
         dma_channel,
         rx_descriptors,
         tx_descriptors,
@@ -75,11 +75,17 @@ async fn main(_spawner: Spawner) {
         println!("available {}", avail);
 
         let count = transaction.pop(&mut data).await.unwrap();
+
+        #[cfg(not(feature = "esp32s2"))]
         println!(
             "got {} bytes, {:x?}..{:x?}",
             count,
             &data[..10],
             &data[count - 10..count]
         );
+
+        // esp-println is a bit slow on ESP32-S2 - don't run into DMA too late errors
+        #[cfg(feature = "esp32s2")]
+        println!("got {} bytes", count,);
     }
 }

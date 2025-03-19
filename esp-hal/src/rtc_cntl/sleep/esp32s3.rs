@@ -120,7 +120,7 @@ impl WakeSource for TimerWakeupSource {
         let clock_freq = RtcClock::slow_freq();
         // TODO: maybe add sleep time adjustlemnt like idf
         // TODO: maybe add check to prevent overflow?
-        let clock_hz = clock_freq.frequency().to_Hz() as u64;
+        let clock_hz = clock_freq.frequency().as_hz() as u64;
         let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();

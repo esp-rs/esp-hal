@@ -24,7 +24,7 @@
 //! - This driver has only blocking API
 
 use crate::{
-    interrupt::{InterruptConfigurable, InterruptHandler},
+    interrupt::InterruptHandler,
     pac,
     peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, ASSIST_DEBUG},
@@ -46,16 +46,13 @@ impl<'d> DebugAssist<'d> {
         DebugAssist { debug_assist }
     }
 
-    fn regs(&self) -> &pac::assist_debug::RegisterBlock {
-        self.debug_assist.register_block()
-    }
-}
-
-impl crate::private::Sealed for DebugAssist<'_> {}
-
-impl InterruptConfigurable for DebugAssist<'_> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::Cpu::other() {
+    /// Register an interrupt handler for the Debug Assist module.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::ASSIST_DEBUG);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::ASSIST_DEBUG, handler.handler()) };
@@ -63,6 +60,19 @@ impl InterruptConfigurable for DebugAssist<'_> {
             Interrupt::ASSIST_DEBUG,
             handler.priority()
         ));
+    }
+
+    fn regs(&self) -> &pac::assist_debug::RegisterBlock {
+        self.debug_assist.register_block()
+    }
+}
+
+impl crate::private::Sealed for DebugAssist<'_> {}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for DebugAssist<'_> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }
 

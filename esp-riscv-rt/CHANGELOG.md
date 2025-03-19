@@ -11,11 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bump MSRV to 1.84 (#2951)
-
 ### Fixed
 
 ### Removed
+
+## [0.10.0] - 2025-02-24
+
+### Changed
+
+- Bump MSRV to 1.84 (#2951)
+- Removed the `fix-sp` feature (check is always enabled) (#3001)
 
 ## 0.9.1 - 2024-11-20
 
@@ -86,3 +91,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.2.0 - 2023-03-14
 
 ## 0.1.0 - 2023-01-26
+
+[0.10.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-riscv-rt-v0.10.0

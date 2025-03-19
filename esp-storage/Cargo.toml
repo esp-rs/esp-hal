@@ -1,13 +1,14 @@
 [package]
-name = "esp-storage"
-version = "0.4.0"
-edition = "2021"
-rust-version = "1.84.0"
-description  = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
-keywords     = ["embedded-storage", "esp32", "espressif", "no-std"]
-categories   = ["embedded", "hardware-support", "no-std"]
-repository   = "https://github.com/esp-rs/esp-storage"
-license      = "MIT OR Apache-2.0"
+name          = "esp-storage"
+version       = "0.5.0"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
+documentation = "https://docs.espressif.com/projects/rust/esp-storage/latest/"
+keywords      = ["embedded-storage", "esp32", "espressif", "no-std"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
@@ -15,13 +16,13 @@ features       = ["esp32c6"]
 
 [dependencies]
 embedded-storage = "0.3.1"
-critical-section = { version =  "1.2.0", optional = true }
+critical-section = { version = "1.2.0", optional = true }
 
 [build-dependencies]
 esp-build = { version = "0.2.0", path = "../esp-build" }
 
 [features]
-default = ["critical-section", "storage"]
+default          = ["critical-section", "storage"]
 critical-section = ["dep:critical-section"]
 # ReadStorage/Storage traits
 storage = []
@@ -29,13 +30,13 @@ storage = []
 nor-flash = []
 # Bytewise read emulation
 bytewise-read = []
-esp32c2 = []
-esp32c3 = []
-esp32c6 = []
-esp32h2 = []
-esp32   = []
-esp32s2 = []
-esp32s3 = []
+esp32c2       = []
+esp32c3       = []
+esp32c6       = []
+esp32h2       = []
+esp32         = []
+esp32s2       = []
+esp32s3       = []
 # Enable flash emulation to run tests
 emulation = []
 

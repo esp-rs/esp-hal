@@ -238,7 +238,7 @@ pub(crate) mod utils {
             const PSRAM_EID_SIZE_M: u32 = 0x07;
             const PSRAM_EID_SIZE_S: u32 = 5;
 
-            let size_id = (((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S
+            let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
                 & PSRAM_EID_SIZE_M;
 
             const PSRAM_EID_SIZE_32MBITS: u32 = 1;
@@ -592,11 +592,6 @@ pub(crate) mod utils {
             // config sram cache r/w command
             spi.sram_dwr_cmd()
                 .modify(|_, w| w.cache_sram_usr_wr_cmd_bitlen().bits(7));
-
-            spi.sram_dwr_cmd().modify(|_, w| {
-                w.cache_sram_usr_wr_cmd_bitlen()
-                    .bits(PSRAM_QUAD_WRITE as u8)
-            });
 
             spi.sram_dwr_cmd().modify(|_, w| {
                 w.cache_sram_usr_wr_cmd_value()

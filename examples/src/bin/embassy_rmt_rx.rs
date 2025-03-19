@@ -15,7 +15,7 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
     rmt::{PulseCode, Rmt, RxChannelAsync, RxChannelConfig, RxChannelCreatorAsync},
-    time::RateExtU32,
+    time::Rate,
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
@@ -46,9 +46,9 @@ async fn main(spawner: Spawner) {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
-            let freq = 32.MHz();
+            let freq = Rate::from_mhz(32);
         } else {
-            let freq = 80.MHz();
+            let freq = Rate::from_mhz(80);
         }
     };
 
@@ -68,13 +68,11 @@ async fn main(spawner: Spawner) {
     }
 
     spawner
-        .spawn(signal_task(
-            Output::new(
-                peripherals.GPIO5,
-                OutputConfig::default().with_level(Level::Low),
-            )
-            .unwrap(),
-        ))
+        .spawn(signal_task(Output::new(
+            peripherals.GPIO5,
+            Level::Low,
+            OutputConfig::default(),
+        )))
         .unwrap();
 
     let mut data: [u32; 48] = [PulseCode::empty(); 48];

@@ -17,7 +17,7 @@ use esp_hal::{
         DataMode,
         Mode,
     },
-    time::RateExtU32,
+    time::Rate,
     Blocking,
 };
 use hil_test as _;
@@ -198,9 +198,9 @@ mod tests {
 
         // Make sure pins have no pullups
         let config = InputConfig::default().with_pull(Pull::Down);
-        let _ = Input::new(&mut pin, config).unwrap();
-        let _ = Input::new(&mut pin_mirror, config).unwrap();
-        let _ = Input::new(&mut unconnected_pin, config).unwrap();
+        let _ = Input::new(&mut pin, config);
+        let _ = Input::new(&mut pin_mirror, config);
+        let _ = Input::new(&mut unconnected_pin, config);
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
@@ -213,7 +213,7 @@ mod tests {
         let spi = Spi::new(
             peripherals.SPI2,
             Config::default()
-                .with_frequency(100.kHz())
+                .with_frequency(Rate::from_khz(100))
                 .with_mode(Mode::_0),
         )
         .unwrap();
@@ -230,8 +230,7 @@ mod tests {
     #[test]
     fn test_spi_reads_correctly_from_gpio_pin_0(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
-        let pin_mirror =
-            Output::new(pin_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
+        let pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
 
         let spi = ctx.spi.with_sio0(pin).with_dma(ctx.dma_channel);
 
@@ -241,8 +240,7 @@ mod tests {
     #[test]
     fn test_spi_reads_correctly_from_gpio_pin_1(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
-        let pin_mirror =
-            Output::new(pin_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
+        let pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
 
         let spi = ctx.spi.with_sio1(pin).with_dma(ctx.dma_channel);
 
@@ -252,8 +250,7 @@ mod tests {
     #[test]
     fn test_spi_reads_correctly_from_gpio_pin_2(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
-        let pin_mirror =
-            Output::new(pin_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
+        let pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
 
         let spi = ctx.spi.with_sio2(pin).with_dma(ctx.dma_channel);
 
@@ -263,8 +260,7 @@ mod tests {
     #[test]
     fn test_spi_reads_correctly_from_gpio_pin_3(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
-        let pin_mirror =
-            Output::new(pin_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
+        let pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
 
         let spi = ctx.spi.with_sio3(pin).with_dma(ctx.dma_channel);
 
@@ -274,8 +270,7 @@ mod tests {
     #[test]
     fn test_spi_writes_and_reads_correctly_pin_0(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
-        let pin_mirror =
-            Output::new(pin_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
+        let pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
 
         let spi = ctx.spi.with_sio0(pin).with_dma(ctx.dma_channel);
 
@@ -285,8 +280,7 @@ mod tests {
     #[test]
     fn test_spi_writes_and_reads_correctly_pin_1(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
-        let pin_mirror =
-            Output::new(pin_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
+        let pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
 
         let spi = ctx.spi.with_sio1(pin).with_dma(ctx.dma_channel);
 
@@ -296,8 +290,7 @@ mod tests {
     #[test]
     fn test_spi_writes_and_reads_correctly_pin_2(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
-        let pin_mirror =
-            Output::new(pin_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
+        let pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
 
         let spi = ctx.spi.with_sio2(pin).with_dma(ctx.dma_channel);
 
@@ -307,8 +300,7 @@ mod tests {
     #[test]
     fn test_spi_writes_and_reads_correctly_pin_3(ctx: Context) {
         let [pin, pin_mirror, _] = ctx.gpios;
-        let pin_mirror =
-            Output::new(pin_mirror, OutputConfig::default().with_level(Level::High)).unwrap();
+        let pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
 
         let spi = ctx.spi.with_sio3(pin).with_dma(ctx.dma_channel);
 

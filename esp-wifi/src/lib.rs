@@ -1,6 +1,6 @@
 #![cfg_attr(
     all(docsrs, not(not_really_docsrs)),
-    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.esp-rs.org/esp-hal/'>browse the <code>esp-wifi</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C3, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs might change depending on the chip.</p></div>\n\n<br/>\n\n"
+    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.espressif.com/projects/rust/'>browse the <code>esp-wifi</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C3, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs might change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
 //! This documentation is built for the
 #![cfg_attr(esp32, doc = "**ESP32**")]
@@ -104,15 +104,18 @@ use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
-use esp_hal as hal;
-use esp_hal::peripheral::Peripheral;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-use fugit::MegahertzU32;
+use esp_hal::{
+    self as hal,
+    clock::RadioClockController,
+    peripheral::Peripheral,
+    peripherals::RADIO_CLK,
+};
 use hal::{
     clock::Clocks,
     rng::{Rng, Trng},
-    system::RadioClockController,
+    time::Rate,
     timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
     Blocking,
 };
@@ -121,17 +124,23 @@ use portable_atomic::Ordering;
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
 use crate::{
+    preempt::yield_task,
+    radio::{setup_radio_isr, shutdown_radio_isr},
     tasks::init_tasks,
-    timer::{setup_timer_isr, shutdown_timer_isr},
 };
 
 mod binary {
     pub use esp_wifi_sys::*;
 }
 mod compat;
-mod preempt;
 
-mod timer;
+#[cfg(feature = "builtin-scheduler")]
+mod preempt_builtin;
+
+pub mod preempt;
+
+mod radio;
+mod time;
 
 #[cfg(feature = "wifi")]
 pub mod wifi;
@@ -367,20 +376,30 @@ impl private::Sealed for Trng<'_> {}
 pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     timer: impl Peripheral<P = T> + 'd,
     _rng: impl Peripheral<P = R> + 'd,
-    _radio_clocks: impl Peripheral<P = hal::peripherals::RADIO_CLK> + 'd,
+    _radio_clocks: impl Peripheral<P = RADIO_CLK> + 'd,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
-    const MIN_CLOCK: u32 = 80;
+    const MIN_CLOCK: Rate = Rate::from_mhz(80);
     let clocks = Clocks::get();
-    if clocks.cpu_clock < MegahertzU32::MHz(MIN_CLOCK) {
+    if clocks.cpu_clock < MIN_CLOCK {
         return Err(InitializationError::WrongClockConfig);
     }
 
     info!("esp-wifi configuration {:?}", crate::CONFIG);
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
     phy_mem_init();
+
+    setup_radio_isr();
+
+    // Enable timer tick interrupt
+    #[cfg(feature = "builtin-scheduler")]
+    preempt_builtin::setup_timer(unsafe { timer.clone_unchecked() }.timer());
+
+    // This initializes the task switcher
+    preempt::enable();
+
     init_tasks();
-    setup_timer_isr(unsafe { timer.clone_unchecked() }.timer());
+    yield_task();
 
     wifi_set_log_verbose();
     init_clocks();
@@ -392,6 +411,9 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     }
 
     crate::flags::ESP_WIFI_INITIALIZED.store(true, Ordering::Release);
+
+    #[cfg(not(feature = "builtin-scheduler"))]
+    let _ = timer; // mark used to suppress warning
 
     Ok(EspWifiController {
         _inner: PhantomData,
@@ -432,10 +454,13 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
         crate::flags::BLE.store(false, Ordering::Release);
     }
 
-    shutdown_timer_isr();
-    crate::preempt::delete_all_tasks();
+    shutdown_radio_isr();
 
-    crate::timer::TIMER.with(|timer| timer.take());
+    #[cfg(feature = "builtin-scheduler")]
+    preempt_builtin::disable_timer();
+
+    // This shuts down the task switcher and timer tick interrupt.
+    preempt::disable();
 
     crate::flags::ESP_WIFI_INITIALIZED.store(false, Ordering::Release);
 
@@ -478,6 +503,6 @@ pub fn wifi_set_log_verbose() {
 }
 
 fn init_clocks() {
-    let mut radio_clocks = unsafe { esp_hal::peripherals::RADIO_CLK::steal() };
-    radio_clocks.init_clocks();
+    let radio_clocks = unsafe { RADIO_CLK::steal() };
+    RadioClockController::new(radio_clocks).init_clocks();
 }

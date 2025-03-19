@@ -1,13 +1,14 @@
 [package]
-name         = "esp-ieee802154"
-version      = "0.5.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Low-level IEEE 802.15.4 driver for the ESP32-C6 and ESP32-H2"
-keywords     = ["embedded", "ieee802154", "esp32", "espressif", "wpan"]
-categories   = ["embedded", "network-programming", "no-std"]
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-ieee802154"
+version       = "0.6.0"
+edition       = "2021"
+rust-version  = "1.84.0"
+description   = "Low-level IEEE 802.15.4 driver for the ESP32-C6 and ESP32-H2"
+documentation = "https://docs.espressif.com/projects/rust/esp-ieee802154/latest/"
+keywords      = ["embedded", "esp32", "espressif", "ieee802154", "wpan"]
+categories    = ["embedded", "network-programming", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
@@ -20,15 +21,15 @@ test  = false
 [dependencies]
 byte              = "0.2.7"
 critical-section  = "1.2.0"
-document-features = "0.2.10"
-esp-hal           = { version = "0.23.0", path = "../esp-hal" }
-esp-wifi-sys      = "0.7.0"
+document-features = "0.2.11"
+esp-hal           = { version = "1.0.0-beta.0", path = "../esp-hal" }
+esp-wifi-sys      = "0.7.1"
 heapless          = "0.8.0"
 ieee802154        = "0.6.1"
 cfg-if            = "1.0.0"
 esp-config        = { version = "0.3.0", path = "../esp-config" }
 defmt             = { version = "0.3.10", optional = true }
-log               = { version = "0.4.25", optional = true }
+log               = { version = "0.4.26", optional = true }
 
 [build-dependencies]
 esp-config        = { version = "0.3.0", path = "../esp-config" }
