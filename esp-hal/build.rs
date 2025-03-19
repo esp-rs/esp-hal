@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     .contains(&std::env::var("TARGET").unwrap_or_default().as_str())
     {
         panic!("
-        Seems you are building for an unsupported targe (e.g. the host environment).
+        Seems you are building for an unsupported target (e.g. the host environment).
         Maybe you are missing the the `target` in `.cargo/config.toml` or you have configs overriding it?
         
         See https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure
