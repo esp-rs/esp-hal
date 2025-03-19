@@ -12,6 +12,38 @@ use esp_println as _;
 const MAX_BACKTRACE_ADDRESSES: usize =
     esp_config::esp_config_int!(usize, "ESP_BACKTRACE_CONFIG_BACKTRACE_FRAMES");
 
+pub struct Backtrace(pub(crate) heapless::Vec<BacktraceFrame, MAX_BACKTRACE_ADDRESSES>);
+
+impl Backtrace {
+    /// Captures a stack backtrace.
+    #[inline]
+    pub fn capture() -> Self {
+        arch::backtrace()
+    }
+
+    #[inline]
+    #[cfg(feature = "exception-handler")]
+    fn from_sp(sp: u32) -> Self {
+        arch::backtrace_internal(sp, 0)
+    }
+
+    /// Returns the backtrace frames as a slice.
+    #[inline]
+    pub fn frames(&self) -> &[BacktraceFrame] {
+        &self.0
+    }
+}
+
+pub struct BacktraceFrame {
+    pub(crate) pc: usize,
+}
+
+impl BacktraceFrame {
+    pub fn program_counter(&self) -> usize {
+        self.pc - crate::arch::RA_OFFSET
+    }
+}
+
 const RESET: &str = "\u{001B}[0m";
 const RED: &str = "\u{001B}[31m";
 
@@ -55,13 +87,13 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     println!("Backtrace:");
     println!("");
 
-    let backtrace = crate::arch::backtrace();
+    let backtrace = Backtrace::capture();
     #[cfg(target_arch = "riscv32")]
-    if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
+    if backtrace.frames().is_empty() {
         println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
     }
-    for addr in backtrace.into_iter().flatten() {
-        println!("0x{:x}", addr - crate::arch::RA_OFFSET);
+    for frame in backtrace.frames() {
+        println!("0x{:x}", frame.program_counter());
     }
 
     abort();
@@ -76,11 +108,9 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
     println!("\n\nException occurred '{}'", cause);
     println!("{:?}", context);
 
-    let backtrace = crate::arch::backtrace_internal(context.A1, 0);
-    for e in backtrace {
-        if let Some(addr) = e {
-            println!("0x{:x}", addr);
-        }
+    let backtrace = Backtrace::from_sp(context.A1);
+    for frame in backtrace.frames() {
+        println!("0x{:x}", frame.program_counter());
     }
 
     abort();
@@ -130,12 +160,13 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
 
         println!("{:?}", context);
 
-        let backtrace = crate::arch::backtrace_internal(context.s0 as u32, 0);
-        if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
+        let backtrace = Backtrace::from_sp(context.s0 as u32);
+        let frames = backtrace.frames();
+        if frames.is_empty() {
             println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
         }
-        for addr in backtrace.into_iter().flatten() {
-            println!("0x{:x}", addr - crate::arch::RA_OFFSET);
+        for frame in backtrace.frames() {
+            println!("0x{:x}", frame.program_counter());
         }
     }
 

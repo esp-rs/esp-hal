@@ -1,6 +1,6 @@
 use core::arch::asm;
 
-use crate::MAX_BACKTRACE_ADDRESSES;
+use crate::{Backtrace, BacktraceFrame};
 
 // subtract 4 from the return address
 // the return address is the address following the JALR
@@ -165,7 +165,7 @@ MTVAL=0x{:08x}
 /// This needs `force-frame-pointers` enabled.
 #[inline(never)]
 #[cold]
-pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
+pub fn backtrace() -> Backtrace {
     let fp = unsafe {
         let mut _tmp: u32;
         asm!("mv {0}, x8", out(reg) _tmp);
@@ -175,12 +175,8 @@ pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
     backtrace_internal(fp, 2)
 }
 
-pub(crate) fn backtrace_internal(
-    fp: u32,
-    suppress: u32,
-) -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let mut result = [None; MAX_BACKTRACE_ADDRESSES];
-    let mut index = 0;
+pub(crate) fn backtrace_internal(fp: u32, suppress: u32) -> Backtrace {
+    let mut result = Backtrace(heapless::Vec::new());
 
     let mut fp = fp;
     let mut suppress = suppress;
@@ -189,7 +185,7 @@ pub(crate) fn backtrace_internal(
         return result;
     }
 
-    while index < result.len() {
+    while !result.0.is_full() {
         // RA/PC
         let address = unsafe { (fp as *const u32).offset(-1).read_volatile() };
         // next FP
@@ -204,8 +200,9 @@ pub(crate) fn backtrace_internal(
         }
 
         if suppress == 0 {
-            result[index] = Some(address as usize);
-            index += 1;
+            _ = result.0.push(BacktraceFrame {
+                pc: address as usize,
+            });
         } else {
             suppress -= 1;
         }
