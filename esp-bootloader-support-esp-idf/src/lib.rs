@@ -159,7 +159,8 @@ pub const MMU_PAGE_SIZE: u32 = {
     }
 };
 
-/// This macro populates the application descriptor (see [EspAppDesc]) which is available as a static named `ESP_APP_DESC`
+/// This macro populates the application descriptor (see [EspAppDesc]) which is
+/// available as a static named `ESP_APP_DESC`
 ///
 /// In most cases you can just use the no-arguments version of this macro.
 #[macro_export]
