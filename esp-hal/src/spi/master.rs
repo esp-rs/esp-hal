@@ -498,18 +498,23 @@ impl Config {
         self
     }
 
-    fn recalculate(&self) -> Result<u32, ConfigError> {
-        // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
-
+    fn clock_source_freq_hz(&self) -> Rate {
         let clocks = Clocks::get();
+
+        // FIXME: take clock source into account
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-                let apb_clk_freq = clocks.pll_48m_clock;
+                clocks.pll_48m_clock
             } else {
-                let apb_clk_freq = clocks.apb_clock;
+                clocks.apb_clock
             }
         }
+    }
+
+    fn recalculate(&self) -> Result<u32, ConfigError> {
+        // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
+        let source_freq = self.clock_source_freq_hz();
 
         let reg_val: u32;
         let duty_cycle = 128;
@@ -517,7 +522,7 @@ impl Config {
         // In HW, n, h and l fields range from 1 to 64, pre ranges from 1 to 8K.
         // The value written to register is one lower than the used value.
 
-        if self.frequency > ((apb_clk_freq / 4) * 3) {
+        if self.frequency > ((source_freq / 4) * 3) {
             // Using APB frequency directly will give us the best result here.
             reg_val = 1 << 31;
         } else {
@@ -534,17 +539,17 @@ impl Config {
             let mut besterr: i32 = 0;
             let mut errval: i32;
 
-            let raw_freq = self.frequency.as_hz() as i32;
-            let raw_apb_freq = apb_clk_freq.as_hz() as i32;
+            let target_freq_hz = self.frequency.as_hz() as i32;
+            let source_freq_hz = source_freq.as_hz() as i32;
 
             // Start at n = 2. We need to be able to set h/l so we have at least
             // one high and one low pulse.
 
-            for n in 2..64 {
+            for n in 2..=64 {
                 // Effectively, this does:
                 // pre = round((APB_CLK_FREQ / n) / frequency)
 
-                pre = ((raw_apb_freq / n) + (raw_freq / 2)) / raw_freq;
+                pre = ((source_freq_hz / n) + (target_freq_hz / 2)) / target_freq_hz;
 
                 if pre <= 0 {
                     pre = 1;
@@ -554,7 +559,7 @@ impl Config {
                     pre = 16;
                 }
 
-                errval = (raw_apb_freq / (pre * n) - raw_freq).abs();
+                errval = (source_freq_hz / (pre * n) - target_freq_hz).abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
                     bestn = n;
@@ -588,17 +593,17 @@ impl Config {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32h2)] {
-                if self.frequency < Rate::from_khz(70) || self.frequency > Rate::from_mhz(48) {
-                    return Err(ConfigError::UnsupportedFrequency);
-                }
-            } else {
-                if self.frequency < Rate::from_khz(70) || self.frequency > Rate::from_mhz(80) {
-                    return Err(ConfigError::UnsupportedFrequency);
-                }
-            }
+        let source_freq = self.clock_source_freq_hz();
+        let min_divider = 1;
+        // FIXME: while ESP32 and S2 support pre dividers as large as 8192,
+        // those values are not currently supported by the divider calculation.
+        let max_divider = 16 * 64; // n * pre
+
+        if self.frequency < source_freq / max_divider || self.frequency > source_freq / min_divider
+        {
+            return Err(ConfigError::UnsupportedFrequency);
         }
+
         Ok(())
     }
 }
