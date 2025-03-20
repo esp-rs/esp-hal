@@ -1,6 +1,6 @@
 use core::{arch::asm, fmt::Display};
 
-use crate::MAX_BACKTRACE_ADDRESSES;
+use crate::{Backtrace, BacktraceFrame};
 
 // subtract 3 from the return address
 // the return address is the address following the callxN
@@ -387,7 +387,7 @@ fn sp() -> u32 {
 /// Get an array of backtrace addresses.
 #[inline(never)]
 #[cold]
-pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
+pub fn backtrace() -> Backtrace {
     let sp = sp();
 
     backtrace_internal(sp, 0)
@@ -397,12 +397,8 @@ pub(crate) fn remove_window_increment(address: u32) -> u32 {
     (address & 0x3fff_ffff) | 0x4000_0000
 }
 
-pub(crate) fn backtrace_internal(
-    sp: u32,
-    suppress: u32,
-) -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let mut result = [None; MAX_BACKTRACE_ADDRESSES];
-    let mut index = 0;
+pub(crate) fn backtrace_internal(sp: u32, suppress: u32) -> Backtrace {
+    let mut result = Backtrace(heapless::Vec::new());
 
     let mut fp = sp;
     let mut suppress = suppress;
@@ -411,7 +407,7 @@ pub(crate) fn backtrace_internal(
         return result;
     }
 
-    while index < result.len() {
+    while !result.0.is_full() {
         // RA/PC
         let address = unsafe { (fp as *const u32).offset(-4).read_volatile() };
         let address = remove_window_increment(address);
@@ -429,8 +425,9 @@ pub(crate) fn backtrace_internal(
         }
 
         if suppress == 0 {
-            result[index] = Some(address as usize);
-            index += 1;
+            _ = result.0.push(BacktraceFrame {
+                pc: address as usize,
+            });
         } else {
             suppress -= 1;
         }
