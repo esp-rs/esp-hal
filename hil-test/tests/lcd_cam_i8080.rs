@@ -9,7 +9,7 @@
 use esp_hal::{
     dma::{DmaChannel0, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, NoPin},
+    gpio::NoPin,
     lcd_cam::{
         lcd::i8080::{Command, Config, TxEightBits, TxSixteenBits, I8080},
         BitOrder,
@@ -19,6 +19,7 @@ use esp_hal::{
         channel::{CtrlMode, EdgeMode},
         Pcnt,
     },
+    peripherals,
     time::Rate,
     Blocking,
 };
@@ -28,11 +29,11 @@ const DATA_SIZE: usize = 1024 * 10;
 
 #[allow(non_snake_case)]
 struct Pins {
-    pub GPIO8: GpioPin<8>,
-    pub GPIO11: GpioPin<11>,
-    pub GPIO12: GpioPin<12>,
-    pub GPIO16: GpioPin<16>,
-    pub GPIO17: GpioPin<17>,
+    pub GPIO8: peripherals::GPIO8,
+    pub GPIO11: peripherals::GPIO11,
+    pub GPIO12: peripherals::GPIO12,
+    pub GPIO16: peripherals::GPIO16,
+    pub GPIO17: peripherals::GPIO17,
 }
 
 struct Context<'d> {

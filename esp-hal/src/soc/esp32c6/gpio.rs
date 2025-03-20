@@ -37,7 +37,7 @@
 //! `gpio` peripheral to access the appropriate registers.
 
 use crate::{
-    gpio::{AlternateFunction, GpioPin},
+    gpio::AlternateFunction,
     pac::io_mux,
     peripherals::{GPIO, IO_MUX},
 };

@@ -18,9 +18,9 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::GpioPin,
     handler,
     main,
+    peripherals::GPIO4,
     ram,
     rtc_cntl::Rtc,
     touch::{Continuous, Touch, TouchConfig, TouchPad},
@@ -28,7 +28,7 @@ use esp_hal::{
 };
 use esp_println::println;
 
-static TOUCH1: Mutex<RefCell<Option<TouchPad<GpioPin<4>, Continuous, Blocking>>>> =
+static TOUCH1: Mutex<RefCell<Option<TouchPad<GPIO4, Continuous, Blocking>>>> =
     Mutex::new(RefCell::new(None));
 
 #[handler]

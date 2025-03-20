@@ -11,7 +11,7 @@ use core::{
 /// having a dedicated struct instead:
 ///
 /// - Memory efficiency: Peripheral singletons are typically either zero-sized
-///   (for concrete peripherals like `GpioPin<5>` or `SPI2`) or very small (for
+///   (for concrete peripherals like `GPIO5` or `SPI2`) or very small (for
 ///   example `AnyPin`, which is 1 byte). However `&mut T` is always 4 bytes for
 ///   32-bit targets, even if T is zero-sized. PeripheralRef stores a copy of
 ///   `T` instead, so it's the same size.
@@ -85,7 +85,7 @@ impl<'a, T> PeripheralRef<'a, T> {
     /// using an `Into` impl to convert from `T` to `U`.
     ///
     /// For example, this can be useful to degrade GPIO pins: converting from
-    /// `PeripheralRef<'a, GpioPin<11>>` to `PeripheralRef<'a, AnyPin>`.
+    /// `PeripheralRef<'a, GPIO11>` to `PeripheralRef<'a, AnyPin>`.
     #[inline]
     pub fn map_into<U>(self) -> PeripheralRef<'a, U>
     where
@@ -257,20 +257,17 @@ mod peripheral_macros {
                 ),* $(,)?
             ]
         ) => {
-            $(
-                $crate::create_peripheral!($name <= $from_pac);
-            )*
-            $(
-                $crate::create_peripheral!(#[instability::unstable] $unstable_name <= $unstable_from_pac);
-            )*
-
-            pub(crate) mod gpio {
-                $crate::gpio! {
-                    $( ($pin, $($pin_tokens)* ) )*
-                }
-            }
-
             paste::paste! {
+                $(
+                    $crate::create_peripheral!($name <= $from_pac);
+                )*
+                $(
+                    $crate::create_peripheral!(#[instability::unstable] $unstable_name <= $unstable_from_pac);
+                )*
+                $(
+                    $crate::create_peripheral!([< GPIO $pin >] <= virtual);
+                )*
+
                 /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
                 #[allow(non_snake_case)]
                 pub struct Peripherals {
@@ -298,7 +295,7 @@ mod peripheral_macros {
 
                     $(
                         #[doc = concat!("GPIO", stringify!($pin))]
-                        pub [<GPIO $pin>]: $crate::gpio::GpioPin<$pin>,
+                        pub [<GPIO $pin>]: [<GPIO $pin>],
                     )*
 
                     $(
@@ -339,7 +336,7 @@ mod peripheral_macros {
                             )*
 
                             $(
-                                [<GPIO $pin>]: $crate::gpio::GpioPin::<$pin>::steal(),
+                                [<GPIO $pin>]: [<GPIO $pin>]::steal(),
                             )*
 
                             $(
@@ -347,6 +344,10 @@ mod peripheral_macros {
                             )*
                         }
                     }
+                }
+
+                $crate::gpio! {
+                    $( ($pin, $($pin_tokens)* ) )*
                 }
             }
 
