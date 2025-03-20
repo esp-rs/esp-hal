@@ -2040,8 +2040,7 @@ mod dma {
 
                 spi.wait_for_idle_async().await;
 
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
 
                 spi.defuse();
             }
@@ -2100,8 +2099,7 @@ mod dma {
                 }
                 spi.wait_for_idle_async().await;
 
-                let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                debug_assert_eq!(bytes_read, read_chunk.len());
+                read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
             }
 
             spi.defuse();
@@ -2135,9 +2133,7 @@ mod dma {
                     )?;
                 }
                 spi.wait_for_idle_async().await;
-
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
             }
 
             spi.defuse();
@@ -2201,9 +2197,7 @@ mod dma {
                 }
 
                 self.wait_for_idle();
-
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
             }
 
             Ok(())
@@ -2259,8 +2253,7 @@ mod dma {
                 }
                 self.wait_for_idle();
 
-                let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                debug_assert_eq!(bytes_read, read_chunk.len());
+                read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
             }
 
             if !read_remainder.is_empty() {
@@ -2291,9 +2284,7 @@ mod dma {
                     )?;
                 }
                 self.wait_for_idle();
-
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
             }
 
             Ok(())
@@ -2327,8 +2318,7 @@ mod dma {
 
             self.wait_for_idle();
 
-            let bytes_read = self.rx_buf.read_received_data(buffer);
-            debug_assert_eq!(bytes_read, buffer.len());
+            buffer.copy_from_slice(&self.rx_buf.as_slice()[..buffer.len()]);
 
             Ok(())
         }
