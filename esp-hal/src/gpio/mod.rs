@@ -1796,6 +1796,14 @@ impl<'d> Flex<'d> {
         self.pin.set_to_push_pull_output();
     }
 
+    /// Set the GPIO to input mode.
+    #[inline]
+    #[instability::unstable]
+    pub fn set_as_input(&mut self, pull: Pull) {
+        self.pin.init_input(pull);
+        self.pin.enable_output(false);
+    }
+
     /// Set the output as high.
     #[inline]
     #[instability::unstable]
