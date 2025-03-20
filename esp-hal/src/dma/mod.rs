@@ -2932,6 +2932,7 @@ pub(crate) mod asynch {
     where
         TX: Tx,
     {
+        #[cfg_attr(esp32c2, allow(dead_code))]
         pub fn new(tx: &'a mut TX) -> Self {
             Self { tx }
         }

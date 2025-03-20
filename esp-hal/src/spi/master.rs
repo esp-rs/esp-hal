@@ -1227,14 +1227,7 @@ mod dma {
 
     use super::*;
     use crate::{
-        dma::{
-            asynch::{DmaRxFuture, DmaTxFuture},
-            Channel,
-            DmaRxBuf,
-            DmaTxBuf,
-            EmptyBuf,
-            PeripheralDmaChannel,
-        },
+        dma::{asynch::DmaRxFuture, Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel},
         spi::master::dma::asynch::DropGuard,
     };
 
@@ -1443,9 +1436,6 @@ mod dma {
         }
 
         fn is_done(&self) -> bool {
-            if self.tx_transfer_in_progress && !self.channel.tx.is_done() {
-                return false;
-            }
             if self.driver().busy() {
                 return false;
             }
@@ -1480,10 +1470,6 @@ mod dma {
                 _ = DmaRxFuture::new(&mut self.channel.rx).await;
                 self.rx_transfer_in_progress = false;
             }
-            if self.tx_transfer_in_progress {
-                _ = DmaTxFuture::new(&mut self.channel.tx).await;
-                self.tx_transfer_in_progress = false;
-            }
 
             core::future::poll_fn(|cx| {
                 use core::task::Poll;
@@ -1495,6 +1481,14 @@ mod dma {
                 }
             })
             .await;
+
+            if self.tx_transfer_in_progress {
+                // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
+                if !self.channel.tx.is_done() {
+                    self.channel.tx.stop_transfer();
+                }
+                self.tx_transfer_in_progress = false;
+            }
         }
 
         /// # Safety:
@@ -2040,16 +2034,13 @@ mod dma {
             let chunk_size = self.rx_buf.capacity();
 
             for chunk in words.chunks_mut(chunk_size) {
-                self.rx_buf.set_length(chunk.len());
-
                 let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
 
                 unsafe { spi.start_dma_transfer(chunk.len(), 0, &mut self.rx_buf, &mut EmptyBuf)? };
 
                 spi.wait_for_idle_async().await;
 
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
 
                 spi.defuse();
             }
@@ -2067,7 +2058,7 @@ mod dma {
             let chunk_size = self.tx_buf.capacity();
 
             for chunk in words.chunks(chunk_size) {
-                self.tx_buf.fill(chunk);
+                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
                 unsafe { spi.start_dma_transfer(0, chunk.len(), &mut EmptyBuf, &mut self.tx_buf)? };
 
@@ -2096,8 +2087,7 @@ mod dma {
                 .chunks_mut(chunk_size)
                 .zip(write_common.chunks(chunk_size))
             {
-                self.tx_buf.fill(write_chunk);
-                self.rx_buf.set_length(read_chunk.len());
+                self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
                 unsafe {
                     spi.start_dma_transfer(
@@ -2109,8 +2099,7 @@ mod dma {
                 }
                 spi.wait_for_idle_async().await;
 
-                let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                debug_assert_eq!(bytes_read, read_chunk.len());
+                read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
             }
 
             spi.defuse();
@@ -2133,8 +2122,7 @@ mod dma {
 
             let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
             for chunk in words.chunks_mut(self.tx_buf.capacity()) {
-                self.tx_buf.fill(chunk);
-                self.rx_buf.set_length(chunk.len());
+                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
                 unsafe {
                     spi.start_dma_transfer(
@@ -2145,9 +2133,7 @@ mod dma {
                     )?;
                 }
                 spi.wait_for_idle_async().await;
-
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
             }
 
             spi.defuse();
@@ -2201,8 +2187,6 @@ mod dma {
             self.wait_for_idle();
             self.spi_dma.driver().setup_full_duplex()?;
             for chunk in words.chunks_mut(self.rx_buf.capacity()) {
-                self.rx_buf.set_length(chunk.len());
-
                 unsafe {
                     self.spi_dma.start_dma_transfer(
                         chunk.len(),
@@ -2213,9 +2197,7 @@ mod dma {
                 }
 
                 self.wait_for_idle();
-
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
             }
 
             Ok(())
@@ -2227,7 +2209,7 @@ mod dma {
             self.wait_for_idle();
             self.spi_dma.driver().setup_full_duplex()?;
             for chunk in words.chunks(self.tx_buf.capacity()) {
-                self.tx_buf.fill(chunk);
+                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
                 unsafe {
                     self.spi_dma.start_dma_transfer(
@@ -2259,8 +2241,7 @@ mod dma {
                 .chunks_mut(chunk_size)
                 .zip(write_common.chunks(chunk_size))
             {
-                self.tx_buf.fill(write_chunk);
-                self.rx_buf.set_length(read_chunk.len());
+                self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
                 unsafe {
                     self.spi_dma.start_dma_transfer(
@@ -2272,8 +2253,7 @@ mod dma {
                 }
                 self.wait_for_idle();
 
-                let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                debug_assert_eq!(bytes_read, read_chunk.len());
+                read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
             }
 
             if !read_remainder.is_empty() {
@@ -2293,8 +2273,7 @@ mod dma {
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
 
             for chunk in words.chunks_mut(chunk_size) {
-                self.tx_buf.fill(chunk);
-                self.rx_buf.set_length(chunk.len());
+                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
                 unsafe {
                     self.spi_dma.start_dma_transfer(
@@ -2305,9 +2284,7 @@ mod dma {
                     )?;
                 }
                 self.wait_for_idle();
-
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
             }
 
             Ok(())
@@ -2327,7 +2304,6 @@ mod dma {
                 return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
-            self.rx_buf.set_length(buffer.len());
 
             unsafe {
                 self.spi_dma.start_half_duplex_read(
@@ -2342,8 +2318,7 @@ mod dma {
 
             self.wait_for_idle();
 
-            let bytes_read = self.rx_buf.read_received_data(buffer);
-            debug_assert_eq!(bytes_read, buffer.len());
+            buffer.copy_from_slice(&self.rx_buf.as_slice()[..buffer.len()]);
 
             Ok(())
         }
@@ -2362,7 +2337,7 @@ mod dma {
                 return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
-            self.tx_buf.fill(buffer);
+            self.tx_buf.as_mut_slice()[..buffer.len()].copy_from_slice(buffer);
 
             unsafe {
                 self.spi_dma.start_half_duplex_write(
