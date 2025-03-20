@@ -19,6 +19,7 @@ cfg-if      = "1.0.0"
 defmt       = { version = "0.3.10", optional = true }
 esp-config  = { version = "0.3.0", path = "../esp-config" }
 esp-println = { version = "0.13.0", optional = true, default-features = false, path = "../esp-println" }
+heapless    = "0.8"
 semihosting = { version = "0.1.18", optional = true }
 
 [build-dependencies]
