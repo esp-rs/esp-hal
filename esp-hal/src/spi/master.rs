@@ -539,8 +539,8 @@ impl Config {
             let mut besterr: i32 = 0;
             let mut errval: i32;
 
-            let raw_freq = self.frequency.as_hz() as i32;
-            let raw_apb_freq = source_freq.as_hz() as i32;
+            let target_freq_hz = self.frequency.as_hz() as i32;
+            let source_freq_hz = source_freq.as_hz() as i32;
 
             // Start at n = 2. We need to be able to set h/l so we have at least
             // one high and one low pulse.
@@ -549,7 +549,7 @@ impl Config {
                 // Effectively, this does:
                 // pre = round((APB_CLK_FREQ / n) / frequency)
 
-                pre = ((raw_apb_freq / n) + (raw_freq / 2)) / raw_freq;
+                pre = ((source_freq_hz / n) + (target_freq_hz / 2)) / target_freq_hz;
 
                 if pre <= 0 {
                     pre = 1;
@@ -559,7 +559,7 @@ impl Config {
                     pre = 16;
                 }
 
-                errval = (raw_apb_freq / (pre * n) - raw_freq).abs();
+                errval = (source_freq_hz / (pre * n) - target_freq_hz).abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
                     bestn = n;
