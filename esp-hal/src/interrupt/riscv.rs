@@ -397,7 +397,7 @@ mod vectored {
                     ))
                 {
                     if priority_by_core(core, cpu_interrupt) == priority {
-                        res.set(interrupt_nr as u16);
+                        res.set(interrupt_nr);
                     }
                 }
             }
