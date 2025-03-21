@@ -195,8 +195,7 @@ global_asm!(
     wsr     a0, PS
     rsync
 
-    movi    a6, \\level                     // put interrupt level in a6 = a2 in callee
-    mov     a7, sp                         // put address of save frame in a7=a3 in callee
+    mov     a6, sp                         // put address of save frame in a6=a2 in callee
     call4   __level_\\level\\()_interrupt    // call handler <= actual call!
 
     RESTORE_CONTEXT \\level
@@ -514,9 +513,23 @@ __default_naked_exception:
     SAVE_CONTEXT 1
 
     l32i    a6, sp, +XT_STK_EXCCAUSE  // put cause in a6 = a2 in callee
-    mov     a7, sp                    // put address of save frame in a7=a3 in callee
 
-    beqi    a6, 4, .Level1Interrupt   // Handle Level1 interrupt
+    bnei    a6, 4, .HandleException   // Handle exception elsewhere
+
+    movi    a0, (1 | PS_WOE)          // set PS.INTLEVEL accordingly
+    wsr     a0, PS
+    rsync
+    mov     a6, sp                    // put address of save frame in a6=a2 in callee
+
+    call4   __level_1_interrupt       // call handler <= actual call!
+
+.RestoreContext:
+    RESTORE_CONTEXT 1
+
+    rfe                               // PS.EXCM is cleared
+
+.HandleException:
+    mov     a7, sp                    // put address of save frame in a7=a3 in callee
 
     movi    a0, (PS_INTLEVEL_EXCM | PS_WOE)
     wsr     a0, PS
@@ -525,18 +538,6 @@ __default_naked_exception:
     call4   __exception               // call handler <= actual call!
     j       .RestoreContext
 
-.Level1Interrupt:
-    movi    a0, (1 | PS_WOE)          // set PS.INTLEVEL accordingly
-    wsr     a0, PS
-    rsync
-
-    movi    a6, 1                     // put interrupt level in a6 = a2 in callee
-    call4   __level_1_interrupt       // call handler <= actual call!
-
-.RestoreContext:
-    RESTORE_CONTEXT 1
-
-    rfe                               // PS.EXCM is cleared
 .Ldefault_naked_exception_end:
     .size .Ldefault_naked_exception_start, .Ldefault_naked_exception_end
 
