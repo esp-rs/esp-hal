@@ -65,6 +65,7 @@ pub use state::*;
 use crate::{
     common_adapter::*,
     config::PowerSaveMode,
+    esp_now,
     esp_wifi_result,
     hal::ram,
     wifi::private::EspWifiPacketBuffer,
@@ -2716,6 +2717,8 @@ impl Drop for FreeApListOnDrop {
 pub struct Interfaces<'d> {
     pub sta: WifiDevice<'d>,
     pub ap: WifiDevice<'d>,
+    #[cfg(feature = "esp-now")]
+    pub esp_now: esp_now::EspNow<'d>,
 }
 
 /// Create a WiFi controller and it's associated interfaces.
@@ -2743,6 +2746,8 @@ pub fn new<'d>(
                 _phantom: Default::default(),
                 mode: WifiDeviceMode::Ap,
             },
+            #[cfg(feature = "esp-now")]
+            esp_now: esp_now::EspNow::new_internal(),
         },
     ))
 }
