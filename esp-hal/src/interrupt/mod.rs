@@ -85,13 +85,6 @@ mod xtensa;
 
 pub mod software;
 
-#[cfg(xtensa)]
-#[no_mangle]
-extern "C" fn EspDefaultHandler(_interrupt: crate::peripherals::Interrupt) {
-    panic!("Unhandled interrupt: {:?}", _interrupt);
-}
-
-#[cfg(riscv)]
 #[no_mangle]
 extern "C" fn EspDefaultHandler(_interrupt: crate::peripherals::Interrupt) {
     panic!("Unhandled interrupt: {:?}", _interrupt);
