@@ -56,6 +56,36 @@ pub struct EspAppDesc {
 }
 
 impl EspAppDesc {
+    /// Needs to be public since it's used by the macro
+    #[doc(hidden)]
+    pub const fn new_internal(
+        version: &str,
+        project_name: &str,
+        build_time: &str,
+        build_date: &str,
+        idf_ver: &str,
+        min_efuse_blk_rev_full: u16,
+        max_efuse_blk_rev_full: u16,
+        mmu_page_size: u32,
+    ) -> Self {
+        Self {
+            magic_word: ESP_APP_DESC_MAGIC_WORD,
+            secure_version: 0,
+            reserv1: [0; 2],
+            version: str_to_cstr_array(version),
+            project_name: str_to_cstr_array(project_name),
+            time: str_to_cstr_array(build_time),
+            date: str_to_cstr_array(build_date),
+            idf_ver: str_to_cstr_array(idf_ver),
+            app_elf_sha256: [0; 32],
+            min_efuse_blk_rev_full: min_efuse_blk_rev_full,
+            max_efuse_blk_rev_full: max_efuse_blk_rev_full,
+            mmu_page_size: (31 - u32::leading_zeros(mmu_page_size)) as u8,
+            reserv3: [0; 3],
+            reserv2: [0; 18],
+        }
+    }
+
     /// The magic word - should be `0xABCD5432`
     pub fn magic_word(&self) -> u32 {
         self.magic_word
@@ -99,18 +129,22 @@ impl EspAppDesc {
     }
 
     /// Minimal eFuse block revision supported by image
+    ///
+    /// Format `major * 100 + minor`
     pub fn min_efuse_blk_rev_full(&self) -> u16 {
         self.min_efuse_blk_rev_full
     }
 
     /// Maximal eFuse block revision supported by image
+    ///
+    /// Format `major * 100 + minor`
     pub fn max_efuse_blk_rev_full(&self) -> u16 {
         self.max_efuse_blk_rev_full
     }
 
-    /// MMU page size
-    pub fn mmu_page_size(&self) -> u8 {
-        self.mmu_page_size
+    /// MMU page size in bytes
+    pub fn mmu_page_size(&self) -> u32 {
+        self.mmu_page_size as u32 * 4096
     }
 }
 
@@ -127,7 +161,7 @@ impl core::fmt::Debug for EspAppDesc {
             .field("app_elf_sha256", &self.app_elf_sha256)
             .field("min_efuse_blk_rev_full", &self.min_efuse_blk_rev_full)
             .field("max_efuse_blk_rev_full", &self.max_efuse_blk_rev_full)
-            .field("mmu_page_size", &self.mmu_page_size)
+            .field("mmu_page_size", &(self.mmu_page_size as u32 * 4096))
             .finish()
     }
 }
@@ -137,6 +171,22 @@ fn array_to_str(array: &[core::ffi::c_char]) -> &str {
     unsafe {
         core::str::from_utf8_unchecked(core::slice::from_raw_parts(array.as_ptr().cast(), len))
     }
+}
+
+const ESP_APP_DESC_MAGIC_WORD: u32 = 0xABCD5432;
+
+const fn str_to_cstr_array<const C: usize>(s: &str) -> [::core::ffi::c_char; C] {
+    let bytes = s.as_bytes();
+    let mut ret: [::core::ffi::c_char; C] = [0; C];
+    let mut i = 0;
+    loop {
+        ret[i] = bytes[i] as _;
+        i += 1;
+        if i >= bytes.len() {
+            break;
+        }
+    }
+    ret
 }
 
 /// Build time
@@ -172,7 +222,7 @@ macro_rules! esp_app_desc {
             $crate::BUILD_TIME,
             $crate::BUILD_DATE,
             "5.3.1",
-            (31 - u32::leading_zeros($crate::MMU_PAGE_SIZE)) as u8,
+            $crate::MMU_PAGE_SIZE,
             0,
             u16::MAX
         );
@@ -188,43 +238,17 @@ macro_rules! esp_app_desc {
      $min_efuse_blk_rev_full: expr,
      $max_efuse_blk_rev_full: expr
     ) => {
-        const ESP_APP_DESC_MAGIC_WORD: u32 = 0xABCD5432;
-
-        const fn str_to_cstr_array<const C: usize>(s: &str) -> [::core::ffi::c_char; C] {
-            let bytes = s.as_bytes();
-            if bytes.len() >= C {
-                assert!(true, "String is too long for the C-string field");
-            }
-
-            let mut ret: [::core::ffi::c_char; C] = [0; C];
-            let mut i = 0;
-            loop {
-                ret[i] = bytes[i] as _;
-                i += 1;
-                if i >= bytes.len() {
-                    break;
-                }
-            }
-            ret
-        }
-
         #[export_name = "esp_app_desc"]
         #[link_section = ".rodata_desc.appdesc"]
-        pub static ESP_APP_DESC: $crate::EspAppDesc = $crate::EspAppDesc {
-            magic_word: ESP_APP_DESC_MAGIC_WORD,
-            secure_version: 0,
-            reserv1: [0; 2],
-            version: str_to_cstr_array($version),
-            project_name: str_to_cstr_array($project_name),
-            time: str_to_cstr_array($build_time),
-            date: str_to_cstr_array($build_date),
-            idf_ver: str_to_cstr_array($idf_ver),
-            app_elf_sha256: [0; 32],
-            min_efuse_blk_rev_full: $min_efuse_blk_rev_full,
-            max_efuse_blk_rev_full: $max_efuse_blk_rev_full,
-            mmu_page_size: $mmu_page_size,
-            reserv3: [0; 3],
-            reserv2: [0; 18],
-        };
+        pub static ESP_APP_DESC: $crate::EspAppDesc = $crate::EspAppDesc::new_internal(
+            $version,
+            $project_name,
+            $build_time,
+            $build_date,
+            $idf_ver,
+            $min_efuse_blk_rev_full,
+            $max_efuse_blk_rev_full,
+            $mmu_page_size,
+        );
     };
 }
