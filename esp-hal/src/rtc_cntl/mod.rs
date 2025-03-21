@@ -301,7 +301,7 @@ impl<'d> Rtc<'d> {
             swd: Swd::new(),
         };
 
-        #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
+        #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
         RtcSleepConfig::base_settings(&this);
 
         this
