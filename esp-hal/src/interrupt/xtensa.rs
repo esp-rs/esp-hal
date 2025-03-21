@@ -621,8 +621,9 @@ mod vectored {
                 handler(save_frame);
             }
         } else {
-            let status = if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
-                // Next, handle edge triggered peripheral interrupts.
+            let status = if !cfg!(esp32s3) && (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+                // Next, handle edge triggered peripheral interrupts. Note that on the S3 all
+                // peripheral interrupts are level-triggered.
 
                 // If the interrupt is edge triggered, we need to clear the
                 // request on the CPU's side
