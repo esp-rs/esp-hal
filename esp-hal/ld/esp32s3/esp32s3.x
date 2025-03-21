@@ -7,10 +7,6 @@ PROVIDE(__zero_bss = default_mem_hook);
 PROVIDE(__init_data = default_mem_hook);
 PROVIDE(__post_init = default_post_init);
 
-PROVIDE(__level_1_interrupt = handle_interrupts);
-PROVIDE(__level_2_interrupt = handle_interrupts);
-PROVIDE(__level_3_interrupt = handle_interrupts);
-
 INCLUDE exception.x
 
 SECTIONS {

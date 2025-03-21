@@ -35,7 +35,7 @@ pub(crate) fn shutdown_radio_isr() {
 #[cfg(feature = "ble")]
 #[allow(non_snake_case)]
 #[no_mangle]
-fn Software0(_level: u32) {
+fn Software0() {
     unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_7;
         trace!("interrupt Software0 {:?} {:?}", fnc, arg);
