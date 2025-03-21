@@ -653,7 +653,9 @@ mod classic {
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         use super::mcause;
-        let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
+        // Both C6 and H2 have 5 bits of code. The riscv crate masks 31 bits, which then
+        // causes a bounds check to be present.
+        let interrupt_id: usize = mcause::read().bits() & 0x1f;
         let intr = INTERRUPT_CORE0::regs();
         let interrupt_priority = intr
             .cpu_int_pri(0)
