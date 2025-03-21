@@ -286,7 +286,7 @@ pub enum EspNowWifiInterface {
 }
 
 impl EspNowWifiInterface {
-    fn to_wifi_interface(&self) -> wifi_interface_t {
+    fn as_wifi_interface(&self) -> wifi_interface_t {
         match self {
             EspNowWifiInterface::Ap => wifi_interface_t_WIFI_IF_AP,
             EspNowWifiInterface::Sta => wifi_interface_t_WIFI_IF_STA,
@@ -328,7 +328,7 @@ impl EspNowManager<'_> {
             peer_addr: peer.peer_address,
             lmk: peer.lmk.unwrap_or([0u8; 16]),
             channel: peer.channel.unwrap_or(0),
-            ifidx: peer.interface.to_wifi_interface(),
+            ifidx: peer.interface.as_wifi_interface(),
             encrypt: peer.encrypt,
             priv_: core::ptr::null_mut(),
         };
@@ -360,7 +360,7 @@ impl EspNowManager<'_> {
             peer_addr: peer.peer_address,
             lmk: peer.lmk.unwrap_or([0u8; 16]),
             channel: peer.channel.unwrap_or(0),
-            ifidx: peer.interface.to_wifi_interface(),
+            ifidx: peer.interface.as_wifi_interface(),
             encrypt: peer.encrypt,
             priv_: core::ptr::null_mut(),
         };
