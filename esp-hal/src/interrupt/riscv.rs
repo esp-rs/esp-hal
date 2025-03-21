@@ -455,8 +455,9 @@ mod vectored {
         // this has no effect on level interrupts, but the interrupt may be an edge one
         // so we clear it anyway
         clear(core, cpu_intr);
-        let prio: Priority =
-            unsafe { core::mem::transmute(INTERRUPT_TO_PRIORITY[cpu_intr as usize - 1] as u8) };
+
+        let priority = INTERRUPT_TO_PRIORITY[cpu_intr as usize];
+        let prio: Priority = unsafe { core::mem::transmute(priority) };
         let configured_interrupts = configured_interrupts(core, status, prio);
 
         for interrupt_nr in configured_interrupts.iterator() {
@@ -572,9 +573,10 @@ mod classic {
     pub(super) static PRIORITY_TO_INTERRUPT: &[usize] =
         &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
+    // First element is not used, just there to avoid a -1 in the interrupt handler.
     #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
-    pub(super) static INTERRUPT_TO_PRIORITY: &[usize] =
-        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    pub(super) static INTERRUPT_TO_PRIORITY: [u8; 16] =
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
     /// Enable a CPU interrupt
     ///
@@ -626,7 +628,7 @@ mod classic {
     #[inline]
     pub fn clear(_core: Cpu, which: CpuInterrupt) {
         unsafe {
-            let cpu_interrupt_number = which as isize;
+            let cpu_interrupt_number = which as usize;
             let intr = INTERRUPT_CORE0::regs();
             intr.cpu_int_clear()
                 .write(|w| w.bits(1 << cpu_interrupt_number));
@@ -725,9 +727,10 @@ mod plic {
     pub(super) static PRIORITY_TO_INTERRUPT: &[usize] =
         &[1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 
+    // First element is not used, just there to avoid a -1 in the interrupt handler.
     #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
-    pub(super) static INTERRUPT_TO_PRIORITY: &[usize] = &[
-        1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    pub(super) static INTERRUPT_TO_PRIORITY: [u8; 20] = [
+        0, 1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     ];
 
     /// Enable a CPU interrupt
