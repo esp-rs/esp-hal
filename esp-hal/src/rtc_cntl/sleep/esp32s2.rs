@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     gpio::{RtcFunction, RtcPin},
-    peripherals::{EXTMEM, LPWR, RTC_IO, SENS, SPI0, SPI1, SYSCON, SYSTEM},
+    peripherals::{EXTMEM, LPWR, RTC_IO, SENS, SPI0, SPI1, SYSTEM},
     rom::regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
 };
@@ -168,7 +168,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         &self,
         _rtc: &Rtc<'_>,
         triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
+        _sleep_config: &mut RtcSleepConfig,
     ) {
         // Checked TODO: Remove comment
         // NOTE: RTC may be powered down according to TRM
@@ -335,9 +335,6 @@ impl Default for RtcSleepConfig {
         cfg
     }
 }
-
-const SYSCON_SRAM_POWER_UP: u16 = 0x7FF;
-const SYSCON_ROM_POWER_UP: u8 = 0x7;
 
 fn rtc_sleep_pu(val: bool) {
     // Called rtc_sleep_pd in idf, but makes more sense like this with the single
