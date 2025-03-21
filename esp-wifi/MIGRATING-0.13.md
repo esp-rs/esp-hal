@@ -12,3 +12,12 @@ An instance of `esp-now` is now available via the wifi interfaces - there are no
 +
 +    let mut esp_now = interfaces.esp_now;
 ```
+
+## Getting the sniffer
+
+The sniffer is now part of `Interfaces`
+
+```diff
+-    let mut sniffer = controller.take_sniffer().unwrap();
++    let mut sniffer = interfaces.sniffer;
+```

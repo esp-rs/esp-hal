@@ -56,12 +56,13 @@ fn main() -> ! {
     .unwrap();
 
     // We must initialize some kind of interface and start it.
-    let (mut controller, _) = esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+    let (mut controller, interfaces) =
+        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 
-    let mut sniffer = controller.take_sniffer().unwrap();
+    let mut sniffer = interfaces.sniffer;
 
     // Create a buffer, which can hold the enitre serialized beacon frame.
     let mut beacon = [0u8; 300];

@@ -43,13 +43,13 @@ fn main() -> ! {
     .unwrap();
 
     // We must initialize some kind of interface and start it.
-    let (mut controller, _interfaces) =
+    let (mut controller, interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 
-    let mut sniffer = controller.take_sniffer().unwrap();
+    let mut sniffer = interfaces.sniffer;
     sniffer.set_promiscuous_mode(true).unwrap();
     sniffer.set_receive_cb(|packet| {
         let _ = match_frames! {
