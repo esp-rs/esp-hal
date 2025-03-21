@@ -466,21 +466,6 @@ impl EspNowManager<'_> {
     }
 }
 
-impl Drop for EspNowManager<'_> {
-    fn drop(&mut self) {
-        if unwrap!(
-            crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
-                Some(x.saturating_sub(1))
-            })
-        ) == 0
-        {
-            if let Err(e) = crate::wifi::wifi_deinit() {
-                warn!("Failed to cleanly deinit wifi: {:?}", e);
-            }
-        }
-    }
-}
-
 /// This is the sender part of ESP-NOW. You can get this sender by splitting
 /// a `EspNow` instance.
 ///
