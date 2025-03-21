@@ -474,7 +474,7 @@ mod vectored {
                 let int_level = cpu_interrupt.level() as u8 as u32;
 
                 if int_level == level {
-                    res.set(interrupt_nr as u16);
+                    res.set(interrupt_nr);
                 }
             }
 
