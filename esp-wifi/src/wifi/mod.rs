@@ -53,8 +53,6 @@ use esp_wifi_sys::include::{
 use num_derive::FromPrimitive;
 #[doc(hidden)]
 pub(crate) use os_adapter::*;
-#[cfg(feature = "sniffer")]
-use portable_atomic::AtomicBool;
 use portable_atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -2182,9 +2180,9 @@ unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: 
 
 #[cfg(feature = "sniffer")]
 /// A wifi sniffer.
-pub struct Sniffer {
-    promiscuous_mode_enabled: AtomicBool,
-}
+#[non_exhaustive]
+pub struct Sniffer {}
+
 #[cfg(feature = "sniffer")]
 impl Sniffer {
     pub(crate) fn new() -> Self {
@@ -2193,15 +2191,11 @@ impl Sniffer {
         unwrap!(esp_wifi_result!(unsafe {
             esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
         }));
-        Self {
-            promiscuous_mode_enabled: AtomicBool::new(false),
-        }
+        Self {}
     }
     /// Set promiscuous mode enabled or disabled.
     pub fn set_promiscuous_mode(&self, enabled: bool) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(enabled) })?;
-        self.promiscuous_mode_enabled
-            .store(enabled, Ordering::Relaxed);
         Ok(())
     }
     /// Transmit a raw frame.
@@ -2716,6 +2710,10 @@ impl Drop for FreeApListOnDrop {
 pub struct Interfaces<'d> {
     pub sta: WifiDevice<'d>,
     pub ap: WifiDevice<'d>,
+    #[cfg(feature = "esp-now")]
+    pub esp_now: crate::esp_now::EspNow<'d>,
+    #[cfg(feature = "sniffer")]
+    pub sniffer: Sniffer,
 }
 
 /// Create a WiFi controller and it's associated interfaces.
@@ -2731,8 +2729,6 @@ pub fn new<'d>(
     Ok((
         WifiController {
             _phantom: Default::default(),
-            #[cfg(feature = "sniffer")]
-            sniffer_taken: AtomicBool::new(false),
         },
         Interfaces {
             sta: WifiDevice {
@@ -2743,6 +2739,10 @@ pub fn new<'d>(
                 _phantom: Default::default(),
                 mode: WifiDeviceMode::Ap,
             },
+            #[cfg(feature = "esp-now")]
+            esp_now: crate::esp_now::EspNow::new_internal(),
+            #[cfg(feature = "sniffer")]
+            sniffer: Sniffer::new(),
         },
     ))
 }
@@ -2750,8 +2750,6 @@ pub fn new<'d>(
 #[non_exhaustive]
 pub struct WifiController<'d> {
     _phantom: PhantomData<&'d ()>,
-    #[cfg(feature = "sniffer")]
-    sniffer_taken: AtomicBool,
 }
 
 impl Drop for WifiController<'_> {
@@ -2770,17 +2768,6 @@ impl Drop for WifiController<'_> {
 }
 
 impl WifiController<'_> {
-    /// Attempts to take the sniffer, returns `Some(Sniffer)` if successful,
-    /// otherwise `None`.
-    #[cfg(feature = "sniffer")]
-    pub fn take_sniffer(&self) -> Option<Sniffer> {
-        if !self.sniffer_taken.fetch_or(true, Ordering::Acquire) {
-            Some(Sniffer::new())
-        } else {
-            None
-        }
-    }
-
     /// Set CSI configuration and register the receiving callback.
     #[cfg(feature = "csi")]
     pub fn set_csi(

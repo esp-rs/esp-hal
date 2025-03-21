@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The scheduler now runs at interrupt priority 1 on Xtensa chips, too. (#3164)
 
+- `esp-now` and `sniffer` are available via `Interfaces` (#3283)
+
 ### Fixed
 
 ### Removed

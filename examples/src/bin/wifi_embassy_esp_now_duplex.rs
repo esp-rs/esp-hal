@@ -54,7 +54,13 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     let wifi = peripherals.WIFI;
-    let esp_now = esp_wifi::esp_now::EspNow::new(&esp_wifi_ctrl, wifi).unwrap();
+    let (mut controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, wifi).unwrap();
+    controller.set_mode(esp_wifi::wifi::WifiMode::Sta).unwrap();
+    controller.start().unwrap();
+
+    let esp_now = interfaces.esp_now;
+    esp_now.set_channel(11).unwrap();
+
     println!("esp-now version {}", esp_now.version().unwrap());
 
     cfg_if::cfg_if! {
@@ -121,6 +127,7 @@ async fn listener(manager: &'static EspNowManager<'static>, mut receiver: EspNow
             if !manager.peer_exists(&r.info.src_address) {
                 manager
                     .add_peer(PeerInfo {
+                        interface: esp_wifi::esp_now::EspNowWifiInterface::Sta,
                         peer_address: r.info.src_address,
                         lmk: None,
                         channel: None,
