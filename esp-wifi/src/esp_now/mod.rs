@@ -277,6 +277,7 @@ impl Debug for ReceivedData {
 
 /// The interface to use for this peer
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EspNowWifiInterface {
     /// Use the AP interface
     Ap,
