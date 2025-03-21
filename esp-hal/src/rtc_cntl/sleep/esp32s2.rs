@@ -8,7 +8,8 @@ use super::{
 };
 use crate::{
     gpio::{RtcFunction, RtcPin},
-    peripherals::{/* APB_CTRL, */ EXTMEM, LPWR, RTC_IO, SPI0, SPI1, SYSCON, SYSTEM},
+    peripherals::{EXTMEM, LPWR, RTC_IO, SENS, SPI0, SPI1, SYSCON, SYSTEM},
+    rom::regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
 };
 
@@ -46,7 +47,7 @@ pub const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u8 = 100;
 /// Minimum sleep value.
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 /// Deep sleep debug attenuation setting for ultra-low power mode.
-pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_ULTRA_LOW: u8 = 15;
+pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_DEFAULT: u8 = 15;
 /// Power-up setting for other blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
 /// Wait cycles for other blocks.
@@ -71,6 +72,13 @@ pub const DG_PERI_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
 pub const RTC_MEM_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
 /// RTC memory wait cycles.
 pub const RTC_MEM_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+
+const I2C_BOD_REG: u32 = 0x61;
+const I2C_BOD_REG_HOSTID: u32 = 1;
+
+const I2C_BOD_REG_THRESHOLD: u32 = 0x5;
+const I2C_BOD_REG_THRESHOLD_MSB: u32 = 2;
+const I2C_BOD_REG_THRESHOLD_LSB: u32 = 0;
 
 impl WakeSource for TimerWakeupSource {
     fn apply(
@@ -99,10 +107,8 @@ impl WakeSource for TimerWakeupSource {
                 .write(|w| w.main_timer().clear_bit_by_one());
 
             rtc_cntl.slp_timer1().write(|w| {
-                w.slp_val_hi()
-                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
-                    .main_timer_alarm_en()
-                    .set_bit()
+                w.slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16);
+                w.main_timer_alarm_en().set_bit()
             });
         }
     }
@@ -115,15 +121,22 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
         triggers: &mut WakeTriggers,
         sleep_config: &mut RtcSleepConfig,
     ) {
+        // Checked TODO: remove comment
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext0(true);
+
+        // TODO: disable clock when not in use
+        SENS::regs()
+            .sar_io_mux_conf()
+            .modify(|_, w| w.iomux_clk_gate_en().set_bit());
 
         // set pin to RTC function
         self.pin
             .borrow_mut()
             .rtc_set_config(true, true, RtcFunction::Rtc);
 
+        // rtcio_hal_ext0_set_wakeup_pin
         unsafe {
             let rtc_io = RTC_IO::regs();
             // set pin register field
@@ -157,9 +170,15 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         triggers: &mut WakeTriggers,
         sleep_config: &mut RtcSleepConfig,
     ) {
-        // don't power down RTC peripherals
-        sleep_config.set_rtc_peri_pd_en(false);
+        // Checked TODO: Remove comment
+        // NOTE: RTC may be powered down according to TRM
+        // sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext1(true);
+
+        // TODO: disable clock when not in use
+        SENS::regs()
+            .sar_io_mux_conf()
+            .modify(|_, w| w.iomux_clk_gate_en().set_bit());
 
         // set pins to RTC function
         let mut pins = self.pins.borrow_mut();
@@ -204,13 +223,11 @@ impl RtcioWakeupSource<'_, '_> {
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
         rtcio.pin(pin.number() as usize).modify(|_, w| unsafe {
-            w.gpio_pin_wakeup_enable()
-                .set_bit()
-                .gpio_pin_int_type()
-                .bits(match level {
-                    WakeupLevel::Low => 4,
-                    WakeupLevel::High => 5,
-                })
+            w.gpio_pin_wakeup_enable().set_bit();
+            w.gpio_pin_int_type().bits(match level {
+                WakeupLevel::Low => 4,
+                WakeupLevel::High => 5,
+            })
         });
     }
 }
@@ -313,6 +330,8 @@ impl Default for RtcSleepConfig {
         cfg.set_light_slp_reject(true);
         cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
         cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_1V10);
+        cfg.set_rtc_slowmem_pd_en(true);
+        cfg.set_rtc_fastmem_pd_en(true);
         cfg
     }
 }
@@ -383,8 +402,11 @@ impl RtcSleepConfig {
         cfg.set_wifi_pd_en(true);
         cfg.set_int_8m_pd_en(true);
 
-        cfg.set_dig_peri_pd_en(true);
-        cfg.set_dig_dbias_slp(0); // because of dig_peri_pd_en
+        // Because of force_flags
+        cfg.set_vddsdio_pd_en(true);
+
+        // because of dig_peri_pd_en
+        cfg.set_dig_dbias_slp(0);
 
         cfg.set_deep_slp(true);
         cfg.set_wdt_flashboot_mod_en(false);
@@ -392,13 +414,16 @@ impl RtcSleepConfig {
         cfg.set_xtal_fpu(false);
         cfg.set_deep_slp_reject(true);
         cfg.set_light_slp_reject(true);
-        cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
 
-        // because of dig_peri_pd_en
+        // because of RTC_SLEEP_PD_DIG
+        // NOTE: Might be the a different case for RTC_SLEEP_PD_DIG in
+        // rtc_sleep_get_default_config
         cfg.set_rtc_regulator_fpu(false);
-        cfg.set_dbg_atten_slp(RTC_CNTL_DBG_ATTEN_DEEPSLEEP_ULTRA_LOW);
+        cfg.set_dbg_atten_slp(RTC_CNTL_DBG_ATTEN_DEEPSLEEP_DEFAULT);
+        cfg.set_rtc_dbias_slp(0);
 
         // because of xtal_fpu
+        cfg.set_xtal_fpu(false);
         cfg.set_bias_sleep_monitor(true);
         cfg.set_pd_cur_monitor(true);
         cfg.set_bias_sleep_slp(true);
@@ -425,10 +450,8 @@ impl RtcSleepConfig {
             rtc_cntl.ana_conf().modify(|_, w| w.pvtmon_pu().clear_bit());
 
             rtc_cntl.timer1().modify(|_, w| {
-                w.pll_buf_wait()
-                    .bits(RTC_CNTL_PLL_BUF_WAIT_DEFAULT)
-                    .ck8m_wait()
-                    .bits(RTC_CNTL_CK8M_WAIT_DEFAULT)
+                w.pll_buf_wait().bits(RTC_CNTL_PLL_BUF_WAIT_DEFAULT);
+                w.ck8m_wait().bits(RTC_CNTL_CK8M_WAIT_DEFAULT)
             });
 
             // idf: "Moved from rtc sleep to rtc init to save sleep function running time
@@ -626,8 +649,27 @@ impl RtcSleepConfig {
             // sometimes trigger during deep sleep to circumvent
             // this we disable the brownout detector before sleeping' - from
             // idf's deep_sleep_start()
-            // TODO: Check
-            rtc_cntl.brown_out().modify(|_, w| w.ena().clear_bit());
+            unsafe {
+                // brownout_hal_config(brownlout_hal_config_t{0})
+                rtc_cntl.brown_out().modify(|_, w| {
+                    w.int_wait().bits(2);
+                    w.close_flash_ena().clear_bit();
+                    w.pd_rf_ena().clear_bit();
+                    w.cnt_clr().set_bit()
+                });
+                rtc_cntl.brown_out().modify(|_, w| {
+                    // Set followed by clear in idf
+                    w.cnt_clr().clear_bit();
+                    w.rst_wait().bits(0x3fff);
+                    w.rst_ena().clear_bit();
+                    w.brown_out2_ena().set_bit();
+                    w.rst_sel().set_bit()
+                });
+                regi2c_write_mask!(I2C_BOD_REG, I2C_BOD_REG_THRESHOLD, 0);
+                rtc_cntl.brown_out().modify(|_, w| w.ena().clear_bit());
+                rtc_cntl.int_ena().modify(|_, w| w.brown_out().clear_bit());
+                // NOTE: rtc_isr_deregister?
+            }
         }
 
         if self.lslp_mem_inf_fpu() {
@@ -743,7 +785,8 @@ impl RtcSleepConfig {
     }
 
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
-        // Note: OK. Parts moved to apply TODO: Remove comment
+        // NOTE: esp32s2 deep sleep uses asm. Can this work without?
+        // Note: OK. TODO: Remove comment
         // TODO: Add reject triggers
         unsafe {
             LPWR::regs()
@@ -756,9 +799,10 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
 
             // WARN: slp_wakeup is not set in esp-idf
-            LPWR::regs()
-                .state0()
-                .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+            LPWR::regs().state0().write(|w| {
+                w.sleep_en().set_bit();
+                w.slp_wakeup().set_bit()
+            });
         }
     }
 
