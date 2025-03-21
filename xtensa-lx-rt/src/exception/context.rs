@@ -113,19 +113,19 @@ extern "Rust" {
     fn __double_exception(cause: ExceptionCause, save_frame: &mut Context);
 
     /// This symbol will be provided by the user via `#[interrupt(1)]`
-    fn __level_1_interrupt(level: u32, save_frame: &mut Context);
+    fn __level_1_interrupt(save_frame: &mut Context);
     /// This symbol will be provided by the user via `#[interrupt(2)]`
-    fn __level_2_interrupt(level: u32, save_frame: &mut Context);
+    fn __level_2_interrupt(save_frame: &mut Context);
     /// This symbol will be provided by the user via `#[interrupt(3)]`
-    fn __level_3_interrupt(level: u32, save_frame: &mut Context);
+    fn __level_3_interrupt(save_frame: &mut Context);
     /// This symbol will be provided by the user via `#[interrupt(4)]`
-    fn __level_4_interrupt(level: u32, save_frame: &mut Context);
+    fn __level_4_interrupt(save_frame: &mut Context);
     /// This symbol will be provided by the user via `#[interrupt(5)]`
-    fn __level_5_interrupt(level: u32, save_frame: &mut Context);
+    fn __level_5_interrupt(save_frame: &mut Context);
     /// This symbol will be provided by the user via `#[interrupt(6)]`
-    fn __level_6_interrupt(level: u32, save_frame: &mut Context);
+    fn __level_6_interrupt(save_frame: &mut Context);
     /// This symbol will be provided by the user via `#[interrupt(7)]`
-    fn __level_7_interrupt(level: u32, save_frame: &mut Context);
+    fn __level_7_interrupt(save_frame: &mut Context);
 }
 
 #[no_mangle]

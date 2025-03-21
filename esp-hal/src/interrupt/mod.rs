@@ -87,8 +87,8 @@ pub mod software;
 
 #[cfg(xtensa)]
 #[no_mangle]
-extern "C" fn EspDefaultHandler(_level: u32, _interrupt: crate::peripherals::Interrupt) {
-    panic!("Unhandled level {} interrupt: {:?}", _level, _interrupt);
+extern "C" fn EspDefaultHandler(_interrupt: crate::peripherals::Interrupt) {
+    panic!("Unhandled interrupt: {:?}", _interrupt);
 }
 
 #[cfg(riscv)]

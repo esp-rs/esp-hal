@@ -77,7 +77,7 @@ extern "C" fn timer_tick_handler(_context: &mut TrapFrame) {
 #[allow(non_snake_case)]
 #[cfg_attr(not(esp32), export_name = "Software0")]
 #[cfg_attr(esp32, export_name = "Software1")]
-fn task_switch_interrupt(_level: u32, context: &mut TrapFrame) {
+fn task_switch_interrupt(context: &mut TrapFrame) {
     let intr = SW_INTERRUPT;
     unsafe { core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack)) };
 
