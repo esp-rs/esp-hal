@@ -75,7 +75,7 @@
 //! # Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! ### TX operation
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -107,7 +107,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ### RX operation
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -216,7 +216,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{
@@ -426,6 +426,25 @@ where
         Ok(())
     }
 
+    #[cfg(not(any(esp32, esp32s2)))]
+    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
+        let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
+
+        if frequency > src_clock {
+            return Err(Error::UnreachableTargetFrequency);
+        }
+
+        let div = (src_clock / frequency) - 1;
+
+        if div > u8::MAX as u32 {
+            return Err(Error::UnreachableTargetFrequency);
+        }
+
+        self::chip_specific::configure_clock(div);
+
+        Ok(())
+    }
+
     // A memsize = 0 indicates that the channel memory is available
     #[cfg(any(esp32, esp32s2))]
     fn clear_memsizes(&self) {
@@ -448,25 +467,6 @@ where
             rmt.ch_rx_conf0(i)
                 .modify(|_, w| unsafe { w.mem_size().bits(0) });
         }
-    }
-
-    #[cfg(not(any(esp32, esp32s2)))]
-    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
-        let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
-
-        if frequency > src_clock {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        let div = (src_clock / frequency) - 1;
-
-        if div > u8::MAX as u32 {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        self::chip_specific::configure_clock(div);
-
-        Ok(())
     }
 }
 
