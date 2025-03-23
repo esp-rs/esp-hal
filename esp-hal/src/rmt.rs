@@ -75,7 +75,7 @@
 //! # Ok(())
 //! # }
 //! ```
-//!
+//! 
 //! ### TX operation
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -107,7 +107,7 @@
 //! }
 //! # }
 //! ```
-//!
+//! 
 //! ### RX operation
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -216,7 +216,7 @@
 //! }
 //! # }
 //! ```
-//!
+//! 
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{
@@ -427,25 +427,25 @@ where
     }
 
     // A memsize = 0 indicates that the channel memory is available
-    #[cfg(not(esp32s3))]
+    #[cfg(any(esp32, esp32s2))]
     fn clear_memsizes(&self) {
         let rmt = crate::peripherals::RMT::regs();
         for i in 0..NUM_CHANNELS {
-            rmt.chconf0(i as usize)
+            rmt.chconf0(i)
                 .modify(|_, w| unsafe { w.mem_size().bits(0) });
         }
     }
 
     // A memsize = 0 indicates that the channel memory is available
-    #[cfg(esp32s3)]
+    #[cfg(not(any(esp32, esp32s2)))]
     fn clear_memsizes(&self) {
         let rmt = crate::peripherals::RMT::regs();
         for i in 0..NUM_CHANNELS / 2 {
-            rmt.ch_tx_conf0(i as usize)
+            rmt.ch_tx_conf0(i)
                 .modify(|_, w| unsafe { w.mem_size().bits(0) });
         }
         for i in 0..NUM_CHANNELS / 2 {
-            rmt.ch_rx_conf0(i as usize)
+            rmt.ch_rx_conf0(i)
                 .modify(|_, w| unsafe { w.mem_size().bits(0) });
         }
     }
@@ -2137,7 +2137,7 @@ mod chip_specific {
 
                     if memory_blocks_requested > 1 {
                         for i in $ch_index..$ch_index + memory_blocks_requested {
-                            if rmt.ch_rx_conf0(i as usize).read().mem_size().bits() != 0 {
+                            if rmt.ch_rx_conf0(i as uszie).read().mem_size().bits() != 0 {
                                 memory_block_is_available = false;
                                 break;
                             }
