@@ -265,6 +265,8 @@ pub enum Error {
     InvalidDataLength,
     /// Receiver error most likely RMT memory overflow
     ReceiverError,
+    /// Memory block is not available for channel
+    MemoryBlockNotAvailable,
 }
 
 ///  Convenience trait to work with pulse codes.
@@ -409,6 +411,7 @@ where
     ) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
         me.configure_clock(frequency)?;
+        me.clear_memsizes();
         Ok(me)
     }
 
@@ -421,6 +424,30 @@ where
         self::chip_specific::configure_clock();
 
         Ok(())
+    }
+
+    // A memsize = 0 indicates that the channel memory is available
+    #[cfg(not(esp32s3))]
+    fn clear_memsizes(&self) {
+        let rmt = crate::peripherals::RMT::regs();
+        for i in 0..NUM_CHANNELS {
+            rmt.chconf0(i as usize)
+                .modify(|_, w| unsafe { w.mem_size().bits(0) });
+        }
+    }
+
+    // A memsize = 0 indicates that the channel memory is available
+    #[cfg(esp32s3)]
+    fn clear_memsizes(&self) {
+        let rmt = crate::peripherals::RMT::regs();
+        for i in 0..NUM_CHANNELS / 2 {
+            rmt.ch_tx_conf0(i as usize)
+                .modify(|_, w| unsafe { w.mem_size().bits(0) });
+        }
+        for i in 0..NUM_CHANNELS / 2 {
+            rmt.ch_rx_conf0(i as usize)
+                .modify(|_, w| unsafe { w.mem_size().bits(0) });
+        }
     }
 
     #[cfg(not(any(esp32, esp32s2)))]
@@ -502,6 +529,16 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
         return Err(Error::InvalidMemsize);
     }
 
+    // If a channel's memory block is available then its memory size will be 0
+    if !T::is_memory_blocks_available(config.memsize) {
+        return Err(Error::MemoryBlockNotAvailable);
+    }
+
+    // If configured to use extended memory blocks then set the extended memory
+    // blocks to 1 to indicate they are unavailable. Setting the memsize for
+    // this channel will be set further down in the code
+    T::set_memory_blocks_unavailable(config.memsize);
+
     crate::into_mapped_ref!(pin);
     pin.init_input(crate::gpio::Pull::None);
     T::input_signal().connect_to(pin);
@@ -531,6 +568,17 @@ fn configure_tx_channel<'d, P: PeripheralOutput, T: TxChannelInternal>(
     if config.memsize > NUM_CHANNELS as u8 - T::CHANNEL {
         return Err(Error::InvalidMemsize);
     }
+
+    // If a channel's memory block is available then its memory size will be 0
+    if !T::is_memory_blocks_available(config.memsize) {
+        return Err(Error::MemoryBlockNotAvailable);
+    }
+
+    // If configured to use extended memory blocks then set the extended memory
+    // blocks to 1 to indicate they are unavailable. Setting the memsize for
+    // this channel will be set further down in the code
+    T::set_memory_blocks_unavailable(config.memsize);
+
     crate::into_mapped_ref!(pin);
     pin.set_to_push_pull_output();
     T::output_signal().connect_to(pin);
@@ -1588,6 +1636,10 @@ pub trait TxChannelInternal {
 
     fn set_idle_output(enable: bool, level: Level);
 
+    fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool;
+
+    fn set_memory_blocks_unavailable(num_memory_blocks: u8);
+
     fn set_memsize(memsize: u8);
 
     fn memsize() -> u8;
@@ -1675,6 +1727,10 @@ pub trait RxChannelInternal {
     fn set_wrap_mode(wrap: bool);
 
     fn set_carrier(carrier: bool, high: u16, low: u16, level: Level);
+
+    fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool;
+
+    fn set_memory_blocks_unavailable(num_memory_blocks: u8);
 
     fn set_memsize(value: u8);
 
@@ -1891,6 +1947,35 @@ mod chip_specific {
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
+                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
+                    let rmt = crate::peripherals::RMT::regs();
+                    let mut memory_block_is_available = true;
+
+                    if memory_blocks_requested > 1 {
+                        for i in $ch_num..$ch_num + memory_blocks_requested {
+                            if rmt.ch_tx_conf0(i as usize).read().mem_size().bits() != 0 {
+                                memory_block_is_available = false;
+                                break;
+                            }
+                        }
+                    } else {
+                        memory_block_is_available =
+                            rmt.ch_tx_conf0($ch_num).read().mem_size().bits() == 0;
+                    }
+
+                    memory_block_is_available
+                }
+
+                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
+                    let rmt = crate::peripherals::RMT::regs();
+                    if num_memory_blocks > 1 {
+                        for i in $ch_num + 1..$ch_num + num_memory_blocks {
+                            rmt.ch_tx_conf0(i as usize)
+                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
+                        }
+                    }
+                }
+
                 fn set_memsize(value: u8) {
                     let rmt = crate::peripherals::RMT::regs();
 
@@ -2040,6 +2125,35 @@ mod chip_specific {
                             .carrier_out_lv()
                             .bit(level.into())
                     });
+                }
+
+                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
+                    let rmt = crate::peripherals::RMT::regs();
+                    let mut memory_block_is_available = true;
+
+                    if memory_blocks_requested > 1 {
+                        for i in $ch_index..$ch_index + memory_blocks_requested {
+                            if rmt.ch_rx_conf0(i as usize).read().mem_size().bits() != 0 {
+                                memory_block_is_available = false;
+                                break;
+                            }
+                        }
+                    } else {
+                        memory_block_is_available =
+                            rmt.ch_rx_conf0($ch_index).read().mem_size().bits() == 0;
+                    }
+
+                    memory_block_is_available
+                }
+
+                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
+                    let rmt = crate::peripherals::RMT::regs();
+                    if num_memory_blocks > 1 {
+                        for i in $ch_index + 1..$ch_index + num_memory_blocks {
+                            rmt.ch_rx_conf0(i as usize)
+                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
+                        }
+                    }
                 }
 
                 fn set_memsize(value: u8) {
@@ -2286,6 +2400,35 @@ mod chip_specific {
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
+                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
+                    let rmt = crate::peripherals::RMT::regs();
+                    let mut memory_block_is_available = true;
+
+                    if memory_blocks_requested > 1 {
+                        for i in $ch_num..$ch_num + memory_blocks_requested {
+                            if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
+                                memory_block_is_available = false;
+                                break;
+                            }
+                        }
+                    } else {
+                        memory_block_is_available =
+                            rmt.chconf0($ch_num).read().mem_size().bits() == 0;
+                    }
+
+                    memory_block_is_available
+                }
+
+                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
+                    let rmt = crate::peripherals::RMT::regs();
+                    if num_memory_blocks > 1 {
+                        for i in $ch_num + 1..$ch_num + num_memory_blocks {
+                            rmt.chconf0(i as usize)
+                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
+                        }
+                    }
+                }
+
                 fn set_memsize(value: u8) {
                     let rmt = crate::peripherals::RMT::regs();
 
@@ -2434,6 +2577,35 @@ mod chip_specific {
                             .carrier_out_lv()
                             .bit(level.into())
                     });
+                }
+
+                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
+                    let rmt = crate::peripherals::RMT::regs();
+                    let mut memory_block_is_available = true;
+
+                    if memory_blocks_requested > 1 {
+                        for i in $ch_num..$ch_num + memory_blocks_requested {
+                            if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
+                                memory_block_is_available = false;
+                                break;
+                            }
+                        }
+                    } else {
+                        memory_block_is_available =
+                            rmt.chconf0($ch_num).read().mem_size().bits() == 0;
+                    }
+
+                    memory_block_is_available
+                }
+
+                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
+                    let rmt = crate::peripherals::RMT::regs();
+                    if num_memory_blocks > 1 {
+                        for i in $ch_num + 1..$ch_num + num_memory_blocks {
+                            rmt.chconf0(i as usize)
+                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
+                        }
+                    }
                 }
 
                 fn set_memsize(value: u8) {
