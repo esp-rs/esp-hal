@@ -21,3 +21,33 @@ traits are now implemented for GPIO pins (stably) and driver structs (unstably) 
 
 This change means it's no longer possible to pass a reference to a GPIO driver to a peripheral
 driver. For example, it's no longer possible to pass an `&mut Input` to `Spi::with_miso`.
+
+## I2S driver now takes `DmaDescriptor`s later in construction
+
+```diff
+  let i2s = I2s::new(
+      peripherals.I2S0,
+      Standard::Philips,
+      DataFormat::Data16Channel16,
+      Rate::from_hz(44100),
+      dma_channel,
+-     rx_descriptors,
+-     tx_descriptors,
+  );
+
+  let i2s_tx = i2s
+      .i2s_tx
+      .with_bclk(peripherals.GPIO2)
+      .with_ws(peripherals.GPIO4)
+      .with_dout(peripherals.GPIO5)
+-     .build();
++     .build(tx_descriptors);
+
+  let i2s_rx = i2s
+      .i2s_rx
+      .with_bclk(peripherals.GPIO2)
+      .with_ws(peripherals.GPIO4)
+      .with_din(peripherals.GPIO5)
+-     .build();
++     .build(rx_descriptors);
+```

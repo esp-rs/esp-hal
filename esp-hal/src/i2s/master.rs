@@ -36,8 +36,7 @@
     not(any(esp32, esp32s2)),
     doc = "let dma_channel = peripherals.DMA_CH0;"
 )]
-//! let (mut rx_buffer, rx_descriptors, _, tx_descriptors) =
-//! dma_buffers!(0, 4 * 4092);
+//! let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers!(4 * 4092, 0);
 //!
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,
@@ -45,15 +44,13 @@
 //!     DataFormat::Data16Channel16,
 //!     Rate::from_hz(44100),
 //!     dma_channel,
-//!     rx_descriptors,
-//!     tx_descriptors,
 //! );
 #![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(peripherals.GPIO0);")]
 //! let mut i2s_rx = i2s.i2s_rx
 //!     .with_bclk(peripherals.GPIO1)
 //!     .with_ws(peripherals.GPIO2)
 //!     .with_din(peripherals.GPIO5)
-//!     .build();
+//!     .build(rx_descriptors);
 //!
 //! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer)?;
 //!
@@ -336,8 +333,6 @@ impl<'d> I2s<'d, Blocking> {
         data_format: DataFormat,
         sample_rate: Rate,
         channel: impl Peripheral<P = CH> + 'd,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
     ) -> Self
     where
         CH: DmaChannelFor<AnyI2s>,
@@ -367,13 +362,11 @@ impl<'d> I2s<'d, Blocking> {
             i2s_rx: RxCreator {
                 i2s: unsafe { i2s.clone_unchecked() },
                 rx_channel: channel.rx,
-                descriptors: rx_descriptors,
                 guard: rx_guard,
             },
             i2s_tx: TxCreator {
                 i2s,
                 tx_channel: channel.tx,
-                descriptors: tx_descriptors,
                 guard: tx_guard,
             },
         }
@@ -385,13 +378,11 @@ impl<'d> I2s<'d, Blocking> {
             i2s_rx: RxCreator {
                 i2s: self.i2s_rx.i2s,
                 rx_channel: self.i2s_rx.rx_channel.into_async(),
-                descriptors: self.i2s_rx.descriptors,
                 guard: self.i2s_rx.guard,
             },
             i2s_tx: TxCreator {
                 i2s: self.i2s_tx.i2s,
                 tx_channel: self.i2s_tx.tx_channel.into_async(),
-                descriptors: self.i2s_tx.descriptors,
                 guard: self.i2s_tx.guard,
             },
         }
@@ -711,7 +702,6 @@ mod private {
     {
         pub i2s: PeripheralRef<'d, AnyI2s>,
         pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>,
-        pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
 
@@ -719,12 +709,12 @@ mod private {
     where
         Dm: DriverMode,
     {
-        pub fn build(self) -> I2sTx<'d, Dm> {
+        pub fn build(self, descriptors: &'static mut [DmaDescriptor]) -> I2sTx<'d, Dm> {
             let peripheral = self.i2s.peripheral();
             I2sTx {
                 i2s: self.i2s,
                 tx_channel: self.tx_channel,
-                tx_chain: DescriptorChain::new(self.descriptors),
+                tx_chain: DescriptorChain::new(descriptors),
                 _guard: PeripheralGuard::new(peripheral),
             }
         }
@@ -760,7 +750,6 @@ mod private {
     {
         pub i2s: PeripheralRef<'d, AnyI2s>,
         pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>,
-        pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
 
@@ -768,12 +757,12 @@ mod private {
     where
         Dm: DriverMode,
     {
-        pub fn build(self) -> I2sRx<'d, Dm> {
+        pub fn build(self, descriptors: &'static mut [DmaDescriptor]) -> I2sRx<'d, Dm> {
             let peripheral = self.i2s.peripheral();
             I2sRx {
                 i2s: self.i2s,
                 rx_channel: self.rx_channel,
-                rx_chain: DescriptorChain::new(self.descriptors),
+                rx_chain: DescriptorChain::new(descriptors),
                 _guard: PeripheralGuard::new(peripheral),
             }
         }
