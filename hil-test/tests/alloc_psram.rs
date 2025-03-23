@@ -14,7 +14,11 @@ use hil_test as _;
 extern crate alloc;
 
 #[cfg(test)]
+<<<<<<< HEAD
 #[embedded_test::tests]
+=======
+#[embedded_test::tests(default_timeout = 2)]
+>>>>>>> d7af7dec (esp32s2: psram_cache_init typo fix (#3196))
 mod tests {
     #[init]
     fn init() {
@@ -34,6 +38,7 @@ mod tests {
             assert_eq!(vec[i], i);
         }
     }
+<<<<<<< HEAD
 
     #[test]
     fn all_psram_is_usable() {
@@ -49,4 +54,6 @@ mod tests {
             assert_eq!(vec[i], (i % 256) as u8);
         }
     }
+=======
+>>>>>>> d7af7dec (esp32s2: psram_cache_init typo fix (#3196))
 }

@@ -309,4 +309,30 @@ fn abort() -> ! {
             halt();
         }
     }
+    #[cfg(feature = "custom-pre-backtrace")]
+    {
+        extern "Rust" {
+            fn custom_pre_backtrace();
+        }
+        unsafe { custom_pre_backtrace() }
+    }
+
+    set_color_code(RED);
+}
+
+#[allow(unused)]
+fn abort() -> ! {
+    println!("");
+    println!("");
+    println!("");
+
+    set_color_code(RESET);
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "semihosting")] {
+            semihosting::process::abort();
+        } else {
+            halt();
+        }
+    }
 }

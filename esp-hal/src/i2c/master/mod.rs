@@ -990,7 +990,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    /// 
+    ///
     /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the passed buffer has zero length.
@@ -1019,7 +1019,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    /// 
+    ///
     /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the passed buffer has zero length.
@@ -2226,8 +2226,10 @@ impl Driver<'_> {
         }
 
         self.setup_write(address, bytes, start, cmd_iterator)?;
-
+<<<<<<< HEAD
         add_cmd(cmd_iterator, Command::End)?;
+=======
+>>>>>>> 81844514 (Clean up dead code (#3224))
         self.start_transmission();
 
         Ok(())
@@ -2378,7 +2380,7 @@ impl Driver<'_> {
             return Ok(());
         }
 
-        self.start_write_operation(address, bytes, start)?;
+        self.write_remaining_tx_fifo(index, bytes).await?;
         self.wait_for_completion(true).await?;
 
         if stop {

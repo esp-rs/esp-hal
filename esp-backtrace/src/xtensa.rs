@@ -16,87 +16,87 @@ pub(super) const RA_OFFSET: usize = 3;
 #[repr(C)]
 pub enum ExceptionCause {
     /// Illegal Instruction
-    IllegalInstruction             = 0,
+    IllegalInstruction = 0,
     /// System Call (Syscall Instruction)
-    Syscall                        = 1,
+    Syscall = 1,
     /// Instruction Fetch Error
-    InstrFetchError                = 2,
+    InstrFetchError = 2,
     /// Load Store Error
-    LoadStoreError                 = 3,
+    LoadStoreError = 3,
     /// Level 1 Interrupt
-    LevelOneInterrupt              = 4,
+    LevelOneInterrupt = 4,
     /// Stack Extension Assist (movsp Instruction) For Alloca
-    Alloca                         = 5,
+    Alloca = 5,
     /// Integer Divide By Zero
-    DivideByZero                   = 6,
+    DivideByZero = 6,
     /// Use Of Failed Speculative Access (Not Implemented)
-    NextPCValueIllegal             = 7,
+    NextPCValueIllegal = 7,
     /// Privileged Instruction
-    PrivilegedInstruction          = 8,
+    PrivilegedInstruction = 8,
     /// Unaligned Load Or Store
-    UnalignedLoadOrStore           = 9,
+    UnalignedLoadOrStore = 9,
     /// Reserved
     ExternalRegisterPrivilegeError = 10,
     /// Reserved
-    ExclusiveError                 = 11,
+    ExclusiveError = 11,
     /// Pif Data Error On Instruction Fetch (Rb-200x And Later)
-    InstrDataError                 = 12,
+    InstrDataError = 12,
     /// Pif Data Error On Load Or Store (Rb-200x And Later)
-    LoadStoreDataError             = 13,
+    LoadStoreDataError = 13,
     /// Pif Address Error On Instruction Fetch (Rb-200x And Later)
-    InstrAddrError                 = 14,
+    InstrAddrError = 14,
     /// Pif Address Error On Load Or Store (Rb-200x And Later)
-    LoadStoreAddrError             = 15,
+    LoadStoreAddrError = 15,
     /// Itlb Miss (No Itlb Entry Matches, Hw Refill Also Missed)
-    ItlbMiss                       = 16,
+    ItlbMiss = 16,
     /// Itlb Multihit (Multiple Itlb Entries Match)
-    ItlbMultiHit                   = 17,
+    ItlbMultiHit = 17,
     /// Ring Privilege Violation On Instruction Fetch
-    InstrRing                      = 18,
+    InstrRing = 18,
     /// Size Restriction On Ifetch (Not Implemented)
-    Reserved19                     = 19,
+    Reserved19 = 19,
     /// Cache Attribute Does Not Allow Instruction Fetch
-    InstrProhibited                = 20,
+    InstrProhibited = 20,
     /// Reserved
-    Reserved21                     = 21,
+    Reserved21 = 21,
     /// Reserved
-    Reserved22                     = 22,
+    Reserved22 = 22,
     /// Reserved
-    Reserved23                     = 23,
+    Reserved23 = 23,
     /// Dtlb Miss (No Dtlb Entry Matches, Hw Refill Also Missed)
-    DtlbMiss                       = 24,
+    DtlbMiss = 24,
     /// Dtlb Multihit (Multiple Dtlb Entries Match)
-    DtlbMultiHit                   = 25,
+    DtlbMultiHit = 25,
     /// Ring Privilege Violation On Load Or Store
-    LoadStoreRing                  = 26,
+    LoadStoreRing = 26,
     /// Size Restriction On Load/Store (Not Implemented)
-    Reserved27                     = 27,
+    Reserved27 = 27,
     /// Cache Attribute Does Not Allow Load
-    LoadProhibited                 = 28,
+    LoadProhibited = 28,
     /// Cache Attribute Does Not Allow Store
-    StoreProhibited                = 29,
+    StoreProhibited = 29,
     /// Reserved
-    Reserved30                     = 30,
+    Reserved30 = 30,
     /// Reserved
-    Reserved31                     = 31,
+    Reserved31 = 31,
     /// Access To Coprocessor 0 When Disabled
-    Cp0Disabled                    = 32,
+    Cp0Disabled = 32,
     /// Access To Coprocessor 1 When Disabled
-    Cp1Disabled                    = 33,
+    Cp1Disabled = 33,
     /// Access To Coprocessor 2 When Disabled
-    Cp2Disabled                    = 34,
+    Cp2Disabled = 34,
     /// Access To Coprocessor 3 When Disabled
-    Cp3Disabled                    = 35,
+    Cp3Disabled = 35,
     /// Access To Coprocessor 4 When Disabled
-    Cp4Disabled                    = 36,
+    Cp4Disabled = 36,
     /// Access To Coprocessor 5 When Disabled
-    Cp5Disabled                    = 37,
+    Cp5Disabled = 37,
     /// Access To Coprocessor 6 When Disabled
-    Cp6Disabled                    = 38,
+    Cp6Disabled = 38,
     /// Access To Coprocessor 7 When Disabled
-    Cp7Disabled                    = 39,
+    Cp7Disabled = 39,
     /// None
-    None                           = 255,
+    None = 255,
 }
 
 impl Display for ExceptionCause {

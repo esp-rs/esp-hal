@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - RMT now uses correct max filter threshold of 255 instead of 127 (#3192)
+- RMT fix filter threshold, value check no longer required (#3192)
 - Full-duplex SPI works when mixed with half-duplex SPI (#3176)
 - `Uart::flush_async` should no longer return prematurely (#3186)
 - Detecting a UART overflow now clears the RX FIFO. (#3190)
@@ -29,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: Fixed SPI3 QSPI signals (#3201)
 - ESP32-C6/H2: The `flip_link` feature should no longer crash (#3203)
 - SPI: `Spi::transfer_in_place_async` now stops the transfer when cancelled (#3242)
+- ESP32/ESP32-S2: Avoid running into timeouts with reads/writes larger than the FIFO (#3199)
+
+- ESP32-C6: Keep ADC enabled to improve radio signal strength (#3249)
+- ESP32-S2: Fixed PSRAM initialization (#3196)
+- ESP32: Fixed SPI3 QSPI signals (#3201)
+
 - ESP32/ESP32-S2: Avoid running into timeouts with reads/writes larger than the FIFO (#3199)
 
 - ESP32-C6: Keep ADC enabled to improve radio signal strength (#3249)

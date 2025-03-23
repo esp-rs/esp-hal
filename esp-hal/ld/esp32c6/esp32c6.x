@@ -67,6 +67,17 @@ SECTIONS {
 INSERT AFTER .stack;
 #ENDIF
 
+  /* Shared sections - ordering matters */
+  INCLUDE "rwtext.x"
+  INCLUDE "rwdata.x"
+  /* End of Shared sections */
+}
+#IF ESP_HAL_CONFIG_FLIP_LINK
+/* INSERT BEFORE does not seem to work for the .stack section. Instead, we place every RAM
+  section after .stack if `flip_link` is enabled. */
+INSERT AFTER .stack;
+#ENDIF
+
 SECTIONS {
   /**
    * Bootloader really wants to have separate segments for ROTEXT and RODATA
@@ -90,6 +101,7 @@ INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
+/* End of Shared sections #2 */
 /* End of Shared sections #2 */
 
 INCLUDE "debug.x"
