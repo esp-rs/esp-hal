@@ -79,7 +79,7 @@ pub(crate) fn reset_sta_state() {
 /// This does not support AP-STA mode. Use one of `sta_state` or
 /// `ap_state` instead.
 pub fn wifi_state() -> WifiState {
-    use super::WifiMode;
+    use crate::wifi::config::WifiMode;
     match WifiMode::current() {
         Ok(WifiMode::Sta) => sta_state(),
         Ok(WifiMode::Ap) => ap_state(),

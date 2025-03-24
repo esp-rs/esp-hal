@@ -42,7 +42,7 @@ use esp_println::{print, println};
 use esp_wifi::{
     ble::controller::BleConnector,
     init,
-    wifi::{ClientConfiguration, Configuration},
+    wifi::config::{ClientConfiguration, Configuration},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},

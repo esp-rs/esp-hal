@@ -31,7 +31,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_wifi::{
     init,
-    wifi::{AccessPointConfiguration, ClientConfiguration, Configuration},
+    wifi::config::{AccessPointConfiguration, ClientConfiguration, Configuration},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},

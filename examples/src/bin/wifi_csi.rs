@@ -19,7 +19,10 @@ use esp_hal::{clock::CpuClock, main, rng::Rng, time, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     init,
-    wifi::{AccessPointInfo, ClientConfiguration, Configuration, CsiConfig, WifiError},
+    wifi::{
+        config::{AccessPointInfo, ClientConfiguration, Configuration, CsiConfig},
+        WifiError,
+    },
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},

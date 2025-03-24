@@ -42,7 +42,9 @@ fn main() -> ! {
 
     let wifi = peripherals.WIFI;
     let (mut controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, wifi).unwrap();
-    controller.set_mode(esp_wifi::wifi::WifiMode::Sta).unwrap();
+    controller
+        .set_mode(esp_wifi::wifi::config::WifiMode::Sta)
+        .unwrap();
     controller.start().unwrap();
 
     let mut esp_now = interfaces.esp_now;

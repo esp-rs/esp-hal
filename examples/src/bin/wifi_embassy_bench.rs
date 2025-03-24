@@ -29,7 +29,13 @@ use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     init,
-    wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState},
+    wifi::{
+        config::{ClientConfiguration, Configuration},
+        event::WifiEvent,
+        WifiController,
+        WifiDevice,
+        WifiState,
+    },
     EspWifiController,
 };
 
