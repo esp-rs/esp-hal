@@ -298,7 +298,8 @@ impl EspNowWifiInterface {
         match interface {
             wifi_interface_t_WIFI_IF_AP => EspNowWifiInterface::Ap,
             wifi_interface_t_WIFI_IF_STA => EspNowWifiInterface::Sta,
-            _ => EspNowWifiInterface::Sta,
+            wifi_interface_t_WIFI_IF_NAN => panic!("NAN is unsupported"),
+            _ => unreachable!("Unknown interface"),
         }
     }
 }
