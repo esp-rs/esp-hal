@@ -786,6 +786,8 @@ impl DmaRxBuf {
     ///
     /// Returns the number of bytes in written to `buf`.
     pub fn read_received_data(&self, mut buf: &mut [u8]) -> usize {
+        // Note that due to an ESP32 quirk, the last received descriptor may not get
+        // updated.
         let capacity = buf.len();
         for chunk in self.received_data() {
             if buf.is_empty() {
