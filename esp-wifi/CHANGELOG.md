@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `esp-now` and `sniffer` are available via `Interfaces` (#3283)
 
+- Have a `config` module, move `WifiEvent` to the event module (#3295)
+
 ### Fixed
 
 ### Removed
