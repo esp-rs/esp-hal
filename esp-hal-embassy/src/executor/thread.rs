@@ -120,7 +120,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         // Manual critical section implementation that only masks interrupts handlers.
         // We must not acquire the cross-core on dual-core systems because that would
         // prevent the other core from doing useful work while this core is sleeping.
-        let token: critical_section::RawRestoreState;
+        let token: u32;
         unsafe { core::arch::asm!("rsil {0}, 5", out(reg) token) };
 
         // we do not care about race conditions between the load and store operations,

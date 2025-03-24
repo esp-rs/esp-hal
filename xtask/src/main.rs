@@ -692,7 +692,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         &path,
                         &[
                             &format!("--target={}", chip.target()),
-                            &format!("--features={chip},executors,defmt,esp-hal/unstable"),
+                            &format!("--features={chip},executors,defmt,esp-hal/unstable,esp-hal/critical-section-impl"),
                         ],
                         args.fix,
                         package.build_on_host(),
@@ -701,7 +701,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
-                        let features = format!("--features={chip},esp-hal/unstable");
+                        let features = format!(
+                            "--features={chip},esp-hal/unstable,esp-hal/critical-section-impl"
+                        );
                         lint_package(
                             chip,
                             &path,
@@ -766,7 +768,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspWifi => {
                     let mut features =
-                        format!("--features={chip},defmt,esp-hal/unstable,builtin-scheduler");
+                        format!("--features={chip},defmt,esp-hal/unstable,esp-hal/critical-section-impl,builtin-scheduler");
 
                     if device.contains("wifi") {
                         features.push_str(",esp-now,sniffer")

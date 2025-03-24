@@ -137,10 +137,10 @@ jobs:
 
       - name: msrv RISCV (esp-wifi)
         run: |
-          cargo xtask build-package --features=esp32c2,wifi,ble,esp-hal/unstable --target=riscv32imc-unknown-none-elf   esp-wifi
-          cargo xtask build-package --features=esp32c3,wifi,ble,esp-hal/unstable --target=riscv32imc-unknown-none-elf   esp-wifi
-          cargo xtask build-package --features=esp32c6,wifi,ble,esp-hal/unstable --target=riscv32imac-unknown-none-elf  esp-wifi
-          cargo xtask build-package --features=esp32h2,ble,esp-hal/unstable --target=riscv32imac-unknown-none-elf  esp-wifi
+          cargo xtask build-package --features=esp32c2,wifi,ble,esp-hal/unstable,esp-hal/critical-section-impl --target=riscv32imc-unknown-none-elf   esp-wifi
+          cargo xtask build-package --features=esp32c3,wifi,ble,esp-hal/unstable,esp-hal/critical-section-impl --target=riscv32imc-unknown-none-elf   esp-wifi
+          cargo xtask build-package --features=esp32c6,wifi,ble,esp-hal/unstable,esp-hal/critical-section-impl --target=riscv32imac-unknown-none-elf  esp-wifi
+          cargo xtask build-package --features=esp32h2,ble,esp-hal/unstable,esp-hal/critical-section-impl --target=riscv32imac-unknown-none-elf  esp-wifi
 
         # Verify the MSRV for all Xtensa chips:
       - name: msrv Xtensa (esp-hal)
@@ -151,9 +151,9 @@ jobs:
 
       - name: msrv Xtensa (esp-wifi)
         run: |
-          cargo xtask build-package --toolchain=esp --features=esp32,wifi,ble,esp-hal/unstable   --target=xtensa-esp32-none-elf   esp-wifi
-          cargo xtask build-package --toolchain=esp --features=esp32s2,wifi,esp-hal/unstable     --target=xtensa-esp32s2-none-elf esp-wifi
-          cargo xtask build-package --toolchain=esp --features=esp32s3,wifi,ble,esp-hal/unstable --target=xtensa-esp32s3-none-elf esp-wifi
+          cargo xtask build-package --toolchain=esp --features=esp32,wifi,ble,esp-hal/unstable,esp-hal/critical-section-impl   --target=xtensa-esp32-none-elf   esp-wifi
+          cargo xtask build-package --toolchain=esp --features=esp32s2,wifi,esp-hal/unstable,esp-hal/critical-section-impl     --target=xtensa-esp32s2-none-elf esp-wifi
+          cargo xtask build-package --toolchain=esp --features=esp32s3,wifi,ble,esp-hal/unstable,esp-hal/critical-section-impl --target=xtensa-esp32s3-none-elf esp-wifi
 
       - name: msrv (esp-lp-hal)
         run: |

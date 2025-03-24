@@ -394,10 +394,10 @@ mod vectored {
         }
     }
 
-    impl TryFrom<u8> for Priority {
+    impl TryFrom<u32> for Priority {
         type Error = Error;
 
-        fn try_from(value: u8) -> Result<Self, Self::Error> {
+        fn try_from(value: u32) -> Result<Self, Self::Error> {
             match value {
                 0 => Ok(Priority::None),
                 1 => Ok(Priority::Priority1),
@@ -405,6 +405,14 @@ mod vectored {
                 3 => Ok(Priority::Priority3),
                 _ => Err(Error::InvalidInterrupt),
             }
+        }
+    }
+
+    impl TryFrom<u8> for Priority {
+        type Error = Error;
+
+        fn try_from(value: u8) -> Result<Self, Self::Error> {
+            Self::try_from(value as u32)
         }
     }
 

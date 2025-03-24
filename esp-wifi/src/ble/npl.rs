@@ -617,15 +617,14 @@ unsafe extern "C" fn ble_npl_get_time_forever() -> u32 {
 
 unsafe extern "C" fn ble_npl_hw_exit_critical(mask: u32) {
     trace!("ble_npl_hw_exit_critical {}", mask);
-    critical_section::release(core::mem::transmute::<u8, critical_section::RestoreState>(
-        mask as u8,
+    critical_section::release(core::mem::transmute::<u32, critical_section::RestoreState>(
+        mask,
     ));
 }
 
 unsafe extern "C" fn ble_npl_hw_enter_critical() -> u32 {
     trace!("ble_npl_hw_enter_critical");
-    let as_u8: u8 = core::mem::transmute(critical_section::acquire());
-    as_u8 as u32
+    core::mem::transmute::<critical_section::RestoreState, u32>(critical_section::acquire())
 }
 
 unsafe extern "C" fn ble_npl_hw_set_isr(_no: i32, _mask: u32) {

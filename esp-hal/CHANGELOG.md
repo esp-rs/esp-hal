@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpiDma<Async>` now uses the SPI interrupt (instead of DMA) to wait for completion (#3303)
 
 - `gpio::interconnect` types now have a lifetime associated with them (#3302)
+- The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)
 
 ### Fixed
 
