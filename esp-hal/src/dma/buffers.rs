@@ -580,7 +580,17 @@ impl DmaTxBuf {
         self.descriptors.set_tx_length(
             len,
             burst.max_chunk_size_for(self.buffer, TransferDirection::Out),
-        )
+        )?;
+
+        // This only needs to be done once (after every significant length change) as
+        // Self::prepare sets Preparation::auto_write_back to false.
+        for desc in self.descriptors.linked_iter_mut() {
+            // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
+            // the end of the transfer.
+            desc.reset_for_tx(desc.next.is_null());
+        }
+
+        Ok(())
     }
 
     /// Reset the descriptors to only transmit `len` amount of bytes from this
@@ -617,12 +627,6 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
     type View = BufView<DmaTxBuf>;
 
     fn prepare(&mut self) -> Preparation {
-        for desc in self.descriptors.linked_iter_mut() {
-            // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
-            // the end of the transfer.
-            desc.reset_for_tx(desc.next.is_null());
-        }
-
         cfg_if::cfg_if! {
             if #[cfg(psram_dma)] {
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
