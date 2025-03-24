@@ -113,7 +113,7 @@ fn delete_task(task: *mut Context) {
         let mut ptr = ctx_now.0;
         let initial = ptr;
         loop {
-            if (*ptr).next == task {
+            if core::ptr::eq((*ptr).next, task) {
                 (*ptr).next = (*((*ptr).next)).next;
 
                 free((*task).allocated_stack as *mut u8);
@@ -123,7 +123,7 @@ fn delete_task(task: *mut Context) {
 
             ptr = (*ptr).next;
 
-            if ptr == initial {
+            if core::ptr::eq(ptr, initial) {
                 break;
             }
         }
@@ -148,7 +148,7 @@ fn delete_all_tasks() {
             free((*task_to_delete).allocated_stack as *mut u8);
             free(task_to_delete as *mut u8);
 
-            if next_task == current_task {
+            if core::ptr::eq(next_task, current_task) {
                 break;
             }
 
@@ -170,7 +170,7 @@ fn schedule_task_deletion(task: *mut Context) {
         SCHEDULED_TASK_TO_DELETE = task;
     }
 
-    if task == current_task() {
+    if core::ptr::eq(task, current_task()) {
         loop {
             timer::yield_task();
         }
