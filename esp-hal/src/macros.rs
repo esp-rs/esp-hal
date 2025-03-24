@@ -189,15 +189,18 @@ macro_rules! ignore {
 /// Define a piece of (Espressif-specific) metadata that external tools may
 /// parse.
 ///
-/// This metadata is zero cost.
+/// The symbol name be formatted as `_ESP_METADATA_<category>_<name>`.
+///
+/// This metadata is zero cost, i.e. the value will not be flashed to the
+/// device.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! metadata {
-    ($section:literal, $symbol:ident, $value:expr) => {
-        #[link_section = concat!(".espressif.metadata.", $section)]
+    ($category:literal, $key:ident, $value:expr) => {
+        #[link_section = concat!(".espressif.metadata")]
         #[used]
-        #[no_mangle] // prevent invoking the macro multiple times with the same symbol name
-        static $symbol: [u8; $value.len()] = const {
+        #[export_name = concat!($category, ".", stringify!($key))]
+        static $key: [u8; $value.len()] = const {
             let val_bytes = $value.as_bytes();
             let mut val_bytes_array = [0; $value.len()];
             let mut i = 0;

@@ -147,7 +147,7 @@ mod fmt;
 
 use core::marker::PhantomData;
 
-metadata!("build_info", _METADATA_BUILD_INFO_CHIP_NAME, chip!());
+metadata!("build_info", CHIP_NAME, chip!());
 
 #[cfg(riscv)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
