@@ -1,6 +1,16 @@
-//! GPIO performance test
+//! GPIO interrupt latency test.
 //!
-//! Encoder channel A: GPIO2
+//! This program outputs a square wave in the most complicated way possible: by
+//! toggling the output, and in a different task waiting for the output to be
+//! toggled. This is done to test the GPIO interrupt latency. You can measure
+//! the output frequency with a logic analyzer or an oscilloscope. The higher
+//! the frequency, the lower the interrupt latency.
+//!
+//! The async runtime introduces a constant overhead so the pulse length itself
+//! does not directly equal to the time it takes to process the interrupt.
+//!
+//! Outputs used: GPIO2, GPIO4. These are toggled one after the other, so the
+//! generated square waves are 90 degrees out of phase.
 
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
