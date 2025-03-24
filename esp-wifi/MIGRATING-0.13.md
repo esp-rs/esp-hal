@@ -21,3 +21,14 @@ The sniffer is now part of `Interfaces`
 -    let mut sniffer = controller.take_sniffer().unwrap();
 +    let mut sniffer = interfaces.sniffer;
 ```
+
+## WiFi configuration items are moved to `esp_wifi::wifi::config`, `WifiEvent` is moved to `esp_wifi::wifi::event`
+
+```diff
+-    wifi::{AccessPointInfo, ClientConfiguration, Configuration, WifiError, WifiEvent},
++    wifi::{
++        config::{AccessPointInfo, ClientConfiguration, Configuration},
++        event::WifiEvent,
++        WifiError,
++    },
+```
