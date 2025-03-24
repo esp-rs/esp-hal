@@ -1698,7 +1698,7 @@ pub unsafe extern "C" fn wifi_create_queue(
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c_void) {
     trace!("wifi_delete_queue {:?}", queue);
-    if queue == addr_of_mut!(QUEUE_HANDLE).cast() {
+    if core::ptr::eq(queue, addr_of_mut!(QUEUE_HANDLE).cast()) {
         delete_queue(QUEUE_HANDLE);
     } else {
         warn!("unknown queue when trying to delete WIFI queue");
