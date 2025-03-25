@@ -78,7 +78,7 @@ fn perform_spi_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
 fn perform_spidmabus_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
     const DMA_BUFFER_SIZE: usize = 4;
 
-    let (rx, rxd, buffer, descriptors) = dma_buffers!(1, DMA_BUFFER_SIZE);
+    let (rx, rxd, buffer, descriptors) = dma_buffers!(4, DMA_BUFFER_SIZE);
     let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
     let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
