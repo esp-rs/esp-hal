@@ -33,6 +33,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
     main,
@@ -66,43 +67,50 @@ fn main() -> ! {
     }
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+    let mut slave_receive = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let mut slave_send = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let mut spi = Spi::new(peripherals.SPI2, Mode::_0)
         .with_sck(slave_sclk)
         .with_mosi(slave_mosi)
         .with_miso(slave_miso)
         .with_cs(slave_cs)
-        .with_dma(dma_channel, rx_descriptors, tx_descriptors);
+        .with_dma(dma_channel);
 
     let delay = Delay::new();
 
     // DMA buffer require a static life-time
     let master_send = &mut [0u8; 32000];
     let master_receive = &mut [0u8; 32000];
-    let mut slave_send = tx_buffer;
-    let mut slave_receive = rx_buffer;
     let mut i = 0;
 
     for (i, v) in master_send.iter_mut().enumerate() {
         *v = (i % 255) as u8;
     }
-    for (i, v) in slave_send.iter_mut().enumerate() {
+    for (i, v) in slave_send.as_mut_slice().iter_mut().enumerate() {
         *v = (254 - (i % 255)) as u8;
     }
 
     loop {
         master_send[0] = i;
         master_send[master_send.len() - 1] = i;
-        slave_send[0] = i;
-        slave_send[slave_send.len() - 1] = i;
-        slave_receive.fill(0xff);
+        slave_send.as_mut_slice()[0] = i;
+        *slave_send.as_mut_slice().last_mut().unwrap() = i;
+        slave_receive.as_mut_slice().fill(0xff);
         i = i.wrapping_add(1);
 
         println!("Iteration {i}");
 
         println!("Do `transfer`");
 
-        let transfer = spi.transfer(&mut slave_receive, &mut slave_send).unwrap();
+        let transfer = spi
+            .transfer(
+                slave_receive.len(),
+                slave_receive,
+                slave_send.len(),
+                slave_send,
+            )
+            .unwrap();
 
         bitbang_master(
             master_send,
@@ -113,11 +121,11 @@ fn main() -> ! {
             &master_miso,
         );
 
-        transfer.wait().unwrap();
+        (spi, (slave_receive, slave_send)) = transfer.wait();
         println!(
             "slave got {:x?} .. {:x?}, master got {:x?} .. {:x?}",
-            &slave_receive[..10],
-            &slave_receive[slave_receive.len() - 10..],
+            &slave_receive.as_slice()[..10],
+            &slave_receive.as_slice()[slave_receive.len() - 10..],
             &master_receive[..10],
             &master_receive[master_receive.len() - 10..]
         );
@@ -125,8 +133,8 @@ fn main() -> ! {
         delay.delay_millis(250);
 
         println!("Do `read`");
-        slave_receive.fill(0xff);
-        let transfer = spi.read(&mut slave_receive).unwrap();
+        slave_receive.as_mut_slice().fill(0xff);
+        let transfer = spi.read(slave_receive.len(), slave_receive).unwrap();
 
         bitbang_master(
             master_send,
@@ -137,17 +145,17 @@ fn main() -> ! {
             &master_miso,
         );
 
-        transfer.wait().unwrap();
+        (spi, slave_receive) = transfer.wait();
         println!(
             "slave got {:x?} .. {:x?}",
-            &slave_receive[..10],
-            &slave_receive[slave_receive.len() - 10..],
+            &slave_receive.as_slice()[..10],
+            &slave_receive.as_slice()[slave_receive.len() - 10..],
         );
 
         delay.delay_millis(250);
 
         println!("Do `write`");
-        let transfer = spi.write(&mut slave_send).unwrap();
+        let transfer = spi.write(slave_send.len(), slave_send).unwrap();
 
         master_receive.fill(0);
 
@@ -160,7 +168,7 @@ fn main() -> ! {
             &master_miso,
         );
 
-        transfer.wait().unwrap();
+        (spi, slave_send) = transfer.wait();
         println!(
             "master got {:x?} .. {:x?}",
             &master_receive[..10],
