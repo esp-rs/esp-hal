@@ -81,6 +81,12 @@ jobs:
           toolchain: stable
           components: rust-src
 
+      # MIRI is only available in nightly
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: miri
+
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "ci-${{ matrix.device.soc }}"

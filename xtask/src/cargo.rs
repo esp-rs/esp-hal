@@ -174,7 +174,8 @@ impl CargoArgsBuilder {
             args.push(format!("+{toolchain}"));
         }
 
-        args.push(self.subcommand.clone());
+        let sub_commands: Vec<String> = self.subcommand.split(' ').into_iter().map(|v| v.to_string()).collect();
+        args.extend_from_slice(&sub_commands);
 
         if let Some(ref target) = self.target {
             args.push(format!("--target={target}"));

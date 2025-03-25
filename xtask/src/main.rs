@@ -12,9 +12,7 @@ use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
-    target_triple,
-    Package,
-    Version,
+    target_triple, Package, Version,
 };
 
 // ----------------------------------------------------------------------------
@@ -48,6 +46,8 @@ enum Cli {
     RunDocTests(ExampleArgs),
     /// Run the given example for the specified chip.
     RunExample(ExampleArgs),
+    /// Run the binary example for the specified chip via Miri.
+    RunMiri(ExampleArgs),
     /// Run all applicable tests or the specified test for a specified chip.
     RunTests(TestArgs),
     /// Run all ELFs in a folder.
@@ -242,6 +242,7 @@ fn main() -> Result<()> {
         Cli::RunDocTests(args) => run_doc_tests(&workspace, args),
         Cli::RunElfs(args) => run_elfs(args),
         Cli::RunExample(args) => examples(&workspace, args, CargoAction::Run),
+        Cli::RunMiri(args) => miri(&workspace, args),
         Cli::RunTests(args) => tests(&workspace, args, CargoAction::Run),
         Cli::Ci(args) => run_ci_checks(&workspace, args),
         Cli::TagReleases(args) => tag_releases(&workspace, args),
@@ -298,6 +299,80 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
     }
 }
 
+fn miri(workspace: &Path, args: ExampleArgs) -> Result<()> {
+    // Ensure that the package/chip combination provided are valid:
+    xtask::validate_package_chip(&args.package, &args.chip)?;
+
+    if args.package != Package::MiriTest {
+        panic!("find out how to do this!");
+        //return Err(anyhow::Error::from("Only `miri-test` is supported here".into()));
+    }
+
+    // Absolute path of the package's root:
+    let package_path = xtask::windows_safe_path(&workspace.join(args.package.to_string()));
+
+    let example_path = match args.package {
+        Package::Examples | Package::QaTest | Package::MiriTest => {
+            package_path.join("src").join("bin")
+        }
+        Package::HilTest => package_path.join("tests"),
+        _ => package_path.join("examples"),
+    };
+
+    // Load all examples which support the specified chip and parse their metadata:
+    let mut examples = xtask::firmware::load(&example_path)?
+        .iter()
+        .filter_map(|example| {
+            if example.supports_chip(args.chip) {
+                Some(example.clone())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // Sort all examples by name:
+    examples.sort_by_key(|a| a.binary_name());
+
+    run_miri(args, examples, &package_path)
+}
+
+fn run_miri(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
+    // for now just return if the target is Xtensa - we don't have Miri for Xtensa
+    if args.chip.is_xtensa() {
+        return Ok(());
+    }
+
+    // Determine the appropriate build target for the given package and chip:
+    let target = target_triple(args.package, &args.chip)?;
+
+    let mut found_one = false;
+    for example in examples
+        .iter()
+        .filter(|ex| (args.example.is_none()  && ex.supports_chip(args.chip)) || ex.matches(&args.example))
+    {
+        found_one = true;
+        xtask::execute_app(
+            package_path,
+            args.chip,
+            target,
+            example,
+            CargoAction::Run,
+            1,
+            args.debug,
+            true,
+        )?;
+    }
+
+    ensure!(
+        found_one,
+        "Example not found or unsupported for {}",
+        args.chip
+    );
+
+    Ok(())
+}
+
 fn build_examples(
     args: ExampleArgs,
     examples: Vec<Metadata>,
@@ -322,6 +397,7 @@ fn build_examples(
                 CargoAction::Build(out_path.clone()),
                 1,
                 args.debug,
+                false,
             )?;
         }
         Ok(())
@@ -339,6 +415,7 @@ fn build_examples(
                 CargoAction::Build(out_path.clone()),
                 1,
                 args.debug,
+                false,
             )
         })
     }
@@ -361,6 +438,7 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
             CargoAction::Run,
             1,
             args.debug,
+            false,
         )?;
     }
 
@@ -423,6 +501,7 @@ fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path)
                     CargoAction::Run,
                     1,
                     args.debug,
+                    false,
                 )
                 .is_err()
             {
@@ -473,6 +552,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
                 action.clone(),
                 args.repeat.unwrap_or(1),
                 false,
+                false,
             )?;
         }
         Ok(())
@@ -488,6 +568,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
                 &test,
                 action.clone(),
                 args.repeat.unwrap_or(1),
+                false,
                 false,
             )
             .is_err()
@@ -819,7 +900,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 // We will *not* check the following packages with `clippy`; this
                 // may or may not change in the future:
-                Package::Examples | Package::HilTest | Package::QaTest => {}
+                Package::Examples | Package::HilTest | Package::QaTest | Package::MiriTest => {}
 
                 // By default, no `clippy` arguments are required:
                 _ => lint_package(chip, &path, &[], args.fix, package.build_on_host())?,
@@ -1120,6 +1201,19 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             debug: true,
         },
         CargoAction::Build(PathBuf::from(format!("./qa-test/target/"))),
+    )
+    .inspect_err(|_| failure = true)
+    .ok();
+
+    // Miri checks
+    miri(
+        workspace,
+        ExampleArgs {
+            package: Package::MiriTest,
+            chip: args.chip,
+            example: None,
+            debug: true,
+        },
     )
     .inspect_err(|_| failure = true)
     .ok();
