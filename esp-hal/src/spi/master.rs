@@ -3663,7 +3663,7 @@ macro_rules! spi_instance {
                 #[inline(always)]
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
-                        register_block: crate::peripherals::[<SPI $num>]::regs(),
+                        register_block: crate::peripherals::[<SPI $num>]::ptr(),
                         peripheral: crate::system::Peripheral::[<Spi $num>],
                         interrupt: crate::peripherals::Interrupt::[<SPI $num>],
                         sclk: OutputSignal::$sclk,
