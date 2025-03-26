@@ -1293,7 +1293,8 @@ mod dma {
     impl<'d> SpiDma<'d, Blocking> {
         /// Converts the SPI instance into async mode.
         #[instability::unstable]
-        pub fn into_async(self) -> SpiDma<'d, Async> {
+        pub fn into_async(mut self) -> SpiDma<'d, Async> {
+            self.set_interrupt_handler(self.spi.handler());
             SpiDma {
                 spi: self.spi,
                 channel: self.channel.into_async(),
@@ -1370,12 +1371,42 @@ mod dma {
         pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.driver().clear_interrupts(interrupts.into());
         }
+
+        #[cfg_attr(
+            not(multi_core),
+            doc = "Registers an interrupt handler for the peripheral."
+        )]
+        #[cfg_attr(
+            multi_core,
+            doc = "Registers an interrupt handler for the peripheral on the current core."
+        )]
+        #[doc = ""]
+        /// Note that this will replace any previously registered interrupt
+        /// handlers.
+        ///
+        /// You can restore the default/unhandled interrupt handler by using
+        /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+        ///
+        /// # Panics
+        ///
+        /// Panics if passed interrupt handler is invalid (e.g. has priority
+        /// `None`)
+        #[instability::unstable]
+        pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+            let interrupt = self.driver().info.interrupt;
+            for core in Cpu::other() {
+                crate::interrupt::disable(core, interrupt);
+            }
+            unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
+            unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+        }
     }
 
     impl<'d> SpiDma<'d, Async> {
         /// Converts the SPI instance into async mode.
         #[instability::unstable]
         pub fn into_blocking(self) -> SpiDma<'d, Blocking> {
+            crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
             SpiDma {
                 spi: self.spi,
                 channel: self.channel.into_blocking(),
@@ -1464,23 +1495,42 @@ mod dma {
         }
 
         async fn wait_for_idle_async(&mut self) {
-            // As a future enhancement, setup Spi Future in here as well.
-
             if self.rx_transfer_in_progress {
                 _ = DmaRxFuture::new(&mut self.channel.rx).await;
                 self.rx_transfer_in_progress = false;
             }
 
-            core::future::poll_fn(|cx| {
-                use core::task::Poll;
-                if self.is_done() {
-                    Poll::Ready(())
-                } else {
-                    cx.waker().wake_by_ref();
+            struct Fut(Driver);
+            impl Future for Fut {
+                type Output = ();
+
+                fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                    if self
+                        .0
+                        .interrupts()
+                        .contains(SpiInterrupt::TransferDone)
+                    {
+                        self.0
+                            .clear_interrupts(SpiInterrupt::TransferDone.into());
+                        return Poll::Ready(());
+                    }
+
+                    self.0.state.waker.register(cx.waker());
+                    self.0
+                        .enable_listen(SpiInterrupt::TransferDone.into(), true);
                     Poll::Pending
                 }
-            })
-            .await;
+            }
+            impl Drop for Fut {
+                fn drop(&mut self) {
+                    self.0
+                        .enable_listen(SpiInterrupt::TransferDone.into(), false);
+                }
+            }
+
+            if !self.is_done() {
+                Fut(self.driver()).await;
+            }
 
             if self.tx_transfer_in_progress {
                 // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
