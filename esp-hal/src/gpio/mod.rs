@@ -1146,13 +1146,6 @@ pub struct Output<'d> {
 
 impl private::Sealed for Output<'_> {}
 
-unsafe impl<'d> Peripheral for Output<'d> {
-    type P = Flex<'d>;
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        self.pin.clone_unchecked()
-    }
-}
-
 impl<'d> Output<'d> {
     /// Creates a new GPIO output driver.
     ///
@@ -1361,13 +1354,6 @@ pub struct Input<'d> {
 }
 
 impl private::Sealed for Input<'_> {}
-
-unsafe impl<'d> Peripheral for Input<'d> {
-    type P = Flex<'d>;
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        self.pin.clone_unchecked()
-    }
-}
 
 impl<'d> Input<'d> {
     /// Creates a new GPIO input.
@@ -1635,15 +1621,6 @@ pub struct Flex<'d> {
 }
 
 impl private::Sealed for Flex<'_> {}
-
-unsafe impl Peripheral for Flex<'_> {
-    type P = Self;
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self {
-            pin: PeripheralRef::new(AnyPin(self.pin.number())),
-        }
-    }
-}
 
 impl<'d> Flex<'d> {
     /// Create flexible pin driver for a [Pin].

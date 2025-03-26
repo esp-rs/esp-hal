@@ -24,7 +24,7 @@ pub struct PeripheralRef<'a, T> {
     _lifetime: PhantomData<&'a mut T>,
 }
 
-impl<'a, T> crate::private::Sealed for PeripheralRef<'a, T> {}
+impl<T> crate::private::Sealed for PeripheralRef<'_, T> {}
 
 impl<'a, T> PeripheralRef<'a, T> {
     /// Create a new exclusive reference to a peripheral

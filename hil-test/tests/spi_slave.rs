@@ -115,6 +115,11 @@ mod tests {
             }
         }
 
+        // A bit of test-specific hackery, we need to be able to work with the Input
+        // driver directly while the SPI is driving the output signal part of
+        // the GPIO. This is currently not possible to describe in safe code.
+        let miso_pin_clone = unsafe { miso_pin.clone_unchecked() };
+
         let mosi_gpio = Output::new(mosi_pin, Level::Low, OutputConfig::default());
         let cs_gpio = Output::new(cs_pin, Level::High, OutputConfig::default());
         let sclk_gpio = Output::new(sclk_pin, Level::Low, OutputConfig::default());
@@ -123,7 +128,7 @@ mod tests {
         let cs = cs_gpio.peripheral_input();
         let sclk = sclk_gpio.peripheral_input();
         let mosi = mosi_gpio.peripheral_input();
-        let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
+        let miso = miso_pin_clone.split().1;
 
         Context {
             spi: Spi::new(peripherals.SPI2, Mode::_1)

@@ -609,7 +609,7 @@ where
                 Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
             };
 
-            signal.connect_to(&mut self.output_pin);
+            signal.connect_to(&self.output_pin);
         } else {
             return Err(Error::Timer);
         }

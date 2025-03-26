@@ -50,10 +50,6 @@ impl Level {
     ) -> &'static [(AlternateFunction, OutputSignal)] {
         &[]
     }
-
-    pub(crate) fn connect_peripheral_to_output(&self, _signal: OutputSignal) {}
-
-    pub(crate) fn disconnect_from_peripheral_output(&self, _signal: OutputSignal) {}
 }
 
 /// Placeholder pin, used when no pin is required when using a peripheral.
