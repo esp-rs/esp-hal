@@ -258,7 +258,7 @@ impl Clone for InputSignal {
     }
 }
 
-impl Peripheral for InputSignal {
+unsafe impl Peripheral for InputSignal {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -385,7 +385,7 @@ impl From<Flex<'static>> for OutputSignal {
     }
 }
 
-impl Peripheral for OutputSignal {
+unsafe impl Peripheral for OutputSignal {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -523,7 +523,7 @@ enum InputConnectionInner {
 #[instability::unstable]
 pub struct InputConnection(InputConnectionInner);
 
-impl Peripheral for InputConnection {
+unsafe impl Peripheral for InputConnection {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -628,7 +628,7 @@ pub struct OutputConnection(OutputConnectionInner);
 
 impl Sealed for OutputConnection {}
 
-impl Peripheral for OutputConnection {
+unsafe impl Peripheral for OutputConnection {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {

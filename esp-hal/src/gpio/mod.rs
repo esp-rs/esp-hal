@@ -132,16 +132,6 @@ pub(crate) struct PinGuard {
 }
 
 impl crate::private::Sealed for PinGuard {}
-impl Peripheral for PinGuard {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self {
-            pin: self.pin,
-            signal: self.signal,
-        }
-    }
-}
 
 impl PinGuard {
     pub(crate) fn new(mut pin: AnyPin, signal: OutputSignal) -> Self {
@@ -689,7 +679,7 @@ fn disable_usb_pads(gpionum: u8) {
     }
 }
 
-impl<const GPIONUM: u8> Peripheral for GpioPin<GPIONUM>
+unsafe impl<const GPIONUM: u8> Peripheral for GpioPin<GPIONUM>
 where
     Self: Pin,
 {
@@ -963,7 +953,7 @@ macro_rules! gpio {
                 }
             )+
 
-            impl $crate::peripheral::Peripheral for $crate::gpio::AnyPin {
+            unsafe impl $crate::peripheral::Peripheral for $crate::gpio::AnyPin {
                 type P = $crate::gpio::AnyPin;
                 unsafe fn clone_unchecked(&self) ->  Self {
                     Self(self.0)
@@ -1150,7 +1140,7 @@ pub struct Output<'d> {
 
 impl private::Sealed for Output<'_> {}
 
-impl<'d> Peripheral for Output<'d> {
+unsafe impl<'d> Peripheral for Output<'d> {
     type P = Flex<'d>;
     unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
@@ -1361,7 +1351,7 @@ pub struct Input<'d> {
 
 impl private::Sealed for Input<'_> {}
 
-impl<'d> Peripheral for Input<'d> {
+unsafe impl<'d> Peripheral for Input<'d> {
     type P = Flex<'d>;
     unsafe fn clone_unchecked(&self) -> Self::P {
         self.pin.clone_unchecked()
@@ -1630,7 +1620,7 @@ pub struct Flex<'d> {
 
 impl private::Sealed for Flex<'_> {}
 
-impl Peripheral for Flex<'_> {
+unsafe impl Peripheral for Flex<'_> {
     type P = Self;
     unsafe fn clone_unchecked(&self) -> Self::P {
         Self {

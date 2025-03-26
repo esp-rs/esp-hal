@@ -8,7 +8,7 @@
 use super::*;
 use crate::gpio::interconnect::connect_input_signal;
 
-impl crate::peripheral::Peripheral for Level {
+unsafe impl crate::peripheral::Peripheral for Level {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -72,7 +72,7 @@ impl Level {
 #[derive(Default, Clone, Copy)]
 pub struct NoPin;
 
-impl crate::peripheral::Peripheral for NoPin {
+unsafe impl crate::peripheral::Peripheral for NoPin {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
