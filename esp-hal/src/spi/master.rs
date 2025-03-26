@@ -1505,13 +1505,8 @@ mod dma {
                 type Output = ();
 
                 fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                    if self
-                        .0
-                        .interrupts()
-                        .contains(SpiInterrupt::TransferDone)
-                    {
-                        self.0
-                            .clear_interrupts(SpiInterrupt::TransferDone.into());
+                    if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
+                        self.0.clear_interrupts(SpiInterrupt::TransferDone.into());
                         return Poll::Ready(());
                     }
 
@@ -3801,8 +3796,8 @@ fn handle_async<I: Instance>(instance: I) {
 
     let driver = Driver { info, state };
     if driver.interrupts().contains(SpiInterrupt::TransferDone) {
-        state.waker.wake();
         driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
+        state.waker.wake();
     }
 }
 
