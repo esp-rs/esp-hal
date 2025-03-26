@@ -125,7 +125,6 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use peripheral::PeripheralRef;
 use private::*;
 
 use crate::{
@@ -151,7 +150,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     parl_io::asynch::interrupt_handler,
-    peripheral::{self, Peripheral},
+    peripheral::Peripheral,
     peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
     time::Rate,
@@ -364,31 +363,29 @@ impl RxClkPin for NoPin {
 
 /// Wraps a GPIO pin which will be used as the clock output signal
 pub struct ClkOutPin<'d> {
-    pin: PeripheralRef<'d, OutputConnection>,
+    pin: OutputConnection<'d>,
 }
 impl<'d> ClkOutPin<'d> {
     /// Create a ClkOutPin
-    pub fn new(pin: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        Self { pin }
+    pub fn new(pin: impl PeripheralOutput<'d>) -> Self {
+        Self { pin: pin.into() }
     }
 }
 impl TxClkPin for ClkOutPin<'_> {
     fn configure(&mut self) {
         self.pin.set_to_push_pull_output();
-        crate::gpio::OutputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
+        crate::gpio::OutputSignal::PARL_TX_CLK.connect_to(&self.pin);
     }
 }
 
 /// Wraps a GPIO pin which will be used as the TX clock input signal
 pub struct ClkInPin<'d> {
-    pin: PeripheralRef<'d, InputConnection>,
+    pin: InputConnection<'d>,
 }
 impl<'d> ClkInPin<'d> {
     /// Create a new ClkInPin
-    pub fn new(pin: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        Self { pin }
+    pub fn new(pin: impl PeripheralInput<'d>) -> Self {
+        Self { pin: pin.into() }
     }
 }
 impl TxClkPin for ClkInPin<'_> {
@@ -398,23 +395,22 @@ impl TxClkPin for ClkInPin<'_> {
             .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
         self.pin.init_input(crate::gpio::Pull::None);
-        crate::gpio::InputSignal::PARL_TX_CLK.connect_to(&mut self.pin);
+        crate::gpio::InputSignal::PARL_TX_CLK.connect_to(&self.pin);
     }
 }
 
 /// Wraps a GPIO pin which will be used as the RX clock input signal
 pub struct RxClkInPin<'d> {
-    pin: PeripheralRef<'d, InputConnection>,
+    pin: InputConnection<'d>,
     sample_edge: SampleEdge,
 }
 impl<'d> RxClkInPin<'d> {
     /// Create a new RxClkInPin
-    pub fn new(
-        pin: impl Peripheral<P = impl PeripheralInput> + 'd,
-        sample_edge: SampleEdge,
-    ) -> Self {
-        crate::into_mapped_ref!(pin);
-        Self { pin, sample_edge }
+    pub fn new(pin: impl PeripheralInput<'d>, sample_edge: SampleEdge) -> Self {
+        Self {
+            pin: pin.into(),
+            sample_edge,
+        }
     }
 }
 impl RxClkPin for RxClkInPin<'_> {
@@ -424,7 +420,7 @@ impl RxClkPin for RxClkInPin<'_> {
             .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
         self.pin.init_input(crate::gpio::Pull::None);
-        crate::gpio::InputSignal::PARL_RX_CLK.connect_to(&mut self.pin);
+        crate::gpio::InputSignal::PARL_RX_CLK.connect_to(&self.pin);
 
         Instance::set_rx_clk_edge_sel(self.sample_edge);
     }
@@ -436,7 +432,7 @@ where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
 {
     tx_pins: P,
-    valid_pin: PeripheralRef<'d, OutputConnection>,
+    valid_pin: OutputConnection<'d>,
 }
 
 impl<'d, P> TxPinConfigWithValidPin<'d, P>
@@ -444,9 +440,11 @@ where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins,
 {
     /// Create a [TxPinConfigWithValidPin]
-    pub fn new(tx_pins: P, valid_pin: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        crate::into_mapped_ref!(valid_pin);
-        Self { tx_pins, valid_pin }
+    pub fn new(tx_pins: P, valid_pin: impl PeripheralOutput<'d>) -> Self {
+        Self {
+            tx_pins,
+            valid_pin: valid_pin.into(),
+        }
     }
 }
 
@@ -462,7 +460,7 @@ where
     fn configure(&mut self) -> Result<(), Error> {
         self.tx_pins.configure()?;
         self.valid_pin.set_to_push_pull_output();
-        Instance::tx_valid_pin_signal().connect_to(&mut self.valid_pin);
+        Instance::tx_valid_pin_signal().connect_to(&self.valid_pin);
         Instance::set_tx_hw_valid_en(true);
         Ok(())
     }
@@ -510,7 +508,7 @@ macro_rules! tx_pins {
             #[doc = "bit output mode"]
             pub struct $name<'d> {
                 $(
-                    [< pin_ $pin:lower >] : PeripheralRef<'d, OutputConnection>,
+                    [< pin_ $pin:lower >] : OutputConnection<'d >,
                 )+
             }
 
@@ -520,11 +518,10 @@ macro_rules! tx_pins {
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = impl PeripheralOutput > + 'd,
+                        [< pin_ $pin:lower >] : impl PeripheralOutput<'d>,
                     )+
                 ) -> Self {
-                    crate::into_mapped_ref!($( [< pin_ $pin:lower >] ),+);
-                    Self { $( [< pin_ $pin:lower >] ),+ }
+                    Self { $( [< pin_ $pin:lower >]: [< pin_ $pin:lower >].into() ),+ }
                 }
             }
 
@@ -615,7 +612,7 @@ where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
 {
     rx_pins: P,
-    valid_pin: PeripheralRef<'d, InputConnection>,
+    valid_pin: InputConnection<'d>,
     enable_mode: EnableMode,
 }
 
@@ -624,15 +621,10 @@ where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
 {
     /// Create a new [RxPinConfigWithValidPin]
-    pub fn new(
-        rx_pins: P,
-        valid_pin: impl Peripheral<P = impl PeripheralInput> + 'd,
-        enable_mode: EnableMode,
-    ) -> Self {
-        crate::into_mapped_ref!(valid_pin);
+    pub fn new(rx_pins: P, valid_pin: impl PeripheralInput<'d>, enable_mode: EnableMode) -> Self {
         Self {
             rx_pins,
-            valid_pin,
+            valid_pin: valid_pin.into(),
             enable_mode,
         }
     }
@@ -650,7 +642,7 @@ where
     fn configure(&mut self) -> Result<(), Error> {
         self.rx_pins.configure()?;
         self.valid_pin.init_input(crate::gpio::Pull::None);
-        Instance::rx_valid_pin_signal().connect_to(&mut self.valid_pin);
+        Instance::rx_valid_pin_signal().connect_to(&self.valid_pin);
         Instance::set_rx_sw_en(false);
         if let Some(sel) = self.enable_mode.pulse_submode_sel() {
             Instance::set_rx_pulse_submode_sel(sel);
@@ -722,7 +714,7 @@ macro_rules! rx_pins {
             #[doc = "bit input mode"]
             pub struct $name<'d> {
                 $(
-                    [< pin_ $pin:lower >] : PeripheralRef<'d, InputConnection>,
+                    [< pin_ $pin:lower >] : InputConnection<'d>,
                 )+
             }
 
@@ -732,11 +724,10 @@ macro_rules! rx_pins {
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
-                        [< pin_ $pin:lower >] : impl Peripheral<P = impl PeripheralInput > + 'd,
+                        [< pin_ $pin:lower >] : impl PeripheralInput<'d>,
                     )+
                 ) -> Self {
-                    crate::into_mapped_ref!($( [< pin_ $pin:lower >] ),+);
-                    Self { $( [< pin_ $pin:lower >] ),+ }
+                    Self { $( [< pin_ $pin:lower >]: [< pin_ $pin:lower >].into() ),+ }
                 }
             }
 
@@ -745,7 +736,7 @@ macro_rules! rx_pins {
                 fn configure(&mut self)  -> Result<(), Error> {
                     $(
                         self.[< pin_ $pin:lower >].init_input(crate::gpio::Pull::None);
-                        crate::gpio::InputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
+                        crate::gpio::InputSignal::$signal.connect_to(&self.[< pin_ $pin:lower >]);
                     )+
 
                     private::Instance::set_rx_bit_width( private::WidSel::[< Bits $width >]);

@@ -150,7 +150,7 @@ impl<const C: u8> EventChannel<C> {
     /// Trigger at rising edge
     pub fn rising_edge<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<InputSignal>> + 'd,
+        pin: impl Into<InputSignal<'d>>,
         pin_config: InputConfig,
     ) -> Event<'d> {
         self.into_event(pin, pin_config, EventKind::Rising)
@@ -159,7 +159,7 @@ impl<const C: u8> EventChannel<C> {
     /// Trigger at falling edge
     pub fn falling_edge<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<InputSignal>> + 'd,
+        pin: impl Into<InputSignal<'d>>,
         pin_config: InputConfig,
     ) -> Event<'d> {
         self.into_event(pin, pin_config, EventKind::Falling)
@@ -168,7 +168,7 @@ impl<const C: u8> EventChannel<C> {
     /// Trigger at any edge
     pub fn any_edge<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<InputSignal>> + 'd,
+        pin: impl Into<InputSignal<'d>>,
         pin_config: InputConfig,
     ) -> Event<'d> {
         self.into_event(pin, pin_config, EventKind::Any)
@@ -176,11 +176,11 @@ impl<const C: u8> EventChannel<C> {
 
     fn into_event<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<InputSignal>> + 'd,
+        pin: impl Into<InputSignal<'d>>,
         pin_config: InputConfig,
         kind: EventKind,
     ) -> Event<'d> {
-        crate::into_mapped_ref!(pin);
+        let pin = pin.into();
 
         pin.init_input(pin_config.pull);
 
@@ -256,27 +256,19 @@ impl<const C: u8> TaskChannel<C> {
     // number is the pin-count
 
     /// Task to set a high level
-    pub fn set<'d>(
-        self,
-        pin: impl Peripheral<P = impl Into<OutputSignal>> + 'd,
-        pin_config: OutputConfig,
-    ) -> Task<'d> {
+    pub fn set<'d>(self, pin: impl Into<OutputSignal<'d>>, pin_config: OutputConfig) -> Task<'d> {
         self.into_task(pin, pin_config, TaskKind::Set)
     }
 
     /// Task to set a low level
-    pub fn clear<'d>(
-        self,
-        pin: impl Peripheral<P = impl Into<OutputSignal>> + 'd,
-        pin_config: OutputConfig,
-    ) -> Task<'d> {
+    pub fn clear<'d>(self, pin: impl Into<OutputSignal<'d>>, pin_config: OutputConfig) -> Task<'d> {
         self.into_task(pin, pin_config, TaskKind::Clear)
     }
 
     /// Task to toggle the level
     pub fn toggle<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<OutputSignal>> + 'd,
+        pin: impl Into<OutputSignal<'d>>,
         pin_config: OutputConfig,
     ) -> Task<'d> {
         self.into_task(pin, pin_config, TaskKind::Toggle)
@@ -284,11 +276,11 @@ impl<const C: u8> TaskChannel<C> {
 
     fn into_task<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<OutputSignal>> + 'd,
+        pin: impl Into<OutputSignal<'d>>,
         pin_config: OutputConfig,
         kind: TaskKind,
     ) -> Task<'d> {
-        crate::into_mapped_ref!(pin);
+        let pin = pin.into();
 
         pin.set_output_high(pin_config.initial_state.into());
         if pin_config.open_drain {

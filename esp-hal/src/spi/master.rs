@@ -50,7 +50,7 @@ use crate::{
     clock::Clocks,
     dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{
-        interconnect::{OutputConnection, PeripheralInput, PeripheralOutput},
+        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         NoPin,
         OutputSignal,
@@ -711,10 +711,10 @@ impl<'d> Spi<'d, Blocking> {
 
         let is_qspi = this.driver().info.sio2_input.is_some();
         if is_qspi {
-            unwrap!(this.driver().info.sio2_input).connect_to(NoPin);
-            unwrap!(this.driver().info.sio2_output).connect_to(NoPin);
-            unwrap!(this.driver().info.sio3_input).connect_to(NoPin);
-            unwrap!(this.driver().info.sio3_output).connect_to(NoPin);
+            unwrap!(this.driver().info.sio2_input).connect_to(&NoPin);
+            unwrap!(this.driver().info.sio2_output).connect_to(&NoPin);
+            unwrap!(this.driver().info.sio3_input).connect_to(&NoPin);
+            unwrap!(this.driver().info.sio3_output).connect_to(&NoPin);
         }
 
         Ok(this)
@@ -874,10 +874,10 @@ where
     /// SPI clock signal.
     ///
     /// Disconnects the previous pin that was assigned with `with_sck`.
-    pub fn with_sck<SCK: PeripheralOutput>(mut self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
-        crate::into_mapped_ref!(sclk);
+    pub fn with_sck(mut self, sclk: impl PeripheralOutput<'d>) -> Self {
+        let sclk = sclk.into();
         sclk.set_to_push_pull_output();
-        self.pins.sclk_pin = OutputConnection::connect_with_guard(sclk, self.driver().info.sclk);
+        self.pins.sclk_pin = sclk.connect_with_guard(self.driver().info.sclk);
 
         self
     }
@@ -890,14 +890,11 @@ where
     ///
     /// Disconnects the previous pin that was assigned with `with_mosi` or
     /// `with_sio0`.
-    pub fn with_mosi<MOSI: PeripheralOutput>(
-        mut self,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-    ) -> Self {
-        crate::into_mapped_ref!(mosi);
+    pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
+        let mosi = mosi.into();
         mosi.enable_output(false);
 
-        self.pins.mosi_pin = OutputConnection::connect_with_guard(mosi, self.driver().info.mosi);
+        self.pins.mosi_pin = mosi.connect_with_guard(self.driver().info.mosi);
 
         self
     }
@@ -909,11 +906,11 @@ where
     ///
     /// You want to use this for full-duplex SPI or
     /// [DataMode::SingleTwoDataLines]
-    pub fn with_miso<MISO: PeripheralInput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
-        crate::into_mapped_ref!(miso);
+    pub fn with_miso(self, miso: impl PeripheralInput<'d>) -> Self {
+        let miso = miso.into();
         miso.enable_input(true);
 
-        self.driver().info.miso.connect_to(miso);
+        self.driver().info.miso.connect_to(&miso);
 
         self
     }
@@ -932,16 +929,13 @@ where
     ///
     /// Note: You do not need to call [Self::with_mosi] when this is used.
     #[instability::unstable]
-    pub fn with_sio0<MOSI: PeripheralOutput>(
-        mut self,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-    ) -> Self {
-        crate::into_mapped_ref!(mosi);
+    pub fn with_sio0(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
+        let mosi = mosi.into();
         mosi.enable_output(true);
         mosi.enable_input(true);
 
-        self.driver().info.sio0_input.connect_to(&mut mosi);
-        self.pins.mosi_pin = OutputConnection::connect_with_guard(mosi, self.driver().info.mosi);
+        self.driver().info.sio0_input.connect_to(&mosi);
+        self.pins.mosi_pin = mosi.connect_with_guard(self.driver().info.mosi);
 
         self
     }
@@ -959,17 +953,13 @@ where
     ///
     /// Note: You do not need to call [Self::with_miso] when this is used.
     #[instability::unstable]
-    pub fn with_sio1<SIO1: PeripheralOutput>(
-        mut self,
-        miso: impl Peripheral<P = SIO1> + 'd,
-    ) -> Self {
-        crate::into_mapped_ref!(miso);
-        miso.enable_input(true);
-        miso.enable_output(true);
+    pub fn with_sio1(mut self, sio1: impl PeripheralOutput<'d>) -> Self {
+        let sio1 = sio1.into();
+        sio1.enable_input(true);
+        sio1.enable_output(true);
 
-        self.driver().info.miso.connect_to(&mut miso);
-        self.pins.sio1_pin =
-            OutputConnection::connect_with_guard(miso, self.driver().info.sio1_output);
+        self.driver().info.miso.connect_to(&sio1);
+        self.pins.sio1_pin = sio1.connect_with_guard(self.driver().info.sio1_output);
 
         self
     }
@@ -983,21 +973,18 @@ where
     /// QSPI operations are unstable, associated pins configuration is
     /// inefficient.
     #[instability::unstable]
-    pub fn with_sio2<SIO2: PeripheralOutput>(
-        mut self,
-        sio2: impl Peripheral<P = SIO2> + 'd,
-    ) -> Self {
+    pub fn with_sio2(mut self, sio2: impl PeripheralOutput<'d>) -> Self {
         // TODO: panic if not QSPI?
-        crate::into_mapped_ref!(sio2);
+        let sio2 = sio2.into();
         sio2.enable_input(true);
         sio2.enable_output(true);
 
-        unwrap!(self.driver().info.sio2_input).connect_to(&mut sio2);
+        unwrap!(self.driver().info.sio2_input).connect_to(&sio2);
         self.pins.sio2_pin = self
             .driver()
             .info
             .sio2_output
-            .map(|signal| OutputConnection::connect_with_guard(sio2, signal));
+            .map(|signal| sio2.connect_with_guard(signal));
 
         self
     }
@@ -1011,21 +998,18 @@ where
     /// QSPI operations are unstable, associated pins configuration is
     /// inefficient.
     #[instability::unstable]
-    pub fn with_sio3<SIO3: PeripheralOutput>(
-        mut self,
-        sio3: impl Peripheral<P = SIO3> + 'd,
-    ) -> Self {
+    pub fn with_sio3(mut self, sio3: impl PeripheralOutput<'d>) -> Self {
         // TODO: panic if not QSPI?
-        crate::into_mapped_ref!(sio3);
+        let sio3 = sio3.into();
         sio3.enable_input(true);
         sio3.enable_output(true);
 
-        unwrap!(self.driver().info.sio3_input).connect_to(&mut sio3);
+        unwrap!(self.driver().info.sio3_input).connect_to(&sio3);
         self.pins.sio3_pin = self
             .driver()
             .info
             .sio3_output
-            .map(|signal| OutputConnection::connect_with_guard(sio3, signal));
+            .map(|signal| sio3.connect_with_guard(signal));
 
         self
     }
@@ -1042,10 +1026,10 @@ where
     /// be set, regardless of the total number available. There is no
     /// mechanism to select which CS line to use.
     #[instability::unstable]
-    pub fn with_cs<CS: PeripheralOutput>(mut self, cs: impl Peripheral<P = CS> + 'd) -> Self {
-        crate::into_mapped_ref!(cs);
+    pub fn with_cs(mut self, cs: impl PeripheralOutput<'d>) -> Self {
+        let cs = cs.into();
         cs.set_to_push_pull_output();
-        self.pins.cs_pin = OutputConnection::connect_with_guard(cs, self.driver().info.cs);
+        self.pins.cs_pin = cs.connect_with_guard(self.driver().info.cs);
 
         self
     }

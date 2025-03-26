@@ -6,7 +6,6 @@
 // polluting the main module.
 
 use super::*;
-use crate::gpio::interconnect::connect_input_signal;
 
 unsafe impl crate::peripheral::Peripheral for Level {
     type P = Self;
@@ -32,15 +31,6 @@ impl Level {
 
     pub(crate) fn is_input_high(&self) -> bool {
         *self == Level::High
-    }
-
-    pub(crate) fn connect_input_to_peripheral(&self, signal: InputSignal) {
-        let value = match self {
-            Level::High => ONE_INPUT,
-            Level::Low => ZERO_INPUT,
-        };
-
-        connect_input_signal(signal, value, false, true);
     }
 
     pub(crate) fn set_to_open_drain_output(&self) {}

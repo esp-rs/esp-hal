@@ -16,7 +16,6 @@ use crate::{
         OutputSignal,
     },
     pac::ledc::RegisterBlock,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::LEDC,
 };
 
@@ -152,22 +151,18 @@ pub struct Channel<'a, S: TimerSpeed> {
     ledc: &'a RegisterBlock,
     timer: Option<&'a dyn TimerIFace<S>>,
     number: Number,
-    output_pin: PeripheralRef<'a, OutputConnection>,
+    output_pin: OutputConnection<'a>,
 }
 
 impl<'a, S: TimerSpeed> Channel<'a, S> {
     /// Return a new channel
-    pub fn new(
-        number: Number,
-        output_pin: impl Peripheral<P = impl PeripheralOutput> + 'a,
-    ) -> Self {
-        crate::into_mapped_ref!(output_pin);
+    pub fn new(number: Number, output_pin: impl PeripheralOutput<'a>) -> Self {
         let ledc = LEDC::regs();
         Channel {
             ledc,
             timer: None,
             number,
-            output_pin,
+            output_pin: output_pin.into(),
         }
     }
 }

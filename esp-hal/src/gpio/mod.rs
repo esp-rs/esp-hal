@@ -134,10 +134,11 @@ pub(crate) struct PinGuard {
 impl crate::private::Sealed for PinGuard {}
 
 impl PinGuard {
-    pub(crate) fn new(mut pin: AnyPin, signal: OutputSignal) -> Self {
-        signal.connect_to(&mut pin);
+    pub(crate) fn new(pin: AnyPin, signal: OutputSignal) -> Self {
+        let number = pin.number();
+        signal.connect_to(&pin.into_ref());
         Self {
-            pin: pin.number(),
+            pin: number,
             signal,
         }
     }
@@ -153,8 +154,8 @@ impl PinGuard {
 impl Drop for PinGuard {
     fn drop(&mut self) {
         if self.pin != u8::MAX {
-            let mut pin = unsafe { AnyPin::steal(self.pin) };
-            self.signal.disconnect_from(&mut pin);
+            let pin = unsafe { AnyPin::steal(self.pin) };
+            self.signal.disconnect_from(&pin.into_ref());
         }
     }
 }
@@ -640,7 +641,12 @@ where
     /// # }
     /// ```
     #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+    pub fn split(
+        self,
+    ) -> (
+        interconnect::InputSignal<'static>,
+        interconnect::OutputSignal<'static>,
+    ) {
         // FIXME: we should implement this in the gpio macro for output pins, but we
         // should also have an input-only alternative for pins that can't be used as
         // outputs.
@@ -1212,7 +1218,12 @@ impl<'d> Output<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+    pub fn split(
+        self,
+    ) -> (
+        interconnect::InputSignal<'d>,
+        interconnect::OutputSignal<'d>,
+    ) {
         self.pin.split()
     }
 
@@ -1232,7 +1243,7 @@ impl<'d> Output<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+    pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
         self.pin.peripheral_input()
     }
 
@@ -1252,7 +1263,7 @@ impl<'d> Output<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal<'d> {
         self.pin.into_peripheral_output()
     }
 
@@ -1422,7 +1433,7 @@ impl<'d> Input<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+    pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
         self.pin.peripheral_input()
     }
 
@@ -1576,7 +1587,12 @@ impl<'d> Input<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+    pub fn split(
+        self,
+    ) -> (
+        interconnect::InputSignal<'d>,
+        interconnect::OutputSignal<'d>,
+    ) {
         self.pin.split()
     }
 
@@ -1597,7 +1613,7 @@ impl<'d> Input<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal<'d> {
         self.pin.into_peripheral_output()
     }
 
@@ -1673,7 +1689,7 @@ impl<'d> Flex<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+    pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
         unsafe { AnyPin::steal(self.number()) }.split().0
     }
 
@@ -1909,7 +1925,12 @@ impl<'d> Flex<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+    pub fn split(
+        self,
+    ) -> (
+        interconnect::InputSignal<'d>,
+        interconnect::OutputSignal<'d>,
+    ) {
         assert!(self.pin.is_output());
         unsafe { AnyPin::steal(self.number()) }.split()
     }
@@ -1930,7 +1951,7 @@ impl<'d> Flex<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal<'d> {
         self.split().1
     }
 }
@@ -1976,7 +1997,12 @@ impl AnyPin {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+    pub fn split(
+        self,
+    ) -> (
+        interconnect::InputSignal<'static>,
+        interconnect::OutputSignal<'static>,
+    ) {
         assert!(self.is_output());
         (
             interconnect::InputSignal::new(Self(self.0)),

@@ -52,7 +52,7 @@ use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
-        interconnect::{OutputConnection, PeripheralInput, PeripheralOutput},
+        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         OutputSignal,
         PinGuard,
@@ -675,10 +675,10 @@ where
 {
     /// Configure RTS pin
     #[instability::unstable]
-    pub fn with_rts(mut self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        crate::into_mapped_ref!(rts);
+    pub fn with_rts(mut self, rts: impl PeripheralOutput<'d>) -> Self {
+        let rts = rts.into();
         rts.set_to_push_pull_output();
-        self.rts_pin = OutputConnection::connect_with_guard(rts, self.uart.info().rts_signal);
+        self.rts_pin = rts.connect_with_guard(self.uart.info().rts_signal);
 
         self
     }
@@ -690,12 +690,12 @@ where
     ///
     /// Disconnects the previous pin that was assigned with `with_tx`.
     #[instability::unstable]
-    pub fn with_tx(mut self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        crate::into_mapped_ref!(tx);
+    pub fn with_tx(mut self, tx: impl PeripheralOutput<'d>) -> Self {
+        let tx = tx.into();
         // Make sure we don't cause an unexpected low pulse on the pin.
         tx.set_output_high(true);
         tx.set_to_push_pull_output();
-        self.tx_pin = OutputConnection::connect_with_guard(tx, self.uart.info().tx_signal);
+        self.tx_pin = tx.connect_with_guard(self.uart.info().tx_signal);
 
         self
     }
@@ -1035,10 +1035,10 @@ where
     ///
     /// Sets the specified pin to input and connects it to the UART CTS signal.
     #[instability::unstable]
-    pub fn with_cts(self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
-        crate::into_mapped_ref!(cts);
+    pub fn with_cts(self, cts: impl PeripheralInput<'d>) -> Self {
+        let cts = cts.into();
         cts.init_input(Pull::None);
-        self.uart.info().cts_signal.connect_to(cts);
+        self.uart.info().cts_signal.connect_to(&cts);
 
         self
     }
@@ -1052,10 +1052,10 @@ where
     /// initially high, to avoid receiving a non-data byte caused by an
     /// initial low signal level.
     #[instability::unstable]
-    pub fn with_rx(self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
-        crate::into_mapped_ref!(rx);
+    pub fn with_rx(self, rx: impl PeripheralInput<'d>) -> Self {
+        let rx = rx.into();
         rx.init_input(Pull::Up);
-        self.uart.info().rx_signal.connect_to(rx);
+        self.uart.info().rx_signal.connect_to(&rx);
 
         self
     }
@@ -1470,7 +1470,7 @@ where
     /// configure the driver side (i.e. the TX pin), or ensure that the line is
     /// initially high, to avoid receiving a non-data byte caused by an
     /// initial low signal level.
-    pub fn with_rx(mut self, rx: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+    pub fn with_rx(mut self, rx: impl PeripheralInput<'d>) -> Self {
         self.rx = self.rx.with_rx(rx);
         self
     }
@@ -1479,19 +1479,19 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the UART
     /// TX signal.
-    pub fn with_tx(mut self, tx: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    pub fn with_tx(mut self, tx: impl PeripheralOutput<'d>) -> Self {
         self.tx = self.tx.with_tx(tx);
         self
     }
 
     /// Configure CTS pin
-    pub fn with_cts(mut self, cts: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
+    pub fn with_cts(mut self, cts: impl PeripheralInput<'d>) -> Self {
         self.rx = self.rx.with_cts(cts);
         self
     }
 
     /// Configure RTS pin
-    pub fn with_rts(mut self, rts: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    pub fn with_rts(mut self, rts: impl PeripheralOutput<'d>) -> Self {
         self.tx = self.tx.with_rts(rts);
         self
     }
