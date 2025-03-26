@@ -38,7 +38,13 @@ pub(crate) fn psram_range() -> Range<usize> {
     }
 }
 
-const DRAM: Range<usize> = self::constants::SOC_DRAM_LOW..self::constants::SOC_DRAM_HIGH;
+/// The lower bound of the system's DRAM (Data RAM) address space.
+const SOC_DRAM_LOW: usize = esp_config::esp_config_int!(usize, "REGION-DRAM-START");
+
+/// The upper bound of the system's DRAM (Data RAM) address space.
+const SOC_DRAM_HIGH: usize = esp_config::esp_config_int!(usize, "REGION-DRAM-END");
+
+const DRAM: Range<usize> = SOC_DRAM_LOW..SOC_DRAM_HIGH;
 
 #[cfg(feature = "psram")]
 pub struct MappedPsram {
