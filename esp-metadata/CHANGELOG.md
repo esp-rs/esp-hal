@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add ability to define memory regions, have DRAM defined there (#3300)
 
+- Provide macros to get the start/end of a memory region, make it possible to use the macros in a no-std project (#3300)
+
 ### Changed
 
 ### Fixed
