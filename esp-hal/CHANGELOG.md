@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for `rand_core` 0.9 (#3211)
 - `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` and `ESP_HAL_CONFIG_STACK_GUARD_VALUE` to configure Rust's [Stack smashing protection](https://doc.rust-lang.org/rustc/exploit-mitigations.html#stack-smashing-protection) (#3203)
 - Experimental metadata in the output `.elf` (#3276)
+- `PeripheralInput::connect_input_to_peripheral` and `PeripheralOuptut::{connect_peripheral_to_output, disconnect_from_peripheral_output}` (#3302)
 
 ### Changed
 
@@ -19,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::i2s::master::AnyI2s` has been moved to `esp_hal::i2s::AnyI2s` (#3226)
 - `esp_hal::i2c::master::AnyI2c` has been moved to `esp_hal::i2c::AnyI2c` (#3226)
 - `SpiDmaBus` no longer adjusts the DMA buffer length for each transfer (#3263)
+
+- `gpio::interconnect` types now have a lifetime associated with them (#3302)
 
 ### Fixed
 
@@ -36,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: Keep ADC enabled to improve radio signal strength (#3249)
 
 ### Removed
+
+- `gpio::{Level, NoPin, Input, Output, Flex}` no longer implement `Peripheral` (#3302)
 
 ## v1.0.0-beta.0
 
