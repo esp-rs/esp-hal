@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Using the `#handler` macro with a priority of `None` will fail at compile time
+- Using the `#handler` macro with a priority of `None` will fail at compile time (#3304)
 
 ### Fixed
 
