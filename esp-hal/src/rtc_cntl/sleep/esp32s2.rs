@@ -121,8 +121,6 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
         triggers: &mut WakeTriggers,
         sleep_config: &mut RtcSleepConfig,
     ) {
-        // Checked TODO: remove comment
-        // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext0(true);
 
@@ -170,7 +168,6 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         triggers: &mut WakeTriggers,
         sleep_config: &mut RtcSleepConfig,
     ) {
-        // Checked TODO: Remove comment
         sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext1(true);
 
@@ -336,8 +333,8 @@ impl Default for RtcSleepConfig {
 }
 
 fn rtc_sleep_pu(val: bool) {
-    // Called rtc_sleep_pd in idf, but makes more sense like this with the single
-    // boolean argument Checked: OK TODO: Remove comment
+    // Note: Called rtc_sleep_pd in idf, but makes more sense like this with the
+    // single boolean argument
     let rtc_cntl = LPWR::regs();
     let syscon = unsafe { &*esp32s2::SYSCON::ptr() };
     let bb = unsafe { &*esp32s2::BB::ptr() };
@@ -429,7 +426,6 @@ impl RtcSleepConfig {
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
-        // Checked TODO: Remove comment
         // settings derived from esp_clk_init -> rtc_init
         unsafe {
             let rtc_cntl = LPWR::regs();
@@ -494,10 +490,6 @@ impl RtcSleepConfig {
                     .bits(RTC_CNTL_ULPCP_TOUCH_START_WAIT_DEFAULT)
             });
 
-            // TODO: Check all the if statements in idf here
-            //
-            //
-            //
             // clkctl_init
             {
                 // clear CMMU clock force on
@@ -781,8 +773,6 @@ impl RtcSleepConfig {
     }
 
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
-        // NOTE: esp32s2 deep sleep uses asm. Can this work without?
-        // Note: OK. TODO: Remove comment
         // TODO: Add reject triggers
         unsafe {
             LPWR::regs()
@@ -803,7 +793,6 @@ impl RtcSleepConfig {
     }
 
     pub(crate) fn finish_sleep(&self) {
-        // OK Checked TODO: Remove comment
         // In deep sleep mode, we never get here
         unsafe {
             LPWR::regs().int_clr().write(|w| {
