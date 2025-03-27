@@ -46,11 +46,10 @@ pub struct LowPowerOutput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     /// Create a new output pin for use by the low-power core
-    pub fn new<P>(pin: impl Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(pin: P) -> Self
     where
-        P: OutputPin + RtcPin,
+        P: OutputPin + RtcPin + 'd,
     {
-        into_ref!(pin);
         pin.rtc_set_config(false, true, RtcFunction::Rtc);
 
         let this = Self {

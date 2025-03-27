@@ -442,11 +442,11 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<0>, 0),
-            (GpioPin<1>, 1),
-            (GpioPin<2>, 2),
-            (GpioPin<3>, 3),
-            (GpioPin<4>, 4),
+            (GpioPin<'_, 0>, 0),
+            (GpioPin<'_, 1>, 1),
+            (GpioPin<'_, 2>, 2),
+            (GpioPin<'_, 3>, 3),
+            (GpioPin<'_, 4>, 4),
         ]
     }
 }
@@ -455,17 +455,17 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<0>, 0),
-            (GpioPin<1>, 1),
-            (GpioPin<2>, 2),
-            (GpioPin<3>, 3),
-            (GpioPin<4>, 4),
+            (GpioPin<'_, 0>, 0),
+            (GpioPin<'_, 1>, 1),
+            (GpioPin<'_, 2>, 2),
+            (GpioPin<'_, 3>, 3),
+            (GpioPin<'_, 4>, 4),
         ]
     }
 
     crate::analog::adc::impl_adc_interface! {
         ADC2 [
-            (GpioPin<5>, 0),
+            (GpioPin<'_, 5>, 0),
         ]
     }
 }
@@ -474,13 +474,13 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<0>, 0),
-            (GpioPin<1>, 1),
-            (GpioPin<2>, 2),
-            (GpioPin<3>, 3),
-            (GpioPin<4>, 4),
-            (GpioPin<5>, 5),
-            (GpioPin<6>, 6),
+            (GpioPin<'_, 0>, 0),
+            (GpioPin<'_, 1>, 1),
+            (GpioPin<'_, 2>, 2),
+            (GpioPin<'_, 3>, 3),
+            (GpioPin<'_, 4>, 4),
+            (GpioPin<'_, 5>, 5),
+            (GpioPin<'_, 6>, 6),
         ]
     }
 }
@@ -489,11 +489,11 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<1>, 0),
-            (GpioPin<2>, 1),
-            (GpioPin<3>, 2),
-            (GpioPin<4>, 3),
-            (GpioPin<5>, 4),
+            (GpioPin<'_, 1>, 0),
+            (GpioPin<'_, 2>, 1),
+            (GpioPin<'_, 3>, 2),
+            (GpioPin<'_, 4>, 3),
+            (GpioPin<'_, 5>, 4),
         ]
     }
 }

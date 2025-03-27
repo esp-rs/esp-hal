@@ -15,7 +15,6 @@ use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     interrupt::{software::SoftwareInterruptControl, Priority},
-    peripheral::Peripheral,
     spi::{
         master::{Config, Spi},
         Mode,

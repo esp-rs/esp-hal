@@ -11,10 +11,10 @@
 
 use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
+#[cfg(feature = "unstable")]
+use esp_hal::peripherals::SPI2;
 use esp_hal::{
     gpio::Input,
-    peripheral::Peripheral,
-    peripherals::SPI2,
     spi::master::{Config, Spi},
     time::Rate,
     Blocking,

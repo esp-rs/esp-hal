@@ -33,7 +33,10 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     let mut pin4 = peripherals.GPIO4;
-    let ext0_pin = Input::new(&mut pin4, InputConfig::default().with_pull(Pull::None));
+    let ext0_pin = Input::new(
+        pin4.reborrow(),
+        InputConfig::default().with_pull(Pull::None),
+    );
 
     println!("up and runnning!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -46,7 +49,7 @@ fn main() -> ! {
     core::mem::drop(ext0_pin);
 
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
-    let ext0 = Ext0WakeupSource::new(&mut pin4, WakeupLevel::High);
+    let ext0 = Ext0WakeupSource::new(pin4, WakeupLevel::High);
     println!("sleeping!");
     delay.delay_millis(100);
     rtc.sleep_deep(&[&timer, &ext0]);

@@ -115,7 +115,7 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
+impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
     fn apply(
         &self,
         _rtc: &Rtc<'_>,
@@ -146,7 +146,7 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
     }
 }
 
-impl<P: RtcPin> Drop for Ext0WakeupSource<'_, P> {
+impl<P: RtcPin> Drop for Ext0WakeupSource<P> {
     fn drop(&mut self) {
         // should we have saved the pin configuration first?
         // set pin back to IO_MUX (input_enable and func have no effect when pin is sent

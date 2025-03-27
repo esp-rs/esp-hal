@@ -45,7 +45,7 @@ struct Context {
     #[cfg(pcnt)]
     pcnt: esp_hal::peripherals::PCNT,
     dma_channel: DmaChannel0,
-    gpios: [AnyPin; 3],
+    gpios: [AnyPin<'static>; 3],
 }
 
 fn transfer_read(
@@ -198,9 +198,9 @@ mod tests {
 
         // Make sure pins have no pullups
         let config = InputConfig::default().with_pull(Pull::Down);
-        let _ = Input::new(&mut pin, config);
-        let _ = Input::new(&mut pin_mirror, config);
-        let _ = Input::new(&mut unconnected_pin, config);
+        let _ = Input::new(pin.reborrow(), config);
+        let _ = Input::new(pin_mirror.reborrow(), config);
+        let _ = Input::new(unconnected_pin.reborrow(), config);
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {

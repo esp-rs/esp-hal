@@ -100,7 +100,7 @@ mod tests {
     use super::*;
 
     struct Context {
-        dout: AnyPin,
+        dout: AnyPin<'static>,
         dma_channel: DmaChannel0,
         i2s: I2S0,
     }

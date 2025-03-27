@@ -304,7 +304,7 @@ mod peripheral_macros {
 
                     $(
                         #[doc = concat!("GPIO", stringify!($pin))]
-                        pub [<GPIO $pin>]: $crate::gpio::GpioPin<$pin>,
+                        pub [<GPIO $pin>]: $crate::gpio::GpioPin<'static, $pin>,
                     )*
 
                     $(
