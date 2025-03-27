@@ -12,7 +12,6 @@
 use esp_hal::{
     dma_buffers,
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
-    peripheral::Peripheral,
     spi::{slave::Spi, Mode},
     Blocking,
 };

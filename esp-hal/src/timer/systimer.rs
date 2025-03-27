@@ -679,7 +679,7 @@ pub mod etm {
     //!
     //! let timer_event = Event::new(&alarm0);
     //! let led_task = gpio_ext.channel0_task.toggle(
-    //!     &mut led,
+    //!     led,
     //!     OutputConfig {
     //!         open_drain: false,
     //!         pull: Pull::None,

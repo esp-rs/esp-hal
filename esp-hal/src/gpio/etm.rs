@@ -32,12 +32,12 @@
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
 //! #
-//! # let mut led = peripherals.GPIO1;
+//! # let led = peripherals.GPIO1;
 //! # let button = peripherals.GPIO9;
 //!
 //! let gpio_ext = Channels::new(peripherals.GPIO_SD);
 //! let led_task = gpio_ext.channel0_task.toggle(
-//!     &mut led,
+//!     led,
 //!     OutputConfig {
 //!         open_drain: false,
 //!         pull: Pull::None,

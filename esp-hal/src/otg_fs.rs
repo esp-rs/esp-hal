@@ -64,8 +64,8 @@ impl<'d> Usb<'d> {
     /// Creates a new `Usb` instance.
     pub fn new(
         usb0: impl Peripheral<P = peripherals::USB0> + 'd,
-        _usb_dp: impl Peripheral<P = impl UsbDp> + 'd,
-        _usb_dm: impl Peripheral<P = impl UsbDm> + 'd,
+        _usb_dp: impl UsbDp + 'd,
+        _usb_dm: impl UsbDm + 'd,
     ) -> Self {
         let guard = GenericPeripheralGuard::new();
 

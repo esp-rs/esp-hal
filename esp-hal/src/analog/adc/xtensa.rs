@@ -526,31 +526,31 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<1>,  0),
-            (GpioPin<2>,  1),
-            (GpioPin<3>,  2),
-            (GpioPin<4>,  3),
-            (GpioPin<5>,  4),
-            (GpioPin<6>,  5),
-            (GpioPin<7>,  6),
-            (GpioPin<8>,  7),
-            (GpioPin<9>,  8),
-            (GpioPin<10>, 9),
+            (GpioPin<'_, 1>,  0),
+            (GpioPin<'_, 2>,  1),
+            (GpioPin<'_, 3>,  2),
+            (GpioPin<'_, 4>,  3),
+            (GpioPin<'_, 5>,  4),
+            (GpioPin<'_, 6>,  5),
+            (GpioPin<'_, 7>,  6),
+            (GpioPin<'_, 8>,  7),
+            (GpioPin<'_, 9>,  8),
+            (GpioPin<'_, 10>, 9),
         ]
     }
 
     crate::analog::adc::impl_adc_interface! {
         ADC2 [
-            (GpioPin<11>, 0),
-            (GpioPin<12>, 1),
-            (GpioPin<13>, 2),
-            (GpioPin<14>, 3),
-            (GpioPin<15>, 4),
-            (GpioPin<16>, 5),
-            (GpioPin<17>, 6),
-            (GpioPin<18>, 7),
-            (GpioPin<19>, 8),
-            (GpioPin<20>, 9),
+            (GpioPin<'_, 11>, 0),
+            (GpioPin<'_, 12>, 1),
+            (GpioPin<'_, 13>, 2),
+            (GpioPin<'_, 14>, 3),
+            (GpioPin<'_, 15>, 4),
+            (GpioPin<'_, 16>, 5),
+            (GpioPin<'_, 17>, 6),
+            (GpioPin<'_, 18>, 7),
+            (GpioPin<'_, 19>, 8),
+            (GpioPin<'_, 20>, 9),
         ]
     }
 }

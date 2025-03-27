@@ -61,7 +61,6 @@ use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
     interrupt::{self, InterruptHandler, Priority, DEFAULT_INTERRUPT_HANDLER},
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{
         gpio::{handle_gpio_input, handle_gpio_output},
         Interrupt,
@@ -134,9 +133,9 @@ pub(crate) struct PinGuard {
 impl crate::private::Sealed for PinGuard {}
 
 impl PinGuard {
-    pub(crate) fn new(pin: AnyPin, signal: OutputSignal) -> Self {
+    pub(crate) fn new(pin: AnyPin<'_>, signal: OutputSignal) -> Self {
         let number = pin.number();
-        signal.connect_to(&pin.into_ref());
+        signal.connect_to(&pin);
         Self {
             pin: number,
             signal,
@@ -155,7 +154,7 @@ impl Drop for PinGuard {
     fn drop(&mut self) {
         if self.pin != u8::MAX {
             let pin = unsafe { AnyPin::steal(self.pin) };
-            self.signal.disconnect_from(&pin.into_ref());
+            self.signal.disconnect_from(&pin);
         }
     }
 }
@@ -439,9 +438,9 @@ pub trait Pin: Sealed {
     /// # Ok(())
     /// # }
     /// ```
-    fn degrade(self) -> AnyPin
+    fn degrade<'d>(self) -> AnyPin<'d>
     where
-        Self: Sized,
+        Self: Sized + 'd,
     {
         unsafe { AnyPin::steal(self.number()) }
     }
@@ -454,10 +453,10 @@ pub trait Pin: Sealed {
 }
 
 /// Trait implemented by pins which can be used as inputs.
-pub trait InputPin: Pin + Into<AnyPin> + 'static {}
+pub trait InputPin: Pin {}
 
 /// Trait implemented by pins which can be used as outputs.
-pub trait OutputPin: Pin + Into<AnyPin> + 'static {}
+pub trait OutputPin: Pin {}
 
 /// Trait implemented by pins which can be used as analog pins
 #[instability::unstable]
@@ -609,14 +608,19 @@ impl GpioBank {
 #[non_exhaustive]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct GpioPin<const GPIONUM: u8>;
+pub struct GpioPin<'lt, const GPIONUM: u8> {
+    _lifetime: core::marker::PhantomData<&'lt mut ()>,
+}
 
 /// Any GPIO pin.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyPin(pub(crate) u8);
+pub struct AnyPin<'lt> {
+    pub(crate) pin: u8,
+    pub(crate) _lifetime: core::marker::PhantomData<&'lt mut ()>,
+}
 
-impl<const GPIONUM: u8> GpioPin<GPIONUM>
+impl<'lt, const GPIONUM: u8> GpioPin<'lt, GPIONUM>
 where
     Self: Pin,
 {
@@ -626,7 +630,24 @@ where
     ///
     /// Ensure that only one instance of a pin exists at one time.
     pub unsafe fn steal() -> Self {
-        Self
+        Self {
+            _lifetime: core::marker::PhantomData,
+        }
+    }
+
+    /// Unsafely clone the pin.
+    ///
+    /// # Safety
+    ///
+    /// Ensure that only one instance of a pin is in use at one time.
+    pub unsafe fn clone_unchecked(&self) -> Self {
+        GpioPin::steal()
+    }
+
+    /// Create a new GpioPin object that is limited to the lifetime of the
+    /// passed reference.
+    pub fn reborrow(&mut self) -> GpioPin<'_, GPIONUM> {
+        unsafe { self.clone_unchecked() }
     }
 
     /// Split the pin into an input and output signal.
@@ -644,8 +665,8 @@ where
     pub fn split(
         self,
     ) -> (
-        interconnect::InputSignal<'static>,
-        interconnect::OutputSignal<'static>,
+        interconnect::InputSignal<'lt>,
+        interconnect::OutputSignal<'lt>,
     ) {
         // FIXME: we should implement this in the gpio macro for output pins, but we
         // should also have an input-only alternative for pins that can't be used as
@@ -685,18 +706,7 @@ fn disable_usb_pads(gpionum: u8) {
     }
 }
 
-unsafe impl<const GPIONUM: u8> Peripheral for GpioPin<GPIONUM>
-where
-    Self: Pin,
-{
-    type P = GpioPin<GPIONUM>;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        core::ptr::read(self as *const _)
-    }
-}
-
-impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> {}
+impl<const GPIONUM: u8> private::Sealed for GpioPin<'_, GPIONUM> {}
 
 pub(crate) fn bind_default_interrupt_handler() {
     // We first check if a handler is set in the vector table.
@@ -867,17 +877,17 @@ macro_rules! if_rtcio_pin {
 #[macro_export]
 macro_rules! io_type {
     (Input, $gpionum:literal) => {
-        impl $crate::gpio::InputPin for $crate::gpio::GpioPin<$gpionum> {}
+        impl $crate::gpio::InputPin for $crate::gpio::GpioPin<'_, $gpionum> {}
     };
     (Output, $gpionum:literal) => {
-        impl $crate::gpio::OutputPin for $crate::gpio::GpioPin<$gpionum> {}
+        impl $crate::gpio::OutputPin for $crate::gpio::GpioPin<'_, $gpionum> {}
     };
     (Analog, $gpionum:literal) => {
         // FIXME: the implementation shouldn't be in the GPIO module
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
         #[cfg(any(doc, feature = "unstable"))]
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<$gpionum> {
+        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<'_, $gpionum> {
             /// Configures the pin for analog mode.
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::GPIO;
@@ -919,7 +929,7 @@ macro_rules! gpio {
                     $crate::io_type!($type, $gpionum);
                 )*
 
-                impl $crate::gpio::Pin for $crate::gpio::GpioPin<$gpionum> {
+                impl $crate::gpio::Pin for $crate::gpio::GpioPin<'_, $gpionum> {
                     #[inline(always)]
                     fn number(&self) -> u8 {
                         $gpionum
@@ -952,21 +962,14 @@ macro_rules! gpio {
                     }
                 }
 
-                impl From<$crate::gpio::GpioPin<$gpionum>> for $crate::gpio::AnyPin {
-                    fn from(pin: $crate::gpio::GpioPin<$gpionum>) -> Self {
+                impl<'lt> From<$crate::gpio::GpioPin<'lt, $gpionum>> for $crate::gpio::AnyPin<'lt> {
+                    fn from(pin: $crate::gpio::GpioPin<'lt, $gpionum>) -> Self {
                         $crate::gpio::Pin::degrade(pin)
                     }
                 }
             )+
 
-            unsafe impl $crate::peripheral::Peripheral for $crate::gpio::AnyPin {
-                type P = $crate::gpio::AnyPin;
-                unsafe fn clone_unchecked(&self) ->  Self {
-                    Self(self.0)
-                }
-            }
-
-            impl $crate::gpio::AnyPin {
+            impl $crate::gpio::AnyPin<'_> {
                 /// Conjure a new GPIO pin out of thin air.
                 ///
                 /// # Safety
@@ -979,11 +982,29 @@ macro_rules! gpio {
                 pub unsafe fn steal(pin: u8) ->  Self {
                     const PINS: &[u8] = &[$($gpionum),*];
                     assert!(PINS.contains(&pin), "Pin {} does not exist", pin);
-                    Self(pin)
+                    Self { pin, _lifetime: core::marker::PhantomData }
+                }
+
+                /// Unsafely clone the pin.
+                ///
+                /// # Safety
+                ///
+                /// Ensure that only one instance of a pin is in use at one time.
+                pub unsafe fn clone_unchecked(&self) -> Self {
+                    Self {
+                        pin: self.pin,
+                        _lifetime: core::marker::PhantomData,
+                    }
+                }
+
+                /// Create a new AnyPin object that is limited to the lifetime of the
+                /// passed reference.
+                pub fn reborrow(&mut self) -> $crate::gpio::AnyPin<'_> {
+                    unsafe { self.clone_unchecked() }
                 }
 
                 pub(crate) fn is_output(&self) -> bool {
-                    match self.0 {
+                    match self.pin {
                         $(
                             $gpionum => $crate::if_output_pin!($($type),* { true } else { false }),
                         )+
@@ -1001,7 +1022,7 @@ macro_rules! gpio {
                         $(
                             $gpionum => $crate::if_output_pin!($($type),* {{
                                 #[allow(unused_mut)]
-                                let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
+                                let mut $inner = unsafe { GpioPin::<'static, $gpionum>::steal() };
                                 $code
                             }} else {{
                                 panic!("Unsupported")
@@ -1019,7 +1040,7 @@ macro_rules! gpio {
                         $(
                             $gpionum => {{
                                 #[allow(unused_mut)]
-                                let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
+                                let mut $inner = unsafe { GpioPin::<'static, $gpionum>::steal() };
                                 $code
                             }},
                         )+
@@ -1040,7 +1061,7 @@ macro_rules! gpio {
                                 $(
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {{
                                         #[allow(unused_mut)]
-                                        let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
+                                        let mut $inner = unsafe { GpioPin::<'static, $gpionum>::steal() };
                                         $code
                                     }} else {{
                                         panic!("Unsupported")
@@ -1059,7 +1080,7 @@ macro_rules! gpio {
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {
                                         $crate::if_output_pin!($($type),* {{
                                             #[allow(unused_mut)]
-                                            let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
+                                            let mut $inner = unsafe { GpioPin::<'static, $gpionum>::steal() };
                                             $code
                                         }} else {{
                                             panic!("Unsupported")
@@ -1180,11 +1201,7 @@ impl<'d> Output<'d> {
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
-    pub fn new(
-        pin: impl Peripheral<P = impl OutputPin> + 'd,
-        initial_level: Level,
-        config: OutputConfig,
-    ) -> Self {
+    pub fn new(pin: impl OutputPin + 'd, initial_level: Level, config: OutputConfig) -> Self {
         // Set up the pin
         let mut this = Self {
             pin: Flex::new(pin),
@@ -1394,7 +1411,7 @@ impl<'d> Input<'d> {
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
-    pub fn new(pin: impl Peripheral<P = impl InputPin> + 'd, config: InputConfig) -> Self {
+    pub fn new(pin: impl InputPin + 'd, config: InputConfig) -> Self {
         let mut pin = Flex::new(pin);
 
         pin.pin.enable_output(false);
@@ -1617,7 +1634,7 @@ impl<'d> Input<'d> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Flex<'d> {
-    pin: PeripheralRef<'d, AnyPin>,
+    pin: AnyPin<'d>,
 }
 
 impl private::Sealed for Flex<'_> {}
@@ -1627,8 +1644,8 @@ impl<'d> Flex<'d> {
     /// No mode change happens.
     #[inline]
     #[instability::unstable]
-    pub fn new(pin: impl Peripheral<P = impl Into<AnyPin>> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
+    pub fn new(pin: impl Pin + 'd) -> Self {
+        let pin = pin.degrade();
 
         #[cfg(usb_device)]
         disable_usb_pads(pin.number());
@@ -1866,7 +1883,7 @@ impl<'d> Flex<'d> {
         let pull_down = config.pull == Pull::Down;
 
         #[cfg(esp32)]
-        crate::soc::gpio::errata36(AnyPin(self.pin.0), pull_up, pull_down);
+        crate::soc::gpio::errata36(unsafe { self.pin.clone_unchecked() }, pull_up, pull_down);
 
         io_mux_reg(self.number()).modify(|_, w| {
             unsafe { w.fun_drv().bits(config.drive_strength as u8) };
@@ -1933,9 +1950,9 @@ impl<'d> Flex<'d> {
     }
 }
 
-impl private::Sealed for AnyPin {}
+impl private::Sealed for AnyPin<'_> {}
 
-impl AnyPin {
+impl<'lt> AnyPin<'lt> {
     fn bank(&self) -> GpioBank {
         #[cfg(gpio_bank_1)]
         if self.number() >= 32 {
@@ -1977,13 +1994,19 @@ impl AnyPin {
     pub fn split(
         self,
     ) -> (
-        interconnect::InputSignal<'static>,
-        interconnect::OutputSignal<'static>,
+        interconnect::InputSignal<'lt>,
+        interconnect::OutputSignal<'lt>,
     ) {
         assert!(self.is_output());
         (
-            interconnect::InputSignal::new(Self(self.0)),
-            interconnect::OutputSignal::new(Self(self.0)),
+            interconnect::InputSignal::new(Self {
+                pin: self.pin,
+                _lifetime: self._lifetime,
+            }),
+            interconnect::OutputSignal::new(Self {
+                pin: self.pin,
+                _lifetime: self._lifetime,
+            }),
         )
     }
 
@@ -2017,7 +2040,7 @@ impl AnyPin {
         let pull_down = pull == Pull::Down;
 
         #[cfg(esp32)]
-        crate::soc::gpio::errata36(Self(self.0), pull_up, pull_down);
+        crate::soc::gpio::errata36(unsafe { self.clone_unchecked() }, pull_up, pull_down);
 
         io_mux_reg(self.number()).modify(|_, w| {
             w.fun_wpd().bit(pull_down);
@@ -2106,10 +2129,10 @@ impl AnyPin {
     }
 }
 
-impl Pin for AnyPin {
+impl Pin for AnyPin<'_> {
     #[inline(always)]
     fn number(&self) -> u8 {
-        self.0
+        self.pin
     }
 
     fn output_signals(&self, _: private::Internal) -> &'static [(AlternateFunction, OutputSignal)] {
@@ -2125,11 +2148,11 @@ impl Pin for AnyPin {
     }
 }
 
-impl InputPin for AnyPin {}
-impl OutputPin for AnyPin {}
+impl InputPin for AnyPin<'_> {}
+impl OutputPin for AnyPin<'_> {}
 
 #[cfg(any(lp_io, rtc_cntl))]
-impl RtcPin for AnyPin {
+impl RtcPin for AnyPin<'_> {
     #[cfg(xtensa)]
     #[allow(unused_braces, reason = "False positive")]
     fn rtc_number(&self) -> u8 {
@@ -2157,7 +2180,7 @@ impl RtcPin for AnyPin {
 }
 
 #[cfg(any(lp_io, rtc_cntl))]
-impl RtcPinWithResistors for AnyPin {
+impl RtcPinWithResistors for AnyPin<'_> {
     fn rtcio_pullup(&self, enable: bool) {
         handle_rtcio_with_resistors!(self, target, {
             RtcPinWithResistors::rtcio_pullup(&target, enable)
@@ -2218,11 +2241,7 @@ mod asynch {
         pub async fn wait_for(&mut self, event: Event) {
             // We construct the Future first, because its `Drop` implementation
             // is load-bearing if `wait_for` is dropped during the initialization.
-            let mut future = PinFuture {
-                pin: Flex {
-                    pin: unsafe { self.pin.clone_unchecked() },
-                },
-            };
+            let future = PinFuture { pin: self };
 
             // Make sure this pin is not being processed by an interrupt handler.
             if future.pin.is_listening() {
@@ -2360,11 +2379,11 @@ mod asynch {
     }
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    struct PinFuture<'d> {
-        pin: Flex<'d>,
+    struct PinFuture<'f, 'd> {
+        pin: &'f mut Flex<'d>,
     }
 
-    impl PinFuture<'_> {
+    impl PinFuture<'_, '_> {
         fn number(&self) -> u8 {
             self.pin.number()
         }
@@ -2384,7 +2403,7 @@ mod asynch {
         }
     }
 
-    impl core::future::Future for PinFuture<'_> {
+    impl core::future::Future for PinFuture<'_, '_> {
         type Output = ();
 
         fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -2398,7 +2417,7 @@ mod asynch {
         }
     }
 
-    impl Drop for PinFuture<'_> {
+    impl Drop for PinFuture<'_, '_> {
         fn drop(&mut self) {
             // If the pin isn't listening, the future has either been dropped before setup,
             // or the interrupt has already been handled.

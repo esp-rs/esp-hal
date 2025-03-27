@@ -30,9 +30,9 @@ use hil_test as _;
 struct Context {
     parl_io: PARL_IO,
     dma_channel: DmaChannel0,
-    clock_pin: AnyPin,
-    valid_pin: AnyPin,
-    data_pins: [AnyPin; 4],
+    clock_pin: AnyPin<'static>,
+    valid_pin: AnyPin<'static>,
+    data_pins: [AnyPin<'static>; 4],
 }
 
 #[cfg(test)]

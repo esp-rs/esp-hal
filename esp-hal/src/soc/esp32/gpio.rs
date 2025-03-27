@@ -535,7 +535,7 @@ macro_rules! rtcio_analog {
     (
         $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
     ) => {
-        impl $crate::gpio::RtcPin for $crate::gpio::GpioPin<$pin_num> {
+        impl $crate::gpio::RtcPin for $crate::gpio::GpioPin<'_, $pin_num> {
             fn rtc_number(&self) -> u8 {
                 $rtc_pin
             }
@@ -564,7 +564,7 @@ macro_rules! rtcio_analog {
         $(
             // FIXME: replace with $(ignore($rue)) once stable
             $crate::ignore!($rue);
-            impl $crate::gpio::RtcPinWithResistors for $crate::gpio::GpioPin<$pin_num> {
+            impl $crate::gpio::RtcPinWithResistors for $crate::gpio::GpioPin<'_, $pin_num> {
                 fn rtcio_pullup(&self, enable: bool) {
                     paste::paste! {
                         $crate::peripherals::RTC_IO::regs()
@@ -581,7 +581,7 @@ macro_rules! rtcio_analog {
             }
         )?
 
-        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<$pin_num> {
+        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<'_, $pin_num> {
             /// Configures the pin for analog mode.
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::gpio::RtcPin;
@@ -628,7 +628,7 @@ macro_rules! rtcio_analog {
             rtcio_analog!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue )?);
         )+
 
-        pub(crate) fn errata36(pin: $crate::gpio::AnyPin, pull_up: bool, pull_down: bool) {
+        pub(crate) fn errata36(pin: $crate::gpio::AnyPin<'_>, pull_up: bool, pull_down: bool) {
             use $crate::gpio::{Pin, RtcPinWithResistors};
 
             let has_pullups = match pin.number() {
@@ -683,7 +683,7 @@ macro_rules! touch {
         )+
     ) => {
         $(
-        impl $crate::gpio::TouchPin for GpioPin<$pin_num> {
+        impl $crate::gpio::TouchPin for GpioPin<'_, $pin_num> {
             fn set_touch(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::{GPIO, RTC_IO, SENS};
                 use $crate::gpio::RtcPin;
