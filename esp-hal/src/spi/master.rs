@@ -1525,6 +1525,19 @@ mod dma {
 
             if !self.is_done() {
                 Fut(self.driver()).await;
+
+                #[cfg(esp32)]
+                // Need to poll for done-ness even after interrupt fires.
+                core::future::poll_fn(|cx| {
+                    use core::task::Poll;
+                    if self.is_done() {
+                        Poll::Ready(())
+                    } else {
+                        cx.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                })
+                .await;
             }
 
             if self.tx_transfer_in_progress {
