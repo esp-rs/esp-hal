@@ -309,7 +309,7 @@ pub struct RtcioWakeupSource<'a, 'b> {
 
 #[cfg(any(esp32c3, esp32s2, esp32s3, esp32c2))]
 impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
-    /// Creates a new external wake-up source (Ext1).
+    /// Creates a new external GPIO wake-up source.
     pub fn new(pins: &'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]) -> Self {
         Self {
             pins: RefCell::new(pins),
