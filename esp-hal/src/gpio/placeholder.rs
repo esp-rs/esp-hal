@@ -7,14 +7,6 @@
 
 use super::*;
 
-unsafe impl crate::peripheral::Peripheral for Level {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        *self
-    }
-}
-
 impl Level {
     pub(crate) fn pull_direction(&self, _pull: Pull) {}
 
@@ -57,14 +49,6 @@ impl Level {
 /// When used as a peripheral signal, `NoPin` is equivalent to [`Level::Low`].
 #[derive(Default, Clone, Copy)]
 pub struct NoPin;
-
-unsafe impl crate::peripheral::Peripheral for NoPin {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self
-    }
-}
 
 impl private::Sealed for NoPin {}
 
