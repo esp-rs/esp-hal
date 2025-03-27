@@ -1506,6 +1506,13 @@ mod dma {
 
                 fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                     if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
+                        #[cfg(esp32)]
+                        // Need to poll for done-ness even after interrupt fires.
+                        if self.0.busy() {
+                            cx.waker().wake_by_ref();
+                            return Poll::Pending;
+                        }
+
                         self.0.clear_interrupts(SpiInterrupt::TransferDone.into());
                         return Poll::Ready(());
                     }
@@ -1525,19 +1532,6 @@ mod dma {
 
             if !self.is_done() {
                 Fut(self.driver()).await;
-
-                #[cfg(esp32)]
-                // Need to poll for done-ness even after interrupt fires.
-                core::future::poll_fn(|cx| {
-                    use core::task::Poll;
-                    if self.is_done() {
-                        Poll::Ready(())
-                    } else {
-                        cx.waker().wake_by_ref();
-                        Poll::Pending
-                    }
-                })
-                .await;
             }
 
             if self.tx_transfer_in_progress {
