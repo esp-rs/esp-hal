@@ -168,11 +168,10 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         &self,
         _rtc: &Rtc<'_>,
         triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
+        sleep_config: &mut RtcSleepConfig,
     ) {
         // Checked TODO: Remove comment
-        // NOTE: RTC may be powered down according to TRM
-        // sleep_config.set_rtc_peri_pd_en(false);
+        sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext1(true);
 
         // TODO: disable clock when not in use
