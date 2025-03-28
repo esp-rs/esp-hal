@@ -155,6 +155,44 @@ impl Efuse {
         let efuse_val = Self::rtc_table_get_raw_efuse_value(tag) * info.multiplier;
         efuse_val + info.base + Self::rtc_table_get_raw_efuse_value(info.dependency)
     }
+
+    /// coeff_b from: <https://github.com/espressif/esp-idf/blob/903af13e847cd301e476d8b16b4ee1c21b30b5c6/components/esp_adc/esp32s2/adc_cali_line_fitting.c#L91>
+    /// Extracted from prepare_calib_data_for(...),
+    /// calculate_characterization_coefficients(...) &
+    /// characterize_using_two_points(...)
+    pub fn rtc_calib_init_code(unit: u8, atten: Attenuation) -> Option<u16> {
+        if unit >= 2 {
+            return None;
+        }
+        let (_, calib_version) = Self::block_version();
+        let version_number = calib_version;
+
+        match version_number {
+            1 => {
+                let low = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
+                    version_number,
+                    unit,
+                    atten,
+                    RtcCalibParam::V1VLow,
+                )?);
+                let high = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
+                    version_number,
+                    unit,
+                    atten,
+                    RtcCalibParam::V1VHigh,
+                )?);
+
+                const V_HIGH: [i32; 4] = [600, 800, 1000, 2000];
+                const V_LOW: i32 = 250;
+
+                let fraction = (V_LOW * high - V_HIGH[atten as usize]) / (high - low);
+                let scaled = 1024 * fraction;
+                Some(scaled as u16)
+            }
+            2 => Some(0),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]
