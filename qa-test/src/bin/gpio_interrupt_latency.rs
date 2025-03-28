@@ -34,12 +34,14 @@ async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let p = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
-    let mut enc_a = Flex::new(p.GPIO2);
+    let mut enc_a = Flex::new(unsafe { p.GPIO2.clone_unchecked() });
+    let enc_a_clone = Flex::new(p.GPIO2);
     enc_a.set_as_output();
     enc_a.apply_output_config(&OutputConfig::default());
     enc_a.enable_input(true);
 
-    let mut enc_b = Flex::new(p.GPIO4);
+    let mut enc_b = Flex::new(unsafe { p.GPIO4.clone_unchecked() });
+    let enc_b_clone = Flex::new(p.GPIO4);
     enc_b.set_as_output();
     enc_b.apply_output_config(&OutputConfig::default());
     enc_b.enable_input(true);
@@ -47,11 +49,7 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(p.TIMG0);
     esp_hal_embassy::init(timg0.timer0);
 
-    spawner.must_spawn(toggle(
-        unsafe { enc_a.clone_unchecked() },
-        unsafe { enc_b.clone_unchecked() },
-        &SIGNAL,
-    ));
+    spawner.must_spawn(toggle(enc_a_clone, enc_b_clone, &SIGNAL));
     spawner.must_spawn(wait(enc_a, enc_b, &SIGNAL));
 }
 
