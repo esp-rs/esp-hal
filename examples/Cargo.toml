@@ -23,7 +23,7 @@ embedded-io-async   = "0.6.1"
 embedded-storage    = "0.3.1"
 esp-alloc           = { path = "../esp-alloc" }
 esp-backtrace       = { path = "../esp-backtrace", features = ["exception-handler", "panic-handler", "println"] }
-esp-hal             = { path = "../esp-hal", features = ["log", "critical-section-impl"] }
+esp-hal             = { path = "../esp-hal", features = ["log"] }
 esp-hal-embassy     = { path = "../esp-hal-embassy", optional = true }
 esp-ieee802154      = { path = "../esp-ieee802154", optional = true }
 esp-println         = { path = "../esp-println", features = ["log"] }
