@@ -43,9 +43,11 @@
 //! # {after_snippet}
 //! ```
 
+use self::adc_raw_map::*;
 pub use self::fields::*;
 use crate::{analog::adc::Attenuation, peripherals::EFUSE, soc::efuse_field::EfuseField};
 
+mod adc_raw_map;
 mod fields;
 
 /// A struct representing the eFuse functionality of the chip.
@@ -68,43 +70,6 @@ impl Into<usize> for RtcCalibParam {
         }
     }
 }
-
-// https://github.com/espressif/esp-idf/blob/a45d713b03fd96d8805d1cc116f02a4415b360c7/components/efuse/esp32s2/include/esp_efuse_rtc_table.h#L31C1-L65C34
-// These are the tags. Either use them directly or use
-// esp_efuse_rtc_table_get_tag to calculate the corresponding tag.
-const RTCCALIB_V1IDX_A10L: usize = 1;
-const RTCCALIB_V1IDX_A11L: usize = 2;
-const RTCCALIB_V1IDX_A12L: usize = 3;
-const RTCCALIB_V1IDX_A13L: usize = 4;
-const RTCCALIB_V1IDX_A20L: usize = 5;
-const RTCCALIB_V1IDX_A21L: usize = 6;
-const RTCCALIB_V1IDX_A22L: usize = 7;
-const RTCCALIB_V1IDX_A23L: usize = 8;
-const RTCCALIB_V1IDX_A10H: usize = 9;
-const RTCCALIB_V1IDX_A11H: usize = 10;
-const RTCCALIB_V1IDX_A12H: usize = 11;
-const RTCCALIB_V1IDX_A13H: usize = 12;
-const RTCCALIB_V1IDX_A20H: usize = 13;
-const RTCCALIB_V1IDX_A21H: usize = 14;
-const RTCCALIB_V1IDX_A22H: usize = 15;
-const RTCCALIB_V1IDX_A23H: usize = 16;
-const RTCCALIB_V2IDX_A10H: usize = 17;
-const RTCCALIB_V2IDX_A11H: usize = 18;
-const RTCCALIB_V2IDX_A12H: usize = 19;
-const RTCCALIB_V2IDX_A13H: usize = 20;
-const RTCCALIB_V2IDX_A20H: usize = 21;
-const RTCCALIB_V2IDX_A21H: usize = 22;
-const RTCCALIB_V2IDX_A22H: usize = 23;
-const RTCCALIB_V2IDX_A23H: usize = 24;
-const RTCCALIB_V2IDX_A10I: usize = 25;
-const RTCCALIB_V2IDX_A11I: usize = 26;
-const RTCCALIB_V2IDX_A12I: usize = 27;
-const RTCCALIB_V2IDX_A13I: usize = 28;
-const RTCCALIB_V2IDX_A20I: usize = 29;
-const RTCCALIB_V2IDX_A21I: usize = 30;
-const RTCCALIB_V2IDX_A22I: usize = 31;
-const RTCCALIB_V2IDX_A23I: usize = 32;
-const RTCCALIB_IDX_TMPSENSOR: usize = 33;
 
 impl Efuse {
     /// Get status of SPI boot encryption.
@@ -152,10 +117,10 @@ impl Efuse {
 
         use RtcCalibParam::*;
         let param_offset = match (version, tag) {
-            (1, V1VLow) => RTCCALIB_V1IDX_A10L,
-            (1, V1VHigh) => RTCCALIB_V1IDX_A10H,
-            (2, V2VInit) => RTCCALIB_V2IDX_A10I,
-            (2, V2VHigh) => RTCCALIB_V2IDX_A10H,
+            (1, V1VLow) => TAG_RTCCALIB_V1IDX_A10L,
+            (1, V1VHigh) => TAG_RTCCALIB_V1IDX_A10H,
+            (2, V2VInit) => TAG_RTCCALIB_V2IDX_A10I,
+            (2, V2VHigh) => TAG_RTCCALIB_V2IDX_A10H,
             _ => return None,
         };
 
@@ -176,7 +141,7 @@ impl Efuse {
         }
         let info = &RAW_MAP[tag];
         // TODO: Check BE/LE
-        let val = Self::read_field_be(EfuseField::new(info.block, info.begin_bit, info.length));
+        let val = Self::read_field_le(EfuseField::new(info.block, info.begin_bit, info.length));
         signed_bit_to_int(val, info.length)
     }
 
@@ -226,288 +191,3 @@ impl EfuseBlock {
         }
     }
 }
-
-/// See <https://github.com/espressif/esp-idf/blob/a45d713b03fd96d8805d1cc116f02a4415b360c7/components/efuse/esp32s2/esp_efuse_rtc_table.c#L48>
-struct MapInfo {
-    block: EfuseBlock,
-    begin_bit: u16,
-    length: u16,
-    multiplier: i32,
-    base: i32,
-    dependency: usize,
-}
-
-const RAW_MAP: [MapInfo; 34] = [
-    MapInfo {
-        block: EfuseBlock::Block0,
-        begin_bit: 0,
-        length: 0,
-        multiplier: 0,
-        base: 0,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 208,
-        length: 6,
-        multiplier: 4,
-        base: 2231,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 214,
-        length: 6,
-        multiplier: 4,
-        base: 1643,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 220,
-        length: 6,
-        multiplier: 4,
-        base: 1290,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 226,
-        length: 6,
-        multiplier: 4,
-        base: 701,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 232,
-        length: 6,
-        multiplier: 4,
-        base: 2305,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 238,
-        length: 6,
-        multiplier: 4,
-        base: 1693,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 244,
-        length: 6,
-        multiplier: 4,
-        base: 1343,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 250,
-        length: 6,
-        multiplier: 4,
-        base: 723,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 144,
-        length: 8,
-        multiplier: 4,
-        base: 5775,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 152,
-        length: 8,
-        multiplier: 4,
-        base: 5693,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 160,
-        length: 8,
-        multiplier: 4,
-        base: 5723,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 168,
-        length: 8,
-        multiplier: 4,
-        base: 6209,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 176,
-        length: 8,
-        multiplier: 4,
-        base: 5817,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 184,
-        length: 8,
-        multiplier: 4,
-        base: 5703,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 192,
-        length: 8,
-        multiplier: 4,
-        base: 5731,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 200,
-        length: 8,
-        multiplier: 4,
-        base: 6157,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 197,
-        length: 6,
-        multiplier: 2,
-        base: 169,
-        dependency: RTCCALIB_V2IDX_A12H,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 203,
-        length: 6,
-        multiplier: 2,
-        base: -26,
-        dependency: RTCCALIB_V2IDX_A12H,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 209,
-        length: 9,
-        multiplier: 2,
-        base: 126,
-        dependency: RTCCALIB_V2IDX_A21H,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 218,
-        length: 7,
-        multiplier: 2,
-        base: 387,
-        dependency: RTCCALIB_V2IDX_A12H,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 225,
-        length: 7,
-        multiplier: 2,
-        base: 177,
-        dependency: RTCCALIB_V2IDX_A21H,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 232,
-        length: 10,
-        multiplier: 2,
-        base: 5815,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 242,
-        length: 7,
-        multiplier: 2,
-        base: 27,
-        dependency: RTCCALIB_V2IDX_A21H,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 249,
-        length: 7,
-        multiplier: 2,
-        base: 410,
-        dependency: RTCCALIB_V2IDX_A21H,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 147,
-        length: 8,
-        multiplier: 2,
-        base: 1519,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 155,
-        length: 6,
-        multiplier: 2,
-        base: 88,
-        dependency: RTCCALIB_V2IDX_A10I,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 161,
-        length: 5,
-        multiplier: 2,
-        base: 8,
-        dependency: RTCCALIB_V2IDX_A11I,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 166,
-        length: 6,
-        multiplier: 2,
-        base: 70,
-        dependency: RTCCALIB_V2IDX_A12I,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 172,
-        length: 8,
-        multiplier: 2,
-        base: 1677,
-        dependency: 0,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 180,
-        length: 6,
-        multiplier: 2,
-        base: 23,
-        dependency: RTCCALIB_V2IDX_A20I,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 186,
-        length: 5,
-        multiplier: 2,
-        base: 6,
-        dependency: RTCCALIB_V2IDX_A21I,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 191,
-        length: 6,
-        multiplier: 2,
-        base: 13,
-        dependency: RTCCALIB_V2IDX_A22I,
-    },
-    MapInfo {
-        block: EfuseBlock::Block2,
-        begin_bit: 135,
-        length: 9,
-        multiplier: 1,
-        base: 0,
-        dependency: 0,
-    },
-];
