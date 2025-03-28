@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::i2s::master::AnyI2s` has been moved to `esp_hal::i2s::AnyI2s` (#3226)
 - `esp_hal::i2c::master::AnyI2c` has been moved to `esp_hal::i2c::AnyI2c` (#3226)
 - `SpiDmaBus` no longer adjusts the DMA buffer length for each transfer (#3263)
+- `SpiDma<Async>` now uses the SPI interrupt (instead of DMA) to wait for completion (#3303)
 
 - `gpio::interconnect` types now have a lifetime associated with them (#3302)
 
