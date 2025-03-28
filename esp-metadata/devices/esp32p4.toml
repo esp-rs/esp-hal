@@ -100,3 +100,5 @@ symbols = [
     "gpio_bank_1",
     "spi_octal",
 ]
+
+memory = [{ name = "dram", start = 0x4FF0_0000, end = 0x4FFC_0000 }]

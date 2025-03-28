@@ -95,3 +95,5 @@ symbols = [
     # Other capabilities
     "psram_dma",
 ]
+
+memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]

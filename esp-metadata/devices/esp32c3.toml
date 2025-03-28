@@ -66,3 +66,5 @@ symbols = [
     "uart_support_wakeup_int",
     "gpio_support_deepsleep_wakeup",
 ]
+
+memory = [{ name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 }]

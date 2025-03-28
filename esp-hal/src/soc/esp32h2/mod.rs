@@ -64,11 +64,6 @@ pub(crate) mod constants {
     /// Hertz.
     pub const PARL_IO_SCLK: u32 = 96_000_000;
 
-    /// Start address of the system's DRAM (low range).
-    pub const SOC_DRAM_LOW: usize = 0x4080_0000;
-    /// End address of the system's DRAM (high range).
-    pub const SOC_DRAM_HIGH: usize = 0x4085_0000;
-
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);
 }
