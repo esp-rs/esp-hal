@@ -14,6 +14,7 @@ exclude  = [
     "esp-metadata",
     "esp-println",
     "esp-riscv-rt",
+    "esp-rustls-provider",
     "esp-wifi",
     "esp-storage",
     "examples",
