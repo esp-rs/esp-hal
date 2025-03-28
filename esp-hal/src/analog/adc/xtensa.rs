@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 pub use self::calibration::*;
 use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 use crate::efuse::Efuse;
 use crate::{
     peripherals::{APB_SARADC, SENS},
@@ -489,7 +489,7 @@ where
     }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(1, atten)
@@ -504,7 +504,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(2, atten)

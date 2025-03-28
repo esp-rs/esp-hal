@@ -1,0 +1,4 @@
+{
+  "rust-analyzer.cargo.features": ["esp32s2"],
+  "rust-analyzer.check.features": ["esp32s2"]
+}
