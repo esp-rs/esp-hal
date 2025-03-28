@@ -1,21 +1,6 @@
+use crate::soc::regi2c;
+
 const SYSTEM_WIFI_CLK_RNG_EN: u32 = 1 << 15;
-
-const I2C_SAR_ADC: u8 = 0x69;
-const I2C_SAR_ADC_HOSTID: u8 = 1;
-const ADC_SARADC_ENCAL_REF_ADDR: u8 = 0x7;
-const ADC_SARADC_ENCAL_REF_ADDR_MSB: u32 = 4;
-const ADC_SARADC_ENCAL_REF_ADDR_LSB: u32 = 4;
-const ADC_SARADC_ENT_TSENS_ADDR: u32 = 0x7;
-const ADC_SARADC_ENT_TSENS_ADDR_MSB: u32 = 2;
-const ADC_SARADC_ENT_TSENS_ADDR_LSB: u32 = 2;
-const ADC_SARADC_ENT_RTC_ADDR: u32 = 0x7;
-const ADC_SARADC_ENT_RTC_ADDR_MSB: u32 = 3;
-const ADC_SARADC_ENT_RTC_ADDR_LSB: u32 = 3;
-const ADC_SARADC_DTEST_RTC_ADDR: u32 = 0x7;
-const ADC_SARADC_DTEST_RTC_ADDR_MSB: u32 = 1;
-const ADC_SARADC_DTEST_RTC_ADDR_LSB: u32 = 0;
-
-use crate::rom::regi2c_write_mask;
 
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
@@ -52,7 +37,6 @@ pub(crate) fn ensure_randomness() {
             .modify(|_, w| w.apb_saradc_clk_en().clear_bit());
 
         apb_saradc.clkm_conf().modify(|_, w| w.clk_sel().bits(2));
-
         apb_saradc.ctrl().modify(|_, w| w.sar_clk_gated().set_bit());
         apb_saradc.clkm_conf().modify(|_, w| w.clk_en().set_bit());
 
@@ -61,9 +45,7 @@ pub(crate) fn ensure_randomness() {
             .modify(|_, w| w.clkm_div_num().bits(3));
 
         apb_saradc.ctrl().modify(|_, w| w.sar_clk_div().bits(3));
-
         apb_saradc.ctrl2().modify(|_, w| w.timer_target().bits(3));
-
         apb_saradc.ctrl().modify(|_, w| w.sar_clk_div().bits(3));
 
         sens.sar_power_xpd_sar()
@@ -74,13 +56,9 @@ pub(crate) fn ensure_randomness() {
             .modify(|_, w| w.meas_num_limit().clear_bit());
 
         apb_saradc.ctrl().modify(|_, w| w.work_mode().bits(1));
-
         apb_saradc.ctrl().modify(|_, w| w.sar2_patt_len().bits(0));
-
         apb_saradc.sar2_patt_tab1().modify(|_, w| w.bits(0xafffff));
-
         apb_saradc.ctrl().modify(|_, w| w.sar1_patt_len().bits(0));
-
         apb_saradc.sar1_patt_tab1().modify(|_, w| w.bits(0xafffff));
 
         sens.sar_meas1_mux()
@@ -106,16 +84,12 @@ pub(crate) fn ensure_randomness() {
             .modify(|_, w| w.filter_channel1().bits(0xD));
 
         apb_saradc.ctrl2().modify(|_, w| w.timer_sel().set_bit());
-
         apb_saradc.ctrl2().modify(|_, w| w.timer_en().set_bit());
 
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENCAL_REF_ADDR, 1);
-
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENT_TSENS_ADDR, 1);
-
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENT_RTC_ADDR, 1);
-
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_DTEST_RTC_ADDR, 1);
+        regi2c::ADC_SAR1_ENCAL_REF.write_field(1);
+        regi2c::ADC_SAR_ENT_TSENS.write_field(1);
+        regi2c::ADC_SAR_ENT_RTC.write_field(1);
+        regi2c::ADC_SAR_DTEST_RTC.write_field(1);
     }
 }
 
@@ -126,13 +100,10 @@ pub(crate) fn revert_trng() {
     let sens = crate::peripherals::SENS::regs();
 
     unsafe {
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENCAL_REF_ADDR, 0);
-
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENT_TSENS_ADDR, 0);
-
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENT_RTC_ADDR, 0);
-
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_DTEST_RTC_ADDR, 0);
+        regi2c::ADC_SAR1_ENCAL_REF.write_field(0);
+        regi2c::ADC_SAR_ENT_TSENS.write_field(0);
+        regi2c::ADC_SAR_ENT_RTC.write_field(0);
+        regi2c::ADC_SAR_DTEST_RTC.write_field(0);
 
         sens.sar_power_xpd_sar()
             .modify(|_, w| w.force_xpd_sar().bits(0));

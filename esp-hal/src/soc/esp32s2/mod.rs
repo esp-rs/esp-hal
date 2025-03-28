@@ -22,6 +22,7 @@ crate::unstable_module! {
 }
 pub mod gpio;
 pub mod peripherals;
+pub(crate) mod regi2c;
 
 /// The name of the chip ("esp32s2") as `&str`
 #[macro_export]
