@@ -71,6 +71,9 @@ impl Into<usize> for RtcCalibParam {
     }
 }
 
+const RTC_CALIB_V_HIGH: [i32; 4] = [600, 800, 1000, 2000];
+const RTC_CALIB_V_LOW: i32 = 250;
+
 impl Efuse {
     /// Get status of SPI boot encryption.
     pub fn flash_encryption() -> bool {
@@ -160,6 +163,7 @@ impl Efuse {
     /// Extracted from prepare_calib_data_for(...),
     /// calculate_characterization_coefficients(...) &
     /// characterize_using_two_points(...)
+
     pub fn rtc_calib_init_code(unit: u8, atten: Attenuation) -> Option<u16> {
         if unit >= 2 {
             return None;
@@ -182,14 +186,50 @@ impl Efuse {
                     RtcCalibParam::V1VHigh,
                 )?);
 
-                const V_HIGH: [i32; 4] = [600, 800, 1000, 2000];
-                const V_LOW: i32 = 250;
-
-                let fraction = (V_LOW * high - V_HIGH[atten as usize]) / (high - low);
+                let fraction =
+                    (RTC_CALIB_V_LOW * high - RTC_CALIB_V_HIGH[atten as usize]) / (high - low);
                 let scaled = 1024 * fraction;
                 Some(scaled as u16)
             }
             2 => Some(0),
+            _ => None,
+        }
+    }
+
+    pub fn rtc_calib_cal_mv(unit: u8, atten: Attenuation) -> u16 {
+        let index = atten as usize;
+        if index >= 4 {
+            return 0;
+        }
+        RTC_CALIB_V_HIGH[index] as u16
+    }
+
+    pub fn rtc_calib_cal_code(unit: u8, atten: Attenuation) -> Option<u16> {
+        if unit >= 2 {
+            return None;
+        }
+        let (_, calib_version) = Self::block_version();
+        let version_number = calib_version;
+
+        match version_number {
+            1 => {
+                let high = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
+                    version_number,
+                    unit,
+                    atten,
+                    RtcCalibParam::V1VHigh,
+                )?);
+                Some(high as u16)
+            }
+            2 => {
+                let high = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
+                    version_number,
+                    unit,
+                    atten,
+                    RtcCalibParam::V2VHigh,
+                )?);
+                Some(high as u16)
+            }
             _ => None,
         }
     }
