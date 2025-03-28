@@ -128,17 +128,17 @@ macro_rules! coeff_tables {
 mod impls {
     use super::*;
 
-    impl AdcHasCurveCal for crate::peripherals::ADC1 {
+    impl AdcHasCurveCal for crate::peripherals::ADC1<'_> {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
     }
 
     #[cfg(esp32c3)]
-    impl AdcHasCurveCal for crate::peripherals::ADC2 {
+    impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
     }
 
     #[cfg(esp32s3)]
-    impl AdcHasCurveCal for crate::peripherals::ADC2 {
+    impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS2;
     }
 

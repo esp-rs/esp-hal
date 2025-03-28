@@ -40,7 +40,7 @@ mod tests {
     }
 
     #[test]
-    fn test_controller_comms(mut peripherals: Peripherals) {
+    fn test_controller_comms(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         let init = esp_wifi::init(
             timg0.timer0,
@@ -49,7 +49,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut connector = BleConnector::new(&init, &mut peripherals.BT);
+        let mut connector = BleConnector::new(&init, peripherals.BT);
 
         // send reset cmd
         pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {

@@ -72,7 +72,7 @@
 //!
 //! let syst = SystemTimer::new(peripherals.SYSTIMER);
 //! let mut alarm0 = syst.alarm0;
-//! let mut timer = PeriodicTimer::new(&mut alarm0);
+//! let mut timer = PeriodicTimer::new(alarm0.reborrow());
 //! timer.start(Duration::from_secs(1));
 //!
 //! let led = peripherals.GPIO1;
@@ -88,7 +88,7 @@
 //!     },
 //! );
 //!
-//! let timer_event = Event::new(&mut alarm0);
+//! let timer_event = Event::new(&alarm0);
 //!
 //! let etm = Etm::new(peripherals.SOC_ETM);
 //! let channel0 = etm.channel0;
@@ -102,11 +102,7 @@
 //! # }
 //! ```
 
-use crate::{
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::SOC_ETM,
-    system::GenericPeripheralGuard,
-};
+use crate::{peripherals::SOC_ETM, system::GenericPeripheralGuard};
 
 /// Unconfigured EtmChannel.
 #[non_exhaustive]
@@ -186,7 +182,7 @@ macro_rules! create_etm {
             ///
             /// Provides access to all the [EtmChannel]
             pub struct Etm<'d> {
-                _peripheral: PeripheralRef<'d, crate::peripherals::SOC_ETM>,
+                _peripheral: crate::peripherals::SOC_ETM<'d>,
                 $(
                     /// An individual ETM channel, identified by its index number.
                     pub [< channel $num >]: EtmChannel<$num>,
@@ -195,9 +191,7 @@ macro_rules! create_etm {
 
             impl<'d> Etm<'d> {
                 /// Creates a new `Etm` instance.
-                pub fn new(peripheral: impl Peripheral<P = crate::peripherals::SOC_ETM> + 'd) -> Self {
-                    crate::into_ref!(peripheral);
-
+                pub fn new(peripheral: crate::peripherals::SOC_ETM<'d>) -> Self {
                     Self {
                         _peripheral: peripheral,
                         $([< channel $num >]: EtmChannel { },)+

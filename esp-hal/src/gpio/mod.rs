@@ -736,14 +736,14 @@ pub(crate) fn bind_default_interrupt_handler() {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct Io {
-    _io_mux: IO_MUX,
+pub struct Io<'d> {
+    _io_mux: IO_MUX<'d>,
 }
 
-impl Io {
+impl<'d> Io<'d> {
     /// Initialize the I/O driver.
     #[instability::unstable]
-    pub fn new(_io_mux: IO_MUX) -> Self {
+    pub fn new(_io_mux: IO_MUX<'d>) -> Self {
         Io { _io_mux }
     }
 
@@ -789,10 +789,10 @@ impl Io {
     }
 }
 
-impl crate::private::Sealed for Io {}
+impl crate::private::Sealed for Io<'_> {}
 
 #[instability::unstable]
-impl crate::interrupt::InterruptConfigurable for Io {
+impl crate::interrupt::InterruptConfigurable for Io<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
     }

@@ -17,13 +17,12 @@
 //! [`PeriodicTimer`](super::PeriodicTimer). Using the System timer directly is
 //! only possible through the low level [`Timer`](crate::timer::Timer) trait.
 
-use core::fmt::Debug;
+use core::{fmt::Debug, marker::PhantomData};
 
 use super::{Error, Timer as _};
 use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
-    peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
     sync::{lock, RawMutex},
     system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
@@ -44,18 +43,18 @@ pub enum UnitConfig {
 }
 
 /// System Timer driver.
-pub struct SystemTimer {
+pub struct SystemTimer<'d> {
     /// Alarm 0.
-    pub alarm0: Alarm,
+    pub alarm0: Alarm<'d>,
 
     /// Alarm 1.
-    pub alarm1: Alarm,
+    pub alarm1: Alarm<'d>,
 
     /// Alarm 2.
-    pub alarm2: Alarm,
+    pub alarm2: Alarm<'d>,
 }
 
-impl SystemTimer {
+impl<'d> SystemTimer<'d> {
     cfg_if::cfg_if! {
         if #[cfg(esp32s2)] {
             /// Bitmask to be applied to the raw register value.
@@ -96,7 +95,7 @@ impl SystemTimer {
     }
 
     /// Create a new instance.
-    pub fn new(_systimer: SYSTIMER) -> Self {
+    pub fn new(_systimer: SYSTIMER<'d>) -> Self {
         // Don't reset Systimer as it will break `time::Instant::now`, only enable it
         PeripheralClockControl::enable(PeripheralEnable::Systimer);
 
@@ -266,17 +265,41 @@ impl Unit {
 /// An alarm unit
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Alarm {
+pub struct Alarm<'d> {
     comp: u8,
     unit: Unit,
+    _lifetime: PhantomData<&'d mut ()>,
 }
 
-impl Alarm {
+impl Alarm<'_> {
     const fn new(comp: u8) -> Self {
         Alarm {
             comp,
             unit: Unit::Unit0,
+            _lifetime: PhantomData,
         }
+    }
+
+    /// Unsafely clone this peripheral reference.
+    ///
+    /// # Safety
+    ///
+    /// You must ensure that you're only using one instance of this type at a
+    /// time.
+    pub unsafe fn clone_unchecked(&self) -> Self {
+        Self {
+            comp: self.comp,
+            unit: self.unit,
+            _lifetime: PhantomData,
+        }
+    }
+
+    /// Creates a new peripheral reference with a shorter lifetime.
+    ///
+    /// Use this method if you would like to keep working with the peripheral
+    /// after you dropped the driver that consumes this.
+    pub fn reborrow(&mut self) -> Alarm<'_> {
+        unsafe { self.clone_unchecked() }
     }
 
     /// Returns the comparator's number.
@@ -451,7 +474,7 @@ enum ComparatorMode {
     Target,
 }
 
-impl super::Timer for Alarm {
+impl super::Timer for Alarm<'_> {
     fn start(&self) {
         self.set_enable(true);
     }
@@ -589,25 +612,15 @@ impl super::Timer for Alarm {
     }
 }
 
-unsafe impl Peripheral for Alarm {
-    type P = Self;
-
-    #[inline]
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Alarm {
-            comp: self.comp,
-            unit: self.unit,
-        }
-    }
-}
-
-impl crate::private::Sealed for Alarm {}
+impl crate::private::Sealed for Alarm<'_> {}
 
 static CONF_LOCK: RawMutex = RawMutex::new();
 static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 // Async functionality of the system timer.
 mod asynch {
+    use core::marker::PhantomData;
+
     use procmacros::handler;
 
     use super::*;
@@ -616,7 +629,7 @@ mod asynch {
     const NUM_ALARMS: usize = 3;
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [const { AtomicWaker::new() }; NUM_ALARMS];
 
-    pub(super) fn waker(alarm: &Alarm) -> &AtomicWaker {
+    pub(super) fn waker(alarm: &Alarm<'_>) -> &'static AtomicWaker {
         &WAKERS[alarm.channel() as usize]
     }
 
@@ -625,6 +638,7 @@ mod asynch {
         Alarm {
             comp: alarm,
             unit: Unit::Unit0,
+            _lifetime: PhantomData,
         }
         .enable_interrupt(false);
 
@@ -706,7 +720,7 @@ pub mod etm {
 
     impl Event {
         /// Creates an ETM event from the given [Alarm]
-        pub fn new(alarm: &Alarm) -> Self {
+        pub fn new(alarm: &Alarm<'_>) -> Self {
             Self {
                 id: 50 + alarm.channel(),
             }

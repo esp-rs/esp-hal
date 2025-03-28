@@ -46,10 +46,7 @@
 
 #[cfg(any(esp32, esp32c2))]
 use crate::rtc_cntl::RtcClock;
-use crate::{
-    peripheral::{Peripheral, PeripheralRef},
-    time::Rate,
-};
+use crate::time::Rate;
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
@@ -598,15 +595,14 @@ impl Clocks {
 #[cfg(any(bt, ieee802154, wifi))]
 #[instability::unstable]
 pub struct RadioClockController<'d> {
-    _rcc: PeripheralRef<'d, crate::peripherals::RADIO_CLK>,
+    _rcc: crate::peripherals::RADIO_CLK<'d>,
 }
 
 #[cfg(any(bt, ieee802154, wifi))]
 impl<'d> RadioClockController<'d> {
     /// Create a new instance of the radio clock controller
     #[instability::unstable]
-    pub fn new(rcc: impl Peripheral<P = crate::peripherals::RADIO_CLK> + 'd) -> Self {
-        crate::into_ref!(rcc);
+    pub fn new(rcc: crate::peripherals::RADIO_CLK<'d>) -> Self {
         Self { _rcc: rcc }
     }
 

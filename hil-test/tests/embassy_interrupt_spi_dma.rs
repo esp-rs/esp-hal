@@ -206,9 +206,9 @@ mod test {
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
-                use esp_hal::dma::Spi2DmaChannel as DmaChannel;
+                type DmaChannel<'a> = esp_hal::dma::Spi2DmaChannel<'a>;
             } else {
-                type DmaChannel = esp_hal::dma::DmaChannel0;
+                type DmaChannel<'a> = esp_hal::dma::DmaChannel0<'a>;
             }
         }
 
@@ -216,8 +216,8 @@ mod test {
         static LOOP_COUNT: AtomicU32 = AtomicU32::new(0);
 
         pub struct SpiPeripherals {
-            pub spi: SPI2,
-            pub dma_channel: DmaChannel,
+            pub spi: SPI2<'static>,
+            pub dma_channel: DmaChannel<'static>,
         }
 
         #[embassy_executor::task]

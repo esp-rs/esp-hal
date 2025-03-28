@@ -34,8 +34,8 @@ use esp_hal::{
 use hil_test as _;
 
 struct Context {
-    parl_io: PARL_IO,
-    dma_channel: DmaChannel0,
+    parl_io: PARL_IO<'static>,
+    dma_channel: DmaChannel0<'static>,
     clock: OutputSignal<'static>,
     valid: OutputSignal<'static>,
     clock_loopback: InputSignal<'static>,

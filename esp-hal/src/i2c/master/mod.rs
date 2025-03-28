@@ -43,7 +43,6 @@ use crate::{
     i2c::{AnyI2c, AnyI2cInner},
     interrupt::InterruptHandler,
     pac::i2c0::{RegisterBlock, COMD},
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     private,
     system::{PeripheralClockControl, PeripheralGuard},
@@ -437,7 +436,7 @@ impl Default for Config {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct I2c<'d, Dm: DriverMode> {
-    i2c: PeripheralRef<'d, AnyI2c>,
+    i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
     config: Config,
     guard: PeripheralGuard,
@@ -480,19 +479,14 @@ impl<'d> I2c<'d, Blocking> {
     ///
     /// A [`ConfigError`] variant will be returned if bus frequency or timeout
     /// passed in config is invalid.
-    pub fn new(
-        i2c: impl Peripheral<P = impl Instance> + 'd,
-        config: Config,
-    ) -> Result<Self, ConfigError> {
-        crate::into_mapped_ref!(i2c);
-
+    pub fn new(i2c: impl Instance + Into<AnyI2c<'d>>, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
         let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
         let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
 
         let i2c = I2c {
-            i2c,
+            i2c: i2c.into(),
             phantom: PhantomData,
             config,
             guard,
@@ -2623,7 +2617,7 @@ pub struct State {
 
 /// I2C Peripheral Instance
 #[doc(hidden)]
-pub trait Instance: Peripheral<P = Self> + Into<AnyI2c> + 'static {
+pub trait Instance: crate::private::Sealed {
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);
 
@@ -2728,7 +2722,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 
 macro_rules! instance {
     ($inst:ident, $peri:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
-        impl Instance for crate::peripherals::$inst {
+        impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {
                 #[crate::handler]
                 pub(super) fn irq_handler() {
@@ -2760,7 +2754,7 @@ instance!(I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA, I2C_EXT0);
 #[cfg(i2c1)]
 instance!(I2C1, I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA, I2C_EXT1);
 
-impl Instance for AnyI2c {
+impl Instance for AnyI2c<'_> {
     delegate::delegate! {
         to match &self.0 {
             AnyI2cInner::I2c0(i2c) => i2c,

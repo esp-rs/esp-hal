@@ -60,7 +60,6 @@ use crate::{
     },
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     private::OnDrop,
     system::{PeripheralClockControl, PeripheralGuard},
@@ -363,7 +362,7 @@ impl Default for AtCmdConfig {
 }
 
 struct UartBuilder<'d, Dm: DriverMode> {
-    uart: PeripheralRef<'d, AnyUart>,
+    uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
 }
 
@@ -371,10 +370,9 @@ impl<'d, Dm> UartBuilder<'d, Dm>
 where
     Dm: DriverMode,
 {
-    fn new(uart: impl Peripheral<P = impl Instance> + 'd) -> Self {
-        crate::into_mapped_ref!(uart);
+    fn new(uart: impl Instance + Into<AnyUart<'d>>) -> Self {
         Self {
-            uart,
+            uart: uart.into(),
             phantom: PhantomData,
         }
     }
@@ -429,7 +427,7 @@ pub struct Uart<'d, Dm: DriverMode> {
 /// UART (Transmit)
 #[instability::unstable]
 pub struct UartTx<'d, Dm: DriverMode> {
-    uart: PeripheralRef<'d, AnyUart>,
+    uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
     rts_pin: PinGuard,
@@ -439,7 +437,7 @@ pub struct UartTx<'d, Dm: DriverMode> {
 /// UART (Receive)
 #[instability::unstable]
 pub struct UartRx<'d, Dm: DriverMode> {
-    uart: PeripheralRef<'d, AnyUart>,
+    uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
 }
@@ -560,7 +558,7 @@ impl<'d> UartTx<'d, Blocking> {
     /// ```
     #[instability::unstable]
     pub fn new(
-        uart: impl Peripheral<P = impl Instance> + 'd,
+        uart: impl Instance + Into<AnyUart<'d>>,
         config: Config,
     ) -> Result<Self, ConfigError> {
         let (_, uart_tx) = UartBuilder::new(uart).init(config)?.split();
@@ -859,7 +857,7 @@ impl<'d> UartRx<'d, Blocking> {
     /// ```
     #[instability::unstable]
     pub fn new(
-        uart: impl Peripheral<P = impl Instance> + 'd,
+        uart: impl Instance + Into<AnyUart<'d>>,
         config: Config,
     ) -> Result<Self, ConfigError> {
         let (uart_rx, _) = UartBuilder::new(uart).init(config)?.split();
@@ -1234,7 +1232,7 @@ impl<'d> Uart<'d, Blocking> {
     /// # }
     /// ```
     pub fn new(
-        uart: impl Peripheral<P = impl Instance> + 'd,
+        uart: impl Instance + Into<AnyUart<'d>>,
         config: Config,
     ) -> Result<Self, ConfigError> {
         UartBuilder::new(uart).init(config)
@@ -1983,8 +1981,7 @@ struct UartRxFuture {
 }
 
 impl UartRxFuture {
-    fn new(uart: impl Peripheral<P = impl Instance>, events: impl Into<EnumSet<RxEvent>>) -> Self {
-        crate::into_ref!(uart);
+    fn new(uart: impl Instance, events: impl Into<EnumSet<RxEvent>>) -> Self {
         Self {
             events: events.into(),
             uart: uart.info(),
@@ -2034,8 +2031,7 @@ struct UartTxFuture {
 }
 
 impl UartTxFuture {
-    fn new(uart: impl Peripheral<P = impl Instance>, events: impl Into<EnumSet<TxEvent>>) -> Self {
-        crate::into_ref!(uart);
+    fn new(uart: impl Instance, events: impl Into<EnumSet<TxEvent>>) -> Self {
         Self {
             events: events.into(),
             uart: uart.info(),
@@ -2165,7 +2161,7 @@ pub mod lp_uart {
     ///
     /// The driver uses XTAL as clock source.
     pub struct LpUart {
-        uart: LP_UART,
+        uart: LP_UART<'static>,
     }
 
     impl LpUart {
@@ -2178,7 +2174,7 @@ pub mod lp_uart {
         /// [`Apb`]: super::ClockSource::Apb
         // TODO: CTS and RTS pins
         pub fn new(
-            uart: LP_UART,
+            uart: LP_UART<'static>,
             config: Config,
             _tx: LowPowerOutput<'_, 5>,
             _rx: LowPowerInput<'_, 4>,
@@ -2377,7 +2373,7 @@ pub mod lp_uart {
 
 /// UART Peripheral Instance
 #[doc(hidden)]
-pub trait Instance: Peripheral<P = Self> + Into<AnyUart> + 'static {
+pub trait Instance: crate::private::Sealed {
     /// Returns the peripheral data and state describing this UART instance.
     fn parts(&self) -> (&'static Info, &'static State);
 
@@ -2993,7 +2989,7 @@ unsafe impl Sync for Info {}
 
 macro_rules! impl_instance {
     ($inst:ident, $peri:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
-        impl Instance for crate::peripherals::$inst {
+        impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[crate::handler]
                 pub(super) fn irq_handler() {
@@ -3030,17 +3026,17 @@ impl_instance!(UART2, Uart2, U2TXD, U2RXD, U2CTS, U2RTS);
 
 crate::any_peripheral! {
     /// Any UART peripheral.
-    pub peripheral AnyUart {
+    pub peripheral AnyUart<'d> {
         #[cfg(uart0)]
-        Uart0(crate::peripherals::UART0),
+        Uart0(crate::peripherals::UART0<'d>),
         #[cfg(uart1)]
-        Uart1(crate::peripherals::UART1),
+        Uart1(crate::peripherals::UART1<'d>),
         #[cfg(uart2)]
-        Uart2(crate::peripherals::UART2),
+        Uart2(crate::peripherals::UART2<'d>),
     }
 }
 
-impl Instance for AnyUart {
+impl Instance for AnyUart<'_> {
     #[inline]
     fn parts(&self) -> (&'static Info, &'static State) {
         match &self.0 {

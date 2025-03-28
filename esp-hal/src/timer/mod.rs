@@ -50,7 +50,6 @@ use core::{
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptConfigurable, InterruptHandler},
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     system::Cpu,
     time::{Duration, Instant},
@@ -79,7 +78,7 @@ pub enum Error {
 }
 
 /// Functionality provided by any timer peripheral.
-pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
+pub trait Timer: crate::private::Sealed {
     /// Start the timer.
     #[doc(hidden)]
     fn start(&self);
@@ -135,16 +134,15 @@ pub trait Timer: Into<AnyTimer> + 'static + crate::private::Sealed {
 
 /// A one-shot timer.
 pub struct OneShotTimer<'d, Dm: DriverMode> {
-    inner: PeripheralRef<'d, AnyTimer>,
+    inner: AnyTimer<'d>,
     _ph: PhantomData<Dm>,
 }
 
 impl<'d> OneShotTimer<'d, Blocking> {
     /// Construct a new instance of [`OneShotTimer`].
-    pub fn new(inner: impl Peripheral<P = impl Timer> + 'd) -> OneShotTimer<'d, Blocking> {
-        crate::into_mapped_ref!(inner);
+    pub fn new(inner: impl Timer + Into<AnyTimer<'d>>) -> OneShotTimer<'d, Blocking> {
         Self {
-            inner,
+            inner: inner.into(),
             _ph: PhantomData,
         }
     }
@@ -200,12 +198,11 @@ impl OneShotTimer<'_, Async> {
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct WaitFuture<'d> {
-    timer: PeripheralRef<'d, AnyTimer>,
+    timer: AnyTimer<'d>,
 }
 
 impl<'d> WaitFuture<'d> {
-    fn new(timer: impl Peripheral<P = AnyTimer> + 'd) -> Self {
-        crate::into_ref!(timer);
+    fn new(timer: AnyTimer<'d>) -> Self {
         // For some reason, on the S2 we need to enable the interrupt before we
         // read its status. Doing so in the other order causes the interrupt
         // request to never be fired.
@@ -335,16 +332,15 @@ impl embedded_hal_async::delay::DelayNs for OneShotTimer<'_, Async> {
 
 /// A periodic timer.
 pub struct PeriodicTimer<'d, Dm: DriverMode> {
-    inner: PeripheralRef<'d, AnyTimer>,
+    inner: AnyTimer<'d>,
     _ph: PhantomData<Dm>,
 }
 
 impl<'d> PeriodicTimer<'d, Blocking> {
     /// Construct a new instance of [`PeriodicTimer`].
-    pub fn new(inner: impl Peripheral<P = impl Timer> + 'd) -> PeriodicTimer<'d, Blocking> {
-        crate::into_mapped_ref!(inner);
+    pub fn new(inner: impl Timer + Into<AnyTimer<'d>>) -> PeriodicTimer<'d, Blocking> {
         Self {
-            inner,
+            inner: inner.into(),
             _ph: PhantomData,
         }
     }
@@ -419,14 +415,14 @@ where
 
 crate::any_peripheral! {
     /// Any Timer peripheral.
-    pub peripheral AnyTimer {
-        TimgTimer(timg::Timer),
+    pub peripheral AnyTimer<'d> {
+        TimgTimer(timg::Timer<'d>),
         #[cfg(systimer)]
-        SystimerAlarm(systimer::Alarm),
+        SystimerAlarm(systimer::Alarm<'d>),
     }
 }
 
-impl Timer for AnyTimer {
+impl Timer for AnyTimer<'_> {
     delegate::delegate! {
         to match &self.0 {
             AnyTimerInner::TimgTimer(inner) => inner,

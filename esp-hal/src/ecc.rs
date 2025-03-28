@@ -30,7 +30,6 @@ use core::marker::PhantomData;
 use crate::{
     interrupt::InterruptHandler,
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, ECC},
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::{self, GenericPeripheralGuard},
@@ -40,7 +39,7 @@ use crate::{
 
 /// The ECC Accelerator driver instance
 pub struct Ecc<'d, Dm: DriverMode> {
-    ecc: PeripheralRef<'d, ECC>,
+    ecc: ECC<'d>,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     phantom: PhantomData<Dm>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::Ecc as u8 }>,
@@ -102,9 +101,7 @@ pub enum WorkMode {
 
 impl<'d> Ecc<'d, Blocking> {
     /// Create a new instance in [Blocking] mode.
-    pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
-        crate::into_ref!(ecc);
-
+    pub fn new(ecc: ECC<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self {

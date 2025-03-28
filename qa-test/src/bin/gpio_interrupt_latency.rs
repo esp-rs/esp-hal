@@ -23,7 +23,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
     gpio::{Flex, OutputConfig},
-    peripheral::Peripheral,
     timer::timg::TimerGroup,
 };
 

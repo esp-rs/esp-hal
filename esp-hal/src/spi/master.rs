@@ -58,7 +58,6 @@ use crate::{
     },
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
-    peripheral::{Peripheral, PeripheralRef},
     private::{self, OnDrop, Sealed},
     spi::AnySpi,
     system::{Cpu, PeripheralGuard},
@@ -662,7 +661,7 @@ impl core::fmt::Display for ConfigError {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Spi<'d, Dm: DriverMode> {
-    spi: PeripheralRef<'d, AnySpi>,
+    spi: AnySpi<'d>,
     _mode: PhantomData<Dm>,
     guard: PeripheralGuard,
     pins: SpiPinGuard,
@@ -677,11 +676,9 @@ impl<'d> Spi<'d, Blocking> {
     ///
     /// See [`Spi::apply_config`].
     pub fn new(
-        spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
+        spi: impl PeripheralInstance + Into<AnySpi<'d>>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        crate::into_mapped_ref!(spi);
-
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
         let mosi_pin = PinGuard::new_unconnected(spi.info().mosi);
@@ -692,7 +689,7 @@ impl<'d> Spi<'d, Blocking> {
         let sio3_pin = spi.info().sio3_output.map(PinGuard::new_unconnected);
 
         let mut this = Spi {
-            spi,
+            spi: spi.into(),
             _mode: PhantomData,
             guard,
             pins: SpiPinGuard {
@@ -777,15 +774,8 @@ impl<'d> Spi<'d, Blocking> {
     /// # }
     /// ```
     #[instability::unstable]
-    pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking>
-    where
-        CH: DmaChannelFor<AnySpi>,
-    {
-        SpiDma::new(
-            self.spi,
-            self.pins,
-            channel.map(|ch| ch.degrade()).into_ref(),
-        )
+    pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
+        SpiDma::new(self.spi, self.pins, channel.degrade())
     }
 
     #[cfg_attr(
@@ -1267,8 +1257,8 @@ mod dma {
     where
         Dm: DriverMode,
     {
-        pub(crate) spi: PeripheralRef<'d, AnySpi>,
-        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<AnySpi>>,
+        pub(crate) spi: AnySpi<'d>,
+        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<AnySpi<'d>>>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
@@ -1297,9 +1287,9 @@ mod dma {
         }
 
         pub(super) fn new(
-            spi: PeripheralRef<'d, AnySpi>,
+            spi: AnySpi<'d>,
             pins: SpiPinGuard,
-            channel: PeripheralRef<'d, PeripheralDmaChannel<AnySpi>>,
+            channel: PeripheralDmaChannel<AnySpi<'d>>,
         ) -> Self {
             let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
@@ -2689,7 +2679,7 @@ mod ehal1 {
 
 /// SPI peripheral instance.
 #[doc(hidden)]
-pub trait PeripheralInstance: private::Sealed + Into<AnySpi> + DmaEligible + 'static {
+pub trait PeripheralInstance: private::Sealed + DmaEligible {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;
 }
@@ -3700,7 +3690,7 @@ unsafe impl Sync for Info {}
 macro_rules! spi_instance {
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident $(, $sio2:ident, $sio3:ident)?) => {
         paste::paste! {
-            impl PeripheralInstance for crate::peripherals::[<SPI $num>] {
+            impl PeripheralInstance for crate::peripherals::[<SPI $num>]<'_> {
                 #[inline(always)]
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
@@ -3726,7 +3716,7 @@ macro_rules! spi_instance {
             $(
                 // If the extra pins are set, implement QspiInstance
                 $crate::ignore!($sio2);
-                impl QspiInstance for crate::peripherals::[<SPI $num>] {}
+                impl QspiInstance for crate::peripherals::[<SPI $num>]<'_> {}
             )?
         }
     }
@@ -3754,7 +3744,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl PeripheralInstance for super::AnySpi {
+impl PeripheralInstance for super::AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,
@@ -3766,7 +3756,7 @@ impl PeripheralInstance for super::AnySpi {
     }
 }
 
-impl QspiInstance for super::AnySpi {}
+impl QspiInstance for super::AnySpi<'_> {}
 
 #[doc(hidden)]
 pub struct State {
@@ -3805,7 +3795,7 @@ pub trait Instance: PeripheralInstance {
 
 macro_rules! master_instance {
     ($peri:ident) => {
-        impl Instance for $crate::peripherals::$peri {
+        impl Instance for $crate::peripherals::$peri<'_> {
             fn state(&self) -> &'static State {
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
@@ -3836,7 +3826,7 @@ master_instance!(SPI2);
 #[cfg(spi3)]
 master_instance!(SPI3);
 
-impl Instance for super::AnySpi {
+impl Instance for super::AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,

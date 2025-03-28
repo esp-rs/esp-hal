@@ -113,7 +113,6 @@ use crate::{
         ClockError,
     },
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
     time::Rate,
@@ -131,8 +130,8 @@ pub enum ConfigError {
 
 /// Represents the RGB LCD interface.
 pub struct Dpi<'d, Dm: DriverMode> {
-    lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
+    lcd_cam: LCD_CAM<'d>,
+    tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
@@ -142,15 +141,12 @@ where
     Dm: DriverMode,
 {
     /// Create a new instance of the RGB/DPI driver.
-    pub fn new<CH>(
+    pub fn new(
         lcd: Lcd<'d, Dm>,
-        channel: impl Peripheral<P = CH> + 'd,
+        channel: impl TxChannelFor<LCD_CAM<'d>>,
         config: Config,
-    ) -> Result<Self, ConfigError>
-    where
-        CH: TxChannelFor<LCD_CAM>,
-    {
-        let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));
+    ) -> Result<Self, ConfigError> {
+        let tx_channel = ChannelTx::new(channel.degrade());
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,

@@ -31,14 +31,11 @@
 use core::marker::PhantomData;
 
 use super::{InputPin, OutputPin, RtcPin};
-use crate::{
-    peripheral::Peripheral,
-    peripherals::{GPIO, LP_AON, LP_IO},
-};
+use crate::peripherals::{GPIO, LP_AON, LP_IO};
 
 /// A GPIO output pin configured for low power operation
 pub struct LowPowerOutput<'d, const PIN: u8> {
-    phantom: PhantomData<&'d ()>,
+    phantom: PhantomData<&'d mut ()>,
 }
 
 impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
@@ -74,15 +71,15 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
 
 /// A GPIO input pin configured for low power operation
 pub struct LowPowerInput<'d, const PIN: u8> {
-    phantom: PhantomData<&'d ()>,
+    phantom: PhantomData<&'d mut ()>,
 }
 
 impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     /// Create a new input pin for use by the low-power core
     #[instability::unstable]
-    pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(_pin: P) -> Self
     where
-        P: InputPin + RtcPin,
+        P: InputPin + RtcPin + 'd,
     {
         init_low_power_pin(PIN);
 
@@ -119,15 +116,15 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
 
 /// A GPIO open-drain output pin configured for low power operation
 pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
-    phantom: PhantomData<&'d ()>,
+    phantom: PhantomData<&'d mut ()>,
 }
 
 impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     /// Create a new output pin for use by the low-power core
     #[instability::unstable]
-    pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(_pin: P) -> Self
     where
-        P: InputPin + OutputPin + RtcPin,
+        P: InputPin + OutputPin + RtcPin + 'd,
     {
         init_low_power_pin(PIN);
 
