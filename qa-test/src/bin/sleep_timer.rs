@@ -1,6 +1,6 @@
 //! Demonstrates deep sleep with timer wakeup
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32s3 esp32c2
+//% CHIPS: esp32 esp32c3 esp32c6 esp32s2 esp32s3 esp32c2
 
 #![no_std]
 #![no_main]
