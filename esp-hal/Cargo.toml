@@ -21,7 +21,7 @@ bitflags                 = "2.8.0"
 bytemuck                 = "1.21.0"
 bitfield                 = "0.18.1"
 cfg-if                   = "1.0.0"
-critical-section         = "1.2.0"
+critical-section         = { version = "1.2.0", features = ["restore-state-u32"] }
 defmt                    = { version = "0.3.10", optional = true }
 delegate                 = "0.13.2"
 digest                   = { version = "0.10.7", default-features = false, optional = true }
@@ -92,9 +92,6 @@ bluetooth = []
 usb-otg = ["dep:embassy-usb-driver", "dep:embassy-usb-synopsys-otg", "dep:esp-synopsys-usb-otg", "dep:usb-device"]
 
 __esp_hal_embassy = []
-
-## Provide a critical section implementation suitable for the target.
-critical-section-impl = ["critical-section/restore-state-u32"]
 
 ## Enable debug features in the HAL (used for development).
 debug = [

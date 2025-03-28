@@ -494,7 +494,7 @@ impl<L: single_core::RawLock> Drop for LockGuard<'_, L> {
     }
 }
 
-#[cfg(feature = "critical-section-impl")]
+#[cfg(impl_critical_section)]
 mod critical_section {
     struct CriticalSection;
 
