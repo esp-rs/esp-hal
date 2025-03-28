@@ -86,10 +86,6 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-#[cfg(target_arch = "riscv32")]
-type InterruptsFlagType = u8;
-
-#[cfg(target_arch = "xtensa")]
 type InterruptsFlagType = u32;
 
 static mut G_INTER_FLAGS: [InterruptsFlagType; 10] = [0; 10];
