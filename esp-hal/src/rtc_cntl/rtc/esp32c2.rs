@@ -2,33 +2,15 @@ use strum::FromRepr;
 
 use crate::{
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
-    rom::regi2c_write_mask,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
+    soc::regi2c,
 };
-
-const I2C_DIG_REG: u32 = 0x6d;
-const I2C_DIG_REG_HOSTID: u32 = 0;
-
-const I2C_ULP: u32 = 0x61;
-const I2C_ULP_HOSTID: u32 = 0;
-
-const I2C_DIG_REG_XPD_RTC_REG: u32 = 13;
-const I2C_DIG_REG_XPD_RTC_REG_MSB: u32 = 2;
-const I2C_DIG_REG_XPD_RTC_REG_LSB: u32 = 2;
-
-const I2C_DIG_REG_XPD_DIG_REG: u32 = 13;
-const I2C_DIG_REG_XPD_DIG_REG_MSB: u32 = 3;
-const I2C_DIG_REG_XPD_DIG_REG_LSB: u32 = 3;
-
-const I2C_ULP_IR_FORCE_XPD_CK: u32 = 0;
-const I2C_ULP_IR_FORCE_XPD_CK_MSB: u32 = 2;
-const I2C_ULP_IR_FORCE_XPD_CK_LSB: u32 = 2;
 
 pub(crate) fn init() {
     let rtc_cntl = LPWR::regs();
 
-    regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
-    regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
+    regi2c::I2C_DIG_REG_XPD_DIG_REG.write_field(0);
+    regi2c::I2C_DIG_REG_XPD_RTC_REG.write_field(0);
 
     unsafe {
         rtc_cntl
@@ -51,7 +33,7 @@ pub(crate) fn init() {
         rtc_cntl.int_clr().write(|w| w.bits(u32::MAX));
     }
 
-    regi2c_write_mask!(I2C_ULP, I2C_ULP_IR_FORCE_XPD_CK, 0);
+    regi2c::I2C_ULP_IR_FORCE_XPD_CK.write_field(0);
 }
 
 pub(crate) fn configure_clock() {
@@ -121,24 +103,18 @@ fn power_control_init() {
 
     // Force PD APLL
     rtc_cntl.ana_conf().modify(|_, w| {
-        w.plla_force_pu()
-            .clear_bit()
-            .plla_force_pd()
-            .set_bit()
-            // Open SAR_I2C protect function to avoid SAR_I2C
-            // Reset when rtc_ldo is low.
-            .i2c_reset_por_force_pd()
-            .clear_bit()
+        w.plla_force_pu().clear_bit();
+        w.plla_force_pd().set_bit();
+        // Open SAR_I2C protect function to avoid SAR_I2C
+        // Reset when rtc_ldo is low.
+        w.i2c_reset_por_force_pd().clear_bit()
     });
 
     // Cancel BBPLL force PU if setting no force power up
     rtc_cntl.options0().modify(|_, w| {
-        w.bbpll_force_pu()
-            .clear_bit()
-            .bbpll_i2c_force_pu()
-            .clear_bit()
-            .bb_i2c_force_pu()
-            .clear_bit()
+        w.bbpll_force_pu().clear_bit();
+        w.bbpll_i2c_force_pu().clear_bit();
+        w.bb_i2c_force_pu().clear_bit()
     });
 
     rtc_cntl
@@ -186,9 +162,10 @@ fn rtc_sleep_pu() {
         w.pbus_mem_force_pu().clear_bit();
         w.agc_mem_force_pu().clear_bit()
     });
-    APB_CTRL::regs()
-        .mem_power_up()
-        .modify(|_, w| unsafe { w.sram_power_up().bits(0u8).rom_power_up().bits(0u8) });
+    APB_CTRL::regs().mem_power_up().modify(|_, w| unsafe {
+        w.sram_power_up().bits(0u8);
+        w.rom_power_up().bits(0u8)
+    });
 }
 
 // Terminology:

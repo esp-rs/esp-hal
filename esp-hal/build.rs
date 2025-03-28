@@ -46,8 +46,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         unreachable!() // We've confirmed exactly one known device was selected
     };
 
-    // Load the configuration file for the configured device:
     let chip = Chip::from_str(device_name)?;
+    if chip.target() != std::env::var("TARGET").unwrap_or_default().as_str() {
+        panic!("
+        Seems you are building for an unsupported or wrong target (e.g. the host environment).
+        Maybe you are missing the `target` in `.cargo/config.toml` or you have configs overriding it?
+        
+        See https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure
+        ");
+    }
+
+    // Load the configuration file for the configured device:
     let config = Config::for_chip(&chip);
 
     // Define all necessary configuration symbols for the configured device:

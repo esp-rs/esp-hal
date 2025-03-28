@@ -667,15 +667,16 @@ impl<'d, Dm> TwaiConfiguration<'d, Dm>
 where
     Dm: DriverMode,
 {
-    fn new_internal<TX: PeripheralOutput, RX: PeripheralInput>(
+    fn new_internal(
         twai: PeripheralRef<'d, AnyTwai>,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl PeripheralInput<'d>,
+        tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
         no_transceiver: bool,
         mode: TwaiMode,
     ) -> Self {
-        crate::into_mapped_ref!(tx_pin, rx_pin);
+        let rx_pin = rx_pin.into();
+        let tx_pin = tx_pin.into();
 
         let guard = PeripheralGuard::new(twai.peripheral());
 
@@ -710,13 +711,13 @@ where
             tx_pin.set_to_push_pull_output();
             Pull::None
         };
-        this.twai.output_signal().connect_to(tx_pin);
+        this.twai.output_signal().connect_to(&tx_pin);
 
         // Setting up RX pin later allows us to use a single pin in tests.
         // `set_to_push_pull_output` disables input, here we re-enable it if rx_pin
         // uses the same GPIO.
         rx_pin.init_input(rx_pull);
-        this.twai.input_signal().connect_to(rx_pin);
+        this.twai.input_signal().connect_to(&rx_pin);
 
         // Freeze REC by changing to LOM mode
         this.set_mode(TwaiMode::ListenOnly);
@@ -934,10 +935,10 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
     /// Create a new instance of [TwaiConfiguration]
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
-    pub fn new<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new(
         peripheral: impl Peripheral<P = impl Instance> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl PeripheralInput<'d>,
+        tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
@@ -950,10 +951,10 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
     ///
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
-    pub fn new_no_transceiver<RX: PeripheralInput, TX: PeripheralOutput>(
+    pub fn new_no_transceiver(
         peripheral: impl Peripheral<P = impl Instance> + 'd,
-        rx_pin: impl Peripheral<P = RX> + 'd,
-        tx_pin: impl Peripheral<P = TX> + 'd,
+        rx_pin: impl PeripheralInput<'d>,
+        tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {

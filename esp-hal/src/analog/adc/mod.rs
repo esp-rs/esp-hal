@@ -94,6 +94,7 @@ pub enum AdcCalSource {
     /// Use Ground as the calibration source
     Gnd,
     /// Use Vref as the calibration source
+    #[cfg(not(esp32h2))]
     Ref,
 }
 

@@ -51,6 +51,27 @@ pub fn interrupt_handler() {
     });
 }
 
+// Compile-time test to check that GPIOs can be passed by reference.
+fn _gpios_can_be_reused() {
+    let p = esp_hal::init(esp_hal::Config::default());
+
+    let mut gpio1 = p.GPIO1;
+
+    {
+        let _driver = Input::new(&mut gpio1, InputConfig::default().with_pull(Pull::Down));
+    }
+
+    {
+        let _driver = esp_hal::spi::master::Spi::new(p.SPI2, Default::default())
+            .unwrap()
+            .with_mosi(&mut gpio1);
+    }
+
+    {
+        let _driver = Input::new(&mut gpio1, InputConfig::default().with_pull(Pull::Down));
+    }
+}
+
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {

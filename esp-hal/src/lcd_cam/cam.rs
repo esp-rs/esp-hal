@@ -228,44 +228,38 @@ impl<'d> Camera<'d> {
 
 impl<'d> Camera<'d> {
     /// Configures the master clock (MCLK) pin for the camera interface.
-    pub fn with_master_clock<MCLK: PeripheralOutput>(
-        self,
-        mclk: impl Peripheral<P = MCLK> + 'd,
-    ) -> Self {
-        crate::into_mapped_ref!(mclk);
-
+    pub fn with_master_clock(self, mclk: impl PeripheralOutput<'d>) -> Self {
+        let mclk = mclk.into();
         mclk.set_to_push_pull_output();
-        OutputSignal::CAM_CLK.connect_to(mclk);
+        OutputSignal::CAM_CLK.connect_to(&mclk);
 
         self
     }
 
     /// Configures the pixel clock (PCLK) pin for the camera interface.
-    pub fn with_pixel_clock<PCLK: PeripheralInput>(
-        self,
-        pclk: impl Peripheral<P = PCLK> + 'd,
-    ) -> Self {
-        crate::into_mapped_ref!(pclk);
+    pub fn with_pixel_clock(self, pclk: impl PeripheralInput<'d>) -> Self {
+        let pclk = pclk.into();
 
         pclk.init_input(Pull::None);
-        InputSignal::CAM_PCLK.connect_to(pclk);
+        InputSignal::CAM_PCLK.connect_to(&pclk);
 
         self
     }
 
     /// Configures the control pins for the camera interface (VSYNC and
     /// HENABLE).
-    pub fn with_ctrl_pins<VSYNC: PeripheralInput, HENABLE: PeripheralInput>(
+    pub fn with_ctrl_pins(
         self,
-        vsync: impl Peripheral<P = VSYNC> + 'd,
-        h_enable: impl Peripheral<P = HENABLE> + 'd,
+        vsync: impl PeripheralInput<'d>,
+        h_enable: impl PeripheralInput<'d>,
     ) -> Self {
-        crate::into_mapped_ref!(vsync, h_enable);
+        let vsync = vsync.into();
+        let h_enable = h_enable.into();
 
         vsync.init_input(Pull::None);
-        InputSignal::CAM_V_SYNC.connect_to(vsync);
+        InputSignal::CAM_V_SYNC.connect_to(&vsync);
         h_enable.init_input(Pull::None);
-        InputSignal::CAM_H_ENABLE.connect_to(h_enable);
+        InputSignal::CAM_H_ENABLE.connect_to(&h_enable);
 
         self.regs()
             .cam_ctrl1()
@@ -276,24 +270,22 @@ impl<'d> Camera<'d> {
 
     /// Configures the control pins for the camera interface (VSYNC, HSYNC, and
     /// HENABLE) with DE (data enable).
-    pub fn with_ctrl_pins_and_de<
-        VSYNC: PeripheralInput,
-        HSYNC: PeripheralInput,
-        HENABLE: PeripheralInput,
-    >(
+    pub fn with_ctrl_pins_and_de(
         self,
-        vsync: impl Peripheral<P = VSYNC> + 'd,
-        hsync: impl Peripheral<P = HSYNC> + 'd,
-        h_enable: impl Peripheral<P = HENABLE> + 'd,
+        vsync: impl PeripheralInput<'d>,
+        hsync: impl PeripheralInput<'d>,
+        h_enable: impl PeripheralInput<'d>,
     ) -> Self {
-        crate::into_mapped_ref!(vsync, hsync, h_enable);
+        let vsync = vsync.into();
+        let hsync = hsync.into();
+        let h_enable = h_enable.into();
 
         vsync.init_input(Pull::None);
-        InputSignal::CAM_V_SYNC.connect_to(vsync);
+        InputSignal::CAM_V_SYNC.connect_to(&vsync);
         hsync.init_input(Pull::None);
-        InputSignal::CAM_H_SYNC.connect_to(hsync);
+        InputSignal::CAM_H_SYNC.connect_to(&hsync);
         h_enable.init_input(Pull::None);
-        InputSignal::CAM_H_ENABLE.connect_to(h_enable);
+        InputSignal::CAM_H_ENABLE.connect_to(&h_enable);
 
         self.regs()
             .cam_ctrl1()
@@ -477,38 +469,29 @@ impl RxEightBits {
     /// Creates a new instance of `RxEightBits`, configuring the specified pins
     /// as the 8-bit data bus.
     pub fn new<'d>(
-        pin_0: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_1: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_2: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_3: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_4: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_5: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_6: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_7: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_0: impl PeripheralInput<'d>,
+        pin_1: impl PeripheralInput<'d>,
+        pin_2: impl PeripheralInput<'d>,
+        pin_3: impl PeripheralInput<'d>,
+        pin_4: impl PeripheralInput<'d>,
+        pin_5: impl PeripheralInput<'d>,
+        pin_6: impl PeripheralInput<'d>,
+        pin_7: impl PeripheralInput<'d>,
     ) -> Self {
-        crate::into_mapped_ref!(pin_0);
-        crate::into_mapped_ref!(pin_1);
-        crate::into_mapped_ref!(pin_2);
-        crate::into_mapped_ref!(pin_3);
-        crate::into_mapped_ref!(pin_4);
-        crate::into_mapped_ref!(pin_5);
-        crate::into_mapped_ref!(pin_6);
-        crate::into_mapped_ref!(pin_7);
-
         let pairs = [
-            (pin_0, InputSignal::CAM_DATA_0),
-            (pin_1, InputSignal::CAM_DATA_1),
-            (pin_2, InputSignal::CAM_DATA_2),
-            (pin_3, InputSignal::CAM_DATA_3),
-            (pin_4, InputSignal::CAM_DATA_4),
-            (pin_5, InputSignal::CAM_DATA_5),
-            (pin_6, InputSignal::CAM_DATA_6),
-            (pin_7, InputSignal::CAM_DATA_7),
+            (pin_0.into(), InputSignal::CAM_DATA_0),
+            (pin_1.into(), InputSignal::CAM_DATA_1),
+            (pin_2.into(), InputSignal::CAM_DATA_2),
+            (pin_3.into(), InputSignal::CAM_DATA_3),
+            (pin_4.into(), InputSignal::CAM_DATA_4),
+            (pin_5.into(), InputSignal::CAM_DATA_5),
+            (pin_6.into(), InputSignal::CAM_DATA_6),
+            (pin_7.into(), InputSignal::CAM_DATA_7),
         ];
 
         for (pin, signal) in pairs.into_iter() {
             pin.init_input(Pull::None);
-            signal.connect_to(pin);
+            signal.connect_to(&pin);
         }
 
         Self { _pins: () }
@@ -530,62 +513,45 @@ impl RxSixteenBits {
     /// Creates a new instance of `RxSixteenBits`, configuring the specified
     /// pins as the 16-bit data bus.
     pub fn new<'d>(
-        pin_0: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_1: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_2: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_3: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_4: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_5: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_6: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_7: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_8: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_9: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_10: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_11: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_12: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_13: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_14: impl Peripheral<P = impl PeripheralInput> + 'd,
-        pin_15: impl Peripheral<P = impl PeripheralInput> + 'd,
+        pin_0: impl PeripheralInput<'d>,
+        pin_1: impl PeripheralInput<'d>,
+        pin_2: impl PeripheralInput<'d>,
+        pin_3: impl PeripheralInput<'d>,
+        pin_4: impl PeripheralInput<'d>,
+        pin_5: impl PeripheralInput<'d>,
+        pin_6: impl PeripheralInput<'d>,
+        pin_7: impl PeripheralInput<'d>,
+        pin_8: impl PeripheralInput<'d>,
+        pin_9: impl PeripheralInput<'d>,
+        pin_10: impl PeripheralInput<'d>,
+        pin_11: impl PeripheralInput<'d>,
+        pin_12: impl PeripheralInput<'d>,
+        pin_13: impl PeripheralInput<'d>,
+        pin_14: impl PeripheralInput<'d>,
+        pin_15: impl PeripheralInput<'d>,
     ) -> Self {
-        crate::into_mapped_ref!(pin_0);
-        crate::into_mapped_ref!(pin_1);
-        crate::into_mapped_ref!(pin_2);
-        crate::into_mapped_ref!(pin_3);
-        crate::into_mapped_ref!(pin_4);
-        crate::into_mapped_ref!(pin_5);
-        crate::into_mapped_ref!(pin_6);
-        crate::into_mapped_ref!(pin_7);
-        crate::into_mapped_ref!(pin_8);
-        crate::into_mapped_ref!(pin_9);
-        crate::into_mapped_ref!(pin_10);
-        crate::into_mapped_ref!(pin_11);
-        crate::into_mapped_ref!(pin_12);
-        crate::into_mapped_ref!(pin_13);
-        crate::into_mapped_ref!(pin_14);
-        crate::into_mapped_ref!(pin_15);
-
         let pairs = [
-            (pin_0, InputSignal::CAM_DATA_0),
-            (pin_1, InputSignal::CAM_DATA_1),
-            (pin_2, InputSignal::CAM_DATA_2),
-            (pin_3, InputSignal::CAM_DATA_3),
-            (pin_4, InputSignal::CAM_DATA_4),
-            (pin_5, InputSignal::CAM_DATA_5),
-            (pin_6, InputSignal::CAM_DATA_6),
-            (pin_7, InputSignal::CAM_DATA_7),
-            (pin_8, InputSignal::CAM_DATA_8),
-            (pin_9, InputSignal::CAM_DATA_9),
-            (pin_10, InputSignal::CAM_DATA_10),
-            (pin_11, InputSignal::CAM_DATA_11),
-            (pin_12, InputSignal::CAM_DATA_12),
-            (pin_13, InputSignal::CAM_DATA_13),
-            (pin_14, InputSignal::CAM_DATA_14),
-            (pin_15, InputSignal::CAM_DATA_15),
+            (pin_0.into(), InputSignal::CAM_DATA_0),
+            (pin_1.into(), InputSignal::CAM_DATA_1),
+            (pin_2.into(), InputSignal::CAM_DATA_2),
+            (pin_3.into(), InputSignal::CAM_DATA_3),
+            (pin_4.into(), InputSignal::CAM_DATA_4),
+            (pin_5.into(), InputSignal::CAM_DATA_5),
+            (pin_6.into(), InputSignal::CAM_DATA_6),
+            (pin_7.into(), InputSignal::CAM_DATA_7),
+            (pin_8.into(), InputSignal::CAM_DATA_8),
+            (pin_9.into(), InputSignal::CAM_DATA_9),
+            (pin_10.into(), InputSignal::CAM_DATA_10),
+            (pin_11.into(), InputSignal::CAM_DATA_11),
+            (pin_12.into(), InputSignal::CAM_DATA_12),
+            (pin_13.into(), InputSignal::CAM_DATA_13),
+            (pin_14.into(), InputSignal::CAM_DATA_14),
+            (pin_15.into(), InputSignal::CAM_DATA_15),
         ];
 
         for (pin, signal) in pairs.into_iter() {
             pin.init_input(Pull::None);
-            signal.connect_to(pin);
+            signal.connect_to(&pin);
         }
 
         Self { _pins: () }

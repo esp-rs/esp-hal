@@ -466,8 +466,8 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
     }
 }
 
-fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
-    pin: impl Peripheral<P = P> + 'd,
+fn configure_rx_channel<'d, T: RxChannelInternal>(
+    pin: impl PeripheralInput<'d>,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
     cfg_if::cfg_if! {
@@ -482,9 +482,9 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
         return Err(Error::InvalidArgument);
     }
 
-    crate::into_mapped_ref!(pin);
+    let pin = pin.into();
     pin.init_input(crate::gpio::Pull::None);
-    T::input_signal().connect_to(pin);
+    T::input_signal().connect_to(&pin);
 
     T::set_divider(config.clk_divider);
     T::set_carrier(
@@ -499,13 +499,13 @@ fn configure_rx_channel<'d, P: PeripheralInput, T: RxChannelInternal>(
     Ok(T::new())
 }
 
-fn configure_tx_channel<'d, P: PeripheralOutput, T: TxChannelInternal>(
-    pin: impl Peripheral<P = P> + 'd,
+fn configure_tx_channel<'d, T: TxChannelInternal>(
+    pin: impl PeripheralOutput<'d>,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
-    crate::into_mapped_ref!(pin);
+    let pin = pin.into();
     pin.set_to_push_pull_output();
-    T::output_signal().connect_to(pin);
+    T::output_signal().connect_to(&pin);
 
     T::set_divider(config.clk_divider);
     T::set_carrier(
@@ -520,17 +520,12 @@ fn configure_tx_channel<'d, P: PeripheralOutput, T: TxChannelInternal>(
 }
 
 /// Creates a TX channel
-pub trait TxChannelCreator<'d, T, P>
+pub trait TxChannelCreator<'d, T>
 where
-    P: PeripheralOutput,
     T: TxChannel,
 {
     /// Configure the TX channel
-    fn configure(
-        self,
-        pin: impl Peripheral<P = P> + 'd,
-        config: TxChannelConfig,
-    ) -> Result<T, Error>
+    fn configure(self, pin: impl PeripheralOutput<'d>, config: TxChannelConfig) -> Result<T, Error>
     where
         Self: Sized,
     {
@@ -539,17 +534,12 @@ where
 }
 
 /// Creates a TX channel in async mode
-pub trait TxChannelCreatorAsync<'d, T, P>
+pub trait TxChannelCreatorAsync<'d, T>
 where
-    P: PeripheralOutput,
     T: TxChannelAsync,
 {
     /// Configure the TX channel
-    fn configure(
-        self,
-        pin: impl Peripheral<P = P> + 'd,
-        config: TxChannelConfig,
-    ) -> Result<T, Error>
+    fn configure(self, pin: impl PeripheralOutput<'d>, config: TxChannelConfig) -> Result<T, Error>
     where
         Self: Sized,
     {
@@ -558,17 +548,12 @@ where
 }
 
 /// Creates a RX channel
-pub trait RxChannelCreator<'d, T, P>
+pub trait RxChannelCreator<'d, T>
 where
-    P: PeripheralInput,
     T: RxChannel,
 {
     /// Configure the RX channel
-    fn configure(
-        self,
-        pin: impl Peripheral<P = P> + 'd,
-        config: RxChannelConfig,
-    ) -> Result<T, Error>
+    fn configure(self, pin: impl PeripheralInput<'d>, config: RxChannelConfig) -> Result<T, Error>
     where
         Self: Sized,
     {
@@ -577,17 +562,12 @@ where
 }
 
 /// Creates a RX channel in async mode
-pub trait RxChannelCreatorAsync<'d, T, P>
+pub trait RxChannelCreatorAsync<'d, T>
 where
-    P: PeripheralInput,
     T: RxChannelAsync,
 {
     /// Configure the RX channel
-    fn configure(
-        self,
-        pin: impl Peripheral<P = P> + 'd,
-        config: RxChannelConfig,
-    ) -> Result<T, Error>
+    fn configure(self, pin: impl PeripheralInput<'d>, config: RxChannelConfig) -> Result<T, Error>
     where
         Self: Sized,
     {
@@ -725,21 +705,16 @@ where
 
 macro_rules! impl_tx_channel_creator {
     ($channel:literal) => {
-        impl<'d, P>
-            $crate::rmt::TxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>, P>
+        impl<'d> $crate::rmt::TxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>>
             for ChannelCreator<$crate::Blocking, $channel>
-        where
-            P: $crate::gpio::interconnect::PeripheralOutput,
         {
         }
 
         impl $crate::rmt::TxChannel for $crate::rmt::Channel<$crate::Blocking, $channel> {}
 
-        impl<'d, P>
-            $crate::rmt::TxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
+        impl<'d>
+            $crate::rmt::TxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>>
             for ChannelCreator<$crate::Async, $channel>
-        where
-            P: $crate::gpio::interconnect::PeripheralOutput,
         {
         }
 
@@ -749,21 +724,16 @@ macro_rules! impl_tx_channel_creator {
 
 macro_rules! impl_rx_channel_creator {
     ($channel:literal) => {
-        impl<'d, P>
-            $crate::rmt::RxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>, P>
+        impl<'d> $crate::rmt::RxChannelCreator<'d, $crate::rmt::Channel<$crate::Blocking, $channel>>
             for ChannelCreator<$crate::Blocking, $channel>
-        where
-            P: $crate::gpio::interconnect::PeripheralInput,
         {
         }
 
         impl $crate::rmt::RxChannel for $crate::rmt::Channel<$crate::Blocking, $channel> {}
 
-        impl<'d, P>
-            $crate::rmt::RxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>, P>
+        impl<'d>
+            $crate::rmt::RxChannelCreatorAsync<'d, $crate::rmt::Channel<$crate::Async, $channel>>
             for ChannelCreator<$crate::Async, $channel>
-        where
-            P: $crate::gpio::interconnect::PeripheralInput,
         {
         }
 

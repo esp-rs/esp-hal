@@ -6,15 +6,6 @@
 // polluting the main module.
 
 use super::*;
-use crate::gpio::interconnect::connect_input_signal;
-
-impl crate::peripheral::Peripheral for Level {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        *self
-    }
-}
 
 impl Level {
     pub(crate) fn pull_direction(&self, _pull: Pull) {}
@@ -34,15 +25,6 @@ impl Level {
         *self == Level::High
     }
 
-    pub(crate) fn connect_input_to_peripheral(&self, signal: InputSignal) {
-        let value = match self {
-            Level::High => ONE_INPUT,
-            Level::Low => ZERO_INPUT,
-        };
-
-        connect_input_signal(signal, value, false, true);
-    }
-
     pub(crate) fn set_to_open_drain_output(&self) {}
     pub(crate) fn set_to_push_pull_output(&self) {}
     pub(crate) fn enable_output(&self, _on: bool) {}
@@ -60,10 +42,6 @@ impl Level {
     ) -> &'static [(AlternateFunction, OutputSignal)] {
         &[]
     }
-
-    pub(crate) fn connect_peripheral_to_output(&self, _signal: OutputSignal) {}
-
-    pub(crate) fn disconnect_from_peripheral_output(&self, _signal: OutputSignal) {}
 }
 
 /// Placeholder pin, used when no pin is required when using a peripheral.
@@ -71,14 +49,6 @@ impl Level {
 /// When used as a peripheral signal, `NoPin` is equivalent to [`Level::Low`].
 #[derive(Default, Clone, Copy)]
 pub struct NoPin;
-
-impl crate::peripheral::Peripheral for NoPin {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self
-    }
-}
 
 impl private::Sealed for NoPin {}
 

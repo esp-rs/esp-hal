@@ -589,7 +589,7 @@ impl super::Timer for Alarm {
     }
 }
 
-impl Peripheral for Alarm {
+unsafe impl Peripheral for Alarm {
     type P = Self;
 
     #[inline]

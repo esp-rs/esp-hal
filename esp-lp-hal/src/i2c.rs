@@ -187,8 +187,8 @@ pub struct LpI2c {
 }
 
 impl LpI2c {
-    /// Writes bytes to slave with address `addr`
-    pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+    /// Writes bytes to slave with given `address`
+    pub fn write(&mut self, address: u8, bytes: &[u8]) -> Result<(), Error> {
         let mut cmd_iterator = CommandRegister::COMD0;
 
         // If SCL is busy, reset the Master FSM
@@ -206,7 +206,7 @@ impl LpI2c {
         self.add_cmd_lp(&mut cmd_iterator, Command::Start)?;
 
         // Load device address and R/W bit into FIFO
-        self.write_fifo((addr << 1) | OperationType::Write as u8);
+        self.write_fifo((address << 1) | OperationType::Write as u8);
 
         self.add_cmd_lp(
             &mut cmd_iterator,
@@ -273,8 +273,8 @@ impl LpI2c {
         Ok(())
     }
 
-    /// Reads enough bytes from slave with `addr` to fill `buffer`
-    pub fn read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    /// Reads enough bytes from slave with given `address` to fill `buffer`
+    pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
         // Check size constraints
         if buffer.len() > 254 {
             return Err(Error::ExceedingFifo);
@@ -285,7 +285,7 @@ impl LpI2c {
         self.add_cmd_lp(&mut cmd_iterator, Command::Start)?;
 
         // Load device address
-        self.write_fifo((addr << 1) | OperationType::Read as u8);
+        self.write_fifo((address << 1) | OperationType::Read as u8);
 
         self.add_cmd_lp(
             &mut cmd_iterator,
@@ -372,14 +372,19 @@ impl LpI2c {
         Ok(())
     }
 
-    /// Writes bytes to slave with address `addr` and then reads enough bytes
+    /// Writes bytes to slave with given `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
-    pub fn write_read(&mut self, addr: u8, bytes: &[u8], buffer: &mut [u8]) -> Result<(), Error> {
+    pub fn write_read(
+        &mut self,
+        address: u8,
+        bytes: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
         // It would be possible to combine the write and read in one transaction, but
         // filling the tx fifo with the current code is somewhat slow even in release
         // mode which can cause issues.
-        self.write(addr, bytes)?;
-        self.read(addr, buffer)?;
+        self.write(address, bytes)?;
+        self.read(address, buffer)?;
 
         Ok(())
     }

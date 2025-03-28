@@ -362,9 +362,6 @@ mod tests {
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        dma_rx_buf.set_length(TRANSFER_SIZE);
-        dma_tx_buf.set_length(TRANSFER_SIZE);
-
         // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);
 
@@ -402,9 +399,6 @@ mod tests {
             .set_edge_signal(ctx.miso_input.peripheral_input());
         unit.channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-
-        dma_rx_buf.set_length(TRANSFER_SIZE);
-        dma_tx_buf.set_length(TRANSFER_SIZE);
 
         // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);
@@ -655,14 +649,15 @@ mod tests {
         let transmit = [0b0110_1010; TRANSFER_SIZE];
 
         for i in 1..4 {
-            receive.copy_from_slice(&[5, 5, 5, 5, 5]);
+            receive.copy_from_slice(&[5; TRANSFER_SIZE]);
             SpiBusAsync::read(&mut spi, &mut receive).await.unwrap();
-            assert_eq!(receive, [0, 0, 0, 0, 0]);
+            assert_eq!(receive, [0; TRANSFER_SIZE]);
 
             SpiBusAsync::transfer(&mut spi, &mut receive, &transmit)
                 .await
                 .unwrap();
             assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+            assert_eq!(receive, [0b0110_1010; TRANSFER_SIZE]);
         }
     }
 

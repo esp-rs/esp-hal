@@ -139,7 +139,7 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
     }
 }
 
-impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
+unsafe impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
     type P = SoftwareInterrupt<NUM>;
 
     #[inline]

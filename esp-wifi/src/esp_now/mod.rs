@@ -13,17 +13,13 @@ use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::{cell::RefCell, fmt::Debug, marker::PhantomData};
 
 use critical_section::Mutex;
-use enumset::EnumSet;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 #[cfg(feature = "csi")]
 use crate::wifi::CsiConfig;
 use crate::{
     binary::include::*,
-    config::PowerSaveMode,
-    hal::peripheral::{Peripheral, PeripheralRef},
-    wifi::{Protocol, RxControlInfo, WifiError},
-    EspWifiController,
+    wifi::{RxControlInfo, WifiError},
 };
 
 const RECEIVE_QUEUE_SIZE: usize = 10;
@@ -216,6 +212,9 @@ pub enum WifiPhyRate {
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeerInfo {
+    /// Interface to use
+    pub interface: EspNowWifiInterface,
+
     /// ESP-NOW peer MAC address that is also the MAC address of station or
     /// softap.
     pub peer_address: [u8; 6],
@@ -276,16 +275,33 @@ impl Debug for ReceivedData {
     }
 }
 
-/// A token used to create an `EspNow` instance while Wi-Fi is enabled.
-pub struct EspNowWithWifiCreateToken {
-    _private: (),
+/// The interface to use for this peer
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum EspNowWifiInterface {
+    /// Use the AP interface
+    Ap,
+    /// Use the STA interface
+    Sta,
 }
 
-/// Enables ESP-NOW while keeping Wi-Fi active.
-pub fn enable_esp_now_with_wifi(
-    device: crate::hal::peripherals::WIFI,
-) -> (crate::hal::peripherals::WIFI, EspNowWithWifiCreateToken) {
-    (device, EspNowWithWifiCreateToken { _private: () })
+impl EspNowWifiInterface {
+    fn as_wifi_interface(&self) -> wifi_interface_t {
+        match self {
+            EspNowWifiInterface::Ap => wifi_interface_t_WIFI_IF_AP,
+            EspNowWifiInterface::Sta => wifi_interface_t_WIFI_IF_STA,
+        }
+    }
+
+    fn from_wifi_interface(interface: wifi_interface_t) -> Self {
+        #[allow(non_upper_case_globals)]
+        match interface {
+            wifi_interface_t_WIFI_IF_AP => EspNowWifiInterface::Ap,
+            wifi_interface_t_WIFI_IF_STA => EspNowWifiInterface::Sta,
+            wifi_interface_t_WIFI_IF_NAN => panic!("NAN is unsupported"),
+            _ => unreachable!("Unknown interface"),
+        }
+    }
 }
 
 /// Manages the `EspNow` instance lifecycle while ensuring it remains active.
@@ -294,56 +310,6 @@ pub struct EspNowManager<'d> {
 }
 
 impl EspNowManager<'_> {
-    /// Set the wifi protocol.
-    ///
-    /// This will set the wifi protocol to the desired protocol
-    ///
-    /// # Arguments:
-    ///
-    /// * `protocols` - The desired protocols
-    pub fn set_protocol(&self, protocols: EnumSet<Protocol>) -> Result<(), EspNowError> {
-        let mut protocol = 0u8;
-
-        protocols.into_iter().for_each(|v| match v {
-            Protocol::P802D11B => protocol |= WIFI_PROTOCOL_11B as u8,
-            Protocol::P802D11BG => protocol |= WIFI_PROTOCOL_11B as u8 | WIFI_PROTOCOL_11G as u8,
-            Protocol::P802D11BGN => {
-                protocol |=
-                    WIFI_PROTOCOL_11B as u8 | WIFI_PROTOCOL_11G as u8 | WIFI_PROTOCOL_11N as u8
-            }
-            Protocol::P802D11BGNLR => {
-                protocol |= WIFI_PROTOCOL_11B as u8
-                    | WIFI_PROTOCOL_11G as u8
-                    | WIFI_PROTOCOL_11N as u8
-                    | WIFI_PROTOCOL_LR as u8
-            }
-            Protocol::P802D11LR => protocol |= WIFI_PROTOCOL_LR as u8,
-            Protocol::P802D11BGNAX => {
-                protocol |= WIFI_PROTOCOL_11B as u8
-                    | WIFI_PROTOCOL_11G as u8
-                    | WIFI_PROTOCOL_11N as u8
-                    | WIFI_PROTOCOL_11AX as u8
-            }
-        });
-
-        let mut mode = wifi_mode_t_WIFI_MODE_NULL;
-        check_error!({ esp_wifi_get_mode(&mut mode) })?;
-
-        if mode == wifi_mode_t_WIFI_MODE_STA || mode == wifi_mode_t_WIFI_MODE_APSTA {
-            check_error!({ esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol) })?;
-        }
-        if mode == wifi_mode_t_WIFI_MODE_AP || mode == wifi_mode_t_WIFI_MODE_APSTA {
-            check_error!({ esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol) })?;
-        }
-
-        Ok(())
-    }
-
-    /// Configures modem power saving
-    pub fn set_power_saving(&self, ps: PowerSaveMode) -> Result<(), WifiError> {
-        crate::wifi::apply_power_saving(ps)
-    }
-
     /// Set primary WiFi channel.
     /// Should only be used when using ESP-NOW without AP or STA.
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
@@ -363,7 +329,7 @@ impl EspNowManager<'_> {
             peer_addr: peer.peer_address,
             lmk: peer.lmk.unwrap_or([0u8; 16]),
             channel: peer.channel.unwrap_or(0),
-            ifidx: wifi_interface_t_WIFI_IF_STA,
+            ifidx: peer.interface.as_wifi_interface(),
             encrypt: peer.encrypt,
             priv_: core::ptr::null_mut(),
         };
@@ -395,7 +361,7 @@ impl EspNowManager<'_> {
             peer_addr: peer.peer_address,
             lmk: peer.lmk.unwrap_or([0u8; 16]),
             channel: peer.channel.unwrap_or(0),
-            ifidx: wifi_interface_t_WIFI_IF_STA,
+            ifidx: peer.interface.as_wifi_interface(),
             encrypt: peer.encrypt,
             priv_: core::ptr::null_mut(),
         };
@@ -415,6 +381,7 @@ impl EspNowManager<'_> {
         check_error!({ esp_now_get_peer(peer_address.as_ptr(), &mut raw_peer as *mut _) })?;
 
         Ok(PeerInfo {
+            interface: EspNowWifiInterface::from_wifi_interface(raw_peer.ifidx),
             peer_address: raw_peer.peer_addr,
             lmk: if raw_peer.lmk.is_empty() {
                 None
@@ -447,6 +414,7 @@ impl EspNowManager<'_> {
         check_error!({ esp_now_fetch_peer(from_head, &mut raw_peer as *mut _) })?;
 
         Ok(PeerInfo {
+            interface: EspNowWifiInterface::from_wifi_interface(raw_peer.ifidx),
             peer_address: raw_peer.peer_addr,
             lmk: if raw_peer.lmk.is_empty() {
                 None
@@ -497,21 +465,6 @@ impl EspNowManager<'_> {
     /// Configure ESP-NOW rate.
     pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_config_espnow_rate(wifi_interface_t_WIFI_IF_STA, rate as u32,) })
-    }
-}
-
-impl Drop for EspNowManager<'_> {
-    fn drop(&mut self) {
-        if unwrap!(
-            crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
-                Some(x.saturating_sub(1))
-            })
-        ) == 0
-        {
-            if let Err(e) = crate::wifi::wifi_deinit() {
-                warn!("Failed to cleanly deinit wifi: {:?}", e);
-            }
-        }
     }
 }
 
@@ -605,18 +558,14 @@ struct EspNowRc<'d> {
 }
 
 impl EspNowRc<'_> {
-    fn new() -> Result<Self, EspNowError> {
+    fn new() -> Self {
         static ESP_NOW_RC: AtomicU8 = AtomicU8::new(0);
-        // The reference counter is not 0, which means there is another instance of
-        // EspNow, which is not allowed
-        if ESP_NOW_RC.fetch_add(1, Ordering::AcqRel) != 0 {
-            return Err(EspNowError::DuplicateInstance);
-        }
+        assert!(ESP_NOW_RC.fetch_add(1, Ordering::AcqRel) == 0);
 
-        Ok(Self {
+        Self {
             rc: &ESP_NOW_RC,
             inner: PhantomData,
-        })
+        }
     }
 }
 
@@ -643,15 +592,15 @@ impl Drop for EspNowRc<'_> {
 
 #[allow(unknown_lints)]
 #[allow(clippy::too_long_first_doc_paragraph)]
-/// ESP-NOW is a kind of connectionless Wi-Fi communication protocol that is
+/// ESP-NOW is a kind of connection-less Wi-Fi communication protocol that is
 /// defined by Espressif. In ESP-NOW, application data is encapsulated in a
 /// vendor-specific action frame and then transmitted from one Wi-Fi device to
 /// another without connection. CTR with CBC-MAC Protocol(CCMP) is used to
 /// protect the action frame for security. ESP-NOW is widely used in smart
 /// light, remote controlling, sensor, etc.
 ///
-/// Currently this implementation (when used together with traditional Wi-Fi)
-/// ONLY support STA mode.
+/// For convenience, by default there will be a broadcast peer added on the STA
+/// interface.
 pub struct EspNow<'d> {
     manager: EspNowManager<'d>,
     sender: EspNowSender<'d>,
@@ -660,36 +609,8 @@ pub struct EspNow<'d> {
 }
 
 impl<'d> EspNow<'d> {
-    /// Creates an `EspNow` instance.
-    pub fn new(
-        inited: &'d EspWifiController<'d>,
-        device: impl Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
-    ) -> Result<EspNow<'d>, EspNowError> {
-        EspNow::new_internal(inited, Some(device.into_ref()))
-    }
-
-    /// Creates an `EspNow` instance with support for Wi-Fi coexistence.
-    pub fn new_with_wifi(
-        inited: &'d EspWifiController<'d>,
-        _token: EspNowWithWifiCreateToken,
-    ) -> Result<EspNow<'d>, EspNowError> {
-        EspNow::new_internal(
-            inited,
-            None::<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
-        )
-    }
-
-    fn new_internal(
-        inited: &'d EspWifiController<'d>,
-        device: Option<PeripheralRef<'d, crate::hal::peripherals::WIFI>>,
-    ) -> Result<EspNow<'d>, EspNowError> {
-        if !inited.wifi() {
-            // if wifi isn't already enabled, and we try to coexist - panic
-            assert!(device.is_some());
-            crate::wifi::wifi_init()?;
-        }
-
-        let espnow_rc = EspNowRc::new()?;
+    pub(crate) fn new_internal() -> EspNow<'d> {
+        let espnow_rc = EspNowRc::new();
         let esp_now = EspNow {
             manager: EspNowManager {
                 _rc: espnow_rc.clone(),
@@ -700,40 +621,28 @@ impl<'d> EspNow<'d> {
             receiver: EspNowReceiver { _rc: espnow_rc },
             _phantom: PhantomData,
         };
-        check_error!({ esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_STA) })?;
-        check_error!({ esp_wifi_start() })?;
-        check_error!({
-            esp_wifi_set_inactive_time(wifi_interface_t_WIFI_IF_STA, crate::CONFIG.beacon_timeout)
-        })?;
-        check_error!({ esp_now_init() })?;
-        check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) })?;
-        check_error!({ esp_now_register_send_cb(Some(send_cb)) })?;
 
-        esp_now.add_peer(PeerInfo {
-            peer_address: BROADCAST_ADDRESS,
-            lmk: None,
-            channel: None,
-            encrypt: false,
-        })?;
+        check_error!({ esp_now_init() }).expect("esp-now-init failed");
+        check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) }).ok();
+        check_error!({ esp_now_register_send_cb(Some(send_cb)) }).ok();
 
-        Ok(esp_now)
+        esp_now
+            .add_peer(PeerInfo {
+                interface: EspNowWifiInterface::Sta,
+                peer_address: BROADCAST_ADDRESS,
+                lmk: None,
+                channel: None,
+                encrypt: false,
+            })
+            .ok();
+
+        esp_now
     }
 
     /// Splits the `EspNow` instance into its manager, sender, and receiver
     /// components.
     pub fn split(self) -> (EspNowManager<'d>, EspNowSender<'d>, EspNowReceiver<'d>) {
         (self.manager, self.sender, self.receiver)
-    }
-
-    /// Set the wifi protocol.
-    ///
-    /// This will set the wifi protocol to the desired protocol
-    ///
-    /// # Arguments:
-    ///
-    /// * `protocols` - The desired protocols
-    pub fn set_protocol(&self, protocols: EnumSet<Protocol>) -> Result<(), EspNowError> {
-        self.manager.set_protocol(protocols)
     }
 
     /// Set primary WiFi channel.

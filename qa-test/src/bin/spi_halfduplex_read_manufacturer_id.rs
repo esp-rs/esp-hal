@@ -9,7 +9,7 @@
 //! - CS          =>  GPIO5
 //!
 //! The following wiring is assumed for ESP32:
-//! - SCLK        =>  GPIO0
+//! - SCLK        =>  GPIO12
 //! - MISO/IO0    =>  GPIO2
 //! - MOSI/IO1    =>  GPIO4
 //! - IO2         =>  GPIO5
@@ -48,7 +48,7 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let sclk = peripherals.GPIO0;
+            let sclk = peripherals.GPIO12;
             let miso = peripherals.GPIO2;
             let mosi = peripherals.GPIO4;
             let sio2 = peripherals.GPIO5;

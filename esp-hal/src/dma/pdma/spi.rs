@@ -17,7 +17,7 @@ impl AnySpiDmaRxChannel {
 
 impl crate::private::Sealed for AnySpiDmaRxChannel {}
 impl DmaRxChannel for AnySpiDmaRxChannel {}
-impl Peripheral for AnySpiDmaRxChannel {
+unsafe impl Peripheral for AnySpiDmaRxChannel {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -38,7 +38,7 @@ impl AnySpiDmaTxChannel {
 
 impl crate::private::Sealed for AnySpiDmaTxChannel {}
 impl DmaTxChannel for AnySpiDmaTxChannel {}
-impl Peripheral for AnySpiDmaTxChannel {
+unsafe impl Peripheral for AnySpiDmaTxChannel {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {

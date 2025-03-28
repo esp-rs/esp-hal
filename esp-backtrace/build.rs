@@ -1,4 +1,5 @@
 use esp_build::assert_unique_used_features;
+use esp_config::{generate_config, Value};
 
 fn main() {
     // Ensure that only a single chip is specified:
@@ -12,4 +13,16 @@ fn main() {
     if cfg!(feature = "custom-halt") && cfg!(feature = "halt-cores") {
         panic!("Only one of `custom-halt` and `halt-cores` can be enabled");
     }
+
+    // emit config
+    generate_config(
+        "esp_backtrace",
+        &[(
+            "backtrace-frames",
+            "The maximum number of frames that will be printed in a backtrace",
+            Value::Integer(10),
+            None,
+        )],
+        true,
+    );
 }
