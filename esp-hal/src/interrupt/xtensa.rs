@@ -474,7 +474,7 @@ mod vectored {
                 let int_level = cpu_interrupt.level() as u8 as u32;
 
                 if int_level == level {
-                    res.set(interrupt_nr as u16);
+                    res.set(interrupt_nr);
                 }
             }
 
@@ -561,7 +561,7 @@ mod vectored {
     #[inline]
     fn cpu_interrupt_nr_to_cpu_interrupt_handler(
         number: u32,
-    ) -> Option<unsafe extern "C" fn(u32, save_frame: &mut Context)> {
+    ) -> Option<unsafe extern "C" fn(save_frame: &mut Context)> {
         use xtensa_lx_rt::*;
         // we're fortunate that all esp variants use the same CPU interrupt layout
         Some(match number {
@@ -576,16 +576,30 @@ mod vectored {
         })
     }
 
-    // The linker script defines `__level_1_interrupt`, `__level_2_interrupt` and
-    // `__level_3_interrupt` as `handle_interrupts`
+    #[no_mangle]
+    #[ram]
+    unsafe fn __level_1_interrupt(save_frame: &mut Context) {
+        handle_interrupts::<1>(save_frame);
+    }
 
     #[no_mangle]
     #[ram]
-    unsafe fn handle_interrupts(level: u32, save_frame: &mut Context) {
+    unsafe fn __level_2_interrupt(save_frame: &mut Context) {
+        handle_interrupts::<2>(save_frame);
+    }
+
+    #[no_mangle]
+    #[ram]
+    unsafe fn __level_3_interrupt(save_frame: &mut Context) {
+        handle_interrupts::<3>(save_frame);
+    }
+
+    #[inline(always)]
+    unsafe fn handle_interrupts<const LEVEL: u32>(save_frame: &mut Context) {
         let core = Cpu::current();
 
         let cpu_interrupt_mask =
-            interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[level as usize];
+            interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[LEVEL as usize];
 
         if cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL != 0 {
             // Let's handle CPU-internal interrupts (NMI, Timer, Software, Profiling).
@@ -604,11 +618,12 @@ mod vectored {
             }
 
             if let Some(handler) = cpu_interrupt_nr_to_cpu_interrupt_handler(cpu_interrupt_nr) {
-                handler(level, save_frame);
+                handler(save_frame);
             }
         } else {
-            let status = if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
-                // Next, handle edge triggered peripheral interrupts.
+            let status = if !cfg!(esp32s3) && (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+                // Next, handle edge triggered peripheral interrupts. Note that on the S3 all
+                // peripheral interrupts are level-triggered.
 
                 // If the interrupt is edge triggered, we need to clear the
                 // request on the CPU's side
@@ -623,32 +638,28 @@ mod vectored {
                 status(core)
             };
 
-            let configured_interrupts = configured_interrupts(core, status, level);
+            let configured_interrupts = configured_interrupts(core, status, LEVEL);
             for interrupt_nr in configured_interrupts.iterator() {
                 // Don't use `Interrupt::try_from`. It's slower and placed in flash
                 let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
-                handle_interrupt(level, interrupt, save_frame);
+
+                extern "C" {
+                    // defined in each hal
+                    fn EspDefaultHandler(interrupt: Interrupt);
+                }
+
+                let handler = pac::__INTERRUPTS[interrupt as usize]._handler;
+                if core::ptr::eq(
+                    handler as *const _,
+                    EspDefaultHandler as *const unsafe extern "C" fn(),
+                ) {
+                    EspDefaultHandler(interrupt);
+                } else {
+                    let handler: fn(&mut Context) =
+                        core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler);
+                    handler(save_frame);
+                }
             }
-        }
-    }
-
-    #[ram]
-    unsafe fn handle_interrupt(level: u32, interrupt: Interrupt, save_frame: &mut Context) {
-        extern "C" {
-            // defined in each hal
-            fn EspDefaultHandler(level: u32, interrupt: Interrupt);
-        }
-
-        let handler = pac::__INTERRUPTS[interrupt as usize]._handler;
-        if core::ptr::eq(
-            handler as *const _,
-            EspDefaultHandler as *const unsafe extern "C" fn(),
-        ) {
-            EspDefaultHandler(level, interrupt);
-        } else {
-            let handler: fn(&mut Context) =
-                core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler);
-            handler(save_frame);
         }
     }
 
@@ -729,25 +740,25 @@ mod raw {
 
     #[no_mangle]
     #[link_section = ".rwtext"]
-    unsafe fn __level_4_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe fn __level_4_interrupt(save_frame: &mut Context) {
         level4_interrupt(save_frame)
     }
 
     #[no_mangle]
     #[link_section = ".rwtext"]
-    unsafe fn __level_5_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe fn __level_5_interrupt(save_frame: &mut Context) {
         level5_interrupt(save_frame)
     }
 
     #[no_mangle]
     #[link_section = ".rwtext"]
-    unsafe fn __level_6_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe fn __level_6_interrupt(save_frame: &mut Context) {
         level6_interrupt(save_frame)
     }
 
     #[no_mangle]
     #[link_section = ".rwtext"]
-    unsafe fn __level_7_interrupt(_level: u32, save_frame: &mut Context) {
+    unsafe fn __level_7_interrupt(save_frame: &mut Context) {
         level7_interrupt(save_frame)
     }
 }
