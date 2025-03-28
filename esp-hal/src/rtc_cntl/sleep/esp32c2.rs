@@ -2,65 +2,31 @@ use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RtcFunction, RtcPinWithResistors},
     peripherals::{APB_CTRL, BB, EXTMEM, GPIO, IO_MUX, LPWR, SPI0, SPI1, SYSTEM},
-    rom::regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
+    soc::regi2c,
 };
-
-const I2C_DIG_REG: u32 = 0x6D;
-const I2C_DIG_REG_HOSTID: u32 = 0;
-
-const I2C_DIG_REG_EXT_RTC_DREG: u32 = 4;
-const I2C_DIG_REG_EXT_RTC_DREG_MSB: u32 = 4;
-const I2C_DIG_REG_EXT_RTC_DREG_LSB: u32 = 0;
-
-const I2C_DIG_REG_EXT_RTC_DREG_SLEEP: u32 = 5;
-const I2C_DIG_REG_EXT_RTC_DREG_SLEEP_MSB: u32 = 4;
-const I2C_DIG_REG_EXT_RTC_DREG_SLEEP_LSB: u32 = 0;
-
-const I2C_DIG_REG_EXT_DIG_DREG: u32 = 6;
-const I2C_DIG_REG_EXT_DIG_DREG_MSB: u32 = 4;
-const I2C_DIG_REG_EXT_DIG_DREG_LSB: u32 = 0;
-
-const I2C_DIG_REG_EXT_DIG_DREG_SLEEP: u32 = 7;
-const I2C_DIG_REG_EXT_DIG_DREG_SLEEP_MSB: u32 = 4;
-const I2C_DIG_REG_EXT_DIG_DREG_SLEEP_LSB: u32 = 0;
-
-const I2C_DIG_REG_XPD_RTC_REG: u32 = 13;
-const I2C_DIG_REG_XPD_RTC_REG_MSB: u32 = 2;
-const I2C_DIG_REG_XPD_RTC_REG_LSB: u32 = 2;
-
-const I2C_DIG_REG_XPD_DIG_REG: u32 = 13;
-const I2C_DIG_REG_XPD_DIG_REG_MSB: u32 = 3;
-const I2C_DIG_REG_XPD_DIG_REG_LSB: u32 = 3;
-
-const I2C_ULP_IR_FORCE_XPD_CK: u8 = 0;
-const I2C_ULP_IR_FORCE_XPD_CK_MSB: u8 = 2;
-const I2C_ULP_IR_FORCE_XPD_CK_LSB: u8 = 2;
-
-const I2C_ULP: u8 = 0x61;
-const I2C_ULP_HOSTID: u8 = 0;
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
 // RTC_CNTL_DIG_DBIAS_WAK, RTC_CNTL_DIG_DBIAS_SLP values.
 // Valid if RTC_CNTL_DBG_ATTEN is 0.
 /// Digital bias voltage level of 0.90V.
-pub const RTC_CNTL_DBIAS_0V90: u32 = 13;
+pub const RTC_CNTL_DBIAS_0V90: u8 = 13;
 /// Digital bias voltage level of 0.95V.
-pub const RTC_CNTL_DBIAS_0V95: u32 = 16;
+pub const RTC_CNTL_DBIAS_0V95: u8 = 16;
 /// Digital bias voltage level of 1.00V.
-pub const RTC_CNTL_DBIAS_1V00: u32 = 18;
+pub const RTC_CNTL_DBIAS_1V00: u8 = 18;
 /// Digital bias voltage level of 1.05V.
-pub const RTC_CNTL_DBIAS_1V05: u32 = 20;
+pub const RTC_CNTL_DBIAS_1V05: u8 = 20;
 /// Digital bias voltage level of 1.10V.
-pub const RTC_CNTL_DBIAS_1V10: u32 = 23;
+pub const RTC_CNTL_DBIAS_1V10: u8 = 23;
 /// Digital bias voltage level of 1.15V.
-pub const RTC_CNTL_DBIAS_1V15: u32 = 25;
+pub const RTC_CNTL_DBIAS_1V15: u8 = 25;
 /// Digital bias voltage level of 1.20V.
-pub const RTC_CNTL_DBIAS_1V20: u32 = 28;
+pub const RTC_CNTL_DBIAS_1V20: u8 = 28;
 /// Digital bias voltage level of 1.25V.
-pub const RTC_CNTL_DBIAS_1V25: u32 = 30;
+pub const RTC_CNTL_DBIAS_1V25: u8 = 30;
 /// Digital bias voltage level of approximately 1.34V.
-pub const RTC_CNTL_DBIAS_1V30: u32 = 31;
+pub const RTC_CNTL_DBIAS_1V30: u8 = 31;
 
 /// Default attenuation setting during light sleep, with a voltage drop.
 pub const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_DEFAULT: u8 = 5;
@@ -149,10 +115,8 @@ impl WakeSource for TimerWakeupSource {
                 .write(|w| w.main_timer().clear_bit_by_one());
 
             rtc_cntl.slp_timer1().write(|w| {
-                w.slp_val_hi()
-                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
-                    .main_timer_alarm_en()
-                    .set_bit()
+                w.slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16);
+                w.main_timer_alarm_en().set_bit()
             });
         }
     }
@@ -405,9 +369,9 @@ bitfield::bitfield! {
     /// enable WDT flashboot mode
     pub wdt_flashboot_mod_en, set_wdt_flashboot_mod_en: 11;
     /// set bias for digital domain, in sleep mode
-    pub u32, dig_dbias_slp, set_dig_dbias_slp: 16, 12;
+    pub u8, dig_dbias_slp, set_dig_dbias_slp: 16, 12;
     /// set bias for RTC domain, in sleep mode
-    pub u32, rtc_dbias_slp, set_rtc_dbias_slp: 21, 17;
+    pub u8, rtc_dbias_slp, set_rtc_dbias_slp: 21, 17;
     /// voltage parameter, in sleep mode
     pub u8, dbg_atten_slp, set_dbg_atten_slp: 25, 22;
     /// circuit control parameter, in monitor mode
@@ -501,8 +465,8 @@ fn rtc_sleep_pu(val: bool) {
 
     APB_CTRL::regs().mem_power_up().modify(|_r, w| unsafe {
         w.sram_power_up()
-            .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 })
-            .rom_power_up()
+            .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 });
+        w.rom_power_up()
             .bits(if val { SYSCON_ROM_POWER_UP } else { 0 })
     });
 }
@@ -554,16 +518,13 @@ impl RtcSleepConfig {
         let extmem = EXTMEM::regs();
         let system = SYSTEM::regs();
 
+        regi2c::I2C_DIG_REG_XPD_RTC_REG.write_field(0);
+        regi2c::I2C_DIG_REG_XPD_DIG_REG.write_field(0);
+
         unsafe {
-            regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_RTC_REG, 0);
-
-            regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_XPD_DIG_REG, 0);
-
             rtc_cntl.timer1().modify(|_, w| {
-                w.pll_buf_wait()
-                    .bits(cfg.pll_wait())
-                    .ck8m_wait()
-                    .bits(cfg.ck8m_wait())
+                w.pll_buf_wait().bits(cfg.pll_wait());
+                w.ck8m_wait().bits(cfg.ck8m_wait())
             });
 
             // Moved from rtc sleep to rtc init to save sleep function running time
@@ -576,19 +537,15 @@ impl RtcSleepConfig {
             // TODO: something about cali_ocode
 
             // Reset RTC bias to default value (needed if waking up from deep sleep)
-            regi2c_write_mask!(
-                I2C_DIG_REG,
-                I2C_DIG_REG_EXT_RTC_DREG_SLEEP,
-                RTC_CNTL_DBIAS_1V10
-            );
+            regi2c::I2C_DIG_REG_EXT_RTC_DREG_SLEEP.write_field(RTC_CNTL_DBIAS_1V10);
 
             // LDO dbias initialization
             // TODO: this modifies g_rtc_dbias_pvt_non_240m and g_dig_dbias_pvt_non_240m.
             //       We're using a high enough default but we should read from the efuse.
             // set_rtc_dig_dbias();
 
-            regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_EXT_RTC_DREG, RTC_CNTL_DBIAS_1V25);
-            regi2c_write_mask!(I2C_DIG_REG, I2C_DIG_REG_EXT_DIG_DREG, RTC_CNTL_DBIAS_1V25);
+            regi2c::I2C_DIG_REG_EXT_RTC_DREG.write_field(RTC_CNTL_DBIAS_1V25);
+            regi2c::I2C_DIG_REG_EXT_DIG_DREG.write_field(RTC_CNTL_DBIAS_1V25);
 
             if cfg.clkctl_init() {
                 // clear CMMU clock force on
@@ -623,12 +580,9 @@ impl RtcSleepConfig {
                 // cancel bbpll force pu if setting no force power up
 
                 rtc_cntl.options0().modify(|_, w| {
-                    w.bbpll_force_pu()
-                        .bit(cfg.bbpll_fpu())
-                        .bbpll_i2c_force_pu()
-                        .bit(cfg.bbpll_fpu())
-                        .bb_i2c_force_pu()
-                        .bit(cfg.bbpll_fpu())
+                    w.bbpll_force_pu().bit(cfg.bbpll_fpu());
+                    w.bbpll_i2c_force_pu().bit(cfg.bbpll_fpu());
+                    w.bb_i2c_force_pu().bit(cfg.bbpll_fpu())
                 });
 
                 rtc_cntl
@@ -666,17 +620,15 @@ impl RtcSleepConfig {
                 // cancel digital PADS force no iso
 
                 rtc_cntl.dig_iso().modify(|_, w| {
-                    w.dg_pad_force_unhold()
-                        .clear_bit()
-                        .dg_pad_force_noiso()
-                        .clear_bit()
+                    w.dg_pad_force_unhold().clear_bit();
+                    w.dg_pad_force_noiso().clear_bit()
                 });
             }
 
             rtc_cntl.int_ena().write(|w| w.bits(0));
             rtc_cntl.int_clr().write(|w| w.bits(u32::MAX));
 
-            regi2c_write_mask!(I2C_ULP, I2C_ULP_IR_FORCE_XPD_CK, 1);
+            regi2c::I2C_ULP_IR_FORCE_XPD_CK.write_field(1);
         }
     }
 
@@ -691,54 +643,36 @@ impl RtcSleepConfig {
         unsafe {
             assert!(!self.pd_cur_slp() || self.bias_sleep_slp());
 
-            regi2c_write_mask!(
-                I2C_DIG_REG,
-                I2C_DIG_REG_EXT_RTC_DREG_SLEEP,
-                self.rtc_dbias_slp()
-            );
-
-            regi2c_write_mask!(
-                I2C_DIG_REG,
-                I2C_DIG_REG_EXT_DIG_DREG_SLEEP,
-                self.dig_dbias_slp()
-            );
+            regi2c::I2C_DIG_REG_EXT_RTC_DREG_SLEEP.write_field(self.rtc_dbias_slp());
+            regi2c::I2C_DIG_REG_EXT_DIG_DREG_SLEEP.write_field(self.dig_dbias_slp());
 
             rtc_cntl.bias_conf().modify(|_, w| {
                 w.dbg_atten_monitor()
-                    .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT)
-                    // We have config values for this in self, so I don't know why we're setting
-                    // hardcoded defaults for these next two. It's what IDF does...
-                    .bias_sleep_monitor()
-                    .bit(RTC_CNTL_BIASSLP_MONITOR_DEFAULT)
-                    .pd_cur_monitor()
-                    .bit(RTC_CNTL_PD_CUR_MONITOR_DEFAULT)
+                    .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT);
+                // We have config values for this in self, so I don't know why we're setting
+                // hardcoded defaults for these next two. It's what IDF does...
+                w.bias_sleep_monitor().bit(RTC_CNTL_BIASSLP_MONITOR_DEFAULT);
+                w.pd_cur_monitor().bit(RTC_CNTL_PD_CUR_MONITOR_DEFAULT)
             });
 
             rtc_cntl.bias_conf().modify(|_, w| {
-                w.dbg_atten_deep_slp()
-                    .bits(self.dbg_atten_slp())
-                    .bias_sleep_deep_slp()
-                    .bit(self.bias_sleep_slp())
-                    .pd_cur_deep_slp()
-                    .bit(self.pd_cur_slp())
+                w.dbg_atten_deep_slp().bits(self.dbg_atten_slp());
+                w.bias_sleep_deep_slp().bit(self.bias_sleep_slp());
+                w.pd_cur_deep_slp().bit(self.pd_cur_slp())
             });
 
             if self.deep_slp() {
-                regi2c_write_mask!(I2C_ULP, I2C_ULP_IR_FORCE_XPD_CK, 0);
+                regi2c::I2C_ULP_IR_FORCE_XPD_CK.write_field(0);
 
                 rtc_cntl
                     .dig_pwc()
                     .modify(|_, w| w.dg_wrap_pd_en().set_bit());
 
                 rtc_cntl.ana_conf().modify(|_, w| {
-                    w.ckgen_i2c_pu()
-                        .clear_bit()
-                        .pll_i2c_pu()
-                        .clear_bit()
-                        .rfrx_pbus_pu()
-                        .clear_bit()
-                        .txrf_i2c_pu()
-                        .clear_bit()
+                    w.ckgen_i2c_pu().clear_bit();
+                    w.pll_i2c_pu().clear_bit();
+                    w.rfrx_pbus_pu().clear_bit();
+                    w.txrf_i2c_pu().clear_bit()
                 });
 
                 rtc_cntl
@@ -746,10 +680,8 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.bb_i2c_force_pu().clear_bit());
             } else {
                 rtc_cntl.bias_conf().modify(|_, w| {
-                    w.dg_vdd_drv_b_slp_en()
-                        .set_bit()
-                        .dg_vdd_drv_b_slp()
-                        .bits(RTC_CNTL_DG_VDD_DRV_B_SLP_DEFAULT)
+                    w.dg_vdd_drv_b_slp_en().set_bit();
+                    w.dg_vdd_drv_b_slp().bits(RTC_CNTL_DG_VDD_DRV_B_SLP_DEFAULT)
                 });
 
                 rtc_cntl
@@ -762,26 +694,20 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.regulator_force_pu().bit(self.rtc_regulator_fpu()));
 
             rtc_cntl.clk_conf().modify(|_, w| {
-                w.ck8m_force_pu()
-                    .bit(!self.int_8m_pd_en())
-                    .ck8m_force_nogating()
-                    .bit(!self.int_8m_pd_en())
+                w.ck8m_force_pu().bit(!self.int_8m_pd_en());
+                w.ck8m_force_nogating().bit(!self.int_8m_pd_en())
             });
 
             // enable VDDSDIO control by state machine
 
             rtc_cntl.dig_pwc().modify(|_, w| {
-                w.vdd_spi_pwr_force()
-                    .clear_bit()
-                    .vdd_spi_pd_en()
-                    .bit(self.vddsdio_pd_en())
+                w.vdd_spi_pwr_force().clear_bit();
+                w.vdd_spi_pd_en().bit(self.vddsdio_pd_en())
             });
 
             rtc_cntl.slp_reject_conf().modify(|_, w| {
-                w.deep_slp_reject_en()
-                    .bit(self.deep_slp_reject())
-                    .light_slp_reject_en()
-                    .bit(self.light_slp_reject())
+                w.deep_slp_reject_en().bit(self.deep_slp_reject());
+                w.light_slp_reject_en().bit(self.light_slp_reject())
             });
 
             rtc_cntl
@@ -809,10 +735,8 @@ impl RtcSleepConfig {
         // In deep sleep mode, we never get here
 
         LPWR::regs().int_clr().write(|w| {
-            w.slp_reject()
-                .clear_bit_by_one()
-                .slp_wakeup()
-                .clear_bit_by_one()
+            w.slp_reject().clear_bit_by_one();
+            w.slp_wakeup().clear_bit_by_one()
         });
 
         // restore config if it is a light sleep
