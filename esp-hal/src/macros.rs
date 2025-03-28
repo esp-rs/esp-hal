@@ -109,7 +109,7 @@ macro_rules! any_peripheral {
 
             impl $crate::private::Sealed for $name {}
 
-            impl $crate::peripheral::Peripheral for $name {
+            unsafe impl $crate::peripheral::Peripheral for $name {
                 type P = $name;
 
                 unsafe fn clone_unchecked(&self) -> Self::P {

@@ -138,7 +138,7 @@ impl Rng {
 
 impl Sealed for Rng {}
 
-impl Peripheral for Rng {
+unsafe impl Peripheral for Rng {
     type P = Self;
 
     #[inline]
@@ -287,7 +287,7 @@ impl rand_core09::CryptoRng for Trng<'_> {}
 
 impl Sealed for Trng<'_> {}
 
-impl Peripheral for Trng<'_> {
+unsafe impl Peripheral for Trng<'_> {
     type P = Self;
 
     #[inline]

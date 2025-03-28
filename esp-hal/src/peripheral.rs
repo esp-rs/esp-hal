@@ -1,9 +1,6 @@
 //! # Exclusive peripheral access
 
-use core::{
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
-};
+use core::{marker::PhantomData, ops::Deref};
 
 /// An exclusive reference to a peripheral.
 ///
@@ -26,6 +23,8 @@ pub struct PeripheralRef<'a, T> {
     inner: T,
     _lifetime: PhantomData<&'a mut T>,
 }
+
+impl<T> crate::private::Sealed for PeripheralRef<'_, T> {}
 
 impl<'a, T> PeripheralRef<'a, T> {
     /// Create a new exclusive reference to a peripheral
@@ -146,7 +145,16 @@ impl<T> Deref for PeripheralRef<'_, T> {
 ///
 /// `.into_ref()` on an owned `T` yields a `PeripheralRef<'static, T>`.
 /// `.into_ref()` on an `&'a mut T` yields a `PeripheralRef<'a, T>`.
-pub trait Peripheral: Sized {
+///
+/// # Safety
+///
+/// Implementing this trait is unsound on types that can be obtained again even
+/// after calling `into_ref`. For example, implementing this trait for
+/// `MutexGuard<P>` is unsound, as the guard is dropped to turn it into a
+/// `PeripheralRef<'static, P>`, which allows the `Mutex` to be immediately
+/// re-acquired, potentially resulting in multiple copies of
+/// `PeripheralRef<'static, P>`.
+pub unsafe trait Peripheral: Sized {
     /// Peripheral singleton type
     type P;
 
@@ -201,19 +209,17 @@ pub trait Peripheral: Sized {
     }
 }
 
-impl<T: DerefMut> Peripheral for T
-where
-    T::Target: Peripheral,
-{
-    type P = <T::Target as Peripheral>::P;
+impl<T: Peripheral> crate::private::Sealed for &mut T {}
+unsafe impl<T: Peripheral> Peripheral for &mut T {
+    type P = <T as Peripheral>::P;
 
     #[inline]
     unsafe fn clone_unchecked(&self) -> Self::P {
-        T::Target::clone_unchecked(self)
+        T::clone_unchecked(self)
     }
 }
 
-impl<T: Peripheral> Peripheral for PeripheralRef<'_, T> {
+unsafe impl<T: Peripheral> Peripheral for PeripheralRef<'_, T> {
     type P = T::P;
 
     #[inline]
@@ -431,7 +437,7 @@ mod peripheral_macros {
                 }
             }
 
-            impl $crate::peripheral::Peripheral for $name {
+            unsafe impl $crate::peripheral::Peripheral for $name {
                 type P = $name;
 
                 #[inline]

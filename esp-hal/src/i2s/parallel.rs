@@ -138,39 +138,48 @@ pub trait TxPins<'d> {
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
 pub struct TxSixteenBits<'d> {
-    pins: [PeripheralRef<'d, OutputConnection>; 16],
+    pins: [OutputConnection<'d>; 16],
 }
 
 impl<'d> TxSixteenBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxSixteenBits` instance with the provided output pins.
     pub fn new(
-        pin_0: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_1: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_2: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_3: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_4: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_5: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_6: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_7: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_8: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_9: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_10: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_11: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_12: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_13: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_14: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_15: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_0: impl PeripheralOutput<'d>,
+        pin_1: impl PeripheralOutput<'d>,
+        pin_2: impl PeripheralOutput<'d>,
+        pin_3: impl PeripheralOutput<'d>,
+        pin_4: impl PeripheralOutput<'d>,
+        pin_5: impl PeripheralOutput<'d>,
+        pin_6: impl PeripheralOutput<'d>,
+        pin_7: impl PeripheralOutput<'d>,
+        pin_8: impl PeripheralOutput<'d>,
+        pin_9: impl PeripheralOutput<'d>,
+        pin_10: impl PeripheralOutput<'d>,
+        pin_11: impl PeripheralOutput<'d>,
+        pin_12: impl PeripheralOutput<'d>,
+        pin_13: impl PeripheralOutput<'d>,
+        pin_14: impl PeripheralOutput<'d>,
+        pin_15: impl PeripheralOutput<'d>,
     ) -> Self {
-        crate::into_mapped_ref!(
-            pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10, pin_11,
-            pin_12, pin_13, pin_14, pin_15
-        );
-
         Self {
             pins: [
-                pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10,
-                pin_11, pin_12, pin_13, pin_14, pin_15,
+                pin_0.into(),
+                pin_1.into(),
+                pin_2.into(),
+                pin_3.into(),
+                pin_4.into(),
+                pin_5.into(),
+                pin_6.into(),
+                pin_7.into(),
+                pin_8.into(),
+                pin_9.into(),
+                pin_10.into(),
+                pin_11.into(),
+                pin_12.into(),
+                pin_13.into(),
+                pin_14.into(),
+                pin_15.into(),
             ],
         }
     }
@@ -194,26 +203,33 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
 /// Represents a group of 8 output pins configured for 8-bit parallel data
 /// transmission.
 pub struct TxEightBits<'d> {
-    pins: [PeripheralRef<'d, OutputConnection>; 8],
+    pins: [OutputConnection<'d>; 8],
 }
 
 impl<'d> TxEightBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxSEightBits` instance with the provided output pins.
     pub fn new(
-        pin_0: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_1: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_2: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_3: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_4: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_5: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_6: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_7: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_0: impl PeripheralOutput<'d>,
+        pin_1: impl PeripheralOutput<'d>,
+        pin_2: impl PeripheralOutput<'d>,
+        pin_3: impl PeripheralOutput<'d>,
+        pin_4: impl PeripheralOutput<'d>,
+        pin_5: impl PeripheralOutput<'d>,
+        pin_6: impl PeripheralOutput<'d>,
+        pin_7: impl PeripheralOutput<'d>,
     ) -> Self {
-        crate::into_mapped_ref!(pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7);
-
         Self {
-            pins: [pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7],
+            pins: [
+                pin_0.into(),
+                pin_1.into(),
+                pin_2.into(),
+                pin_3.into(),
+                pin_4.into(),
+                pin_5.into(),
+                pin_6.into(),
+                pin_7.into(),
+            ],
         }
     }
 }
@@ -250,13 +266,12 @@ impl<'d> I2sParallel<'d, Blocking> {
         channel: impl Peripheral<P = CH> + 'd,
         frequency: Rate,
         mut pins: impl TxPins<'d>,
-        clock_pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        clock_pin: impl PeripheralOutput<'d>,
     ) -> Self
     where
         CH: DmaChannelFor<AnyI2s>,
     {
         crate::into_mapped_ref!(i2s);
-        crate::into_mapped_ref!(clock_pin);
 
         let channel = Channel::new(channel.map(|ch| ch.degrade()));
         channel.runtime_ensure_compatible(&i2s);
@@ -266,8 +281,9 @@ impl<'d> I2sParallel<'d, Blocking> {
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
+        let clock_pin = clock_pin.into();
         clock_pin.set_to_push_pull_output();
-        i2s.ws_signal().connect_to(clock_pin);
+        i2s.ws_signal().connect_to(&clock_pin);
 
         pins.configure(i2s.reborrow());
         Self {

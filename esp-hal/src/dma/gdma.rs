@@ -29,7 +29,7 @@ use crate::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyGdmaChannel(u8);
 
-impl Peripheral for AnyGdmaChannel {
+unsafe impl Peripheral for AnyGdmaChannel {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -52,7 +52,7 @@ impl DmaChannel for AnyGdmaChannel {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyGdmaRxChannel(u8);
 
-impl Peripheral for AnyGdmaRxChannel {
+unsafe impl Peripheral for AnyGdmaRxChannel {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -71,7 +71,7 @@ impl DmaChannelConvert<AnyGdmaRxChannel> for AnyGdmaRxChannel {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyGdmaTxChannel(u8);
 
-impl Peripheral for AnyGdmaTxChannel {
+unsafe impl Peripheral for AnyGdmaTxChannel {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -602,7 +602,7 @@ macro_rules! impl_channel {
 
             impl $crate::private::Sealed for [<DmaChannel $num>] {}
 
-            impl Peripheral for [<DmaChannel $num>] {
+            unsafe impl Peripheral for [<DmaChannel $num>] {
                 type P = Self;
 
                 unsafe fn clone_unchecked(&self) -> Self::P {

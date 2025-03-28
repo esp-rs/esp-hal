@@ -24,7 +24,7 @@ use hil_test as _;
 struct Context {
     spi: SpiDma<'static, Blocking>,
     pcnt_unit: Unit<'static, 0>,
-    pcnt_source: InputSignal,
+    pcnt_source: InputSignal<'static>,
 }
 
 fn perform_spi_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {

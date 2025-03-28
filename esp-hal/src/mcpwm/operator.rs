@@ -16,7 +16,6 @@ use crate::{
     gpio::interconnect::{OutputConnection, PeripheralOutput},
     mcpwm::{timer::Timer, PwmPeripheral},
     pac,
-    peripheral::{Peripheral, PeripheralRef},
 };
 
 /// Input/Output Stream descriptor for each channel
@@ -212,7 +211,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     /// Use the A output with the given pin and configuration
     pub fn with_pin_a(
         self,
-        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin: impl PeripheralOutput<'d>,
         config: PwmPinConfig<true>,
     ) -> PwmPin<'d, PWM, OP, true> {
         PwmPin::new(pin, config)
@@ -221,7 +220,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     /// Use the B output with the given pin and configuration
     pub fn with_pin_b(
         self,
-        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin: impl PeripheralOutput<'d>,
         config: PwmPinConfig<false>,
     ) -> PwmPin<'d, PWM, OP, false> {
         PwmPin::new(pin, config)
@@ -230,9 +229,9 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     /// Use both the A and the B output with the given pins and configurations
     pub fn with_pins(
         self,
-        pin_a: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_a: impl PeripheralOutput<'d>,
         config_a: PwmPinConfig<true>,
-        pin_b: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_b: impl PeripheralOutput<'d>,
         config_b: PwmPinConfig<false>,
     ) -> (PwmPin<'d, PWM, OP, true>, PwmPin<'d, PWM, OP, false>) {
         (PwmPin::new(pin_a, config_a), PwmPin::new(pin_b, config_b))
@@ -244,9 +243,9 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     /// configured deadtime
     pub fn with_linked_pins(
         self,
-        pin_a: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_a: impl PeripheralOutput<'d>,
         config_a: PwmPinConfig<true>,
-        pin_b: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_b: impl PeripheralOutput<'d>,
         config_b: PwmPinConfig<false>,
         config_dt: DeadTimeCfg,
     ) -> LinkedPins<'d, PWM, OP> {
@@ -287,17 +286,14 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
 
 /// A pin driven by an MCPWM operator
 pub struct PwmPin<'d, PWM, const OP: u8, const IS_A: bool> {
-    pin: PeripheralRef<'d, OutputConnection>,
+    pin: OutputConnection<'d>,
     phantom: PhantomData<PWM>,
     _guard: PeripheralGuard,
 }
 
 impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP, IS_A> {
-    fn new(
-        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        config: PwmPinConfig<IS_A>,
-    ) -> Self {
-        crate::into_mapped_ref!(pin);
+    fn new(pin: impl PeripheralOutput<'d>, config: PwmPinConfig<IS_A>) -> Self {
+        let pin = pin.into();
 
         let guard = PeripheralGuard::new(PWM::peripheral());
 
@@ -309,7 +305,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin.set_actions(config.actions);
         pin.set_update_method(config.update_method);
 
-        PWM::output_signal::<OP, IS_A>().connect_to(&mut pin.pin);
+        PWM::output_signal::<OP, IS_A>().connect_to(&pin.pin);
         pin.pin.enable_output(true);
 
         pin
@@ -497,9 +493,9 @@ pub struct LinkedPins<'d, PWM, const OP: u8> {
 
 impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
     fn new(
-        pin_a: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_a: impl PeripheralOutput<'d>,
         config_a: PwmPinConfig<true>,
-        pin_b: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_b: impl PeripheralOutput<'d>,
         config_b: PwmPinConfig<false>,
         config_dt: DeadTimeCfg,
     ) -> Self {

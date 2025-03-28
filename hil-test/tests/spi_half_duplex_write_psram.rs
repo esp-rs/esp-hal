@@ -43,7 +43,7 @@ macro_rules! dma_alloc_buffer {
 struct Context {
     spi: SpiDma<'static, Blocking>,
     pcnt_unit: Unit<'static, 0>,
-    pcnt_source: InputSignal,
+    pcnt_source: InputSignal<'static>,
 }
 
 #[cfg(test)]
