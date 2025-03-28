@@ -209,6 +209,7 @@ pub unsafe trait Peripheral: Sized {
     }
 }
 
+impl<T: Peripheral> crate::private::Sealed for &mut T {}
 unsafe impl<T: Peripheral> Peripheral for &mut T {
     type P = <T as Peripheral>::P;
 
