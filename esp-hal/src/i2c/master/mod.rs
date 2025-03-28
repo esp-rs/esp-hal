@@ -917,7 +917,7 @@ where
     /// Connect a pin to the I2C SDA signal.
     ///
     /// This will replace previous pin assignments for this signal.
-    pub fn with_sda(mut self, sda: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    pub fn with_sda(mut self, sda: impl PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
@@ -929,7 +929,7 @@ where
     /// Connect a pin to the I2C SCL signal.
     ///
     /// This will replace previous pin assignments for this signal.
-    pub fn with_scl(mut self, scl: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
+    pub fn with_scl(mut self, scl: impl PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
@@ -939,12 +939,12 @@ where
     }
 
     fn connect_pin(
-        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin: impl PeripheralOutput<'d>,
         input: InputSignal,
         output: OutputSignal,
         guard: &mut PinGuard,
     ) {
-        crate::into_mapped_ref!(pin);
+        let pin = pin.into();
         // avoid the pin going low during configuration
         pin.set_output_high(true);
 
@@ -952,7 +952,7 @@ where
         pin.enable_input(true);
         pin.pull_direction(Pull::Up);
 
-        input.connect_to(pin.reborrow());
+        input.connect_to(&pin);
 
         *guard = OutputConnection::connect_with_guard(pin, output);
     }

@@ -59,7 +59,7 @@ macro_rules! impl_pdma_channel {
 
             impl $crate::private::Sealed for [<$instance DmaChannel>] {}
 
-            impl Peripheral for [<$instance DmaChannel>] {
+            unsafe impl Peripheral for [<$instance DmaChannel>] {
                 type P = Self;
 
                 unsafe fn clone_unchecked(&self) -> Self::P {

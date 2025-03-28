@@ -36,10 +36,10 @@ use hil_test as _;
 struct Context {
     parl_io: PARL_IO,
     dma_channel: DmaChannel0,
-    clock: OutputSignal,
-    valid: OutputSignal,
-    clock_loopback: InputSignal,
-    valid_loopback: InputSignal,
+    clock: OutputSignal<'static>,
+    valid: OutputSignal<'static>,
+    clock_loopback: InputSignal<'static>,
+    valid_loopback: InputSignal<'static>,
     pcnt_unit: Unit<'static, 0>,
 }
 
