@@ -1,10 +1,7 @@
 use core::marker::PhantomData;
 
 use super::{AdcConfig, Attenuation};
-use crate::{
-    peripheral::PeripheralRef,
-    peripherals::{ADC1, ADC2, RTC_IO, SENS},
-};
+use crate::peripherals::{ADC1, ADC2, RTC_IO, SENS};
 
 pub(super) const NUM_ATTENS: usize = 10;
 
@@ -49,7 +46,7 @@ pub trait RegisterAccess {
     fn read_data_sar() -> u16;
 }
 
-impl RegisterAccess for ADC1 {
+impl RegisterAccess for ADC1<'_> {
     fn set_bit_width(resolution: u8) {
         SENS::regs()
             .sar_start_force()
@@ -124,7 +121,7 @@ impl RegisterAccess for ADC1 {
     }
 }
 
-impl RegisterAccess for ADC2 {
+impl RegisterAccess for ADC2<'_> {
     fn set_bit_width(resolution: u8) {
         SENS::regs()
             .sar_start_force()
@@ -201,22 +198,19 @@ impl RegisterAccess for ADC2 {
 
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
-    _adc: PeripheralRef<'d, ADC>,
+    _adc: ADC,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
-    _phantom: PhantomData<Dm>,
+    _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI, crate::Blocking>
 where
-    ADCI: RegisterAccess,
+    ADCI: RegisterAccess + 'd,
 {
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
-    pub fn new(
-        adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
-        config: AdcConfig<ADCI>,
-    ) -> Self {
+    pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
         let sensors = SENS::regs();
 
         // Set reading and sampling resolution
@@ -280,7 +274,7 @@ where
             .modify(|_, w| w.sar2_data_inv().set_bit());
 
         Adc {
-            _adc: adc_instance.into_ref(),
+            _adc: adc_instance,
             attenuations: config.attenuations,
             active_channel: None,
             _phantom: PhantomData,

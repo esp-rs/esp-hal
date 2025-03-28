@@ -24,9 +24,9 @@ use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(pdma)] {
-        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
+        type DmaChannel0<'d> = esp_hal::dma::Spi2DmaChannel<'d>;
     } else {
-        use esp_hal::dma::DmaChannel0;
+        type DmaChannel0<'d> = esp_hal::dma::DmaChannel0<'d>;
     }
 }
 
@@ -43,8 +43,8 @@ type SpiUnderTest = SpiDma<'static, Blocking>;
 struct Context {
     spi: Spi<'static, Blocking>,
     #[cfg(pcnt)]
-    pcnt: esp_hal::peripherals::PCNT,
-    dma_channel: DmaChannel0,
+    pcnt: esp_hal::peripherals::PCNT<'static>,
+    dma_channel: DmaChannel0<'static>,
     gpios: [AnyPin<'static>; 3],
 }
 

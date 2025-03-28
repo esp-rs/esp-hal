@@ -6,7 +6,6 @@ use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuati
 #[cfg(esp32s3)]
 use crate::efuse::Efuse;
 use crate::{
-    peripheral::PeripheralRef,
     peripherals::{APB_SARADC, SENS},
     soc::regi2c,
     system::{GenericPeripheralGuard, Peripheral},
@@ -113,7 +112,7 @@ pub trait RegisterAccess {
     fn reset();
 }
 
-impl RegisterAccess for crate::peripherals::ADC1 {
+impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn set_attenuation(channel: usize, attenuation: u8) {
         SENS::regs().sar_atten1().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
@@ -195,7 +194,7 @@ impl RegisterAccess for crate::peripherals::ADC1 {
 }
 
 #[cfg(esp32s3)]
-impl super::CalibrationAccess for crate::peripherals::ADC1 {
+impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -212,7 +211,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
     }
 }
 
-impl RegisterAccess for crate::peripherals::ADC2 {
+impl RegisterAccess for crate::peripherals::ADC2<'_> {
     fn set_attenuation(channel: usize, attenuation: u8) {
         SENS::regs().sar_atten2().modify(|r, w| {
             let new_value = (r.bits() & !(0b11 << (channel * 2)))
@@ -298,7 +297,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
 }
 
 #[cfg(esp32s3)]
-impl super::CalibrationAccess for crate::peripherals::ADC2 {
+impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -317,23 +316,20 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
 
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
-    _adc: PeripheralRef<'d, ADC>,
+    _adc: ADC,
     active_channel: Option<u8>,
     last_init_code: u16,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
-    _phantom: PhantomData<Dm>,
+    _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI, crate::Blocking>
 where
-    ADCI: RegisterAccess,
+    ADCI: RegisterAccess + 'd,
 {
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
-    pub fn new(
-        adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
-        config: AdcConfig<ADCI>,
-    ) -> Self {
+    pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
         let guard = GenericPeripheralGuard::new();
         let sensors = SENS::regs();
 
@@ -400,7 +396,7 @@ where
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
 
         Adc {
-            _adc: adc_instance.into_ref(),
+            _adc: adc_instance,
             active_channel: None,
             last_init_code: 0,
             _guard: guard,
@@ -494,7 +490,7 @@ where
 }
 
 #[cfg(esp32s3)]
-impl super::AdcCalEfuse for crate::peripherals::ADC1 {
+impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(1, atten)
     }
@@ -509,7 +505,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1 {
 }
 
 #[cfg(esp32s3)]
-impl super::AdcCalEfuse for crate::peripherals::ADC2 {
+impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(2, atten)
     }

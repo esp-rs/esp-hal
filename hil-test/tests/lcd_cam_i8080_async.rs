@@ -23,7 +23,7 @@ const DATA_SIZE: usize = 1024 * 10;
 
 struct Context<'d> {
     lcd_cam: LcdCam<'d, Async>,
-    dma: DmaChannel0,
+    dma: DmaChannel0<'d>,
     dma_buf: DmaTxBuf,
 }
 

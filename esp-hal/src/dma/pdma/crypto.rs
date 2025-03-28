@@ -4,7 +4,6 @@ use crate::{
     asynch::AtomicWaker,
     dma::*,
     interrupt::Priority,
-    peripheral::Peripheral,
     peripherals::{Interrupt, CRYPTO_DMA},
 };
 
@@ -13,46 +12,32 @@ pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;
 /// The RX half of a Crypto DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CryptoDmaRxChannel(pub(crate) CryptoDmaChannel);
+pub struct CryptoDmaRxChannel<'d>(pub(crate) CryptoDmaChannel<'d>);
 
-impl CryptoDmaRxChannel {
+impl CryptoDmaRxChannel<'_> {
     fn regs(&self) -> &CryptoRegisterBlock {
         self.0.register_block()
     }
 }
 
-impl crate::private::Sealed for CryptoDmaRxChannel {}
-impl DmaRxChannel for CryptoDmaRxChannel {}
-unsafe impl Peripheral for CryptoDmaRxChannel {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self(self.0.clone_unchecked())
-    }
-}
+impl crate::private::Sealed for CryptoDmaRxChannel<'_> {}
+impl DmaRxChannel for CryptoDmaRxChannel<'_> {}
 
 /// The TX half of a Crypto DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CryptoDmaTxChannel(pub(crate) CryptoDmaChannel);
+pub struct CryptoDmaTxChannel<'d>(pub(crate) CryptoDmaChannel<'d>);
 
-impl CryptoDmaTxChannel {
+impl CryptoDmaTxChannel<'_> {
     fn regs(&self) -> &CryptoRegisterBlock {
         self.0.register_block()
     }
 }
 
-impl crate::private::Sealed for CryptoDmaTxChannel {}
-impl DmaTxChannel for CryptoDmaTxChannel {}
-unsafe impl Peripheral for CryptoDmaTxChannel {
-    type P = Self;
+impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
+impl DmaTxChannel for CryptoDmaTxChannel<'_> {}
 
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self(self.0.clone_unchecked())
-    }
-}
-
-impl RegisterAccess for CryptoDmaTxChannel {
+impl RegisterAccess for CryptoDmaTxChannel<'_> {
     fn reset(&self) {
         self.regs().conf().modify(|_, w| {
             w.out_rst().set_bit();
@@ -137,7 +122,7 @@ impl RegisterAccess for CryptoDmaTxChannel {
     }
 }
 
-impl TxRegisterAccess for CryptoDmaTxChannel {
+impl TxRegisterAccess for CryptoDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
         self.regs().state1().read().outfifo_cnt_debug().bits() == 0
     }
@@ -165,7 +150,7 @@ impl TxRegisterAccess for CryptoDmaTxChannel {
     }
 }
 
-impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel {
+impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -247,7 +232,7 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel {
     }
 }
 
-impl RegisterAccess for CryptoDmaRxChannel {
+impl RegisterAccess for CryptoDmaRxChannel<'_> {
     fn reset(&self) {
         self.regs().conf().modify(|_, w| {
             w.in_rst().set_bit();
@@ -328,7 +313,7 @@ impl RegisterAccess for CryptoDmaRxChannel {
     }
 }
 
-impl RxRegisterAccess for CryptoDmaRxChannel {
+impl RxRegisterAccess for CryptoDmaRxChannel<'_> {
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         // We don't know if the channel is used by AES or SHA, so interrupt handler
         // setup is the responsibility of the peripheral driver.
@@ -340,7 +325,7 @@ impl RxRegisterAccess for CryptoDmaRxChannel {
     }
 }
 
-impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel {
+impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -434,42 +419,43 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel {
 #[non_exhaustive]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CryptoDmaChannel {}
-
-impl crate::private::Sealed for CryptoDmaChannel {}
-
-unsafe impl Peripheral for CryptoDmaChannel {
-    type P = Self;
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self::steal()
-    }
+pub struct CryptoDmaChannel<'d> {
+    _lifetime: core::marker::PhantomData<&'d mut ()>,
 }
-impl CryptoDmaChannel {
+
+impl crate::private::Sealed for CryptoDmaChannel<'_> {}
+
+impl CryptoDmaChannel<'_> {
     #[doc = r" Unsafely constructs a new DMA channel."]
     #[doc = r""]
     #[doc = r" # Safety"]
     #[doc = r""]
     #[doc = r" The caller must ensure that only a single instance is used."]
     pub unsafe fn steal() -> Self {
-        Self {}
+        Self {
+            _lifetime: core::marker::PhantomData,
+        }
     }
 }
-impl DmaChannel for CryptoDmaChannel {
-    type Rx = CryptoDmaRxChannel;
-    type Tx = CryptoDmaTxChannel;
+impl<'d> DmaChannel for CryptoDmaChannel<'d> {
+    type Rx = CryptoDmaRxChannel<'d>;
+    type Tx = CryptoDmaTxChannel<'d>;
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
-        (CryptoDmaRxChannel(Self {}), CryptoDmaTxChannel(Self {}))
+        (
+            CryptoDmaRxChannel(unsafe { Self::steal() }),
+            CryptoDmaTxChannel(unsafe { Self::steal() }),
+        )
     }
 }
-impl DmaChannelExt for CryptoDmaChannel {
+impl DmaChannelExt for CryptoDmaChannel<'_> {
     fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-        CryptoDmaRxChannel(Self {})
+        CryptoDmaRxChannel(unsafe { Self::steal() })
     }
     fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-        CryptoDmaTxChannel(Self {})
+        CryptoDmaTxChannel(unsafe { Self::steal() })
     }
 }
-impl PdmaChannel for CryptoDmaChannel {
+impl PdmaChannel for CryptoDmaChannel<'_> {
     type RegisterBlock = CryptoRegisterBlock;
     fn register_block(&self) -> &Self::RegisterBlock {
         CRYPTO_DMA::regs()
@@ -491,8 +477,8 @@ impl PdmaChannel for CryptoDmaChannel {
     }
     fn async_handler(&self) -> InterruptHandler {
         pub(crate) extern "C" fn __esp_hal_internal_interrupt_handler() {
-            super::asynch::handle_in_interrupt::<CryptoDmaChannel>();
-            super::asynch::handle_out_interrupt::<CryptoDmaChannel>();
+            super::asynch::handle_in_interrupt::<CryptoDmaChannel<'static>>();
+            super::asynch::handle_out_interrupt::<CryptoDmaChannel<'static>>();
         }
         #[allow(non_upper_case_globals)]
         pub(crate) static interrupt_handler: crate::interrupt::InterruptHandler =
@@ -511,13 +497,13 @@ impl PdmaChannel for CryptoDmaChannel {
         &FLAG
     }
 }
-impl DmaChannelConvert<CryptoDmaRxChannel> for CryptoDmaChannel {
-    fn degrade(self) -> CryptoDmaRxChannel {
+impl<'d> DmaChannelConvert<CryptoDmaRxChannel<'d>> for CryptoDmaChannel<'d> {
+    fn degrade(self) -> CryptoDmaRxChannel<'d> {
         CryptoDmaRxChannel(self)
     }
 }
-impl DmaChannelConvert<CryptoDmaTxChannel> for CryptoDmaChannel {
-    fn degrade(self) -> CryptoDmaTxChannel {
+impl<'d> DmaChannelConvert<CryptoDmaTxChannel<'d>> for CryptoDmaChannel<'d> {
+    fn degrade(self) -> CryptoDmaTxChannel<'d> {
         CryptoDmaTxChannel(self)
     }
 }

@@ -235,7 +235,6 @@ use crate::{
         Level,
     },
     handler,
-    peripheral::Peripheral,
     peripherals::{Interrupt, RMT},
     soc::constants,
     system::{self, GenericPeripheralGuard},
@@ -391,10 +390,7 @@ impl<'d, Dm> Rmt<'d, Dm>
 where
     Dm: crate::DriverMode,
 {
-    pub(crate) fn new_internal(
-        peripheral: impl Peripheral<P = RMT> + 'd,
-        frequency: Rate,
-    ) -> Result<Self, Error> {
+    pub(crate) fn new_internal(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
         me.configure_clock(frequency)?;
         Ok(me)
@@ -433,7 +429,7 @@ where
 
 impl<'d> Rmt<'d, Blocking> {
     /// Create a new RMT instance
-    pub fn new(peripheral: impl Peripheral<P = RMT> + 'd, frequency: Rate) -> Result<Self, Error> {
+    pub fn new(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
         Self::new_internal(peripheral, frequency)
     }
 
@@ -745,17 +741,14 @@ macro_rules! impl_rx_channel_creator {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use crate::{
-        peripheral::{Peripheral, PeripheralRef},
-        system::GenericPeripheralGuard,
-    };
+    use crate::system::GenericPeripheralGuard;
 
     /// RMT Instance
     pub struct Rmt<'d, Dm>
     where
         Dm: crate::DriverMode,
     {
-        pub(super) peripheral: PeripheralRef<'d, crate::peripherals::RMT>,
+        pub(super) peripheral: crate::peripherals::RMT<'d>,
         /// RMT Channel 0.
         pub channel0: ChannelCreator<Dm, 0>,
         /// RMT Channel 1.
@@ -771,11 +764,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) fn create(
-            peripheral: impl Peripheral<P = crate::peripherals::RMT> + 'd,
-        ) -> Self {
-            crate::into_ref!(peripheral);
-
+        pub(super) fn create(peripheral: crate::peripherals::RMT<'d>) -> Self {
             Self {
                 peripheral,
                 channel0: ChannelCreator {
@@ -825,18 +814,14 @@ mod impl_for_chip {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use crate::{
-        peripheral::{Peripheral, PeripheralRef},
-        peripherals::RMT,
-        system::GenericPeripheralGuard,
-    };
+    use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
     pub struct Rmt<'d, Dm>
     where
         Dm: crate::DriverMode,
     {
-        pub(super) peripheral: PeripheralRef<'d, RMT>,
+        pub(super) peripheral: RMT<'d>,
         /// RMT Channel 0.
         pub channel0: ChannelCreator<Dm, 0>,
         /// RMT Channel 1.
@@ -860,8 +845,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) fn create(peripheral: impl Peripheral<P = RMT> + 'd) -> Self {
-            crate::into_ref!(peripheral);
+        pub(super) fn create(peripheral: RMT<'d>) -> Self {
             Self {
                 peripheral,
                 channel0: ChannelCreator {
@@ -951,18 +935,14 @@ mod impl_for_chip {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use crate::{
-        peripheral::{Peripheral, PeripheralRef},
-        peripherals::RMT,
-        system::GenericPeripheralGuard,
-    };
+    use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
     pub struct Rmt<'d, Dm>
     where
         Dm: crate::DriverMode,
     {
-        pub(super) peripheral: PeripheralRef<'d, RMT>,
+        pub(super) peripheral: RMT<'d>,
         /// RMT Channel 0.
         pub channel0: ChannelCreator<Dm, 0>,
         /// RMT Channel 1.
@@ -978,9 +958,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) fn create(peripheral: impl Peripheral<P = RMT> + 'd) -> Self {
-            crate::into_ref!(peripheral);
-
+        pub(super) fn create(peripheral: RMT<'d>) -> Self {
             Self {
                 peripheral,
                 channel0: ChannelCreator {
@@ -1038,18 +1016,14 @@ mod impl_for_chip {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use crate::{
-        peripheral::{Peripheral, PeripheralRef},
-        peripherals::RMT,
-        system::GenericPeripheralGuard,
-    };
+    use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
     pub struct Rmt<'d, Dm>
     where
         Dm: crate::DriverMode,
     {
-        pub(super) peripheral: PeripheralRef<'d, RMT>,
+        pub(super) peripheral: RMT<'d>,
         /// RMT Channel 0.
         pub channel0: ChannelCreator<Dm, 0>,
         /// RMT Channel 1.
@@ -1073,9 +1047,7 @@ mod impl_for_chip {
     where
         Dm: crate::DriverMode,
     {
-        pub(super) fn create(peripheral: impl Peripheral<P = RMT> + 'd) -> Self {
-            crate::into_ref!(peripheral);
-
+        pub(super) fn create(peripheral: RMT<'d>) -> Self {
             Self {
                 peripheral,
                 channel0: ChannelCreator {

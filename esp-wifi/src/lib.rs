@@ -106,12 +106,7 @@ use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-use esp_hal::{
-    self as hal,
-    clock::RadioClockController,
-    peripheral::Peripheral,
-    peripherals::RADIO_CLK,
-};
+use esp_hal::{self as hal, clock::RadioClockController, peripherals::RADIO_CLK};
 use hal::{
     clock::Clocks,
     rng::{Rng, Trng},
@@ -308,15 +303,15 @@ pub trait EspWifiTimerSource: private::Sealed {
 ///
 /// We can't blanket-implement for `Into<AnyTimer>` because of possible
 /// conflicting implementations.
-trait IntoAnyTimer: Into<AnyTimer> {}
+trait IntoAnyTimer: Into<AnyTimer<'static>> {}
 
-impl IntoAnyTimer for TimgTimer where Self: Into<AnyTimer> {}
+impl IntoAnyTimer for TimgTimer<'static> where Self: Into<AnyTimer<'static>> {}
 
 #[cfg(not(feature = "esp32"))]
-impl IntoAnyTimer for Alarm where Self: Into<AnyTimer> {}
+impl IntoAnyTimer for Alarm<'static> where Self: Into<AnyTimer<'static>> {}
 
-impl private::Sealed for AnyTimer {}
-impl IntoAnyTimer for AnyTimer {}
+impl private::Sealed for AnyTimer<'static> {}
+impl IntoAnyTimer for AnyTimer<'static> {}
 
 impl<T> EspWifiTimerSource for T
 where
@@ -334,9 +329,9 @@ impl EspWifiTimerSource for TimeBase {
 }
 
 impl private::Sealed for TimeBase {}
-impl private::Sealed for TimgTimer where Self: Into<AnyTimer> {}
+impl private::Sealed for TimgTimer<'static> where Self: Into<AnyTimer<'static>> {}
 #[cfg(not(feature = "esp32"))]
-impl private::Sealed for Alarm where Self: Into<AnyTimer> {}
+impl private::Sealed for Alarm<'static> where Self: Into<AnyTimer<'static>> {}
 
 /// A marker trait for suitable Rng sources for esp-wifi
 pub trait EspWifiRngSource: rand_core::RngCore + private::Sealed {}
@@ -373,10 +368,10 @@ impl private::Sealed for Trng<'_> {}
 /// .unwrap();
 /// # }
 /// ```
-pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
-    timer: impl Peripheral<P = T> + 'd,
-    _rng: impl Peripheral<P = R> + 'd,
-    _radio_clocks: impl Peripheral<P = RADIO_CLK> + 'd,
+pub fn init<'d>(
+    timer: impl EspWifiTimerSource + 'd,
+    _rng: impl EspWifiRngSource + 'd,
+    _radio_clocks: RADIO_CLK<'d>,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
     const MIN_CLOCK: Rate = Rate::from_mhz(80);
@@ -393,7 +388,10 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
 
     // Enable timer tick interrupt
     #[cfg(feature = "builtin-scheduler")]
-    preempt_builtin::setup_timer(unsafe { timer.clone_unchecked() }.timer());
+    preempt_builtin::setup_timer(timer.timer());
+
+    #[cfg(not(feature = "builtin-scheduler"))]
+    let _ = timer; // mark used to suppress warning
 
     // This initializes the task switcher
     preempt::enable();
@@ -411,9 +409,6 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     }
 
     crate::flags::ESP_WIFI_INITIALIZED.store(true, Ordering::Release);
-
-    #[cfg(not(feature = "builtin-scheduler"))]
-    let _ = timer; // mark used to suppress warning
 
     Ok(EspWifiController {
         _inner: PhantomData,

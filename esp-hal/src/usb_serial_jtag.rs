@@ -130,7 +130,6 @@ use procmacros::handler;
 use crate::{
     asynch::AtomicWaker,
     pac::usb_device::RegisterBlock,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, USB_DEVICE},
     system::{Cpu, PeripheralClockControl},
     Async,
@@ -149,13 +148,13 @@ pub struct UsbSerialJtag<'d, Dm: DriverMode> {
 
 /// USB Serial/JTAG (Transmit)
 pub struct UsbSerialJtagTx<'d, Dm: DriverMode> {
-    peripheral: PeripheralRef<'d, USB_DEVICE>,
+    peripheral: USB_DEVICE<'d>,
     phantom: PhantomData<Dm>,
 }
 
 /// USB Serial/JTAG (Receive)
 pub struct UsbSerialJtagRx<'d, Dm: DriverMode> {
-    peripheral: PeripheralRef<'d, USB_DEVICE>,
+    peripheral: USB_DEVICE<'d>,
     phantom: PhantomData<Dm>,
 }
 
@@ -163,8 +162,7 @@ impl<'d, Dm> UsbSerialJtagTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    fn new_inner(peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
-        crate::into_ref!(peripheral);
+    fn new_inner(peripheral: USB_DEVICE<'d>) -> Self {
         Self {
             peripheral,
             phantom: PhantomData,
@@ -242,8 +240,7 @@ impl<'d, Dm> UsbSerialJtagRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    fn new_inner(peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
-        crate::into_ref!(peripheral);
+    fn new_inner(peripheral: USB_DEVICE<'d>) -> Self {
         Self {
             peripheral,
             phantom: PhantomData,
@@ -320,7 +317,7 @@ where
 
 impl<'d> UsbSerialJtag<'d, Blocking> {
     /// Create a new USB serial/JTAG instance with defaults
-    pub fn new(usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
+    pub fn new(usb_device: USB_DEVICE<'d>) -> Self {
         Self::new_inner(usb_device)
     }
 
@@ -355,12 +352,10 @@ impl<'d, Dm> UsbSerialJtag<'d, Dm>
 where
     Dm: DriverMode,
 {
-    fn new_inner(usb_device: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
+    fn new_inner(usb_device: USB_DEVICE<'d>) -> Self {
         // Do NOT reset the peripheral. Doing so will result in a broken USB JTAG
         // connection.
         PeripheralClockControl::enable(crate::system::Peripheral::UsbDevice);
-
-        crate::into_ref!(usb_device);
 
         usb_device.disable_tx_interrupts();
         usb_device.disable_rx_interrupts();
@@ -379,8 +374,6 @@ where
                 });
             }
         }
-
-        crate::into_ref!(usb_device);
 
         Self {
             rx: UsbSerialJtagRx::new_inner(unsafe { usb_device.clone_unchecked() }),
@@ -486,7 +479,7 @@ pub trait Instance: crate::private::Sealed {
     }
 }
 
-impl Instance for USB_DEVICE {
+impl Instance for USB_DEVICE<'_> {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         USB_DEVICE::regs()
@@ -637,12 +630,11 @@ static WAKER_RX: AtomicWaker = AtomicWaker::new();
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagWriteFuture<'d> {
-    peripheral: PeripheralRef<'d, USB_DEVICE>,
+    peripheral: USB_DEVICE<'d>,
 }
 
 impl<'d> UsbSerialJtagWriteFuture<'d> {
-    fn new(peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
-        crate::into_ref!(peripheral);
+    fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
         // interrupt
         peripheral
@@ -681,12 +673,11 @@ impl core::future::Future for UsbSerialJtagWriteFuture<'_> {
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagReadFuture<'d> {
-    peripheral: PeripheralRef<'d, USB_DEVICE>,
+    peripheral: USB_DEVICE<'d>,
 }
 
 impl<'d> UsbSerialJtagReadFuture<'d> {
-    fn new(peripheral: impl Peripheral<P = USB_DEVICE> + 'd) -> Self {
-        crate::into_ref!(peripheral);
+    fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_OUT_RECV_PKT
         // interrupt
         peripheral

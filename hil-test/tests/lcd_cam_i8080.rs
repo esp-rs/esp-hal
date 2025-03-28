@@ -39,7 +39,7 @@ struct Context<'d> {
     lcd_cam: LcdCam<'d, Blocking>,
     pcnt: Pcnt<'d>,
     pins: Pins,
-    dma: DmaChannel0,
+    dma: DmaChannel0<'d>,
     dma_buf: DmaTxBuf,
 }
 

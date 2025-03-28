@@ -38,42 +38,38 @@
 //! # }
 //! ```
 
-use crate::{
-    gpio::{self, AnalogPin},
-    peripheral::{Peripheral, PeripheralRef},
-};
+use crate::gpio::{self, AnalogPin};
 
 // Only specific pins can be used with each DAC peripheral, and of course
 // these pins are different depending on which chip you are using; for this
 // reason, we will type alias the pins for ease of use later in this module:
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        type Dac1Gpio = gpio::GpioPin<'static, 25>;
-        type Dac2Gpio = gpio::GpioPin<'static, 26>;
+        type Dac1Gpio<'d> = gpio::GpioPin<'d, 25>;
+        type Dac2Gpio<'d> = gpio::GpioPin<'d, 26>;
     } else if #[cfg(esp32s2)] {
-        type Dac1Gpio = gpio::GpioPin<'static, 17>;
-        type Dac2Gpio = gpio::GpioPin<'static, 18>;
+        type Dac1Gpio<'d> = gpio::GpioPin<'d, 17>;
+        type Dac2Gpio<'d> = gpio::GpioPin<'d, 18>;
     }
 }
 
 /// Digital-to-Analog Converter (DAC) Channel
 pub struct Dac<'d, T>
 where
-    T: Instance,
-    T::Pin: AnalogPin,
+    T: Instance + 'd,
+    T::Pin: AnalogPin + 'd,
 {
-    _inner: PeripheralRef<'d, T>,
+    _inner: T,
+    _lifetime: core::marker::PhantomData<&'d mut ()>,
 }
 
 impl<'d, T> Dac<'d, T>
 where
-    T: Instance,
-    T::Pin: AnalogPin,
+    T: Instance + 'd,
+    T::Pin: AnalogPin + 'd,
 {
     /// Construct a new instance of [`Dac`].
-    pub fn new(dac: impl Peripheral<P = T> + 'd, pin: T::Pin) -> Self {
-        crate::into_ref!(dac);
-
+    pub fn new(dac: T, pin: T::Pin) -> Self {
         // TODO: Revert on drop.
         pin.set_analog(crate::private::Internal);
 
@@ -84,7 +80,10 @@ where
 
         T::enable_xpd();
 
-        Self { _inner: dac }
+        Self {
+            _inner: dac,
+            _lifetime: core::marker::PhantomData,
+        }
     }
 
     /// Writes the given value.
@@ -122,14 +121,14 @@ pub trait Instance: crate::private::Sealed {
     }
 }
 
-impl Instance for crate::peripherals::DAC1 {
+impl<'d> Instance for crate::peripherals::DAC1<'d> {
     const INDEX: usize = 0;
 
-    type Pin = Dac1Gpio;
+    type Pin = Dac1Gpio<'d>;
 }
 
-impl Instance for crate::peripherals::DAC2 {
+impl<'d> Instance for crate::peripherals::DAC2<'d> {
     const INDEX: usize = 1;
 
-    type Pin = Dac2Gpio;
+    type Pin = Dac2Gpio<'d>;
 }

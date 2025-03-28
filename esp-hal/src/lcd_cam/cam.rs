@@ -71,7 +71,6 @@ use crate::{
     },
     lcd_cam::{calculate_clkm, BitOrder, ByteOrder, ClockError},
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
     time::Rate,
@@ -121,30 +120,29 @@ pub enum ConfigError {
 /// Represents the camera interface.
 pub struct Cam<'d> {
     /// The LCD_CAM peripheral reference for managing the camera functionality.
-    pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,
+    pub(crate) lcd_cam: LCD_CAM<'d>,
     pub(super) _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
-    lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    rx_channel: ChannelRx<'d, Blocking, PeripheralRxChannel<LCD_CAM>>,
+    lcd_cam: LCD_CAM<'d>,
+    rx_channel: ChannelRx<'d, Blocking, PeripheralRxChannel<LCD_CAM<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 
 impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
-    pub fn new<P, CH>(
+    pub fn new<P>(
         cam: Cam<'d>,
-        channel: impl Peripheral<P = CH> + 'd,
+        channel: impl RxChannelFor<LCD_CAM<'d>>,
         _pins: P,
         config: Config,
     ) -> Result<Self, ConfigError>
     where
-        CH: RxChannelFor<LCD_CAM>,
-        P: RxPins,
+        P: RxPins + 'd,
     {
-        let rx_channel = ChannelRx::new(channel.map(|ch| ch.degrade()));
+        let rx_channel = ChannelRx::new(channel.degrade());
 
         let mut this = Self {
             lcd_cam: cam.lcd_cam,

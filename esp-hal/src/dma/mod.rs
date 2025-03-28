@@ -62,7 +62,6 @@ pub use self::m2m::*;
 pub use self::pdma::*;
 use crate::{
     interrupt::InterruptHandler,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     soc::{is_slice_in_dram, is_valid_memory_address, is_valid_ram_address},
     system,
@@ -1570,8 +1569,8 @@ impl RxCircularState {
 #[doc(hidden)]
 macro_rules! impl_dma_eligible {
     ([$dma_ch:ident] $name:ident => $dma:ident) => {
-        impl $crate::dma::DmaEligible for $crate::peripherals::$name {
-            type Dma = $dma_ch;
+        impl<'d> $crate::dma::DmaEligible for $crate::peripherals::$name<'d> {
+            type Dma = $dma_ch<'d>;
 
             fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
                 $crate::dma::DmaPeripheral::$dma
@@ -1601,19 +1600,13 @@ pub type PeripheralRxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Rx;
 pub type PeripheralTxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Tx;
 
 #[doc(hidden)]
-pub trait DmaRxChannel:
-    RxRegisterAccess + InterruptAccess<DmaRxInterrupt> + Peripheral<P = Self>
-{
-}
+pub trait DmaRxChannel: RxRegisterAccess + InterruptAccess<DmaRxInterrupt> {}
 
 #[doc(hidden)]
-pub trait DmaTxChannel:
-    TxRegisterAccess + InterruptAccess<DmaTxInterrupt> + Peripheral<P = Self>
-{
-}
+pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {}
 
 /// A description of a DMA Channel.
-pub trait DmaChannel: Peripheral<P = Self> {
+pub trait DmaChannel: Sized {
     /// A description of the RX half of a DMA Channel.
     type Rx: DmaRxChannel;
 
@@ -1681,16 +1674,12 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// use esp_hal::spi::AnySpi;
 /// use esp_hal::spi::master::{Spi, SpiDma, Config, Instance as SpiInstance};
 /// use esp_hal::dma::DmaChannelFor;
-/// use esp_hal::peripheral::Peripheral;
 /// use esp_hal::Blocking;
 ///
-/// fn configures_spi_dma<'d, CH>(
+/// fn configures_spi_dma<'d>(
 ///     spi: Spi<'d, Blocking>,
-///     channel: impl Peripheral<P = CH> + 'd,
-/// ) -> SpiDma<'d, Blocking>
-/// where
-///     CH: DmaChannelFor<AnySpi> + 'd,
-///  {
+///     channel: impl DmaChannelFor<AnySpi<'d>>,
+/// ) -> SpiDma<'d, Blocking> {
 ///     spi.with_dma(channel)
 /// }
 #[cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
@@ -1823,20 +1812,18 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
-    pub(crate) rx_impl: PeripheralRef<'a, CH>,
-    pub(crate) _phantom: PhantomData<Dm>,
+    pub(crate) rx_impl: CH,
+    pub(crate) _phantom: PhantomData<(Dm, &'a mut ())>,
     pub(crate) _guard: PeripheralGuard,
 }
 
 impl<'a, CH> ChannelRx<'a, Blocking, CH>
 where
-    CH: DmaRxChannel,
+    CH: DmaRxChannel + 'a,
 {
     /// Creates a new RX channel half.
-    pub fn new(rx_impl: impl Peripheral<P = CH> + 'a) -> Self {
-        crate::into_ref!(rx_impl);
-
-        let _guard = create_guard(&*rx_impl);
+    pub fn new(rx_impl: CH) -> Self {
+        let _guard = create_guard(&rx_impl);
 
         #[cfg(gdma)]
         // clear the mem2mem mode to avoid failed DMA if this
@@ -2124,20 +2111,18 @@ where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
-    pub(crate) tx_impl: PeripheralRef<'a, CH>,
-    pub(crate) _phantom: PhantomData<Dm>,
+    pub(crate) tx_impl: CH,
+    pub(crate) _phantom: PhantomData<(Dm, &'a mut ())>,
     pub(crate) _guard: PeripheralGuard,
 }
 
 impl<'a, CH> ChannelTx<'a, Blocking, CH>
 where
-    CH: DmaTxChannel,
+    CH: DmaTxChannel + 'a,
 {
     /// Creates a new TX channel half.
-    pub fn new(tx_impl: impl Peripheral<P = CH> + 'a) -> Self {
-        crate::into_ref!(tx_impl);
-
-        let _guard = create_guard(&*tx_impl);
+    pub fn new(tx_impl: CH) -> Self {
+        let _guard = create_guard(&tx_impl);
 
         if let Some(interrupt) = tx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
@@ -2476,16 +2461,12 @@ where
 
 impl<'d, CH> Channel<'d, Blocking, CH>
 where
-    CH: DmaChannel,
+    CH: DmaChannel + 'd,
 {
     /// Creates a new DMA channel driver.
     #[instability::unstable]
-    pub fn new(channel: impl Peripheral<P = CH>) -> Self {
-        let (rx, tx) = unsafe {
-            channel
-                .clone_unchecked()
-                .split_internal(crate::private::Internal)
-        };
+    pub fn new(channel: CH) -> Self {
+        let (rx, tx) = unsafe { channel.split_internal(crate::private::Internal) };
         Self {
             rx: ChannelRx::new(rx),
             tx: ChannelTx::new(tx),
@@ -2572,13 +2553,13 @@ where
     }
 }
 
-impl<'d, CH: DmaChannel> From<Channel<'d, Blocking, CH>> for Channel<'d, Async, CH> {
+impl<'d, CH: DmaChannel + 'd> From<Channel<'d, Blocking, CH>> for Channel<'d, Async, CH> {
     fn from(channel: Channel<'d, Blocking, CH>) -> Self {
         channel.into_async()
     }
 }
 
-impl<'d, CH: DmaChannel> From<Channel<'d, Async, CH>> for Channel<'d, Blocking, CH> {
+impl<'d, CH: DmaChannel + 'd> From<Channel<'d, Async, CH>> for Channel<'d, Blocking, CH> {
     fn from(channel: Channel<'d, Async, CH>) -> Self {
         channel.into_blocking()
     }

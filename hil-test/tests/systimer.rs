@@ -31,8 +31,8 @@ static ALARM_PERIODIC: Mutex<RefCell<Option<PeriodicTimer<'static, Blocking>>>> 
     Mutex::new(RefCell::new(None));
 
 struct Context {
-    alarm0: Alarm,
-    alarm1: Alarm,
+    alarm0: Alarm<'static>,
+    alarm1: Alarm<'static>,
 }
 
 #[handler(priority = esp_hal::interrupt::Priority::min())]

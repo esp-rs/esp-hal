@@ -106,16 +106,6 @@
 //! any modifications to the environment, local or otherwise will only get
 //! picked up on a full clean build of the project.
 //!
-//! ## `Peripheral` Pattern
-//!
-//! Drivers take pins and peripherals as [peripheral::Peripheral] in most
-//! circumstances. This means you can pass the pin/peripheral or a mutable
-//! reference to the pin/peripheral.
-//!
-//! The latter can be used to regain access to the pin when the driver gets
-//! dropped. Then it's possible to reuse the pin/peripheral for a different
-//! purpose.
-//!
 //! ## Don't use `core::mem::forget`
 //!
 //! You should never use `core::mem::forget` on any type defined in the HAL.
@@ -534,7 +524,7 @@ pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 
     // RTC domain must be enabled before we try to disable
-    let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
+    let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
     // Handle watchdog configuration with defaults
     cfg_if::cfg_if! {
@@ -560,24 +550,24 @@ pub fn init(config: Config) -> Peripherals {
 
             match config.watchdog.timg0() {
                 WatchdogStatus::Enabled(duration) => {
-                    let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new();
+                    let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new();
                     timg0_wd.enable();
                     timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
                 }
                 WatchdogStatus::Disabled => {
-                    crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new().disable();
+                    crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
                 }
             }
 
             #[cfg(timg1)]
             match config.watchdog.timg1() {
                 WatchdogStatus::Enabled(duration) => {
-                    let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new();
+                    let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new();
                     timg1_wd.enable();
                     timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
                 }
                 WatchdogStatus::Disabled => {
-                    crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new().disable();
+                    crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
                 }
             }
         }
@@ -588,10 +578,10 @@ pub fn init(config: Config) -> Peripherals {
 
             rtc.rwdt.disable();
 
-            crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new().disable();
+            crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
 
             #[cfg(timg1)]
-            crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new().disable();
+            crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
         }
     }
 

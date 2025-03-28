@@ -153,7 +153,6 @@ impl<P: RtcIoWakeupPinType> Ext0WakeupSource<P> {
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPin};
-/// # use esp_hal::peripheral::Peripheral;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -210,7 +209,6 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPinWithResistors};
-/// # use esp_hal::peripheral::Peripheral;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -271,7 +269,6 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use esp_hal::gpio::{self, Input, InputConfig, Pull};
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
-/// # use esp_hal::peripheral::Peripheral;
 ///
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///

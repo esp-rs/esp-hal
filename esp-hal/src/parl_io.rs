@@ -150,7 +150,6 @@ use crate::{
     },
     interrupt::InterruptHandler,
     parl_io::asynch::interrupt_handler,
-    peripheral::Peripheral,
     peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
     time::Rate,
@@ -429,7 +428,7 @@ impl RxClkPin for RxClkInPin<'_> {
 /// Pin configuration with an additional pin for the valid signal.
 pub struct TxPinConfigWithValidPin<'d, P>
 where
-    P: NotContainsValidSignalPin + TxPins + ConfigurePins,
+    P: NotContainsValidSignalPin + TxPins + ConfigurePins + 'd,
 {
     tx_pins: P,
     valid_pin: OutputConnection<'d>,
@@ -437,7 +436,7 @@ where
 
 impl<'d, P> TxPinConfigWithValidPin<'d, P>
 where
-    P: NotContainsValidSignalPin + TxPins + ConfigurePins,
+    P: NotContainsValidSignalPin + TxPins + ConfigurePins + 'd,
 {
     /// Create a [TxPinConfigWithValidPin]
     pub fn new(tx_pins: P, valid_pin: impl PeripheralOutput<'d>) -> Self {
@@ -448,14 +447,14 @@ where
     }
 }
 
-impl<P> TxPins for TxPinConfigWithValidPin<'_, P> where
-    P: NotContainsValidSignalPin + TxPins + ConfigurePins
+impl<'d, P> TxPins for TxPinConfigWithValidPin<'d, P> where
+    P: NotContainsValidSignalPin + TxPins + ConfigurePins + 'd
 {
 }
 
-impl<P> ConfigurePins for TxPinConfigWithValidPin<'_, P>
+impl<'d, P> ConfigurePins for TxPinConfigWithValidPin<'d, P>
 where
-    P: NotContainsValidSignalPin + TxPins + ConfigurePins,
+    P: NotContainsValidSignalPin + TxPins + ConfigurePins + 'd,
 {
     fn configure(&mut self) -> Result<(), Error> {
         self.tx_pins.configure()?;
@@ -826,8 +825,8 @@ where
         bit_order: BitPackOrder,
     ) -> Result<ParlIoTx<'d, Dm>, Error>
     where
-        P: FullDuplex + TxPins + ConfigurePins,
-        CP: TxClkPin,
+        P: FullDuplex + TxPins + ConfigurePins + 'd,
+        CP: TxClkPin + 'd,
     {
         tx_pins.configure()?;
         clk_pin.configure();
@@ -880,7 +879,7 @@ pub struct ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -959,7 +958,7 @@ pub struct ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1071,17 +1070,14 @@ where
 
 impl<'d> ParlIoFullDuplex<'d, Blocking> {
     /// Create a new instance of [ParlIoFullDuplex]
-    pub fn new<CH>(
-        _parl_io: impl Peripheral<P = PARL_IO> + 'd,
-        dma_channel: impl Peripheral<P = CH> + 'd,
+    pub fn new(
+        _parl_io: PARL_IO<'d>,
+        dma_channel: impl DmaChannelFor<PARL_IO<'d>>,
         frequency: Rate,
-    ) -> Result<Self, Error>
-    where
-        CH: DmaChannelFor<PARL_IO>,
-    {
+    ) -> Result<Self, Error> {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
-        let dma_channel = Channel::new(dma_channel.map(|ch| ch.degrade()));
+        let dma_channel = Channel::new(dma_channel.degrade());
         internal_init(frequency)?;
 
         Ok(Self {
@@ -1213,16 +1209,13 @@ where
 
 impl<'d> ParlIoTxOnly<'d, Blocking> {
     /// Creates a new [ParlIoTxOnly]
-    pub fn new<CH>(
-        _parl_io: impl Peripheral<P = PARL_IO> + 'd,
-        dma_channel: impl Peripheral<P = CH> + 'd,
+    pub fn new(
+        _parl_io: PARL_IO<'d>,
+        dma_channel: impl TxChannelFor<PARL_IO<'d>>,
         frequency: Rate,
-    ) -> Result<Self, Error>
-    where
-        CH: TxChannelFor<PARL_IO>,
-    {
+    ) -> Result<Self, Error> {
         let guard = GenericPeripheralGuard::new();
-        let tx_channel = ChannelTx::new(dma_channel.map(|ch| ch.degrade()));
+        let tx_channel = ChannelTx::new(dma_channel.degrade());
         internal_init(frequency)?;
 
         Ok(Self {
@@ -1341,16 +1334,13 @@ where
 
 impl<'d> ParlIoRxOnly<'d, Blocking> {
     /// Create a new [ParlIoRxOnly] instance
-    pub fn new<CH>(
-        _parl_io: impl Peripheral<P = PARL_IO> + 'd,
-        dma_channel: impl Peripheral<P = CH> + 'd,
+    pub fn new(
+        _parl_io: PARL_IO<'d>,
+        dma_channel: impl RxChannelFor<PARL_IO<'d>>,
         frequency: Rate,
-    ) -> Result<Self, Error>
-    where
-        CH: RxChannelFor<PARL_IO>,
-    {
+    ) -> Result<Self, Error> {
         let guard = GenericPeripheralGuard::new();
-        let rx_channel = ChannelRx::new(dma_channel.map(|ch| ch.degrade()));
+        let rx_channel = ChannelRx::new(dma_channel.degrade());
         internal_init(frequency)?;
 
         Ok(Self {
@@ -1762,7 +1752,7 @@ pub struct TxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1771,7 +1761,7 @@ pub struct RxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1780,7 +1770,7 @@ pub struct TxCreatorFullDuplex<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO>>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1789,7 +1779,7 @@ pub struct RxCreatorFullDuplex<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO>>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 

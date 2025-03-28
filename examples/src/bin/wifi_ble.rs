@@ -67,7 +67,7 @@ fn main() -> ! {
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     loop {
-        let connector = BleConnector::new(&esp_wifi_ctrl, &mut bluetooth);
+        let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth.reborrow());
         let hci = HciConnector::new(connector, now);
         let mut ble = Ble::new(&hci);
 

@@ -9,19 +9,19 @@ pub mod parallel;
 
 crate::any_peripheral! {
     /// Any I2S peripheral.
-    pub peripheral AnyI2s {
+    pub peripheral AnyI2s<'d> {
         #[cfg(i2s0)]
-        I2s0(crate::peripherals::I2S0),
+        I2s0(crate::peripherals::I2S0<'d>),
         #[cfg(i2s1)]
-        I2s1(crate::peripherals::I2S1),
+        I2s1(crate::peripherals::I2S1<'d>),
     }
 }
 
-impl DmaEligible for AnyI2s {
+impl<'d> DmaEligible for AnyI2s<'d> {
     #[cfg(gdma)]
-    type Dma = crate::dma::AnyGdmaChannel;
+    type Dma = crate::dma::AnyGdmaChannel<'d>;
     #[cfg(pdma)]
-    type Dma = crate::dma::AnyI2sDmaChannel;
+    type Dma = crate::dma::AnyI2sDmaChannel<'d>;
 
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {

@@ -22,7 +22,7 @@ static mut EXECUTORS: [CallbackContext; COUNT] = [const { CallbackContext::new()
 pub struct InterruptExecutor<const SWI: u8> {
     core: AtomicUsize,
     executor: UnsafeCell<MaybeUninit<InnerExecutor>>,
-    interrupt: SoftwareInterrupt<SWI>,
+    interrupt: SoftwareInterrupt<'static, SWI>,
 }
 
 unsafe impl<const SWI: u8> Send for InterruptExecutor<SWI> {}
@@ -66,7 +66,7 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
     /// Create a new `InterruptExecutor`.
     /// This takes the software interrupt to be used internally.
     #[inline]
-    pub const fn new(interrupt: SoftwareInterrupt<SWI>) -> Self {
+    pub const fn new(interrupt: SoftwareInterrupt<'static, SWI>) -> Self {
         Self {
             core: AtomicUsize::new(usize::MAX),
             executor: UnsafeCell::new(MaybeUninit::uninit()),
