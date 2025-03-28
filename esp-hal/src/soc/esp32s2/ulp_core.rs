@@ -43,10 +43,7 @@
 //! # }
 //! ```
 
-use crate::{
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::LPWR,
-};
+use crate::peripherals::LPWR;
 
 /// Enum representing the possible wakeup sources for the ULP core.
 #[derive(Debug, Clone, Copy)]
@@ -57,14 +54,12 @@ pub enum UlpCoreWakeupSource {
 
 /// Structure representing the ULP (Ultra-Low Power) core.
 pub struct UlpCore<'d> {
-    _lp_core: PeripheralRef<'d, crate::peripherals::ULP_RISCV_CORE>,
+    _lp_core: crate::peripherals::ULP_RISCV_CORE<'d>,
 }
 
 impl<'d> UlpCore<'d> {
     /// Creates a new instance of the `UlpCore` struct.
-    pub fn new(lp_core: impl Peripheral<P = crate::peripherals::ULP_RISCV_CORE> + 'd) -> Self {
-        crate::into_ref!(lp_core);
-
+    pub fn new(lp_core: crate::peripherals::ULP_RISCV_CORE<'d>) -> Self {
         // clear all of RTC_SLOW_RAM - this makes sure .bss is cleared without relying
         let lp_ram =
             unsafe { core::slice::from_raw_parts_mut(0x5000_0000 as *mut u32, 8 * 1024 / 4) };

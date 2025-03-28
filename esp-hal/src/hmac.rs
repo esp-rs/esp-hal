@@ -38,7 +38,6 @@ use core::convert::Infallible;
 
 use crate::{
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::HMAC,
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
@@ -48,7 +47,7 @@ use crate::{
 /// It allows users to compute HMACs for cryptographic purposes, ensuring data
 /// integrity and authenticity.
 pub struct Hmac<'d> {
-    hmac: PeripheralRef<'d, HMAC>,
+    hmac: HMAC<'d>,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     byte_written: usize,
     next_command: NextCommand,
@@ -107,9 +106,7 @@ enum NextCommand {
 
 impl<'d> Hmac<'d> {
     /// Creates a new instance of the HMAC peripheral.
-    pub fn new(hmac: impl Peripheral<P = HMAC> + 'd) -> Self {
-        crate::into_ref!(hmac);
-
+    pub fn new(hmac: HMAC<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self {

@@ -66,7 +66,6 @@ pub use digest::Digest;
 #[cfg(not(esp32))]
 use crate::peripherals::Interrupt;
 use crate::{
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::SHA,
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::GenericPeripheralGuard,
@@ -74,14 +73,13 @@ use crate::{
 
 /// The SHA Accelerator driver instance
 pub struct Sha<'d> {
-    sha: PeripheralRef<'d, SHA>,
+    sha: SHA<'d>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Sha as u8 }>,
 }
 
 impl<'d> Sha<'d> {
     /// Create a new instance of the SHA Accelerator driver.
-    pub fn new(sha: impl Peripheral<P = SHA> + 'd) -> Self {
-        crate::into_ref!(sha);
+    pub fn new(sha: SHA<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self { sha, _guard: guard }
@@ -503,22 +501,22 @@ pub trait ShaAlgorithm: crate::private::Sealed {
     #[cfg(esp32)]
     #[doc(hidden)]
     // Initiate the operation
-    fn start(sha: &crate::peripherals::SHA);
+    fn start(sha: &crate::peripherals::SHA<'_>);
 
     #[cfg(esp32)]
     #[doc(hidden)]
     // Continue the operation
-    fn r#continue(sha: &crate::peripherals::SHA);
+    fn r#continue(sha: &crate::peripherals::SHA<'_>);
 
     #[cfg(esp32)]
     #[doc(hidden)]
     // Calculate the final hash
-    fn load(sha: &crate::peripherals::SHA);
+    fn load(sha: &crate::peripherals::SHA<'_>);
 
     #[cfg(esp32)]
     #[doc(hidden)]
     // Check if peripheral is busy
-    fn is_busy(sha: &crate::peripherals::SHA) -> bool;
+    fn is_busy(sha: &crate::peripherals::SHA<'_>) -> bool;
 }
 
 /// implement digest traits if digest feature is present.
@@ -583,28 +581,28 @@ macro_rules! impl_sha {
             type DigestOutputSize = paste::paste!(digest::consts::[< U $digest_length >]);
 
             #[cfg(esp32)]
-            fn start(sha: &crate::peripherals::SHA) {
+            fn start(sha: &crate::peripherals::SHA<'_>) {
                 paste::paste! {
                     sha.register_block().[< $name:lower _start >]().write(|w| w.[< $name:lower _start >]().set_bit());
                 }
             }
 
             #[cfg(esp32)]
-            fn r#continue(sha: &crate::peripherals::SHA) {
+            fn r#continue(sha: &crate::peripherals::SHA<'_>) {
                 paste::paste! {
                     sha.register_block().[< $name:lower _continue >]().write(|w| w.[< $name:lower _continue >]().set_bit());
                 }
             }
 
             #[cfg(esp32)]
-            fn load(sha: &crate::peripherals::SHA) {
+            fn load(sha: &crate::peripherals::SHA<'_>) {
                 paste::paste! {
                     sha.register_block().[< $name:lower _load >]().write(|w| w.[< $name:lower _load >]().set_bit());
                 }
             }
 
             #[cfg(esp32)]
-            fn is_busy(sha: &crate::peripherals::SHA) -> bool {
+            fn is_busy(sha: &crate::peripherals::SHA<'_>) -> bool {
                 paste::paste! {
                     sha.register_block().[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
                 }
@@ -640,7 +638,7 @@ impl_sha!(Sha512_224, 5, 28, 128);
 #[cfg(any(esp32s2, esp32s3))]
 impl_sha!(Sha512_256, 6, 32, 128);
 
-fn h_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+fn h_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     let sha = sha.register_block();
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
@@ -651,7 +649,7 @@ fn h_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
     }
 }
 
-fn m_mem(sha: &crate::peripherals::SHA, index: usize) -> *mut u32 {
+fn m_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     let sha = sha.register_block();
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {

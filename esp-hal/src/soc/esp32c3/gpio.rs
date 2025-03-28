@@ -205,7 +205,7 @@ pub enum OutputSignal {
 macro_rules! rtc_pins {
     ( $( $pin_num:expr )+ ) => {
         $(
-            impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
+            impl $crate::gpio::RtcPin for GpioPin<'_, $pin_num> {
                 unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                     let rtc_cntl = $crate::peripherals::LPWR::regs();
                     let gpio_wakeup = rtc_cntl.gpio_wakeup();
@@ -227,7 +227,7 @@ macro_rules! rtc_pins {
     };
 }
 
-impl<const N: u8> crate::gpio::RtcPinWithResistors for GpioPin<N>
+impl<const N: u8> crate::gpio::RtcPinWithResistors for GpioPin<'_, N>
 where
     Self: crate::gpio::RtcPin,
 {

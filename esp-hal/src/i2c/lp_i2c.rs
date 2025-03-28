@@ -79,13 +79,13 @@ enum Command {
 
 /// Represents a Low-Power I2C peripheral.
 pub struct LpI2c {
-    i2c: LP_I2C0,
+    i2c: LP_I2C0<'static>,
 }
 
 impl LpI2c {
     /// Creates a new instance of the `LpI2c` peripheral.
     pub fn new(
-        i2c: LP_I2C0,
+        i2c: LP_I2C0<'static>,
         _sda: LowPowerOutputOpenDrain<'_, 6>,
         _scl: LowPowerOutputOpenDrain<'_, 7>,
         frequency: Rate,

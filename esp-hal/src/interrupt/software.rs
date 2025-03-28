@@ -48,13 +48,38 @@
 //! }
 //! ```
 
+use core::marker::PhantomData;
+
 use crate::interrupt::{InterruptConfigurable, InterruptHandler};
 
 /// A software interrupt can be triggered by software.
 #[non_exhaustive]
-pub struct SoftwareInterrupt<const NUM: u8>;
+pub struct SoftwareInterrupt<'d, const NUM: u8> {
+    _lifetime: PhantomData<&'d mut ()>,
+}
 
-impl<const NUM: u8> SoftwareInterrupt<NUM> {
+impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
+    /// Unsafely create an instance of this peripheral out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// You must ensure that you're only using one instance of this type at a
+    /// time.
+    #[inline]
+    pub unsafe fn steal() -> Self {
+        Self {
+            _lifetime: PhantomData,
+        }
+    }
+
+    /// Creates a new peripheral reference with a shorter lifetime.
+    ///
+    /// Use this method if you would like to keep working with the peripheral
+    /// after you dropped the driver that consumes this.
+    pub fn reborrow(&mut self) -> SoftwareInterrupt<'_, NUM> {
+        unsafe { SoftwareInterrupt::steal() }
+    }
+
     /// Sets the interrupt handler for this software-interrupt
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -126,31 +151,11 @@ impl<const NUM: u8> SoftwareInterrupt<NUM> {
             _ => unreachable!(),
         };
     }
-
-    /// Unsafely create an instance of this peripheral out of thin air.
-    ///
-    /// # Safety
-    ///
-    /// You must ensure that you're only using one instance of this type at a
-    /// time.
-    #[inline]
-    pub unsafe fn steal() -> Self {
-        Self
-    }
 }
 
-unsafe impl<const NUM: u8> crate::peripheral::Peripheral for SoftwareInterrupt<NUM> {
-    type P = SoftwareInterrupt<NUM>;
+impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<'_, NUM> {}
 
-    #[inline]
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self::steal()
-    }
-}
-
-impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<NUM> {}
-
-impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<NUM> {
+impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<'_, NUM> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         SoftwareInterrupt::set_interrupt_handler(self, handler);
     }
@@ -170,28 +175,36 @@ for inter-processor communication when using
 `esp-hal-embassy`."#
 )]
 #[non_exhaustive]
-pub struct SoftwareInterruptControl {
+pub struct SoftwareInterruptControl<'d> {
     /// Software interrupt 0.
-    pub software_interrupt0: SoftwareInterrupt<0>,
+    pub software_interrupt0: SoftwareInterrupt<'d, 0>,
     /// Software interrupt 1.
-    pub software_interrupt1: SoftwareInterrupt<1>,
+    pub software_interrupt1: SoftwareInterrupt<'d, 1>,
     /// Software interrupt 2.
-    pub software_interrupt2: SoftwareInterrupt<2>,
+    pub software_interrupt2: SoftwareInterrupt<'d, 2>,
     #[cfg(not(all(feature = "__esp_hal_embassy", multi_core)))]
     /// Software interrupt 3. Only available when not using `esp-hal-embassy`,
     /// or on single-core systems.
-    pub software_interrupt3: SoftwareInterrupt<3>,
+    pub software_interrupt3: SoftwareInterrupt<'d, 3>,
 }
 
-impl SoftwareInterruptControl {
+impl<'d> SoftwareInterruptControl<'d> {
     /// Create a new instance of the software interrupt control.
-    pub fn new(_peripheral: crate::peripherals::SW_INTERRUPT) -> Self {
+    pub fn new(_peripheral: crate::peripherals::SW_INTERRUPT<'d>) -> Self {
         SoftwareInterruptControl {
-            software_interrupt0: SoftwareInterrupt {},
-            software_interrupt1: SoftwareInterrupt {},
-            software_interrupt2: SoftwareInterrupt {},
+            software_interrupt0: SoftwareInterrupt {
+                _lifetime: PhantomData,
+            },
+            software_interrupt1: SoftwareInterrupt {
+                _lifetime: PhantomData,
+            },
+            software_interrupt2: SoftwareInterrupt {
+                _lifetime: PhantomData,
+            },
             #[cfg(not(all(feature = "__esp_hal_embassy", multi_core)))]
-            software_interrupt3: SoftwareInterrupt {},
+            software_interrupt3: SoftwareInterrupt {
+                _lifetime: PhantomData,
+            },
         }
     }
 }

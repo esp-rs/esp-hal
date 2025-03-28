@@ -50,7 +50,7 @@ async fn responder_task(
 }
 
 struct Context {
-    interrupt: SoftwareInterrupt<1>,
+    interrupt: SoftwareInterrupt<'static, 1>,
     #[cfg(multi_core)]
     cpu_control: CpuControl<'static>,
 }

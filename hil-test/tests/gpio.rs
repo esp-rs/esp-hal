@@ -33,8 +33,8 @@ static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
 static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
 struct Context {
-    test_gpio1: AnyPin,
-    test_gpio2: AnyPin,
+    test_gpio1: AnyPin<'static>,
+    test_gpio2: AnyPin<'static>,
     #[cfg(feature = "unstable")]
     delay: Delay,
 }
@@ -58,17 +58,23 @@ fn _gpios_can_be_reused() {
     let mut gpio1 = p.GPIO1;
 
     {
-        let _driver = Input::new(&mut gpio1, InputConfig::default().with_pull(Pull::Down));
+        let _driver = Input::new(
+            gpio1.reborrow(),
+            InputConfig::default().with_pull(Pull::Down),
+        );
     }
 
     {
         let _driver = esp_hal::spi::master::Spi::new(p.SPI2, Default::default())
             .unwrap()
-            .with_mosi(&mut gpio1);
+            .with_mosi(gpio1.reborrow());
     }
 
     {
-        let _driver = Input::new(&mut gpio1, InputConfig::default().with_pull(Pull::Down));
+        let _driver = Input::new(
+            gpio1.reborrow(),
+            InputConfig::default().with_pull(Pull::Down),
+        );
     }
 }
 
@@ -419,7 +425,7 @@ mod tests {
         spawner.must_spawn(test_task(ctx.test_gpio1.degrade()));
 
         #[embassy_executor::task]
-        async fn test_task(pin: AnyPin) {
+        async fn test_task(pin: AnyPin<'static>) {
             let mut pin = Input::new(pin, InputConfig::default().with_pull(Pull::Down));
 
             // This line must return, even if the executor

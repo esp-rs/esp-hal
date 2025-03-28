@@ -173,9 +173,9 @@ mod tests {
 // anything.
 #[allow(unused)] // compile test
 fn esp_wifi_can_be_initialized_with_any_timer(
-    timer: esp_hal::timer::AnyTimer,
+    timer: esp_hal::timer::AnyTimer<'static>,
     rng: esp_hal::rng::Rng,
-    radio_clocks: esp_hal::peripherals::RADIO_CLK,
+    radio_clocks: esp_hal::peripherals::RADIO_CLK<'static>,
 ) {
     esp_wifi::init(timer, rng, radio_clocks);
 }

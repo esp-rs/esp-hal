@@ -16,7 +16,6 @@ use crate::efuse::Efuse;
 use crate::{
     analog::adc::asynch::AdcFuture,
     interrupt::{InterruptConfigurable, InterruptHandler},
-    peripheral::PeripheralRef,
     peripherals::{Interrupt, APB_SARADC},
     soc::regi2c,
     system::{GenericPeripheralGuard, Peripheral},
@@ -130,7 +129,7 @@ pub trait RegisterAccess {
 }
 
 #[cfg(adc1)]
-impl RegisterAccess for crate::peripherals::ADC1 {
+impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
             w.saradc1_onetime_sample().set_bit();
@@ -179,7 +178,7 @@ impl RegisterAccess for crate::peripherals::ADC1 {
 }
 
 #[cfg(adc1)]
-impl super::CalibrationAccess for crate::peripherals::ADC1 {
+impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -198,7 +197,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC1 {
 }
 
 #[cfg(adc2)]
-impl RegisterAccess for crate::peripherals::ADC2 {
+impl RegisterAccess for crate::peripherals::ADC2<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
             w.saradc2_onetime_sample().set_bit();
@@ -245,7 +244,7 @@ impl RegisterAccess for crate::peripherals::ADC2 {
 }
 
 #[cfg(adc2)]
-impl super::CalibrationAccess for crate::peripherals::ADC2 {
+impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
@@ -264,11 +263,11 @@ impl super::CalibrationAccess for crate::peripherals::ADC2 {
 
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADCI, Dm: crate::DriverMode> {
-    _adc: PeripheralRef<'d, ADCI>,
+    _adc: ADCI,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
-    _phantom: PhantomData<Dm>,
+    _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI, Blocking>
@@ -277,10 +276,7 @@ where
 {
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
-    pub fn new(
-        adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
-        config: AdcConfig<ADCI>,
-    ) -> Self {
+    pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         APB_SARADC::regs().ctrl().modify(|_, w| unsafe {
@@ -291,7 +287,7 @@ where
         });
 
         Adc {
-            _adc: adc_instance.into_ref(),
+            _adc: adc_instance,
             attenuations: config.attenuations,
             active_channel: None,
             _guard: guard,
@@ -409,7 +405,7 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
 }
 
 #[cfg(all(adc1, not(esp32h2)))]
-impl super::AdcCalEfuse for crate::peripherals::ADC1 {
+impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(1, atten)
     }
@@ -424,7 +420,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1 {
 }
 
 #[cfg(adc2)]
-impl super::AdcCalEfuse for crate::peripherals::ADC2 {
+impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(2, atten)
     }
@@ -442,11 +438,11 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2 {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<0>, 0),
-            (GpioPin<1>, 1),
-            (GpioPin<2>, 2),
-            (GpioPin<3>, 3),
-            (GpioPin<4>, 4),
+            (GpioPin<'_, 0>, 0),
+            (GpioPin<'_, 1>, 1),
+            (GpioPin<'_, 2>, 2),
+            (GpioPin<'_, 3>, 3),
+            (GpioPin<'_, 4>, 4),
         ]
     }
 }
@@ -455,17 +451,17 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<0>, 0),
-            (GpioPin<1>, 1),
-            (GpioPin<2>, 2),
-            (GpioPin<3>, 3),
-            (GpioPin<4>, 4),
+            (GpioPin<'_, 0>, 0),
+            (GpioPin<'_, 1>, 1),
+            (GpioPin<'_, 2>, 2),
+            (GpioPin<'_, 3>, 3),
+            (GpioPin<'_, 4>, 4),
         ]
     }
 
     crate::analog::adc::impl_adc_interface! {
         ADC2 [
-            (GpioPin<5>, 0),
+            (GpioPin<'_, 5>, 0),
         ]
     }
 }
@@ -474,13 +470,13 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<0>, 0),
-            (GpioPin<1>, 1),
-            (GpioPin<2>, 2),
-            (GpioPin<3>, 3),
-            (GpioPin<4>, 4),
-            (GpioPin<5>, 5),
-            (GpioPin<6>, 6),
+            (GpioPin<'_, 0>, 0),
+            (GpioPin<'_, 1>, 1),
+            (GpioPin<'_, 2>, 2),
+            (GpioPin<'_, 3>, 3),
+            (GpioPin<'_, 4>, 4),
+            (GpioPin<'_, 5>, 5),
+            (GpioPin<'_, 6>, 6),
         ]
     }
 }
@@ -489,11 +485,11 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<1>, 0),
-            (GpioPin<2>, 1),
-            (GpioPin<3>, 2),
-            (GpioPin<4>, 3),
-            (GpioPin<5>, 4),
+            (GpioPin<'_, 1>, 0),
+            (GpioPin<'_, 2>, 1),
+            (GpioPin<'_, 3>, 2),
+            (GpioPin<'_, 4>, 3),
+            (GpioPin<'_, 5>, 4),
         ]
     }
 }
@@ -604,12 +600,12 @@ pub(crate) mod asynch {
 
         #[cfg(adc1)]
         if interrupt_status.adc1_done().bit_is_set() {
-            handle_async(crate::peripherals::ADC1)
+            unsafe { handle_async(crate::peripherals::ADC1::steal()) }
         }
 
         #[cfg(adc2)]
         if interrupt_status.adc2_done().bit_is_set() {
-            handle_async(crate::peripherals::ADC2)
+            unsafe { handle_async(crate::peripherals::ADC2::steal()) }
         }
     }
 
@@ -634,7 +630,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(adc1)]
-    impl AsyncAccess for crate::peripherals::ADC1 {
+    impl AsyncAccess for crate::peripherals::ADC1<'_> {
         fn enable_interrupt() {
             APB_SARADC::regs()
                 .int_ena()
@@ -661,7 +657,7 @@ pub(crate) mod asynch {
     }
 
     #[cfg(adc2)]
-    impl AsyncAccess for crate::peripherals::ADC2 {
+    impl AsyncAccess for crate::peripherals::ADC2<'_> {
         fn enable_interrupt() {
             APB_SARADC::regs()
                 .int_ena()

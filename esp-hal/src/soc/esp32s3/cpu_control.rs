@@ -12,7 +12,6 @@ use core::{
 };
 
 use crate::{
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{CPU_CTRL, LPWR, SYSTEM},
     system::Cpu,
 };
@@ -151,7 +150,7 @@ pub enum Error {
 /// ```
 #[instability::unstable]
 pub struct CpuControl<'d> {
-    _cpu_control: PeripheralRef<'d, CPU_CTRL>,
+    _cpu_control: CPU_CTRL<'d>,
 }
 
 unsafe fn internal_park_core(core: Cpu, park: bool) {
@@ -180,9 +179,7 @@ unsafe fn internal_park_core(core: Cpu, park: bool) {
 impl<'d> CpuControl<'d> {
     /// Creates a new instance of `CpuControl`.
     #[instability::unstable]
-    pub fn new(cpu_control: impl Peripheral<P = CPU_CTRL> + 'd) -> CpuControl<'d> {
-        crate::into_ref!(cpu_control);
-
+    pub fn new(cpu_control: CPU_CTRL<'d>) -> CpuControl<'d> {
         CpuControl {
             _cpu_control: cpu_control,
         }

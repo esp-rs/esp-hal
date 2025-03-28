@@ -12,7 +12,6 @@
 use esp_hal::{
     dma_buffers,
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
-    peripheral::Peripheral,
     spi::{slave::Spi, Mode},
     Blocking,
 };
@@ -20,15 +19,15 @@ use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel = esp_hal::dma::Spi2DmaChannel;
+        type DmaChannel<'d> = esp_hal::dma::Spi2DmaChannel<'d>;
     } else {
-        type DmaChannel = esp_hal::dma::DmaChannel0;
+        type DmaChannel<'d> = esp_hal::dma::DmaChannel0<'d>;
     }
 }
 
 struct Context {
     spi: Spi<'static, Blocking>,
-    dma_channel: DmaChannel,
+    dma_channel: DmaChannel<'static>,
     bitbang_spi: BitbangSpi,
 }
 

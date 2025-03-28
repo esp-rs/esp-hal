@@ -113,19 +113,19 @@ pub enum DataMode {
 
 crate::any_peripheral! {
     /// Any SPI peripheral.
-    pub peripheral AnySpi {
+    pub peripheral AnySpi<'d> {
         #[cfg(spi2)]
-        Spi2(crate::peripherals::SPI2),
+        Spi2(crate::peripherals::SPI2<'d>),
         #[cfg(spi3)]
-        Spi3(crate::peripherals::SPI3),
+        Spi3(crate::peripherals::SPI3<'d>),
     }
 }
 
-impl DmaEligible for AnySpi {
+impl<'d> DmaEligible for AnySpi<'d> {
     #[cfg(gdma)]
-    type Dma = crate::dma::AnyGdmaChannel;
+    type Dma = crate::dma::AnyGdmaChannel<'d>;
     #[cfg(pdma)]
-    type Dma = crate::dma::AnySpiDmaChannel;
+    type Dma = crate::dma::AnySpiDmaChannel<'d>;
 
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {

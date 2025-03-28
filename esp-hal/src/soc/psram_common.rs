@@ -26,7 +26,7 @@ impl PsramSize {
 
 /// Returns the address and size of the available in external memory.
 #[cfg(feature = "psram")]
-pub fn psram_raw_parts(_psram: &crate::peripherals::PSRAM) -> (*mut u8, usize) {
+pub fn psram_raw_parts(_psram: &crate::peripherals::PSRAM<'_>) -> (*mut u8, usize) {
     let range = crate::soc::psram_range();
     (range.start as *mut u8, range.end - range.start)
 }

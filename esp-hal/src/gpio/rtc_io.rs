@@ -34,8 +34,6 @@ use core::marker::PhantomData;
 use super::{InputPin, OutputPin, RtcPin};
 use crate::{
     gpio::RtcFunction,
-    into_ref,
-    peripheral::Peripheral,
     peripherals::{GPIO, RTC_IO},
 };
 
@@ -46,11 +44,10 @@ pub struct LowPowerOutput<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     /// Create a new output pin for use by the low-power core
-    pub fn new<P>(pin: impl Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(pin: P) -> Self
     where
-        P: OutputPin + RtcPin,
+        P: OutputPin + RtcPin + 'd,
     {
-        into_ref!(pin);
         pin.rtc_set_config(false, true, RtcFunction::Rtc);
 
         let this = Self {
@@ -78,16 +75,15 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
 
 /// A GPIO input pin configured for low power operation
 pub struct LowPowerInput<'d, const PIN: u8> {
-    phantom: PhantomData<&'d ()>,
+    phantom: PhantomData<&'d mut ()>,
 }
 
 impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     /// Create a new input pin for use by the low-power core
-    pub fn new<P>(pin: impl Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(pin: P) -> Self
     where
-        P: InputPin + RtcPin,
+        P: InputPin + RtcPin + 'd,
     {
-        into_ref!(pin);
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
         let this = Self {
@@ -128,11 +124,10 @@ pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
 
 impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     /// Create a new output pin for use by the low-power core
-    pub fn new<P>(pin: impl Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(pin: P) -> Self
     where
-        P: InputPin + OutputPin + RtcPin,
+        P: InputPin + OutputPin + RtcPin + 'd,
     {
-        into_ref!(pin);
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
         let this = Self {

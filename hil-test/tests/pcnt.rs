@@ -15,8 +15,8 @@ use hil_test as _;
 
 struct Context<'d> {
     pcnt: Pcnt<'d>,
-    input: AnyPin,
-    output: AnyPin,
+    input: AnyPin<'d>,
+    output: AnyPin<'d>,
     delay: Delay,
 }
 

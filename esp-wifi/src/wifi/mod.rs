@@ -2439,7 +2439,7 @@ pub struct Interfaces<'d> {
 /// Dropping the controller will deinitialize / stop WiFi.
 pub fn new<'d>(
     inited: &'d EspWifiController<'d>,
-    _device: impl crate::hal::peripheral::Peripheral<P = crate::hal::peripherals::WIFI> + 'd,
+    _device: crate::hal::peripherals::WIFI<'d>,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     if !inited.wifi() {
         crate::wifi::wifi_init()?;

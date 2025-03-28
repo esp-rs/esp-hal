@@ -32,12 +32,12 @@
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
 //! #
-//! # let mut led = peripherals.GPIO1;
+//! # let led = peripherals.GPIO1;
 //! # let button = peripherals.GPIO9;
 //!
 //! let gpio_ext = Channels::new(peripherals.GPIO_SD);
 //! let led_task = gpio_ext.channel0_task.toggle(
-//!     &mut led,
+//!     led,
 //!     OutputConfig {
 //!         open_drain: false,
 //!         pull: Pull::None,
@@ -59,7 +59,6 @@ use crate::{
         Level,
         Pull,
     },
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::GPIO_SD,
     private,
 };
@@ -67,7 +66,7 @@ use crate::{
 /// All the GPIO ETM channels
 #[non_exhaustive]
 pub struct Channels<'d> {
-    _gpio_sd: PeripheralRef<'d, GPIO_SD>,
+    _gpio_sd: GPIO_SD<'d>,
     /// Task channel 0 for triggering GPIO tasks.
     pub channel0_task: TaskChannel<0>,
     /// Event channel 0 for handling GPIO events.
@@ -104,9 +103,7 @@ pub struct Channels<'d> {
 
 impl<'d> Channels<'d> {
     /// Create a new instance
-    pub fn new(peripheral: impl Peripheral<P = GPIO_SD> + 'd) -> Self {
-        crate::into_ref!(peripheral);
-
+    pub fn new(peripheral: GPIO_SD<'d>) -> Self {
         Self {
             _gpio_sd: peripheral,
             channel0_task: TaskChannel {},

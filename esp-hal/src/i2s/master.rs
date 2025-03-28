@@ -100,7 +100,6 @@ use crate::{
     gpio::interconnect::PeripheralOutput,
     i2s::AnyI2s,
     interrupt::{InterruptConfigurable, InterruptHandler},
-    peripheral::{Peripheral, PeripheralRef},
     system::PeripheralGuard,
     time::Rate,
     Async,
@@ -330,22 +329,19 @@ impl<'d> I2s<'d, Blocking> {
     /// Construct a new I2S peripheral driver instance for the first I2S
     /// peripheral
     #[allow(clippy::too_many_arguments)]
-    pub fn new<CH>(
-        i2s: impl Peripheral<P = impl RegisterAccess> + 'd,
+    pub fn new(
+        i2s: impl RegisterAccess + Into<AnyI2s<'d>>,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: Rate,
-        channel: impl Peripheral<P = CH> + 'd,
+        channel: impl DmaChannelFor<AnyI2s<'d>>,
         rx_descriptors: &'static mut [DmaDescriptor],
         tx_descriptors: &'static mut [DmaDescriptor],
-    ) -> Self
-    where
-        CH: DmaChannelFor<AnyI2s>,
-    {
-        crate::into_ref!(i2s);
-
-        let channel = Channel::new(channel.map(|ch| ch.degrade()));
+    ) -> Self {
+        let channel = Channel::new(channel.degrade());
         channel.runtime_ensure_compatible(&i2s);
+
+        let i2s = i2s.into();
 
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -360,8 +356,6 @@ impl<'d> I2s<'d, Blocking> {
         i2s.configure(&standard, &data_format);
         i2s.set_master();
         i2s.update();
-
-        let i2s = i2s.map_into();
 
         Self {
             i2s_rx: RxCreator {
@@ -417,8 +411,8 @@ pub struct I2sTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    i2s: PeripheralRef<'d, AnyI2s>,
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>,
+    i2s: AnyI2s<'d>,
+    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s<'d>>>,
     tx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
@@ -449,7 +443,7 @@ impl<'d, Dm> DmaSupportTx for I2sTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>;
+    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s<'d>>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -545,8 +539,8 @@ pub struct I2sRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    i2s: PeripheralRef<'d, AnyI2s>,
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>,
+    i2s: AnyI2s<'d>,
+    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s<'d>>>,
     rx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
@@ -577,7 +571,7 @@ impl<'d, Dm> DmaSupportRx for I2sRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>;
+    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s<'d>>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -696,7 +690,6 @@ mod private {
         },
         i2s::AnyI2sInner,
         interrupt::InterruptHandler,
-        peripheral::{Peripheral, PeripheralRef},
         peripherals::{Interrupt, I2S0},
         DriverMode,
     };
@@ -709,8 +702,8 @@ mod private {
     where
         Dm: DriverMode,
     {
-        pub i2s: PeripheralRef<'d, AnyI2s>,
-        pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s>>,
+        pub i2s: AnyI2s<'d>,
+        pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s<'d>>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
@@ -758,8 +751,8 @@ mod private {
     where
         Dm: DriverMode,
     {
-        pub i2s: PeripheralRef<'d, AnyI2s>,
-        pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s>>,
+        pub i2s: AnyI2s<'d>,
+        pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s<'d>>>,
         pub descriptors: &'static mut [DmaDescriptor],
         pub(crate) guard: PeripheralGuard,
     }
@@ -803,7 +796,7 @@ mod private {
         }
     }
 
-    pub trait RegBlock: Peripheral<P = Self> + DmaEligible + Into<super::AnyI2s> + 'static {
+    pub trait RegBlock: DmaEligible {
         fn regs(&self) -> &RegisterBlock;
         fn peripheral(&self) -> crate::system::Peripheral;
     }
@@ -1490,7 +1483,7 @@ mod private {
         }
     }
 
-    impl RegBlock for I2S0 {
+    impl RegBlock for I2S0<'_> {
         fn regs(&self) -> &RegisterBlock {
             unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
         }
@@ -1500,7 +1493,7 @@ mod private {
         }
     }
 
-    impl RegisterAccessPrivate for I2S0 {
+    impl RegisterAccessPrivate for I2S0<'_> {
         fn set_interrupt_handler(&self, handler: InterruptHandler) {
             for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, Interrupt::I2S0);
@@ -1513,7 +1506,7 @@ mod private {
         }
     }
 
-    impl Signals for crate::peripherals::I2S0 {
+    impl Signals for crate::peripherals::I2S0<'_> {
         fn mclk_signal(&self) -> OutputSignal {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
@@ -1598,7 +1591,7 @@ mod private {
     }
 
     #[cfg(i2s1)]
-    impl RegBlock for I2S1 {
+    impl RegBlock for I2S1<'_> {
         fn regs(&self) -> &RegisterBlock {
             unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
         }
@@ -1609,7 +1602,7 @@ mod private {
     }
 
     #[cfg(i2s1)]
-    impl RegisterAccessPrivate for I2S1 {
+    impl RegisterAccessPrivate for I2S1<'_> {
         fn set_interrupt_handler(&self, handler: InterruptHandler) {
             for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, Interrupt::I2S1);
@@ -1623,7 +1616,7 @@ mod private {
     }
 
     #[cfg(i2s1)]
-    impl Signals for crate::peripherals::I2S1 {
+    impl Signals for crate::peripherals::I2S1<'_> {
         fn mclk_signal(&self) -> OutputSignal {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
@@ -1671,7 +1664,7 @@ mod private {
         }
     }
 
-    impl RegBlock for super::AnyI2s {
+    impl RegBlock for super::AnyI2s<'_> {
         fn regs(&self) -> &RegisterBlock {
             match &self.0 {
                 AnyI2sInner::I2s0(i2s) => RegBlock::regs(i2s),
@@ -1691,7 +1684,7 @@ mod private {
         }
     }
 
-    impl RegisterAccessPrivate for super::AnyI2s {
+    impl RegisterAccessPrivate for super::AnyI2s<'_> {
         delegate::delegate! {
             to match &self.0 {
                 AnyI2sInner::I2s0(i2s) => i2s,
@@ -1703,7 +1696,7 @@ mod private {
         }
     }
 
-    impl Signals for super::AnyI2s {
+    impl Signals for super::AnyI2s<'_> {
         delegate::delegate! {
             to match &self.0 {
                 AnyI2sInner::I2s0(i2s) => i2s,

@@ -1,14 +1,11 @@
 use embedded_io::{Error, ErrorType, Read, Write};
 
 use super::{read_hci, read_next, send_hci};
-use crate::{
-    hal::peripheral::{Peripheral, PeripheralRef},
-    EspWifiController,
-};
+use crate::EspWifiController;
 
 /// A blocking HCI connector
 pub struct BleConnector<'d> {
-    _device: PeripheralRef<'d, crate::hal::peripherals::BT>,
+    _device: crate::hal::peripherals::BT<'d>,
 }
 
 impl Drop for BleConnector<'_> {
@@ -20,13 +17,11 @@ impl Drop for BleConnector<'_> {
 impl<'d> BleConnector<'d> {
     pub fn new(
         _init: &'d EspWifiController<'d>,
-        device: impl Peripheral<P = crate::hal::peripherals::BT> + 'd,
+        device: crate::hal::peripherals::BT<'d>,
     ) -> BleConnector<'d> {
         crate::ble::ble_init();
 
-        Self {
-            _device: device.into_ref(),
-        }
+        Self { _device: device }
     }
 
     pub fn next(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {

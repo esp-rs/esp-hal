@@ -26,7 +26,6 @@ use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 use crate::{
     interrupt::InterruptHandler,
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, RSA},
     system::{Cpu, GenericPeripheralGuard, Peripheral as PeripheralEnable},
     Async,
@@ -45,7 +44,7 @@ pub use rsa_spec_impl::operand_sizes;
 
 /// RSA peripheral container
 pub struct Rsa<'d, Dm: crate::DriverMode> {
-    rsa: PeripheralRef<'d, RSA>,
+    rsa: RSA<'d>,
     phantom: PhantomData<Dm>,
     _guard: GenericPeripheralGuard<{ PeripheralEnable::Rsa as u8 }>,
 }
@@ -54,7 +53,7 @@ impl<'d> Rsa<'d, Blocking> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
+    pub fn new(rsa: RSA<'d>) -> Self {
         Self::new_internal(rsa)
     }
 
@@ -104,9 +103,7 @@ impl<'d> Rsa<'d, Async> {
 }
 
 impl<'d, Dm: crate::DriverMode> Rsa<'d, Dm> {
-    fn new_internal(rsa: impl Peripheral<P = RSA> + 'd) -> Self {
-        crate::into_ref!(rsa);
-
+    fn new_internal(rsa: RSA<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self {

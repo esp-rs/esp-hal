@@ -26,7 +26,6 @@ use esp_hal::{
     delay::Delay,
     dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
     main,
-    peripheral::Peripheral,
     spi::{
         master::{Config, Spi},
         Mode,

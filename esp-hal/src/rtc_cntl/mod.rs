@@ -122,7 +122,6 @@ use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
     interrupt::{self, InterruptHandler},
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     system::{Cpu, SleepSource},
     time::Duration,
@@ -278,7 +277,7 @@ pub(crate) enum RtcCalSel {
 
 /// Low-power Management
 pub struct Rtc<'d> {
-    _inner: PeripheralRef<'d, crate::peripherals::LPWR>,
+    _inner: crate::peripherals::LPWR<'d>,
     /// Reset Watchdog Timer.
     pub rwdt: Rwdt,
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
@@ -290,12 +289,12 @@ impl<'d> Rtc<'d> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(rtc_cntl: impl Peripheral<P = crate::peripherals::LPWR> + 'd) -> Self {
+    pub fn new(rtc_cntl: crate::peripherals::LPWR<'d>) -> Self {
         rtc::init();
         rtc::configure_clock();
 
         let this = Self {
-            _inner: rtc_cntl.into_ref(),
+            _inner: rtc_cntl,
             rwdt: Rwdt::new(),
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             swd: Swd::new(),

@@ -88,14 +88,14 @@ pub trait TimerCollection {
 ///
 /// We can't blanket-implement for `Into<AnyTimer>` because of possible
 /// conflicting implementations.
-trait IntoAnyTimer: Into<AnyTimer> {}
+trait IntoAnyTimer: Into<AnyTimer<'static>> {}
 
-impl IntoAnyTimer for AnyTimer {}
+impl IntoAnyTimer for AnyTimer<'static> {}
 
-impl IntoAnyTimer for TimgTimer where Self: Into<AnyTimer> {}
+impl IntoAnyTimer for TimgTimer<'static> where Self: Into<AnyTimer<'static>> {}
 
 #[cfg(not(feature = "esp32"))]
-impl IntoAnyTimer for Alarm where Self: Into<AnyTimer> {}
+impl IntoAnyTimer for Alarm<'static> where Self: Into<AnyTimer<'static>> {}
 
 impl<T> TimerCollection for T
 where
