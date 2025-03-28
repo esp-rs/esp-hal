@@ -21,6 +21,7 @@ exclude  = [
     "extras/esp-wifishark",
     "extras/ieee802154-sniffer",
     "hil-test",
+    "miri-test",
     "qa-test",
     "xtensa-lx",
     "xtensa-lx-rt",

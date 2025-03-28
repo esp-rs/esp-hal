@@ -1,0 +1,29 @@
+[package]
+name    = "miri-test"
+version = "0.0.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+esp-hal            = { path = "../esp-hal", features = ["unstable"] }
+
+[features]
+unstable = []
+#esp32   = ["esp-hal/esp32",   ]
+esp32c2 = ["esp-hal/esp32c2", ]
+esp32c3 = ["esp-hal/esp32c3", ]
+esp32c6 = ["esp-hal/esp32c6", ]
+esp32h2 = ["esp-hal/esp32h2", ]
+#esp32s2 = ["esp-hal/esp32s2", ]
+#esp32s3 = ["esp-hal/esp32s3", ]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+debug         = 2
+debug-assertions = true
+lto           = "fat"
+codegen-units = 1
+panic = "abort"
