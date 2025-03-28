@@ -53,7 +53,7 @@ mod fields;
 /// A struct representing the eFuse functionality of the chip.
 pub struct Efuse;
 
-pub enum RtcCalibParam {
+enum RtcCalibParam {
     V1VLow,
     V1VHigh,
     V2VInit,
@@ -108,7 +108,7 @@ impl Efuse {
     }
 
     /// See <https://github.com/espressif/esp-idf/blob/a45d713b03fd96d8805d1cc116f02a4415b360c7/components/efuse/esp32s2/esp_efuse_rtc_table.c#L97>
-    pub fn rtc_table_get_tag(
+    fn rtc_table_get_tag(
         version: u8,
         unit: u8,
         atten: Attenuation,
@@ -131,7 +131,7 @@ impl Efuse {
         Some(param_offset + (unit as usize) * RTCCALIB_ATTENCOUNT + (atten as usize))
     }
 
-    pub fn rtc_table_get_raw_efuse_value(tag: usize) -> i32 {
+    fn rtc_table_get_raw_efuse_value(tag: usize) -> i32 {
         if tag == 0 || tag >= RAW_MAP.len() {
             return 0;
         }
@@ -159,11 +159,10 @@ impl Efuse {
         efuse_val + info.base + Self::rtc_table_get_raw_efuse_value(info.dependency)
     }
 
-    /// coeff_b from: <https://github.com/espressif/esp-idf/blob/903af13e847cd301e476d8b16b4ee1c21b30b5c6/components/esp_adc/esp32s2/adc_cali_line_fitting.c#L91>
+    /// -coeff_b (without the scaling) from: <https://github.com/espressif/esp-idf/blob/903af13e847cd301e476d8b16b4ee1c21b30b5c6/components/esp_adc/esp32s2/adc_cali_line_fitting.c#L91>
     /// Extracted from prepare_calib_data_for(...),
     /// calculate_characterization_coefficients(...) &
     /// characterize_using_two_points(...)
-
     pub fn rtc_calib_init_code(unit: u8, atten: Attenuation) -> Option<u16> {
         if unit >= 2 {
             return None;
@@ -186,22 +185,41 @@ impl Efuse {
                     RtcCalibParam::V1VHigh,
                 )?);
 
-                let fraction =
-                    (RTC_CALIB_V_LOW * high - RTC_CALIB_V_HIGH[atten as usize]) / (high - low);
-                let scaled = 1024 * fraction;
-                Some(scaled as u16)
+                let vhigh = RTC_CALIB_V_HIGH[atten as usize];
+                let vlow = RTC_CALIB_V_LOW;
+                let dy = vhigh - vlow;
+                let dx = high - low;
+                let intercept = low - vlow * dx / dy;
+                Some(intercept as u16)
             }
-            2 => Some(0),
+            2 => {
+                let icode = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
+                    version_number,
+                    unit,
+                    atten,
+                    RtcCalibParam::V2VInit,
+                )?);
+                Some(icode as u16)
+            }
             _ => None,
         }
     }
 
-    pub fn rtc_calib_cal_mv(unit: u8, atten: Attenuation) -> u16 {
+    pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
         let index = atten as usize;
         if index >= 4 {
             return 0;
         }
-        RTC_CALIB_V_HIGH[index] as u16
+
+        let (_, calib_version) = Self::block_version();
+        let version_number = calib_version;
+
+        // Note: ... - ..._V_LOW because it's used as dx to calculate the slope in
+        // AdcCalLine::new_cal
+        (match version_number {
+            1 => RTC_CALIB_V_HIGH[index] - RTC_CALIB_V_LOW,
+            _ => RTC_CALIB_V_HIGH[index],
+        }) as u16
     }
 
     pub fn rtc_calib_cal_code(unit: u8, atten: Attenuation) -> Option<u16> {
@@ -213,13 +231,22 @@ impl Efuse {
 
         match version_number {
             1 => {
+                let low = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
+                    version_number,
+                    unit,
+                    atten,
+                    RtcCalibParam::V1VLow,
+                )?);
                 let high = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
                     version_number,
                     unit,
                     atten,
                     RtcCalibParam::V1VHigh,
                 )?);
-                Some(high as u16)
+                // Note: Not just high, but dy, because its purpose is in AdcCalLine::new_cal to
+                // compute the slope
+                let dy = high - low;
+                Some(dy as u16)
             }
             2 => {
                 let high = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
