@@ -133,14 +133,14 @@ impl<'d> PeripheralOutput<'d> for Output<'d> {
 }
 
 // Placeholders
-impl PeripheralInput<'static> for NoPin {
+impl PeripheralInput<'_> for NoPin {
     fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
         // Arbitrary choice but we need to overwrite a previous signal input
         // association.
         Level::Low.connect_input_to_peripheral(signal);
     }
 }
-impl PeripheralOutput<'static> for NoPin {
+impl PeripheralOutput<'_> for NoPin {
     fn connect_peripheral_to_output(&self, _: gpio::OutputSignal) {
         // A peripheral's outputs may be connected to any number of GPIOs.
         // Connecting to, and disconnecting from a NoPin is therefore a
@@ -155,7 +155,7 @@ impl PeripheralOutput<'static> for NoPin {
     }
 }
 
-impl PeripheralInput<'static> for Level {
+impl PeripheralInput<'_> for Level {
     fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
         let value = match self {
             Level::High => gpio::ONE_INPUT,
@@ -165,7 +165,7 @@ impl PeripheralInput<'static> for Level {
         connect_input_signal(signal, value, false, true);
     }
 }
-impl PeripheralOutput<'static> for Level {
+impl PeripheralOutput<'_> for Level {
     fn connect_peripheral_to_output(&self, _: gpio::OutputSignal) {
         // There is no such thing as a constant-high level peripheral output,
         // the implementation just exists for convenience.
@@ -682,13 +682,13 @@ impl<'d> From<InputSignal<'d>> for InputConnection<'d> {
     }
 }
 
-impl From<Level> for InputConnection<'static> {
+impl From<Level> for InputConnection<'_> {
     fn from(level: Level) -> Self {
         Self(InputConnectionInner::Constant(level))
     }
 }
 
-impl From<NoPin> for InputConnection<'static> {
+impl From<NoPin> for InputConnection<'_> {
     fn from(_pin: NoPin) -> Self {
         Self(InputConnectionInner::Constant(Level::Low))
     }
@@ -799,13 +799,13 @@ impl<'d> From<OutputSignal<'d>> for OutputConnection<'d> {
     }
 }
 
-impl From<NoPin> for OutputConnection<'static> {
+impl From<NoPin> for OutputConnection<'_> {
     fn from(_pin: NoPin) -> Self {
         Self(OutputConnectionInner::Constant(Level::Low))
     }
 }
 
-impl From<Level> for OutputConnection<'static> {
+impl From<Level> for OutputConnection<'_> {
     fn from(level: Level) -> Self {
         Self(OutputConnectionInner::Constant(level))
     }
