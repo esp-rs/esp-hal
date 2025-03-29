@@ -2,6 +2,7 @@
 // These are the tags. Either use them directly or use
 // esp_efuse_rtc_table_get_tag to calculate the corresponding tag.
 
+#![allow(unused)]
 use super::EfuseBlock;
 
 pub const TAG_RTCCALIB_V1IDX_A10L: usize = 1;

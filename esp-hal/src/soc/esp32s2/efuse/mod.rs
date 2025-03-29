@@ -205,6 +205,10 @@ impl Efuse {
         }
     }
 
+    /// Return the calibration voltage in mV. It's only used in the calculation
+    /// of the AdcCalLine::new_cal calibration. There it is assumed that this
+    /// value has already been corrected for the intercept, so we do that
+    /// explicityly here.
     pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
         let index = atten as usize;
         if index >= 4 {
@@ -214,7 +218,7 @@ impl Efuse {
         let (_, calib_version) = Self::block_version();
         let version_number = calib_version;
 
-        // Note: ... - ..._V_LOW because it's used as dx to calculate the slope in
+        // Note: ... - ..._V_LOW because it's used as dy to calculate the slope in
         // AdcCalLine::new_cal
         (match version_number {
             1 => RTC_CALIB_V_HIGH[index] - RTC_CALIB_V_LOW,
@@ -222,6 +226,10 @@ impl Efuse {
         }) as u16
     }
 
+    /// Return the adc value for the calibration point. It's only used in the
+    /// calculation of the AdcCalLine::new_cal calibration. There it is
+    /// assumed that this value has already been corrected for the
+    /// intercept, so we do that explicityly here.
     pub fn rtc_calib_cal_code(unit: u8, atten: Attenuation) -> Option<u16> {
         if unit >= 2 {
             return None;
@@ -243,10 +251,10 @@ impl Efuse {
                     atten,
                     RtcCalibParam::V1VHigh,
                 )?);
-                // Note: Not just high, but dy, because its purpose is in AdcCalLine::new_cal to
+                // Note: Not just high, but dx, because its purpose is in AdcCalLine::new_cal to
                 // compute the slope
-                let dy = high - low;
-                Some(dy as u16)
+                let dx = high - low;
+                Some(dx as u16)
             }
             2 => {
                 let high = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
