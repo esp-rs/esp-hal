@@ -16,7 +16,7 @@ mod calibration;
 pub(super) const NUM_ATTENS: usize = 10;
 
 cfg_if::cfg_if! {
-    if #[cfg(esp32s3)] {
+    if #[cfg(any(esp32s2, esp32s3))] {
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
         const ADC_CAL_CHANNEL: u16 = 15;
@@ -193,7 +193,7 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
@@ -296,7 +296,7 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
     }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
