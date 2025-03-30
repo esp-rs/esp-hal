@@ -163,10 +163,11 @@ impl Efuse {
     /// Extracted from prepare_calib_data_for(...),
     /// calculate_characterization_coefficients(...) &
     /// characterize_using_two_points(...)
-    pub fn rtc_calib_init_code(unit: u8, atten: Attenuation) -> Option<u16> {
-        if unit >= 2 {
+    pub fn rtc_calib_init_code(adcn: usize, atten: Attenuation) -> Option<u16> {
+        if adcn > 2 || adcn == 0 {
             return None;
         }
+        let unit = (adcn - 1) as u8;
         let (_, calib_version) = Self::block_version();
         let version_number = calib_version;
 
@@ -209,7 +210,12 @@ impl Efuse {
     /// of the AdcCalLine::new_cal calibration. There it is assumed that this
     /// value has already been corrected for the intercept, so we do that
     /// explicityly here.
-    pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
+    pub fn rtc_calib_cal_mv(adcn: usize, atten: Attenuation) -> u16 {
+        if adcn > 2 || adcn == 0 {
+            return 0;
+        }
+        let _unit = (adcn - 1) as u8;
+
         let index = atten as usize;
         if index >= 4 {
             return 0;
@@ -230,10 +236,11 @@ impl Efuse {
     /// calculation of the AdcCalLine::new_cal calibration. There it is
     /// assumed that this value has already been corrected for the
     /// intercept, so we do that explicityly here.
-    pub fn rtc_calib_cal_code(unit: u8, atten: Attenuation) -> Option<u16> {
-        if unit >= 2 {
+    pub fn rtc_calib_cal_code(adcn: usize, atten: Attenuation) -> Option<u16> {
+        if adcn > 2 || adcn == 0 {
             return None;
         }
+        let unit = (adcn - 1) as u8;
         let (_, calib_version) = Self::block_version();
         let version_number = calib_version;
 
