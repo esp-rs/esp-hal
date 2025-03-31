@@ -14,7 +14,7 @@ pub use generate::{generate_config, Error, Validator, Value};
 #[macro_export]
 macro_rules! esp_config_bool {
     ( $var:expr ) => {
-        match env!($var).as_bytes() {
+        match env!($var) {
             b"true" => true,
             b"false" => false,
             _ => ::core::panic!("boolean value must be either 'true' or 'false'"),
@@ -22,15 +22,11 @@ macro_rules! esp_config_bool {
     };
 }
 
-// TODO: From 1.82 on, we can use `<$ty>::from_str_radix(env!($var), 10)`
 /// Parse the value of an environment variable as an integer at compile time.
 #[macro_export]
 macro_rules! esp_config_int {
     ( $ty:ty, $var:expr ) => {
-        const {
-            const BYTES: &[u8] = env!($var).as_bytes();
-            $crate::esp_config_int_parse!($ty, BYTES)
-        }
+        const { $crate::esp_config_int_parse!($ty, env!($var)) }
     };
 }
 
@@ -44,37 +40,19 @@ macro_rules! esp_config_str {
 
 /// Parse a string like "777" into an integer, which _can_ be used in a `const`
 /// context
+///
+/// Not inlined into `esp_config_int` to make this easy to test.
 #[doc(hidden)] // To avoid confusion with `esp_config_int`, hide this in the docs
 #[macro_export]
 macro_rules! esp_config_int_parse {
-    ( $ty:ty, $bytes:expr ) => {{
-        let mut bytes = $bytes;
-        let mut val: $ty = 0;
-        let mut sign_seen = false;
-        let mut is_negative = false;
-
-        while let [byte, rest @ ..] = bytes {
-            match *byte {
-                b'0'..=b'9' => {
-                    val = val * 10 + (*byte - b'0') as $ty;
-                }
-                b'-' | b'+' if !sign_seen => {
-                    is_negative = *byte == b'-';
-                    sign_seen = true;
-                }
-                _ => ::core::panic!("invalid character encountered while parsing integer"),
+    ( $ty:ty, $s:expr ) => {{
+        let val: $ty = match <$ty>::from_str_radix($s, 10) {
+            Ok(val) => val as $ty,
+            Err(_) => {
+                core::assert!(false, concat!("Unable to parse '", $s, "' as a number."));
+                0
             }
-
-            bytes = rest;
-        }
-
-        if is_negative {
-            let original = val;
-            // Subtract the value twice to get a negative:
-            val -= original;
-            val -= original;
-        }
-
+        };
         val
     }};
 }
@@ -83,28 +61,28 @@ macro_rules! esp_config_int_parse {
 mod test {
     // We can only test success in the const context
     const _: () = {
-        core::assert!(esp_config_int_parse!(i64, "-77777".as_bytes()) == -77777);
-        core::assert!(esp_config_int_parse!(isize, "-7777".as_bytes()) == -7777);
-        core::assert!(esp_config_int_parse!(i32, "-999".as_bytes()) == -999);
-        core::assert!(esp_config_int_parse!(i16, "-99".as_bytes()) == -99);
-        core::assert!(esp_config_int_parse!(i8, "-9".as_bytes()) == -9);
+        core::assert!(esp_config_int_parse!(i64, "-77777") == -77777);
+        core::assert!(esp_config_int_parse!(isize, "-7777") == -7777);
+        core::assert!(esp_config_int_parse!(i32, "-999") == -999);
+        core::assert!(esp_config_int_parse!(i16, "-99") == -99);
+        core::assert!(esp_config_int_parse!(i8, "-9") == -9);
 
-        core::assert!(esp_config_int_parse!(u64, "77777".as_bytes()) == 77777);
-        core::assert!(esp_config_int_parse!(usize, "7777".as_bytes()) == 7777);
-        core::assert!(esp_config_int_parse!(u32, "999".as_bytes()) == 999);
-        core::assert!(esp_config_int_parse!(u16, "99".as_bytes()) == 99);
-        core::assert!(esp_config_int_parse!(u8, "9".as_bytes()) == 9);
+        core::assert!(esp_config_int_parse!(u64, "77777") == 77777);
+        core::assert!(esp_config_int_parse!(usize, "7777") == 7777);
+        core::assert!(esp_config_int_parse!(u32, "999") == 999);
+        core::assert!(esp_config_int_parse!(u16, "99") == 99);
+        core::assert!(esp_config_int_parse!(u8, "9") == 9);
     };
 
     #[test]
     #[should_panic]
     fn test_expect_positive() {
-        esp_config_int_parse!(u8, "-5".as_bytes());
+        esp_config_int_parse!(u8, "-5");
     }
 
     #[test]
     #[should_panic]
     fn test_invalid_digit() {
-        esp_config_int_parse!(u32, "a".as_bytes());
+        esp_config_int_parse!(u32, "a");
     }
 }
