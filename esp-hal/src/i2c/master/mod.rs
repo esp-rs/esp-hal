@@ -479,14 +479,14 @@ impl<'d> I2c<'d, Blocking> {
     ///
     /// A [`ConfigError`] variant will be returned if bus frequency or timeout
     /// passed in config is invalid.
-    pub fn new(i2c: impl Instance<'d>, config: Config) -> Result<Self, ConfigError> {
+    pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
         let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
         let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
 
         let i2c = I2c {
-            i2c: i2c.into(),
+            i2c: i2c.degrade(),
             phantom: PhantomData,
             config,
             guard,
@@ -2616,7 +2616,7 @@ pub struct State {
 }
 
 /// A peripheral singleton compatible with the I2C master driver.
-pub trait Instance<'d>: crate::private::Sealed + Into<AnyI2c<'d>> {
+pub trait Instance: crate::private::Sealed + super::IntoAnyI2c {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);
@@ -2724,7 +2724,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 
 macro_rules! instance {
     ($inst:ident, $peri:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
-        impl<'d> Instance<'d> for crate::peripherals::$inst<'d> {
+        impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {
                 #[crate::handler]
                 pub(super) fn irq_handler() {
@@ -2756,7 +2756,7 @@ instance!(I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA, I2C_EXT0);
 #[cfg(i2c1)]
 instance!(I2C1, I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA, I2C_EXT1);
 
-impl<'d> Instance<'d> for AnyI2c<'d> {
+impl Instance for AnyI2c<'_> {
     delegate::delegate! {
         to match &self.0 {
             AnyI2cInner::I2c0(i2c) => i2c,

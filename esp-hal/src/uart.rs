@@ -370,9 +370,9 @@ impl<'d, Dm> UartBuilder<'d, Dm>
 where
     Dm: DriverMode,
 {
-    fn new(uart: impl Instance<'d>) -> Self {
+    fn new(uart: impl Instance + 'd) -> Self {
         Self {
-            uart: uart.into(),
+            uart: uart.degrade(),
             phantom: PhantomData,
         }
     }
@@ -557,7 +557,7 @@ impl<'d> UartTx<'d, Blocking> {
     /// # }
     /// ```
     #[instability::unstable]
-    pub fn new(uart: impl Instance<'d>, config: Config) -> Result<Self, ConfigError> {
+    pub fn new(uart: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let (_, uart_tx) = UartBuilder::new(uart).init(config)?.split();
 
         Ok(uart_tx)
@@ -853,7 +853,7 @@ impl<'d> UartRx<'d, Blocking> {
     /// # }
     /// ```
     #[instability::unstable]
-    pub fn new(uart: impl Instance<'d>, config: Config) -> Result<Self, ConfigError> {
+    pub fn new(uart: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let (uart_rx, _) = UartBuilder::new(uart).init(config)?.split();
 
         Ok(uart_rx)
@@ -1225,7 +1225,7 @@ impl<'d> Uart<'d, Blocking> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(uart: impl Instance<'d>, config: Config) -> Result<Self, ConfigError> {
+    pub fn new(uart: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         UartBuilder::new(uart).init(config)
     }
 
@@ -1702,7 +1702,7 @@ where
         Ok(())
     }
 
-    fn is_instance<'a>(&self, other: impl Instance<'a>) -> bool {
+    fn is_instance(&self, other: impl Instance) -> bool {
         self.tx.uart.info().is_instance(other)
     }
 
@@ -1972,7 +1972,7 @@ struct UartRxFuture {
 }
 
 impl UartRxFuture {
-    fn new<'d>(uart: impl Instance<'d>, events: impl Into<EnumSet<RxEvent>>) -> Self {
+    fn new(uart: impl Instance, events: impl Into<EnumSet<RxEvent>>) -> Self {
         Self {
             events: events.into(),
             uart: uart.info(),
@@ -2022,7 +2022,7 @@ struct UartTxFuture {
 }
 
 impl UartTxFuture {
-    fn new<'d>(uart: impl Instance<'d>, events: impl Into<EnumSet<TxEvent>>) -> Self {
+    fn new(uart: impl Instance, events: impl Into<EnumSet<TxEvent>>) -> Self {
         Self {
             events: events.into(),
             uart: uart.info(),
@@ -2363,7 +2363,7 @@ pub mod lp_uart {
 }
 
 /// A peripheral singleton compatible with the UART driver.
-pub trait Instance<'d>: crate::private::Sealed + Into<AnyUart<'d>> {
+pub trait Instance: crate::private::Sealed + IntoAnyUart {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this UART instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -2727,7 +2727,7 @@ impl Info {
         Ok(())
     }
 
-    fn is_instance<'a>(&self, other: impl Instance<'a>) -> bool {
+    fn is_instance(&self, other: impl Instance) -> bool {
         self == other.info()
     }
 
@@ -2982,7 +2982,7 @@ unsafe impl Sync for Info {}
 
 macro_rules! impl_instance {
     ($inst:ident, $peri:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
-        impl<'d> Instance<'d> for crate::peripherals::$inst<'d> {
+        impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[crate::handler]
                 pub(super) fn irq_handler() {
@@ -3029,7 +3029,7 @@ crate::any_peripheral! {
     }
 }
 
-impl<'d> Instance<'d> for AnyUart<'d> {
+impl Instance for AnyUart<'_> {
     #[inline]
     fn parts(&self) -> (&'static Info, &'static State) {
         match &self.0 {

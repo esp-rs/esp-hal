@@ -103,11 +103,11 @@ pub struct Spi<'d, Dm: DriverMode> {
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     #[instability::unstable]
-    pub fn new(spi: impl Instance<'d>, mode: Mode) -> Spi<'d, Blocking> {
+    pub fn new(spi: impl Instance + 'd, mode: Mode) -> Spi<'d, Blocking> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
         let this = Spi {
-            spi: spi.into(),
+            spi: spi.degrade(),
             data_mode: mode,
             _mode: PhantomData,
             _guard: guard,
@@ -547,7 +547,7 @@ pub mod dma {
 }
 
 /// A peripheral singleton compatible with the SPI slave driver.
-pub trait Instance<'d>: crate::private::Sealed + Into<AnySpi<'d>> {
+pub trait Instance: crate::private::Sealed + super::IntoAnySpi {
     /// Returns the peripheral data describing this SPI instance.
     #[doc(hidden)]
     fn info(&self) -> &'static Info;
@@ -555,11 +555,11 @@ pub trait Instance<'d>: crate::private::Sealed + Into<AnySpi<'d>> {
 
 /// A marker for DMA-capable SPI peripheral instances.
 #[doc(hidden)]
-pub trait InstanceDma<'d>: Instance<'d> + DmaEligible {}
+pub trait InstanceDma: Instance + DmaEligible {}
 
-impl<'d> InstanceDma<'d> for crate::peripherals::SPI2<'d> {}
+impl InstanceDma for crate::peripherals::SPI2<'_> {}
 #[cfg(spi3)]
-impl<'d> InstanceDma<'d> for crate::peripherals::SPI3<'d> {}
+impl InstanceDma for crate::peripherals::SPI3<'_> {}
 
 /// Peripheral data describing a particular SPI instance.
 #[non_exhaustive]
@@ -765,7 +765,7 @@ unsafe impl Sync for Info {}
 macro_rules! spi_instance {
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
         paste::paste! {
-            impl<'d> Instance<'d> for crate::peripherals::[<SPI $num>]<'d> {
+            impl Instance for crate::peripherals::[<SPI $num>]<'_> {
                 #[inline(always)]
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
@@ -798,7 +798,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl<'d> Instance<'d> for super::AnySpi<'d> {
+impl Instance for super::AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,
@@ -810,4 +810,4 @@ impl<'d> Instance<'d> for super::AnySpi<'d> {
     }
 }
 
-impl<'d> InstanceDma<'d> for super::AnySpi<'d> {}
+impl InstanceDma for super::AnySpi<'_> {}

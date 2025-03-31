@@ -935,13 +935,13 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new(
-        peripheral: impl Instance<'d>,
+        peripheral: impl Instance + 'd,
         rx_pin: impl PeripheralInput<'d>,
         tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        Self::new_internal(peripheral.into(), rx_pin, tx_pin, baud_rate, false, mode)
+        Self::new_internal(peripheral.degrade(), rx_pin, tx_pin, baud_rate, false, mode)
     }
 
     /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
@@ -950,13 +950,13 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
     pub fn new_no_transceiver(
-        peripheral: impl Instance<'d>,
+        peripheral: impl Instance + 'd,
         rx_pin: impl PeripheralInput<'d>,
         tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        Self::new_internal(peripheral.into(), rx_pin, tx_pin, baud_rate, true, mode)
+        Self::new_internal(peripheral.degrade(), rx_pin, tx_pin, baud_rate, true, mode)
     }
 
     /// Convert the configuration into an async configuration.
@@ -1584,12 +1584,12 @@ impl PrivateInstance for AnyTwai<'_> {
 }
 
 /// A peripheral singleton compatible with the TWAI driver.
-pub trait Instance<'d>: PrivateInstance + Into<AnyTwai<'d>> {}
+pub trait Instance: PrivateInstance + IntoAnyTwai {}
 
-impl<'d> Instance<'d> for crate::peripherals::TWAI0<'d> {}
+impl Instance for crate::peripherals::TWAI0<'_> {}
 #[cfg(twai1)]
-impl<'d> Instance<'d> for crate::peripherals::TWAI1<'d> {}
-impl<'d> Instance<'d> for AnyTwai<'d> {}
+impl Instance for crate::peripherals::TWAI1<'_> {}
+impl Instance for AnyTwai<'_> {}
 
 mod asynch {
     use core::{future::poll_fn, task::Poll};

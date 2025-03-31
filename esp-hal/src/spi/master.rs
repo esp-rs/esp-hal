@@ -675,7 +675,7 @@ impl<'d> Spi<'d, Blocking> {
     /// # Errors
     ///
     /// See [`Spi::apply_config`].
-    pub fn new(spi: impl Instance<'d>, config: Config) -> Result<Self, ConfigError> {
+    pub fn new(spi: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
         let mosi_pin = PinGuard::new_unconnected(spi.info().mosi);
@@ -686,7 +686,7 @@ impl<'d> Spi<'d, Blocking> {
         let sio3_pin = spi.info().sio3_output.map(PinGuard::new_unconnected);
 
         let mut this = Spi {
-            spi: spi.into(),
+            spi: spi.degrade(),
             _mode: PhantomData,
             guard,
             pins: SpiPinGuard {
@@ -3773,7 +3773,7 @@ struct Esp32Hack {
 unsafe impl Sync for Esp32Hack {}
 
 #[cfg_attr(place_spi_driver_in_ram, ram)]
-fn handle_async<'d, I: Instance<'d>>(instance: I) {
+fn handle_async(instance: impl Instance) {
     let state = instance.state();
     let info = instance.info();
 
@@ -3785,7 +3785,7 @@ fn handle_async<'d, I: Instance<'d>>(instance: I) {
 }
 
 /// A peripheral singleton compatible with the SPI master driver.
-pub trait Instance<'d>: PeripheralInstance + Into<AnySpi<'d>> {
+pub trait Instance: PeripheralInstance + super::IntoAnySpi {
     #[doc(hidden)]
     fn state(&self) -> &'static State;
     #[doc(hidden)]
@@ -3794,7 +3794,7 @@ pub trait Instance<'d>: PeripheralInstance + Into<AnySpi<'d>> {
 
 macro_rules! master_instance {
     ($peri:ident) => {
-        impl<'d> Instance<'d> for $crate::peripherals::$peri<'d> {
+        impl Instance for $crate::peripherals::$peri<'_> {
             fn state(&self) -> &'static State {
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
@@ -3825,7 +3825,7 @@ master_instance!(SPI2);
 #[cfg(spi3)]
 master_instance!(SPI3);
 
-impl<'d> Instance<'d> for super::AnySpi<'d> {
+impl Instance for super::AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,

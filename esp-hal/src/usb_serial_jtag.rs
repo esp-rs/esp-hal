@@ -452,7 +452,7 @@ where
 
 /// USB Serial/JTAG peripheral instance
 #[doc(hidden)]
-pub trait Instance<'d>: crate::private::Sealed {
+pub trait Instance: crate::private::Sealed {
     /// Get a reference to the peripheral's underlying register block
     fn register_block(&self) -> &RegisterBlock;
 
@@ -479,7 +479,7 @@ pub trait Instance<'d>: crate::private::Sealed {
     }
 }
 
-impl<'d> Instance<'d> for USB_DEVICE<'d> {
+impl Instance for USB_DEVICE<'_> {
     #[inline(always)]
     fn register_block(&self) -> &RegisterBlock {
         USB_DEVICE::regs()

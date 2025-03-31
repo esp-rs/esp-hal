@@ -198,7 +198,7 @@ impl<'d> Trace<'d> {
 
 /// Trace peripheral instance
 #[doc(hidden)]
-pub trait Instance<'d>: crate::private::Sealed {
+pub trait Instance: crate::private::Sealed {
     /// Get a reference to the peripheral's underlying register block
     fn register_block(&self) -> &RegisterBlock;
 
@@ -206,7 +206,7 @@ pub trait Instance<'d>: crate::private::Sealed {
     fn peripheral(&self) -> crate::system::Peripheral;
 }
 
-impl<'d> Instance<'d> for TRACE0<'d> {
+impl Instance for TRACE0<'_> {
     fn register_block(&self) -> &RegisterBlock {
         self.register_block()
     }

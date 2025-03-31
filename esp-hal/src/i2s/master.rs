@@ -326,7 +326,7 @@ impl<'d> I2s<'d, Blocking> {
     /// peripheral
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        i2s: impl Instance<'d>,
+        i2s: impl Instance + 'd,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: Rate,
@@ -335,7 +335,7 @@ impl<'d> I2s<'d, Blocking> {
         let channel = Channel::new(channel.degrade());
         channel.runtime_ensure_compatible(&i2s);
 
-        let i2s = i2s.into();
+        let i2s = i2s.degrade();
 
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -662,11 +662,11 @@ where
 }
 
 /// A peripheral singleton compatible with the I2S master driver.
-pub trait Instance<'d>: RegisterAccessPrivate + Into<AnyI2s<'d>> {}
-impl<'d> Instance<'d> for crate::peripherals::I2S0<'d> {}
+pub trait Instance: RegisterAccessPrivate + super::IntoAnyI2s {}
+impl Instance for crate::peripherals::I2S0<'_> {}
 #[cfg(i2s1)]
-impl<'d> Instance<'d> for crate::peripherals::I2S1<'d> {}
-impl<'d> Instance<'d> for AnyI2s<'d> {}
+impl Instance for crate::peripherals::I2S1<'_> {}
+impl Instance for AnyI2s<'_> {}
 
 mod private {
     use enumset::EnumSet;

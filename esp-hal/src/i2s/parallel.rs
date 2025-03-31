@@ -131,7 +131,7 @@ use crate::{
 #[doc(hidden)]
 pub trait TxPins<'d> {
     fn bus_width(&self) -> u8;
-    fn configure(&mut self, instance: &impl Instance<'d>);
+    fn configure(&mut self, instance: &(impl Instance + 'd));
 }
 
 /// Represents a group of 16 output pins configured for 16-bit parallel data
@@ -189,7 +189,7 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
         self.pins.len() as u8
     }
 
-    fn configure(&mut self, instance: &impl Instance<'d>) {
+    fn configure(&mut self, instance: &(impl Instance + 'd)) {
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
             pin.set_to_push_pull_output();
@@ -237,7 +237,7 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
         self.pins.len() as u8
     }
 
-    fn configure(&mut self, instance: &impl Instance<'d>) {
+    fn configure(&mut self, instance: &(impl Instance + 'd)) {
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
             pin.set_to_push_pull_output();
@@ -259,7 +259,7 @@ where
 impl<'d> I2sParallel<'d, Blocking> {
     /// Create a new I2S Parallel Interface
     pub fn new(
-        i2s: impl Instance<'d>,
+        i2s: impl Instance + 'd,
         channel: impl DmaChannelFor<AnyI2s<'d>>,
         frequency: Rate,
         mut pins: impl TxPins<'d>,
@@ -268,7 +268,7 @@ impl<'d> I2sParallel<'d, Blocking> {
         let channel = Channel::new(channel.degrade());
         channel.runtime_ensure_compatible(&i2s);
 
-        let i2s = i2s.into();
+        let i2s = i2s.degrade();
 
         let guard = PeripheralGuard::new(i2s.peripheral());
 
@@ -784,9 +784,9 @@ impl PrivateInstance for AnyI2s<'_> {
 }
 
 /// A peripheral singleton compatible with the I2S parallel driver.
-pub trait Instance<'d>: Into<AnyI2s<'d>> + PrivateInstance {}
+pub trait Instance: PrivateInstance + super::IntoAnyI2s {}
 
-impl<'d> Instance<'d> for I2S0<'d> {}
+impl Instance for I2S0<'_> {}
 #[cfg(i2s1)]
-impl<'d> Instance<'d> for I2S1<'d> {}
-impl<'d> Instance<'d> for AnyI2s<'d> {}
+impl Instance for I2S1<'_> {}
+impl Instance for AnyI2s<'_> {}

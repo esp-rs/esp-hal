@@ -85,6 +85,15 @@ macro_rules! any_enum {
 
 #[doc(hidden)]
 /// Shorthand to define AnyPeripheral instances.
+///
+/// This macro generates the following:
+///
+/// - An `AnyPeripheral` struct, name provided by the macro call.
+/// - An `AnyPeripheralInner` enum, with the same variants as the original
+///   peripheral.
+/// - A `From` implementation for each peripheral variant.
+/// - A `degrade` method for each peripheral variant using the
+///   `IntoAnyPeripheral` trait.
 #[macro_export]
 macro_rules! any_peripheral {
     ($(#[$meta:meta])* $vis:vis peripheral $name:ident<'d> {
@@ -156,9 +165,42 @@ macro_rules! any_peripheral {
                 }
             }
 
+            /// Trick to make peripherals implement Into, without
+            /// requiring Instance traits to have lifetimes.
+            #[doc(hidden)]
+            pub trait [<Into $name>]: Sized + $crate::private::Sealed {
+                fn degrade<'a>(self) -> $name<'a>
+                where
+                    Self: 'a;
+            }
+
+            // AnyPeripheral converts into itself
+            impl<'d> [<Into $name>] for $name<'d> {
+                #[inline]
+                fn degrade<'a>(self) -> $name<'a>
+                where
+                    Self: 'a,
+                {
+                    self
+                }
+            }
+
             $(
+                // Variants convert into AnyPeripheral
+                $(#[cfg($variant_meta)])*
+                impl<'d> [<Into $name>] for $inner {
+                    #[inline]
+                    fn degrade<'a>(self) -> $name<'a>
+                    where
+                        Self: 'a,
+                    {
+                        $name::from(self)
+                    }
+                }
+
                 $(#[cfg($variant_meta)])*
                 impl<'d> From<$inner> for $name<'d> {
+                    #[inline]
                     fn from(inner: $inner) -> Self {
                         Self([< $name Inner >]::$variant(inner))
                     }
@@ -167,6 +209,7 @@ macro_rules! any_peripheral {
                 $(#[cfg($variant_meta)])*
                 impl<'d> $inner {
                     #[doc = concat!("Type-erase this peripheral into an [`", stringify!($name), "`].")]
+                    #[inline]
                     pub fn degrade(self) -> $name<'d> {
                         $name::from(self)
                     }
