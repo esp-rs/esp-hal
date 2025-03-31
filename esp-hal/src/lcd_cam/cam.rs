@@ -127,7 +127,7 @@ pub struct Cam<'d> {
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
     lcd_cam: LCD_CAM<'d>,
-    rx_channel: ChannelRx<'d, Blocking, PeripheralRxChannel<LCD_CAM<'d>>>,
+    rx_channel: ChannelRx<Blocking, PeripheralRxChannel<LCD_CAM<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 

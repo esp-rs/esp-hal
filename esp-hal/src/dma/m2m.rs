@@ -31,7 +31,7 @@ pub struct Mem2Mem<'d, Dm>
 where
     Dm: DriverMode,
 {
-    channel: Channel<'d, Dm, AnyGdmaChannel<'d>>,
+    channel: Channel<Dm, AnyGdmaChannel<'d>>,
     rx_chain: DescriptorChain,
     tx_chain: DescriptorChain,
     peripheral: DmaPeripheral,
@@ -163,7 +163,7 @@ impl<'d, Dm> DmaSupportRx for Mem2Mem<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type RX = ChannelRx<'d, Dm, AnyGdmaRxChannel<'d>>;
+    type RX = ChannelRx<Dm, AnyGdmaRxChannel<'d>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.channel.rx

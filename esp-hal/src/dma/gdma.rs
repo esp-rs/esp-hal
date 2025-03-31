@@ -579,7 +579,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     }
 }
 
-impl<CH: DmaChannel, Dm: DriverMode> Channel<'_, Dm, CH> {
+impl<CH: DmaChannel, Dm: DriverMode> Channel<Dm, CH> {
     /// Asserts that the channel is compatible with the given peripheral.
     pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &P) {
         // No runtime checks; GDMA channels are compatible with any peripheral

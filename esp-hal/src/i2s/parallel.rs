@@ -252,7 +252,7 @@ where
     Dm: DriverMode,
 {
     instance: AnyI2s<'d>,
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s<'d>>>,
+    tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
     _guard: PeripheralGuard,
 }
 

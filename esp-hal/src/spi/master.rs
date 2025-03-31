@@ -1258,7 +1258,7 @@ mod dma {
         Dm: DriverMode,
     {
         pub(crate) spi: AnySpi<'d>,
-        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<AnySpi<'d>>>,
+        pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]

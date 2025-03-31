@@ -275,7 +275,7 @@ pub mod dma {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
-        channel: Channel<'d, Blocking, PeripheralDmaChannel<AES<'d>>>,
+        channel: Channel<Blocking, PeripheralDmaChannel<AES<'d>>>,
     }
 
     impl<'d> crate::aes::Aes<'d> {

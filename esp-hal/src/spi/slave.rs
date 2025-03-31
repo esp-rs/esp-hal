@@ -209,7 +209,7 @@ pub mod dma {
         Dm: DriverMode,
     {
         pub(crate) spi: AnySpi<'d>,
-        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<AnySpi<'d>>>,
+        pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
         rx_chain: DescriptorChain,
         tx_chain: DescriptorChain,
         _guard: PeripheralGuard,
@@ -246,7 +246,7 @@ pub mod dma {
     where
         Dm: DriverMode,
     {
-        type TX = ChannelTx<'d, Dm, PeripheralTxChannel<AnySpi<'d>>>;
+        type TX = ChannelTx<Dm, PeripheralTxChannel<AnySpi<'d>>>;
 
         fn tx(&mut self) -> &mut Self::TX {
             &mut self.channel.tx
@@ -261,7 +261,7 @@ pub mod dma {
     where
         Dm: DriverMode,
     {
-        type RX = ChannelRx<'d, Dm, PeripheralRxChannel<AnySpi<'d>>>;
+        type RX = ChannelRx<Dm, PeripheralRxChannel<AnySpi<'d>>>;
 
         fn rx(&mut self) -> &mut Self::RX {
             &mut self.channel.rx

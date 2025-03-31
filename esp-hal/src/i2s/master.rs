@@ -402,7 +402,7 @@ where
     Dm: DriverMode,
 {
     i2s: AnyI2s<'d>,
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s<'d>>>,
+    tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
     tx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
@@ -433,7 +433,7 @@ impl<'d, Dm> DmaSupportTx for I2sTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type TX = ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s<'d>>>;
+    type TX = ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>;
 
     fn tx(&mut self) -> &mut Self::TX {
         &mut self.tx_channel
@@ -530,7 +530,7 @@ where
     Dm: DriverMode,
 {
     i2s: AnyI2s<'d>,
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s<'d>>>,
+    rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
     rx_chain: DescriptorChain,
     _guard: PeripheralGuard,
 }
@@ -561,7 +561,7 @@ impl<'d, Dm> DmaSupportRx for I2sRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type RX = ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s<'d>>>;
+    type RX = ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>;
 
     fn rx(&mut self) -> &mut Self::RX {
         &mut self.rx_channel
@@ -693,7 +693,7 @@ mod private {
         Dm: DriverMode,
     {
         pub i2s: AnyI2s<'d>,
-        pub tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<AnyI2s<'d>>>,
+        pub tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
         pub(crate) guard: PeripheralGuard,
     }
 
@@ -741,7 +741,7 @@ mod private {
         Dm: DriverMode,
     {
         pub i2s: AnyI2s<'d>,
-        pub rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<AnyI2s<'d>>>,
+        pub rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
         pub(crate) guard: PeripheralGuard,
     }
 

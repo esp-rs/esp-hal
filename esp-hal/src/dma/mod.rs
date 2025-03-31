@@ -1807,19 +1807,19 @@ fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
-pub struct ChannelRx<'a, Dm, CH>
+pub struct ChannelRx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
     pub(crate) rx_impl: CH,
-    pub(crate) _phantom: PhantomData<(Dm, &'a mut ())>,
+    pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: PeripheralGuard,
 }
 
-impl<'a, CH> ChannelRx<'a, Blocking, CH>
+impl<CH> ChannelRx<Blocking, CH>
 where
-    CH: DmaRxChannel + 'a,
+    CH: DmaRxChannel,
 {
     /// Creates a new RX channel half.
     pub fn new(rx_impl: CH) -> Self {
@@ -1845,7 +1845,7 @@ where
     }
 
     /// Converts a blocking channel to an async channel.
-    pub(crate) fn into_async(mut self) -> ChannelRx<'a, Async, CH> {
+    pub(crate) fn into_async(mut self) -> ChannelRx<Async, CH> {
         if let Some(handler) = self.rx_impl.async_handler() {
             self.set_interrupt_handler(handler);
         }
@@ -1871,12 +1871,12 @@ where
     }
 }
 
-impl<'a, CH> ChannelRx<'a, Async, CH>
+impl<CH> ChannelRx<Async, CH>
 where
     CH: DmaRxChannel,
 {
     /// Converts an async channel into a blocking channel.
-    pub(crate) fn into_blocking(self) -> ChannelRx<'a, Blocking, CH> {
+    pub(crate) fn into_blocking(self) -> ChannelRx<Blocking, CH> {
         if let Some(interrupt) = self.rx_impl.peripheral_interrupt() {
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
@@ -1889,7 +1889,7 @@ where
     }
 }
 
-impl<Dm, CH> ChannelRx<'_, Dm, CH>
+impl<Dm, CH> ChannelRx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaRxChannel,
@@ -1933,14 +1933,14 @@ where
     }
 }
 
-impl<Dm, CH> crate::private::Sealed for ChannelRx<'_, Dm, CH>
+impl<Dm, CH> crate::private::Sealed for ChannelRx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
 }
 
-impl<Dm, CH> Rx for ChannelRx<'_, Dm, CH>
+impl<Dm, CH> Rx for ChannelRx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaRxChannel,
@@ -2106,19 +2106,19 @@ pub trait Tx: crate::private::Sealed {
 
 /// DMA transmit channel
 #[doc(hidden)]
-pub struct ChannelTx<'a, Dm, CH>
+pub struct ChannelTx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
     pub(crate) tx_impl: CH,
-    pub(crate) _phantom: PhantomData<(Dm, &'a mut ())>,
+    pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: PeripheralGuard,
 }
 
-impl<'a, CH> ChannelTx<'a, Blocking, CH>
+impl<CH> ChannelTx<Blocking, CH>
 where
-    CH: DmaTxChannel + 'a,
+    CH: DmaTxChannel,
 {
     /// Creates a new TX channel half.
     pub fn new(tx_impl: CH) -> Self {
@@ -2138,7 +2138,7 @@ where
     }
 
     /// Converts a blocking channel to an async channel.
-    pub(crate) fn into_async(mut self) -> ChannelTx<'a, Async, CH> {
+    pub(crate) fn into_async(mut self) -> ChannelTx<Async, CH> {
         if let Some(handler) = self.tx_impl.async_handler() {
             self.set_interrupt_handler(handler);
         }
@@ -2164,12 +2164,12 @@ where
     }
 }
 
-impl<'a, CH> ChannelTx<'a, Async, CH>
+impl<CH> ChannelTx<Async, CH>
 where
     CH: DmaTxChannel,
 {
     /// Converts an async channel into a blocking channel.
-    pub(crate) fn into_blocking(self) -> ChannelTx<'a, Blocking, CH> {
+    pub(crate) fn into_blocking(self) -> ChannelTx<Blocking, CH> {
         if let Some(interrupt) = self.tx_impl.peripheral_interrupt() {
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
@@ -2182,7 +2182,7 @@ where
     }
 }
 
-impl<Dm, CH> ChannelTx<'_, Dm, CH>
+impl<Dm, CH> ChannelTx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
@@ -2228,14 +2228,14 @@ where
     }
 }
 
-impl<Dm, CH> crate::private::Sealed for ChannelTx<'_, Dm, CH>
+impl<Dm, CH> crate::private::Sealed for ChannelTx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
 }
 
-impl<Dm, CH> Tx for ChannelTx<'_, Dm, CH>
+impl<Dm, CH> Tx for ChannelTx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
@@ -2448,20 +2448,20 @@ pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
 
 /// DMA Channel
 #[non_exhaustive]
-pub struct Channel<'d, Dm, CH>
+pub struct Channel<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaChannel,
 {
     /// RX half of the channel
-    pub rx: ChannelRx<'d, Dm, CH::Rx>,
+    pub rx: ChannelRx<Dm, CH::Rx>,
     /// TX half of the channel
-    pub tx: ChannelTx<'d, Dm, CH::Tx>,
+    pub tx: ChannelTx<Dm, CH::Tx>,
 }
 
-impl<'d, CH> Channel<'d, Blocking, CH>
+impl<CH> Channel<Blocking, CH>
 where
-    CH: DmaChannel + 'd,
+    CH: DmaChannel,
 {
     /// Creates a new DMA channel driver.
     #[instability::unstable]
@@ -2532,7 +2532,7 @@ where
     }
 
     /// Converts a blocking channel to an async channel.
-    pub fn into_async(self) -> Channel<'d, Async, CH> {
+    pub fn into_async(self) -> Channel<Async, CH> {
         Channel {
             rx: self.rx.into_async(),
             tx: self.tx.into_async(),
@@ -2540,12 +2540,12 @@ where
     }
 }
 
-impl<'d, CH> Channel<'d, Async, CH>
+impl<CH> Channel<Async, CH>
 where
     CH: DmaChannel,
 {
     /// Converts an async channel to a blocking channel.
-    pub fn into_blocking(self) -> Channel<'d, Blocking, CH> {
+    pub fn into_blocking(self) -> Channel<Blocking, CH> {
         Channel {
             rx: self.rx.into_blocking(),
             tx: self.tx.into_blocking(),
@@ -2553,14 +2553,14 @@ where
     }
 }
 
-impl<'d, CH: DmaChannel + 'd> From<Channel<'d, Blocking, CH>> for Channel<'d, Async, CH> {
-    fn from(channel: Channel<'d, Blocking, CH>) -> Self {
+impl<CH: DmaChannel> From<Channel<Blocking, CH>> for Channel<Async, CH> {
+    fn from(channel: Channel<Blocking, CH>) -> Self {
         channel.into_async()
     }
 }
 
-impl<'d, CH: DmaChannel + 'd> From<Channel<'d, Async, CH>> for Channel<'d, Blocking, CH> {
-    fn from(channel: Channel<'d, Async, CH>) -> Self {
+impl<CH: DmaChannel> From<Channel<Async, CH>> for Channel<Blocking, CH> {
+    fn from(channel: Channel<Async, CH>) -> Self {
         channel.into_blocking()
     }
 }

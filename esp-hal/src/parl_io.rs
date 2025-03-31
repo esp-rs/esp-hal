@@ -879,7 +879,7 @@ pub struct ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO<'d>>>,
+    tx_channel: ChannelTx<Dm, PeripheralTxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -958,7 +958,7 @@ pub struct ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO<'d>>>,
+    rx_channel: ChannelRx<Dm, PeripheralRxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1752,7 +1752,7 @@ pub struct TxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO<'d>>>,
+    tx_channel: ChannelTx<Dm, PeripheralTxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1761,7 +1761,7 @@ pub struct RxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO<'d>>>,
+    rx_channel: ChannelRx<Dm, PeripheralRxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1770,7 +1770,7 @@ pub struct TxCreatorFullDuplex<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<'d, Dm, PeripheralTxChannel<PARL_IO<'d>>>,
+    tx_channel: ChannelTx<Dm, PeripheralTxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
@@ -1779,7 +1779,7 @@ pub struct RxCreatorFullDuplex<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<'d, Dm, PeripheralRxChannel<PARL_IO<'d>>>,
+    rx_channel: ChannelRx<Dm, PeripheralRxChannel<PARL_IO<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 

@@ -166,7 +166,7 @@ pub(super) fn init_dma(_cs: CriticalSection<'_>) {
     }
 }
 
-impl<CH, Dm> Channel<'_, Dm, CH>
+impl<CH, Dm> Channel<Dm, CH>
 where
     CH: DmaChannel,
     Dm: DriverMode,

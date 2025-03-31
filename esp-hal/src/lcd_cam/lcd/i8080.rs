@@ -93,7 +93,7 @@ pub enum ConfigError {
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, Dm: DriverMode> {
     lcd_cam: LCD_CAM<'d>,
-    tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM<'d>>>,
+    tx_channel: ChannelTx<Blocking, PeripheralTxChannel<LCD_CAM<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
