@@ -14,7 +14,7 @@ pub use generate::{generate_config, Error, Validator, Value};
 #[macro_export]
 macro_rules! esp_config_bool {
     ( $var:expr ) => {
-        match env!($var) {
+        match env!($var).as_bytes() {
             b"true" => true,
             b"false" => false,
             _ => ::core::panic!("boolean value must be either 'true' or 'false'"),
@@ -49,7 +49,7 @@ macro_rules! esp_config_int_parse {
         let val: $ty = match <$ty>::from_str_radix($s, 10) {
             Ok(val) => val as $ty,
             Err(_) => {
-                core::assert!(false, concat!("Unable to parse '", $s, "' as a number."));
+                core::assert!(false, "Unable to parse a config value as a number.");
                 0
             }
         };
