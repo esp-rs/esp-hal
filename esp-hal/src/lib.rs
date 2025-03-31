@@ -93,6 +93,21 @@
 //! }
 //! ```
 //!
+//! ## Reusing peripherals for multiple drivers
+//!
+//! A peripheral can only be used for one driver at a time, but those driver may
+//! be dropped if they are no longer needed. Dropping a driver does not return
+//! resources to the user, but certain patterns help with reusing peripherals.
+//!
+//! Each peripheral singleton (the peripheral's "handle", that you need to pass
+//! to the driver) has a lifetime. This lifetime is, by default, the `'static`
+//! lifetime, meaning that once the peripheral is in use, it can not be used
+//! again. However, each peripheral singleton provides a `reborrow` function,
+//! that can be used to create a new handle with a shorter lifetime. This allows
+//! you to reborrow the peripheral and pass it to a driver, while still keeping
+//! the original handle alive. Once you drop the driver, you will be able to
+//! reborrow the peripheral again.
+//!
 //! ## Additional configuration
 //!
 //! We've exposed some configuration options that don't fit into cargo
