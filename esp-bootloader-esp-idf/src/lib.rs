@@ -81,7 +81,7 @@ impl EspAppDesc {
             app_elf_sha256: [0; 32],
             min_efuse_blk_rev_full,
             max_efuse_blk_rev_full,
-            mmu_page_size: (31 - u32::leading_zeros(mmu_page_size)) as u8,
+            mmu_page_size: (mmu_page_size / 4096) as u8,
             reserv3: [0; 3],
             reserv2: [0; 18],
         }
