@@ -135,10 +135,8 @@ impl crate::private::Sealed for PinGuard {}
 
 impl PinGuard {
     pub(crate) fn new(pin: AnyPin, signal: OutputSignal) -> Self {
-        let number = pin.number();
-        signal.connect_to(&pin.into_ref());
         Self {
-            pin: number,
+            pin: pin.number(),
             signal,
         }
     }

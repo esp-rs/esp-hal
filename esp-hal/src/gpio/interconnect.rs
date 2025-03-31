@@ -870,6 +870,7 @@ impl OutputConnection<'_> {
     }
 
     pub(crate) fn connect_with_guard(self, signal: crate::gpio::OutputSignal) -> PinGuard {
+        signal.connect_to(&self);
         match self.0 {
             OutputConnectionInner::Output(pin) => PinGuard::new(pin.pin, signal),
             OutputConnectionInner::DirectOutput(pin) => PinGuard::new(pin.pin, signal),

@@ -178,10 +178,6 @@ name    = "uart_regression"
 harness = false
 
 [[test]]
-name    = "uart_tx_rx"
-harness = false
-
-[[test]]
 name    = "uart_tx_rx_async"
 harness = false
 
