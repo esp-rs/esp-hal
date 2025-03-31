@@ -14,7 +14,7 @@
 //! section inside `.cargo/config.toml`. Below is a table of tunable parameters
 //! for this crate:
 #![doc = ""]
-#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_bootloader_support_esp_idf_config_table.md"))]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_bootloader_esp_idf_config_table.md"))]
 #![doc = ""]
 #![no_std]
 
@@ -191,16 +191,15 @@ const fn str_to_cstr_array<const C: usize>(s: &str) -> [::core::ffi::c_char; C] 
 }
 
 /// Build time
-pub const BUILD_TIME: &str = env!("ESP_BOOTLOADER_SUPPORT_BUILD_TIME");
+pub const BUILD_TIME: &str = env!("ESP_BOOTLOADER_BUILD_TIME");
 
 /// Build date
-pub const BUILD_DATE: &str = env!("ESP_BOOTLOADER_SUPPORT_BUILD_DATE");
+pub const BUILD_DATE: &str = env!("ESP_BOOTLOADER_BUILD_DATE");
 
 /// MMU page size in bytes
 pub const MMU_PAGE_SIZE: u32 = {
     let mmu_page_size =
-        esp_config::esp_config_str!("ESP_BOOTLOADER_SUPPORT_ESP_IDF_CONFIG_MMU_PAGE_SIZE")
-            .as_bytes();
+        esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_MMU_PAGE_SIZE").as_bytes();
     match mmu_page_size {
         b"8k" => 8 * 1024,
         b"16k" => 16 * 1024,
@@ -209,6 +208,10 @@ pub const MMU_PAGE_SIZE: u32 = {
         _ => 64 * 1024,
     }
 };
+
+/// The (pretended) ESP-IDF version
+pub const ESP_IDF_COMPATIBLE_VERSION: &str =
+    esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_MMU_PAGE_SIZE");
 
 /// This macro populates the application descriptor (see [EspAppDesc]) which is
 /// available as a static named `ESP_APP_DESC`
@@ -222,7 +225,7 @@ macro_rules! esp_app_desc {
             env!("CARGO_PKG_NAME"),
             $crate::BUILD_TIME,
             $crate::BUILD_DATE,
-            "5.3.1",
+            $crate::ESP_IDF_COMPATIBLE_VERSION,
             $crate::MMU_PAGE_SIZE,
             0,
             u16::MAX

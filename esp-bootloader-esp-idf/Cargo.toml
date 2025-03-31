@@ -1,10 +1,10 @@
 [package]
-name          = "esp-bootloader-support-esp-idf"
+name          = "esp-bootloader-esp-idf"
 version       = "0.1.0"
 edition       = "2021"
 rust-version  = "1.84.0"
 description   = "Functionality related to the esp-idf bootloader"
-documentation = "https://docs.espressif.com/projects/rust/esp-bootloaer-support-esp-idf/latest/"
+documentation = "https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/"
 keywords      = ["esp32", "espressif", "no-std"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"

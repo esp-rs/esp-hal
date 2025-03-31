@@ -4,7 +4,7 @@ members  = ["xtask"]
 exclude  = [
     "esp-alloc",
     "esp-backtrace",
-    "esp-bootloader-support-esp-idf",
+    "esp-bootloader-esp-idf",
     "esp-build",
     "esp-config",
     "esp-hal",

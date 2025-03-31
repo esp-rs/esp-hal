@@ -38,7 +38,7 @@ pub mod firmware;
 pub enum Package {
     EspAlloc,
     EspBacktrace,
-    EspBootloaderSupportEspIdf,
+    EspBootloaderEspIdf,
     EspBuild,
     EspConfig,
     EspHal,
