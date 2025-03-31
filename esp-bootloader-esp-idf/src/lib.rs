@@ -162,10 +162,7 @@ impl core::fmt::Debug for EspAppDesc {
             .field("app_elf_sha256", &self.app_elf_sha256)
             .field("min_efuse_blk_rev_full", &self.min_efuse_blk_rev_full)
             .field("max_efuse_blk_rev_full", &self.max_efuse_blk_rev_full)
-            .field(
-                "mmu_page_size",
-                &((2 as u32).pow(self.mmu_page_size as u32)),
-            )
+            .field("mmu_page_size", &self.mmu_page_size)
             .finish()
     }
 }
