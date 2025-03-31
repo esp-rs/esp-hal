@@ -81,7 +81,7 @@ impl EspAppDesc {
             app_elf_sha256: [0; 32],
             min_efuse_blk_rev_full,
             max_efuse_blk_rev_full,
-            mmu_page_size: (mmu_page_size / 4096) as u8,
+            mmu_page_size: (mmu_page_size.ilog2()) as u8,
             reserv3: [0; 3],
             reserv2: [0; 18],
         }
@@ -145,7 +145,7 @@ impl EspAppDesc {
 
     /// MMU page size in bytes
     pub fn mmu_page_size(&self) -> u32 {
-        self.mmu_page_size as u32 * 4096
+        (2 as u32).pow(self.mmu_page_size as u32)
     }
 }
 
@@ -162,7 +162,10 @@ impl core::fmt::Debug for EspAppDesc {
             .field("app_elf_sha256", &self.app_elf_sha256)
             .field("min_efuse_blk_rev_full", &self.min_efuse_blk_rev_full)
             .field("max_efuse_blk_rev_full", &self.max_efuse_blk_rev_full)
-            .field("mmu_page_size", &(self.mmu_page_size as u32 * 4096))
+            .field(
+                "mmu_page_size",
+                &((2 as u32).pow(self.mmu_page_size as u32)),
+            )
             .finish()
     }
 }
