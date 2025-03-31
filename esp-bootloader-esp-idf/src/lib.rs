@@ -145,7 +145,7 @@ impl EspAppDesc {
 
     /// MMU page size in bytes
     pub fn mmu_page_size(&self) -> u32 {
-        (2 as u32).pow(self.mmu_page_size as u32)
+        2_u32.pow(self.mmu_page_size as u32)
     }
 }
 
@@ -164,6 +164,39 @@ impl core::fmt::Debug for EspAppDesc {
             .field("max_efuse_blk_rev_full", &self.max_efuse_blk_rev_full)
             .field("mmu_page_size", &self.mmu_page_size)
             .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for EspAppDesc {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(
+            fmt,
+            "EspAppDesc (\
+            magic_word = {}, \
+            secure_version = {}, \
+            version = {}, \
+            project_name = {}, \
+            time = {}, \
+            date = {}, \
+            idf_ver = {}, \
+            app_elf_sha256 = {}, \
+            min_efuse_blk_rev_full = {}, \
+            max_efuse_blk_rev_full = {}, \
+            mmu_page_size = {}\
+            )",
+            self.magic_word,
+            self.secure_version,
+            self.version(),
+            self.project_name(),
+            self.time(),
+            self.date(),
+            self.idf_ver(),
+            self.app_elf_sha256,
+            self.min_efuse_blk_rev_full,
+            self.max_efuse_blk_rev_full,
+            self.mmu_page_size,
+        )
     }
 }
 

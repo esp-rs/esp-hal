@@ -1,21 +1,27 @@
 [package]
-name          = "esp-bootloader-esp-idf"
-version       = "0.1.0"
-edition       = "2021"
-rust-version  = "1.84.0"
-description   = "Functionality related to the esp-idf bootloader"
+name = "esp-bootloader-esp-idf"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.84.0"
+description = "Functionality related to the esp-idf bootloader"
 documentation = "https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/"
-keywords      = ["esp32", "espressif", "no-std"]
-categories    = ["embedded", "hardware-support", "no-std"]
-repository    = "https://github.com/esp-rs/esp-hal"
-license       = "MIT OR Apache-2.0"
+keywords = ["esp32", "espressif", "no-std"]
+categories = ["embedded", "hardware-support", "no-std"]
+repository = "https://github.com/esp-rs/esp-hal"
+license = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 
 [dependencies]
+defmt = { version = "0.3.10", optional = true }
+log = { version = "0.4.26", optional = true }
 esp-config = { version = "0.3.0", path = "../esp-config" }
 
 [build-dependencies]
-chrono     = { version = "0.4.20", default-features = false, features = ["clock"] }
+chrono = { version = "0.4.20", default-features = false, features = ["clock"] }
 esp-config = { version = "0.3.0", path = "../esp-config", features = ["build"] }
+
+[features]
+log = ["dep:log"]
+defmt = ["dep:defmt"]
