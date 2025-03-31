@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2S driver now takes `DmaDescriptor`s later in construction (#3324)
 - `gpio::interconnect` types now have a lifetime associated with them (#3302)
 - The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)
+- `Trace` is no longer generic (#3305)
 
 ### Fixed
 
