@@ -935,7 +935,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new(
-        peripheral: impl Instance + Into<AnyTwai<'d>>,
+        peripheral: impl Instance<'d>,
         rx_pin: impl PeripheralInput<'d>,
         tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
@@ -950,7 +950,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
     pub fn new_no_transceiver(
-        peripheral: impl Instance + Into<AnyTwai<'d>>,
+        peripheral: impl Instance<'d>,
         rx_pin: impl PeripheralInput<'d>,
         tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
@@ -1284,7 +1284,7 @@ where
 
 /// TWAI peripheral instance.
 #[doc(hidden)]
-pub trait Instance: crate::private::Sealed {
+pub trait PrivateInstance: crate::private::Sealed {
     /// The identifier number for this TWAI instance.
     fn number(&self) -> usize;
 
@@ -1468,7 +1468,7 @@ fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
     }
 }
 
-impl Instance for crate::peripherals::TWAI0<'_> {
+impl PrivateInstance for crate::peripherals::TWAI0<'_> {
     fn number(&self) -> usize {
         0
     }
@@ -1517,7 +1517,7 @@ impl Instance for crate::peripherals::TWAI0<'_> {
 }
 
 #[cfg(twai1)]
-impl Instance for crate::peripherals::TWAI1<'_> {
+impl PrivateInstance for crate::peripherals::TWAI1<'_> {
     fn number(&self) -> usize {
         1
     }
@@ -1563,7 +1563,7 @@ crate::any_peripheral! {
     }
 }
 
-impl Instance for AnyTwai<'_> {
+impl PrivateInstance for AnyTwai<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(twai0)]
@@ -1582,6 +1582,14 @@ impl Instance for AnyTwai<'_> {
         }
     }
 }
+
+/// A peripheral singleton compatible with the TWAI driver.
+pub trait Instance<'d>: PrivateInstance + Into<AnyTwai<'d>> {}
+
+impl<'d> Instance<'d> for crate::peripherals::TWAI0<'d> {}
+#[cfg(twai1)]
+impl<'d> Instance<'d> for crate::peripherals::TWAI1<'d> {}
+impl<'d> Instance<'d> for AnyTwai<'d> {}
 
 mod asynch {
     use core::{future::poll_fn, task::Poll};

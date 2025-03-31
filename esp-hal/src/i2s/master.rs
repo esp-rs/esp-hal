@@ -326,7 +326,7 @@ impl<'d> I2s<'d, Blocking> {
     /// peripheral
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        i2s: impl RegisterAccess + Into<AnyI2s<'d>>,
+        i2s: impl Instance<'d>,
         standard: Standard,
         data_format: DataFormat,
         sample_rate: Rate,
@@ -661,9 +661,12 @@ where
     }
 }
 
-/// Provides an abstraction for accessing the I2S peripheral registers.
-pub trait RegisterAccess: RegisterAccessPrivate {}
-impl<T> RegisterAccess for T where T: RegisterAccessPrivate {}
+/// A peripheral singleton compatible with the I2S master driver.
+pub trait Instance<'d>: RegisterAccessPrivate + Into<AnyI2s<'d>> {}
+impl<'d> Instance<'d> for crate::peripherals::I2S0<'d> {}
+#[cfg(i2s1)]
+impl<'d> Instance<'d> for crate::peripherals::I2S1<'d> {}
+impl<'d> Instance<'d> for AnyI2s<'d> {}
 
 mod private {
     use enumset::EnumSet;

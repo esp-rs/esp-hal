@@ -675,10 +675,7 @@ impl<'d> Spi<'d, Blocking> {
     /// # Errors
     ///
     /// See [`Spi::apply_config`].
-    pub fn new(
-        spi: impl PeripheralInstance + Into<AnySpi<'d>>,
-        config: Config,
-    ) -> Result<Self, ConfigError> {
+    pub fn new(spi: impl Instance<'d>, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
         let mosi_pin = PinGuard::new_unconnected(spi.info().mosi);
@@ -3776,7 +3773,7 @@ struct Esp32Hack {
 unsafe impl Sync for Esp32Hack {}
 
 #[cfg_attr(place_spi_driver_in_ram, ram)]
-fn handle_async<I: Instance>(instance: I) {
+fn handle_async<'d, I: Instance<'d>>(instance: I) {
     let state = instance.state();
     let info = instance.info();
 
@@ -3787,15 +3784,17 @@ fn handle_async<I: Instance>(instance: I) {
     }
 }
 
-#[doc(hidden)]
-pub trait Instance: PeripheralInstance {
+/// A peripheral singleton compatible with the SPI master driver.
+pub trait Instance<'d>: PeripheralInstance + Into<AnySpi<'d>> {
+    #[doc(hidden)]
     fn state(&self) -> &'static State;
+    #[doc(hidden)]
     fn handler(&self) -> InterruptHandler;
 }
 
 macro_rules! master_instance {
     ($peri:ident) => {
-        impl Instance for $crate::peripherals::$peri<'_> {
+        impl<'d> Instance<'d> for $crate::peripherals::$peri<'d> {
             fn state(&self) -> &'static State {
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
@@ -3826,7 +3825,7 @@ master_instance!(SPI2);
 #[cfg(spi3)]
 master_instance!(SPI3);
 
-impl Instance for super::AnySpi<'_> {
+impl<'d> Instance<'d> for super::AnySpi<'d> {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,

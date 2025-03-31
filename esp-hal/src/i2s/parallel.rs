@@ -131,7 +131,7 @@ use crate::{
 #[doc(hidden)]
 pub trait TxPins<'d> {
     fn bus_width(&self) -> u8;
-    fn configure(&mut self, instance: impl Instance);
+    fn configure(&mut self, instance: &impl Instance<'d>);
 }
 
 /// Represents a group of 16 output pins configured for 16-bit parallel data
@@ -189,7 +189,7 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
         self.pins.len() as u8
     }
 
-    fn configure(&mut self, instance: impl Instance) {
+    fn configure(&mut self, instance: &impl Instance<'d>) {
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
             pin.set_to_push_pull_output();
@@ -237,7 +237,7 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
         self.pins.len() as u8
     }
 
-    fn configure(&mut self, instance: impl Instance) {
+    fn configure(&mut self, instance: &impl Instance<'d>) {
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
             pin.set_to_push_pull_output();
@@ -259,7 +259,7 @@ where
 impl<'d> I2sParallel<'d, Blocking> {
     /// Create a new I2S Parallel Interface
     pub fn new(
-        i2s: impl Instance + Into<AnyI2s<'d>>,
+        i2s: impl Instance<'d>,
         channel: impl DmaChannelFor<AnyI2s<'d>>,
         frequency: Rate,
         mut pins: impl TxPins<'d>,
@@ -268,9 +268,10 @@ impl<'d> I2sParallel<'d, Blocking> {
         let channel = Channel::new(channel.degrade());
         channel.runtime_ensure_compatible(&i2s);
 
+        let i2s = i2s.into();
+
         let guard = PeripheralGuard::new(i2s.peripheral());
 
-        let mut i2s = i2s.into();
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
@@ -278,7 +279,7 @@ impl<'d> I2sParallel<'d, Blocking> {
         clock_pin.set_to_push_pull_output();
         i2s.ws_signal().connect_to(&clock_pin);
 
-        pins.configure(i2s.reborrow());
+        pins.configure(&i2s);
         Self {
             instance: i2s,
             tx_channel: channel.tx,
@@ -487,9 +488,8 @@ fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
         numerator,
     }
 }
-
 #[doc(hidden)]
-pub trait Instance: DmaEligible {
+pub trait PrivateInstance: DmaEligible {
     fn regs(&self) -> &RegisterBlock;
     fn peripheral(&self) -> crate::system::Peripheral;
     fn ws_signal(&self) -> OutputSignal;
@@ -666,7 +666,7 @@ pub trait Instance: DmaEligible {
     }
 }
 
-impl Instance for I2S0<'_> {
+impl PrivateInstance for I2S0<'_> {
     fn regs(&self) -> &RegisterBlock {
         unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
     }
@@ -717,7 +717,7 @@ impl Instance for I2S0<'_> {
     }
 }
 
-impl Instance for I2S1<'_> {
+impl PrivateInstance for I2S1<'_> {
     fn regs(&self) -> &RegisterBlock {
         unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
     }
@@ -769,7 +769,7 @@ impl Instance for I2S1<'_> {
     }
 }
 
-impl Instance for AnyI2s<'_> {
+impl PrivateInstance for AnyI2s<'_> {
     delegate::delegate! {
         to match &self.0 {
             AnyI2sInner::I2s0(i2s) => i2s,
@@ -782,3 +782,11 @@ impl Instance for AnyI2s<'_> {
         }
     }
 }
+
+/// A peripheral singleton compatible with the I2S parallel driver.
+pub trait Instance<'d>: Into<AnyI2s<'d>> + PrivateInstance {}
+
+impl<'d> Instance<'d> for I2S0<'d> {}
+#[cfg(i2s1)]
+impl<'d> Instance<'d> for I2S1<'d> {}
+impl<'d> Instance<'d> for AnyI2s<'d> {}

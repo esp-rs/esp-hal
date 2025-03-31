@@ -56,7 +56,7 @@ cfg_if::cfg_if! {
 /// Digital-to-Analog Converter (DAC) Channel
 pub struct Dac<'d, T>
 where
-    T: Instance + 'd,
+    T: Instance<'d>,
     T::Pin: AnalogPin + 'd,
 {
     _inner: T,
@@ -65,7 +65,7 @@ where
 
 impl<'d, T> Dac<'d, T>
 where
-    T: Instance + 'd,
+    T: Instance<'d>,
     T::Pin: AnalogPin + 'd,
 {
     /// Construct a new instance of [`Dac`].
@@ -97,7 +97,7 @@ where
 }
 
 #[doc(hidden)]
-pub trait Instance: crate::private::Sealed {
+pub trait Instance<'d>: crate::private::Sealed {
     const INDEX: usize;
 
     type Pin;
@@ -121,13 +121,13 @@ pub trait Instance: crate::private::Sealed {
     }
 }
 
-impl<'d> Instance for crate::peripherals::DAC1<'d> {
+impl<'d> Instance<'d> for crate::peripherals::DAC1<'d> {
     const INDEX: usize = 0;
 
     type Pin = Dac1Gpio<'d>;
 }
 
-impl<'d> Instance for crate::peripherals::DAC2<'d> {
+impl<'d> Instance<'d> for crate::peripherals::DAC2<'d> {
     const INDEX: usize = 1;
 
     type Pin = Dac2Gpio<'d>;
