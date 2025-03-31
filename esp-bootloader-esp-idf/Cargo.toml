@@ -15,13 +15,25 @@ default-target = "riscv32imac-unknown-none-elf"
 
 [dependencies]
 defmt = { version = "0.3.10", optional = true }
-log = { version = "0.4.26", optional = true }
+document-features = "0.2.11"
 esp-config = { version = "0.3.0", path = "../esp-config" }
+embedded-storage = "0.3.1"
+log = { version = "0.4.26", optional = true }
+md-5 = { version = "0.10.6", default-features = false, optional = true }
+strum = { version = "0.27.1", default-features = false, features = ["derive"] }
 
 [build-dependencies]
 chrono = { version = "0.4.20", default-features = false, features = ["clock"] }
 esp-config = { version = "0.3.0", path = "../esp-config", features = ["build"] }
 
 [features]
+default = ["validation"]
+
+## Enable MD5 validation of the partition table.
+validation = ["dep:md-5"]
+
+## Enable support for the `log` crate
 log = ["dep:log"]
+
+## Enable support for `defmt`
 defmt = ["dep:defmt"]
