@@ -88,11 +88,11 @@ pub trait Clock {
 pub enum CpuClock {
     /// 80MHz CPU clock
     #[cfg(not(esp32h2))]
-    _80MHz  = 80,
+    _80MHz = 80,
 
     /// 96MHz CPU clock
     #[cfg(esp32h2)]
-    _96MHz  = 96,
+    _96MHz = 96,
 
     /// 120MHz CPU clock
     #[cfg(esp32c2)]
@@ -398,7 +398,10 @@ impl Clocks {
                     b"auto" => XtalClock::Other(0), // Can't be `unreachable!` due to const eval.
                     b"26" => XtalClock::_26M,
                     b"40" => XtalClock::_40M,
-                    other => XtalClock::Other(esp_config::esp_config_int_parse!(u32, other)),
+                    other => XtalClock::Other(esp_config::esp_config_int_parse!(
+                        u32,
+                        esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY")
+                    )),
                 }
             }
         }
