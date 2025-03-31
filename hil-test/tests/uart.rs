@@ -7,7 +7,10 @@
 #![no_main]
 
 use esp_hal::{
-    gpio::AnyPin,
+    gpio::{
+        interconnect::{InputSignal, OutputSignal},
+        AnyPin,
+    },
     uart::{self, ClockSource, Uart},
     Blocking,
 };
@@ -152,6 +155,19 @@ mod tests {
             assert_eq!(byte[0], byte_to_write);
             byte_to_write = !byte_to_write;
         }
+    }
+
+    #[test]
+    fn test_send_receive_inverted(ctx: Context) {
+        let mut uart = ctx
+            .uart1
+            .with_tx(OutputSignal::from(ctx.tx).inverted())
+            .with_rx(InputSignal::from(ctx.rx).inverted());
+
+        uart.write(&[0x42]).unwrap();
+        let mut byte = [0u8; 1];
+        uart.read(&mut byte).unwrap();
+        assert_eq!(byte[0], 0x42);
     }
 
     #[test]
