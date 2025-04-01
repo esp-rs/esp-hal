@@ -2538,14 +2538,22 @@ impl WifiController<'_> {
     }
 
     /// A blocking wifi network scan with caller-provided scanning options.
-    pub fn scan_with_config_sync<const N: usize>(
+    pub fn scan_with_config_sync(
         &mut self,
         config: ScanConfig<'_>,
+    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+        self.scan_with_config_sync_max(config, usize::MAX)
+    }
+
+    pub fn scan_with_config_sync_max(
+        &mut self,
+        config: ScanConfig<'_>,
+        max: usize,
     ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
         esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
 
         let count = self.scan_result_count()?;
-        let result = self.scan_results::<N>()?;
+        let result = self.scan_results(max)?;
 
         Ok((result, count))
     }
@@ -2563,41 +2571,36 @@ impl WifiController<'_> {
         Ok(bss_total as usize)
     }
 
-    fn scan_results<const N: usize>(
-        &mut self,
-    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
-        let mut scanned = alloc::vec::Vec::<AccessPointInfo>::with_capacity(N);
-        let mut bss_total: u16 = N as u16;
-
-        let mut records: [MaybeUninit<include::wifi_ap_record_t>; N] = [MaybeUninit::uninit(); N];
+    fn scan_results(&mut self, max: usize) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+        let mut scanned = alloc::vec::Vec::<AccessPointInfo>::new();
+        let mut bss_total: u16 = max as u16;
 
         // Prevents memory leak on error
         let guard = FreeApListOnDrop;
 
-        unsafe {
-            esp_wifi_result!(include::esp_wifi_scan_get_ap_records(
-                &mut bss_total,
-                records[0].as_mut_ptr(),
-            ))?
-        };
+        unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_num(&mut bss_total))? };
 
         guard.defuse();
 
-        for i in 0..bss_total {
-            let record = unsafe { MaybeUninit::assume_init_ref(&records[i as usize]) };
+        let mut record: MaybeUninit<include::wifi_ap_record_t> = MaybeUninit::uninit();
+        for _ in 0..usize::min(bss_total as usize, max) {
+            let record = unsafe { MaybeUninit::assume_init_mut(&mut record) };
+            unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_record(record))? };
             let ap_info = convert_ap_info(record);
-
             scanned.push(ap_info);
         }
+
+        unsafe { esp_wifi_result!(include::esp_wifi_clear_ap_list())? };
 
         Ok(scanned)
     }
 
     /// A blocking wifi network scan with default scanning options.
-    pub fn scan_n<const N: usize>(
+    pub fn scan_n(
         &mut self,
+        max: usize,
     ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
-        self.scan_with_config_sync::<N>(Default::default())
+        self.scan_with_config_sync_max(Default::default(), max)
     }
 
     /// Starts the WiFi controller.
@@ -2731,16 +2734,26 @@ impl WifiController<'_> {
     }
 
     /// Async version of [`crate::wifi::WifiController`]'s `scan_n` method
-    pub async fn scan_n_async<const N: usize>(
+    pub async fn scan_n_async(
         &mut self,
+        max: usize,
     ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
-        self.scan_with_config_async::<N>(Default::default()).await
+        self.scan_with_config_async_max(Default::default(), max)
+            .await
     }
 
     /// An async wifi network scan with caller-provided scanning options.
-    pub async fn scan_with_config_async<const N: usize>(
+    pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,
+    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+        self.scan_with_config_async_max(config, usize::MAX).await
+    }
+
+    async fn scan_with_config_async_max(
+        &mut self,
+        config: ScanConfig<'_>,
+        max: usize,
     ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
         Self::clear_events(WifiEvent::ScanDone);
         esp_wifi_result!(wifi_start_scan(false, config))?;
@@ -2752,7 +2765,7 @@ impl WifiController<'_> {
         guard.defuse();
 
         let count = self.scan_result_count()?;
-        let result = self.scan_results::<N>()?;
+        let result = self.scan_results(max)?;
 
         Ok((result, count))
     }

@@ -171,6 +171,12 @@ async fn connection(mut controller: WifiController<'static>) {
             println!("Starting wifi");
             controller.start_async().await.unwrap();
             println!("Wifi started!");
+
+            println!("Scan");
+            let result = controller.scan_n_async(10).await.unwrap();
+            for ap in result.0 {
+                println!("{:?}", ap);
+            }
         }
         println!("About to connect...");
 
