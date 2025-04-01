@@ -4,11 +4,6 @@
 )]
 //! # Bare-metal (`no_std`) HAL for all Espressif ESP32 devices.
 //!
-//! ## Overview
-//! The HAL implements both blocking _and_ async
-//! APIs for many peripherals. Where applicable, driver implement
-//! the [embedded-hal] and [embedded-hal-async] traits.
-//!
 //! This documentation is built for the
 #![cfg_attr(esp32, doc = "**ESP32**")]
 #![cfg_attr(esp32s2, doc = "**ESP32-S2**")]
@@ -24,6 +19,28 @@
 //!
 //! Depending on your target device, you need to enable the chip feature
 //! for that device. You may also need to do this on ancillary esp-hal crates.
+//!
+//! ## Overview
+//!
+//! ### Peripheral drivers
+//!
+//! The HAL implements both blocking _and_ async APIs for many peripherals.
+//! Where applicable, driver implement the [embedded-hal] and
+//! [embedded-hal-async] traits.
+//!
+//! ### Peripheral singletons
+//!
+//! Each peripheral driver needs a peripheral singleton that tells the driver
+//! which hardware block to use. The peripheral singletons are created by the
+//! HAL initialization, and are returned from [`init`] as fields of the
+//! [`Peripherals`] struct.
+//!
+//! These singletons, by default, represent peripherals for the entire lifetime
+//! of the program. To allow for reusing peripherals, the HAL provides a
+//! `reborrow` method on each peripheral singleton. This method creates a new
+//! handle to the peripheral with a shorter lifetime. This allows you to pass
+//! the handle to a driver, while still keeping the original handle alive. Once
+//! you drop the driver, you will be able to reborrow the peripheral again.
 //!
 //! ## Examples
 //!
@@ -92,21 +109,6 @@
 //!     }
 //! }
 //! ```
-//!
-//! ## Reusing peripherals for multiple drivers
-//!
-//! A peripheral can only be used for one driver at a time, but those driver may
-//! be dropped if they are no longer needed. Dropping a driver does not return
-//! resources to the user, but certain patterns help with reusing peripherals.
-//!
-//! Each peripheral singleton (the peripheral's "handle", that you need to pass
-//! to the driver) has a lifetime. This lifetime is, by default, the `'static`
-//! lifetime, meaning that once the peripheral is in use, it can not be used
-//! again. However, each peripheral singleton provides a `reborrow` function,
-//! that can be used to create a new handle with a shorter lifetime. This allows
-//! you to reborrow the peripheral and pass it to a driver, while still keeping
-//! the original handle alive. Once you drop the driver, you will be able to
-//! reborrow the peripheral again.
 //!
 //! ## Additional configuration
 //!
