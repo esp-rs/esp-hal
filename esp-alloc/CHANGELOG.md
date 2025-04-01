@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `allocator_api2` to support allocator APIs on stable Rust. (#?)
+- `AnyMemory` allocator. (#?)
+
 ### Changed
 
 ### Fixed

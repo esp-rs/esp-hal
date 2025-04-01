@@ -1,4 +1,4 @@
-//! PSRAM-related tests
+//! Allocator and PSRAM-related tests
 
 //% CHIPS(quad): esp32 esp32s2
 // The S3 dev kit in the HIL-tester has octal PSRAM.
@@ -16,6 +16,8 @@ extern crate alloc;
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    use esp_alloc::AnyMemory;
+
     #[init]
     fn init() {
         let p = esp_hal::init(esp_hal::Config::default());
@@ -25,6 +27,19 @@ mod tests {
     #[test]
     fn test_simple() {
         let mut vec = alloc::vec::Vec::new();
+
+        for i in 0..10000 {
+            vec.push(i);
+        }
+
+        for i in 0..10000 {
+            assert_eq!(vec[i], i);
+        }
+    }
+
+    #[test]
+    fn test_simple_with_allocator() {
+        let mut vec = allocator_api2::vec::Vec::new_in(AnyMemory);
 
         for i in 0..10000 {
             vec.push(i);

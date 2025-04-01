@@ -77,10 +77,9 @@
 #![cfg_attr(feature = "nightly", feature(allocator_api))]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
+mod allocators;
 mod macros;
 
-#[cfg(feature = "nightly")]
-use core::alloc::{AllocError, Allocator};
 use core::{
     alloc::{GlobalAlloc, Layout},
     cell::RefCell,
@@ -88,6 +87,7 @@ use core::{
     ptr::{self, NonNull},
 };
 
+pub use allocators::*;
 use critical_section::Mutex;
 use enumset::{EnumSet, EnumSetType};
 use linked_list_allocator::Heap;
@@ -567,23 +567,5 @@ unsafe impl GlobalAlloc for EspHeap {
                 internal_heap_stats.total_freed += before - self.used();
             }
         })
-    }
-}
-
-#[cfg(feature = "nightly")]
-unsafe impl Allocator for EspHeap {
-    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-        let raw_ptr = unsafe { self.alloc(layout) };
-
-        if raw_ptr.is_null() {
-            return Err(AllocError);
-        }
-
-        let ptr = NonNull::new(raw_ptr).ok_or(AllocError)?;
-        Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
-    }
-
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        self.dealloc(ptr.as_ptr(), layout);
     }
 }
