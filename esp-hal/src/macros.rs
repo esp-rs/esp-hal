@@ -165,8 +165,8 @@ macro_rules! any_peripheral {
                 }
             }
 
-            /// Trick to make peripherals implement Into, without
-            /// requiring Instance traits to have lifetimes.
+            // Trick to make peripherals implement Into, without
+            // requiring Instance traits to have lifetimes.
             #[doc(hidden)]
             pub trait [<Into $name>]: Sized + $crate::private::Sealed {
                 fn degrade<'a>(self) -> $name<'a>
