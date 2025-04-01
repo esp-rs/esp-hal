@@ -11,7 +11,7 @@ repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-defmt = { version = "0.3.10", features = ["alloc"], optional = true }
+defmt = { version = "0.3.10", optional = true }
 log = { version = "0.4.26", optional = true }
 document-features  = "0.2.11"
 esp-alloc = { version = "0.7.0", path = "../esp-alloc", optional = true }
