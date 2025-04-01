@@ -88,11 +88,9 @@ fn main() -> ! {
 
     println!("Waiting for CSI data...");
     println!("Start Wifi Scan");
-    let res = controller.scan_n(10);
-    if let Ok((res, _count)) = res {
-        for ap in res {
-            println!("{:?}", ap);
-        }
+    let res = controller.scan_n(10).unwrap();
+    for ap in res {
+        println!("{:?}", ap);
     }
 
     println!("{:?}", controller.capabilities());

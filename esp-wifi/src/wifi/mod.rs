@@ -2541,7 +2541,7 @@ impl WifiController<'_> {
     pub fn scan_with_config_sync(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
         self.scan_with_config_sync_max(config, usize::MAX)
     }
 
@@ -2549,26 +2549,10 @@ impl WifiController<'_> {
         &mut self,
         config: ScanConfig<'_>,
         max: usize,
-    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
         esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
-
-        let count = self.scan_result_count()?;
         let result = self.scan_results(max)?;
-
-        Ok((result, count))
-    }
-
-    fn scan_result_count(&mut self) -> Result<usize, WifiError> {
-        let mut bss_total: u16 = 0;
-
-        // Prevents memory leak on error
-        let guard = FreeApListOnDrop;
-
-        unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_num(&mut bss_total))? };
-
-        guard.defuse();
-
-        Ok(bss_total as usize)
+        Ok(result)
     }
 
     fn scan_results(&mut self, max: usize) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
@@ -2596,10 +2580,7 @@ impl WifiController<'_> {
     }
 
     /// A blocking wifi network scan with default scanning options.
-    pub fn scan_n(
-        &mut self,
-        max: usize,
-    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+    pub fn scan_n(&mut self, max: usize) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
         self.scan_with_config_sync_max(Default::default(), max)
     }
 
@@ -2737,7 +2718,7 @@ impl WifiController<'_> {
     pub async fn scan_n_async(
         &mut self,
         max: usize,
-    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
         self.scan_with_config_async_max(Default::default(), max)
             .await
     }
@@ -2746,7 +2727,7 @@ impl WifiController<'_> {
     pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
         self.scan_with_config_async_max(config, usize::MAX).await
     }
 
@@ -2754,7 +2735,7 @@ impl WifiController<'_> {
         &mut self,
         config: ScanConfig<'_>,
         max: usize,
-    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
         Self::clear_events(WifiEvent::ScanDone);
         esp_wifi_result!(wifi_start_scan(false, config))?;
 
@@ -2764,10 +2745,9 @@ impl WifiController<'_> {
 
         guard.defuse();
 
-        let count = self.scan_result_count()?;
         let result = self.scan_results(max)?;
 
-        Ok((result, count))
+        Ok(result)
     }
 
     /// Async version of [`crate::wifi::WifiController`]'s `start` method

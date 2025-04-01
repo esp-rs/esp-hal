@@ -174,7 +174,7 @@ async fn connection(mut controller: WifiController<'static>) {
 
             println!("Scan");
             let result = controller.scan_n_async(10).await.unwrap();
-            for ap in result.0 {
+            for ap in result {
                 println!("{:?}", ap);
             }
         }
