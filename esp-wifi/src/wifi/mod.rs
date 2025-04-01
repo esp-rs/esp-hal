@@ -218,9 +218,11 @@ pub enum SecondaryChannel {
 
 /// Information about a detected Wi-Fi access point.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointInfo {
     /// The SSID of the access point.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub ssid: alloc::string::String,
 
     /// The BSSID (MAC address) of the access point.
@@ -236,41 +238,20 @@ pub struct AccessPointInfo {
     pub signal_strength: i8,
 
     /// The set of protocols supported by the access point.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub protocols: EnumSet<Protocol>,
 
     /// The authentication method used by the access point.
     pub auth_method: Option<AuthMethod>,
 }
 
-#[cfg(feature = "defmt")]
-impl defmt::Format for AccessPointInfo {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "AccessPointInfo \
-            SSID {}, \
-            BSSID {:?}, \
-            CHANNEL {}, \
-            SECONDARY_CHANNEL {:?}, \
-            SIGNAL_STRENGTH {}, \
-            PROTOCOLS {:?}, \
-            AUTH_METHOD {:?}",
-            self.ssid.as_str(),
-            self.bssid,
-            self.channel,
-            self.secondary_channel,
-            self.signal_strength,
-            defmt::Debug2Format(&self.protocols),
-            self.auth_method,
-        )
-    }
-}
-
 /// Configuration for a Wi-Fi access point.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointConfiguration {
     /// The SSID of the access point.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub ssid: alloc::string::String,
 
     /// Whether the SSID is hidden or visible.
@@ -283,42 +264,18 @@ pub struct AccessPointConfiguration {
     pub secondary_channel: Option<u8>,
 
     /// The set of protocols supported by the access point.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub protocols: EnumSet<Protocol>,
 
     /// The authentication method to be used by the access point.
     pub auth_method: AuthMethod,
 
     /// The password for securing the access point (if applicable).
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub password: alloc::string::String,
 
     /// The maximum number of connections allowed on the access point.
     pub max_connections: u16,
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for AccessPointConfiguration {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "AccessPointConfiguration \
-            SSID {}, \
-            SSID_HIDDEN {}, \
-            CHANNEL {}, \
-            SECONDARY_CHANNEL {:?}, \
-            PROTOCOLS {:?}, \
-            AUTH_METHOD {}, \
-            PASSWORD {}, \
-            MAX_CONNECTIONS {}",
-            self.ssid.as_str(),
-            self.ssid_hidden,
-            self.channel,
-            self.secondary_channel,
-            defmt::Debug2Format(&self.protocols),
-            self.auth_method,
-            self.password.as_str(),
-            self.max_connections,
-        )
-    }
 }
 
 impl Default for AccessPointConfiguration {
@@ -338,9 +295,11 @@ impl Default for AccessPointConfiguration {
 
 /// Client configuration for a Wi-Fi connection.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ClientConfiguration {
     /// The SSID of the Wi-Fi network.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub ssid: alloc::string::String,
 
     /// The BSSID (MAC address) of the client.
@@ -351,30 +310,11 @@ pub struct ClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The password for the Wi-Fi connection.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub password: alloc::string::String,
 
     /// The Wi-Fi channel to connect to.
     pub channel: Option<u8>,
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for ClientConfiguration {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "ClientConfiguration \
-            SSID {}, \
-            BSSID {:?}, \
-            AUTH_METHOD {}, \
-            PASSWORD {}, \
-            CHANNEL {:?}",
-            self.ssid.as_str(),
-            self.bssid,
-            self.auth_method,
-            self.password.as_str(),
-            self.channel,
-        )
-    }
 }
 
 #[cfg(feature = "csi")]
@@ -621,9 +561,11 @@ impl TtlsPhase2Method {
 
 /// Configuration for an EAP (Extensible Authentication Protocol) client.
 #[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct EapClientConfiguration {
     /// The SSID of the network the client is connecting to.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub ssid: alloc::string::String,
 
     /// The BSSID (MAC Address) of the specific access point.
@@ -634,17 +576,21 @@ pub struct EapClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The identity used during authentication.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub identity: Option<alloc::string::String>,
 
     /// The username used for inner authentication.
     /// Some EAP methods require a username for authentication.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub username: Option<alloc::string::String>,
 
     /// The password used for inner authentication.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub password: Option<alloc::string::String>,
 
     /// A new password to be set during the authentication process.
     /// Some methods support password changes during authentication.
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub new_password: Option<alloc::string::String>,
 
     /// Configuration for EAP-FAST.
@@ -695,40 +641,6 @@ impl Debug for EapClientConfiguration {
     }
 }
 
-#[cfg(feature = "defmt")]
-impl defmt::Format for EapClientConfiguration {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "EapClientConfiguration \
-            SSID {}, \
-            BSSID {:?}, \
-            AUTH_METHOD {}, \
-            CHANNEL {:?}, \
-            IDENTITY {}, \
-            USERNAME {}, \
-            EAP_FAST_CONFIG {:?}, \
-            TIME_CHECK {}, \
-            PAC_FILE {}, \
-            CA_CERT {}, \
-            CERTIFICATE_AND_KEY {}, \
-            TTLS_PHASE2_METHOD {:?}",
-            self.ssid.as_str(),
-            self.bssid,
-            self.auth_method,
-            self.channel,
-            self.identity.as_deref().unwrap_or(""),
-            self.username.as_deref().unwrap_or(""),
-            self.eap_fast_config,
-            self.time_check,
-            self.pac_file,
-            self.ca_cert,
-            self.certificate_and_key,
-            self.ttls_phase2_method,
-        )
-    }
-}
-
 impl Default for EapClientConfiguration {
     fn default() -> Self {
         EapClientConfiguration {
@@ -768,9 +680,9 @@ pub enum Capability {
 }
 
 /// Configuration of Wi-Fi operation mode.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Default)]
 #[allow(clippy::large_enum_variant)]
 pub enum Configuration {
     /// No configuration (default).
@@ -789,34 +701,6 @@ pub enum Configuration {
     /// EAP client configuration for enterprise Wi-Fi.
     #[cfg_attr(feature = "serde", serde(skip))]
     EapClient(EapClientConfiguration),
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for Configuration {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        match self {
-            Configuration::None => defmt::write!(fmt, "Configuration None"),
-            Configuration::Client(client_configuration) => {
-                defmt::write!(fmt, "Configuration Client {:?}", client_configuration)
-            }
-            Configuration::AccessPoint(access_point_configuration) => defmt::write!(
-                fmt,
-                "Configuration AccessPoint {:?}",
-                access_point_configuration
-            ),
-            Configuration::Mixed(client_configuration, access_point_configuration) => {
-                defmt::write!(
-                    fmt,
-                    "Configuration Mixed {:?} {:?}",
-                    client_configuration,
-                    access_point_configuration
-                )
-            }
-            Configuration::EapClient(eap_client_configuration) => {
-                defmt::write!(fmt, "Configuration EAP {:?}", eap_client_configuration)
-            }
-        }
-    }
 }
 
 impl Configuration {
