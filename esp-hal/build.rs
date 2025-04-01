@@ -148,7 +148,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ),
         (
             "impl-critical-section",
-            "Provide a `critical-section` implementation.",
+            "Provide a `critical-section` implementation. Note that if disabled, you will need to provide a `critical-section` implementation which is using `critical-section/restore-state-u32`.",
             Value::Bool(true),
             None
         ),
