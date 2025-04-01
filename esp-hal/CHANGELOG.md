@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: Keep ADC enabled to improve radio signal strength (#3249)
 - Fix off-by-one in the allowed range of the spi clock calculations (#3266)
 - Fixed an issue where inverting a pin via the interconnect matrix was ineffective (#3312)
+- Fixed I2C getting in an infinite loop if rx fifo receives less data than expected (#3314)
 
 ### Removed
 
