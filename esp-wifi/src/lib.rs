@@ -293,45 +293,38 @@ impl Drop for EspWifiController<'_> {
 /// A trait to allow better UX for initializing esp-wifi.
 ///
 /// This trait is meant to be used only for the `init` function.
-/// Calling `timers()` multiple times may panic.
 pub trait EspWifiTimerSource: private::Sealed {
     /// Returns the timer source.
-    fn timer(self) -> TimeBase;
-}
-
-/// Helper trait to reduce boilerplate.
-///
-/// We can't blanket-implement for `Into<AnyTimer>` because of possible
-/// conflicting implementations.
-trait IntoAnyTimer: Into<AnyTimer<'static>> {}
-
-impl IntoAnyTimer for TimgTimer<'static> where Self: Into<AnyTimer<'static>> {}
-
-#[cfg(not(feature = "esp32"))]
-impl IntoAnyTimer for Alarm<'static> where Self: Into<AnyTimer<'static>> {}
-
-impl private::Sealed for AnyTimer<'static> {}
-impl IntoAnyTimer for AnyTimer<'static> {}
-
-impl<T> EspWifiTimerSource for T
-where
-    T: IntoAnyTimer + private::Sealed,
-{
-    fn timer(self) -> TimeBase {
-        TimeBase::new(self.into()).timer()
-    }
-}
-
-impl EspWifiTimerSource for TimeBase {
-    fn timer(self) -> TimeBase {
-        self
-    }
+    ///
+    /// # Safety
+    ///
+    /// It is UB to call this method outside of [`init`].
+    unsafe fn timer(self) -> TimeBase;
 }
 
 impl private::Sealed for TimeBase {}
-impl private::Sealed for TimgTimer<'static> where Self: Into<AnyTimer<'static>> {}
+impl private::Sealed for AnyTimer<'_> {}
+impl private::Sealed for TimgTimer<'_> {}
 #[cfg(not(feature = "esp32"))]
-impl private::Sealed for Alarm<'static> where Self: Into<AnyTimer<'static>> {}
+impl private::Sealed for Alarm<'_> {}
+
+impl<T> EspWifiTimerSource for T
+where
+    T: esp_hal::timer::IntoAnyTimer + private::Sealed,
+{
+    unsafe fn timer(self) -> TimeBase {
+        let any_timer: AnyTimer<'_> = self.degrade();
+        let any_timer: AnyTimer<'static> = unsafe {
+            // Safety: this method is only safe to be called from within `init`.
+            // This 'static lifetime is a fake one, the timer is only used for the lifetime
+            // of the `EspWifiController` instance. The lifetime bounds on `init` and
+            // `EspWifiTimerSource` ensure that the timer is not used after the
+            // `EspWifiController` is dropped.
+            core::mem::transmute(any_timer)
+        };
+        TimeBase::new(any_timer)
+    }
+}
 
 /// A marker trait for suitable Rng sources for esp-wifi
 pub trait EspWifiRngSource: rand_core::RngCore + private::Sealed {}
@@ -351,7 +344,6 @@ impl private::Sealed for Trng<'_> {}
 /// - A timg `Timer` instance
 /// - A systimer `Alarm` instance
 /// - An `AnyTimer` instance
-/// - A `OneShotTimer` instance
 ///
 /// # Examples
 ///
@@ -388,7 +380,7 @@ pub fn init<'d>(
 
     // Enable timer tick interrupt
     #[cfg(feature = "builtin-scheduler")]
-    preempt_builtin::setup_timer(timer.timer());
+    preempt_builtin::setup_timer(unsafe { timer.timer() });
 
     #[cfg(not(feature = "builtin-scheduler"))]
     let _ = timer; // mark used to suppress warning
