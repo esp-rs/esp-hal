@@ -162,6 +162,7 @@ impl defmt::Format for PartitionEntry<'_> {
 
 /// Errors which can be returned.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// The partition table is invalid.
     Invalid,
@@ -174,13 +175,6 @@ pub enum Error {
 }
 
 impl core::error::Error for Error {}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for Error {
-    fn format(&self, fmt: defmt::Formatter) {
-        defmt::write!(fmt, "{}", self)
-    }
-}
 
 /// A partition table.
 pub struct PartitionTable<'a> {
