@@ -318,7 +318,7 @@ pub enum AppPartitionSubType {
     /// Factory image
     Factory = 0,
     /// OTA slot 0
-    Ota0    = 0x10,
+    Ota0 = 0x10,
     /// OTA slot 1
     Ota1,
     /// OTA slot 2
@@ -369,7 +369,7 @@ pub enum DataPartitionSubType {
     /// Data partition which stores information about the currently selected OTA
     /// app slot. This partition should be 0x2000 bytes in size. Refer to
     /// the OTA documentation for more details.
-    Ota      = 0,
+    Ota = 0,
     /// Phy is for storing PHY initialization data. This allows PHY to be
     /// configured per-device, instead of in firmware.
     Phy,
@@ -385,9 +385,9 @@ pub enum DataPartitionSubType {
     /// but it is possible to explicitly mark them as undefined as well.
     Undefined,
     /// FAT Filesystem Support.
-    Fat      = 0x81,
+    Fat = 0x81,
     /// SPIFFS Filesystem.
-    Spiffs   = 0x82,
+    Spiffs = 0x82,
     ///  LittleFS filesystem.
     LittleFs = 0x83,
 }
@@ -409,7 +409,7 @@ pub enum BootloaderPartitionSubType {
     Primary = 0,
     /// It is a temporary bootloader partition used by the bootloader OTA update
     /// functionality for downloading a new image.
-    Ota     = 1,
+    Ota = 1,
 }
 
 impl TryFrom<u8> for BootloaderPartitionSubType {
@@ -429,7 +429,7 @@ pub enum PartitionTablePartitionSubType {
     Primary = 0,
     /// It is a temporary partition table partition used by the partition table
     /// OTA update functionality for downloading a new image.
-    Ota     = 1,
+    Ota = 1,
 }
 
 impl TryFrom<u8> for PartitionTablePartitionSubType {
@@ -466,10 +466,7 @@ pub struct FlashRegion<'a, F> {
     flash: &'a mut F,
 }
 
-impl<F> embedded_storage::Region for FlashRegion<'_, F>
-where
-    F: embedded_storage::ReadStorage,
-{
+impl<F> embedded_storage::Region for FlashRegion<'_, F> {
     fn contains(&self, address: u32) -> bool {
         address >= self.raw.offset() && address < self.raw.offset() + self.raw.len()
     }
@@ -525,6 +522,101 @@ where
             .write(address, bytes)
             .map_err(|_e| Error::StorageError)
     }
+}
+
+impl embedded_storage::nor_flash::NorFlashError for Error {
+    fn kind(&self) -> embedded_storage::nor_flash::NorFlashErrorKind {
+        match self {
+            Error::OutOfBounds => embedded_storage::nor_flash::NorFlashErrorKind::OutOfBounds,
+            _ => embedded_storage::nor_flash::NorFlashErrorKind::Other,
+        }
+    }
+}
+
+impl<F> embedded_storage::nor_flash::ErrorType for FlashRegion<'_, F> {
+    type Error = Error;
+}
+
+impl<F> embedded_storage::nor_flash::ReadNorFlash for FlashRegion<'_, F>
+where
+    F: embedded_storage::nor_flash::ReadNorFlash,
+{
+    const READ_SIZE: usize = F::READ_SIZE;
+
+    fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+        let address = offset + self.raw.offset();
+
+        if !self.contains(address) {
+            return Err(Error::OutOfBounds);
+        }
+
+        if !self.contains(address + bytes.len() as u32) {
+            return Err(Error::OutOfBounds);
+        }
+
+        self.flash
+            .read(address, bytes)
+            .map_err(|_e| Error::StorageError)
+    }
+
+    fn capacity(&self) -> usize {
+        self.flash.capacity()
+    }
+}
+
+impl<F> embedded_storage::nor_flash::NorFlash for FlashRegion<'_, F>
+where
+    F: embedded_storage::nor_flash::NorFlash,
+{
+    const WRITE_SIZE: usize = F::WRITE_SIZE;
+
+    const ERASE_SIZE: usize = F::ERASE_SIZE;
+
+    fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
+        let address_from = from + self.raw.offset();
+        let address_to = to + self.raw.offset();
+
+        if self.raw.is_read_only() {
+            return Err(Error::WriteProtected);
+        }
+
+        if !self.contains(address_from) {
+            return Err(Error::OutOfBounds);
+        }
+
+        if !self.contains(address_to) {
+            return Err(Error::OutOfBounds);
+        }
+
+        self.flash
+            .erase(address_from, address_to)
+            .map_err(|_e| Error::StorageError)
+    }
+
+    fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+        let address = offset + self.raw.offset();
+
+        if self.raw.is_read_only() {
+            return Err(Error::WriteProtected);
+        }
+
+        if !self.contains(address) {
+            return Err(Error::OutOfBounds);
+        }
+
+        if !self.contains(address + bytes.len() as u32) {
+            return Err(Error::OutOfBounds);
+        }
+
+        self.flash
+            .write(address, bytes)
+            .map_err(|_e| Error::StorageError)
+    }
+}
+
+impl<F> embedded_storage::nor_flash::MultiwriteNorFlash for FlashRegion<'_, F> where
+    F: embedded_storage::nor_flash::MultiwriteNorFlash
+{
 }
 
 #[cfg(test)]
