@@ -107,10 +107,10 @@ macro_rules! any_peripheral {
             ///
             /// This struct is a type-erased version of a peripheral singleton. It is useful
             /// for creating arrays of peripherals, or avoiding generics. Peripheral singletons
-            /// can be type erased by calling `degrade` on them.
+            /// can be type erased by using their `From` implementation.
             ///
             /// ```rust,ignore
-            /// let any_peripheral = peripheral.degrade();
+            #[doc = concat!("let any_peripheral = ", stringify!($name), "::from(peripheral);")]
             /// ```
             #[derive(Debug)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -203,15 +203,6 @@ macro_rules! any_peripheral {
                     #[inline]
                     fn from(inner: $inner) -> Self {
                         Self([< $name Inner >]::$variant(inner))
-                    }
-                }
-
-                $(#[cfg($variant_meta)])*
-                impl<'d> $inner {
-                    #[doc = concat!("Type-erase this peripheral into an [`", stringify!($name), "`].")]
-                    #[inline]
-                    pub fn degrade(self) -> $name<'d> {
-                        $name::from(self)
                     }
                 }
             )*

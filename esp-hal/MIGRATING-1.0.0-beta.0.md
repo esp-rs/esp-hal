@@ -2,12 +2,17 @@
 
 ## Peripheral singleton changes
 
+> As this is a conceptual change, we'll not list all affected types in this section. `AnyPeripheral`
+> refers to all `Any*` types at the same time - `AnySpi`, `AnyUart`, etc. Similarly, `Driver` refers
+> to any matching peripheral driver.
+
 Peripheral singletons (like `SPI2` or `GpioPin`) no longer implement `Peripheral`. The `Peripheral`
 trait and `PeripheralRef` struct have been removed. The peripheral singletons instead have a
 lifetime and implement the following methods:
 
 - `steal` and `clone_unchecked` to unsafely create them.
 - `reborrow` to safely create a copy with a shorter lifetime.
+- `degrade` has been removed in favour of `AnyPeripheral::from`.
 
 ### Application-facing changes
 
