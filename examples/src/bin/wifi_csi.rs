@@ -19,7 +19,7 @@ use esp_hal::{clock::CpuClock, main, rng::Rng, time, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     init,
-    wifi::{AccessPointInfo, ClientConfiguration, Configuration, CsiConfig, WifiError},
+    wifi::{ClientConfiguration, Configuration, CsiConfig},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
@@ -62,8 +62,8 @@ fn main() -> ! {
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
-        ssid: SSID.try_into().unwrap(),
-        password: PASSWORD.try_into().unwrap(),
+        ssid: SSID.into(),
+        password: PASSWORD.into(),
         ..Default::default()
     });
     let res = controller.set_configuration(&client_config);
@@ -88,7 +88,7 @@ fn main() -> ! {
 
     println!("Waiting for CSI data...");
     println!("Start Wifi Scan");
-    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
+    let res = controller.scan_n::<10>();
     if let Ok((res, _count)) = res {
         for ap in res {
             println!("{:?}", ap);

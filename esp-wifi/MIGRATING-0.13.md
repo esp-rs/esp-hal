@@ -25,3 +25,20 @@ The sniffer is now part of `Interfaces`
 -    let mut sniffer = controller.take_sniffer().unwrap();
 +    let mut sniffer = interfaces.sniffer;
 ```
+
+## The public API is using `alloc` instead of `heapless` now
+
+General usage doesn't change with some small exceptions.
+
+```diff
+-    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
++    let res: Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> = controller.scan_n::<10>();
+```
+
+Some code can be simplified now.
+```diff
+-        ssid: SSID.try_into().unwrap(),
+-        password: PASSWORD.try_into().unwrap(),
++        ssid: SSID.into(),
++        password: PASSWORD.into(),
+```

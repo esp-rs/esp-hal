@@ -11,7 +11,7 @@ repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-defmt = { version = "0.3.10", optional = true }
+defmt = { version = "0.3.10", features = ["alloc"], optional = true }
 log = { version = "0.4.26", optional = true }
 document-features  = "0.2.11"
 esp-alloc = { version = "0.7.0", path = "../esp-alloc", optional = true }
@@ -24,9 +24,6 @@ critical-section = "1.2.0"
 enumset = { version = "1.1.5", default-features = false, optional = true }
 embedded-io = { version = "0.6.1", default-features = false }
 embedded-io-async = { version = "0.6.1" }
-heapless = { version = "0.8.0", default-features = false, features = [
-  "portable-atomic",
-] }
 num-derive = { version = "0.4.2" }
 num-traits = { version = "0.2.19", default-features = false }
 esp-wifi-sys = "0.7.1"
@@ -104,7 +101,7 @@ coex = []
 sys-logs = ["esp-wifi-sys/sys-logs"]
 
 ## Enable support for `defmt`
-defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "heapless/defmt-03"]
+defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt"]
 
 ## Enable support for the `log` crate
 log = ["dep:log", "esp-hal/log", "esp-wifi-sys/log"]
@@ -131,7 +128,7 @@ smoltcp = ["dep:smoltcp"]
 builtin-scheduler = []
 
 # Implement serde Serialize / Deserialize
-serde = ["dep:serde", "enumset?/serde", "heapless/serde"]
+serde = ["dep:serde", "enumset?/serde"]
 
 [package.metadata.docs.rs]
 features = [

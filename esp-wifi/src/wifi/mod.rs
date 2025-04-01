@@ -222,7 +222,7 @@ pub enum SecondaryChannel {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointInfo {
     /// The SSID of the access point.
-    pub ssid: heapless::String<32>,
+    pub ssid: alloc::string::String,
 
     /// The BSSID (MAC address) of the access point.
     pub bssid: [u8; 6],
@@ -250,7 +250,7 @@ pub struct AccessPointInfo {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointConfiguration {
     /// The SSID of the access point.
-    pub ssid: heapless::String<32>,
+    pub ssid: alloc::string::String,
 
     /// Whether the SSID is hidden or visible.
     pub ssid_hidden: bool,
@@ -269,7 +269,7 @@ pub struct AccessPointConfiguration {
     pub auth_method: AuthMethod,
 
     /// The password for securing the access point (if applicable).
-    pub password: heapless::String<64>,
+    pub password: alloc::string::String,
 
     /// The maximum number of connections allowed on the access point.
     pub max_connections: u16,
@@ -278,25 +278,25 @@ pub struct AccessPointConfiguration {
 impl Default for AccessPointConfiguration {
     fn default() -> Self {
         Self {
-            ssid: unwrap!("iot-device".try_into()),
+            ssid: alloc::string::String::from("iot-device"),
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
             protocols: Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN,
             auth_method: AuthMethod::None,
-            password: heapless::String::new(),
+            password: alloc::string::String::new(),
             max_connections: 255,
         }
     }
 }
 
 /// Client configuration for a Wi-Fi connection.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ClientConfiguration {
     /// The SSID of the Wi-Fi network.
-    pub ssid: heapless::String<32>,
+    pub ssid: alloc::string::String,
 
     /// The BSSID (MAC address) of the client.
     pub bssid: Option<[u8; 6]>,
@@ -306,33 +306,10 @@ pub struct ClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The password for the Wi-Fi connection.
-    pub password: heapless::String<64>,
+    pub password: alloc::string::String,
 
     /// The Wi-Fi channel to connect to.
     pub channel: Option<u8>,
-}
-
-impl Debug for ClientConfiguration {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ClientConfiguration")
-            .field("ssid", &self.ssid)
-            .field("bssid", &self.bssid)
-            .field("auth_method", &self.auth_method)
-            .field("channel", &self.channel)
-            .finish()
-    }
-}
-
-impl Default for ClientConfiguration {
-    fn default() -> Self {
-        ClientConfiguration {
-            ssid: heapless::String::new(),
-            bssid: None,
-            auth_method: Default::default(),
-            password: heapless::String::new(),
-            channel: None,
-        }
-    }
 }
 
 #[cfg(feature = "csi")]
@@ -583,7 +560,7 @@ impl TtlsPhase2Method {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct EapClientConfiguration {
     /// The SSID of the network the client is connecting to.
-    pub ssid: heapless::String<32>,
+    pub ssid: alloc::string::String,
 
     /// The BSSID (MAC Address) of the specific access point.
     pub bssid: Option<[u8; 6]>,
@@ -593,18 +570,18 @@ pub struct EapClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The identity used during authentication.
-    pub identity: Option<heapless::String<128>>,
+    pub identity: Option<alloc::string::String>,
 
     /// The username used for inner authentication.
     /// Some EAP methods require a username for authentication.
-    pub username: Option<heapless::String<128>>,
+    pub username: Option<alloc::string::String>,
 
     /// The password used for inner authentication.
-    pub password: Option<heapless::String<64>>,
+    pub password: Option<alloc::string::String>,
 
     /// A new password to be set during the authentication process.
     /// Some methods support password changes during authentication.
-    pub new_password: Option<heapless::String<64>>,
+    pub new_password: Option<alloc::string::String>,
 
     /// Configuration for EAP-FAST.
     pub eap_fast_config: Option<EapFastConfig>,
@@ -657,7 +634,7 @@ impl Debug for EapClientConfiguration {
 impl Default for EapClientConfiguration {
     fn default() -> Self {
         EapClientConfiguration {
-            ssid: heapless::String::new(),
+            ssid: alloc::string::String::new(),
             bssid: None,
             auth_method: AuthMethod::WPA2Enterprise,
             identity: None,
@@ -1463,8 +1440,8 @@ pub(crate) fn wifi_start_scan(
     };
 
     let mut ssid_buf = ssid.map(|m| {
-        let mut buf = heapless::Vec::<u8, 33>::from_iter(m.bytes());
-        unwrap!(buf.push(b'\0').ok());
+        let mut buf = alloc::vec::Vec::from_iter(m.bytes());
+        buf.push(b'\0');
         buf
     });
 
@@ -1673,8 +1650,8 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
         .unwrap_or(record.ssid.len());
     let ssid_ref = unsafe { core::str::from_utf8_unchecked(&record.ssid[..str_len]) };
 
-    let mut ssid = heapless::String::<32>::new();
-    unwrap!(ssid.push_str(ssid_ref));
+    let mut ssid = alloc::string::String::new();
+    ssid.push_str(ssid_ref);
 
     AccessPointInfo {
         ssid,
@@ -2555,11 +2532,11 @@ impl WifiController<'_> {
     pub fn scan_with_config_sync<const N: usize>(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
         esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
 
         let count = self.scan_result_count()?;
-        let result = self.scan_results()?;
+        let result = self.scan_results::<N>()?;
 
         Ok((result, count))
     }
@@ -2579,8 +2556,8 @@ impl WifiController<'_> {
 
     fn scan_results<const N: usize>(
         &mut self,
-    ) -> Result<heapless::Vec<AccessPointInfo, N>, WifiError> {
-        let mut scanned = heapless::Vec::<AccessPointInfo, N>::new();
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+        let mut scanned = alloc::vec::Vec::<AccessPointInfo>::with_capacity(N);
         let mut bss_total: u16 = N as u16;
 
         let mut records: [MaybeUninit<include::wifi_ap_record_t>; N] = [MaybeUninit::uninit(); N];
@@ -2601,7 +2578,7 @@ impl WifiController<'_> {
             let record = unsafe { MaybeUninit::assume_init_ref(&records[i as usize]) };
             let ap_info = convert_ap_info(record);
 
-            scanned.push(ap_info).ok();
+            scanned.push(ap_info);
         }
 
         Ok(scanned)
@@ -2610,8 +2587,8 @@ impl WifiController<'_> {
     /// A blocking wifi network scan with default scanning options.
     pub fn scan_n<const N: usize>(
         &mut self,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-        self.scan_with_config_sync(Default::default())
+    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+        self.scan_with_config_sync::<N>(Default::default())
     }
 
     /// Starts the WiFi controller.
@@ -2747,15 +2724,15 @@ impl WifiController<'_> {
     /// Async version of [`crate::wifi::WifiController`]'s `scan_n` method
     pub async fn scan_n_async<const N: usize>(
         &mut self,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-        self.scan_with_config_async(Default::default()).await
+    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
+        self.scan_with_config_async::<N>(Default::default()).await
     }
 
     /// An async wifi network scan with caller-provided scanning options.
     pub async fn scan_with_config_async<const N: usize>(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+    ) -> Result<(alloc::vec::Vec<AccessPointInfo>, usize), WifiError> {
         Self::clear_events(WifiEvent::ScanDone);
         esp_wifi_result!(wifi_start_scan(false, config))?;
 
@@ -2766,7 +2743,7 @@ impl WifiController<'_> {
         guard.defuse();
 
         let count = self.scan_result_count()?;
-        let result = self.scan_results()?;
+        let result = self.scan_results::<N>()?;
 
         Ok((result, count))
     }
