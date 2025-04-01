@@ -1928,15 +1928,17 @@ impl Driver<'_> {
     /// Reads all bytes from the RX FIFO.
     fn read_all_from_fifo_blocking(&self, buffer: &mut [u8]) -> Result<(), Error> {
         // Read bytes from FIFO
-        // FIXME: Handle case where less data has been provided by the slave than
-        // requested? Or is this prevented from a protocol perspective?
         for byte in buffer.iter_mut() {
             loop {
                 self.check_errors()?;
-
-                let reg = self.regs().fifo_st().read();
-                if reg.rxfifo_raddr().bits() != reg.rxfifo_waddr().bits() {
+                let trans_complete = self.regs().int_raw().read().trans_complete().bit_is_set();
+                let sr_bits = self.regs().sr().read();
+                if sr_bits.rxfifo_cnt().bits() != 0 {
                     break;
+                } else if trans_complete  {
+                    // If we are done driving the bus but we haven't received
+                    // all of the expected bytes, then we never will.
+                    return Err(Error::ExecutionIncomplete);
                 }
             }
 
