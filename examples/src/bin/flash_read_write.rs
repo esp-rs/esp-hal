@@ -59,8 +59,16 @@ fn main() -> ! {
     println!("NVS partition size = {}", nvs_partition.capacity());
     println!();
 
-    nvs_partition.read(0, &mut bytes).unwrap();
-    println!("Read from {:x}:  {:02x?}", 0, &bytes[..32]);
+    let offset_in_nvs_partition = 0;
+
+    nvs_partition
+        .read(offset_in_nvs_partition, &mut bytes)
+        .unwrap();
+    println!(
+        "Read from {:x}:  {:02x?}",
+        offset_in_nvs_partition,
+        &bytes[..32]
+    );
 
     bytes[0x00] = bytes[0x00].wrapping_add(1);
     bytes[0x01] = bytes[0x01].wrapping_add(2);
@@ -71,12 +79,22 @@ fn main() -> ! {
     bytes[0x06] = bytes[0x06].wrapping_add(3);
     bytes[0x07] = bytes[0x07].wrapping_add(4);
 
-    nvs_partition.write(0, &bytes).unwrap();
-    println!("Written to {:x}: {:02x?}", 0, &bytes[..32]);
+    nvs_partition
+        .write(offset_in_nvs_partition, &bytes)
+        .unwrap();
+    println!(
+        "Written to {:x}: {:02x?}",
+        offset_in_nvs_partition,
+        &bytes[..32]
+    );
 
     let mut reread_bytes = [0u8; 32];
     nvs_partition.read(0, &mut reread_bytes).unwrap();
-    println!("Read from {:x}:  {:02x?}", 0, &reread_bytes[..32]);
+    println!(
+        "Read from {:x}:  {:02x?}",
+        offset_in_nvs_partition,
+        &reread_bytes[..32]
+    );
 
     println!();
     println!("Reset (CTRL-R in espflash) to re-read the persisted data.");

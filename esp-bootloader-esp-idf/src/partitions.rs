@@ -20,13 +20,12 @@ const ENTRY_MAGIC: u16 = 0x50aa;
 const MD5_MAGIC: u16 = 0xebeb;
 
 /// Represents a single partition entry.
-#[repr(C)]
 pub struct PartitionEntry<'a> {
-    binary: &'a [u8],
+    binary: &'a [u8; RAW_ENTRY_LEN],
 }
 
 impl<'a> PartitionEntry<'a> {
-    fn new(binary: &'a [u8]) -> Self {
+    fn new(binary: &'a [u8; RAW_ENTRY_LEN]) -> Self {
         Self { binary }
     }
 
@@ -178,7 +177,7 @@ impl core::error::Error for Error {}
 
 /// A partition table.
 pub struct PartitionTable<'a> {
-    binary: &'a [u8],
+    binary: &'a [[u8; RAW_ENTRY_LEN]],
     entries: usize,
 }
 
@@ -193,13 +192,14 @@ impl<'a> PartitionTable<'a> {
         }
 
         let mut raw = Self {
-            binary,
+            // we checked binary before
+            binary: unsafe { core::mem::transmute::<&[u8], &[[u8; 32]]>(binary) },
             entries: binary.len() / RAW_ENTRY_LEN,
         };
 
         #[cfg(feature = "validation")]
         {
-            let hash = {
+            let (hash, index) = {
                 let mut i = 0;
                 loop {
                     let entry = raw.get_partition(i).unwrap();
@@ -216,10 +216,13 @@ impl<'a> PartitionTable<'a> {
 
             use md5::Digest;
             let mut hasher = md5::Md5::new();
-            hasher.update(&raw.binary[..hash.1 * RAW_ENTRY_LEN]);
+
+            for i in 0..index {
+                hasher.update(raw.binary[i]);
+            }
             let calculated_hash = hasher.finalize();
 
-            if *calculated_hash != *hash.0 {
+            if *calculated_hash != *hash {
                 return Err(Error::Invalid);
             }
         }
@@ -264,9 +267,7 @@ impl<'a> PartitionTable<'a> {
         if index >= self.entries {
             return Err(Error::OutOfBounds);
         }
-        Ok(PartitionEntry::new(
-            &self.binary[(index * RAW_ENTRY_LEN)..][..RAW_ENTRY_LEN],
-        ))
+        Ok(PartitionEntry::new(&self.binary[index]))
     }
 
     /// Get the first partition matching the given partition type.
