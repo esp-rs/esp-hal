@@ -223,7 +223,8 @@ pub unsafe extern "C" fn wifi_int_disable(
 ) -> u32 {
     trace!("wifi_int_disable");
     // TODO: can we use wifi_int_mux?
-    unsafe { WIFI_LOCK.acquire() as _ }
+    let token = unsafe { WIFI_LOCK.acquire() };
+    unsafe { core::mem::transmute::<esp_hal::sync::RestoreState, u32>(token) }
 }
 
 /// **************************************************************************
@@ -246,7 +247,7 @@ pub unsafe extern "C" fn wifi_int_restore(
     tmp: u32,
 ) {
     trace!("wifi_int_restore");
-    let token = tmp as critical_section::RawRestoreState;
+    let token = unsafe { core::mem::transmute::<u32, esp_hal::sync::RestoreState>(tmp) };
     unsafe { WIFI_LOCK.release(token) }
 }
 

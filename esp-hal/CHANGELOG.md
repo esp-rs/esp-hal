@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` and `ESP_HAL_CONFIG_STACK_GUARD_VALUE` to configure Rust's [Stack smashing protection](https://doc.rust-lang.org/rustc/exploit-mitigations.html#stack-smashing-protection) (#3203)
 - Experimental metadata in the output `.elf` (#3276)
 - `PeripheralInput::connect_input_to_peripheral` and `PeripheralOuptut::{connect_peripheral_to_output, disconnect_from_peripheral_output}` (#3302)
+- `ESP_HAL_CONFIG_CRITICAL_SECTION_IMPL` to allow opting out of the default `critical-section` implementation (#3293)
 
 ### Changed
 
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpiDma<Async>` now uses the SPI interrupt (instead of DMA) to wait for completion (#3303)
 
 - `gpio::interconnect` types now have a lifetime associated with them (#3302)
+- The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)
 
 ### Fixed
 
