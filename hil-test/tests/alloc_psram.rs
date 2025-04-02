@@ -79,6 +79,18 @@ mod tests {
     }
 
     #[test]
+    fn allocator_does_not_panic_if_fallible_allocation_fails() {
+        let mut vec = Vec::<u8, _>::new_in(InternalMemory);
+        assert!(vec.try_reserve(1_000_000_000).is_err());
+
+        let mut vec = Vec::<u8, _>::new_in(ExternalMemory);
+        assert!(vec.try_reserve(1_000_000_000).is_err());
+
+        let mut vec = Vec::<u8, _>::new_in(AnyMemory);
+        assert!(vec.try_reserve(1_000_000_000).is_err());
+    }
+
+    #[test]
     fn internal_allocator_can_allocate_memory() {
         esp_alloc::heap_allocator!(size: 64000);
         let mut vec: Vec<u32, _> = Vec::new_in(InternalMemory);
