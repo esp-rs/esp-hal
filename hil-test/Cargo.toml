@@ -263,7 +263,7 @@ esp-metadata = { path = "../esp-metadata" }
 default = []
 unstable = ["esp-hal/unstable"]
 
-defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt"]
+defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt", "esp-wifi/defmt"]
 
 # Device support (required!):
 esp32 = [
