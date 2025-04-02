@@ -11,6 +11,7 @@ repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+allocator-api2 = { version = "0.2.0", default-features = false, features = ["alloc"] }
 defmt = { version = "0.3.10", optional = true }
 log = { version = "0.4.26", optional = true }
 document-features  = "0.2.11"
