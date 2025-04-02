@@ -80,7 +80,6 @@ use crate::{
         ChannelTx,
         DescriptorChain,
         DmaChannelFor,
-        DmaDescriptor,
         DmaEligible,
         DmaError,
         DmaTransferRx,
