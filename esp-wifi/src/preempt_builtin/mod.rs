@@ -3,26 +3,118 @@
 mod arch_specific;
 pub mod timer;
 
-use core::{ffi::c_void, mem::size_of};
+use core::{ffi::c_void, mem::MaybeUninit};
 
+use allocator_api2::boxed::Box;
 use arch_specific::*;
-use esp_hal::sync::Locked;
-use esp_wifi_sys::include::malloc;
 use timer::{disable_multitasking, setup_multitasking};
 pub(crate) use timer::{disable_timer, setup_timer};
 
-use crate::{compat::malloc::free, hal::trapframe::TrapFrame, memory_fence::memory_fence};
+use crate::{
+    compat::malloc::InternalMemory,
+    hal::{sync::Locked, trapframe::TrapFrame},
+    preempt::Scheduler,
+};
 
-#[repr(transparent)]
-struct ContextWrapper(*mut Context);
+struct Context {
+    trap_frame: TrapFrame,
+    pub thread_semaphore: u32,
+    pub next: *mut Context,
+    pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
+}
 
-unsafe impl Send for ContextWrapper {}
+impl Context {
+    pub(crate) fn new(
+        task_fn: extern "C" fn(*mut c_void),
+        param: *mut c_void,
+        task_stack_size: usize,
+    ) -> Self {
+        trace!("task_create {:?} {:?} {}", task_fn, param, task_stack_size);
 
-static CTX_NOW: Locked<ContextWrapper> = Locked::new(ContextWrapper(core::ptr::null_mut()));
+        let mut stack = Box::<[u8], _>::new_uninit_slice_in(task_stack_size, InternalMemory);
 
-static mut SCHEDULED_TASK_TO_DELETE: *mut Context = core::ptr::null_mut();
+        let stack_top = unsafe { stack.as_mut_ptr().add(task_stack_size).cast() };
 
-use crate::preempt::Scheduler;
+        Context {
+            trap_frame: new_task_context(task_fn, param, stack_top),
+            thread_semaphore: 0,
+            next: core::ptr::null_mut(),
+            _allocated_stack: stack,
+        }
+    }
+}
+
+struct SchedulerState {
+    /// Pointer to the current task.
+    ///
+    /// Tasks are stored in a circular linked list. CTX_NOW points to the
+    /// current task.
+    current_task: *mut Context,
+
+    /// Pointer to the task that is scheduled for deletion.
+    to_delete: *mut Context,
+}
+
+impl SchedulerState {
+    const fn new() -> Self {
+        Self {
+            current_task: core::ptr::null_mut(),
+            to_delete: core::ptr::null_mut(),
+        }
+    }
+
+    fn delete_task(&mut self, task: *mut Context) {
+        let mut current_task = self.current_task;
+        // Save the first pointer so we can prevent an accidental infinite loop.
+        let initial = current_task;
+        loop {
+            // We don't have the previous pointer, so we need to walk forward in the circle
+            // even if we need to delete the first task.
+
+            // If the next task is the one we want to delete, we need to remove it from the
+            // list, then drop it.
+            let next_task = unsafe { (*current_task).next };
+            if core::ptr::eq(next_task, task) {
+                unsafe {
+                    (*current_task).next = (*next_task).next;
+
+                    core::ptr::drop_in_place(task);
+                    break;
+                }
+            }
+
+            // If the next task is the first task, we can stop. If we needed to delete the
+            // first task, we have already handled it in the above case. If we needed to
+            // delete another task, it has already been deleted in a previous iteration.
+            if core::ptr::eq(next_task, initial) {
+                break;
+            }
+
+            // Move to the next task.
+            current_task = next_task;
+        }
+    }
+
+    fn switch_task(&mut self, trap_frame: &mut TrapFrame) {
+        save_task_context(unsafe { &mut *self.current_task }, trap_frame);
+
+        if !self.to_delete.is_null() {
+            let task_to_delete = core::mem::replace(&mut self.to_delete, core::ptr::null_mut());
+            self.delete_task(task_to_delete);
+        }
+
+        unsafe { self.current_task = (*self.current_task).next };
+
+        restore_task_context(unsafe { &mut *self.current_task }, trap_frame);
+    }
+
+    fn schedule_task_deletion(&mut self, task: *mut Context) -> bool {
+        self.to_delete = task;
+        core::ptr::eq(task, self.current_task)
+    }
+}
+
+static SCHEDULER_STATE: Locked<SchedulerState> = Locked::new(SchedulerState::new());
 
 struct BuiltinScheduler {}
 
@@ -52,7 +144,22 @@ impl Scheduler for BuiltinScheduler {
         param: *mut c_void,
         task_stack_size: usize,
     ) -> *mut c_void {
-        arch_specific::task_create(task, param, task_stack_size) as *mut c_void
+        let task = Box::new_in(Context::new(task, param, task_stack_size), InternalMemory);
+        let task_ptr = Box::into_raw(task);
+
+        SCHEDULER_STATE.with(|state| unsafe {
+            let current_task = state.current_task;
+            debug_assert!(
+                !current_task.is_null(),
+                "Tried to allocate a task before allocating the main task"
+            );
+            // Insert the new task at the next position.
+            let next = (*current_task).next;
+            (*task_ptr).next = next;
+            (*current_task).next = task_ptr;
+        });
+
+        task_ptr as *mut c_void
     }
 
     fn current_task(&self) -> *mut c_void {
@@ -71,108 +178,75 @@ impl Scheduler for BuiltinScheduler {
     }
 }
 
-fn allocate_main_task() -> *mut Context {
-    CTX_NOW.with(|ctx_now| unsafe {
-        if !ctx_now.0.is_null() {
-            panic!("Tried to allocate main task multiple times");
-        }
+fn allocate_main_task() {
+    // This context will be filled out by the first context switch.
+    let context = Box::new_in(
+        Context {
+            trap_frame: TrapFrame::default(),
+            thread_semaphore: 0,
+            next: core::ptr::null_mut(),
+            _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
+        },
+        InternalMemory,
+    );
 
-        let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
-        assert!(!ptr.is_null(), "Failed to allocate main task context");
-        core::ptr::write(ptr, Context::new());
-        (*ptr).next = ptr;
-        ctx_now.0 = ptr;
-        ptr
+    let context_ptr = Box::into_raw(context);
+    unsafe {
+        // The first task loops back to itself.
+        (*context_ptr).next = context_ptr;
+    }
+
+    SCHEDULER_STATE.with(|state| {
+        debug_assert!(
+            state.current_task.is_null(),
+            "Tried to allocate main task multiple times"
+        );
+        state.current_task = context_ptr;
     })
-}
-
-fn allocate_task() -> *mut Context {
-    CTX_NOW.with(|ctx_now| unsafe {
-        if ctx_now.0.is_null() {
-            panic!("Called `allocate_task` before allocating main task");
-        }
-
-        let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
-        assert!(!ptr.is_null(), "Failed to allocate task context");
-        core::ptr::write(ptr, Context::new());
-        (*ptr).next = (*ctx_now.0).next;
-        (*ctx_now.0).next = ptr;
-        ptr
-    })
-}
-
-fn next_task() {
-    CTX_NOW.with(|ctx_now| unsafe {
-        ctx_now.0 = (*ctx_now.0).next;
-    });
-}
-
-/// Delete the given task.
-///
-/// This will also free the memory (stack and context) allocated for it.
-fn delete_task(task: *mut Context) {
-    CTX_NOW.with(|ctx_now| unsafe {
-        let mut ptr = ctx_now.0;
-        let initial = ptr;
-        loop {
-            if core::ptr::eq((*ptr).next, task) {
-                (*ptr).next = (*((*ptr).next)).next;
-
-                free((*task).allocated_stack as *mut u8);
-                free(task as *mut u8);
-                break;
-            }
-
-            ptr = (*ptr).next;
-
-            if core::ptr::eq(ptr, initial) {
-                break;
-            }
-        }
-
-        memory_fence();
-    });
 }
 
 fn delete_all_tasks() {
-    CTX_NOW.with(|ctx_now| unsafe {
-        let current_task = ctx_now.0;
-
-        if current_task.is_null() {
-            return;
-        }
-
-        let mut task_to_delete = current_task;
-
-        loop {
-            let next_task = (*task_to_delete).next;
-
-            free((*task_to_delete).allocated_stack as *mut u8);
-            free(task_to_delete as *mut u8);
-
-            if core::ptr::eq(next_task, current_task) {
-                break;
-            }
-
-            task_to_delete = next_task;
-        }
-
-        ctx_now.0 = core::ptr::null_mut();
-
-        memory_fence();
+    let first_task = SCHEDULER_STATE.with(|state| {
+        // Remove all tasks from the list. We will drop them outside of the critical
+        // section.
+        core::mem::replace(&mut state.current_task, core::ptr::null_mut())
     });
+
+    if first_task.is_null() {
+        return;
+    }
+
+    let mut task_to_delete = first_task;
+
+    loop {
+        let next_task = unsafe {
+            // SAFETY: Tasks are in a circular linked list. We are guaranteed that the next
+            // task is a valid pointer, or the first task that may already have been
+            // deleted. In the second case, we will not move on to the next
+            // iteration, so the loop will not try to free a task twice.
+            let next_task = (*task_to_delete).next;
+            core::ptr::drop_in_place(task_to_delete);
+            next_task
+        };
+
+        if core::ptr::eq(next_task, first_task) {
+            break;
+        }
+
+        task_to_delete = next_task;
+    }
 }
 
 fn current_task() -> *mut Context {
-    CTX_NOW.with(|ctx_now| ctx_now.0)
+    SCHEDULER_STATE.with(|state| state.current_task)
 }
 
 fn schedule_task_deletion(task: *mut Context) {
-    unsafe {
-        SCHEDULED_TASK_TO_DELETE = task;
-    }
+    let deleting_current = SCHEDULER_STATE.with(|state| state.schedule_task_deletion(task));
 
-    if core::ptr::eq(task, current_task()) {
+    // Tasks are deleted during context switches, so we need to yield if we are
+    // deleting the current task.
+    if deleting_current {
         loop {
             timer::yield_task();
         }
@@ -180,15 +254,5 @@ fn schedule_task_deletion(task: *mut Context) {
 }
 
 pub(crate) fn task_switch(trap_frame: &mut TrapFrame) {
-    save_task_context(current_task(), trap_frame);
-
-    unsafe {
-        if !SCHEDULED_TASK_TO_DELETE.is_null() {
-            delete_task(SCHEDULED_TASK_TO_DELETE);
-            SCHEDULED_TASK_TO_DELETE = core::ptr::null_mut();
-        }
-    }
-
-    next_task();
-    restore_task_context(current_task(), trap_frame);
+    SCHEDULER_STATE.with(|state| state.switch_task(trap_frame));
 }
