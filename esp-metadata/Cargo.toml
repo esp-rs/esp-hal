@@ -9,8 +9,13 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [dependencies]
-anyhow     = "1.0.95"
+anyhow     = { version = "1.0.95", optional = true }
 clap       = { version = "4.5.26", features = ["derive"], optional = true }
-basic-toml = "0.1.9"
-serde      = { version = "1.0.217", features = ["derive"] }
-strum      = { version = "0.26.3", features = ["derive"] }
+basic-toml = { version = "0.1.9", optional = true }
+serde      = { version = "1.0.217", features = ["derive"], optional = true }
+strum      = { version = "0.26.3", features = ["derive"], optional = true }
+
+[features]
+default = ["build"]
+build = ["dep:anyhow", "dep:basic-toml", "dep:serde", "dep:strum"]
+clap = ["dep:clap"]
