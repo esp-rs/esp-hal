@@ -67,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the async APIs to have a `_async` postfix to avoid name collisions (#2446)
 - `phy_enable_usb` is enabled by default (#2446)
 - Removed `get_` prefixes from functions (#2528)
+- Opting out of `esp-alloc` now requires implementing `esp_wifi_deallocate_internal_ram` (#3320)
 
 - Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 

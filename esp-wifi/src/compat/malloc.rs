@@ -4,8 +4,6 @@ use core::alloc::Layout;
 pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
     trace!("alloc {}", size);
 
-    let total_size = size + 4;
-
     extern "C" {
         fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8;
     }
@@ -14,11 +12,9 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
 
     if ptr.is_null() {
         warn!("Unable to allocate {} bytes", size);
-        return ptr;
     }
 
-    *(ptr as *mut usize) = total_size;
-    ptr.offset(4)
+    ptr
 }
 
 #[no_mangle]
@@ -26,14 +22,15 @@ pub unsafe extern "C" fn free(ptr: *mut u8) {
     trace!("free {:?}", ptr);
 
     if ptr.is_null() {
+        warn!("Attempt to free null pointer");
         return;
     }
 
-    let ptr = ptr.offset(-4);
-    let total_size = *(ptr as *const usize);
+    extern "C" {
+        fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
+    }
 
-    let layout = Layout::from_size_align_unchecked(total_size, 4);
-    alloc::alloc::dealloc(ptr, layout);
+    esp_wifi_deallocate_internal_ram(ptr);
 }
 
 #[no_mangle]
@@ -85,10 +82,33 @@ pub extern "C" fn esp_wifi_free_internal_heap() -> usize {
 #[doc(hidden)]
 #[no_mangle]
 pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
+    let total_size = size + 4;
     unsafe {
-        esp_alloc::HEAP.alloc_caps(
+        let ptr = esp_alloc::HEAP.alloc_caps(
             esp_alloc::MemoryCapability::Internal.into(),
-            core::alloc::Layout::from_size_align_unchecked(size, 4),
+            core::alloc::Layout::from_size_align_unchecked(total_size, 4),
+        );
+
+        if ptr.is_null() {
+            return ptr;
+        }
+
+        *(ptr as *mut usize) = total_size;
+        ptr.offset(4)
+    }
+}
+
+#[cfg(feature = "esp-alloc")]
+#[doc(hidden)]
+#[no_mangle]
+pub extern "C" fn esp_wifi_deallocate_internal_ram(ptr: *mut u8) {
+    unsafe {
+        let ptr = ptr.offset(-4);
+        let total_size = *(ptr as *const usize);
+
+        esp_alloc::HEAP.dealloc(
+            esp_alloc::MemoryCapability::Internal.into(),
+            core::alloc::Layout::from_size_align_unchecked(total_size, 4),
         )
     }
 }

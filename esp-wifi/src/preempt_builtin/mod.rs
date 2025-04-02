@@ -78,6 +78,7 @@ fn allocate_main_task() -> *mut Context {
         }
 
         let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
+        assert!(!ptr.is_null(), "Failed to allocate main task context");
         core::ptr::write(ptr, Context::new());
         (*ptr).next = ptr;
         ctx_now.0 = ptr;
@@ -92,6 +93,7 @@ fn allocate_task() -> *mut Context {
         }
 
         let ptr = malloc(size_of::<Context>() as u32) as *mut Context;
+        assert!(!ptr.is_null(), "Failed to allocate task context");
         core::ptr::write(ptr, Context::new());
         (*ptr).next = (*ctx_now.0).next;
         (*ctx_now.0).next = ptr;
