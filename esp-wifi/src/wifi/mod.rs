@@ -4,7 +4,7 @@ pub mod event;
 mod internal;
 pub(crate) mod os_adapter;
 pub(crate) mod state;
-use alloc::collections::vec_deque::VecDeque;
+use alloc::{collections::vec_deque::VecDeque, string::String};
 use core::{
     fmt::Debug,
     marker::PhantomData,
@@ -198,6 +198,20 @@ pub enum Protocol {
     P802D11BGNAX,
 }
 
+/// A set of protocols.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct ProtocolSet(EnumSet<Protocol>);
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for ProtocolSet {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        for p in self.0 {
+            defmt::write!(fmt, "{}", p);
+        }
+    }
+}
+
 /// Secondary Wi-Fi channels.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -224,7 +238,7 @@ pub struct AccessPointInfo {
     /// The SSID of the access point.
     // TODO: we can use the `alloc` feature once we have `defmt` 1.0.2
     #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
-    pub ssid: alloc::string::String,
+    pub ssid: String,
 
     /// The BSSID (MAC address) of the access point.
     pub bssid: [u8; 6],
@@ -239,9 +253,7 @@ pub struct AccessPointInfo {
     pub signal_strength: i8,
 
     /// The set of protocols supported by the access point.
-    // TODO: we can use the `alloc` feature once we have `defmt` 1.0.2
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
-    pub protocols: EnumSet<Protocol>,
+    pub protocols: ProtocolSet,
 
     /// The authentication method used by the access point.
     pub auth_method: Option<AuthMethod>,
@@ -252,7 +264,7 @@ pub struct AccessPointInfo {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointConfiguration {
     /// The SSID of the access point.
-    pub ssid: alloc::string::String,
+    pub ssid: String,
 
     /// Whether the SSID is hidden or visible.
     pub ssid_hidden: bool,
@@ -264,13 +276,13 @@ pub struct AccessPointConfiguration {
     pub secondary_channel: Option<u8>,
 
     /// The set of protocols supported by the access point.
-    pub protocols: EnumSet<Protocol>,
+    pub protocols: ProtocolSet,
 
     /// The authentication method to be used by the access point.
     pub auth_method: AuthMethod,
 
     /// The password for securing the access point (if applicable).
-    pub password: alloc::string::String,
+    pub password: String,
 
     /// The maximum number of connections allowed on the access point.
     pub max_connections: u16,
@@ -279,13 +291,13 @@ pub struct AccessPointConfiguration {
 impl Default for AccessPointConfiguration {
     fn default() -> Self {
         Self {
-            ssid: alloc::string::String::from("iot-device"),
+            ssid: String::from("iot-device"),
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
-            protocols: Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN,
+            protocols: ProtocolSet(Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
             auth_method: AuthMethod::None,
-            password: alloc::string::String::new(),
+            password: String::new(),
             max_connections: 255,
         }
     }
@@ -337,7 +349,7 @@ impl defmt::Format for AccessPointConfiguration {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ClientConfiguration {
     /// The SSID of the Wi-Fi network.
-    pub ssid: alloc::string::String,
+    pub ssid: String,
 
     /// The BSSID (MAC address) of the client.
     pub bssid: Option<[u8; 6]>,
@@ -347,7 +359,7 @@ pub struct ClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The password for the Wi-Fi connection.
-    pub password: alloc::string::String,
+    pub password: String,
 
     /// The Wi-Fi channel to connect to.
     pub channel: Option<u8>,
@@ -447,7 +459,7 @@ impl TtlsPhase2Method {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct EapClientConfiguration {
     /// The SSID of the network the client is connecting to.
-    pub ssid: alloc::string::String,
+    pub ssid: String,
 
     /// The BSSID (MAC Address) of the specific access point.
     pub bssid: Option<[u8; 6]>,
@@ -457,18 +469,18 @@ pub struct EapClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The identity used during authentication.
-    pub identity: Option<alloc::string::String>,
+    pub identity: Option<String>,
 
     /// The username used for inner authentication.
     /// Some EAP methods require a username for authentication.
-    pub username: Option<alloc::string::String>,
+    pub username: Option<String>,
 
     /// The password used for inner authentication.
-    pub password: Option<alloc::string::String>,
+    pub password: Option<String>,
 
     /// A new password to be set during the authentication process.
     /// Some methods support password changes during authentication.
-    pub new_password: Option<alloc::string::String>,
+    pub new_password: Option<String>,
 
     /// Configuration for EAP-FAST.
     pub eap_fast_config: Option<EapFastConfig>,
@@ -556,7 +568,7 @@ impl defmt::Format for EapClientConfiguration {
 impl Default for EapClientConfiguration {
     fn default() -> Self {
         EapClientConfiguration {
-            ssid: alloc::string::String::new(),
+            ssid: String::new(),
             bssid: None,
             auth_method: AuthMethod::WPA2Enterprise,
             identity: None,
@@ -1756,7 +1768,7 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
         .unwrap_or(record.ssid.len());
     let ssid_ref = unsafe { core::str::from_utf8_unchecked(&record.ssid[..str_len]) };
 
-    let mut ssid = alloc::string::String::new();
+    let mut ssid = String::new();
     ssid.push_str(ssid_ref);
 
     AccessPointInfo {
@@ -1770,7 +1782,7 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
             _ => panic!(),
         },
         signal_strength: record.rssi,
-        protocols: EnumSet::empty(), // TODO
+        protocols: ProtocolSet(EnumSet::empty()), // TODO
         auth_method: Some(AuthMethod::from_raw(record.authmode)),
     }
 }
@@ -2597,8 +2609,9 @@ impl WifiController<'_> {
     /// ```
     /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
     /// ```
-    pub fn set_protocol(&mut self, protocols: EnumSet<Protocol>) -> Result<(), WifiError> {
+    pub fn set_protocol(&mut self, protocols: ProtocolSet) -> Result<(), WifiError> {
         let protocol = protocols
+            .0
             .into_iter()
             .map(|v| match v {
                 Protocol::P802D11B => WIFI_PROTOCOL_11B,
