@@ -222,6 +222,7 @@ pub enum SecondaryChannel {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointInfo {
     /// The SSID of the access point.
+    // TODO: we can use the `alloc` feature once we have `defmt` 1.0.2
     #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub ssid: alloc::string::String,
 
@@ -238,6 +239,7 @@ pub struct AccessPointInfo {
     pub signal_strength: i8,
 
     /// The set of protocols supported by the access point.
+    // TODO: we can use the `alloc` feature once we have `defmt` 1.0.2
     #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub protocols: EnumSet<Protocol>,
 
@@ -246,12 +248,10 @@ pub struct AccessPointInfo {
 }
 
 /// Configuration for a Wi-Fi access point.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointConfiguration {
     /// The SSID of the access point.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub ssid: alloc::string::String,
 
     /// Whether the SSID is hidden or visible.
@@ -264,14 +264,12 @@ pub struct AccessPointConfiguration {
     pub secondary_channel: Option<u8>,
 
     /// The set of protocols supported by the access point.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub protocols: EnumSet<Protocol>,
 
     /// The authentication method to be used by the access point.
     pub auth_method: AuthMethod,
 
     /// The password for securing the access point (if applicable).
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub password: alloc::string::String,
 
     /// The maximum number of connections allowed on the access point.
@@ -293,13 +291,52 @@ impl Default for AccessPointConfiguration {
     }
 }
 
+impl core::fmt::Debug for AccessPointConfiguration {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AccessPointConfiguration")
+            .field("ssid", &self.ssid)
+            .field("ssid_hidden", &self.ssid_hidden)
+            .field("channel", &self.channel)
+            .field("secondary_channel", &self.secondary_channel)
+            .field("protocols", &self.protocols)
+            .field("auth_method", &self.auth_method)
+            .field("password", &"**REDACTED**")
+            .field("max_connections", &self.max_connections)
+            .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for AccessPointConfiguration {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(
+            fmt,
+            "AccessPointConfiguration {{\
+            ssid: {}, \
+            ssid_hidden: {}, \
+            channel: {}, \
+            secondary_channel: {:?}, \
+            protocols: {:?}, \
+            auth_method: {:?}, \
+            password: **REDACTED**, \
+            max_connections: {}, \
+            }}",
+            self.ssid.as_str(),
+            self.ssid_hidden,
+            self.channel,
+            self.secondary_channel,
+            defmt::Debug2Format(&self.protocols),
+            self.auth_method,
+            self.max_connections
+        );
+    }
+}
+
 /// Client configuration for a Wi-Fi connection.
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ClientConfiguration {
     /// The SSID of the Wi-Fi network.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub ssid: alloc::string::String,
 
     /// The BSSID (MAC address) of the client.
@@ -310,195 +347,41 @@ pub struct ClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The password for the Wi-Fi connection.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub password: alloc::string::String,
 
     /// The Wi-Fi channel to connect to.
     pub channel: Option<u8>,
 }
 
-#[cfg(feature = "csi")]
-pub(crate) trait CsiCallback: FnMut(crate::binary::include::wifi_csi_info_t) {}
-
-#[cfg(feature = "csi")]
-impl<T> CsiCallback for T where T: FnMut(crate::binary::include::wifi_csi_info_t) {}
-
-#[cfg(feature = "csi")]
-unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
-    ctx: *mut crate::wifi::c_types::c_void,
-    data: *mut crate::binary::include::wifi_csi_info_t,
-) {
-    let csi_callback = unsafe { &mut *(ctx as *mut C) };
-    csi_callback(*data);
-}
-
-#[derive(Clone, PartialEq, Eq)]
-// https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
-/// Channel state information(CSI) configuration
-#[cfg(all(not(esp32c6), feature = "csi"))]
-pub struct CsiConfig {
-    /// Enable to receive legacy long training field(lltf) data.
-    pub lltf_en: bool,
-    /// Enable to receive HT long training field(htltf) data.
-    pub htltf_en: bool,
-    /// Enable to receive space time block code HT long training
-    /// field(stbc-htltf2) data.
-    pub stbc_htltf2_en: bool,
-    /// Enable to generate htlft data by averaging lltf and ht_ltf data when
-    /// receiving HT packet. Otherwise, use ht_ltf data directly.
-    pub ltf_merge_en: bool,
-    /// Enable to turn on channel filter to smooth adjacent sub-carrier. Disable
-    /// it to keep independence of adjacent sub-carrier.
-    pub channel_filter_en: bool,
-    /// Manually scale the CSI data by left shifting or automatically scale the
-    /// CSI data. If set true, please set the shift bits. false: automatically.
-    /// true: manually.
-    pub manu_scale: bool,
-    /// Manually left shift bits of the scale of the CSI data. The range of the
-    /// left shift bits is 0~15.
-    pub shift: u8,
-    /// Enable to dump 802.11 ACK frame.
-    pub dump_ack_en: bool,
-}
-
-#[derive(Clone, PartialEq, Eq)]
-#[cfg(all(esp32c6, feature = "csi"))]
-// See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
-pub struct CsiConfig {
-    /// Enable to acquire CSI.
-    pub enable: u32,
-    /// Enable to acquire L-LTF when receiving a 11g PPDU.
-    pub acquire_csi_legacy: u32,
-    /// Enable to acquire HT-LTF when receiving an HT20 PPDU.
-    pub acquire_csi_ht20: u32,
-    /// Enable to acquire HT-LTF when receiving an HT40 PPDU.
-    pub acquire_csi_ht40: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 SU PPDU.
-    pub acquire_csi_su: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 MU PPDU.
-    pub acquire_csi_mu: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 DCM applied PPDU.
-    pub acquire_csi_dcm: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 Beamformed applied PPDU.
-    pub acquire_csi_beamformed: u32,
-    /// When receiving an STBC applied HE PPDU, 0- acquire the complete
-    /// HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the
-    /// HE-LTF1 and HE-LTF2.
-    pub acquire_csi_he_stbc: u32,
-    /// Vvalue 0-3.
-    pub val_scale_cfg: u32,
-    /// Enable to dump 802.11 ACK frame, default disabled.
-    pub dump_ack_en: u32,
-    /// Reserved.
-    pub reserved: u32,
-}
-
-#[cfg(feature = "csi")]
-impl Default for CsiConfig {
-    #[cfg(not(esp32c6))]
-    fn default() -> Self {
-        Self {
-            lltf_en: true,
-            htltf_en: true,
-            stbc_htltf2_en: true,
-            ltf_merge_en: true,
-            channel_filter_en: true,
-            manu_scale: false,
-            shift: 0,
-            dump_ack_en: false,
-        }
-    }
-
-    #[cfg(esp32c6)]
-    fn default() -> Self {
-        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi_he_types.h#L67-L82
-        Self {
-            enable: 1,
-            acquire_csi_legacy: 1,
-            acquire_csi_ht20: 1,
-            acquire_csi_ht40: 1,
-            acquire_csi_su: 1,
-            acquire_csi_mu: 1,
-            acquire_csi_dcm: 1,
-            acquire_csi_beamformed: 1,
-            acquire_csi_he_stbc: 2,
-            val_scale_cfg: 2,
-            dump_ack_en: 1,
-            reserved: 19,
-        }
+impl core::fmt::Debug for ClientConfiguration {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ClientConfiguration")
+            .field("ssid", &self.ssid)
+            .field("bssid", &self.bssid)
+            .field("auth_method", &self.auth_method)
+            .field("password", &"**REDACTED**")
+            .field("channel", &self.channel)
+            .finish()
     }
 }
 
-#[cfg(feature = "csi")]
-impl From<CsiConfig> for wifi_csi_config_t {
-    fn from(config: CsiConfig) -> Self {
-        #[cfg(not(esp32c6))]
-        {
-            wifi_csi_config_t {
-                lltf_en: config.lltf_en,
-                htltf_en: config.htltf_en,
-                stbc_htltf2_en: config.stbc_htltf2_en,
-                ltf_merge_en: config.ltf_merge_en,
-                channel_filter_en: config.channel_filter_en,
-                manu_scale: config.manu_scale,
-                shift: config.shift,
-                dump_ack_en: config.dump_ack_en,
-            }
-        }
-        #[cfg(esp32c6)]
-        {
-            wifi_csi_acquire_config_t {
-                _bitfield_align_1: [0; 0],
-                _bitfield_1: wifi_csi_acquire_config_t::new_bitfield_1(
-                    config.enable,
-                    config.acquire_csi_legacy,
-                    config.acquire_csi_ht20,
-                    config.acquire_csi_ht40,
-                    config.acquire_csi_su,
-                    config.acquire_csi_mu,
-                    config.acquire_csi_dcm,
-                    config.acquire_csi_beamformed,
-                    config.acquire_csi_he_stbc,
-                    config.val_scale_cfg,
-                    config.dump_ack_en,
-                    config.reserved,
-                ),
-            }
-        }
-    }
-}
-
-#[cfg(feature = "csi")]
-impl CsiConfig {
-    /// Set CSI data configuration
-    pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
-        let conf: wifi_csi_config_t = self.clone().into();
-
-        unsafe {
-            esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
-        }
-        Ok(())
-    }
-
-    /// Register the RX callback function of CSI data. Each time a CSI data is
-    /// received, the callback function will be called.
-    pub(crate) fn set_receive_cb<C: CsiCallback>(&mut self, cb: C) -> Result<(), WifiError> {
-        let cb = alloc::boxed::Box::new(cb);
-        let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut crate::wifi::c_types::c_void;
-
-        unsafe {
-            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(csi_rx_cb::<C>), cb_ptr))?;
-        }
-        Ok(())
-    }
-
-    /// Enable or disable CSI
-    pub(crate) fn set_csi(&self, enable: bool) -> Result<(), WifiError> {
-        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1241
-        unsafe {
-            esp_wifi_result!(esp_wifi_set_csi(enable))?;
-        }
-        Ok(())
+#[cfg(feature = "defmt")]
+impl defmt::Format for ClientConfiguration {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(
+            fmt,
+            "ClientConfiguration {{\
+            ssid: {}, \
+            bssid: {:?}, \
+            auth_method: {:?}, \
+            password: **REDACTED**, \
+            channel: {:?}, \
+            }}",
+            self.ssid.as_str(),
+            self.bssid,
+            self.auth_method,
+            self.channel
+        )
     }
 }
 
@@ -561,11 +444,9 @@ impl TtlsPhase2Method {
 
 /// Configuration for an EAP (Extensible Authentication Protocol) client.
 #[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct EapClientConfiguration {
     /// The SSID of the network the client is connecting to.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub ssid: alloc::string::String,
 
     /// The BSSID (MAC Address) of the specific access point.
@@ -576,21 +457,17 @@ pub struct EapClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The identity used during authentication.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub identity: Option<alloc::string::String>,
 
     /// The username used for inner authentication.
     /// Some EAP methods require a username for authentication.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub username: Option<alloc::string::String>,
 
     /// The password used for inner authentication.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub password: Option<alloc::string::String>,
 
     /// A new password to be set during the authentication process.
     /// Some methods support password changes during authentication.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub new_password: Option<alloc::string::String>,
 
     /// Configuration for EAP-FAST.
@@ -628,16 +505,51 @@ impl Debug for EapClientConfiguration {
             .field("channel", &self.channel)
             .field("identity", &self.identity)
             .field("username", &self.username)
+            .field("password", &"**REDACTED**")
+            .field("new_password", &"**REDACTED**")
             .field("eap_fast_config", &self.eap_fast_config)
             .field("time_check", &self.time_check)
             .field("pac_file set", &self.pac_file.is_some())
             .field("ca_cert set", &self.ca_cert.is_some())
-            .field(
-                "certificate_and_key set",
-                &self.certificate_and_key.is_some(),
-            )
+            .field("certificate_and_key set", &"**REDACTED**")
             .field("ttls_phase2_method", &self.ttls_phase2_method)
             .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for EapClientConfiguration {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(
+            fmt,
+            "EapClientConfiguration {{\
+            ssid: {}, \
+            bssid: {:?}, \
+            auth_method: {:?}, \
+            channel: {:?}, \
+            identity: {:?}, \
+            username: {:?}, \
+            password: **REDACTED**, \
+            new_password: **REDACTED**, \
+            eap_fast_config: {:?}, \
+            time_check: {}, \
+            pac_file: {}, \
+            ca_cert: {}, \
+            certificate_and_key: **REDACTED**, \
+            ttls_phase2_method: {:?}, \
+            }}",
+            self.ssid.as_str(),
+            self.bssid,
+            self.auth_method,
+            self.channel,
+            defmt::Debug2Format(&self.identity),
+            defmt::Debug2Format(&self.username),
+            self.eap_fast_config,
+            self.time_check,
+            self.pac_file,
+            self.ca_cert,
+            self.ttls_phase2_method,
+        )
     }
 }
 
@@ -913,6 +825,191 @@ impl From<WifiMode> for wifi_mode_t {
             WifiMode::Ap => wifi_mode_t_WIFI_MODE_AP,
             WifiMode::ApSta => wifi_mode_t_WIFI_MODE_APSTA,
         }
+    }
+}
+
+#[cfg(feature = "csi")]
+pub(crate) trait CsiCallback: FnMut(crate::binary::include::wifi_csi_info_t) {}
+
+#[cfg(feature = "csi")]
+impl<T> CsiCallback for T where T: FnMut(crate::binary::include::wifi_csi_info_t) {}
+
+#[cfg(feature = "csi")]
+unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
+    ctx: *mut crate::wifi::c_types::c_void,
+    data: *mut crate::binary::include::wifi_csi_info_t,
+) {
+    let csi_callback = unsafe { &mut *(ctx as *mut C) };
+    csi_callback(*data);
+}
+
+#[derive(Clone, PartialEq, Eq)]
+// https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
+/// Channel state information(CSI) configuration
+#[cfg(all(not(esp32c6), feature = "csi"))]
+pub struct CsiConfig {
+    /// Enable to receive legacy long training field(lltf) data.
+    pub lltf_en: bool,
+    /// Enable to receive HT long training field(htltf) data.
+    pub htltf_en: bool,
+    /// Enable to receive space time block code HT long training
+    /// field(stbc-htltf2) data.
+    pub stbc_htltf2_en: bool,
+    /// Enable to generate htlft data by averaging lltf and ht_ltf data when
+    /// receiving HT packet. Otherwise, use ht_ltf data directly.
+    pub ltf_merge_en: bool,
+    /// Enable to turn on channel filter to smooth adjacent sub-carrier. Disable
+    /// it to keep independence of adjacent sub-carrier.
+    pub channel_filter_en: bool,
+    /// Manually scale the CSI data by left shifting or automatically scale the
+    /// CSI data. If set true, please set the shift bits. false: automatically.
+    /// true: manually.
+    pub manu_scale: bool,
+    /// Manually left shift bits of the scale of the CSI data. The range of the
+    /// left shift bits is 0~15.
+    pub shift: u8,
+    /// Enable to dump 802.11 ACK frame.
+    pub dump_ack_en: bool,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+#[cfg(all(esp32c6, feature = "csi"))]
+// See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
+pub struct CsiConfig {
+    /// Enable to acquire CSI.
+    pub enable: u32,
+    /// Enable to acquire L-LTF when receiving a 11g PPDU.
+    pub acquire_csi_legacy: u32,
+    /// Enable to acquire HT-LTF when receiving an HT20 PPDU.
+    pub acquire_csi_ht20: u32,
+    /// Enable to acquire HT-LTF when receiving an HT40 PPDU.
+    pub acquire_csi_ht40: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 SU PPDU.
+    pub acquire_csi_su: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 MU PPDU.
+    pub acquire_csi_mu: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 DCM applied PPDU.
+    pub acquire_csi_dcm: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 Beamformed applied PPDU.
+    pub acquire_csi_beamformed: u32,
+    /// When receiving an STBC applied HE PPDU, 0- acquire the complete
+    /// HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the
+    /// HE-LTF1 and HE-LTF2.
+    pub acquire_csi_he_stbc: u32,
+    /// Vvalue 0-3.
+    pub val_scale_cfg: u32,
+    /// Enable to dump 802.11 ACK frame, default disabled.
+    pub dump_ack_en: u32,
+    /// Reserved.
+    pub reserved: u32,
+}
+
+#[cfg(feature = "csi")]
+impl Default for CsiConfig {
+    #[cfg(not(esp32c6))]
+    fn default() -> Self {
+        Self {
+            lltf_en: true,
+            htltf_en: true,
+            stbc_htltf2_en: true,
+            ltf_merge_en: true,
+            channel_filter_en: true,
+            manu_scale: false,
+            shift: 0,
+            dump_ack_en: false,
+        }
+    }
+
+    #[cfg(esp32c6)]
+    fn default() -> Self {
+        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi_he_types.h#L67-L82
+        Self {
+            enable: 1,
+            acquire_csi_legacy: 1,
+            acquire_csi_ht20: 1,
+            acquire_csi_ht40: 1,
+            acquire_csi_su: 1,
+            acquire_csi_mu: 1,
+            acquire_csi_dcm: 1,
+            acquire_csi_beamformed: 1,
+            acquire_csi_he_stbc: 2,
+            val_scale_cfg: 2,
+            dump_ack_en: 1,
+            reserved: 19,
+        }
+    }
+}
+
+#[cfg(feature = "csi")]
+impl From<CsiConfig> for wifi_csi_config_t {
+    fn from(config: CsiConfig) -> Self {
+        #[cfg(not(esp32c6))]
+        {
+            wifi_csi_config_t {
+                lltf_en: config.lltf_en,
+                htltf_en: config.htltf_en,
+                stbc_htltf2_en: config.stbc_htltf2_en,
+                ltf_merge_en: config.ltf_merge_en,
+                channel_filter_en: config.channel_filter_en,
+                manu_scale: config.manu_scale,
+                shift: config.shift,
+                dump_ack_en: config.dump_ack_en,
+            }
+        }
+        #[cfg(esp32c6)]
+        {
+            wifi_csi_acquire_config_t {
+                _bitfield_align_1: [0; 0],
+                _bitfield_1: wifi_csi_acquire_config_t::new_bitfield_1(
+                    config.enable,
+                    config.acquire_csi_legacy,
+                    config.acquire_csi_ht20,
+                    config.acquire_csi_ht40,
+                    config.acquire_csi_su,
+                    config.acquire_csi_mu,
+                    config.acquire_csi_dcm,
+                    config.acquire_csi_beamformed,
+                    config.acquire_csi_he_stbc,
+                    config.val_scale_cfg,
+                    config.dump_ack_en,
+                    config.reserved,
+                ),
+            }
+        }
+    }
+}
+
+#[cfg(feature = "csi")]
+impl CsiConfig {
+    /// Set CSI data configuration
+    pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
+        let conf: wifi_csi_config_t = self.clone().into();
+
+        unsafe {
+            esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
+        }
+        Ok(())
+    }
+
+    /// Register the RX callback function of CSI data. Each time a CSI data is
+    /// received, the callback function will be called.
+    pub(crate) fn set_receive_cb<C: CsiCallback>(&mut self, cb: C) -> Result<(), WifiError> {
+        let cb = alloc::boxed::Box::new(cb);
+        let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut crate::wifi::c_types::c_void;
+
+        unsafe {
+            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(csi_rx_cb::<C>), cb_ptr))?;
+        }
+        Ok(())
+    }
+
+    /// Enable or disable CSI
+    pub(crate) fn set_csi(&self, enable: bool) -> Result<(), WifiError> {
+        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1241
+        unsafe {
+            esp_wifi_result!(esp_wifi_set_csi(enable))?;
+        }
+        Ok(())
     }
 }
 
