@@ -191,9 +191,16 @@ impl<'a> PartitionTable<'a> {
             return Err(Error::Invalid);
         }
 
+        // we checked binary before
+        let binary = unsafe {
+            core::slice::from_raw_parts(
+                binary.as_ptr() as *const [u8; RAW_ENTRY_LEN],
+                binary.len() / RAW_ENTRY_LEN,
+            )
+        };
+
         let mut raw = Self {
-            // we checked binary before
-            binary: unsafe { core::mem::transmute::<&[u8], &[[u8; 32]]>(binary) },
+            binary,
             entries: binary.len() / RAW_ENTRY_LEN,
         };
 
