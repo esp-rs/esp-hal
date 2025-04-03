@@ -183,12 +183,9 @@ pub mod dma {
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
         #[instability::unstable]
-        pub fn with_dma<CH>(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking>
-        where
-            CH: DmaChannelFor<AnySpi>,
-        {
+        pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
             self.spi.info().set_data_mode(self.data_mode, true);
-            SpiDma::new(self.spi, channel.map(|ch| ch.degrade()).into_ref())
+            SpiDma::new(self.spi, channel.degrade())
         }
     }
 
@@ -213,10 +210,7 @@ pub mod dma {
     }
 
     impl<'d> SpiDma<'d, Blocking> {
-        fn new(
-            spi: AnySpi<'d>,
-            channel: PeripheralDmaChannel<AnySpi<'d>>,
-        ) -> Self {
+        fn new(spi: AnySpi<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
             let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
             let guard = PeripheralGuard::new(spi.info().peripheral);
