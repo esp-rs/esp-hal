@@ -3518,19 +3518,6 @@ impl Driver {
         no_mosi_miso: bool,
         data_mode: DataMode,
     ) -> Result<(), Error> {
-        let three_wire = cmd.mode() == DataMode::Single
-            || address.mode() == DataMode::Single
-            || data_mode == DataMode::Single;
-
-        if three_wire
-            && ((cmd != Command::None && cmd.mode() != DataMode::Single)
-                || (address != Address::None && address.mode() != DataMode::Single)
-                || data_mode != DataMode::Single)
-        {
-            error!("Three-wire mode is only supported for single data line mode");
-            return Err(Error::Unsupported);
-        }
-
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
 
         #[cfg(esp32)]
@@ -3566,7 +3553,8 @@ impl Driver {
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
             w.usr_mosi_highpart().clear_bit();
-            w.sio().bit(three_wire);
+            // This bit tells the hardware whether we use Single or SingleTwoDataLines
+            w.sio().bit(data_mode == DataMode::Single);
             w.doutdin().clear_bit();
             w.usr_miso().bit(!is_write && !no_mosi_miso);
             w.usr_mosi().bit(is_write && !no_mosi_miso);
