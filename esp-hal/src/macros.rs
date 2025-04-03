@@ -109,7 +109,7 @@ macro_rules! any_peripheral {
 
             impl $crate::private::Sealed for $name {}
 
-            impl $crate::peripheral::Peripheral for $name {
+            unsafe impl $crate::peripheral::Peripheral for $name {
                 type P = $name;
 
                 unsafe fn clone_unchecked(&self) -> Self::P {
@@ -184,4 +184,31 @@ macro_rules! if_set {
 #[doc(hidden)]
 macro_rules! ignore {
     ($($item:tt)*) => {};
+}
+
+/// Define a piece of (Espressif-specific) metadata that external tools may
+/// parse.
+///
+/// The symbol name be formatted as `_ESP_METADATA_<category>_<name>`.
+///
+/// This metadata is zero cost, i.e. the value will not be flashed to the
+/// device.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! metadata {
+    ($category:literal, $key:ident, $value:expr) => {
+        #[link_section = concat!(".espressif.metadata")]
+        #[used]
+        #[export_name = concat!($category, ".", stringify!($key))]
+        static $key: [u8; $value.len()] = const {
+            let val_bytes = $value.as_bytes();
+            let mut val_bytes_array = [0; $value.len()];
+            let mut i = 0;
+            while i < val_bytes.len() {
+                val_bytes_array[i] = val_bytes[i];
+                i += 1;
+            }
+            val_bytes_array
+        };
+    };
 }

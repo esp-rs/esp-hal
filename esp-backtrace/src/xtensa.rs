@@ -1,6 +1,6 @@
 use core::{arch::asm, fmt::Display};
 
-use crate::MAX_BACKTRACE_ADDRESSES;
+use crate::{Backtrace, BacktraceFrame};
 
 // subtract 3 from the return address
 // the return address is the address following the callxN
@@ -357,66 +357,79 @@ F15=0x{:08x}",
     }
 }
 
-/// Get an array of backtrace addresses.
-pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let sp = unsafe {
-        let mut _tmp: u32;
-        asm!("mov {0}, a1", out(reg) _tmp);
-        _tmp
-    };
+/// This function returns the caller's frame pointer.
+#[inline(never)]
+#[cold]
+fn sp() -> u32 {
+    let mut sp: u32;
+    unsafe {
+        asm!(
+            "mov {0}, a1", // current stack pointer
+            // Spill registers, otherwise `sp - 12` will not contain the previous stack pointer
+            "add a12,a12,a12",
+            "rotw 3",
+            "add a12,a12,a12",
+            "rotw 3",
+            "add a12,a12,a12",
+            "rotw 3",
+            "add a12,a12,a12",
+            "rotw 3",
+            "add a12,a12,a12",
+            "rotw 4",
+            out(reg) sp
+        );
+    }
 
-    backtrace_internal(sp, 1)
+    // current frame pointer, caller's stack pointer
+    unsafe { ((sp - 12) as *const u32).read_volatile() }
 }
 
-pub(crate) fn sanitize_address(address: u32) -> u32 {
+/// Get an array of backtrace addresses.
+#[inline(never)]
+#[cold]
+pub fn backtrace() -> Backtrace {
+    let sp = sp();
+
+    backtrace_internal(sp, 0)
+}
+
+pub(crate) fn remove_window_increment(address: u32) -> u32 {
     (address & 0x3fff_ffff) | 0x4000_0000
 }
 
-pub(crate) fn backtrace_internal(
-    sp: u32,
-    suppress: i32,
-) -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let mut result = [None; 10];
-    let mut index = 0;
+pub(crate) fn backtrace_internal(sp: u32, suppress: u32) -> Backtrace {
+    let mut result = Backtrace(heapless::Vec::new());
 
     let mut fp = sp;
     let mut suppress = suppress;
-    let mut old_address = 0;
 
-    loop {
-        unsafe {
-            let address = sanitize_address((fp as *const u32).offset(-4).read_volatile()); // RA/PC
-            fp = (fp as *const u32).offset(-3).read_volatile(); // next FP
+    if !crate::is_valid_ram_address(fp) {
+        return result;
+    }
 
-            if old_address == address {
-                break;
-            }
+    while !result.0.is_full() {
+        // RA/PC
+        let address = unsafe { (fp as *const u32).offset(-4).read_volatile() };
+        let address = remove_window_increment(address);
+        // next FP
+        fp = unsafe { (fp as *const u32).offset(-3).read_volatile() };
 
-            old_address = address;
+        // the return address is 0 but we sanitized the address - then 0 becomes
+        // 0x40000000
+        if address == 0x40000000 {
+            break;
+        }
 
-            // the address is 0 but we sanitized the address - then 0 becomes 0x40000000
-            if address == 0x40000000 {
-                break;
-            }
+        if !crate::is_valid_ram_address(fp) {
+            break;
+        }
 
-            if !crate::is_valid_ram_address(fp) {
-                break;
-            }
-
-            if fp == 0 {
-                break;
-            }
-
-            if suppress == 0 {
-                result[index] = Some(address as usize);
-                index += 1;
-
-                if index >= MAX_BACKTRACE_ADDRESSES {
-                    break;
-                }
-            } else {
-                suppress -= 1;
-            }
+        if suppress == 0 {
+            _ = result.0.push(BacktraceFrame {
+                pc: address as usize,
+            });
+        } else {
+            suppress -= 1;
         }
     }
 

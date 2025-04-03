@@ -11,6 +11,7 @@ crate::unstable_module! {
 }
 pub mod gpio;
 pub mod peripherals;
+pub(crate) mod regi2c;
 
 /// The name of the chip ("esp32c2") as `&str`
 #[macro_export]
@@ -36,11 +37,6 @@ pub(crate) mod registers {
 
 pub(crate) mod constants {
     use crate::time::Rate;
-
-    /// The lower bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_LOW: usize = 0x3FCA_0000;
-    /// The upper bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_HIGH: usize = 0x3FCE_0000;
 
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);

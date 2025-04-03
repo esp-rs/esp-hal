@@ -10,10 +10,12 @@ license       = "MIT OR Apache-2.0"
 
 [dependencies]
 document-features = "0.2.10"
+serde = { version = "1.0.197", features = ["derive"], optional = true }
+serde_json = { version = "1.0.0", optional = true }
 
 [dev-dependencies]
 temp-env = "0.3.6"
 
 [features]
 ## Enable the generation and parsing of a config
-build = []
+build = ["dep:serde","dep:serde_json"]

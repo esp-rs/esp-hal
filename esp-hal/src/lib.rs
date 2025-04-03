@@ -147,6 +147,8 @@ mod fmt;
 
 use core::marker::PhantomData;
 
+metadata!("build_info", CHIP_NAME, chip!());
+
 #[cfg(riscv)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
@@ -367,6 +369,8 @@ impl crate::private::Sealed for Blocking {}
 impl crate::private::Sealed for Async {}
 
 pub(crate) mod private {
+    use core::mem::ManuallyDrop;
+
     pub trait Sealed {}
 
     #[non_exhaustive]
@@ -388,6 +392,23 @@ pub(crate) mod private {
         /// need for this function.
         pub unsafe fn conjure() -> Self {
             Self
+        }
+    }
+
+    pub(crate) struct OnDrop<F: FnOnce()>(ManuallyDrop<F>);
+    impl<F: FnOnce()> OnDrop<F> {
+        pub fn new(cb: F) -> Self {
+            Self(ManuallyDrop::new(cb))
+        }
+
+        pub fn defuse(self) {
+            core::mem::forget(self);
+        }
+    }
+
+    impl<F: FnOnce()> Drop for OnDrop<F> {
+        fn drop(&mut self) {
+            unsafe { (ManuallyDrop::take(&mut self.0))() }
         }
     }
 }

@@ -50,7 +50,7 @@ use crate::{
     clock::Clocks,
     dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
     gpio::{
-        interconnect::{OutputConnection, PeripheralInput, PeripheralOutput},
+        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         NoPin,
         OutputSignal,
@@ -59,7 +59,7 @@ use crate::{
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
     peripheral::{Peripheral, PeripheralRef},
-    private::{self, Sealed},
+    private::{self, OnDrop, Sealed},
     spi::AnySpi,
     system::{Cpu, PeripheralGuard},
     time::Rate,
@@ -498,18 +498,23 @@ impl Config {
         self
     }
 
-    fn recalculate(&self) -> Result<u32, ConfigError> {
-        // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
-
+    fn clock_source_freq_hz(&self) -> Rate {
         let clocks = Clocks::get();
+
+        // FIXME: take clock source into account
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-                let apb_clk_freq = clocks.pll_48m_clock;
+                clocks.pll_48m_clock
             } else {
-                let apb_clk_freq = clocks.apb_clock;
+                clocks.apb_clock
             }
         }
+    }
+
+    fn recalculate(&self) -> Result<u32, ConfigError> {
+        // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
+        let source_freq = self.clock_source_freq_hz();
 
         let reg_val: u32;
         let duty_cycle = 128;
@@ -517,7 +522,7 @@ impl Config {
         // In HW, n, h and l fields range from 1 to 64, pre ranges from 1 to 8K.
         // The value written to register is one lower than the used value.
 
-        if self.frequency > ((apb_clk_freq / 4) * 3) {
+        if self.frequency > ((source_freq / 4) * 3) {
             // Using APB frequency directly will give us the best result here.
             reg_val = 1 << 31;
         } else {
@@ -534,17 +539,17 @@ impl Config {
             let mut besterr: i32 = 0;
             let mut errval: i32;
 
-            let raw_freq = self.frequency.as_hz() as i32;
-            let raw_apb_freq = apb_clk_freq.as_hz() as i32;
+            let target_freq_hz = self.frequency.as_hz() as i32;
+            let source_freq_hz = source_freq.as_hz() as i32;
 
             // Start at n = 2. We need to be able to set h/l so we have at least
             // one high and one low pulse.
 
-            for n in 2..64 {
+            for n in 2..=64 {
                 // Effectively, this does:
                 // pre = round((APB_CLK_FREQ / n) / frequency)
 
-                pre = ((raw_apb_freq / n) + (raw_freq / 2)) / raw_freq;
+                pre = ((source_freq_hz / n) + (target_freq_hz / 2)) / target_freq_hz;
 
                 if pre <= 0 {
                     pre = 1;
@@ -554,7 +559,7 @@ impl Config {
                     pre = 16;
                 }
 
-                errval = (raw_apb_freq / (pre * n) - raw_freq).abs();
+                errval = (source_freq_hz / (pre * n) - target_freq_hz).abs();
                 if bestn == -1 || errval <= besterr {
                     besterr = errval;
                     bestn = n;
@@ -588,17 +593,17 @@ impl Config {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32h2)] {
-                if self.frequency < Rate::from_khz(70) || self.frequency > Rate::from_mhz(48) {
-                    return Err(ConfigError::UnsupportedFrequency);
-                }
-            } else {
-                if self.frequency < Rate::from_khz(70) || self.frequency > Rate::from_mhz(80) {
-                    return Err(ConfigError::UnsupportedFrequency);
-                }
-            }
+        let source_freq = self.clock_source_freq_hz();
+        let min_divider = 1;
+        // FIXME: while ESP32 and S2 support pre dividers as large as 8192,
+        // those values are not currently supported by the divider calculation.
+        let max_divider = 16 * 64; // n * pre
+
+        if self.frequency < source_freq / max_divider || self.frequency > source_freq / min_divider
+        {
+            return Err(ConfigError::UnsupportedFrequency);
         }
+
         Ok(())
     }
 }
@@ -711,10 +716,10 @@ impl<'d> Spi<'d, Blocking> {
 
         let is_qspi = this.driver().info.sio2_input.is_some();
         if is_qspi {
-            unwrap!(this.driver().info.sio2_input).connect_to(NoPin);
-            unwrap!(this.driver().info.sio2_output).connect_to(NoPin);
-            unwrap!(this.driver().info.sio3_input).connect_to(NoPin);
-            unwrap!(this.driver().info.sio3_output).connect_to(NoPin);
+            unwrap!(this.driver().info.sio2_input).connect_to(&NoPin);
+            unwrap!(this.driver().info.sio2_output).connect_to(&NoPin);
+            unwrap!(this.driver().info.sio3_input).connect_to(&NoPin);
+            unwrap!(this.driver().info.sio3_output).connect_to(&NoPin);
         }
 
         Ok(this)
@@ -849,7 +854,12 @@ impl<'d> Spi<'d, Async> {
         Ok(())
     }
 
-    /// Sends `words` to the slave. Returns the `words` received from the slave
+    /// Sends `words` to the slave. Returns the `words` received from the slave.
+    ///
+    /// This function aborts the transfer when its Future is dropped. Some
+    /// amount of data may have been transferred before the Future is
+    /// dropped. Dropping the future may block for a short while to ensure
+    /// the transfer is aborted.
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
@@ -869,10 +879,10 @@ where
     /// SPI clock signal.
     ///
     /// Disconnects the previous pin that was assigned with `with_sck`.
-    pub fn with_sck<SCK: PeripheralOutput>(mut self, sclk: impl Peripheral<P = SCK> + 'd) -> Self {
-        crate::into_mapped_ref!(sclk);
+    pub fn with_sck(mut self, sclk: impl PeripheralOutput<'d>) -> Self {
+        let sclk = sclk.into();
         sclk.set_to_push_pull_output();
-        self.pins.sclk_pin = OutputConnection::connect_with_guard(sclk, self.driver().info.sclk);
+        self.pins.sclk_pin = sclk.connect_with_guard(self.driver().info.sclk);
 
         self
     }
@@ -885,14 +895,11 @@ where
     ///
     /// Disconnects the previous pin that was assigned with `with_mosi` or
     /// `with_sio0`.
-    pub fn with_mosi<MOSI: PeripheralOutput>(
-        mut self,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-    ) -> Self {
-        crate::into_mapped_ref!(mosi);
+    pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
+        let mosi = mosi.into();
         mosi.enable_output(false);
 
-        self.pins.mosi_pin = OutputConnection::connect_with_guard(mosi, self.driver().info.mosi);
+        self.pins.mosi_pin = mosi.connect_with_guard(self.driver().info.mosi);
 
         self
     }
@@ -904,11 +911,11 @@ where
     ///
     /// You want to use this for full-duplex SPI or
     /// [DataMode::SingleTwoDataLines]
-    pub fn with_miso<MISO: PeripheralInput>(self, miso: impl Peripheral<P = MISO> + 'd) -> Self {
-        crate::into_mapped_ref!(miso);
+    pub fn with_miso(self, miso: impl PeripheralInput<'d>) -> Self {
+        let miso = miso.into();
         miso.enable_input(true);
 
-        self.driver().info.miso.connect_to(miso);
+        self.driver().info.miso.connect_to(&miso);
 
         self
     }
@@ -927,16 +934,13 @@ where
     ///
     /// Note: You do not need to call [Self::with_mosi] when this is used.
     #[instability::unstable]
-    pub fn with_sio0<MOSI: PeripheralOutput>(
-        mut self,
-        mosi: impl Peripheral<P = MOSI> + 'd,
-    ) -> Self {
-        crate::into_mapped_ref!(mosi);
+    pub fn with_sio0(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
+        let mosi = mosi.into();
         mosi.enable_output(true);
         mosi.enable_input(true);
 
-        self.driver().info.sio0_input.connect_to(&mut mosi);
-        self.pins.mosi_pin = OutputConnection::connect_with_guard(mosi, self.driver().info.mosi);
+        self.driver().info.sio0_input.connect_to(&mosi);
+        self.pins.mosi_pin = mosi.connect_with_guard(self.driver().info.mosi);
 
         self
     }
@@ -954,17 +958,13 @@ where
     ///
     /// Note: You do not need to call [Self::with_miso] when this is used.
     #[instability::unstable]
-    pub fn with_sio1<SIO1: PeripheralOutput>(
-        mut self,
-        miso: impl Peripheral<P = SIO1> + 'd,
-    ) -> Self {
-        crate::into_mapped_ref!(miso);
-        miso.enable_input(true);
-        miso.enable_output(true);
+    pub fn with_sio1(mut self, sio1: impl PeripheralOutput<'d>) -> Self {
+        let sio1 = sio1.into();
+        sio1.enable_input(true);
+        sio1.enable_output(true);
 
-        self.driver().info.miso.connect_to(&mut miso);
-        self.pins.sio1_pin =
-            OutputConnection::connect_with_guard(miso, self.driver().info.sio1_output);
+        self.driver().info.miso.connect_to(&sio1);
+        self.pins.sio1_pin = sio1.connect_with_guard(self.driver().info.sio1_output);
 
         self
     }
@@ -978,21 +978,18 @@ where
     /// QSPI operations are unstable, associated pins configuration is
     /// inefficient.
     #[instability::unstable]
-    pub fn with_sio2<SIO2: PeripheralOutput>(
-        mut self,
-        sio2: impl Peripheral<P = SIO2> + 'd,
-    ) -> Self {
+    pub fn with_sio2(mut self, sio2: impl PeripheralOutput<'d>) -> Self {
         // TODO: panic if not QSPI?
-        crate::into_mapped_ref!(sio2);
+        let sio2 = sio2.into();
         sio2.enable_input(true);
         sio2.enable_output(true);
 
-        unwrap!(self.driver().info.sio2_input).connect_to(&mut sio2);
+        unwrap!(self.driver().info.sio2_input).connect_to(&sio2);
         self.pins.sio2_pin = self
             .driver()
             .info
             .sio2_output
-            .map(|signal| OutputConnection::connect_with_guard(sio2, signal));
+            .map(|signal| sio2.connect_with_guard(signal));
 
         self
     }
@@ -1006,21 +1003,18 @@ where
     /// QSPI operations are unstable, associated pins configuration is
     /// inefficient.
     #[instability::unstable]
-    pub fn with_sio3<SIO3: PeripheralOutput>(
-        mut self,
-        sio3: impl Peripheral<P = SIO3> + 'd,
-    ) -> Self {
+    pub fn with_sio3(mut self, sio3: impl PeripheralOutput<'d>) -> Self {
         // TODO: panic if not QSPI?
-        crate::into_mapped_ref!(sio3);
+        let sio3 = sio3.into();
         sio3.enable_input(true);
         sio3.enable_output(true);
 
-        unwrap!(self.driver().info.sio3_input).connect_to(&mut sio3);
+        unwrap!(self.driver().info.sio3_input).connect_to(&sio3);
         self.pins.sio3_pin = self
             .driver()
             .info
             .sio3_output
-            .map(|signal| OutputConnection::connect_with_guard(sio3, signal));
+            .map(|signal| sio3.connect_with_guard(signal));
 
         self
     }
@@ -1037,10 +1031,10 @@ where
     /// be set, regardless of the total number available. There is no
     /// mechanism to select which CS line to use.
     #[instability::unstable]
-    pub fn with_cs<CS: PeripheralOutput>(mut self, cs: impl Peripheral<P = CS> + 'd) -> Self {
-        crate::into_mapped_ref!(cs);
+    pub fn with_cs(mut self, cs: impl PeripheralOutput<'d>) -> Self {
+        let cs = cs.into();
         cs.set_to_push_pull_output();
-        self.pins.cs_pin = OutputConnection::connect_with_guard(cs, self.driver().info.cs);
+        self.pins.cs_pin = cs.connect_with_guard(self.driver().info.cs);
 
         self
     }
@@ -1222,14 +1216,7 @@ mod dma {
 
     use super::*;
     use crate::{
-        dma::{
-            asynch::{DmaRxFuture, DmaTxFuture},
-            Channel,
-            DmaRxBuf,
-            DmaTxBuf,
-            EmptyBuf,
-            PeripheralDmaChannel,
-        },
+        dma::{asynch::DmaRxFuture, Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel},
         spi::master::dma::asynch::DropGuard,
     };
 
@@ -1295,7 +1282,8 @@ mod dma {
     impl<'d> SpiDma<'d, Blocking> {
         /// Converts the SPI instance into async mode.
         #[instability::unstable]
-        pub fn into_async(self) -> SpiDma<'d, Async> {
+        pub fn into_async(mut self) -> SpiDma<'d, Async> {
+            self.set_interrupt_handler(self.spi.handler());
             SpiDma {
                 spi: self.spi,
                 channel: self.channel.into_async(),
@@ -1372,12 +1360,42 @@ mod dma {
         pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
             self.driver().clear_interrupts(interrupts.into());
         }
+
+        #[cfg_attr(
+            not(multi_core),
+            doc = "Registers an interrupt handler for the peripheral."
+        )]
+        #[cfg_attr(
+            multi_core,
+            doc = "Registers an interrupt handler for the peripheral on the current core."
+        )]
+        #[doc = ""]
+        /// Note that this will replace any previously registered interrupt
+        /// handlers.
+        ///
+        /// You can restore the default/unhandled interrupt handler by using
+        /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+        ///
+        /// # Panics
+        ///
+        /// Panics if passed interrupt handler is invalid (e.g. has priority
+        /// `None`)
+        #[instability::unstable]
+        pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+            let interrupt = self.driver().info.interrupt;
+            for core in Cpu::other() {
+                crate::interrupt::disable(core, interrupt);
+            }
+            unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
+            unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+        }
     }
 
     impl<'d> SpiDma<'d, Async> {
         /// Converts the SPI instance into async mode.
         #[instability::unstable]
         pub fn into_blocking(self) -> SpiDma<'d, Blocking> {
+            crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
             SpiDma {
                 spi: self.spi,
                 channel: self.channel.into_blocking(),
@@ -1438,9 +1456,6 @@ mod dma {
         }
 
         fn is_done(&self) -> bool {
-            if self.tx_transfer_in_progress && !self.channel.tx.is_done() {
-                return false;
-            }
             if self.driver().busy() {
                 return false;
             }
@@ -1469,27 +1484,52 @@ mod dma {
         }
 
         async fn wait_for_idle_async(&mut self) {
-            // As a future enhancement, setup Spi Future in here as well.
-
             if self.rx_transfer_in_progress {
                 _ = DmaRxFuture::new(&mut self.channel.rx).await;
                 self.rx_transfer_in_progress = false;
             }
-            if self.tx_transfer_in_progress {
-                _ = DmaTxFuture::new(&mut self.channel.tx).await;
-                self.tx_transfer_in_progress = false;
-            }
 
-            core::future::poll_fn(|cx| {
-                use core::task::Poll;
-                if self.is_done() {
-                    Poll::Ready(())
-                } else {
-                    cx.waker().wake_by_ref();
+            struct Fut(Driver);
+            impl Future for Fut {
+                type Output = ();
+
+                fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                    if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
+                        #[cfg(esp32)]
+                        // Need to poll for done-ness even after interrupt fires.
+                        if self.0.busy() {
+                            cx.waker().wake_by_ref();
+                            return Poll::Pending;
+                        }
+
+                        self.0.clear_interrupts(SpiInterrupt::TransferDone.into());
+                        return Poll::Ready(());
+                    }
+
+                    self.0.state.waker.register(cx.waker());
+                    self.0
+                        .enable_listen(SpiInterrupt::TransferDone.into(), true);
                     Poll::Pending
                 }
-            })
-            .await;
+            }
+            impl Drop for Fut {
+                fn drop(&mut self) {
+                    self.0
+                        .enable_listen(SpiInterrupt::TransferDone.into(), false);
+                }
+            }
+
+            if !self.is_done() {
+                Fut(self.driver()).await;
+            }
+
+            if self.tx_transfer_in_progress {
+                // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
+                if !self.channel.tx.is_done() {
+                    self.channel.tx.stop_transfer();
+                }
+                self.tx_transfer_in_progress = false;
+            }
         }
 
         /// # Safety:
@@ -2035,16 +2075,13 @@ mod dma {
             let chunk_size = self.rx_buf.capacity();
 
             for chunk in words.chunks_mut(chunk_size) {
-                self.rx_buf.set_length(chunk.len());
-
                 let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
 
                 unsafe { spi.start_dma_transfer(chunk.len(), 0, &mut self.rx_buf, &mut EmptyBuf)? };
 
                 spi.wait_for_idle_async().await;
 
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
 
                 spi.defuse();
             }
@@ -2062,7 +2099,7 @@ mod dma {
             let chunk_size = self.tx_buf.capacity();
 
             for chunk in words.chunks(chunk_size) {
-                self.tx_buf.fill(chunk);
+                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
                 unsafe { spi.start_dma_transfer(0, chunk.len(), &mut EmptyBuf, &mut self.tx_buf)? };
 
@@ -2091,8 +2128,7 @@ mod dma {
                 .chunks_mut(chunk_size)
                 .zip(write_common.chunks(chunk_size))
             {
-                self.tx_buf.fill(write_chunk);
-                self.rx_buf.set_length(read_chunk.len());
+                self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
                 unsafe {
                     spi.start_dma_transfer(
@@ -2104,8 +2140,7 @@ mod dma {
                 }
                 spi.wait_for_idle_async().await;
 
-                let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                debug_assert_eq!(bytes_read, read_chunk.len());
+                read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
             }
 
             spi.defuse();
@@ -2128,8 +2163,7 @@ mod dma {
 
             let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
             for chunk in words.chunks_mut(self.tx_buf.capacity()) {
-                self.tx_buf.fill(chunk);
-                self.rx_buf.set_length(chunk.len());
+                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
                 unsafe {
                     spi.start_dma_transfer(
@@ -2140,9 +2174,7 @@ mod dma {
                     )?;
                 }
                 spi.wait_for_idle_async().await;
-
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
             }
 
             spi.defuse();
@@ -2196,8 +2228,6 @@ mod dma {
             self.wait_for_idle();
             self.spi_dma.driver().setup_full_duplex()?;
             for chunk in words.chunks_mut(self.rx_buf.capacity()) {
-                self.rx_buf.set_length(chunk.len());
-
                 unsafe {
                     self.spi_dma.start_dma_transfer(
                         chunk.len(),
@@ -2208,9 +2238,7 @@ mod dma {
                 }
 
                 self.wait_for_idle();
-
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
             }
 
             Ok(())
@@ -2222,7 +2250,7 @@ mod dma {
             self.wait_for_idle();
             self.spi_dma.driver().setup_full_duplex()?;
             for chunk in words.chunks(self.tx_buf.capacity()) {
-                self.tx_buf.fill(chunk);
+                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
                 unsafe {
                     self.spi_dma.start_dma_transfer(
@@ -2254,8 +2282,7 @@ mod dma {
                 .chunks_mut(chunk_size)
                 .zip(write_common.chunks(chunk_size))
             {
-                self.tx_buf.fill(write_chunk);
-                self.rx_buf.set_length(read_chunk.len());
+                self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
                 unsafe {
                     self.spi_dma.start_dma_transfer(
@@ -2267,8 +2294,7 @@ mod dma {
                 }
                 self.wait_for_idle();
 
-                let bytes_read = self.rx_buf.read_received_data(read_chunk);
-                debug_assert_eq!(bytes_read, read_chunk.len());
+                read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
             }
 
             if !read_remainder.is_empty() {
@@ -2288,8 +2314,7 @@ mod dma {
             let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
 
             for chunk in words.chunks_mut(chunk_size) {
-                self.tx_buf.fill(chunk);
-                self.rx_buf.set_length(chunk.len());
+                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
                 unsafe {
                     self.spi_dma.start_dma_transfer(
@@ -2300,9 +2325,7 @@ mod dma {
                     )?;
                 }
                 self.wait_for_idle();
-
-                let bytes_read = self.rx_buf.read_received_data(chunk);
-                debug_assert_eq!(bytes_read, chunk.len());
+                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
             }
 
             Ok(())
@@ -2322,7 +2345,6 @@ mod dma {
                 return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
-            self.rx_buf.set_length(buffer.len());
 
             unsafe {
                 self.spi_dma.start_half_duplex_read(
@@ -2337,8 +2359,7 @@ mod dma {
 
             self.wait_for_idle();
 
-            let bytes_read = self.rx_buf.read_received_data(buffer);
-            debug_assert_eq!(bytes_read, buffer.len());
+            buffer.copy_from_slice(&self.rx_buf.as_slice()[..buffer.len()]);
 
             Ok(())
         }
@@ -2357,7 +2378,7 @@ mod dma {
                 return Err(Error::from(DmaError::Overflow));
             }
             self.wait_for_idle();
-            self.tx_buf.fill(buffer);
+            self.tx_buf.as_mut_slice()[..buffer.len()].copy_from_slice(buffer);
 
             unsafe {
                 self.spi_dma.start_half_duplex_write(
@@ -2869,6 +2890,22 @@ impl Driver {
     /// Returns the register block for this SPI instance.
     pub fn regs(&self) -> &RegisterBlock {
         unsafe { &*self.info.register_block }
+    }
+
+    fn abort_transfer(&self) {
+        // Note(danielb): This method came later than DmaDriver::abort_transfer. That
+        // function works for DMA so I have left it unchanged, but does not work
+        // for CPU-controlled transfers on the ESP32. Toggling slave mode works on
+        // ESP32, but not on later chips.
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().slave().modify(|_, w| w.mode().set_bit());
+                self.regs().slave().modify(|_, w| w.mode().clear_bit());
+            } else {
+                self.configure_datalen(1, 1);
+            }
+        }
+        self.update();
     }
 
     /// Initialize for full-duplex 1 bit mode
@@ -3390,8 +3427,7 @@ impl Driver {
     }
 
     fn busy(&self) -> bool {
-        let reg_block = self.regs();
-        reg_block.cmd().read().usr().bit_is_set()
+        self.regs().cmd().read().usr().bit_is_set()
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
@@ -3416,7 +3452,16 @@ impl Driver {
     #[cfg_attr(place_spi_driver_in_ram, ram)]
     async fn transfer_in_place_async(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_async(chunk).await?;
+            // Cut the transfer short if the future is dropped. We'll block for a short
+            // while to ensure the peripheral is idle.
+            let cancel_on_drop = OnDrop::new(|| {
+                self.abort_transfer();
+                while self.busy() {}
+            });
+            let res = self.write_async(chunk).await;
+            cancel_on_drop.defuse();
+            res?;
+
             self.read_from_fifo(chunk)?;
         }
 
@@ -3643,7 +3688,7 @@ impl Driver {
 
 impl PartialEq for Info {
     fn eq(&self, other: &Self) -> bool {
-        self.register_block == other.register_block
+        core::ptr::eq(self.register_block, other.register_block)
     }
 }
 
@@ -3747,8 +3792,8 @@ fn handle_async<I: Instance>(instance: I) {
 
     let driver = Driver { info, state };
     if driver.interrupts().contains(SpiInterrupt::TransferDone) {
-        state.waker.wake();
         driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
+        state.waker.wake();
     }
 }
 

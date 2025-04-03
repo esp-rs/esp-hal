@@ -11,12 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support for `rand_core` 0.9 (#3211)
 - `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` and `ESP_HAL_CONFIG_STACK_GUARD_VALUE` to configure Rust's [Stack smashing protection](https://doc.rust-lang.org/rustc/exploit-mitigations.html#stack-smashing-protection) (#3203)
+- Experimental metadata in the output `.elf` (#3276)
+- `PeripheralInput::connect_input_to_peripheral` and `PeripheralOuptut::{connect_peripheral_to_output, disconnect_from_peripheral_output}` (#3302)
+- `ESP_HAL_CONFIG_CRITICAL_SECTION_IMPL` to allow opting out of the default `critical-section` implementation (#3293)
 
 ### Changed
 
 - Replaced `chrono::NaiveDateTime` on the RTC API by raw `u64` timestamps (#3200)
 - `esp_hal::i2s::master::AnyI2s` has been moved to `esp_hal::i2s::AnyI2s` (#3226)
 - `esp_hal::i2c::master::AnyI2c` has been moved to `esp_hal::i2c::AnyI2c` (#3226)
+- `SpiDmaBus` no longer adjusts the DMA buffer length for each transfer (#3263)
+- `SpiDma<Async>` now uses the SPI interrupt (instead of DMA) to wait for completion (#3303)
+- I2S driver now takes `DmaDescriptor`s later in construction (#3324)
+- `gpio::interconnect` types now have a lifetime associated with them (#3302)
+- The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)
 
 ### Fixed
 
@@ -28,13 +36,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Uart::{with_tx, with_rx}` can now be called on the async driver as well (#3212)
 - ESP32: Fixed SPI3 QSPI signals (#3201)
 - ESP32-C6/H2: The `flip_link` feature should no longer crash (#3203)
-
+- SPI: `Spi::transfer_in_place_async` now stops the transfer when cancelled (#3242)
 - ESP32/ESP32-S2: Avoid running into timeouts with reads/writes larger than the FIFO (#3199)
-
+- ESP32: Enforce required pointer alignments in DMA buffers (#3296)
 - ESP32-C6: Keep ADC enabled to improve radio signal strength (#3249)
 - Flex: Revert removal of `Flex::set_as_input` (#3250)
+- Fix off-by-one in the allowed range of the spi clock calculations (#3266)
+- Fixed an issue where inverting a pin via the interconnect matrix was ineffective (#3312)
 
 ### Removed
+
+- `gpio::{Level, NoPin, Input, Output, Flex}` no longer implement `Peripheral` (#3302)
 
 ## v1.0.0-beta.0
 

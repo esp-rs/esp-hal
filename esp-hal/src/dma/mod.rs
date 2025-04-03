@@ -1347,7 +1347,7 @@ impl TxCircularState {
                     break;
                 }
 
-                if current == self.last_seen_handled_descriptor_ptr {
+                if core::ptr::eq(current, self.last_seen_handled_descriptor_ptr) {
                     return Err(DmaError::Late);
                 }
             }
@@ -1365,7 +1365,9 @@ impl TxCircularState {
                 }
             } else {
                 unsafe {
-                    while !((*ptr).next.is_null() || (*ptr).next == self.first_desc_ptr) {
+                    while !((*ptr).next.is_null()
+                        || core::ptr::eq((*ptr).next, self.first_desc_ptr))
+                    {
                         let dw0 = ptr.read_volatile();
                         self.available += dw0.len();
                         ptr = ptr.offset(1);
@@ -1376,7 +1378,7 @@ impl TxCircularState {
                     self.available += dw0.len();
 
                     // in circular mode we need to honor the now available bytes at start
-                    if (*ptr).next == self.first_desc_ptr {
+                    if core::ptr::eq((*ptr).next, self.first_desc_ptr) {
                         ptr = self.first_desc_ptr;
                         while ptr < descr_address {
                             let dw0 = ptr.read_volatile();
@@ -1510,7 +1512,7 @@ impl RxCircularState {
                 unsafe { self.last_seen_handled_descriptor_ptr.read_volatile() }.next;
             current_in_descr = unsafe { current_in_descr_ptr.read_volatile() };
 
-            if current_in_descr_ptr == last_seen_ptr {
+            if core::ptr::eq(current_in_descr_ptr, last_seen_ptr) {
                 return Err(DmaError::Late);
             }
         }
@@ -2932,6 +2934,7 @@ pub(crate) mod asynch {
     where
         TX: Tx,
     {
+        #[cfg_attr(esp32c2, allow(dead_code))]
         pub fn new(tx: &'a mut TX) -> Self {
             Self { tx }
         }

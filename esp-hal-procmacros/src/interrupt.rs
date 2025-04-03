@@ -96,6 +96,15 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     quote::quote_spanned!(original_span =>
         #f
 
+        const _: () = {
+            core::assert!(
+            match #priority {
+                #root::interrupt::Priority::None => false,
+                _ => true,
+            },
+            "Priority::None is not supported");
+        };
+
         #[allow(non_upper_case_globals)]
         #vis const #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
     )

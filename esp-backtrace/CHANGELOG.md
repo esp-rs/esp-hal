@@ -9,9 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The length of the stack trace can now be configured using `ESP_BACKTRACE_CONFIG_BACKTRACE_FRAMES` (#3271)
+- `Backtrace` and `BacktraceFrame` types. (#3280)
+
 ### Changed
 
+- The `arch::backtrace` function now returns a `Backtrace` struct (#3280)
+
 ### Fixed
+
+- Stack traces no longer stop at recursive functions (#3270)
+- ESP32/S2/S3: Fixed an issue where the backtrace wasn't correctly captured in some cases (#3272)
 
 ### Removed
 

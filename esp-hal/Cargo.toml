@@ -21,7 +21,7 @@ bitflags                 = "2.8.0"
 bytemuck                 = "1.21.0"
 bitfield                 = "0.18.1"
 cfg-if                   = "1.0.0"
-critical-section         = "1.2.0"
+critical-section         = { version = "1.2.0", features = ["restore-state-u32"] }
 defmt                    = { version = "0.3.10", optional = true }
 delegate                 = "0.13.2"
 digest                   = { version = "0.10.7", default-features = false, optional = true }
@@ -39,6 +39,7 @@ embedded-io-async        = { version = "0.6.1", optional = true }
 enumset                  = "1.1.5"
 esp-build                = { version = "0.2.0", path = "../esp-build" }
 esp-config               = { version = "0.3.0", path = "../esp-config" }
+esp-metadata             = { version = "0.6.0", path = "../esp-metadata", default-features = false }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                    = "0.3.7"
 instability              = "0.3.7"
@@ -68,12 +69,10 @@ esp32s3 = { version = "0.31.0", features = ["critical-section", "rt"], optional 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.12.1" }
 esp-riscv-rt     = { version = "0.10.0", path = "../esp-riscv-rt" }
-critical-section = { version = "1.2.0", features = ["restore-state-u8"] }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
 xtensa-lx        = { version = "0.10.0", path = "../xtensa-lx" }
 xtensa-lx-rt     = { version = "0.18.0", path = "../xtensa-lx-rt" }
-critical-section = { version = "1.2.0", features = ["restore-state-u32"] }
 
 [build-dependencies]
 basic-toml   = "0.1.9"

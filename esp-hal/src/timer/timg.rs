@@ -356,7 +356,7 @@ impl super::Timer for Timer {
     }
 }
 
-impl Peripheral for Timer {
+unsafe impl Peripheral for Timer {
     type P = Self;
 
     #[inline]

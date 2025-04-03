@@ -127,37 +127,37 @@ impl<'d> Spi<'d, Blocking> {
 
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
     #[instability::unstable]
-    pub fn with_sck(self, sclk: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
-        crate::into_mapped_ref!(sclk);
+    pub fn with_sck(self, sclk: impl PeripheralInput<'d>) -> Self {
+        let sclk = sclk.into();
         sclk.enable_input(true);
-        self.spi.info().sclk.connect_to(sclk);
+        self.spi.info().sclk.connect_to(&sclk);
         self
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     #[instability::unstable]
-    pub fn with_mosi(self, mosi: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
-        crate::into_mapped_ref!(mosi);
+    pub fn with_mosi(self, mosi: impl PeripheralInput<'d>) -> Self {
+        let mosi = mosi.into();
         mosi.enable_input(true);
-        self.spi.info().mosi.connect_to(mosi);
+        self.spi.info().mosi.connect_to(&mosi);
         self
     }
 
     /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
     #[instability::unstable]
-    pub fn with_miso(self, miso: impl Peripheral<P = impl PeripheralOutput> + 'd) -> Self {
-        crate::into_mapped_ref!(miso);
+    pub fn with_miso(self, miso: impl PeripheralOutput<'d>) -> Self {
+        let miso = miso.into();
         miso.set_to_push_pull_output();
-        self.spi.info().miso.connect_to(miso);
+        self.spi.info().miso.connect_to(&miso);
         self
     }
 
     /// Assign the CS (Chip Select) pin for the SPI instance.
     #[instability::unstable]
-    pub fn with_cs(self, cs: impl Peripheral<P = impl PeripheralInput> + 'd) -> Self {
-        crate::into_mapped_ref!(cs);
+    pub fn with_cs(self, cs: impl PeripheralInput<'d>) -> Self {
+        let cs = cs.into();
         cs.enable_input(true);
-        self.spi.info().cs.connect_to(cs);
+        self.spi.info().cs.connect_to(&cs);
         self
     }
 }
@@ -767,7 +767,7 @@ impl Info {
 
 impl PartialEq for Info {
     fn eq(&self, other: &Self) -> bool {
-        self.register_block == other.register_block
+        core::ptr::eq(self.register_block, other.register_block)
     }
 }
 

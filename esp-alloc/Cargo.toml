@@ -15,6 +15,7 @@ default-target = "riscv32imc-unknown-none-elf"
 features       = ["nightly"]
 
 [dependencies]
+allocator-api2        = { version = "0.2.0", default-features = false }
 defmt                 = { version = "0.3.10", optional = true }
 cfg-if                = "1.0.0"
 critical-section      = "1.2.0"
@@ -24,7 +25,7 @@ document-features     = "0.2.11"
 
 [features]
 default = []
-nightly = []
+nightly = ["allocator-api2/nightly"]
 
 ## Implement `defmt::Format` on certain types.
 defmt = ["dep:defmt"]

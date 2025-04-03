@@ -1,7 +1,7 @@
 # esp-build
 
 [![Crates.io](https://img.shields.io/crates/v/esp-build?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-build)
-[![docs.rs](https://img.shields.io/docsrs/esp-build?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-build)
+[![docs.rs](https://img.shields.io/docsrs/esp-build?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-build/latest/)
 ![MSRV](https://img.shields.io/badge/MSRV-1.84-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-build?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
@@ -10,7 +10,7 @@ Build utilities for use with `esp-hal` and other related packages, intended for 
 
 [build scripts]: https://doc.rust-lang.org/cargo/reference/build-scripts.html
 
-## [Documentation](https://docs.rs/crate/esp-build)
+## [Documentation](https://docs.espressif.com/projects/rust/esp-build/latest/)
 
 ## Minimum Supported Rust Version (MSRV)
 

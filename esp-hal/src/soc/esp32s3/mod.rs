@@ -23,6 +23,7 @@ crate::unstable_module! {
 pub mod cpu_control;
 pub mod gpio;
 pub mod peripherals;
+pub(crate) mod regi2c;
 
 /// The name of the chip ("esp32s3") as `&str`
 #[macro_export]
@@ -57,11 +58,6 @@ pub(crate) mod constants {
     pub const RMT_CLOCK_SRC: u8 = 1;
     /// RMT Clock source frequency.
     pub const RMT_CLOCK_SRC_FREQ: Rate = Rate::from_mhz(80);
-
-    /// The lower bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_LOW: usize = 0x3FC8_8000;
-    /// The upper bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_HIGH: usize = 0x3FD0_0000;
 
     /// A reference clock tick of 1 MHz.
     pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);

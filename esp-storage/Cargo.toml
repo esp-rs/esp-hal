@@ -7,7 +7,7 @@ description   = "Implementation of embedded-storage traits to access unencrypted
 documentation = "https://docs.espressif.com/projects/rust/esp-storage/latest/"
 keywords      = ["embedded-storage", "esp32", "espressif", "no-std"]
 categories    = ["embedded", "hardware-support", "no-std"]
-repository    = "https://github.com/esp-rs/esp-storage"
+repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]

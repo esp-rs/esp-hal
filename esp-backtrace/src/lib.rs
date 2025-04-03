@@ -9,18 +9,46 @@ use defmt as _;
 #[cfg(feature = "println")]
 use esp_println as _;
 
-const MAX_BACKTRACE_ADDRESSES: usize = 10;
+const MAX_BACKTRACE_ADDRESSES: usize =
+    esp_config::esp_config_int!(usize, "ESP_BACKTRACE_CONFIG_BACKTRACE_FRAMES");
 
-#[cfg(feature = "colors")]
+pub struct Backtrace(pub(crate) heapless::Vec<BacktraceFrame, MAX_BACKTRACE_ADDRESSES>);
+
+impl Backtrace {
+    /// Captures a stack backtrace.
+    #[inline]
+    pub fn capture() -> Self {
+        arch::backtrace()
+    }
+
+    #[inline]
+    #[cfg(feature = "exception-handler")]
+    fn from_sp(sp: u32) -> Self {
+        arch::backtrace_internal(sp, 0)
+    }
+
+    /// Returns the backtrace frames as a slice.
+    #[inline]
+    pub fn frames(&self) -> &[BacktraceFrame] {
+        &self.0
+    }
+}
+
+pub struct BacktraceFrame {
+    pub(crate) pc: usize,
+}
+
+impl BacktraceFrame {
+    pub fn program_counter(&self) -> usize {
+        self.pc - crate::arch::RA_OFFSET
+    }
+}
+
 const RESET: &str = "\u{001B}[0m";
-#[cfg(feature = "colors")]
 const RED: &str = "\u{001B}[31m";
 
 #[cfg(feature = "defmt")]
 macro_rules! println {
-    ("") => {
-        // Do nothing if the string is just a space
-    };
     ($($arg:tt)*) => {
         defmt::error!($($arg)*);
     };
@@ -35,7 +63,7 @@ macro_rules! println {
 
 #[allow(unused, unused_variables)]
 fn set_color_code(code: &str) {
-    #[cfg(feature = "println")]
+    #[cfg(all(feature = "colors", feature = "println"))]
     {
         println!("{}", code);
     }
@@ -50,43 +78,25 @@ pub mod arch;
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     pre_backtrace();
 
-    #[cfg(feature = "colors")]
-    set_color_code(RED);
-
     println!("");
     println!("====================== PANIC ======================");
 
-    #[cfg(not(feature = "defmt"))]
-    println!("{}", info);
-
-    #[cfg(feature = "defmt")]
     println!("{}", info);
 
     println!("");
     println!("Backtrace:");
     println!("");
 
-    let backtrace = crate::arch::backtrace();
+    let backtrace = Backtrace::capture();
     #[cfg(target_arch = "riscv32")]
-    if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
+    if backtrace.frames().is_empty() {
         println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
     }
-    for addr in backtrace.into_iter().flatten() {
-        #[cfg(all(feature = "colors", feature = "println"))]
-        println!("{}0x{:x}", RED, addr - crate::arch::RA_OFFSET);
-
-        #[cfg(not(all(feature = "colors", feature = "println")))]
-        println!("0x{:x}", addr - crate::arch::RA_OFFSET);
+    for frame in backtrace.frames() {
+        println!("0x{:x}", frame.program_counter());
     }
 
-    #[cfg(feature = "colors")]
-    set_color_code(RESET);
-
-    #[cfg(feature = "semihosting")]
-    semihosting::process::abort();
-
-    #[cfg(not(feature = "semihosting"))]
-    halt();
+    abort();
 }
 
 #[cfg(all(feature = "exception-handler", target_arch = "xtensa"))]
@@ -95,36 +105,15 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
     pre_backtrace();
 
-    #[cfg(feature = "colors")]
-    set_color_code(RED);
-
-    // Unfortunately, a different formatter string is used
-    #[cfg(not(feature = "defmt"))]
-    esp_println::println!("\n\nException occurred '{}'", cause);
-
-    #[cfg(feature = "defmt")]
-    defmt::error!("\n\nException occurred '{}'", cause);
-
+    println!("\n\nException occurred '{}'", cause);
     println!("{:?}", context);
 
-    let backtrace = crate::arch::backtrace_internal(context.A1, 0);
-    for e in backtrace {
-        if let Some(addr) = e {
-            println!("0x{:x}", addr);
-        }
+    let backtrace = Backtrace::from_sp(context.A1);
+    for frame in backtrace.frames() {
+        println!("0x{:x}", frame.program_counter());
     }
-    println!("");
-    println!("");
-    println!("");
 
-    #[cfg(feature = "colors")]
-    set_color_code(RESET);
-
-    #[cfg(feature = "semihosting")]
-    semihosting::process::abort();
-
-    #[cfg(not(feature = "semihosting"))]
-    halt();
+    abort();
 }
 
 #[cfg(all(feature = "exception-handler", target_arch = "riscv32"))]
@@ -135,9 +124,6 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
     let mepc = context.pc;
     let code = context.mcause & 0xff;
     let mtval = context.mtval;
-
-    #[cfg(feature = "colors")]
-    set_color_code(RED);
 
     if code == 14 {
         println!("");
@@ -171,37 +157,20 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
             "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}",
             code, mepc, mtval
         );
-        #[cfg(not(feature = "defmt"))]
-        println!("{:x?}", context);
 
-        #[cfg(feature = "defmt")]
         println!("{:?}", context);
 
-        let backtrace = crate::arch::backtrace_internal(context.s0 as u32, 0);
-        if backtrace.iter().filter(|e| e.is_some()).count() == 0 {
+        let backtrace = Backtrace::from_sp(context.s0 as u32);
+        let frames = backtrace.frames();
+        if frames.is_empty() {
             println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
         }
-        for addr in backtrace.into_iter().flatten() {
-            #[cfg(all(feature = "colors", feature = "println"))]
-            println!("{}0x{:x}", RED, addr - crate::arch::RA_OFFSET);
-
-            #[cfg(not(all(feature = "colors", feature = "println")))]
-            println!("0x{:x}", addr - crate::arch::RA_OFFSET);
+        for frame in backtrace.frames() {
+            println!("0x{:x}", frame.program_counter());
         }
     }
 
-    println!("");
-    println!("");
-    println!("");
-
-    #[cfg(feature = "colors")]
-    set_color_code(RESET);
-
-    #[cfg(feature = "semihosting")]
-    semihosting::process::abort();
-
-    #[cfg(not(feature = "semihosting"))]
-    halt();
+    abort();
 }
 
 // Ensure that the address is in DRAM and that it is 16-byte aligned.
@@ -259,83 +228,85 @@ fn is_valid_ram_address(address: u32) -> bool {
     true
 }
 
-#[cfg(all(
-    any(
-        not(any(feature = "esp32", feature = "esp32p4", feature = "esp32s3")),
-        not(feature = "halt-cores")
-    ),
-    not(feature = "custom-halt")
-))]
 #[allow(unused)]
 fn halt() -> ! {
-    loop {
-        continue;
-    }
-}
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "custom-halt")] {
+            // call custom code
+            extern "Rust" {
+                fn custom_halt() -> !;
+            }
+            unsafe { custom_halt() }
+        } else if #[cfg(any(feature = "esp32", /*feature = "esp32p4",*/ feature = "esp32s3"))] {
+            // multi-core
+            #[cfg(feature = "esp32")]
+            mod registers {
+                pub(crate) const OPTIONS0: u32 = 0x3ff48000;
+                pub(crate) const SW_CPU_STALL: u32 = 0x3ff480ac;
+            }
 
-#[cfg(feature = "custom-halt")]
-fn halt() -> ! {
-    extern "Rust" {
-        fn custom_halt() -> !;
-    }
-    unsafe { custom_halt() }
-}
+            #[cfg(feature = "esp32p4")]
+            mod registers {
+                pub(crate) const SW_CPU_STALL: u32 = 0x50115200;
+            }
 
-// TODO: Enable `halt` function for `esp32p4` feature once implemented
-#[cfg(all(any(feature = "esp32", feature = "esp32s3"), feature = "halt-cores"))]
-#[allow(unused)]
-fn halt() -> ! {
-    #[cfg(feature = "esp32")]
-    mod registers {
-        pub(crate) const OPTIONS0: u32 = 0x3ff48000;
-        pub(crate) const SW_CPU_STALL: u32 = 0x3ff480ac;
-    }
+            #[cfg(feature = "esp32s3")]
+            mod registers {
+                pub(crate) const OPTIONS0: u32 = 0x60008000;
+                pub(crate) const SW_CPU_STALL: u32 = 0x600080bc;
+            }
 
-    #[cfg(feature = "esp32p4")]
-    mod registers {
-        pub(crate) const SW_CPU_STALL: u32 = 0x50115200;
-    }
+            let sw_cpu_stall = registers::SW_CPU_STALL as *mut u32;
 
-    #[cfg(feature = "esp32s3")]
-    mod registers {
-        pub(crate) const OPTIONS0: u32 = 0x60008000;
-        pub(crate) const SW_CPU_STALL: u32 = 0x600080bc;
-    }
+            unsafe {
+                // We need to write the value "0x86" to stall a particular core. The write
+                // location is split into two separate bit fields named "c0" and "c1", and the
+                // two fields are located in different registers. Each core has its own pair of
+                // "c0" and "c1" bit fields.
 
-    let sw_cpu_stall = registers::SW_CPU_STALL as *mut u32;
+                let options0 = registers::OPTIONS0 as *mut u32;
 
-    #[cfg(feature = "esp32p4")]
-    unsafe {}
+                options0.write_volatile(options0.read_volatile() & !(0b1111) | 0b1010);
 
-    #[cfg(not(feature = "esp32p4"))]
-    unsafe {
-        // We need to write the value "0x86" to stall a particular core. The write
-        // location is split into two separate bit fields named "c0" and "c1", and the
-        // two fields are located in different registers. Each core has its own pair of
-        // "c0" and "c1" bit fields.
-
-        let options0 = registers::OPTIONS0 as *mut u32;
-
-        options0.write_volatile(options0.read_volatile() & !(0b1111) | 0b1010);
-
-        sw_cpu_stall.write_volatile(
-            sw_cpu_stall.read_volatile() & !(0b111111 << 20) & !(0b111111 << 26)
-                | (0x21 << 20)
-                | (0x21 << 26),
-        );
+                sw_cpu_stall.write_volatile(
+                    sw_cpu_stall.read_volatile() & !(0b111111 << 20) & !(0b111111 << 26)
+                        | (0x21 << 20)
+                        | (0x21 << 26),
+                );
+            }
+        }
     }
 
+    #[allow(clippy::empty_loop)]
     loop {}
 }
 
-#[cfg(not(feature = "custom-pre-backtrace"))]
 #[allow(unused)]
-fn pre_backtrace() {}
-
-#[cfg(feature = "custom-pre-backtrace")]
 fn pre_backtrace() {
-    extern "Rust" {
-        fn custom_pre_backtrace();
+    #[cfg(feature = "custom-pre-backtrace")]
+    {
+        extern "Rust" {
+            fn custom_pre_backtrace();
+        }
+        unsafe { custom_pre_backtrace() }
     }
-    unsafe { custom_pre_backtrace() }
+
+    set_color_code(RED);
+}
+
+#[allow(unused)]
+fn abort() -> ! {
+    println!("");
+    println!("");
+    println!("");
+
+    set_color_code(RESET);
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "semihosting")] {
+            semihosting::process::abort();
+        } else {
+            halt();
+        }
+    }
 }

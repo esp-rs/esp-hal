@@ -169,10 +169,10 @@ impl Priority {
     }
 }
 
-impl TryFrom<u8> for Priority {
+impl TryFrom<u32> for Priority {
     type Error = Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Priority::None),
             1 => Ok(Priority::Priority1),
@@ -192,6 +192,14 @@ impl TryFrom<u8> for Priority {
             15 => Ok(Priority::Priority15),
             _ => Err(Error::InvalidInterruptPriority),
         }
+    }
+}
+
+impl TryFrom<u8> for Priority {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Priority::try_from(value as u32)
     }
 }
 
@@ -397,7 +405,7 @@ mod vectored {
                     ))
                 {
                     if priority_by_core(core, cpu_interrupt) == priority {
-                        res.set(interrupt_nr as u16);
+                        res.set(interrupt_nr);
                     }
                 }
             }
@@ -455,8 +463,9 @@ mod vectored {
         // this has no effect on level interrupts, but the interrupt may be an edge one
         // so we clear it anyway
         clear(core, cpu_intr);
-        let prio: Priority =
-            unsafe { core::mem::transmute(INTERRUPT_TO_PRIORITY[cpu_intr as usize - 1] as u8) };
+
+        let priority = INTERRUPT_TO_PRIORITY[cpu_intr as usize];
+        let prio: Priority = unsafe { core::mem::transmute(priority) };
         let configured_interrupts = configured_interrupts(core, status, prio);
 
         for interrupt_nr in configured_interrupts.iterator() {
@@ -572,9 +581,10 @@ mod classic {
     pub(super) static PRIORITY_TO_INTERRUPT: &[usize] =
         &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
+    // First element is not used, just there to avoid a -1 in the interrupt handler.
     #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
-    pub(super) static INTERRUPT_TO_PRIORITY: &[usize] =
-        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    pub(super) static INTERRUPT_TO_PRIORITY: [u8; 16] =
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
     /// Enable a CPU interrupt
     ///
@@ -626,7 +636,7 @@ mod classic {
     #[inline]
     pub fn clear(_core: Cpu, which: CpuInterrupt) {
         unsafe {
-            let cpu_interrupt_number = which as isize;
+            let cpu_interrupt_number = which as usize;
             let intr = INTERRUPT_CORE0::regs();
             intr.cpu_int_clear()
                 .write(|w| w.bits(1 << cpu_interrupt_number));
@@ -651,7 +661,9 @@ mod classic {
     #[link_section = ".trap"]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         use super::mcause;
-        let interrupt_id: usize = mcause::read().code(); // MSB is whether its exception or interrupt.
+        // Both C6 and H2 have 5 bits of code. The riscv crate masks 31 bits, which then
+        // causes a bounds check to be present.
+        let interrupt_id: usize = mcause::read().bits() & 0x1f;
         let intr = INTERRUPT_CORE0::regs();
         let interrupt_priority = intr
             .cpu_int_pri(0)
@@ -725,9 +737,10 @@ mod plic {
     pub(super) static PRIORITY_TO_INTERRUPT: &[usize] =
         &[1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 
+    // First element is not used, just there to avoid a -1 in the interrupt handler.
     #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
-    pub(super) static INTERRUPT_TO_PRIORITY: &[usize] = &[
-        1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    pub(super) static INTERRUPT_TO_PRIORITY: [u8; 20] = [
+        0, 1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     ];
 
     /// Enable a CPU interrupt

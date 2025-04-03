@@ -10,10 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added new `_esp_println_timestamp()` hook, gated by the `timestamp` feature to provide timestamp for logging (#3194)
+- Added metadata for espflash to help setting log format (#3276)
 
 ### Changed
 
 ### Fixed
+
+- Manually setting a log level now correctly ignores `ESP_LOG`. (#3240)
+- Fixed logging rules being order-dependent. (#3240)
 
 ### Removed
 

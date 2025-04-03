@@ -23,7 +23,7 @@ impl CryptoDmaRxChannel {
 
 impl crate::private::Sealed for CryptoDmaRxChannel {}
 impl DmaRxChannel for CryptoDmaRxChannel {}
-impl Peripheral for CryptoDmaRxChannel {
+unsafe impl Peripheral for CryptoDmaRxChannel {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -44,7 +44,7 @@ impl CryptoDmaTxChannel {
 
 impl crate::private::Sealed for CryptoDmaTxChannel {}
 impl DmaTxChannel for CryptoDmaTxChannel {}
-impl Peripheral for CryptoDmaTxChannel {
+unsafe impl Peripheral for CryptoDmaTxChannel {
     type P = Self;
 
     unsafe fn clone_unchecked(&self) -> Self::P {
@@ -438,7 +438,7 @@ pub struct CryptoDmaChannel {}
 
 impl crate::private::Sealed for CryptoDmaChannel {}
 
-impl Peripheral for CryptoDmaChannel {
+unsafe impl Peripheral for CryptoDmaChannel {
     type P = Self;
     unsafe fn clone_unchecked(&self) -> Self::P {
         Self::steal()

@@ -22,6 +22,7 @@ crate::unstable_module! {
 }
 pub mod gpio;
 pub mod peripherals;
+pub(crate) mod regi2c;
 
 /// The name of the chip ("esp32s2") as `&str`
 #[macro_export]
@@ -51,10 +52,6 @@ pub(crate) mod constants {
     pub const RMT_RAM_START: usize = 0x3f416400;
     /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
     pub const RMT_CHANNEL_RAM_SIZE: usize = 64;
-    /// Start address of the system's DRAM (low range).
-    pub const SOC_DRAM_LOW: usize = 0x3FFB_0000;
-    /// End address of the system's DRAM (high range).
-    pub const SOC_DRAM_HIGH: usize = 0x4000_0000;
     /// Reference clock tick frequency, set to 1 MHz.
     pub const REF_TICK: Rate = Rate::from_mhz(1);
 }

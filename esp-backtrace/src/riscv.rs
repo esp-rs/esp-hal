@@ -1,6 +1,6 @@
 use core::arch::asm;
 
-use crate::MAX_BACKTRACE_ADDRESSES;
+use crate::{Backtrace, BacktraceFrame};
 
 // subtract 4 from the return address
 // the return address is the address following the JALR
@@ -163,7 +163,9 @@ MTVAL=0x{:08x}
 /// Get an array of backtrace addresses.
 ///
 /// This needs `force-frame-pointers` enabled.
-pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
+#[inline(never)]
+#[cold]
+pub fn backtrace() -> Backtrace {
     let fp = unsafe {
         let mut _tmp: u32;
         asm!("mv {0}, x8", out(reg) _tmp);
@@ -173,45 +175,36 @@ pub fn backtrace() -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
     backtrace_internal(fp, 2)
 }
 
-pub(crate) fn backtrace_internal(
-    fp: u32,
-    suppress: i32,
-) -> [Option<usize>; MAX_BACKTRACE_ADDRESSES] {
-    let mut result = [None; 10];
-    let mut index = 0;
+pub(crate) fn backtrace_internal(fp: u32, suppress: u32) -> Backtrace {
+    let mut result = Backtrace(heapless::Vec::new());
 
     let mut fp = fp;
     let mut suppress = suppress;
-    let mut old_address = 0;
-    loop {
-        unsafe {
-            let address = (fp as *const u32).offset(-1).read_volatile(); // RA/PC
-            fp = (fp as *const u32).offset(-2).read_volatile(); // next FP
 
-            if old_address == address {
-                break;
-            }
+    if !crate::is_valid_ram_address(fp) {
+        return result;
+    }
 
-            old_address = address;
+    while !result.0.is_full() {
+        // RA/PC
+        let address = unsafe { (fp as *const u32).offset(-1).read_volatile() };
+        // next FP
+        fp = unsafe { (fp as *const u32).offset(-2).read_volatile() };
 
-            if address == 0 {
-                break;
-            }
+        if address == 0 {
+            break;
+        }
 
-            if !crate::is_valid_ram_address(fp) {
-                break;
-            }
+        if !crate::is_valid_ram_address(fp) {
+            break;
+        }
 
-            if suppress == 0 {
-                result[index] = Some(address as usize);
-                index += 1;
-
-                if index >= MAX_BACKTRACE_ADDRESSES {
-                    break;
-                }
-            } else {
-                suppress -= 1;
-            }
+        if suppress == 0 {
+            _ = result.0.push(BacktraceFrame {
+                pc: address as usize,
+            });
+        } else {
+            suppress -= 1;
         }
     }
 

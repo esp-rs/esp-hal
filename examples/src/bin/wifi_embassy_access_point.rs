@@ -72,7 +72,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let (controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
-    let device = interfaces.sta;
+    let device = interfaces.ap;
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {

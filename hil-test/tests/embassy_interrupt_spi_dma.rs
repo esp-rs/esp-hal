@@ -67,7 +67,9 @@ async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Blocki
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 #[embassy_executor::task]
 async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocking>) {
-    let mut i2s_tx = i2s_tx.into_async().i2s_tx.build();
+    let (_, _, _, tx_descriptors) = dma_buffers!(128);
+
+    let mut i2s_tx = i2s_tx.into_async().i2s_tx.build(tx_descriptors);
 
     loop {
         let mut buffer: [u8; 8] = [0; 8];
@@ -151,19 +153,13 @@ mod test {
         .with_dma(dma_channel2);
 
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
-        let other_peripheral = {
-            let (_, rx_descriptors, _, tx_descriptors) = dma_buffers!(128);
-
-            esp_hal::i2s::master::I2s::new(
-                peripherals.I2S0,
-                esp_hal::i2s::master::Standard::Philips,
-                esp_hal::i2s::master::DataFormat::Data8Channel8,
-                Rate::from_khz(8),
-                dma_channel2,
-                rx_descriptors,
-                tx_descriptors,
-            )
-        };
+        let other_peripheral = esp_hal::i2s::master::I2s::new(
+            peripherals.I2S0,
+            esp_hal::i2s::master::Standard::Philips,
+            esp_hal::i2s::master::DataFormat::Data8Channel8,
+            Rate::from_khz(8),
+            dma_channel2,
+        );
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
