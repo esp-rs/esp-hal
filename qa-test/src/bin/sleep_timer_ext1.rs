@@ -3,7 +3,7 @@
 //! The following wiring is assumed:
 //! - ext1 wakeup pins => GPIO2, GPIO4
 
-//% CHIPS: esp32 esp32s3
+//% CHIPS: esp32 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]

@@ -72,6 +72,9 @@ crate::peripherals! {
         USB_WRAP <= USB_WRAP,
         WIFI <= WIFI,
         XTS_AES <= XTS_AES,
+        NRX <= NRX,
+        FE <= FE,
+        FE2 <= FE2,
     ],
     pins: [
         (0, [Input, Output, Analog, RtcIo])
