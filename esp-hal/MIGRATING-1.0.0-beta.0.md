@@ -99,3 +99,20 @@ The affected types in the `gpio::interconnect` module are:
 -     .build();
 +     .build(rx_descriptors);
 ```
+
+## SPI Slave driver now uses the newer DMA APIs
+
+```diff
+  let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
++ let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
++ let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+- let transfer = spi.transfer(&mut rx_buffer, &mut tx_buffer)?;
++ let transfer = spi.transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)?;
+
+- let transfer = spi.write(&mut tx_buffer)?;
++ let transfer = spi.write(dma_tx_buf.len(), dma_tx_buf)?;
+
+- let transfer = spi.read(&mut rx_buffer)?;
++ let transfer = spi.read(dma_rx_buf.len(), dma_rx_buf)?;
+```

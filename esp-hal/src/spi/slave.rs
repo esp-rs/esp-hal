@@ -16,6 +16,7 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 //! # use esp_hal::spi::Mode;
 //! # use esp_hal::spi::slave::Spi;
 #![cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
@@ -27,6 +28,8 @@
 //!
 //! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 //! dma_buffers!(32000);
+//! let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+//! let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
 //!     Mode::_0,
@@ -35,19 +38,12 @@
 //! .with_mosi(mosi)
 //! .with_miso(miso)
 //! .with_cs(cs)
-//! .with_dma(
-//!     dma_channel,
-//!     rx_descriptors,
-//!     tx_descriptors,
-//! );
-//!
-//! let mut receive = rx_buffer;
-//! let mut send = tx_buffer;
+//! .with_dma(dma_channel);
 //!
 //! let transfer = spi
-//!     .transfer(&mut receive, &mut send)?;
+//!     .transfer(50, dma_rx_buf, 50, dma_tx_buf)?;
 //!
-//! transfer.wait()?;
+//! transfer.wait();
 //! # Ok(())
 //! # }
 //! ```
@@ -64,7 +60,7 @@
 #![cfg_attr(esp32, doc = "- ESP32 only supports SPI mode 1 and 3.\n\n")]
 //! It also does not support blocking operations, as the actual
 //! transfer is controlled by the SPI master; if these are necessary,
-//! then the `DmaTransfer` object can be `wait()`ed on or polled for
+//! then the `SpiDmaTransfer` object can be `wait()`ed on or polled for
 //! `is_done()`.
 //!
 //! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
@@ -162,26 +158,22 @@ impl<'d> Spi<'d, Blocking> {
 /// DMA (Direct Memory Access) functionality (Slave).
 #[instability::unstable]
 pub mod dma {
+    use core::mem::ManuallyDrop;
+
+    use enumset::enum_set;
+
     use super::*;
     use crate::{
         dma::{
-            dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
             Channel,
-            ChannelRx,
-            ChannelTx,
-            DescriptorChain,
             DmaChannelFor,
-            DmaDescriptor,
-            DmaTransferRx,
-            DmaTransferRxTx,
-            DmaTransferTx,
+            DmaRxBuffer,
+            DmaRxInterrupt,
+            DmaTxBuffer,
+            EmptyBuf,
             PeripheralDmaChannel,
-            PeripheralRxChannel,
-            PeripheralTxChannel,
-            ReadBuffer,
             Rx,
             Tx,
-            WriteBuffer,
         },
         DriverMode,
     };
@@ -191,18 +183,13 @@ pub mod dma {
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
         #[instability::unstable]
-        pub fn with_dma(
-            self,
-            channel: impl DmaChannelFor<AnySpi<'d>>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> SpiDma<'d, Blocking> {
+        pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
             self.spi.info().set_data_mode(self.data_mode, true);
-            SpiDma::new(self.spi, channel.degrade(), rx_descriptors, tx_descriptors)
+            SpiDma::new(self.spi, channel.degrade())
         }
     }
 
-    /// A DMA capable SPI instance.
+    /// A structure representing a DMA transfer for SPI.
     #[instability::unstable]
     pub struct SpiDma<'d, Dm>
     where
@@ -210,8 +197,6 @@ pub mod dma {
     {
         pub(crate) spi: AnySpi<'d>,
         pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
-        rx_chain: DescriptorChain,
-        tx_chain: DescriptorChain,
         _guard: PeripheralGuard,
     }
 
@@ -224,61 +209,8 @@ pub mod dma {
         }
     }
 
-    impl<Dm> DmaSupport for SpiDma<'_, Dm>
-    where
-        Dm: DriverMode,
-    {
-        fn peripheral_wait_dma(&mut self, is_rx: bool, is_tx: bool) {
-            while !((!is_tx || self.channel.tx.is_done())
-                && (!is_rx || self.channel.rx.is_done())
-                && !self.spi.info().is_bus_busy())
-            {}
-
-            self.spi.info().flush().ok();
-        }
-
-        fn peripheral_dma_stop(&mut self) {
-            unreachable!("unsupported")
-        }
-    }
-
-    impl<'d, Dm> DmaSupportTx for SpiDma<'d, Dm>
-    where
-        Dm: DriverMode,
-    {
-        type TX = ChannelTx<Dm, PeripheralTxChannel<AnySpi<'d>>>;
-
-        fn tx(&mut self) -> &mut Self::TX {
-            &mut self.channel.tx
-        }
-
-        fn chain(&mut self) -> &mut DescriptorChain {
-            &mut self.tx_chain
-        }
-    }
-
-    impl<'d, Dm> DmaSupportRx for SpiDma<'d, Dm>
-    where
-        Dm: DriverMode,
-    {
-        type RX = ChannelRx<Dm, PeripheralRxChannel<AnySpi<'d>>>;
-
-        fn rx(&mut self) -> &mut Self::RX {
-            &mut self.channel.rx
-        }
-
-        fn chain(&mut self) -> &mut DescriptorChain {
-            &mut self.rx_chain
-        }
-    }
-
     impl<'d> SpiDma<'d, Blocking> {
-        fn new(
-            spi: AnySpi<'d>,
-            channel: PeripheralDmaChannel<AnySpi<'d>>,
-            rx_descriptors: &'static mut [DmaDescriptor],
-            tx_descriptors: &'static mut [DmaDescriptor],
-        ) -> Self {
+        fn new(spi: AnySpi<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
             let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
             let guard = PeripheralGuard::new(spi.info().peripheral);
@@ -286,14 +218,12 @@ pub mod dma {
             Self {
                 spi,
                 channel,
-                rx_chain: DescriptorChain::new(rx_descriptors),
-                tx_chain: DescriptorChain::new(tx_descriptors),
                 _guard: guard,
             }
         }
     }
 
-    impl<Dm> SpiDma<'_, Dm>
+    impl<'d, Dm> SpiDma<'d, Dm>
     where
         Dm: DriverMode,
     {
@@ -306,113 +236,217 @@ pub mod dma {
 
         /// Register a buffer for a DMA write.
         ///
-        /// This will return a [DmaTransferTx]. The maximum amount of data to be
-        /// sent is 32736 bytes.
+        /// This will return a [SpiDmaTransfer]. The maximum amount of data to
+        /// be sent is 32736 bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
         #[instability::unstable]
-        pub fn write<'t, TXBUF>(
-            &'t mut self,
-            words: &'t TXBUF,
-        ) -> Result<DmaTransferTx<'t, Self>, Error>
+        pub fn write<TX>(
+            mut self,
+            bytes_to_write: usize,
+            mut buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, Dm, TX>, (Error, Self, TX)>
         where
-            TXBUF: ReadBuffer,
+            TX: DmaTxBuffer,
         {
-            let (ptr, len) = unsafe { words.read_buffer() };
-
-            if len > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
+            if bytes_to_write > MAX_DMA_SIZE {
+                return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
-            unsafe {
-                self.driver()
-                    .start_transfer_dma(
-                        &mut self.rx_chain,
-                        &mut self.tx_chain,
-                        core::ptr::null_mut(),
-                        0,
-                        ptr,
-                        len,
-                        &mut self.channel.rx,
-                        &mut self.channel.tx,
-                    )
-                    .map(move |_| DmaTransferTx::new(self))
+            let result = unsafe {
+                self.driver().start_transfer_dma(
+                    0,
+                    bytes_to_write,
+                    &mut EmptyBuf,
+                    &mut buffer,
+                    &mut self.channel.rx,
+                    &mut self.channel.tx,
+                )
+            };
+            if let Err(err) = result {
+                return Err((err, self, buffer));
             }
+
+            Ok(SpiDmaTransfer::new(self, buffer, false, true))
         }
 
         /// Register a buffer for a DMA read.
         ///
-        /// This will return a [DmaTransferRx]. The maximum amount of data to be
-        /// received is 32736 bytes.
+        /// This will return a [SpiDmaTransfer]. The maximum amount of data to
+        /// be received is 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
         #[instability::unstable]
-        pub fn read<'t, RXBUF>(
-            &'t mut self,
-            words: &'t mut RXBUF,
-        ) -> Result<DmaTransferRx<'t, Self>, Error>
+        pub fn read<RX>(
+            mut self,
+            bytes_to_read: usize,
+            mut buffer: RX,
+        ) -> Result<SpiDmaTransfer<'d, Dm, RX>, (Error, Self, RX)>
         where
-            RXBUF: WriteBuffer,
+            RX: DmaRxBuffer,
         {
-            let (ptr, len) = unsafe { words.write_buffer() };
-
-            if len > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
+            if bytes_to_read > MAX_DMA_SIZE {
+                return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
             }
 
-            unsafe {
-                self.driver()
-                    .start_transfer_dma(
-                        &mut self.rx_chain,
-                        &mut self.tx_chain,
-                        ptr,
-                        len,
-                        core::ptr::null(),
-                        0,
-                        &mut self.channel.rx,
-                        &mut self.channel.tx,
-                    )
-                    .map(move |_| DmaTransferRx::new(self))
+            let result = unsafe {
+                self.driver().start_transfer_dma(
+                    bytes_to_read,
+                    0,
+                    &mut buffer,
+                    &mut EmptyBuf,
+                    &mut self.channel.rx,
+                    &mut self.channel.tx,
+                )
+            };
+            if let Err(err) = result {
+                return Err((err, self, buffer));
             }
+
+            Ok(SpiDmaTransfer::new(self, buffer, true, false))
         }
 
         /// Register buffers for a DMA transfer.
         ///
-        /// This will return a [DmaTransferRxTx]. The maximum amount of data to
+        /// This will return a [SpiDmaTransfer]. The maximum amount of data to
         /// be sent/received is 32736 bytes.
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.
         #[instability::unstable]
-        pub fn transfer<'t, RXBUF, TXBUF>(
-            &'t mut self,
-            read_buffer: &'t mut RXBUF,
-            words: &'t TXBUF,
-        ) -> Result<DmaTransferRxTx<'t, Self>, Error>
+        #[allow(clippy::type_complexity)]
+        pub fn transfer<RX, TX>(
+            mut self,
+            bytes_to_read: usize,
+            mut rx_buffer: RX,
+            bytes_to_write: usize,
+            mut tx_buffer: TX,
+        ) -> Result<SpiDmaTransfer<'d, Dm, (RX, TX)>, (Error, Self, RX, TX)>
         where
-            RXBUF: WriteBuffer,
-            TXBUF: ReadBuffer,
+            RX: DmaRxBuffer,
+            TX: DmaTxBuffer,
         {
-            let (write_ptr, write_len) = unsafe { words.read_buffer() };
-            let (read_ptr, read_len) = unsafe { read_buffer.write_buffer() };
-
-            if write_len > MAX_DMA_SIZE || read_len > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
+            if bytes_to_read > MAX_DMA_SIZE || bytes_to_write > MAX_DMA_SIZE {
+                return Err((
+                    Error::MaxDmaTransferSizeExceeded,
+                    self,
+                    rx_buffer,
+                    tx_buffer,
+                ));
             }
 
+            let result = unsafe {
+                self.driver().start_transfer_dma(
+                    bytes_to_read,
+                    bytes_to_write,
+                    &mut rx_buffer,
+                    &mut tx_buffer,
+                    &mut self.channel.rx,
+                    &mut self.channel.tx,
+                )
+            };
+            if let Err(err) = result {
+                return Err((err, self, rx_buffer, tx_buffer));
+            }
+
+            Ok(SpiDmaTransfer::new(
+                self,
+                (rx_buffer, tx_buffer),
+                true,
+                true,
+            ))
+        }
+    }
+
+    /// A structure representing a DMA transfer for SPI.
+    ///
+    /// This structure holds references to the SPI instance, DMA buffers, and
+    /// transfer status.
+    #[instability::unstable]
+    pub struct SpiDmaTransfer<'d, Dm, Buf>
+    where
+        Dm: DriverMode,
+    {
+        spi_dma: ManuallyDrop<SpiDma<'d, Dm>>,
+        dma_buf: ManuallyDrop<Buf>,
+        has_rx: bool,
+        has_tx: bool,
+    }
+
+    impl<'d, Dm, Buf> SpiDmaTransfer<'d, Dm, Buf>
+    where
+        Dm: DriverMode,
+    {
+        fn new(spi_dma: SpiDma<'d, Dm>, dma_buf: Buf, has_rx: bool, has_tx: bool) -> Self {
+            Self {
+                spi_dma: ManuallyDrop::new(spi_dma),
+                dma_buf: ManuallyDrop::new(dma_buf),
+                has_rx,
+                has_tx,
+            }
+        }
+
+        /// Checks if the transfer is complete.
+        ///
+        /// This method returns `true` if both RX and TX operations are done,
+        /// and the SPI instance is no longer busy.
+        #[instability::unstable]
+        pub fn is_done(&self) -> bool {
+            if self.has_rx {
+                let done_int =
+                    enum_set!(DmaRxInterrupt::SuccessfulEof | DmaRxInterrupt::DescriptorEmpty);
+                if self
+                    .spi_dma
+                    .channel
+                    .rx
+                    .pending_in_interrupts()
+                    .is_disjoint(done_int)
+                {
+                    return false;
+                }
+            }
+            !self.spi_dma.spi.info().is_bus_busy()
+        }
+
+        /// Waits for the DMA transfer to complete.
+        ///
+        /// This method blocks until the transfer is finished and returns the
+        /// `SpiDma` instance and the associated buffer.
+        #[instability::unstable]
+        pub fn wait(mut self) -> (SpiDma<'d, Dm>, Buf) {
+            while !self.is_done() {
+                // Wait for the SPI to become idle
+            }
+
+            if self.has_tx {
+                // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
+                if !self.spi_dma.channel.tx.is_done() {
+                    self.spi_dma.channel.tx.stop_transfer();
+                }
+            }
+
+            let retval = unsafe {
+                (
+                    ManuallyDrop::take(&mut self.spi_dma),
+                    ManuallyDrop::take(&mut self.dma_buf),
+                )
+            };
+            core::mem::forget(self);
+            retval
+        }
+    }
+
+    impl<Dm, Buf> Drop for SpiDmaTransfer<'_, Dm, Buf>
+    where
+        Dm: DriverMode,
+    {
+        fn drop(&mut self) {
+            while !self.is_done() {
+                // Wait for the SPI to become idle
+            }
             unsafe {
-                self.driver()
-                    .start_transfer_dma(
-                        &mut self.rx_chain,
-                        &mut self.tx_chain,
-                        read_ptr,
-                        read_len,
-                        write_ptr,
-                        write_len,
-                        &mut self.channel.rx,
-                        &mut self.channel.tx,
-                    )
-                    .map(move |_| DmaTransferRxTx::new(self))
+                ManuallyDrop::drop(&mut self.spi_dma);
+                ManuallyDrop::drop(&mut self.dma_buf);
             }
         }
     }
@@ -430,12 +464,10 @@ pub mod dma {
         #[allow(clippy::too_many_arguments)]
         unsafe fn start_transfer_dma<RX, TX>(
             &self,
-            rx_chain: &mut DescriptorChain,
-            tx_chain: &mut DescriptorChain,
-            read_buffer_ptr: *mut u8,
             read_buffer_len: usize,
-            write_buffer_ptr: *const u8,
             write_buffer_len: usize,
+            rx_buffer: &mut impl DmaRxBuffer,
+            tx_buffer: &mut impl DmaTxBuffer,
             rx: &mut RX,
             tx: &mut TX,
         ) -> Result<(), Error>
@@ -448,13 +480,11 @@ pub mod dma {
             self.info.reset_spi();
 
             if read_buffer_len > 0 {
-                rx_chain.fill_for_rx(false, read_buffer_ptr, read_buffer_len)?;
-                rx.prepare_transfer_without_start(self.dma_peripheral, rx_chain)?;
+                rx.prepare_transfer(self.dma_peripheral, rx_buffer)?;
             }
 
             if write_buffer_len > 0 {
-                tx_chain.fill_for_tx(false, write_buffer_ptr, write_buffer_len)?;
-                tx.prepare_transfer_without_start(self.dma_peripheral, tx_chain)?;
+                tx.prepare_transfer(self.dma_peripheral, tx_buffer)?;
             }
 
             #[cfg(esp32)]
@@ -730,14 +760,6 @@ impl Info {
         {
             self.regs().dma_int_raw().read().trans_done().bit_is_clear()
         }
-    }
-
-    // Check if the bus is busy and if it is wait for it to be idle
-    fn flush(&self) -> Result<(), Error> {
-        while self.is_bus_busy() {
-            // Wait for bus to be clear
-        }
-        Ok(())
     }
 
     // Clear the transaction-done interrupt flag so flush() can work properly. Not

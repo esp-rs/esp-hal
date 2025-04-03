@@ -10,6 +10,7 @@
 #![no_main]
 
 use esp_hal::{
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
     spi::{slave::Spi, Mode},
@@ -144,11 +145,10 @@ mod tests {
     fn test_basic(mut ctx: Context) {
         const DMA_SIZE: usize = 32;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_SIZE);
-        let mut spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel, rx_descriptors, tx_descriptors);
-        let slave_send = tx_buffer;
-        let slave_receive = rx_buffer;
+        let mut slave_receive = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut slave_send = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+        let spi = ctx.spi.with_dma(ctx.dma_channel);
 
         // The transfer stops if the buffers are full, not when the master
         // deasserts CS. Therefore, these need to be the same size as the DMA buffers.
@@ -158,18 +158,20 @@ mod tests {
         for (i, v) in master_send.iter_mut().enumerate() {
             *v = (i % 255) as u8;
         }
-        for (i, v) in slave_send.iter_mut().enumerate() {
+        for (i, v) in slave_send.as_mut_slice().iter_mut().enumerate() {
             *v = (254 - (i % 255)) as u8;
         }
-        slave_receive.fill(0xFF);
+        slave_receive.as_mut_slice().fill(0xFF);
 
-        let transfer = spi.transfer(slave_receive, &slave_send).unwrap();
+        let transfer = spi
+            .transfer(DMA_SIZE, slave_receive, DMA_SIZE, slave_send)
+            .unwrap();
 
         ctx.bitbang_spi.transfer_buf(master_receive, master_send);
 
-        transfer.wait().unwrap();
+        (_, (slave_receive, slave_send)) = transfer.wait();
 
-        assert_eq!(slave_receive, master_send);
-        assert_eq!(master_receive, slave_send);
+        assert_eq!(slave_receive.as_slice(), master_send);
+        assert_eq!(master_receive, slave_send.as_slice());
     }
 }
