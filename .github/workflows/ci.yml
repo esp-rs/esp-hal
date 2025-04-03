@@ -195,3 +195,6 @@ jobs:
 
       # Check the formatting of all packages:
       - run: cd esp-config && cargo test --features build
+
+      # Check the formatting of all packages:
+      - run: cd esp-bootloader-esp-idf && cargo test
