@@ -53,6 +53,7 @@ pub enum Package {
     EspWifi,
     Examples,
     HilTest,
+    MiriTest,
     QaTest,
     XtensaLx,
     XtensaLxRt,
@@ -87,7 +88,7 @@ impl Package {
 
     /// Should documentation be built for the package?
     pub fn is_published(&self) -> bool {
-        !matches!(self, Package::Examples | Package::HilTest | Package::QaTest)
+        !matches!(self, Package::Examples | Package::HilTest | Package::QaTest | Package::MiriTest)
     }
 
     /// Build on host
@@ -115,6 +116,7 @@ pub fn execute_app(
     action: CargoAction,
     repeat: usize,
     debug: bool,
+    use_miri: bool,
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
@@ -138,6 +140,10 @@ pub fn execute_app(
         .target(target)
         .features(&features);
 
+    if use_miri {
+        builder = builder.toolchain(if chip.is_xtensa() { "esp" } else { "nightly" });
+    }
+
     let bin_arg = if package.starts_with("src/bin") {
         format!("--bin={}", app.binary_name())
     } else if package.starts_with("tests") {
@@ -151,6 +157,8 @@ pub fn execute_app(
         "build"
     } else if package.starts_with("tests") {
         "test"
+    } else if use_miri {
+        "miri run"
     } else {
         "run"
     };
