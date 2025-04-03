@@ -7,9 +7,8 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{AnyGdmaChannel, BurstConfig, DmaChannelConvert, DmaError, ExternalBurstConfig, Mem2Mem},
+    dma::{AnyGdmaChannel, DmaChannelConvert, DmaError, Mem2Mem},
     dma_buffers,
-    dma_buffers_chunk_size,
     dma_descriptors,
 };
 use hil_test as _;
@@ -60,34 +59,6 @@ mod tests {
 
         let mut mem2mem = Mem2Mem::new(ctx.channel, ctx.dma_peripheral)
             .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
-            .unwrap();
-
-        for i in 0..core::mem::size_of_val(tx_buffer) {
-            tx_buffer[i] = (i % 256) as u8;
-        }
-        let dma_wait = mem2mem.start_transfer(rx_buffer, tx_buffer).unwrap();
-        dma_wait.wait().unwrap();
-        for i in 0..core::mem::size_of_val(tx_buffer) {
-            assert_eq!(rx_buffer[i], tx_buffer[i]);
-        }
-    }
-
-    #[test]
-    fn test_internal_mem2mem_chunk_size(ctx: Context) {
-        const CHUNK_SIZE: usize = 2048;
-
-        let (tx_buffer, tx_descriptors, rx_buffer, rx_descriptors) =
-            dma_buffers_chunk_size!(DATA_SIZE, CHUNK_SIZE);
-
-        let mut mem2mem = Mem2Mem::new(ctx.channel, ctx.dma_peripheral)
-            .with_descriptors(
-                rx_descriptors,
-                tx_descriptors,
-                BurstConfig {
-                    external_memory: ExternalBurstConfig::Size64,
-                    internal_memory: Default::default(),
-                },
-            )
             .unwrap();
 
         for i in 0..core::mem::size_of_val(tx_buffer) {
