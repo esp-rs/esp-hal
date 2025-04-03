@@ -42,6 +42,38 @@
 //! the handle to a driver, while still keeping the original handle alive. Once
 //! you drop the driver, you will be able to reborrow the peripheral again.
 //!
+//! For example, if you want to use the [`I2c`](i2c::master::I2c) driver and you
+//! don't intend to drop the driver, you can pass the peripheral singleton to
+//! the driver by value:
+//!
+//! ```rust, ignore
+//! // Peripheral singletons are returned from the `init` function.
+//! let peripherals = esp_hal::init(esp_hal::Config::default());
+//!
+//! let mut i2c = I2C::new(peripherals.I2C0, /* ... */);
+//! ```
+//!
+//! If you want to use the peripheral in multiple places (for example, you want
+//! to drop the driver for some period of time to minimize power consumption),
+//! you can reborrow the peripheral singleton and pass it to the driver by
+//! reference:
+//!
+//! ```rust, ignore
+//! // Note that in this case, `peripherals` needs to be mutable.
+//! let mut peripherals = esp_hal::init(esp_hal::Config::default());
+//!
+//! let i2c = I2C::new(peripherals.I2C0.reborrow(), /* ... */);
+//!
+//! // Do something with the I2C driver...
+//!
+//! core::mem::drop(i2c); // Drop the driver to minimize power consumption.
+//!
+//! // Do something else...
+//!
+//! // You can then take or reborrow the peripheral singleton again.
+//! let i2c = I2C::new(peripherals.I2C0.reborrow(), /* ... */);
+//! ```
+//!
 //! ## Examples
 //!
 //! We have a plethora of [examples] in the esp-hal repository. We use
