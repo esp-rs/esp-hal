@@ -112,7 +112,6 @@ use crate::{
         DmaError,
         DmaTxBuffer,
         PeripheralTxChannel,
-        Tx,
     },
     gpio::{
         interconnect::{OutputConnection, PeripheralOutput},

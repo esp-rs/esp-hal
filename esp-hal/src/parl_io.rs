@@ -139,9 +139,7 @@ use crate::{
         DmaTxBuffer,
         PeripheralRxChannel,
         PeripheralTxChannel,
-        Rx,
         RxChannelFor,
-        Tx,
         TxChannelFor,
     },
     gpio::{

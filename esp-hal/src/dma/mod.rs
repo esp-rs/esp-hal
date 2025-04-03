@@ -1324,9 +1324,10 @@ impl TxCircularState {
         }
     }
 
-    pub(crate) fn update<T>(&mut self, channel: &T) -> Result<(), DmaError>
+    pub(crate) fn update<Dm, CH>(&mut self, channel: &ChannelTx<Dm, CH>) -> Result<(), DmaError>
     where
-        T: Tx,
+        Dm: DriverMode,
+        CH: DmaTxChannel,
     {
         if channel
             .pending_out_interrupts()
@@ -1735,60 +1736,6 @@ where
 {
 }
 
-/// The functions here are not meant to be used outside the HAL
-#[doc(hidden)]
-pub trait Rx: crate::private::Sealed {
-    unsafe fn prepare_transfer_without_start(
-        &mut self,
-        peri: DmaPeripheral,
-        chain: &DescriptorChain,
-    ) -> Result<(), DmaError>;
-
-    unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
-        &mut self,
-        peri: DmaPeripheral,
-        buffer: &mut BUF,
-    ) -> Result<(), DmaError>;
-
-    fn start_transfer(&mut self) -> Result<(), DmaError>;
-
-    fn stop_transfer(&mut self);
-
-    #[cfg(gdma)]
-    fn set_mem2mem_mode(&mut self, value: bool);
-
-    fn listen_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
-
-    fn unlisten_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
-
-    fn is_listening_in(&self) -> EnumSet<DmaRxInterrupt>;
-
-    fn clear_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>);
-
-    fn pending_in_interrupts(&self) -> EnumSet<DmaRxInterrupt>;
-
-    fn is_done(&self) -> bool;
-
-    fn has_error(&self) -> bool {
-        self.pending_in_interrupts()
-            .contains(DmaRxInterrupt::DescriptorError)
-    }
-
-    fn has_dscr_empty_error(&self) -> bool {
-        self.pending_in_interrupts()
-            .contains(DmaRxInterrupt::DescriptorEmpty)
-    }
-
-    fn has_eof_error(&self) -> bool {
-        self.pending_in_interrupts()
-            .contains(DmaRxInterrupt::ErrorEof)
-    }
-
-    fn clear_interrupts(&self);
-
-    fn waker(&self) -> &'static crate::asynch::AtomicWaker;
-}
-
 // NOTE(p4): because the P4 has two different GDMAs, we won't be able to use
 // `GenericPeripheralGuard`.
 cfg_if::cfg_if! {
@@ -1940,14 +1887,15 @@ where
 {
 }
 
-impl<Dm, CH> Rx for ChannelRx<Dm, CH>
+#[allow(unused)]
+impl<Dm, CH> ChannelRx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
     // API.
-    unsafe fn prepare_transfer_without_start(
+    pub(crate) unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
@@ -1992,7 +1940,7 @@ where
         self.do_prepare(preparation, peri)
     }
 
-    unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
+    pub(crate) unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
         peri: DmaPeripheral,
         buffer: &mut BUF,
@@ -2002,7 +1950,7 @@ where
         self.do_prepare(preparation, peri)
     }
 
-    fn start_transfer(&mut self) -> Result<(), DmaError> {
+    pub(crate) fn start_transfer(&mut self) -> Result<(), DmaError> {
         self.rx_impl.start();
 
         if self
@@ -2015,93 +1963,62 @@ where
         }
     }
 
-    fn stop_transfer(&mut self) {
+    pub(crate) fn stop_transfer(&mut self) {
         self.rx_impl.stop()
     }
 
     #[cfg(gdma)]
-    fn set_mem2mem_mode(&mut self, value: bool) {
+    pub(crate) fn set_mem2mem_mode(&mut self, value: bool) {
         self.rx_impl.set_mem2mem_mode(value);
     }
 
-    fn listen_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+    pub(crate) fn listen_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
         self.rx_impl.listen(interrupts);
     }
 
-    fn unlisten_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+    pub(crate) fn unlisten_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
         self.rx_impl.unlisten(interrupts);
     }
 
-    fn is_listening_in(&self) -> EnumSet<DmaRxInterrupt> {
+    pub(crate) fn is_listening_in(&self) -> EnumSet<DmaRxInterrupt> {
         self.rx_impl.is_listening()
     }
 
-    fn clear_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+    pub(crate) fn clear_in(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
         self.rx_impl.clear(interrupts);
     }
 
-    fn pending_in_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
+    pub(crate) fn pending_in_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
         self.rx_impl.pending_interrupts()
     }
 
-    fn is_done(&self) -> bool {
+    pub(crate) fn is_done(&self) -> bool {
         self.pending_in_interrupts()
             .contains(DmaRxInterrupt::SuccessfulEof)
     }
 
-    fn clear_interrupts(&self) {
+    pub(crate) fn clear_interrupts(&self) {
         self.rx_impl.clear_all();
     }
 
-    fn waker(&self) -> &'static crate::asynch::AtomicWaker {
+    pub(crate) fn waker(&self) -> &'static crate::asynch::AtomicWaker {
         self.rx_impl.waker()
     }
-}
 
-/// The functions here are not meant to be used outside the HAL
-#[doc(hidden)]
-pub trait Tx: crate::private::Sealed {
-    unsafe fn prepare_transfer_without_start(
-        &mut self,
-        peri: DmaPeripheral,
-        chain: &DescriptorChain,
-    ) -> Result<(), DmaError>;
-
-    unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
-        &mut self,
-        peri: DmaPeripheral,
-        buffer: &mut BUF,
-    ) -> Result<(), DmaError>;
-
-    fn listen_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
-
-    fn unlisten_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
-
-    fn is_listening_out(&self) -> EnumSet<DmaTxInterrupt>;
-
-    fn clear_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>);
-
-    fn pending_out_interrupts(&self) -> EnumSet<DmaTxInterrupt>;
-
-    fn start_transfer(&mut self) -> Result<(), DmaError>;
-
-    fn stop_transfer(&mut self);
-
-    fn is_done(&self) -> bool {
-        self.pending_out_interrupts()
-            .contains(DmaTxInterrupt::TotalEof)
+    pub(crate) fn has_error(&self) -> bool {
+        self.pending_in_interrupts()
+            .contains(DmaRxInterrupt::DescriptorError)
     }
 
-    fn has_error(&self) -> bool {
-        self.pending_out_interrupts()
-            .contains(DmaTxInterrupt::DescriptorError)
+    pub(crate) fn has_dscr_empty_error(&self) -> bool {
+        self.pending_in_interrupts()
+            .contains(DmaRxInterrupt::DescriptorEmpty)
     }
 
-    fn clear_interrupts(&self);
-
-    fn waker(&self) -> &'static crate::asynch::AtomicWaker;
-
-    fn last_out_dscr_address(&self) -> usize;
+    pub(crate) fn has_eof_error(&self) -> bool {
+        self.pending_in_interrupts()
+            .contains(DmaRxInterrupt::ErrorEof)
+    }
 }
 
 /// DMA transmit channel
@@ -2235,14 +2152,15 @@ where
 {
 }
 
-impl<Dm, CH> Tx for ChannelTx<Dm, CH>
+#[allow(unused)]
+impl<Dm, CH> ChannelTx<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
     // API.
-    unsafe fn prepare_transfer_without_start(
+    pub(crate) unsafe fn prepare_transfer_without_start(
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
@@ -2291,7 +2209,7 @@ where
         Ok(())
     }
 
-    unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
+    pub(crate) unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
         &mut self,
         peri: DmaPeripheral,
         buffer: &mut BUF,
@@ -2301,7 +2219,7 @@ where
         self.do_prepare(preparation, peri)
     }
 
-    fn start_transfer(&mut self) -> Result<(), DmaError> {
+    pub(crate) fn start_transfer(&mut self) -> Result<(), DmaError> {
         self.tx_impl.start();
         while self.tx_impl.is_fifo_empty() && self.pending_out_interrupts().is_empty() {}
 
@@ -2315,40 +2233,50 @@ where
         }
     }
 
-    fn stop_transfer(&mut self) {
+    pub(crate) fn stop_transfer(&mut self) {
         self.tx_impl.stop()
     }
 
-    fn listen_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+    pub(crate) fn listen_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
         self.tx_impl.listen(interrupts);
     }
 
-    fn unlisten_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+    pub(crate) fn unlisten_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
         self.tx_impl.unlisten(interrupts);
     }
 
-    fn is_listening_out(&self) -> EnumSet<DmaTxInterrupt> {
+    pub(crate) fn is_listening_out(&self) -> EnumSet<DmaTxInterrupt> {
         self.tx_impl.is_listening()
     }
 
-    fn clear_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+    pub(crate) fn clear_out(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
         self.tx_impl.clear(interrupts);
     }
 
-    fn pending_out_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
+    pub(crate) fn pending_out_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
         self.tx_impl.pending_interrupts()
     }
 
-    fn waker(&self) -> &'static crate::asynch::AtomicWaker {
+    pub(crate) fn waker(&self) -> &'static crate::asynch::AtomicWaker {
         self.tx_impl.waker()
     }
 
-    fn clear_interrupts(&self) {
+    pub(crate) fn clear_interrupts(&self) {
         self.tx_impl.clear_all();
     }
 
-    fn last_out_dscr_address(&self) -> usize {
+    pub(crate) fn last_out_dscr_address(&self) -> usize {
         self.tx_impl.last_dscr_address()
+    }
+
+    pub(crate) fn is_done(&self) -> bool {
+        self.pending_out_interrupts()
+            .contains(DmaTxInterrupt::TotalEof)
+    }
+
+    pub(crate) fn has_error(&self) -> bool {
+        self.pending_out_interrupts()
+            .contains(DmaTxInterrupt::DescriptorError)
     }
 }
 
@@ -2569,6 +2497,8 @@ pub(crate) mod dma_private {
     use super::*;
 
     pub trait DmaSupport {
+        type DriverMode: DriverMode;
+
         /// Wait until the transfer is done.
         ///
         /// Depending on the peripheral this might include checking the DMA
@@ -2587,17 +2517,17 @@ pub(crate) mod dma_private {
     }
 
     pub trait DmaSupportTx: DmaSupport {
-        type TX: Tx;
+        type Channel: DmaTxChannel;
 
-        fn tx(&mut self) -> &mut Self::TX;
+        fn tx(&mut self) -> &mut ChannelTx<Self::DriverMode, Self::Channel>;
 
         fn chain(&mut self) -> &mut DescriptorChain;
     }
 
     pub trait DmaSupportRx: DmaSupport {
-        type RX: Rx;
+        type Channel: DmaRxChannel;
 
-        fn rx(&mut self) -> &mut Self::RX;
+        fn rx(&mut self) -> &mut ChannelRx<Self::DriverMode, Self::Channel>;
 
         fn chain(&mut self) -> &mut DescriptorChain;
     }
@@ -2905,26 +2835,26 @@ pub(crate) mod asynch {
     use super::*;
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct DmaTxFuture<'a, TX>
+    pub struct DmaTxFuture<'a, CH>
     where
-        TX: Tx,
+        CH: DmaTxChannel,
     {
-        pub(crate) tx: &'a mut TX,
+        pub(crate) tx: &'a mut ChannelTx<Async, CH>,
     }
 
-    impl<'a, TX> DmaTxFuture<'a, TX>
+    impl<'a, CH> DmaTxFuture<'a, CH>
     where
-        TX: Tx,
+        CH: DmaTxChannel,
     {
         #[cfg_attr(esp32c2, allow(dead_code))]
-        pub fn new(tx: &'a mut TX) -> Self {
+        pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
             Self { tx }
         }
     }
 
-    impl<TX> core::future::Future for DmaTxFuture<'_, TX>
+    impl<CH> core::future::Future for DmaTxFuture<'_, CH>
     where
-        TX: Tx,
+        CH: DmaTxChannel,
     {
         type Output = Result<(), DmaError>;
 
@@ -2951,9 +2881,9 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<TX> Drop for DmaTxFuture<'_, TX>
+    impl<CH> Drop for DmaTxFuture<'_, CH>
     where
-        TX: Tx,
+        CH: DmaTxChannel,
     {
         fn drop(&mut self) {
             self.tx
@@ -2962,25 +2892,25 @@ pub(crate) mod asynch {
     }
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct DmaRxFuture<'a, RX>
+    pub struct DmaRxFuture<'a, CH>
     where
-        RX: Rx,
+        CH: DmaRxChannel,
     {
-        pub(crate) rx: &'a mut RX,
+        pub(crate) rx: &'a mut ChannelRx<Async, CH>,
     }
 
-    impl<'a, RX> DmaRxFuture<'a, RX>
+    impl<'a, CH> DmaRxFuture<'a, CH>
     where
-        RX: Rx,
+        CH: DmaRxChannel,
     {
-        pub fn new(rx: &'a mut RX) -> Self {
+        pub fn new(rx: &'a mut ChannelRx<Async, CH>) -> Self {
             Self { rx }
         }
     }
 
-    impl<RX> core::future::Future for DmaRxFuture<'_, RX>
+    impl<CH> core::future::Future for DmaRxFuture<'_, CH>
     where
-        RX: Rx,
+        CH: DmaRxChannel,
     {
         type Output = Result<(), DmaError>;
 
@@ -3011,9 +2941,9 @@ pub(crate) mod asynch {
         }
     }
 
-    impl<RX> Drop for DmaRxFuture<'_, RX>
+    impl<CH> Drop for DmaRxFuture<'_, CH>
     where
-        RX: Rx,
+        CH: DmaRxChannel,
     {
         fn drop(&mut self) {
             self.rx.unlisten_in(
@@ -3025,28 +2955,28 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    pub struct DmaTxDoneChFuture<'a, TX>
+    pub struct DmaTxDoneChFuture<'a, CH>
     where
-        TX: Tx,
+        CH: DmaTxChannel,
     {
-        pub(crate) tx: &'a mut TX,
+        pub(crate) tx: &'a mut ChannelTx<Async, CH>,
         _a: (),
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, TX> DmaTxDoneChFuture<'a, TX>
+    impl<'a, CH> DmaTxDoneChFuture<'a, CH>
     where
-        TX: Tx,
+        CH: DmaTxChannel,
     {
-        pub fn new(tx: &'a mut TX) -> Self {
+        pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
             Self { tx, _a: () }
         }
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<TX> core::future::Future for DmaTxDoneChFuture<'_, TX>
+    impl<CH> core::future::Future for DmaTxDoneChFuture<'_, CH>
     where
-        TX: Tx,
+        CH: DmaTxChannel,
     {
         type Output = Result<(), DmaError>;
 
@@ -3078,9 +3008,9 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<TX> Drop for DmaTxDoneChFuture<'_, TX>
+    impl<CH> Drop for DmaTxDoneChFuture<'_, CH>
     where
-        TX: Tx,
+        CH: DmaTxChannel,
     {
         fn drop(&mut self) {
             self.tx
@@ -3089,28 +3019,28 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    pub struct DmaRxDoneChFuture<'a, RX>
+    pub struct DmaRxDoneChFuture<'a, CH>
     where
-        RX: Rx,
+        CH: DmaRxChannel,
     {
-        pub(crate) rx: &'a mut RX,
+        pub(crate) rx: &'a mut ChannelRx<Async, CH>,
         _a: (),
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<'a, RX> DmaRxDoneChFuture<'a, RX>
+    impl<'a, CH> DmaRxDoneChFuture<'a, CH>
     where
-        RX: Rx,
+        CH: DmaRxChannel,
     {
-        pub fn new(rx: &'a mut RX) -> Self {
+        pub fn new(rx: &'a mut ChannelRx<Async, CH>) -> Self {
             Self { rx, _a: () }
         }
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<RX> core::future::Future for DmaRxDoneChFuture<'_, RX>
+    impl<CH> core::future::Future for DmaRxDoneChFuture<'_, CH>
     where
-        RX: Rx,
+        CH: DmaRxChannel,
     {
         type Output = Result<(), DmaError>;
 
@@ -3146,9 +3076,9 @@ pub(crate) mod asynch {
     }
 
     #[cfg(any(i2s0, i2s1))]
-    impl<RX> Drop for DmaRxDoneChFuture<'_, RX>
+    impl<CH> Drop for DmaRxDoneChFuture<'_, CH>
     where
-        RX: Rx,
+        CH: DmaRxChannel,
     {
         fn drop(&mut self) {
             self.rx.unlisten_in(

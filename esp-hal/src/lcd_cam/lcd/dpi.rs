@@ -103,7 +103,7 @@ use core::{
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, Tx, TxChannelFor},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
     gpio::{interconnect::PeripheralOutput, Level, OutputSignal},
     lcd_cam::{
         calculate_clkm,

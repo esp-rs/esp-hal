@@ -13,8 +13,6 @@ use crate::{
         DmaPeripheral,
         DmaTransferRx,
         ReadBuffer,
-        Rx,
-        Tx,
         WriteBuffer,
     },
     Async,
@@ -150,6 +148,8 @@ impl<Dm> DmaSupport for Mem2Mem<'_, Dm>
 where
     Dm: DriverMode,
 {
+    type DriverMode = Dm;
+
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         while !self.channel.rx.is_done() {}
     }
@@ -163,9 +163,9 @@ impl<'d, Dm> DmaSupportRx for Mem2Mem<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type RX = ChannelRx<Dm, AnyGdmaRxChannel<'d>>;
+    type Channel = AnyGdmaRxChannel<'d>;
 
-    fn rx(&mut self) -> &mut Self::RX {
+    fn rx(&mut self) -> &mut ChannelRx<Self::DriverMode, Self::Channel> {
         &mut self.channel.rx
     }
 

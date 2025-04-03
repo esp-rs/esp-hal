@@ -48,7 +48,7 @@ use super::{BitOrder, DataMode, DmaError, Error, Mode};
 use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
-    dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
+    dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer},
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -1470,6 +1470,106 @@ mod dma {
             fence(Ordering::Acquire);
         }
 
+        /// # Safety:
+        ///
+        /// The caller must ensure to not access the buffer contents while the
+        /// transfer is in progress. Moving the buffer itself is allowed.
+        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        unsafe fn start_transfer_dma<RX: DmaRxBuffer, TX: DmaTxBuffer>(
+            &mut self,
+            full_duplex: bool,
+            bytes_to_read: usize,
+            bytes_to_write: usize,
+            rx_buffer: &mut RX,
+            tx_buffer: &mut TX,
+        ) -> Result<(), Error> {
+            if bytes_to_read > MAX_DMA_SIZE || bytes_to_write > MAX_DMA_SIZE {
+                return Err(Error::MaxDmaTransferSizeExceeded);
+            }
+
+            self.rx_transfer_in_progress = bytes_to_read > 0;
+            self.tx_transfer_in_progress = bytes_to_write > 0;
+            unsafe {
+                self.dma_driver().start_transfer_dma(
+                    full_duplex,
+                    bytes_to_read,
+                    bytes_to_write,
+                    rx_buffer,
+                    tx_buffer,
+                    &mut self.channel,
+                )
+            }
+        }
+
+        #[cfg(all(esp32, spi_address_workaround))]
+        fn set_up_address_workaround(
+            &mut self,
+            cmd: Command,
+            address: Address,
+            dummy: u8,
+        ) -> Result<(), Error> {
+            if dummy > 0 {
+                // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                error!("Dummy bits are not supported when there is no data to write");
+                return Err(Error::Unsupported);
+            }
+
+            let bytes_to_write = address.width().div_ceil(8);
+            // The address register is read in big-endian order,
+            // we have to prepare the emulated write in the same way.
+            let addr_bytes = address.value().to_be_bytes();
+            let addr_bytes = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
+            self.address_buffer.fill(addr_bytes);
+
+            self.driver().setup_half_duplex(
+                true,
+                cmd,
+                Address::None,
+                false,
+                dummy,
+                bytes_to_write == 0,
+                address.mode(),
+            )?;
+
+            // FIXME: we could use self.start_transfer_dma if the address buffer was part of
+            // the (yet-to-be-created) State struct.
+            self.tx_transfer_in_progress = true;
+            unsafe {
+                self.dma_driver().start_transfer_dma(
+                    false,
+                    0,
+                    bytes_to_write,
+                    &mut EmptyBuf,
+                    &mut self.address_buffer,
+                    &mut self.channel,
+                )
+            }
+        }
+
+        fn cancel_transfer(&mut self) {
+            // The SPI peripheral is controlling how much data we transfer, so let's
+            // update its counter.
+            // 0 doesn't take effect on ESP32 and cuts the currently transmitted byte
+            // immediately.
+            // 1 seems to stop after transmitting the current byte which is somewhat less
+            // impolite.
+            if self.tx_transfer_in_progress || self.rx_transfer_in_progress {
+                self.dma_driver().abort_transfer();
+
+                // We need to stop the DMA transfer, too.
+                if self.tx_transfer_in_progress {
+                    self.channel.tx.stop_transfer();
+                    self.tx_transfer_in_progress = false;
+                }
+                if self.rx_transfer_in_progress {
+                    self.channel.rx.stop_transfer();
+                    self.rx_transfer_in_progress = false;
+                }
+            }
+        }
+    }
+
+    impl SpiDma<'_, Async> {
         async fn wait_for_idle_async(&mut self) {
             if self.rx_transfer_in_progress {
                 _ = DmaRxFuture::new(&mut self.channel.rx).await;
@@ -1516,106 +1616,6 @@ mod dma {
                     self.channel.tx.stop_transfer();
                 }
                 self.tx_transfer_in_progress = false;
-            }
-        }
-
-        /// # Safety:
-        ///
-        /// The caller must ensure to not access the buffer contents while the
-        /// transfer is in progress. Moving the buffer itself is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
-        unsafe fn start_transfer_dma<RX: DmaRxBuffer, TX: DmaTxBuffer>(
-            &mut self,
-            full_duplex: bool,
-            bytes_to_read: usize,
-            bytes_to_write: usize,
-            rx_buffer: &mut RX,
-            tx_buffer: &mut TX,
-        ) -> Result<(), Error> {
-            if bytes_to_read > MAX_DMA_SIZE || bytes_to_write > MAX_DMA_SIZE {
-                return Err(Error::MaxDmaTransferSizeExceeded);
-            }
-
-            self.rx_transfer_in_progress = bytes_to_read > 0;
-            self.tx_transfer_in_progress = bytes_to_write > 0;
-            unsafe {
-                self.dma_driver().start_transfer_dma(
-                    full_duplex,
-                    bytes_to_read,
-                    bytes_to_write,
-                    rx_buffer,
-                    tx_buffer,
-                    &mut self.channel.rx,
-                    &mut self.channel.tx,
-                )
-            }
-        }
-
-        #[cfg(all(esp32, spi_address_workaround))]
-        fn set_up_address_workaround(
-            &mut self,
-            cmd: Command,
-            address: Address,
-            dummy: u8,
-        ) -> Result<(), Error> {
-            if dummy > 0 {
-                // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
-                error!("Dummy bits are not supported when there is no data to write");
-                return Err(Error::Unsupported);
-            }
-
-            let bytes_to_write = address.width().div_ceil(8);
-            // The address register is read in big-endian order,
-            // we have to prepare the emulated write in the same way.
-            let addr_bytes = address.value().to_be_bytes();
-            let addr_bytes = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
-            self.address_buffer.fill(addr_bytes);
-
-            self.driver().setup_half_duplex(
-                true,
-                cmd,
-                Address::None,
-                false,
-                dummy,
-                bytes_to_write == 0,
-                address.mode(),
-            )?;
-
-            // FIXME: we could use self.start_transfer_dma if the address buffer was part of
-            // the (yet-to-be-created) State struct.
-            self.tx_transfer_in_progress = true;
-            unsafe {
-                self.dma_driver().start_transfer_dma(
-                    false,
-                    0,
-                    bytes_to_write,
-                    &mut EmptyBuf,
-                    &mut self.address_buffer,
-                    &mut self.channel.rx,
-                    &mut self.channel.tx,
-                )
-            }
-        }
-
-        fn cancel_transfer(&mut self) {
-            // The SPI peripheral is controlling how much data we transfer, so let's
-            // update its counter.
-            // 0 doesn't take effect on ESP32 and cuts the currently transmitted byte
-            // immediately.
-            // 1 seems to stop after transmitting the current byte which is somewhat less
-            // impolite.
-            if self.tx_transfer_in_progress || self.rx_transfer_in_progress {
-                self.dma_driver().abort_transfer();
-
-                // We need to stop the DMA transfer, too.
-                if self.tx_transfer_in_progress {
-                    self.channel.tx.stop_transfer();
-                    self.tx_transfer_in_progress = false;
-                }
-                if self.rx_transfer_in_progress {
-                    self.channel.rx.stop_transfer();
-                    self.rx_transfer_in_progress = false;
-                }
             }
         }
     }
@@ -2748,15 +2748,14 @@ impl DmaDriver {
 
     #[allow(clippy::too_many_arguments)]
     #[cfg_attr(place_spi_driver_in_ram, ram)]
-    unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
+    unsafe fn start_transfer_dma<Dm: DriverMode>(
         &self,
         _full_duplex: bool,
         rx_len: usize,
         tx_len: usize,
         rx_buffer: &mut impl DmaRxBuffer,
         tx_buffer: &mut impl DmaTxBuffer,
-        rx: &mut RX,
-        tx: &mut TX,
+        channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
     ) -> Result<(), Error> {
         #[cfg(esp32s2)]
         {
@@ -2775,8 +2774,10 @@ impl DmaDriver {
         self.enable_dma();
 
         if rx_len > 0 {
-            rx.prepare_transfer(self.dma_peripheral, rx_buffer)
-                .and_then(|_| rx.start_transfer())?;
+            channel
+                .rx
+                .prepare_transfer(self.dma_peripheral, rx_buffer)
+                .and_then(|_| channel.rx.start_transfer())?;
         } else {
             #[cfg(esp32)]
             {
@@ -2793,8 +2794,10 @@ impl DmaDriver {
             }
         }
         if tx_len > 0 {
-            tx.prepare_transfer(self.dma_peripheral, tx_buffer)
-                .and_then(|_| tx.start_transfer())?;
+            channel
+                .tx
+                .prepare_transfer(self.dma_peripheral, tx_buffer)
+                .and_then(|_| channel.tx.start_transfer())?;
         }
 
         #[cfg(gdma)]
@@ -3848,6 +3851,8 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+use crate::dma::{Channel, PeripheralDmaChannel};
 
 impl Future for SpiFuture<'_> {
     type Output = ();

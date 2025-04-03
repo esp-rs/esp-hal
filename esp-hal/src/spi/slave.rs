@@ -172,8 +172,6 @@ pub mod dma {
             DmaTxBuffer,
             EmptyBuf,
             PeripheralDmaChannel,
-            Rx,
-            Tx,
         },
         DriverMode,
     };
@@ -259,8 +257,7 @@ pub mod dma {
                     bytes_to_write,
                     &mut EmptyBuf,
                     &mut buffer,
-                    &mut self.channel.rx,
-                    &mut self.channel.tx,
+                    &mut self.channel,
                 )
             };
             if let Err(err) = result {
@@ -295,8 +292,7 @@ pub mod dma {
                     0,
                     &mut buffer,
                     &mut EmptyBuf,
-                    &mut self.channel.rx,
-                    &mut self.channel.tx,
+                    &mut self.channel,
                 )
             };
             if let Err(err) = result {
@@ -341,8 +337,7 @@ pub mod dma {
                     bytes_to_write,
                     &mut rx_buffer,
                     &mut tx_buffer,
-                    &mut self.channel.rx,
-                    &mut self.channel.tx,
+                    &mut self.channel,
                 )
             };
             if let Err(err) = result {
@@ -462,29 +457,28 @@ pub mod dma {
         }
 
         #[allow(clippy::too_many_arguments)]
-        unsafe fn start_transfer_dma<RX, TX>(
+        unsafe fn start_transfer_dma<Dm: DriverMode>(
             &self,
             read_buffer_len: usize,
             write_buffer_len: usize,
             rx_buffer: &mut impl DmaRxBuffer,
             tx_buffer: &mut impl DmaTxBuffer,
-            rx: &mut RX,
-            tx: &mut TX,
-        ) -> Result<(), Error>
-        where
-            RX: Rx,
-            TX: Tx,
-        {
+            channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
+        ) -> Result<(), Error> {
             self.enable_dma();
 
             self.info.reset_spi();
 
             if read_buffer_len > 0 {
-                rx.prepare_transfer(self.dma_peripheral, rx_buffer)?;
+                channel
+                    .rx
+                    .prepare_transfer(self.dma_peripheral, rx_buffer)?;
             }
 
             if write_buffer_len > 0 {
-                tx.prepare_transfer(self.dma_peripheral, tx_buffer)?;
+                channel
+                    .tx
+                    .prepare_transfer(self.dma_peripheral, tx_buffer)?;
             }
 
             #[cfg(esp32)]
@@ -503,11 +497,11 @@ pub mod dma {
             self.regs().cmd().modify(|_, w| w.usr().set_bit());
 
             if read_buffer_len > 0 {
-                rx.start_transfer()?;
+                channel.rx.start_transfer()?;
             }
 
             if write_buffer_len > 0 {
-                tx.start_transfer()?;
+                channel.tx.start_transfer()?;
             }
 
             Ok(())
