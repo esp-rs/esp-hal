@@ -31,7 +31,7 @@ impl<'a> PartitionEntry<'a> {
 
     /// The magic value of the entry.
     pub fn magic(&self) -> u16 {
-        u16::from_le_bytes(self.binary[..2].try_into().unwrap())
+        u16::from_le_bytes(unwrap!(self.binary[..2].try_into()))
     }
 
     /// The partition type in raw representation.
@@ -46,12 +46,12 @@ impl<'a> PartitionEntry<'a> {
 
     /// Offset of the partition on flash.
     pub fn offset(&self) -> u32 {
-        u32::from_le_bytes(self.binary[4..][..4].try_into().unwrap())
+        u32::from_le_bytes(unwrap!(self.binary[4..][..4].try_into()))
     }
 
     /// Length of the partition in bytes.
     pub fn len(&self) -> u32 {
-        u32::from_le_bytes(self.binary[8..][..4].try_into().unwrap())
+        u32::from_le_bytes(unwrap!(self.binary[8..][..4].try_into()))
     }
 
     /// Checks for a zero-length partition.
@@ -79,7 +79,7 @@ impl<'a> PartitionEntry<'a> {
     /// Raw flags of this partition. You probably want to use
     /// [Self::is_read_only] and [Self::is_encrypted] instead.
     pub fn flags(&self) -> u32 {
-        u32::from_le_bytes(self.binary[28..][..4].try_into().unwrap())
+        u32::from_le_bytes(unwrap!(self.binary[28..][..4].try_into()))
     }
 
     /// If the partition is read only.
@@ -95,10 +95,10 @@ impl<'a> PartitionEntry<'a> {
     /// The partition type (type and sub-type).
     pub fn partition_type(&self) -> PartitionType {
         match self.raw_type() {
-            0 => PartitionType::App(self.raw_subtype().try_into().unwrap()),
-            1 => PartitionType::Data(self.raw_subtype().try_into().unwrap()),
-            2 => PartitionType::Bootloader(self.raw_subtype().try_into().unwrap()),
-            3 => PartitionType::PartitionTable(self.raw_subtype().try_into().unwrap()),
+            0 => PartitionType::App(unwrap!(self.raw_subtype().try_into())),
+            1 => PartitionType::Data(unwrap!(self.raw_subtype().try_into())),
+            2 => PartitionType::Bootloader(unwrap!(self.raw_subtype().try_into())),
+            3 => PartitionType::PartitionTable(unwrap!(self.raw_subtype().try_into())),
             _ => unreachable!(),
         }
     }
