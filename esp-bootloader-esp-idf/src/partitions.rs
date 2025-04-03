@@ -255,10 +255,8 @@ impl<'a> PartitionTable<'a> {
                     if i == raw.entries {
                         break;
                     }
-
-                    if i > raw.entries {
-                        return Err(Error::Invalid);
-                    }
+                } else {
+                    return Err(Error::Invalid);
                 }
             }
             i
@@ -787,6 +785,16 @@ mod tests {
             PartitionTable::new(&SIMPLE[..RAW_ENTRY_LEN * 3]),
             Err(Error::Invalid)
         ));
+    }
+
+    #[test]
+    fn validation_fails_wo_hash_max_entries() {
+        let mut data = [0u8; PARTITION_TABLE_MAX_LEN];
+        for i in 0..96 {
+            data[(i * RAW_ENTRY_LEN)..][..RAW_ENTRY_LEN].copy_from_slice(&SIMPLE[..32]);
+        }
+
+        assert!(matches!(PartitionTable::new(&data), Err(Error::Invalid)));
     }
 
     #[test]
