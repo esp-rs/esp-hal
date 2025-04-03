@@ -91,7 +91,7 @@
 //! you will need it for the `Box` and `Vec` types.
 //!
 //! ```toml
-//! allocator-api2 = { version = "0.2", features = ["alloc"] }
+//! allocator-api2 = { version = "0.2", default-features = false, features = ["alloc"] }
 //! ```
 //!
 //! With this, you can use the `Box` and `Vec` types from `allocator_api2`, with
