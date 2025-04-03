@@ -4,7 +4,7 @@ pub mod event;
 mod internal;
 pub(crate) mod os_adapter;
 pub(crate) mod state;
-use alloc::collections::vec_deque::VecDeque;
+use alloc::{collections::vec_deque::VecDeque, string::String};
 use core::{
     fmt::Debug,
     marker::PhantomData,
@@ -222,7 +222,9 @@ pub enum SecondaryChannel {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointInfo {
     /// The SSID of the access point.
-    pub ssid: heapless::String<32>,
+    // TODO: we can use the `alloc` feature once we have `defmt` 1.0.2
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+    pub ssid: String,
 
     /// The BSSID (MAC address) of the access point.
     pub bssid: [u8; 6],
@@ -236,21 +238,16 @@ pub struct AccessPointInfo {
     /// The signal strength of the access point (RSSI).
     pub signal_strength: i8,
 
-    /// The set of protocols supported by the access point.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
-    pub protocols: EnumSet<Protocol>,
-
     /// The authentication method used by the access point.
     pub auth_method: Option<AuthMethod>,
 }
 
 /// Configuration for a Wi-Fi access point.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AccessPointConfiguration {
     /// The SSID of the access point.
-    pub ssid: heapless::String<32>,
+    pub ssid: String,
 
     /// Whether the SSID is hidden or visible.
     pub ssid_hidden: bool,
@@ -262,41 +259,112 @@ pub struct AccessPointConfiguration {
     pub secondary_channel: Option<u8>,
 
     /// The set of protocols supported by the access point.
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
     pub protocols: EnumSet<Protocol>,
 
     /// The authentication method to be used by the access point.
     pub auth_method: AuthMethod,
 
     /// The password for securing the access point (if applicable).
-    pub password: heapless::String<64>,
+    pub password: String,
 
     /// The maximum number of connections allowed on the access point.
     pub max_connections: u16,
 }
 
+impl AccessPointConfiguration {
+    fn validate(&self) -> Result<(), WifiError> {
+        if self.ssid.len() > 32 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if self.password.len() > 64 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        Ok(())
+    }
+}
+
 impl Default for AccessPointConfiguration {
     fn default() -> Self {
         Self {
-            ssid: unwrap!("iot-device".try_into()),
+            ssid: String::from("iot-device"),
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
-            protocols: Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN,
+            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
             auth_method: AuthMethod::None,
-            password: heapless::String::new(),
+            password: String::new(),
             max_connections: 255,
         }
     }
 }
 
+impl core::fmt::Debug for AccessPointConfiguration {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AccessPointConfiguration")
+            .field("ssid", &self.ssid)
+            .field("ssid_hidden", &self.ssid_hidden)
+            .field("channel", &self.channel)
+            .field("secondary_channel", &self.secondary_channel)
+            .field("protocols", &self.protocols)
+            .field("auth_method", &self.auth_method)
+            .field("password", &"**REDACTED**")
+            .field("max_connections", &self.max_connections)
+            .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for AccessPointConfiguration {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Default)]
+        #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+        pub struct ProtocolSet(EnumSet<Protocol>);
+
+        #[cfg(feature = "defmt")]
+        impl defmt::Format for ProtocolSet {
+            fn format(&self, fmt: defmt::Formatter<'_>) {
+                for (i, p) in self.0.into_iter().enumerate() {
+                    if i > 0 {
+                        defmt::write!(fmt, " ");
+                    }
+                    defmt::write!(fmt, "{}", p);
+                }
+            }
+        }
+
+        let protocol_set = ProtocolSet(self.protocols);
+
+        defmt::write!(
+            fmt,
+            "AccessPointConfiguration {{\
+            ssid: {}, \
+            ssid_hidden: {}, \
+            channel: {}, \
+            secondary_channel: {}, \
+            protocols: {}, \
+            auth_method: {}, \
+            password: **REDACTED**, \
+            max_connections: {}, \
+            }}",
+            self.ssid.as_str(),
+            self.ssid_hidden,
+            self.channel,
+            self.secondary_channel,
+            protocol_set,
+            self.auth_method,
+            self.max_connections
+        );
+    }
+}
+
 /// Client configuration for a Wi-Fi connection.
-#[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ClientConfiguration {
     /// The SSID of the Wi-Fi network.
-    pub ssid: heapless::String<32>,
+    pub ssid: String,
 
     /// The BSSID (MAC address) of the client.
     pub bssid: Option<[u8; 6]>,
@@ -306,217 +374,55 @@ pub struct ClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The password for the Wi-Fi connection.
-    pub password: heapless::String<64>,
+    pub password: String,
 
     /// The Wi-Fi channel to connect to.
     pub channel: Option<u8>,
 }
 
-impl Debug for ClientConfiguration {
+impl ClientConfiguration {
+    fn validate(&self) -> Result<(), WifiError> {
+        if self.ssid.len() > 32 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if self.password.len() > 64 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        Ok(())
+    }
+}
+
+impl core::fmt::Debug for ClientConfiguration {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ClientConfiguration")
             .field("ssid", &self.ssid)
             .field("bssid", &self.bssid)
             .field("auth_method", &self.auth_method)
+            .field("password", &"**REDACTED**")
             .field("channel", &self.channel)
             .finish()
     }
 }
 
-impl Default for ClientConfiguration {
-    fn default() -> Self {
-        ClientConfiguration {
-            ssid: heapless::String::new(),
-            bssid: None,
-            auth_method: Default::default(),
-            password: heapless::String::new(),
-            channel: None,
-        }
-    }
-}
-
-#[cfg(feature = "csi")]
-pub(crate) trait CsiCallback: FnMut(crate::binary::include::wifi_csi_info_t) {}
-
-#[cfg(feature = "csi")]
-impl<T> CsiCallback for T where T: FnMut(crate::binary::include::wifi_csi_info_t) {}
-
-#[cfg(feature = "csi")]
-unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
-    ctx: *mut crate::wifi::c_types::c_void,
-    data: *mut crate::binary::include::wifi_csi_info_t,
-) {
-    let csi_callback = unsafe { &mut *(ctx as *mut C) };
-    csi_callback(*data);
-}
-
-#[derive(Clone, PartialEq, Eq)]
-// https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
-/// Channel state information(CSI) configuration
-#[cfg(all(not(esp32c6), feature = "csi"))]
-pub struct CsiConfig {
-    /// Enable to receive legacy long training field(lltf) data.
-    pub lltf_en: bool,
-    /// Enable to receive HT long training field(htltf) data.
-    pub htltf_en: bool,
-    /// Enable to receive space time block code HT long training
-    /// field(stbc-htltf2) data.
-    pub stbc_htltf2_en: bool,
-    /// Enable to generate htlft data by averaging lltf and ht_ltf data when
-    /// receiving HT packet. Otherwise, use ht_ltf data directly.
-    pub ltf_merge_en: bool,
-    /// Enable to turn on channel filter to smooth adjacent sub-carrier. Disable
-    /// it to keep independence of adjacent sub-carrier.
-    pub channel_filter_en: bool,
-    /// Manually scale the CSI data by left shifting or automatically scale the
-    /// CSI data. If set true, please set the shift bits. false: automatically.
-    /// true: manually.
-    pub manu_scale: bool,
-    /// Manually left shift bits of the scale of the CSI data. The range of the
-    /// left shift bits is 0~15.
-    pub shift: u8,
-    /// Enable to dump 802.11 ACK frame.
-    pub dump_ack_en: bool,
-}
-
-#[derive(Clone, PartialEq, Eq)]
-#[cfg(all(esp32c6, feature = "csi"))]
-// See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
-pub struct CsiConfig {
-    /// Enable to acquire CSI.
-    pub enable: u32,
-    /// Enable to acquire L-LTF when receiving a 11g PPDU.
-    pub acquire_csi_legacy: u32,
-    /// Enable to acquire HT-LTF when receiving an HT20 PPDU.
-    pub acquire_csi_ht20: u32,
-    /// Enable to acquire HT-LTF when receiving an HT40 PPDU.
-    pub acquire_csi_ht40: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 SU PPDU.
-    pub acquire_csi_su: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 MU PPDU.
-    pub acquire_csi_mu: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 DCM applied PPDU.
-    pub acquire_csi_dcm: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 Beamformed applied PPDU.
-    pub acquire_csi_beamformed: u32,
-    /// When receiving an STBC applied HE PPDU, 0- acquire the complete
-    /// HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the
-    /// HE-LTF1 and HE-LTF2.
-    pub acquire_csi_he_stbc: u32,
-    /// Vvalue 0-3.
-    pub val_scale_cfg: u32,
-    /// Enable to dump 802.11 ACK frame, default disabled.
-    pub dump_ack_en: u32,
-    /// Reserved.
-    pub reserved: u32,
-}
-
-#[cfg(feature = "csi")]
-impl Default for CsiConfig {
-    #[cfg(not(esp32c6))]
-    fn default() -> Self {
-        Self {
-            lltf_en: true,
-            htltf_en: true,
-            stbc_htltf2_en: true,
-            ltf_merge_en: true,
-            channel_filter_en: true,
-            manu_scale: false,
-            shift: 0,
-            dump_ack_en: false,
-        }
-    }
-
-    #[cfg(esp32c6)]
-    fn default() -> Self {
-        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi_he_types.h#L67-L82
-        Self {
-            enable: 1,
-            acquire_csi_legacy: 1,
-            acquire_csi_ht20: 1,
-            acquire_csi_ht40: 1,
-            acquire_csi_su: 1,
-            acquire_csi_mu: 1,
-            acquire_csi_dcm: 1,
-            acquire_csi_beamformed: 1,
-            acquire_csi_he_stbc: 2,
-            val_scale_cfg: 2,
-            dump_ack_en: 1,
-            reserved: 19,
-        }
-    }
-}
-
-#[cfg(feature = "csi")]
-impl From<CsiConfig> for wifi_csi_config_t {
-    fn from(config: CsiConfig) -> Self {
-        #[cfg(not(esp32c6))]
-        {
-            wifi_csi_config_t {
-                lltf_en: config.lltf_en,
-                htltf_en: config.htltf_en,
-                stbc_htltf2_en: config.stbc_htltf2_en,
-                ltf_merge_en: config.ltf_merge_en,
-                channel_filter_en: config.channel_filter_en,
-                manu_scale: config.manu_scale,
-                shift: config.shift,
-                dump_ack_en: config.dump_ack_en,
-            }
-        }
-        #[cfg(esp32c6)]
-        {
-            wifi_csi_acquire_config_t {
-                _bitfield_align_1: [0; 0],
-                _bitfield_1: wifi_csi_acquire_config_t::new_bitfield_1(
-                    config.enable,
-                    config.acquire_csi_legacy,
-                    config.acquire_csi_ht20,
-                    config.acquire_csi_ht40,
-                    config.acquire_csi_su,
-                    config.acquire_csi_mu,
-                    config.acquire_csi_dcm,
-                    config.acquire_csi_beamformed,
-                    config.acquire_csi_he_stbc,
-                    config.val_scale_cfg,
-                    config.dump_ack_en,
-                    config.reserved,
-                ),
-            }
-        }
-    }
-}
-
-#[cfg(feature = "csi")]
-impl CsiConfig {
-    /// Set CSI data configuration
-    pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
-        let conf: wifi_csi_config_t = self.clone().into();
-
-        unsafe {
-            esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
-        }
-        Ok(())
-    }
-
-    /// Register the RX callback function of CSI data. Each time a CSI data is
-    /// received, the callback function will be called.
-    pub(crate) fn set_receive_cb<C: CsiCallback>(&mut self, cb: C) -> Result<(), WifiError> {
-        let cb = alloc::boxed::Box::new(cb);
-        let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut crate::wifi::c_types::c_void;
-
-        unsafe {
-            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(csi_rx_cb::<C>), cb_ptr))?;
-        }
-        Ok(())
-    }
-
-    /// Enable or disable CSI
-    pub(crate) fn set_csi(&self, enable: bool) -> Result<(), WifiError> {
-        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1241
-        unsafe {
-            esp_wifi_result!(esp_wifi_set_csi(enable))?;
-        }
-        Ok(())
+#[cfg(feature = "defmt")]
+impl defmt::Format for ClientConfiguration {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(
+            fmt,
+            "ClientConfiguration {{\
+            ssid: {}, \
+            bssid: {:?}, \
+            auth_method: {:?}, \
+            password: **REDACTED**, \
+            channel: {:?}, \
+            }}",
+            self.ssid.as_str(),
+            self.bssid,
+            self.auth_method,
+            self.channel
+        )
     }
 }
 
@@ -579,11 +485,10 @@ impl TtlsPhase2Method {
 
 /// Configuration for an EAP (Extensible Authentication Protocol) client.
 #[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct EapClientConfiguration {
     /// The SSID of the network the client is connecting to.
-    pub ssid: heapless::String<32>,
+    pub ssid: String,
 
     /// The BSSID (MAC Address) of the specific access point.
     pub bssid: Option<[u8; 6]>,
@@ -593,18 +498,18 @@ pub struct EapClientConfiguration {
     pub auth_method: AuthMethod,
 
     /// The identity used during authentication.
-    pub identity: Option<heapless::String<128>>,
+    pub identity: Option<String>,
 
     /// The username used for inner authentication.
     /// Some EAP methods require a username for authentication.
-    pub username: Option<heapless::String<128>>,
+    pub username: Option<String>,
 
     /// The password used for inner authentication.
-    pub password: Option<heapless::String<64>>,
+    pub password: Option<String>,
 
     /// A new password to be set during the authentication process.
     /// Some methods support password changes during authentication.
-    pub new_password: Option<heapless::String<64>>,
+    pub new_password: Option<String>,
 
     /// Configuration for EAP-FAST.
     pub eap_fast_config: Option<EapFastConfig>,
@@ -632,6 +537,32 @@ pub struct EapClientConfiguration {
     pub channel: Option<u8>,
 }
 
+impl EapClientConfiguration {
+    fn validate(&self) -> Result<(), WifiError> {
+        if self.ssid.len() > 32 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if self.identity.as_ref().unwrap_or(&String::new()).len() > 128 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if self.username.as_ref().unwrap_or(&String::new()).len() > 128 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if self.password.as_ref().unwrap_or(&String::new()).len() > 64 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if self.new_password.as_ref().unwrap_or(&String::new()).len() > 64 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        Ok(())
+    }
+}
+
 impl Debug for EapClientConfiguration {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("EapClientConfiguration")
@@ -641,23 +572,58 @@ impl Debug for EapClientConfiguration {
             .field("channel", &self.channel)
             .field("identity", &self.identity)
             .field("username", &self.username)
+            .field("password", &"**REDACTED**")
+            .field("new_password", &"**REDACTED**")
             .field("eap_fast_config", &self.eap_fast_config)
             .field("time_check", &self.time_check)
             .field("pac_file set", &self.pac_file.is_some())
             .field("ca_cert set", &self.ca_cert.is_some())
-            .field(
-                "certificate_and_key set",
-                &self.certificate_and_key.is_some(),
-            )
+            .field("certificate_and_key set", &"**REDACTED**")
             .field("ttls_phase2_method", &self.ttls_phase2_method)
             .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for EapClientConfiguration {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(
+            fmt,
+            "EapClientConfiguration {{\
+            ssid: {}, \
+            bssid: {:?}, \
+            auth_method: {:?}, \
+            channel: {:?}, \
+            identity: {:?}, \
+            username: {:?}, \
+            password: **REDACTED**, \
+            new_password: **REDACTED**, \
+            eap_fast_config: {:?}, \
+            time_check: {}, \
+            pac_file: {}, \
+            ca_cert: {}, \
+            certificate_and_key: **REDACTED**, \
+            ttls_phase2_method: {:?}, \
+            }}",
+            self.ssid.as_str(),
+            self.bssid,
+            self.auth_method,
+            self.channel,
+            &self.identity.as_ref().map_or("", |v| v.as_str()),
+            &self.username.as_ref().map_or("", |v| v.as_str()),
+            self.eap_fast_config,
+            self.time_check,
+            self.pac_file,
+            self.ca_cert,
+            self.ttls_phase2_method,
+        )
     }
 }
 
 impl Default for EapClientConfiguration {
     fn default() -> Self {
         EapClientConfiguration {
-            ssid: heapless::String::new(),
+            ssid: String::new(),
             bssid: None,
             auth_method: AuthMethod::WPA2Enterprise,
             identity: None,
@@ -693,10 +659,9 @@ pub enum Capability {
 }
 
 /// Configuration of Wi-Fi operation mode.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Default)]
 #[allow(clippy::large_enum_variant)]
 pub enum Configuration {
     /// No configuration (default).
@@ -718,6 +683,23 @@ pub enum Configuration {
 }
 
 impl Configuration {
+    fn validate(&self) -> Result<(), WifiError> {
+        match self {
+            Configuration::None => Ok(()),
+            Configuration::Client(client_configuration) => client_configuration.validate(),
+            Configuration::AccessPoint(access_point_configuration) => {
+                access_point_configuration.validate()
+            }
+            Configuration::Mixed(client_configuration, access_point_configuration) => {
+                client_configuration.validate()?;
+                access_point_configuration.validate()
+            }
+            Configuration::EapClient(eap_client_configuration) => {
+                eap_client_configuration.validate()
+            }
+        }
+    }
+
     /// Returns a reference to the client configuration if available.
     pub fn as_client_conf_ref(&self) -> Option<&ClientConfiguration> {
         match self {
@@ -930,6 +912,191 @@ impl From<WifiMode> for wifi_mode_t {
     }
 }
 
+#[cfg(feature = "csi")]
+pub(crate) trait CsiCallback: FnMut(crate::binary::include::wifi_csi_info_t) {}
+
+#[cfg(feature = "csi")]
+impl<T> CsiCallback for T where T: FnMut(crate::binary::include::wifi_csi_info_t) {}
+
+#[cfg(feature = "csi")]
+unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
+    ctx: *mut crate::wifi::c_types::c_void,
+    data: *mut crate::binary::include::wifi_csi_info_t,
+) {
+    let csi_callback = unsafe { &mut *(ctx as *mut C) };
+    csi_callback(*data);
+}
+
+#[derive(Clone, PartialEq, Eq)]
+// https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
+/// Channel state information(CSI) configuration
+#[cfg(all(not(esp32c6), feature = "csi"))]
+pub struct CsiConfig {
+    /// Enable to receive legacy long training field(lltf) data.
+    pub lltf_en: bool,
+    /// Enable to receive HT long training field(htltf) data.
+    pub htltf_en: bool,
+    /// Enable to receive space time block code HT long training
+    /// field(stbc-htltf2) data.
+    pub stbc_htltf2_en: bool,
+    /// Enable to generate htlft data by averaging lltf and ht_ltf data when
+    /// receiving HT packet. Otherwise, use ht_ltf data directly.
+    pub ltf_merge_en: bool,
+    /// Enable to turn on channel filter to smooth adjacent sub-carrier. Disable
+    /// it to keep independence of adjacent sub-carrier.
+    pub channel_filter_en: bool,
+    /// Manually scale the CSI data by left shifting or automatically scale the
+    /// CSI data. If set true, please set the shift bits. false: automatically.
+    /// true: manually.
+    pub manu_scale: bool,
+    /// Manually left shift bits of the scale of the CSI data. The range of the
+    /// left shift bits is 0~15.
+    pub shift: u8,
+    /// Enable to dump 802.11 ACK frame.
+    pub dump_ack_en: bool,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+#[cfg(all(esp32c6, feature = "csi"))]
+// See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
+pub struct CsiConfig {
+    /// Enable to acquire CSI.
+    pub enable: u32,
+    /// Enable to acquire L-LTF when receiving a 11g PPDU.
+    pub acquire_csi_legacy: u32,
+    /// Enable to acquire HT-LTF when receiving an HT20 PPDU.
+    pub acquire_csi_ht20: u32,
+    /// Enable to acquire HT-LTF when receiving an HT40 PPDU.
+    pub acquire_csi_ht40: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 SU PPDU.
+    pub acquire_csi_su: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 MU PPDU.
+    pub acquire_csi_mu: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 DCM applied PPDU.
+    pub acquire_csi_dcm: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 Beamformed applied PPDU.
+    pub acquire_csi_beamformed: u32,
+    /// When receiving an STBC applied HE PPDU, 0- acquire the complete
+    /// HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the
+    /// HE-LTF1 and HE-LTF2.
+    pub acquire_csi_he_stbc: u32,
+    /// Vvalue 0-3.
+    pub val_scale_cfg: u32,
+    /// Enable to dump 802.11 ACK frame, default disabled.
+    pub dump_ack_en: u32,
+    /// Reserved.
+    pub reserved: u32,
+}
+
+#[cfg(feature = "csi")]
+impl Default for CsiConfig {
+    #[cfg(not(esp32c6))]
+    fn default() -> Self {
+        Self {
+            lltf_en: true,
+            htltf_en: true,
+            stbc_htltf2_en: true,
+            ltf_merge_en: true,
+            channel_filter_en: true,
+            manu_scale: false,
+            shift: 0,
+            dump_ack_en: false,
+        }
+    }
+
+    #[cfg(esp32c6)]
+    fn default() -> Self {
+        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi_he_types.h#L67-L82
+        Self {
+            enable: 1,
+            acquire_csi_legacy: 1,
+            acquire_csi_ht20: 1,
+            acquire_csi_ht40: 1,
+            acquire_csi_su: 1,
+            acquire_csi_mu: 1,
+            acquire_csi_dcm: 1,
+            acquire_csi_beamformed: 1,
+            acquire_csi_he_stbc: 2,
+            val_scale_cfg: 2,
+            dump_ack_en: 1,
+            reserved: 19,
+        }
+    }
+}
+
+#[cfg(feature = "csi")]
+impl From<CsiConfig> for wifi_csi_config_t {
+    fn from(config: CsiConfig) -> Self {
+        #[cfg(not(esp32c6))]
+        {
+            wifi_csi_config_t {
+                lltf_en: config.lltf_en,
+                htltf_en: config.htltf_en,
+                stbc_htltf2_en: config.stbc_htltf2_en,
+                ltf_merge_en: config.ltf_merge_en,
+                channel_filter_en: config.channel_filter_en,
+                manu_scale: config.manu_scale,
+                shift: config.shift,
+                dump_ack_en: config.dump_ack_en,
+            }
+        }
+        #[cfg(esp32c6)]
+        {
+            wifi_csi_acquire_config_t {
+                _bitfield_align_1: [0; 0],
+                _bitfield_1: wifi_csi_acquire_config_t::new_bitfield_1(
+                    config.enable,
+                    config.acquire_csi_legacy,
+                    config.acquire_csi_ht20,
+                    config.acquire_csi_ht40,
+                    config.acquire_csi_su,
+                    config.acquire_csi_mu,
+                    config.acquire_csi_dcm,
+                    config.acquire_csi_beamformed,
+                    config.acquire_csi_he_stbc,
+                    config.val_scale_cfg,
+                    config.dump_ack_en,
+                    config.reserved,
+                ),
+            }
+        }
+    }
+}
+
+#[cfg(feature = "csi")]
+impl CsiConfig {
+    /// Set CSI data configuration
+    pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
+        let conf: wifi_csi_config_t = self.clone().into();
+
+        unsafe {
+            esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
+        }
+        Ok(())
+    }
+
+    /// Register the RX callback function of CSI data. Each time a CSI data is
+    /// received, the callback function will be called.
+    pub(crate) fn set_receive_cb<C: CsiCallback>(&mut self, cb: C) -> Result<(), WifiError> {
+        let cb = alloc::boxed::Box::new(cb);
+        let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut crate::wifi::c_types::c_void;
+
+        unsafe {
+            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(csi_rx_cb::<C>), cb_ptr))?;
+        }
+        Ok(())
+    }
+
+    /// Enable or disable CSI
+    pub(crate) fn set_csi(&self, enable: bool) -> Result<(), WifiError> {
+        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1241
+        unsafe {
+            esp_wifi_result!(esp_wifi_set_csi(enable))?;
+        }
+        Ok(())
+    }
+}
+
 const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
 const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
 
@@ -942,6 +1109,7 @@ pub(crate) static DATA_QUEUE_RX_STA: Locked<VecDeque<EspWifiPacketBuffer>> =
 /// Common errors.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum WifiError {
     /// Wi-Fi module is not initialized or not initialized for `Wi-Fi`
     /// operations.
@@ -958,6 +1126,9 @@ pub enum WifiError {
 
     /// Unsupported operation or mode.
     Unsupported,
+
+    /// Passed arguments are invalid.
+    InvalidArguments,
 }
 
 /// Events generated by the WiFi driver.
@@ -1463,8 +1634,8 @@ pub(crate) fn wifi_start_scan(
     };
 
     let mut ssid_buf = ssid.map(|m| {
-        let mut buf = heapless::Vec::<u8, 33>::from_iter(m.bytes());
-        unwrap!(buf.push(b'\0').ok());
+        let mut buf = alloc::vec::Vec::from_iter(m.bytes());
+        buf.push(b'\0');
         buf
     });
 
@@ -1673,8 +1844,8 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
         .unwrap_or(record.ssid.len());
     let ssid_ref = unsafe { core::str::from_utf8_unchecked(&record.ssid[..str_len]) };
 
-    let mut ssid = heapless::String::<32>::new();
-    unwrap!(ssid.push_str(ssid_ref));
+    let mut ssid = String::new();
+    ssid.push_str(ssid_ref);
 
     AccessPointInfo {
         ssid,
@@ -1687,7 +1858,6 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
             _ => panic!(),
         },
         signal_strength: record.rssi,
-        protocols: EnumSet::empty(), // TODO
         auth_method: Some(AuthMethod::from_raw(record.authmode)),
     }
 }
@@ -2552,20 +2722,26 @@ impl WifiController<'_> {
     }
 
     /// A blocking wifi network scan with caller-provided scanning options.
-    pub fn scan_with_config_sync<const N: usize>(
+    pub fn scan_with_config_sync(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-        esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
-
-        let count = self.scan_result_count()?;
-        let result = self.scan_results()?;
-
-        Ok((result, count))
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+        self.scan_with_config_sync_max(config, usize::MAX)
     }
 
-    fn scan_result_count(&mut self) -> Result<usize, WifiError> {
-        let mut bss_total: u16 = 0;
+    pub fn scan_with_config_sync_max(
+        &mut self,
+        config: ScanConfig<'_>,
+        max: usize,
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+        esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
+        let result = self.scan_results(max)?;
+        Ok(result)
+    }
+
+    fn scan_results(&mut self, max: usize) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+        let mut scanned = alloc::vec::Vec::<AccessPointInfo>::new();
+        let mut bss_total: u16 = max as u16;
 
         // Prevents memory leak on error
         let guard = FreeApListOnDrop;
@@ -2574,44 +2750,22 @@ impl WifiController<'_> {
 
         guard.defuse();
 
-        Ok(bss_total as usize)
-    }
-
-    fn scan_results<const N: usize>(
-        &mut self,
-    ) -> Result<heapless::Vec<AccessPointInfo, N>, WifiError> {
-        let mut scanned = heapless::Vec::<AccessPointInfo, N>::new();
-        let mut bss_total: u16 = N as u16;
-
-        let mut records: [MaybeUninit<include::wifi_ap_record_t>; N] = [MaybeUninit::uninit(); N];
-
-        // Prevents memory leak on error
-        let guard = FreeApListOnDrop;
-
-        unsafe {
-            esp_wifi_result!(include::esp_wifi_scan_get_ap_records(
-                &mut bss_total,
-                records[0].as_mut_ptr(),
-            ))?
-        };
-
-        guard.defuse();
-
-        for i in 0..bss_total {
-            let record = unsafe { MaybeUninit::assume_init_ref(&records[i as usize]) };
+        let mut record: MaybeUninit<include::wifi_ap_record_t> = MaybeUninit::uninit();
+        for _ in 0..usize::min(bss_total as usize, max) {
+            let record = unsafe { MaybeUninit::assume_init_mut(&mut record) };
+            unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_record(record))? };
             let ap_info = convert_ap_info(record);
-
-            scanned.push(ap_info).ok();
+            scanned.push(ap_info);
         }
+
+        unsafe { esp_wifi_result!(include::esp_wifi_clear_ap_list())? };
 
         Ok(scanned)
     }
 
     /// A blocking wifi network scan with default scanning options.
-    pub fn scan_n<const N: usize>(
-        &mut self,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-        self.scan_with_config_sync(Default::default())
+    pub fn scan_n(&mut self, max: usize) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+        self.scan_with_config_sync_max(Default::default(), max)
     }
 
     /// Starts the WiFi controller.
@@ -2652,6 +2806,8 @@ impl WifiController<'_> {
     /// This will set the mode accordingly.
     /// You need to use Wifi::connect() for connecting to an AP.
     pub fn set_configuration(&mut self, conf: &Configuration) -> Result<(), WifiError> {
+        conf.validate()?;
+
         let mode = match conf {
             Configuration::None => {
                 return Err(WifiError::InternalError(
@@ -2745,17 +2901,27 @@ impl WifiController<'_> {
     }
 
     /// Async version of [`crate::wifi::WifiController`]'s `scan_n` method
-    pub async fn scan_n_async<const N: usize>(
+    pub async fn scan_n_async(
         &mut self,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
-        self.scan_with_config_async(Default::default()).await
+        max: usize,
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+        self.scan_with_config_async_max(Default::default(), max)
+            .await
     }
 
     /// An async wifi network scan with caller-provided scanning options.
-    pub async fn scan_with_config_async<const N: usize>(
+    pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<(heapless::Vec<AccessPointInfo, N>, usize), WifiError> {
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+        self.scan_with_config_async_max(config, usize::MAX).await
+    }
+
+    async fn scan_with_config_async_max(
+        &mut self,
+        config: ScanConfig<'_>,
+        max: usize,
+    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
         Self::clear_events(WifiEvent::ScanDone);
         esp_wifi_result!(wifi_start_scan(false, config))?;
 
@@ -2765,10 +2931,9 @@ impl WifiController<'_> {
 
         guard.defuse();
 
-        let count = self.scan_result_count()?;
-        let result = self.scan_results()?;
+        let result = self.scan_results(max)?;
 
-        Ok((result, count))
+        Ok(result)
     }
 
     /// Async version of [`crate::wifi::WifiController`]'s `start` method

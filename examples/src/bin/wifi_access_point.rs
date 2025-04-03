@@ -81,7 +81,7 @@ fn main() -> ! {
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-        ssid: "esp-wifi".try_into().unwrap(),
+        ssid: "esp-wifi".into(),
         ..Default::default()
     });
     let res = controller.set_configuration(&client_config);
