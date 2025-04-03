@@ -191,6 +191,13 @@ impl<'a> PartitionTable<'a> {
             return Err(Error::Invalid);
         }
 
+        if binary.len() == 0 {
+            return Ok(Self {
+                binary: &[],
+                entries: 0,
+            });
+        }
+
         // we checked binary before
         let binary = unsafe {
             core::slice::from_raw_parts(
@@ -209,14 +216,15 @@ impl<'a> PartitionTable<'a> {
             let (hash, index) = {
                 let mut i = 0;
                 loop {
-                    let entry = raw.get_partition(i).unwrap();
-                    if entry.magic() == MD5_MAGIC {
-                        break (&entry.binary[16..][..16], i);
-                    }
+                    if let Ok(entry) = raw.get_partition(i) {
+                        if entry.magic() == MD5_MAGIC {
+                            break (&entry.binary[16..][..16], i);
+                        }
 
-                    i += 1;
-                    if i >= raw.entries {
-                        return Err(Error::Invalid);
+                        i += 1;
+                        if i >= raw.entries {
+                            return Err(Error::Invalid);
+                        }
                     }
                 }
             };
@@ -237,18 +245,20 @@ impl<'a> PartitionTable<'a> {
         let entries = {
             let mut i = 0;
             loop {
-                if raw.get_partition(i).unwrap().magic() != ENTRY_MAGIC {
-                    break;
-                }
+                if let Ok(entry) = raw.get_partition(i) {
+                    if entry.magic() != ENTRY_MAGIC {
+                        break;
+                    }
 
-                i += 1;
+                    i += 1;
 
-                if i == raw.entries {
-                    break;
-                }
+                    if i == raw.entries {
+                        break;
+                    }
 
-                if i > raw.entries {
-                    return Err(Error::Invalid);
+                    if i > raw.entries {
+                        return Err(Error::Invalid);
+                    }
                 }
             }
             i
@@ -761,5 +771,31 @@ mod tests {
         assert_eq!(false, pt.get_partition(3).unwrap().is_encrypted());
         assert_eq!(false, pt.get_partition(4).unwrap().is_encrypted());
         assert_eq!(false, pt.get_partition(5).unwrap().is_encrypted());
+    }
+
+    #[test]
+    fn empty_byte_array() {
+        let pt = PartitionTable::new(&[]).unwrap();
+
+        assert_eq!(0, pt.len());
+        assert!(matches!(pt.get_partition(0), Err(Error::OutOfBounds)));
+    }
+
+    #[test]
+    fn validation_fails_wo_hash() {
+        assert!(matches!(
+            PartitionTable::new(&SIMPLE[..RAW_ENTRY_LEN * 3]),
+            Err(Error::Invalid)
+        ));
+    }
+
+    #[test]
+    fn validation_succeeds_with_enough_entries() {
+        assert_eq!(
+            3,
+            PartitionTable::new(&SIMPLE[..RAW_ENTRY_LEN * 4])
+                .unwrap()
+                .len()
+        );
     }
 }
