@@ -201,7 +201,7 @@ impl<'a> PartitionTable<'a> {
 
         let mut raw = Self {
             binary,
-            entries: binary.len() / RAW_ENTRY_LEN,
+            entries: binary.len(),
         };
 
         #[cfg(feature = "validation")]
