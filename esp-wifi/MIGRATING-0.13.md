@@ -32,7 +32,7 @@ General usage doesn't change with some small exceptions.
 
 ```diff
 -    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
-+    let res: Result<alloc::vec::Vec<AccessPointInfo, WifiError> = controller.scan_n(10);
++    let res: Result<alloc::vec::Vec<AccessPointInfo>, WifiError> = controller.scan_n(10);
 ```
 
 Some code can be simplified now.
@@ -42,3 +42,7 @@ Some code can be simplified now.
 +        ssid: SSID.into(),
 +        password: PASSWORD.into(),
 ```
+
+## `AccessPointInfo` doesn't include the `protocols` field anymore
+
+That field was never populated and has been removed.

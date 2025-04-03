@@ -198,20 +198,6 @@ pub enum Protocol {
     P802D11BGNAX,
 }
 
-/// A set of protocols.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct ProtocolSet(EnumSet<Protocol>);
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for ProtocolSet {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        for p in self.0 {
-            defmt::write!(fmt, "{}", p);
-        }
-    }
-}
-
 /// Secondary Wi-Fi channels.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -252,9 +238,6 @@ pub struct AccessPointInfo {
     /// The signal strength of the access point (RSSI).
     pub signal_strength: i8,
 
-    /// The set of protocols supported by the access point.
-    pub protocols: ProtocolSet,
-
     /// The authentication method used by the access point.
     pub auth_method: Option<AuthMethod>,
 }
@@ -276,7 +259,7 @@ pub struct AccessPointConfiguration {
     pub secondary_channel: Option<u8>,
 
     /// The set of protocols supported by the access point.
-    pub protocols: ProtocolSet,
+    pub protocols: EnumSet<Protocol>,
 
     /// The authentication method to be used by the access point.
     pub auth_method: AuthMethod,
@@ -309,7 +292,7 @@ impl Default for AccessPointConfiguration {
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
-            protocols: ProtocolSet(Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
+            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
             auth_method: AuthMethod::None,
             password: String::new(),
             max_connections: 255,
@@ -335,15 +318,33 @@ impl core::fmt::Debug for AccessPointConfiguration {
 #[cfg(feature = "defmt")]
 impl defmt::Format for AccessPointConfiguration {
     fn format(&self, fmt: defmt::Formatter<'_>) {
+        #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Default)]
+        #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+        pub struct ProtocolSet(EnumSet<Protocol>);
+
+        #[cfg(feature = "defmt")]
+        impl defmt::Format for ProtocolSet {
+            fn format(&self, fmt: defmt::Formatter<'_>) {
+                for (i, p) in self.0.into_iter().enumerate() {
+                    if i > 0 {
+                        defmt::write!(fmt, " ");
+                    }
+                    defmt::write!(fmt, "{}", p);
+                }
+            }
+        }
+
+        let protocol_set = ProtocolSet(self.protocols);
+
         defmt::write!(
             fmt,
             "AccessPointConfiguration {{\
             ssid: {}, \
             ssid_hidden: {}, \
             channel: {}, \
-            secondary_channel: {:?}, \
-            protocols: {:?}, \
-            auth_method: {:?}, \
+            secondary_channel: {}, \
+            protocols: {}, \
+            auth_method: {}, \
             password: **REDACTED**, \
             max_connections: {}, \
             }}",
@@ -351,7 +352,7 @@ impl defmt::Format for AccessPointConfiguration {
             self.ssid_hidden,
             self.channel,
             self.secondary_channel,
-            defmt::Debug2Format(&self.protocols),
+            protocol_set,
             self.auth_method,
             self.max_connections
         );
@@ -608,8 +609,8 @@ impl defmt::Format for EapClientConfiguration {
             self.bssid,
             self.auth_method,
             self.channel,
-            defmt::Debug2Format(&self.identity),
-            defmt::Debug2Format(&self.username),
+            &self.identity.as_ref().map_or("", |v| v.as_str()),
+            &self.username.as_ref().map_or("", |v| v.as_str()),
             self.eap_fast_config,
             self.time_check,
             self.pac_file,
@@ -1857,7 +1858,6 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
             _ => panic!(),
         },
         signal_strength: record.rssi,
-        protocols: ProtocolSet(EnumSet::empty()), // TODO
         auth_method: Some(AuthMethod::from_raw(record.authmode)),
     }
 }
@@ -2684,9 +2684,8 @@ impl WifiController<'_> {
     /// ```
     /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
     /// ```
-    pub fn set_protocol(&mut self, protocols: ProtocolSet) -> Result<(), WifiError> {
+    pub fn set_protocol(&mut self, protocols: EnumSet<Protocol>) -> Result<(), WifiError> {
         let protocol = protocols
-            .0
             .into_iter()
             .map(|v| match v {
                 Protocol::P802D11B => WIFI_PROTOCOL_11B,
