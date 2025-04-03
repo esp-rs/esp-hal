@@ -42,7 +42,7 @@ async fn main(_spawner: Spawner) {
         }
     }
 
-    let (rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(4092 * 4, 0);
+    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(4092 * 4, 0);
 
     let i2s = I2s::new(
         peripherals.I2S0,
@@ -50,8 +50,6 @@ async fn main(_spawner: Spawner) {
         DataFormat::Data16Channel16,
         Rate::from_hz(44100),
         dma_channel,
-        rx_descriptors,
-        tx_descriptors,
     )
     .into_async();
 
@@ -63,7 +61,7 @@ async fn main(_spawner: Spawner) {
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
         .with_din(peripherals.GPIO5)
-        .build();
+        .build(rx_descriptors);
 
     let buffer = rx_buffer;
     println!("Start");
