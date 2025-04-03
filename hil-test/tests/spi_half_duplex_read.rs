@@ -148,4 +148,58 @@ mod tests {
 
         assert_eq!(buffer.as_slice(), &[0xFF; DMA_BUFFER_SIZE]);
     }
+
+    #[test]
+    fn data_mode_combinations_are_not_rejected(ctx: Context) {
+        const DMA_BUFFER_SIZE: usize = 4;
+
+        let (buffer, descriptors, tx, txd) = dma_buffers!(DMA_BUFFER_SIZE, DMA_BUFFER_SIZE);
+        let dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();
+
+        let mut buffer = [0xAA; DMA_BUFFER_SIZE];
+        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
+
+        let modes = [
+            // 4-wire half-duplex mode
+            (Command::None, Address::None, DataMode::SingleTwoDataLines),
+            // Simple 3-wire half-duplex mode
+            (Command::None, Address::None, DataMode::Single),
+            // Simple DSPI/QSPI modes
+            (Command::None, Address::None, DataMode::Dual),
+            (Command::None, Address::None, DataMode::Quad),
+            // Half-duplex modes with command and/or address phases
+            (
+                Command::_8Bit(0x32, DataMode::Single),
+                Address::_24Bit(0x2C << 8, DataMode::Single),
+                DataMode::Single,
+            ),
+            (
+                Command::_8Bit(0x32, DataMode::Single),
+                Address::_24Bit(0x2C << 8, DataMode::Single),
+                DataMode::Dual,
+            ),
+            (
+                Command::_8Bit(0x32, DataMode::Single),
+                Address::_24Bit(0x2C << 8, DataMode::Single),
+                DataMode::Quad,
+            ),
+            // SingleTwoDataLines is not meaningful for command/address phases but supporting it
+            // shouldn't be an issue.
+            (
+                Command::_8Bit(0x32, DataMode::SingleTwoDataLines),
+                Address::_24Bit(0x2C << 8, DataMode::SingleTwoDataLines),
+                DataMode::Quad,
+            ),
+        ];
+
+        for (command, address, data) in modes {
+            if let Err(e) = spi.half_duplex_read(data, command, address, 0, &mut buffer) {
+                panic!(
+                    "Failed to read with command {:?}, address {:?}, data mode {:?}: {:?}",
+                    command, address, data, e
+                );
+            }
+        }
+    }
 }

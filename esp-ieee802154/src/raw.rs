@@ -71,7 +71,7 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
-pub(crate) fn esp_ieee802154_enable(radio_clock_control: &mut RADIO_CLK) {
+pub(crate) fn esp_ieee802154_enable(radio_clock_control: RADIO_CLK<'_>) {
     let mut radio_clock_control = RadioClockController::new(radio_clock_control);
     radio_clock_control.init_clocks();
     radio_clock_control.enable_phy(true);

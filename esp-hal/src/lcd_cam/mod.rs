@@ -15,7 +15,6 @@ use crate::{
     handler,
     interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
-    peripheral::Peripheral,
     peripherals::{Interrupt, LCD_CAM},
     system::{Cpu, GenericPeripheralGuard},
     Async,
@@ -32,9 +31,7 @@ pub struct LcdCam<'d, Dm: crate::DriverMode> {
 
 impl<'d> LcdCam<'d, Blocking> {
     /// Creates a new `LcdCam` instance.
-    pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
-        crate::into_ref!(lcd_cam);
-
+    pub fn new(lcd_cam: LCD_CAM<'d>) -> Self {
         let lcd_guard = GenericPeripheralGuard::new();
         let cam_guard = GenericPeripheralGuard::new();
 

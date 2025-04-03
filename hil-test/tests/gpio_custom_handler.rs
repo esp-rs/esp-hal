@@ -13,7 +13,7 @@
 
 use embassy_time::{Duration, Timer};
 use esp_hal::{
-    gpio::{AnyPin, Flex, Input, InputConfig, Io, Level, Output, OutputConfig, Pull},
+    gpio::{Flex, Input, InputConfig, InputPin, Io, Level, Output, OutputConfig, OutputPin, Pull},
     handler,
     timer::timg::TimerGroup,
 };
@@ -39,10 +39,10 @@ pub fn interrupt_handler() {
     // Do nothing
 }
 
-async fn drive_pins(gpio1: impl Into<AnyPin>, gpio2: impl Into<AnyPin>) -> usize {
+async fn drive_pins(gpio1: impl InputPin, gpio2: impl OutputPin) -> usize {
     let counter = AtomicUsize::new(0);
-    let mut test_gpio1 = Input::new(gpio1.into(), InputConfig::default().with_pull(Pull::Down));
-    let mut test_gpio2 = Output::new(gpio2.into(), Level::Low, OutputConfig::default());
+    let mut test_gpio1 = Input::new(gpio1, InputConfig::default().with_pull(Pull::Down));
+    let mut test_gpio2 = Output::new(gpio2, Level::Low, OutputConfig::default());
     embassy_futures::select::select(
         async {
             loop {

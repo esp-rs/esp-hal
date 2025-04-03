@@ -11,10 +11,10 @@
 
 use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
+#[cfg(feature = "unstable")]
+use esp_hal::peripherals::SPI2;
 use esp_hal::{
     gpio::Input,
-    peripheral::Peripheral,
-    peripherals::SPI2,
     spi::master::{Config, Spi},
     time::Rate,
     Blocking,
@@ -36,16 +36,16 @@ cfg_if::cfg_if! {
 #[cfg(feature = "unstable")]
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel = esp_hal::dma::Spi2DmaChannel;
+        type DmaChannel<'d> = esp_hal::dma::Spi2DmaChannel<'d>;
     } else {
-        type DmaChannel = esp_hal::dma::DmaChannel0;
+        type DmaChannel<'d> = esp_hal::dma::DmaChannel0<'d>;
     }
 }
 
 struct Context {
     spi: Spi<'static, Blocking>,
     #[cfg(feature = "unstable")]
-    dma_channel: DmaChannel,
+    dma_channel: DmaChannel<'static>,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
     #[cfg(feature = "unstable")]

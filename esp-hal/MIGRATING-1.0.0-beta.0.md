@@ -1,5 +1,61 @@
 # Migration Guide from v1.0.0-beta.0 to ?
 
+## Peripheral singleton changes
+
+> As this is a conceptual change, we'll not list all affected types in this section. `AnyPeripheral`
+> refers to all `Any*` types at the same time - `AnySpi`, `AnyUart`, etc. Similarly, `Driver` refers
+> to any matching peripheral driver.
+
+Peripheral singletons (like `SPI2` or `GpioPin`) no longer implement `Peripheral`. The `Peripheral`
+trait and `PeripheralRef` struct have been removed. The peripheral singletons instead have a
+lifetime and implement the following methods:
+
+- `steal` and `clone_unchecked` to unsafely create them.
+- `reborrow` to safely create a copy with a shorter lifetime.
+- `degrade` has been removed in favour of `AnyPeripheral::from`.
+
+### Application-facing changes
+
+Peripheral drivers no longer accept `&mut singleton`.
+
+Use `reborrow` instead:
+
+```diff
+-let driver = Driver::new(&mut peripheral);
++let driver = Driver::new(peripheral.reborrow());
+```
+
+After dropping the driver, `peripheral` should be accessible again as it used to be previously.
+
+### Peripheral driver changes
+
+The `Peripheral` and `PeripheralRef` types no longer exist. The driver structs and constructors need
+to be updated accordingly:
+
+If the driver works with a single peripheral instance, for example `AES`:
+
+```diff
+ struct Driver<'d> {
+-   aes: PeripheralRef<'d, AES>,
++   aes: AES<'d>,
+ }
+ // ...
+-fn new(aes: impl Peripheral<P = AES> + 'd)
++fn new(aes: AES<'d>)
+```
+
+If a driver works with multiple peripheral instances, e.g. `SPI`:
+
+```diff
+ struct Driver<'d> {
+-   spi: PeripheralRef<'d, AnySpi>,
++   spi: AnySpi<'d>,
+ }
+ // ...
+-fn new(spi: impl Peripheral<P = impl Instance> + 'd)
++fn new(spi: impl Instance + Into<AnySpi<'d>>)
+```
+
 ## GPIO changes
 
 ### Interconnect types now have a lifetime
@@ -13,14 +69,6 @@ The affected types in the `gpio::interconnect` module are:
 - `OutputSignal`
 - `InputConnection`
 - `OutputConnection`
-
-### Pin drivers no longer implement `Peripheral`
-
-Peripheral drivers now take `impl PeripheralInput` and `impl PeripheralOutput` directly. These
-traits are now implemented for GPIO pins (stably) and driver structs (unstably) alike.
-
-This change means it's no longer possible to pass a reference to a GPIO driver to a peripheral
-driver. For example, it's no longer possible to pass an `&mut Input` to `Spi::with_miso`.
 
 ## I2S driver now takes `DmaDescriptor`s later in construction
 

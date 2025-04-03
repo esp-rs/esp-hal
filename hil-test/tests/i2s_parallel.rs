@@ -14,7 +14,7 @@ use esp_hal::{
 };
 use hil_test as _;
 
-type DmaChannel0 = esp_hal::dma::I2s0DmaChannel;
+type DmaChannel0<'a> = esp_hal::dma::I2s0DmaChannel<'a>;
 
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
@@ -22,8 +22,8 @@ mod tests {
     use super::*;
 
     struct Context {
-        dma_channel: DmaChannel0,
-        i2s: I2S0,
+        dma_channel: DmaChannel0<'static>,
+        i2s: I2S0<'static>,
     }
 
     #[init]

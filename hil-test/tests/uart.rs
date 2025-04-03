@@ -19,8 +19,8 @@ use hil_test as _;
 struct Context {
     uart0: Uart<'static, Blocking>,
     uart1: Uart<'static, Blocking>,
-    rx: AnyPin,
-    tx: AnyPin,
+    rx: AnyPin<'static>,
+    tx: AnyPin<'static>,
 }
 
 #[cfg(test)]

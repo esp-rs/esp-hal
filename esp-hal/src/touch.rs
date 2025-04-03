@@ -30,7 +30,6 @@ use core::marker::PhantomData;
 
 use crate::{
     gpio::TouchPin,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{LPWR, SENS, TOUCH},
     private::{Internal, Sealed},
     rtc_cntl::Rtc,
@@ -86,7 +85,7 @@ pub struct TouchConfig {
 
 /// This struct marks a successfully initialized touch peripheral
 pub struct Touch<'d, Tm: TouchMode, Dm: DriverMode> {
-    _inner: PeripheralRef<'d, TOUCH>,
+    _inner: TOUCH<'d>,
     _touch_mode: PhantomData<Tm>,
     _mode: PhantomData<Dm>,
 }
@@ -196,11 +195,7 @@ impl<'d> Touch<'d, OneShot, Blocking> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn one_shot_mode(
-        touch_peripheral: impl Peripheral<P = TOUCH> + 'd,
-        config: Option<TouchConfig>,
-    ) -> Self {
-        crate::into_ref!(touch_peripheral);
+    pub fn one_shot_mode(touch_peripheral: TOUCH<'d>, config: Option<TouchConfig>) -> Self {
         let rtccntl = LPWR::regs();
         let sens = SENS::regs();
 
@@ -257,12 +252,7 @@ impl<'d> Touch<'d, Continuous, Blocking> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn continuous_mode(
-        touch_peripheral: impl Peripheral<P = TOUCH> + 'd,
-        config: Option<TouchConfig>,
-    ) -> Self {
-        crate::into_ref!(touch_peripheral);
-
+    pub fn continuous_mode(touch_peripheral: TOUCH<'d>, config: Option<TouchConfig>) -> Self {
         Self::initialize_common_continuous(config);
 
         Self {
@@ -302,12 +292,10 @@ impl<'d> Touch<'d, Continuous, Async> {
     /// # }
     /// ```
     pub fn async_mode(
-        touch_peripheral: impl Peripheral<P = TOUCH> + 'd,
+        touch_peripheral: TOUCH<'d>,
         rtc: &mut Rtc<'_>,
         config: Option<TouchConfig>,
     ) -> Self {
-        crate::into_ref!(touch_peripheral);
-
         Self::initialize_common_continuous(config);
 
         rtc.set_interrupt_handler(asynch::handle_touch_interrupt);

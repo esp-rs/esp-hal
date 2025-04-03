@@ -98,7 +98,6 @@
 use self::unit::Unit;
 use crate::{
     interrupt::{self, InterruptHandler},
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, PCNT},
     system::GenericPeripheralGuard,
 };
@@ -108,7 +107,7 @@ pub mod unit;
 
 /// Pulse Counter (PCNT) peripheral driver.
 pub struct Pcnt<'d> {
-    _instance: PeripheralRef<'d, PCNT>,
+    _instance: PCNT<'d>,
 
     /// Unit 0
     pub unit0: Unit<'d, 0>,
@@ -136,9 +135,7 @@ pub struct Pcnt<'d> {
 
 impl<'d> Pcnt<'d> {
     /// Return a new PCNT
-    pub fn new(_instance: impl Peripheral<P = PCNT> + 'd) -> Self {
-        crate::into_ref!(_instance);
-
+    pub fn new(_instance: PCNT<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
         let pcnt = PCNT::regs();
 

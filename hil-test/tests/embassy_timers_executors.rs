@@ -12,12 +12,11 @@ use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     interrupt::Priority,
     timer::systimer::SystemTimer,
-    timer::AnyTimer,
 };
 use esp_hal::{
     peripherals::Peripherals,
     time,
-    timer::{timg::TimerGroup, OneShotTimer, PeriodicTimer},
+    timer::{timg::TimerGroup, AnyTimer, OneShotTimer, PeriodicTimer},
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
@@ -44,7 +43,6 @@ mod test_helpers {
 }
 
 mod test_cases {
-    use esp_hal::peripheral::Peripheral;
 
     use super::*;
 
@@ -62,7 +60,7 @@ mod test_cases {
         );
     }
 
-    pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
+    pub fn run_test_periodic_timer<'d, T: esp_hal::timer::Timer + Into<AnyTimer<'d>>>(timer: T) {
         let mut periodic = PeriodicTimer::new(timer);
 
         let t1 = time::Instant::now();
@@ -80,7 +78,7 @@ mod test_cases {
         );
     }
 
-    pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
+    pub fn run_test_oneshot_timer<'d, T: esp_hal::timer::Timer + Into<AnyTimer<'d>>>(timer: T) {
         let mut timer = OneShotTimer::new(timer);
 
         let t1 = esp_hal::time::Instant::now();
@@ -167,16 +165,16 @@ mod test {
     #[test]
     fn test_periodic_oneshot_timg(peripherals: Peripherals) {
         let mut timg0 = TimerGroup::new(peripherals.TIMG0);
-        run_test_periodic_timer(&mut timg0.timer0);
-        run_test_oneshot_timer(&mut timg0.timer0);
+        run_test_periodic_timer(timg0.timer0.reborrow());
+        run_test_oneshot_timer(timg0.timer0.reborrow());
     }
 
     #[test]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_oneshot_systimer(peripherals: Peripherals) {
         let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
-        run_test_periodic_timer(&mut systimer.alarm0);
-        run_test_oneshot_timer(&mut systimer.alarm0);
+        run_test_periodic_timer(systimer.alarm0.reborrow());
+        run_test_oneshot_timer(systimer.alarm0.reborrow());
     }
 
     #[test]

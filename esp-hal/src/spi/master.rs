@@ -58,7 +58,6 @@ use crate::{
     },
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
-    peripheral::{Peripheral, PeripheralRef},
     private::{self, OnDrop, Sealed},
     spi::AnySpi,
     system::{Cpu, PeripheralGuard},
@@ -662,7 +661,7 @@ impl core::fmt::Display for ConfigError {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Spi<'d, Dm: DriverMode> {
-    spi: PeripheralRef<'d, AnySpi>,
+    spi: AnySpi<'d>,
     _mode: PhantomData<Dm>,
     guard: PeripheralGuard,
     pins: SpiPinGuard,
@@ -676,12 +675,7 @@ impl<'d> Spi<'d, Blocking> {
     /// # Errors
     ///
     /// See [`Spi::apply_config`].
-    pub fn new(
-        spi: impl Peripheral<P = impl PeripheralInstance> + 'd,
-        config: Config,
-    ) -> Result<Self, ConfigError> {
-        crate::into_mapped_ref!(spi);
-
+    pub fn new(spi: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
         let mosi_pin = PinGuard::new_unconnected(spi.info().mosi);
@@ -692,7 +686,7 @@ impl<'d> Spi<'d, Blocking> {
         let sio3_pin = spi.info().sio3_output.map(PinGuard::new_unconnected);
 
         let mut this = Spi {
-            spi,
+            spi: spi.degrade(),
             _mode: PhantomData,
             guard,
             pins: SpiPinGuard {
@@ -777,15 +771,8 @@ impl<'d> Spi<'d, Blocking> {
     /// # }
     /// ```
     #[instability::unstable]
-    pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking>
-    where
-        CH: DmaChannelFor<AnySpi>,
-    {
-        SpiDma::new(
-            self.spi,
-            self.pins,
-            channel.map(|ch| ch.degrade()).into_ref(),
-        )
+    pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
+        SpiDma::new(self.spi, self.pins, channel.degrade())
     }
 
     #[cfg_attr(
@@ -1267,8 +1254,8 @@ mod dma {
     where
         Dm: DriverMode,
     {
-        pub(crate) spi: PeripheralRef<'d, AnySpi>,
-        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<AnySpi>>,
+        pub(crate) spi: AnySpi<'d>,
+        pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
         tx_transfer_in_progress: bool,
         rx_transfer_in_progress: bool,
         #[cfg(all(esp32, spi_address_workaround))]
@@ -1297,9 +1284,9 @@ mod dma {
         }
 
         pub(super) fn new(
-            spi: PeripheralRef<'d, AnySpi>,
+            spi: AnySpi<'d>,
             pins: SpiPinGuard,
-            channel: PeripheralRef<'d, PeripheralDmaChannel<AnySpi>>,
+            channel: PeripheralDmaChannel<AnySpi<'d>>,
         ) -> Self {
             let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
@@ -2689,7 +2676,7 @@ mod ehal1 {
 
 /// SPI peripheral instance.
 #[doc(hidden)]
-pub trait PeripheralInstance: private::Sealed + Into<AnySpi> + DmaEligible + 'static {
+pub trait PeripheralInstance: private::Sealed + DmaEligible {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;
 }
@@ -3518,19 +3505,6 @@ impl Driver {
         no_mosi_miso: bool,
         data_mode: DataMode,
     ) -> Result<(), Error> {
-        let three_wire = cmd.mode() == DataMode::Single
-            || address.mode() == DataMode::Single
-            || data_mode == DataMode::Single;
-
-        if three_wire
-            && ((cmd != Command::None && cmd.mode() != DataMode::Single)
-                || (address != Address::None && address.mode() != DataMode::Single)
-                || data_mode != DataMode::Single)
-        {
-            error!("Three-wire mode is only supported for single data line mode");
-            return Err(Error::Unsupported);
-        }
-
         self.init_spi_data_mode(cmd.mode(), address.mode(), data_mode)?;
 
         #[cfg(esp32)]
@@ -3566,7 +3540,8 @@ impl Driver {
         reg_block.user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
             w.usr_mosi_highpart().clear_bit();
-            w.sio().bit(three_wire);
+            // This bit tells the hardware whether we use Single or SingleTwoDataLines
+            w.sio().bit(data_mode == DataMode::Single);
             w.doutdin().clear_bit();
             w.usr_miso().bit(!is_write && !no_mosi_miso);
             w.usr_mosi().bit(is_write && !no_mosi_miso);
@@ -3700,7 +3675,7 @@ unsafe impl Sync for Info {}
 macro_rules! spi_instance {
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident $(, $sio2:ident, $sio3:ident)?) => {
         paste::paste! {
-            impl PeripheralInstance for crate::peripherals::[<SPI $num>] {
+            impl PeripheralInstance for crate::peripherals::[<SPI $num>]<'_> {
                 #[inline(always)]
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
@@ -3726,7 +3701,7 @@ macro_rules! spi_instance {
             $(
                 // If the extra pins are set, implement QspiInstance
                 $crate::ignore!($sio2);
-                impl QspiInstance for crate::peripherals::[<SPI $num>] {}
+                impl QspiInstance for crate::peripherals::[<SPI $num>]<'_> {}
             )?
         }
     }
@@ -3754,7 +3729,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl PeripheralInstance for super::AnySpi {
+impl PeripheralInstance for super::AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,
@@ -3766,7 +3741,7 @@ impl PeripheralInstance for super::AnySpi {
     }
 }
 
-impl QspiInstance for super::AnySpi {}
+impl QspiInstance for super::AnySpi<'_> {}
 
 #[doc(hidden)]
 pub struct State {
@@ -3786,7 +3761,7 @@ struct Esp32Hack {
 unsafe impl Sync for Esp32Hack {}
 
 #[cfg_attr(place_spi_driver_in_ram, ram)]
-fn handle_async<I: Instance>(instance: I) {
+fn handle_async(instance: impl Instance) {
     let state = instance.state();
     let info = instance.info();
 
@@ -3797,15 +3772,17 @@ fn handle_async<I: Instance>(instance: I) {
     }
 }
 
-#[doc(hidden)]
-pub trait Instance: PeripheralInstance {
+/// A peripheral singleton compatible with the SPI master driver.
+pub trait Instance: PeripheralInstance + super::IntoAnySpi {
+    #[doc(hidden)]
     fn state(&self) -> &'static State;
+    #[doc(hidden)]
     fn handler(&self) -> InterruptHandler;
 }
 
 macro_rules! master_instance {
     ($peri:ident) => {
-        impl Instance for $crate::peripherals::$peri {
+        impl Instance for $crate::peripherals::$peri<'_> {
             fn state(&self) -> &'static State {
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
@@ -3836,7 +3813,7 @@ master_instance!(SPI2);
 #[cfg(spi3)]
 master_instance!(SPI3);
 
-impl Instance for super::AnySpi {
+impl Instance for super::AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,

@@ -28,18 +28,18 @@ const DATA_SIZE: usize = 1024 * 10;
 
 #[allow(non_snake_case)]
 struct Pins {
-    pub GPIO8: GpioPin<8>,
-    pub GPIO11: GpioPin<11>,
-    pub GPIO12: GpioPin<12>,
-    pub GPIO16: GpioPin<16>,
-    pub GPIO17: GpioPin<17>,
+    pub GPIO8: GpioPin<'static, 8>,
+    pub GPIO11: GpioPin<'static, 11>,
+    pub GPIO12: GpioPin<'static, 12>,
+    pub GPIO16: GpioPin<'static, 16>,
+    pub GPIO17: GpioPin<'static, 17>,
 }
 
 struct Context<'d> {
     lcd_cam: LcdCam<'d, Blocking>,
     pcnt: Pcnt<'d>,
     pins: Pins,
-    dma: DmaChannel0,
+    dma: DmaChannel0<'d>,
     dma_buf: DmaTxBuf,
 }
 

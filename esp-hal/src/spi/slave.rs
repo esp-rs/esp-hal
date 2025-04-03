@@ -77,7 +77,6 @@ use crate::{
         OutputSignal,
     },
     pac::spi2::RegisterBlock,
-    peripheral::{Peripheral, PeripheralRef},
     spi::AnySpi,
     system::PeripheralGuard,
     Blocking,
@@ -91,7 +90,7 @@ const MAX_DMA_SIZE: usize = 32768 - 32;
 /// See the [module-level documentation][self] for more details.
 #[instability::unstable]
 pub struct Spi<'d, Dm: DriverMode> {
-    spi: PeripheralRef<'d, AnySpi>,
+    spi: AnySpi<'d>,
     #[allow(dead_code)]
     data_mode: Mode,
     _mode: PhantomData<Dm>,
@@ -100,13 +99,11 @@ pub struct Spi<'d, Dm: DriverMode> {
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     #[instability::unstable]
-    pub fn new(spi: impl Peripheral<P = impl Instance> + 'd, mode: Mode) -> Spi<'d, Blocking> {
-        crate::into_mapped_ref!(spi);
-
+    pub fn new(spi: impl Instance + 'd, mode: Mode) -> Spi<'d, Blocking> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
         let this = Spi {
-            spi,
+            spi: spi.degrade(),
             data_mode: mode,
             _mode: PhantomData,
             _guard: guard,
@@ -186,7 +183,7 @@ pub mod dma {
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
         #[instability::unstable]
-        pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> SpiDma<'d, Blocking>
+        pub fn with_dma<CH>(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking>
         where
             CH: DmaChannelFor<AnySpi>,
         {
@@ -201,8 +198,8 @@ pub mod dma {
     where
         Dm: DriverMode,
     {
-        pub(crate) spi: PeripheralRef<'d, AnySpi>,
-        pub(crate) channel: Channel<'d, Dm, PeripheralDmaChannel<AnySpi>>,
+        pub(crate) spi: AnySpi<'d>,
+        pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
         _guard: PeripheralGuard,
     }
 
@@ -217,8 +214,8 @@ pub mod dma {
 
     impl<'d> SpiDma<'d, Blocking> {
         fn new(
-            spi: PeripheralRef<'d, AnySpi>,
-            channel: PeripheralRef<'d, PeripheralDmaChannel<AnySpi>>,
+            spi: AnySpi<'d>,
+            channel: PeripheralDmaChannel<AnySpi<'d>>,
         ) -> Self {
             let channel = Channel::new(channel);
             channel.runtime_ensure_compatible(&spi);
@@ -585,10 +582,10 @@ pub mod dma {
     }
 }
 
-/// SPI peripheral instance.
-#[doc(hidden)]
-pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + 'static {
+/// A peripheral singleton compatible with the SPI slave driver.
+pub trait Instance: crate::private::Sealed + super::IntoAnySpi {
     /// Returns the peripheral data describing this SPI instance.
+    #[doc(hidden)]
     fn info(&self) -> &'static Info;
 }
 
@@ -596,9 +593,9 @@ pub trait Instance: Peripheral<P = Self> + Into<AnySpi> + 'static {
 #[doc(hidden)]
 pub trait InstanceDma: Instance + DmaEligible {}
 
-impl InstanceDma for crate::peripherals::SPI2 {}
+impl InstanceDma for crate::peripherals::SPI2<'_> {}
 #[cfg(spi3)]
-impl InstanceDma for crate::peripherals::SPI3 {}
+impl InstanceDma for crate::peripherals::SPI3<'_> {}
 
 /// Peripheral data describing a particular SPI instance.
 #[non_exhaustive]
@@ -796,7 +793,7 @@ unsafe impl Sync for Info {}
 macro_rules! spi_instance {
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
         paste::paste! {
-            impl Instance for crate::peripherals::[<SPI $num>] {
+            impl Instance for crate::peripherals::[<SPI $num>]<'_> {
                 #[inline(always)]
                 fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
@@ -829,7 +826,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl Instance for super::AnySpi {
+impl Instance for super::AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             super::AnySpiInner::Spi2(spi) => spi,
@@ -841,4 +838,4 @@ impl Instance for super::AnySpi {
     }
 }
 
-impl InstanceDma for super::AnySpi {}
+impl InstanceDma for super::AnySpi<'_> {}

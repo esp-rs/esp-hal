@@ -34,11 +34,7 @@
 //! # }
 //! ```
 
-use crate::{
-    pac::trace::RegisterBlock,
-    peripheral::{Peripheral, PeripheralRef},
-    system::PeripheralGuard,
-};
+use crate::{pac::trace::RegisterBlock, peripherals::TRACE0, system::PeripheralGuard};
 
 /// Errors returned from [Trace::stop_trace]
 #[derive(Debug, Clone, Copy)]
@@ -57,22 +53,15 @@ pub struct TraceResult {
 }
 
 /// TRACE Encoder Instance
-pub struct Trace<'d, T>
-where
-    T: Instance,
-{
-    peripheral: PeripheralRef<'d, T>,
+pub struct Trace<'d> {
+    peripheral: TRACE0<'d>,
     buffer: Option<&'d mut [u8]>,
     _guard: PeripheralGuard,
 }
 
-impl<'d, T> Trace<'d, T>
-where
-    T: Instance,
-{
+impl<'d> Trace<'d> {
     /// Construct a new instance
-    pub fn new(peripheral: impl Peripheral<P = T> + 'd) -> Self {
-        crate::into_ref!(peripheral);
+    pub fn new(peripheral: TRACE0<'d>) -> Self {
         let guard = PeripheralGuard::new(peripheral.peripheral());
 
         Self {
@@ -217,7 +206,7 @@ pub trait Instance: crate::private::Sealed {
     fn peripheral(&self) -> crate::system::Peripheral;
 }
 
-impl Instance for crate::peripherals::TRACE0 {
+impl Instance for TRACE0<'_> {
     fn register_block(&self) -> &RegisterBlock {
         self.register_block()
     }

@@ -130,7 +130,6 @@ use crate::{
     },
     interrupt::InterruptHandler,
     pac::twai0::RegisterBlock,
-    peripheral::{Peripheral, PeripheralRef},
     system::{Cpu, PeripheralGuard},
     twai::filter::SingleStandardFilter,
     Async,
@@ -656,7 +655,7 @@ impl BaudRate {
 
 /// An inactive TWAI peripheral in the "Reset"/configuration state.
 pub struct TwaiConfiguration<'d, Dm: DriverMode> {
-    twai: PeripheralRef<'d, AnyTwai>,
+    twai: AnyTwai<'d>,
     filter: Option<(FilterType, [u8; 8])>,
     phantom: PhantomData<Dm>,
     mode: TwaiMode,
@@ -668,7 +667,7 @@ where
     Dm: DriverMode,
 {
     fn new_internal(
-        twai: PeripheralRef<'d, AnyTwai>,
+        twai: AnyTwai<'d>,
         rx_pin: impl PeripheralInput<'d>,
         tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
@@ -936,14 +935,13 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new(
-        peripheral: impl Peripheral<P = impl Instance> + 'd,
+        peripheral: impl Instance + 'd,
         rx_pin: impl PeripheralInput<'d>,
         tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        crate::into_mapped_ref!(peripheral);
-        Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, false, mode)
+        Self::new_internal(peripheral.degrade(), rx_pin, tx_pin, baud_rate, false, mode)
     }
 
     /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
@@ -952,14 +950,13 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
     /// You don't need a transceiver by following the description in the
     /// `twai.rs` example
     pub fn new_no_transceiver(
-        peripheral: impl Peripheral<P = impl Instance> + 'd,
+        peripheral: impl Instance + 'd,
         rx_pin: impl PeripheralInput<'d>,
         tx_pin: impl PeripheralOutput<'d>,
         baud_rate: BaudRate,
         mode: TwaiMode,
     ) -> Self {
-        crate::into_mapped_ref!(peripheral);
-        Self::new_internal(peripheral, rx_pin, tx_pin, baud_rate, true, mode)
+        Self::new_internal(peripheral.degrade(), rx_pin, tx_pin, baud_rate, true, mode)
     }
 
     /// Convert the configuration into an async configuration.
@@ -1016,7 +1013,7 @@ impl crate::interrupt::InterruptConfigurable for TwaiConfiguration<'_, Blocking>
 /// In this mode, the TWAI controller can transmit and receive messages
 /// including error signals (such as error and overload frames).
 pub struct Twai<'d, Dm: DriverMode> {
-    twai: PeripheralRef<'d, AnyTwai>,
+    twai: AnyTwai<'d>,
     tx: TwaiTx<'d, Dm>,
     rx: TwaiRx<'d, Dm>,
     phantom: PhantomData<Dm>,
@@ -1121,7 +1118,7 @@ where
 
 /// Interface to the TWAI transmitter part.
 pub struct TwaiTx<'d, Dm: DriverMode> {
-    twai: PeripheralRef<'d, AnyTwai>,
+    twai: AnyTwai<'d>,
     phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
 }
@@ -1166,7 +1163,7 @@ where
 
 /// Interface to the TWAI receiver part.
 pub struct TwaiRx<'d, Dm: DriverMode> {
-    twai: PeripheralRef<'d, AnyTwai>,
+    twai: AnyTwai<'d>,
     phantom: PhantomData<Dm>,
     _guard: PeripheralGuard,
 }
@@ -1287,7 +1284,7 @@ where
 
 /// TWAI peripheral instance.
 #[doc(hidden)]
-pub trait Instance: Peripheral<P = Self> + Into<AnyTwai> + 'static {
+pub trait PrivateInstance: crate::private::Sealed {
     /// The identifier number for this TWAI instance.
     fn number(&self) -> usize;
 
@@ -1471,7 +1468,7 @@ fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
     }
 }
 
-impl Instance for crate::peripherals::TWAI0 {
+impl PrivateInstance for crate::peripherals::TWAI0<'_> {
     fn number(&self) -> usize {
         0
     }
@@ -1520,7 +1517,7 @@ impl Instance for crate::peripherals::TWAI0 {
 }
 
 #[cfg(twai1)]
-impl Instance for crate::peripherals::TWAI1 {
+impl PrivateInstance for crate::peripherals::TWAI1<'_> {
     fn number(&self) -> usize {
         1
     }
@@ -1558,15 +1555,15 @@ impl Instance for crate::peripherals::TWAI1 {
 
 crate::any_peripheral! {
     /// Any TWAI peripheral.
-    pub peripheral AnyTwai {
+    pub peripheral AnyTwai<'d> {
         #[cfg(twai0)]
-        Twai0(crate::peripherals::TWAI0),
+        Twai0(crate::peripherals::TWAI0<'d>),
         #[cfg(twai1)]
-        Twai1(crate::peripherals::TWAI1),
+        Twai1(crate::peripherals::TWAI1<'d>),
     }
 }
 
-impl Instance for AnyTwai {
+impl PrivateInstance for AnyTwai<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(twai0)]
@@ -1585,6 +1582,14 @@ impl Instance for AnyTwai {
         }
     }
 }
+
+/// A peripheral singleton compatible with the TWAI driver.
+pub trait Instance: PrivateInstance + IntoAnyTwai {}
+
+impl Instance for crate::peripherals::TWAI0<'_> {}
+#[cfg(twai1)]
+impl Instance for crate::peripherals::TWAI1<'_> {}
+impl Instance for AnyTwai<'_> {}
 
 mod asynch {
     use core::{future::poll_fn, task::Poll};
@@ -1642,14 +1647,13 @@ mod asynch {
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct TransmitFuture<'d, 'f> {
-        twai: PeripheralRef<'d, AnyTwai>,
+        twai: AnyTwai<'d>,
         frame: &'f EspTwaiFrame,
         in_flight: bool,
     }
 
     impl<'d, 'f> TransmitFuture<'d, 'f> {
-        pub fn new(twai: impl Peripheral<P = AnyTwai> + 'd, frame: &'f EspTwaiFrame) -> Self {
-            crate::into_ref!(twai);
+        pub fn new(twai: AnyTwai<'d>, frame: &'f EspTwaiFrame) -> Self {
             Self {
                 twai,
                 frame,
