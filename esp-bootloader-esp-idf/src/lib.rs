@@ -6,6 +6,8 @@
 //! bootloader.
 //!
 //! - populating the application-descriptor
+//! - read the partition table
+//! - conveniently use a partition to read and write flash contents
 //!
 //! ## Additional configuration
 //!
@@ -16,7 +18,15 @@
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_bootloader_esp_idf_config_table.md"))]
 #![doc = ""]
+//! ## Feature Flags
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
+
+// MUST be the first module
+mod fmt;
+
+pub mod partitions;
 
 /// ESP-IDF compatible application descriptor
 ///
@@ -25,7 +35,7 @@
 pub struct EspAppDesc {
     /// Magic word ESP_APP_DESC_MAGIC_WORD
     magic_word: u32,
-    /// Secure version               
+    /// Secure version
     secure_version: u32,
     /// Reserved
     reserv1: [u32; 2],

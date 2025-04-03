@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support ESP-IDF app descriptor (#3281)
 
+- Support reading partition tables and conveniently read/write partition content (#3316)
+
 ### Changed
 
 ### Fixed

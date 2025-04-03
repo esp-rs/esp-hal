@@ -32,6 +32,8 @@ jobs:
               - 'esp-backtrace/**'
             esp-build:
               - 'esp-build/**'
+            esp-bootloader-esp-idf:
+              - 'esp-bootloader-esp-idf/**'
             esp-config:
               - 'esp-config/**'
             esp-hal:
@@ -82,6 +84,14 @@ jobs:
           changeLogPath: esp-build/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-build/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-bootloader-esp-idf)
+        if: steps.changes.outputs.esp-bootloader-esp-idf == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-bootloader-esp-idf/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-bootloader-esp-idf/CHANGELOG.md file."
 
       - name: Check that changelog updated (esp-config)
         if: steps.changes.outputs.esp-config == 'true'
