@@ -85,9 +85,18 @@ macro_rules! any_enum {
 
 #[doc(hidden)]
 /// Shorthand to define AnyPeripheral instances.
+///
+/// This macro generates the following:
+///
+/// - An `AnyPeripheral` struct, name provided by the macro call.
+/// - An `AnyPeripheralInner` enum, with the same variants as the original
+///   peripheral.
+/// - A `From` implementation for each peripheral variant.
+/// - A `degrade` method for each peripheral variant using the
+///   `IntoAnyPeripheral` trait.
 #[macro_export]
 macro_rules! any_peripheral {
-    ($(#[$meta:meta])* $vis:vis peripheral $name:ident {
+    ($(#[$meta:meta])* $vis:vis peripheral $name:ident<'d> {
         $(
             $(#[cfg($variant_meta:meta)])*
             $variant:ident($inner:ty)
@@ -98,33 +107,46 @@ macro_rules! any_peripheral {
             ///
             /// This struct is a type-erased version of a peripheral singleton. It is useful
             /// for creating arrays of peripherals, or avoiding generics. Peripheral singletons
-            /// can be type erased by calling `degrade` on them.
+            /// can be type erased by using their `From` implementation.
             ///
             /// ```rust,ignore
-            /// let any_peripheral = peripheral.degrade();
+            #[doc = concat!("let any_peripheral = ", stringify!($name), "::from(peripheral);")]
             /// ```
             #[derive(Debug)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-            $vis struct $name([< $name Inner >]);
+            $vis struct $name<'d>([< $name Inner >]<'d>);
 
-            impl $crate::private::Sealed for $name {}
-
-            unsafe impl $crate::peripheral::Peripheral for $name {
-                type P = $name;
-
-                unsafe fn clone_unchecked(&self) -> Self::P {
+            impl $name<'_> {
+                /// Unsafely clone this peripheral reference.
+                ///
+                /// # Safety
+                ///
+                /// You must ensure that you're only using one instance of this type at a time.
+                #[inline]
+                pub unsafe fn clone_unchecked(&self) -> Self {
                     match &self.0 {
                         $(
                             $(#[cfg($variant_meta)])*
-                            [<$name Inner>]::$variant(inner) => $name::from(inner.clone_unchecked()),
+                            [< $name Inner >]::$variant(inner) => $name([<$name Inner>]::$variant(inner.clone_unchecked())),
                         )*
                     }
                 }
+
+                /// Creates a new peripheral reference with a shorter lifetime.
+                ///
+                /// Use this method if you would like to keep working with the peripheral after
+                /// you dropped the driver that consumes this.
+                #[inline]
+                pub fn reborrow(&mut self) -> $name<'_> {
+                    unsafe { self.clone_unchecked() }
+                }
             }
+
+            impl $crate::private::Sealed for $name<'_> {}
 
             $(#[$meta])*
             #[derive(Debug)]
-            enum [< $name Inner >] {
+            enum [< $name Inner >]<'d> {
                 $(
                     $(#[cfg($variant_meta)])*
                     $variant($inner),
@@ -132,7 +154,7 @@ macro_rules! any_peripheral {
             }
 
             #[cfg(feature = "defmt")]
-            impl defmt::Format for [< $name Inner >] {
+            impl defmt::Format for [< $name Inner >]<'_> {
                 fn format(&self, fmt: defmt::Formatter<'_>) {
                     match self {
                         $(
@@ -143,19 +165,44 @@ macro_rules! any_peripheral {
                 }
             }
 
+            // Trick to make peripherals implement Into, without
+            // requiring Instance traits to have lifetimes.
+            #[doc(hidden)]
+            pub trait [<Into $name>]: Sized + $crate::private::Sealed {
+                fn degrade<'a>(self) -> $name<'a>
+                where
+                    Self: 'a;
+            }
+
+            // AnyPeripheral converts into itself
+            impl<'d> [<Into $name>] for $name<'d> {
+                #[inline]
+                fn degrade<'a>(self) -> $name<'a>
+                where
+                    Self: 'a,
+                {
+                    self
+                }
+            }
+
             $(
+                // Variants convert into AnyPeripheral
                 $(#[cfg($variant_meta)])*
-                impl From<$inner> for $name {
-                    fn from(inner: $inner) -> Self {
-                        Self([< $name Inner >]::$variant(inner))
+                impl<'d> [<Into $name>] for $inner {
+                    #[inline]
+                    fn degrade<'a>(self) -> $name<'a>
+                    where
+                        Self: 'a,
+                    {
+                        $name::from(self)
                     }
                 }
 
                 $(#[cfg($variant_meta)])*
-                impl $inner {
-                    #[doc = concat!("Type-erase this peripheral into an [`", stringify!($name), "`].")]
-                    pub fn degrade(self) -> $name {
-                        $name::from(self)
+                impl<'d> From<$inner> for $name<'d> {
+                    #[inline]
+                    fn from(inner: $inner) -> Self {
+                        Self([< $name Inner >]::$variant(inner))
                     }
                 }
             )*

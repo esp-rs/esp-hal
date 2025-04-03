@@ -89,7 +89,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     let mut bluetooth = peripherals.BT;
 
-    let connector = BleConnector::new(&esp_wifi_ctrl, &mut bluetooth);
+    let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth.reborrow());
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut ble = Ble::new(connector, now);

@@ -23,9 +23,9 @@ use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel0 = esp_hal::dma::I2s0DmaChannel;
+        type DmaChannel0<'d> = esp_hal::dma::I2s0DmaChannel<'d>;
     } else {
-        type DmaChannel0 = esp_hal::dma::DmaChannel0;
+        type DmaChannel0<'d> = esp_hal::dma::DmaChannel0<'d>;
     }
 }
 
@@ -100,9 +100,9 @@ mod tests {
     use super::*;
 
     struct Context {
-        dout: AnyPin,
-        dma_channel: DmaChannel0,
-        i2s: I2S0,
+        dout: AnyPin<'static>,
+        dma_channel: DmaChannel0<'static>,
+        i2s: I2S0<'static>,
     }
 
     #[init]

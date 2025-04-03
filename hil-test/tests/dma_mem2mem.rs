@@ -18,15 +18,15 @@ const DATA_SIZE: usize = 1024 * 10;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32c2, esp32c6, esp32h2))] {
-        type DmaPeripheralType = esp_hal::peripherals::MEM2MEM1;
+        type DmaPeripheralType<'d> = esp_hal::peripherals::MEM2MEM1<'d>;
     } else {
-        type DmaPeripheralType = esp_hal::peripherals::SPI2;
+        type DmaPeripheralType<'d> = esp_hal::peripherals::SPI2<'d>;
     }
 }
 
 struct Context {
-    channel: AnyGdmaChannel,
-    dma_peripheral: DmaPeripheralType,
+    channel: AnyGdmaChannel<'static>,
+    dma_peripheral: DmaPeripheralType<'static>,
 }
 
 #[cfg(test)]

@@ -14,54 +14,54 @@
 //!
 //! <em>PS: Note that the number of DMA channels is chip-specific.</em>
 
+use core::marker::PhantomData;
+
 use critical_section::CriticalSection;
 
 use crate::{
     dma::*,
     handler,
     interrupt::Priority,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{pac, Interrupt, DMA},
 };
 
 /// An arbitrary GDMA channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyGdmaChannel(u8);
-
-unsafe impl Peripheral for AnyGdmaChannel {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self(self.0)
-    }
+pub struct AnyGdmaChannel<'d> {
+    channel: u8,
+    _lifetime: PhantomData<&'d mut ()>,
 }
 
-impl crate::private::Sealed for AnyGdmaChannel {}
-impl DmaChannel for AnyGdmaChannel {
-    type Rx = AnyGdmaRxChannel;
-    type Tx = AnyGdmaTxChannel;
+impl crate::private::Sealed for AnyGdmaChannel<'_> {}
+impl<'d> DmaChannel for AnyGdmaChannel<'d> {
+    type Rx = AnyGdmaRxChannel<'d>;
+    type Tx = AnyGdmaTxChannel<'d>;
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
-        (AnyGdmaRxChannel(self.0), AnyGdmaTxChannel(self.0))
+        (
+            AnyGdmaRxChannel {
+                channel: self.channel,
+                _lifetime: PhantomData,
+            },
+            AnyGdmaTxChannel {
+                channel: self.channel,
+                _lifetime: PhantomData,
+            },
+        )
     }
 }
 
 /// An arbitrary GDMA RX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyGdmaRxChannel(u8);
-
-unsafe impl Peripheral for AnyGdmaRxChannel {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self(self.0)
-    }
+pub struct AnyGdmaRxChannel<'d> {
+    channel: u8,
+    _lifetime: PhantomData<&'d mut ()>,
 }
 
-impl DmaChannelConvert<AnyGdmaRxChannel> for AnyGdmaRxChannel {
-    fn degrade(self) -> AnyGdmaRxChannel {
+impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for AnyGdmaRxChannel<'d> {
+    fn degrade(self) -> AnyGdmaRxChannel<'d> {
         self
     }
 }
@@ -69,18 +69,13 @@ impl DmaChannelConvert<AnyGdmaRxChannel> for AnyGdmaRxChannel {
 /// An arbitrary GDMA TX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyGdmaTxChannel(u8);
-
-unsafe impl Peripheral for AnyGdmaTxChannel {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self(self.0)
-    }
+pub struct AnyGdmaTxChannel<'d> {
+    channel: u8,
+    _lifetime: PhantomData<&'d mut ()>,
 }
 
-impl DmaChannelConvert<AnyGdmaTxChannel> for AnyGdmaTxChannel {
-    fn degrade(self) -> AnyGdmaTxChannel {
+impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for AnyGdmaTxChannel<'d> {
+    fn degrade(self) -> AnyGdmaTxChannel<'d> {
         self
     }
 }
@@ -98,33 +93,33 @@ cfg_if::cfg_if! {
     }
 }
 
-impl crate::private::Sealed for AnyGdmaTxChannel {}
-impl DmaTxChannel for AnyGdmaTxChannel {}
+impl crate::private::Sealed for AnyGdmaTxChannel<'_> {}
+impl DmaTxChannel for AnyGdmaTxChannel<'_> {}
 
-impl AnyGdmaTxChannel {
+impl AnyGdmaTxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &pac::dma::ch::CH {
-        DMA::regs().ch(self.0 as usize)
+        DMA::regs().ch(self.channel as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
     fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.0 as usize)
+        DMA::regs().int_ch(self.channel as usize)
     }
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     fn int(&self) -> &pac::dma::out_int_ch::OUT_INT_CH {
-        DMA::regs().out_int_ch(self.0 as usize)
+        DMA::regs().out_int_ch(self.channel as usize)
     }
     #[cfg(esp32s3)]
     #[inline(always)]
     fn int(&self) -> &pac::dma::ch::out_int::OUT_INT {
-        DMA::regs().ch(self.0 as usize).out_int()
+        DMA::regs().ch(self.channel as usize).out_int()
     }
 }
 
-impl RegisterAccess for AnyGdmaTxChannel {
+impl RegisterAccess for AnyGdmaTxChannel<'_> {
     fn reset(&self) {
         let conf0 = self.ch().out_conf0();
         conf0.modify(|_, w| w.out_rst().set_bit());
@@ -198,7 +193,7 @@ impl RegisterAccess for AnyGdmaTxChannel {
     }
 }
 
-impl TxRegisterAccess for AnyGdmaTxChannel {
+impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(esp32s3)] {
@@ -224,7 +219,7 @@ impl TxRegisterAccess for AnyGdmaTxChannel {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        match self.0 {
+        match self.channel {
             0 => DmaChannel0::handler_out(),
             #[cfg(not(esp32c2))]
             1 => DmaChannel1::handler_out(),
@@ -239,7 +234,7 @@ impl TxRegisterAccess for AnyGdmaTxChannel {
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        match self.0 {
+        match self.channel {
             0 => DmaChannel0::isr_out(),
             #[cfg(not(esp32c2))]
             1 => DmaChannel1::isr_out(),
@@ -254,7 +249,7 @@ impl TxRegisterAccess for AnyGdmaTxChannel {
     }
 }
 
-impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel {
+impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -324,13 +319,13 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &TX_WAKERS[self.0 as usize]
+        &TX_WAKERS[self.channel as usize]
     }
 
     fn is_async(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                TX_IS_ASYNC[self.0 as usize].load(portable_atomic::Ordering::Acquire)
+                TX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
             } else {
                 true
             }
@@ -340,41 +335,41 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel {
     fn set_async(&self, _is_async: bool) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                TX_IS_ASYNC[self.0 as usize].store(_is_async, portable_atomic::Ordering::Release);
+                TX_IS_ASYNC[self.channel as usize].store(_is_async, portable_atomic::Ordering::Release);
             }
         }
     }
 }
 
-impl crate::private::Sealed for AnyGdmaRxChannel {}
-impl DmaRxChannel for AnyGdmaRxChannel {}
+impl crate::private::Sealed for AnyGdmaRxChannel<'_> {}
+impl DmaRxChannel for AnyGdmaRxChannel<'_> {}
 
-impl AnyGdmaRxChannel {
+impl AnyGdmaRxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &pac::dma::ch::CH {
-        DMA::regs().ch(self.0 as usize)
+        DMA::regs().ch(self.channel as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
     fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.0 as usize)
+        DMA::regs().int_ch(self.channel as usize)
     }
 
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     fn int(&self) -> &pac::dma::in_int_ch::IN_INT_CH {
-        DMA::regs().in_int_ch(self.0 as usize)
+        DMA::regs().in_int_ch(self.channel as usize)
     }
 
     #[cfg(esp32s3)]
     #[inline(always)]
     fn int(&self) -> &pac::dma::ch::in_int::IN_INT {
-        DMA::regs().ch(self.0 as usize).in_int()
+        DMA::regs().ch(self.channel as usize).in_int()
     }
 }
 
-impl RegisterAccess for AnyGdmaRxChannel {
+impl RegisterAccess for AnyGdmaRxChannel<'_> {
     fn reset(&self) {
         let conf0 = self.ch().in_conf0();
         conf0.modify(|_, w| w.in_rst().set_bit());
@@ -446,7 +441,7 @@ impl RegisterAccess for AnyGdmaRxChannel {
     }
 }
 
-impl RxRegisterAccess for AnyGdmaRxChannel {
+impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
     fn set_mem2mem_mode(&self, value: bool) {
         self.ch()
             .in_conf0()
@@ -454,7 +449,7 @@ impl RxRegisterAccess for AnyGdmaRxChannel {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        match self.0 {
+        match self.channel {
             0 => DmaChannel0::handler_in(),
             #[cfg(not(esp32c2))]
             1 => DmaChannel1::handler_in(),
@@ -469,7 +464,7 @@ impl RxRegisterAccess for AnyGdmaRxChannel {
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        match self.0 {
+        match self.channel {
             0 => DmaChannel0::isr_in(),
             #[cfg(not(esp32c2))]
             1 => DmaChannel1::isr_in(),
@@ -484,7 +479,7 @@ impl RxRegisterAccess for AnyGdmaRxChannel {
     }
 }
 
-impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel {
+impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -562,13 +557,13 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &RX_WAKERS[self.0 as usize]
+        &RX_WAKERS[self.channel as usize]
     }
 
     fn is_async(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                RX_IS_ASYNC[self.0 as usize].load(portable_atomic::Ordering::Acquire)
+                RX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
             } else {
                 true
             }
@@ -578,15 +573,15 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel {
     fn set_async(&self, _is_async: bool) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                RX_IS_ASYNC[self.0 as usize].store(_is_async, portable_atomic::Ordering::Release);
+                RX_IS_ASYNC[self.channel as usize].store(_is_async, portable_atomic::Ordering::Release);
             }
         }
     }
 }
 
-impl<CH: DmaChannel, Dm: DriverMode> Channel<'_, Dm, CH> {
+impl<CH: DmaChannel, Dm: DriverMode> Channel<Dm, CH> {
     /// Asserts that the channel is compatible with the given peripheral.
-    pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &PeripheralRef<'_, P>) {
+    pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &P) {
         // No runtime checks; GDMA channels are compatible with any peripheral
     }
 }
@@ -594,34 +589,9 @@ impl<CH: DmaChannel, Dm: DriverMode> Channel<'_, Dm, CH> {
 macro_rules! impl_channel {
     ($num:literal, $interrupt_in:ident $(, $interrupt_out:ident)? ) => {
         paste::paste! {
-            /// A description of a specific GDMA channel
-            #[non_exhaustive]
-            #[derive(Debug, PartialEq, Eq)]
-            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-            pub struct [<DmaChannel $num>] {}
+            $crate::create_peripheral!([<DmaChannel $num>] <= virtual);
 
-            impl $crate::private::Sealed for [<DmaChannel $num>] {}
-
-            unsafe impl Peripheral for [<DmaChannel $num>] {
-                type P = Self;
-
-                unsafe fn clone_unchecked(&self) -> Self::P {
-                    Self::steal()
-                }
-            }
-
-            impl [<DmaChannel $num>] {
-                /// Unsafely constructs a new DMA channel.
-                ///
-                /// # Safety
-                ///
-                /// The caller must ensure that only a single instance is used.
-                pub unsafe fn steal() -> Self {
-                    Self {}
-                }
-            }
-
-            impl [<DmaChannel $num>] {
+            impl [<DmaChannel $num>]<'_> {
                 fn handler_in() -> Option<InterruptHandler> {
                     $crate::if_set! {
                         $({
@@ -629,15 +599,15 @@ macro_rules! impl_channel {
                             #[handler(priority = Priority::max())]
                             fn interrupt_handler_in() {
                                 $crate::ignore!($interrupt_out);
-                                super::asynch::handle_in_interrupt::<[< DmaChannel $num >]>();
+                                super::asynch::handle_in_interrupt::<[< DmaChannel $num >]<'static>>();
                             }
                             Some(interrupt_handler_in)
                         })?,
                         {
                             #[handler(priority = Priority::max())]
                             fn interrupt_handler() {
-                                super::asynch::handle_in_interrupt::<[< DmaChannel $num >]>();
-                                super::asynch::handle_out_interrupt::<[< DmaChannel $num >]>();
+                                super::asynch::handle_in_interrupt::<[< DmaChannel $num >]<'static>>();
+                                super::asynch::handle_out_interrupt::<[< DmaChannel $num >]<'static>>();
                             }
                             Some(interrupt_handler)
                         }
@@ -654,7 +624,7 @@ macro_rules! impl_channel {
                             #[handler(priority = Priority::max())]
                             fn interrupt_handler_out() {
                                 $crate::ignore!($interrupt_out);
-                                super::asynch::handle_out_interrupt::<[< DmaChannel $num >]>();
+                                super::asynch::handle_out_interrupt::<[< DmaChannel $num >]<'static>>();
                             }
                             Some(interrupt_handler_out)
                         })?,
@@ -667,40 +637,64 @@ macro_rules! impl_channel {
                 }
             }
 
-            impl DmaChannel for [<DmaChannel $num>] {
-                type Rx = AnyGdmaRxChannel;
-                type Tx = AnyGdmaTxChannel;
+            impl<'d> DmaChannel for [<DmaChannel $num>]<'d> {
+                type Rx = AnyGdmaRxChannel<'d>;
+                type Tx = AnyGdmaTxChannel<'d>;
 
                 unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
-                    (AnyGdmaRxChannel($num), AnyGdmaTxChannel($num))
+                    (
+                        AnyGdmaRxChannel {
+                            channel: $num,
+                            _lifetime: core::marker::PhantomData,
+                        },
+                        AnyGdmaTxChannel {
+                            channel: $num,
+                            _lifetime: core::marker::PhantomData,
+                        },
+                    )
                 }
             }
 
-            impl DmaChannelConvert<AnyGdmaChannel> for [<DmaChannel $num>] {
-                fn degrade(self) -> AnyGdmaChannel {
-                    AnyGdmaChannel($num)
+            impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for [<DmaChannel $num>]<'d> {
+                fn degrade(self) -> AnyGdmaChannel<'d> {
+                    AnyGdmaChannel {
+                        channel: $num,
+                        _lifetime: core::marker::PhantomData,
+                    }
                 }
             }
 
-            impl DmaChannelConvert<AnyGdmaRxChannel> for [<DmaChannel $num>] {
-                fn degrade(self) -> AnyGdmaRxChannel {
-                    AnyGdmaRxChannel($num)
+            impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for [<DmaChannel $num>]<'d> {
+                fn degrade(self) -> AnyGdmaRxChannel<'d> {
+                    AnyGdmaRxChannel {
+                        channel: $num,
+                        _lifetime: core::marker::PhantomData,
+                    }
                 }
             }
 
-            impl DmaChannelConvert<AnyGdmaTxChannel> for [<DmaChannel $num>] {
-                fn degrade(self) -> AnyGdmaTxChannel {
-                    AnyGdmaTxChannel($num)
+            impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for [<DmaChannel $num>]<'d> {
+                fn degrade(self) -> AnyGdmaTxChannel<'d> {
+                    AnyGdmaTxChannel {
+                        channel: $num,
+                        _lifetime: core::marker::PhantomData,
+                    }
                 }
             }
 
-            impl DmaChannelExt for [<DmaChannel $num>] {
+            impl DmaChannelExt for [<DmaChannel $num>]<'_> {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    AnyGdmaRxChannel($num)
+                    AnyGdmaRxChannel {
+                        channel: $num,
+                        _lifetime: core::marker::PhantomData,
+                    }
                 }
 
                 fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    AnyGdmaTxChannel($num)
+                    AnyGdmaTxChannel {
+                        channel: $num,
+                        _lifetime: core::marker::PhantomData,
+                    }
                 }
             }
         }

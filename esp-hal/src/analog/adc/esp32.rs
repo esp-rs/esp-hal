@@ -1,10 +1,7 @@
 use core::marker::PhantomData;
 
 use super::{AdcConfig, Attenuation};
-use crate::{
-    peripheral::PeripheralRef,
-    peripherals::{ADC1, ADC2, RTC_IO, SENS},
-};
+use crate::peripherals::{ADC1, ADC2, RTC_IO, SENS};
 
 pub(super) const NUM_ATTENS: usize = 10;
 
@@ -49,7 +46,7 @@ pub trait RegisterAccess {
     fn read_data_sar() -> u16;
 }
 
-impl RegisterAccess for ADC1 {
+impl RegisterAccess for ADC1<'_> {
     fn set_bit_width(resolution: u8) {
         SENS::regs()
             .sar_start_force()
@@ -124,7 +121,7 @@ impl RegisterAccess for ADC1 {
     }
 }
 
-impl RegisterAccess for ADC2 {
+impl RegisterAccess for ADC2<'_> {
     fn set_bit_width(resolution: u8) {
         SENS::regs()
             .sar_start_force()
@@ -201,22 +198,19 @@ impl RegisterAccess for ADC2 {
 
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
-    _adc: PeripheralRef<'d, ADC>,
+    _adc: ADC,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
-    _phantom: PhantomData<Dm>,
+    _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI, crate::Blocking>
 where
-    ADCI: RegisterAccess,
+    ADCI: RegisterAccess + 'd,
 {
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
-    pub fn new(
-        adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
-        config: AdcConfig<ADCI>,
-    ) -> Self {
+    pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
         let sensors = SENS::regs();
 
         // Set reading and sampling resolution
@@ -280,7 +274,7 @@ where
             .modify(|_, w| w.sar2_data_inv().set_bit());
 
         Adc {
-            _adc: adc_instance.into_ref(),
+            _adc: adc_instance,
             attenuations: config.attenuations,
             active_channel: None,
             _phantom: PhantomData,
@@ -352,29 +346,29 @@ impl<ADC1> Adc<'_, ADC1, crate::Blocking> {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<36>, 0), // Alt. name: SENSOR_VP
-            (GpioPin<37>, 1), // Alt. name: SENSOR_CAPP
-            (GpioPin<38>, 2), // Alt. name: SENSOR_CAPN
-            (GpioPin<39>, 3), // Alt. name: SENSOR_VN
-            (GpioPin<33>, 4), // Alt. name: 32K_XP
-            (GpioPin<32>, 5), // Alt. name: 32K_XN
-            (GpioPin<34>, 6), // Alt. name: VDET_1
-            (GpioPin<35>, 7), // Alt. name: VDET_2
+            (GpioPin<'_, 36>, 0), // Alt. name: SENSOR_VP
+            (GpioPin<'_, 37>, 1), // Alt. name: SENSOR_CAPP
+            (GpioPin<'_, 38>, 2), // Alt. name: SENSOR_CAPN
+            (GpioPin<'_, 39>, 3), // Alt. name: SENSOR_VN
+            (GpioPin<'_, 33>, 4), // Alt. name: 32K_XP
+            (GpioPin<'_, 32>, 5), // Alt. name: 32K_XN
+            (GpioPin<'_, 34>, 6), // Alt. name: VDET_1
+            (GpioPin<'_, 35>, 7), // Alt. name: VDET_2
         ]
     }
 
     crate::analog::adc::impl_adc_interface! {
         ADC2 [
-            (GpioPin<4>,  0),
-            (GpioPin<0>,  1),
-            (GpioPin<2>,  2),
-            (GpioPin<15>, 3), // Alt. name: MTDO
-            (GpioPin<13>, 4), // Alt. name: MTCK
-            (GpioPin<12>, 5), // Alt. name: MTDI
-            (GpioPin<14>, 6), // Alt. name: MTMS
-            (GpioPin<27>, 7),
-            (GpioPin<25>, 8),
-            (GpioPin<26>, 9),
+            (GpioPin<'_, 4>,  0),
+            (GpioPin<'_, 0>,  1),
+            (GpioPin<'_, 2>,  2),
+            (GpioPin<'_, 15>, 3), // Alt. name: MTDO
+            (GpioPin<'_, 13>, 4), // Alt. name: MTCK
+            (GpioPin<'_, 12>, 5), // Alt. name: MTDI
+            (GpioPin<'_, 14>, 6), // Alt. name: MTMS
+            (GpioPin<'_, 27>, 7),
+            (GpioPin<'_, 25>, 8),
+            (GpioPin<'_, 26>, 9),
         ]
     }
 }

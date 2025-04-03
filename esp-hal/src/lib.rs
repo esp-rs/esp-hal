@@ -4,11 +4,6 @@
 )]
 //! # Bare-metal (`no_std`) HAL for all Espressif ESP32 devices.
 //!
-//! ## Overview
-//! The HAL implements both blocking _and_ async
-//! APIs for many peripherals. Where applicable, driver implement
-//! the [embedded-hal] and [embedded-hal-async] traits.
-//!
 //! This documentation is built for the
 #![cfg_attr(esp32, doc = "**ESP32**")]
 #![cfg_attr(esp32s2, doc = "**ESP32-S2**")]
@@ -24,6 +19,60 @@
 //!
 //! Depending on your target device, you need to enable the chip feature
 //! for that device. You may also need to do this on ancillary esp-hal crates.
+//!
+//! ## Overview
+//!
+//! ### Peripheral drivers
+//!
+//! The HAL implements both blocking _and_ async APIs for many peripherals.
+//! Where applicable, driver implement the [embedded-hal] and
+//! [embedded-hal-async] traits.
+//!
+//! ### Peripheral singletons
+//!
+//! Each peripheral driver needs a peripheral singleton that tells the driver
+//! which hardware block to use. The peripheral singletons are created by the
+//! HAL initialization, and are returned from [`init`] as fields of the
+//! [`Peripherals`] struct.
+//!
+//! These singletons, by default, represent peripherals for the entire lifetime
+//! of the program. To allow for reusing peripherals, the HAL provides a
+//! `reborrow` method on each peripheral singleton. This method creates a new
+//! handle to the peripheral with a shorter lifetime. This allows you to pass
+//! the handle to a driver, while still keeping the original handle alive. Once
+//! you drop the driver, you will be able to reborrow the peripheral again.
+//!
+//! For example, if you want to use the [`I2c`](i2c::master::I2c) driver and you
+//! don't intend to drop the driver, you can pass the peripheral singleton to
+//! the driver by value:
+//!
+//! ```rust, ignore
+//! // Peripheral singletons are returned from the `init` function.
+//! let peripherals = esp_hal::init(esp_hal::Config::default());
+//!
+//! let mut i2c = I2C::new(peripherals.I2C0, /* ... */);
+//! ```
+//!
+//! If you want to use the peripheral in multiple places (for example, you want
+//! to drop the driver for some period of time to minimize power consumption),
+//! you can reborrow the peripheral singleton and pass it to the driver by
+//! reference:
+//!
+//! ```rust, ignore
+//! // Note that in this case, `peripherals` needs to be mutable.
+//! let mut peripherals = esp_hal::init(esp_hal::Config::default());
+//!
+//! let i2c = I2C::new(peripherals.I2C0.reborrow(), /* ... */);
+//!
+//! // Do something with the I2C driver...
+//!
+//! core::mem::drop(i2c); // Drop the driver to minimize power consumption.
+//!
+//! // Do something else...
+//!
+//! // You can then take or reborrow the peripheral singleton again.
+//! let i2c = I2C::new(peripherals.I2C0.reborrow(), /* ... */);
+//! ```
 //!
 //! ## Examples
 //!
@@ -105,16 +154,6 @@
 //! It's important to note that due to a [bug in cargo](https://github.com/rust-lang/cargo/issues/10358),
 //! any modifications to the environment, local or otherwise will only get
 //! picked up on a full clean build of the project.
-//!
-//! ## `Peripheral` Pattern
-//!
-//! Drivers take pins and peripherals as [peripheral::Peripheral] in most
-//! circumstances. This means you can pass the pin/peripheral or a mutable
-//! reference to the pin/peripheral.
-//!
-//! The latter can be used to regain access to the pin when the driver gets
-//! dropped. Then it's possible to reuse the pin/peripheral for a different
-//! purpose.
 //!
 //! ## Don't use `core::mem::forget`
 //!
@@ -534,7 +573,7 @@ pub fn init(config: Config) -> Peripherals {
     let mut peripherals = Peripherals::take();
 
     // RTC domain must be enabled before we try to disable
-    let mut rtc = crate::rtc_cntl::Rtc::new(&mut peripherals.LPWR);
+    let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
     // Handle watchdog configuration with defaults
     cfg_if::cfg_if! {
@@ -560,24 +599,24 @@ pub fn init(config: Config) -> Peripherals {
 
             match config.watchdog.timg0() {
                 WatchdogStatus::Enabled(duration) => {
-                    let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new();
+                    let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new();
                     timg0_wd.enable();
                     timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
                 }
                 WatchdogStatus::Disabled => {
-                    crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new().disable();
+                    crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
                 }
             }
 
             #[cfg(timg1)]
             match config.watchdog.timg1() {
                 WatchdogStatus::Enabled(duration) => {
-                    let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new();
+                    let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new();
                     timg1_wd.enable();
                     timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
                 }
                 WatchdogStatus::Disabled => {
-                    crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new().disable();
+                    crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
                 }
             }
         }
@@ -588,10 +627,10 @@ pub fn init(config: Config) -> Peripherals {
 
             rtc.rwdt.disable();
 
-            crate::timer::timg::Wdt::<crate::peripherals::TIMG0>::new().disable();
+            crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
 
             #[cfg(timg1)]
-            crate::timer::timg::Wdt::<crate::peripherals::TIMG1>::new().disable();
+            crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
         }
     }
 

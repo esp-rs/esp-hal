@@ -26,20 +26,17 @@
 use crate::{
     interrupt::InterruptHandler,
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, ASSIST_DEBUG},
 };
 
 /// The debug assist driver instance.
 pub struct DebugAssist<'d> {
-    debug_assist: PeripheralRef<'d, ASSIST_DEBUG>,
+    debug_assist: ASSIST_DEBUG<'d>,
 }
 
 impl<'d> DebugAssist<'d> {
     /// Create a new instance in [crate::Blocking] mode.
-    pub fn new(debug_assist: impl Peripheral<P = ASSIST_DEBUG> + 'd) -> Self {
-        crate::into_ref!(debug_assist);
-
+    pub fn new(debug_assist: ASSIST_DEBUG<'d>) -> Self {
         // NOTE: We should enable the debug assist, however, it's always enabled in ROM
         //       code already.
 

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Experimental metadata in the output `.elf` (#3276)
 - `PeripheralInput::connect_input_to_peripheral` and `PeripheralOuptut::{connect_peripheral_to_output, disconnect_from_peripheral_output}` (#3302)
 - `ESP_HAL_CONFIG_CRITICAL_SECTION_IMPL` to allow opting out of the default `critical-section` implementation (#3293)
+- All peripheral singletons (`GpioPin<...>`, `SPIn`, ...) now have a lifetime, as well as `steal`, `reborrow` and `clone_unchecked` methods (#3305)
 
 ### Changed
 
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2S driver now takes `DmaDescriptor`s later in construction (#3324)
 - `gpio::interconnect` types now have a lifetime associated with them (#3302)
 - The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)
+- `Trace` is no longer generic (#3305)
 
 ### Fixed
 
@@ -45,7 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- `gpio::{Level, NoPin, Input, Output, Flex}` no longer implement `Peripheral` (#3302)
+- The `Peripheral` trait and `PeripheralRef` struct have been removed (#3302, #3305)
+- Removed the inherent `degrade` method from peripheral singletons. (#3305)
 
 ## v1.0.0-beta.0
 

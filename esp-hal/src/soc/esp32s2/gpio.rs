@@ -321,7 +321,7 @@ macro_rules! rtcio_analog {
     (
         $pin_num:expr, $pin_reg:expr, $prefix:pat, $hold:ident
     ) => {
-        impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
+        impl $crate::gpio::RtcPin for GpioPin<'_, $pin_num> {
             fn rtc_number(&self) -> u8 {
                 $pin_num
             }
@@ -349,7 +349,7 @@ macro_rules! rtcio_analog {
             }
         }
 
-        impl $crate::gpio::RtcPinWithResistors for GpioPin<$pin_num>
+        impl $crate::gpio::RtcPinWithResistors for GpioPin<'_, $pin_num>
         {
             fn rtcio_pullup(&self, enable: bool) {
                 paste::paste! {
@@ -366,7 +366,7 @@ macro_rules! rtcio_analog {
             }
         }
 
-        impl $crate::gpio::AnalogPin for GpioPin<$pin_num> {
+        impl $crate::gpio::AnalogPin for GpioPin<'_, $pin_num> {
             /// Configures the pin for analog mode.
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::gpio::RtcPin;
@@ -454,8 +454,8 @@ impl InterruptStatusRegisterAccess {
 }
 
 // implement marker traits on USB pins
-impl crate::otg_fs::UsbDm for GpioPin<19> {}
-impl crate::otg_fs::UsbDp for GpioPin<20> {}
+impl crate::otg_fs::UsbDm for GpioPin<'_, 19> {}
+impl crate::otg_fs::UsbDp for GpioPin<'_, 20> {}
 
 fn enable_iomux_clk_gate() {
     SENS::regs()

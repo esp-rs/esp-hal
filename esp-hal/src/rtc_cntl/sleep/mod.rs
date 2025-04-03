@@ -23,11 +23,6 @@ use crate::gpio::RtcPin as RtcIoWakeupPinType;
 #[cfg(any(esp32c3, esp32c6, esp32c2))]
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
 use crate::rtc_cntl::Rtc;
-#[cfg(any(esp32, esp32s3))]
-use crate::{
-    into_ref,
-    peripheral::{Peripheral, PeripheralRef},
-};
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
@@ -112,7 +107,7 @@ pub enum Error {
 ///
 /// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin_4 = peripherals.GPIO4;
-/// let pin_4_input = Input::new(&mut pin_4, config);
+/// let pin_4_input = Input::new(pin_4.reborrow(), config);
 ///
 /// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
@@ -122,7 +117,7 @@ pub enum Error {
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
 /// core::mem::drop(pin_4_input);
-/// let ext0 = Ext0WakeupSource::new(&mut pin_4, WakeupLevel::High);
+/// let ext0 = Ext0WakeupSource::new(pin_4, WakeupLevel::High);
 ///
 /// delay.delay_millis(100);
 /// rtc.sleep_deep(&[&timer, &ext0]);
@@ -130,19 +125,18 @@ pub enum Error {
 /// # }
 /// ```
 #[cfg(any(esp32, esp32s3))]
-pub struct Ext0WakeupSource<'a, P: RtcIoWakeupPinType> {
+pub struct Ext0WakeupSource<P: RtcIoWakeupPinType> {
     /// The pin used as the wake-up source.
-    pin: RefCell<PeripheralRef<'a, P>>,
+    pin: RefCell<P>,
     /// The level at which the wake-up event is triggered.
     level: WakeupLevel,
 }
 
 #[cfg(any(esp32, esp32s3))]
-impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
+impl<P: RtcIoWakeupPinType> Ext0WakeupSource<P> {
     /// Creates a new external wake-up source (Ext0``) with the specified pin
     /// and wake-up level.
-    pub fn new(pin: impl Peripheral<P = P> + 'a, level: WakeupLevel) -> Self {
-        into_ref!(pin);
+    pub fn new(pin: P, level: WakeupLevel) -> Self {
         Self {
             pin: RefCell::new(pin),
             level,
@@ -159,7 +153,6 @@ impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPin};
-/// # use esp_hal::peripheral::Peripheral;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -167,7 +160,7 @@ impl<'a, P: RtcIoWakeupPinType> Ext0WakeupSource<'a, P> {
 /// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin_2 = peripherals.GPIO2;
 /// let mut pin_4 = peripherals.GPIO4;
-/// let pin_4_driver = Input::new(&mut pin_4, config);
+/// let pin_4_driver = Input::new(pin_4.reborrow(), config);
 ///
 /// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
@@ -216,7 +209,6 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPinWithResistors};
-/// # use esp_hal::peripheral::Peripheral;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -224,7 +216,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// let config = InputConfig::default().with_pull(Pull::None);
 /// let mut pin2 = peripherals.GPIO2;
 /// let mut pin3 = peripherals.GPIO3;
-/// let mut pin2_input = Input::new(&mut pin2, config);
+/// let mut pin2_input = Input::new(pin2.reborrow(), config);
 ///
 /// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
@@ -277,7 +269,6 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use esp_hal::gpio::{self, Input, InputConfig, Pull};
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
-/// # use esp_hal::peripheral::Peripheral;
 ///
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///

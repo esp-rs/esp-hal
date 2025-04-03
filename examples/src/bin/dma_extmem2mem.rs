@@ -39,7 +39,7 @@ macro_rules! dma_alloc_buffer {
     }};
 }
 
-fn init_heap(psram: &esp_hal::peripherals::PSRAM) {
+fn init_heap(psram: &esp_hal::peripherals::PSRAM<'_>) {
     let (start, size) = esp_hal::psram::psram_raw_parts(psram);
     info!("init_heap: start: {:p}", start);
     unsafe {

@@ -106,12 +106,7 @@ use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-use esp_hal::{
-    self as hal,
-    clock::RadioClockController,
-    peripheral::Peripheral,
-    peripherals::RADIO_CLK,
-};
+use esp_hal::{self as hal, clock::RadioClockController, peripherals::RADIO_CLK};
 use hal::{
     clock::Clocks,
     rng::{Rng, Trng},
@@ -298,45 +293,38 @@ impl Drop for EspWifiController<'_> {
 /// A trait to allow better UX for initializing esp-wifi.
 ///
 /// This trait is meant to be used only for the `init` function.
-/// Calling `timers()` multiple times may panic.
 pub trait EspWifiTimerSource: private::Sealed {
     /// Returns the timer source.
-    fn timer(self) -> TimeBase;
-}
-
-/// Helper trait to reduce boilerplate.
-///
-/// We can't blanket-implement for `Into<AnyTimer>` because of possible
-/// conflicting implementations.
-trait IntoAnyTimer: Into<AnyTimer> {}
-
-impl IntoAnyTimer for TimgTimer where Self: Into<AnyTimer> {}
-
-#[cfg(not(feature = "esp32"))]
-impl IntoAnyTimer for Alarm where Self: Into<AnyTimer> {}
-
-impl private::Sealed for AnyTimer {}
-impl IntoAnyTimer for AnyTimer {}
-
-impl<T> EspWifiTimerSource for T
-where
-    T: IntoAnyTimer + private::Sealed,
-{
-    fn timer(self) -> TimeBase {
-        TimeBase::new(self.into()).timer()
-    }
-}
-
-impl EspWifiTimerSource for TimeBase {
-    fn timer(self) -> TimeBase {
-        self
-    }
+    ///
+    /// # Safety
+    ///
+    /// It is UB to call this method outside of [`init`].
+    unsafe fn timer(self) -> TimeBase;
 }
 
 impl private::Sealed for TimeBase {}
-impl private::Sealed for TimgTimer where Self: Into<AnyTimer> {}
+impl private::Sealed for AnyTimer<'_> {}
+impl private::Sealed for TimgTimer<'_> {}
 #[cfg(not(feature = "esp32"))]
-impl private::Sealed for Alarm where Self: Into<AnyTimer> {}
+impl private::Sealed for Alarm<'_> {}
+
+impl<T> EspWifiTimerSource for T
+where
+    T: esp_hal::timer::IntoAnyTimer + private::Sealed,
+{
+    unsafe fn timer(self) -> TimeBase {
+        let any_timer: AnyTimer<'_> = self.degrade();
+        let any_timer: AnyTimer<'static> = unsafe {
+            // Safety: this method is only safe to be called from within `init`.
+            // This 'static lifetime is a fake one, the timer is only used for the lifetime
+            // of the `EspWifiController` instance. The lifetime bounds on `init` and
+            // `EspWifiTimerSource` ensure that the timer is not used after the
+            // `EspWifiController` is dropped.
+            core::mem::transmute(any_timer)
+        };
+        TimeBase::new(any_timer)
+    }
+}
 
 /// A marker trait for suitable Rng sources for esp-wifi
 pub trait EspWifiRngSource: rand_core::RngCore + private::Sealed {}
@@ -356,7 +344,6 @@ impl private::Sealed for Trng<'_> {}
 /// - A timg `Timer` instance
 /// - A systimer `Alarm` instance
 /// - An `AnyTimer` instance
-/// - A `OneShotTimer` instance
 ///
 /// # Examples
 ///
@@ -373,10 +360,10 @@ impl private::Sealed for Trng<'_> {}
 /// .unwrap();
 /// # }
 /// ```
-pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
-    timer: impl Peripheral<P = T> + 'd,
-    _rng: impl Peripheral<P = R> + 'd,
-    _radio_clocks: impl Peripheral<P = RADIO_CLK> + 'd,
+pub fn init<'d>(
+    timer: impl EspWifiTimerSource + 'd,
+    _rng: impl EspWifiRngSource + 'd,
+    _radio_clocks: RADIO_CLK<'d>,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     // A minimum clock of 80MHz is required to operate WiFi module.
     const MIN_CLOCK: Rate = Rate::from_mhz(80);
@@ -393,7 +380,10 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
 
     // Enable timer tick interrupt
     #[cfg(feature = "builtin-scheduler")]
-    preempt_builtin::setup_timer(unsafe { timer.clone_unchecked() }.timer());
+    preempt_builtin::setup_timer(unsafe { timer.timer() });
+
+    #[cfg(not(feature = "builtin-scheduler"))]
+    let _ = timer; // mark used to suppress warning
 
     // This initializes the task switcher
     preempt::enable();
@@ -411,9 +401,6 @@ pub fn init<'d, T: EspWifiTimerSource, R: EspWifiRngSource>(
     }
 
     crate::flags::ESP_WIFI_INITIALIZED.store(true, Ordering::Release);
-
-    #[cfg(not(feature = "builtin-scheduler"))]
-    let _ = timer; // mark used to suppress warning
 
     Ok(EspWifiController {
         _inner: PhantomData,

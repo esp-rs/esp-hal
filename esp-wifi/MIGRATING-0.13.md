@@ -1,5 +1,9 @@
 # Migration Guide from 0.13.x to 0.14.x
 
+## Initializing esp-wifi
+
+esp-wifi can no longer be initialized with a `PeriodicTimer`.
+
 ## Initializing esp-now
 
 An instance of `esp-now` is now available via the wifi interfaces - there are no separate constructors anymore.

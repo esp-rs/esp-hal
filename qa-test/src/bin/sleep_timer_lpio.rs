@@ -35,7 +35,10 @@ fn main() -> ! {
 
     let mut pin2 = peripherals.GPIO2;
     let mut pin3 = peripherals.GPIO3;
-    let input = Input::new(&mut pin2, InputConfig::default().with_pull(Pull::None));
+    let input = Input::new(
+        pin2.reborrow(),
+        InputConfig::default().with_pull(Pull::None),
+    );
 
     println!("up and runnning!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
