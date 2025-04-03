@@ -193,8 +193,8 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
 
-      # Check the formatting of all packages:
+      # Run tests in esp-config
       - run: cd esp-config && cargo test --features build
 
-      # Check the formatting of all packages:
+      # Run tests in esp-bootloader-esp-idf
       - run: cd esp-bootloader-esp-idf && cargo test

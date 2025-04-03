@@ -191,7 +191,7 @@ impl<'a> PartitionTable<'a> {
             return Err(Error::Invalid);
         }
 
-        if binary.len() == 0 {
+        if binary.is_empty() {
             return Ok(Self {
                 binary: &[],
                 entries: 0,

@@ -35,7 +35,7 @@ pub mod partitions;
 pub struct EspAppDesc {
     /// Magic word ESP_APP_DESC_MAGIC_WORD
     magic_word: u32,
-    /// Secure version               
+    /// Secure version
     secure_version: u32,
     /// Reserved
     reserv1: [u32; 2],
