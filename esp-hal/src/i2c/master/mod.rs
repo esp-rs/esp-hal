@@ -1476,11 +1476,11 @@ impl Driver<'_> {
         #[cfg(not(esp32))]
         self.regs()
             .scl_st_time_out()
-            .write(|w| unsafe { w.scl_st_to_i2c().bits(config.scl_st_timeout) });
+            .write(|w| unsafe { w.scl_st_to().bits(config.scl_st_timeout) });
         #[cfg(not(esp32))]
         self.regs()
             .scl_main_st_time_out()
-            .write(|w| unsafe { w.scl_main_st_to_i2c().bits(config.scl_main_st_timeout) });
+            .write(|w| unsafe { w.scl_main_st_to().bits(config.scl_main_st_timeout) });
 
         self.update_config();
 
