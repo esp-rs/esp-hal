@@ -11,6 +11,7 @@ repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+allocator-api2 = { version = "0.2.0", default-features = false, features = ["alloc"] }
 defmt = { version = "0.3.10", optional = true }
 log = { version = "0.4.26", optional = true }
 document-features  = "0.2.11"
@@ -50,8 +51,10 @@ default = ["builtin-scheduler", "esp-alloc"]
 
 ## Use `esp-alloc` for dynamic allocations.
 ##
-## If you opt-out you need to provide implementations for `pub extern "C" fn esp_wifi_free_internal_heap() -> usize`
-## and `pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8`
+## If you opt-out you need to provide implementations for the following functions:
+## - `pub extern "C" fn esp_wifi_free_internal_heap() -> usize`
+## - `pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8`
+## - `pub extern "C" fn esp_wifi_deallocate_internal_ram(ptr: *mut u8)`
 esp-alloc = ["dep:esp-alloc"]
 
 # Chip Support Feature Flags
