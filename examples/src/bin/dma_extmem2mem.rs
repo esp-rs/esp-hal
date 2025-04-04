@@ -11,7 +11,13 @@
 use aligned::{Aligned, A64};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, dma::Mem2Mem, dma_descriptors_chunk_size, main, time::Duration};
+use esp_hal::{
+    delay::Delay,
+    dma::{BurstConfig, ExternalBurstConfig, Mem2Mem},
+    dma_descriptors_chunk_size,
+    main,
+    time::Duration,
+};
 use log::{error, info};
 extern crate alloc;
 
@@ -66,14 +72,16 @@ fn main() -> ! {
 
     let dma_peripheral = peripherals.SPI2;
 
-    let mut mem2mem = Mem2Mem::new_with_chunk_size(
-        peripherals.DMA_CH0,
-        dma_peripheral,
-        rx_descriptors,
-        tx_descriptors,
-        CHUNK_SIZE,
-    )
-    .unwrap();
+    let mut mem2mem = Mem2Mem::new(peripherals.DMA_CH0, dma_peripheral)
+        .with_descriptors(
+            rx_descriptors,
+            tx_descriptors,
+            BurstConfig {
+                external_memory: ExternalBurstConfig::Size64,
+                internal_memory: Default::default(),
+            },
+        )
+        .unwrap();
 
     for i in 0..core::mem::size_of_val(extram_buffer) {
         extram_buffer[i] = (i % 256) as u8;
@@ -81,7 +89,7 @@ fn main() -> ! {
     }
 
     info!(" ext2int: Starting transfer of {} bytes", DATA_SIZE);
-    match mem2mem.start_transfer(&mut intram_buffer, &extram_buffer) {
+    match mem2mem.start_transfer(intram_buffer, extram_buffer) {
         Ok(dma_wait) => {
             info!("Transfer started");
             dma_wait.wait().unwrap();
@@ -113,7 +121,7 @@ fn main() -> ! {
     }
 
     info!(" int2ext: Starting transfer of {} bytes", DATA_SIZE);
-    match mem2mem.start_transfer(&mut extram_buffer, &intram_buffer) {
+    match mem2mem.start_transfer(extram_buffer, intram_buffer) {
         Ok(dma_wait) => {
             info!("Transfer started");
             dma_wait.wait().unwrap();

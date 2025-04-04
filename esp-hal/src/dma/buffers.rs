@@ -681,13 +681,29 @@ impl DmaRxBuf {
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
+        Self::new_with_config(descriptors, buffer, BurstConfig::default())
+    }
+
+    /// Creates a new [DmaRxBuf] from some descriptors and a buffer.
+    ///
+    /// There must be enough descriptors for the provided buffer.
+    /// Depending on alignment requirements, each descriptor can handle at most
+    /// 4092 bytes worth of buffer.
+    ///
+    /// Both the descriptors and buffer must be in DMA-capable memory.
+    /// Only DRAM is supported for descriptors.
+    pub fn new_with_config(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+        config: impl Into<BurstConfig>,
+    ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
             descriptors: DescriptorSet::new(descriptors)?,
             buffer,
             burst: BurstConfig::default(),
         };
 
-        buf.configure(buf.burst, buf.capacity())?;
+        buf.configure(config, buf.capacity())?;
 
         Ok(buf)
     }
