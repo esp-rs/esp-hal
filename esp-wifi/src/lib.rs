@@ -94,6 +94,16 @@
 // toolchain doesn't know about that lint, yet)
 #![allow(unknown_lints)]
 #![allow(non_local_definitions)]
+#![cfg_attr(
+    not(any(feature = "wifi", feature = "ble")),
+    allow(
+        unused,
+        reason = "There are a number of places where code is needed for either wifi or ble,
+        and cfg-ing them out would make the code less readable just to avoid warnings in the
+        less common case. Truly unused code will be flagged by the check that enables either
+        ble or wifi."
+    )
+)]
 
 extern crate alloc;
 
