@@ -2,13 +2,11 @@
 #[allow(unused_imports)]
 use crate::{
     binary,
-    hal::{
-        interrupt,
-        peripherals::{Interrupt, INTERRUPT_CORE0},
-    },
+    hal::{interrupt, peripherals::Interrupt},
 };
 
 pub(crate) fn setup_radio_isr() {
+    use crate::hal::peripherals::INTERRUPT_CORE0;
     // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU
     // interrupt 31 which is masked by default for some reason for this
     // interrupt, mapping it to 0 doesn't deactivate it
