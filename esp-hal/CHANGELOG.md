@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `Peripheral` trait and `PeripheralRef` struct have been removed (#3302, #3305)
 - Removed the inherent `degrade` method from peripheral singletons. (#3305)
+- Removed the `FullDuplex` trait from the PARL_IO driver. (#????)
 
 ## v1.0.0-beta.0
 
