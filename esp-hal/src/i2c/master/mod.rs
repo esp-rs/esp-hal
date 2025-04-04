@@ -1437,11 +1437,11 @@ impl Driver<'_> {
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
     fn setup(&self, config: &Config) -> Result<(), ConfigError> {
-        if config.scl_st_timeout() > 23 {
+        if config.scl_st_timeout > 23 {
             return Err(ConfigError::TimeoutInvalid);
         }
 
-        if config.scl_main_st_timeout() > 23 {
+        if config.scl_main_st_timeout > 23 {
             return Err(ConfigError::TimeoutInvalid);
         }
 
@@ -1472,11 +1472,11 @@ impl Driver<'_> {
         #[cfg(not(esp32))]
         self.regs()
             .scl_st_time_out()
-            .write(|w| unsafe { w.scl_st_to_i2c().bits(config.scl_st_timeout()) });
+            .write(|w| unsafe { w.scl_st_to_i2c().bits(config.scl_st_timeout) });
         #[cfg(not(esp32))]
         self.regs()
             .scl_main_st_time_out()
-            .write(|w| unsafe { w.scl_main_st_to_i2c().bits(config.scl_main_st_timeout()) });
+            .write(|w| unsafe { w.scl_main_st_to_i2c().bits(config.scl_main_st_timeout) });
 
         self.update_config();
 

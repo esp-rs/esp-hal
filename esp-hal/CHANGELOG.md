@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved numbered GPIO pin types from `esp_hal::gpio::GpioPin<N>` to `esp_hal::peripherals::GPION<'_>` (#3349)
 - Moved DMA channel types from `esp_hal::dma::DmaChannelN`/`esp_hal::dma::XYDmaChannel` to `esp_hal::peripherals::DMA_XY` (#3372)
 - `ParlIoFullDuplex`, `ParlIoTxOnly` and `ParlIoRxOnly` have been merged into `ParlIo` (#3366)
+- I2C checks ST_TOUT / MAIN_ST_TOUT where available (#3333)
 
 ### Fixed
 
