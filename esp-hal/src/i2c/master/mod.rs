@@ -165,6 +165,75 @@ impl BusTimeout {
     }
 }
 
+#[cfg(not(esp32))]
+cfg_if::cfg_if! {
+    if #[cfg(esp32s2)] {
+        type FsmTimeoutType = u32;
+    } else {
+        type FsmTimeoutType = u8;
+    }
+}
+
+/// When the FSM remains unchanged for more than
+#[cfg_attr(esp32s2, doc = "the given amount of bus clock cycles")]
+#[cfg_attr(not(esp32), doc = "the 2^ the given amount of bus clock cycles")]
+/// a timeout will be triggered.
+///
+/// The default value is
+#[cfg_attr(esp32s2, doc = "0x100")]
+#[cfg_attr(not(esp32), doc = "0x10")]
+#[instability::unstable]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(not(esp32))]
+pub struct FsmTimeout {
+    value: FsmTimeoutType,
+}
+
+#[cfg(not(esp32))]
+impl FsmTimeout {
+    cfg_if::cfg_if! {
+        if #[cfg(esp32s2)] {
+            const FSM_TIMEOUT_MAX: FsmTimeoutType = 0xff_ffff;
+        } else {
+            const FSM_TIMEOUT_MAX: FsmTimeoutType = 23;
+        }
+    }
+
+    cfg_if::cfg_if! {
+        if #[cfg(esp32s2)] {
+            const FSM_TIMEOUT_DEFAULT: FsmTimeoutType = 0x100;
+        } else {
+            const FSM_TIMEOUT_DEFAULT: FsmTimeoutType = 0x10;
+        }
+    }
+
+    /// Creates a new timeout.
+    ///
+    /// The meaning of the value and the allowed range of values is different
+    /// for different chips.
+    pub fn new(value: FsmTimeoutType) -> Result<Self, ConfigError> {
+        if value > Self::FSM_TIMEOUT_MAX {
+            return Err(ConfigError::TimeoutInvalid);
+        }
+
+        Ok(Self { value })
+    }
+
+    fn value(&self) -> FsmTimeoutType {
+        self.value
+    }
+}
+
+#[cfg(not(esp32))]
+impl Default for FsmTimeout {
+    fn default() -> Self {
+        Self {
+            value: Self::FSM_TIMEOUT_DEFAULT,
+        }
+    }
+}
+
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -426,17 +495,15 @@ pub struct Config {
     /// I2C SCL timeout period.
     timeout: BusTimeout,
 
-    /// Sets the threshold value for the unchanged period of the SCL_FSM state.
-    /// Must not exceed 23. Measurement unit: i2c_sclk.
+    /// Sets the threshold value for the unchanged period of the SCL_FSM.
     #[cfg(not(esp32))]
     #[builder_lite(unstable)]
-    scl_st_timeout: u8,
+    scl_st_timeout: FsmTimeout,
 
-    /// Sets the threshold for the unchanged duration of the SCL_MAIN_FSM state.
-    /// Must not exceed 23. Measurement unit: i2c_sclk.
+    /// Sets the threshold for the unchanged duration of the SCL_MAIN_FSM.
     #[cfg(not(esp32))]
     #[builder_lite(unstable)]
-    scl_main_st_timeout: u8,
+    scl_main_st_timeout: FsmTimeout,
 }
 
 impl Default for Config {
@@ -445,9 +512,9 @@ impl Default for Config {
             frequency: Rate::from_khz(100),
             timeout: BusTimeout::BusCycles(10),
             #[cfg(not(esp32))]
-            scl_st_timeout: 16,
+            scl_st_timeout: Default::default(),
             #[cfg(not(esp32))]
-            scl_main_st_timeout: 16,
+            scl_main_st_timeout: Default::default(),
         }
     }
 }
@@ -1439,16 +1506,6 @@ impl Driver<'_> {
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
     fn setup(&self, config: &Config) -> Result<(), ConfigError> {
-        #[cfg(not(esp32))]
-        if config.scl_st_timeout > 23 {
-            return Err(ConfigError::TimeoutInvalid);
-        }
-
-        #[cfg(not(esp32))]
-        if config.scl_main_st_timeout > 23 {
-            return Err(ConfigError::TimeoutInvalid);
-        }
-
         self.regs().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
@@ -1476,11 +1533,11 @@ impl Driver<'_> {
         #[cfg(not(esp32))]
         self.regs()
             .scl_st_time_out()
-            .write(|w| unsafe { w.scl_st_to().bits(config.scl_st_timeout) });
+            .write(|w| unsafe { w.scl_st_to().bits(config.scl_st_timeout.value()) });
         #[cfg(not(esp32))]
         self.regs()
             .scl_main_st_time_out()
-            .write(|w| unsafe { w.scl_main_st_to().bits(config.scl_main_st_timeout) });
+            .write(|w| unsafe { w.scl_main_st_to().bits(config.scl_main_st_timeout.value()) });
 
         self.update_config();
 
