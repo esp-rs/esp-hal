@@ -82,20 +82,15 @@ pub struct Unit<'d, const NUM: usize> {
     pub channel0: Channel<'d, NUM, 0>,
     /// The second channel in PCNT unit.
     pub channel1: Channel<'d, NUM, 1>,
-
-    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Pcnt as u8 }>,
 }
 
 impl<const NUM: usize> Unit<'_, NUM> {
     /// return a new Unit
     pub(super) fn new() -> Self {
-        let guard = GenericPeripheralGuard::new();
-
         Self {
             counter: Counter::new(),
             channel0: Channel::new(),
             channel1: Channel::new(),
-            _guard: guard,
         }
     }
 
@@ -319,12 +314,17 @@ unsafe impl<const NUM: usize> Send for Unit<'_, NUM> {}
 #[derive(Clone)]
 pub struct Counter<'d, const NUM: usize> {
     _phantom: PhantomData<&'d ()>,
+
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Pcnt as u8 }>,
 }
 
 impl<const NUM: usize> Counter<'_, NUM> {
     fn new() -> Self {
+        let guard = GenericPeripheralGuard::new();
+
         Self {
             _phantom: PhantomData,
+            _guard: guard,
         }
     }
 

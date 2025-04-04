@@ -290,6 +290,16 @@ impl<const P: u8> GenericPeripheralGuard<P> {
     }
 }
 
+impl<const P: u8> Clone for GenericPeripheralGuard<P> {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+
+    fn clone_from(&mut self, _source: &Self) {
+        // This is a no-op since the ref count for P remains the same.
+    }
+}
+
 impl<const P: u8> Drop for GenericPeripheralGuard<P> {
     fn drop(&mut self) {
         let peripheral = unwrap!(Peripheral::try_from(P));
