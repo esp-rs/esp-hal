@@ -422,7 +422,9 @@ impl Default for Config {
         Config {
             frequency: Rate::from_khz(100),
             timeout: BusTimeout::BusCycles(10),
+            #[cfg(not(esp32))]
             scl_st_timeout: 16,
+            #[cfg(not(esp32))]
             scl_main_st_timeout: 16,
         }
     }
@@ -1411,10 +1413,12 @@ impl Driver<'_> {
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
     fn setup(&self, config: &Config) -> Result<(), ConfigError> {
+        #[cfg(not(esp32))]
         if config.scl_st_timeout > 23 {
             return Err(ConfigError::TimeoutInvalid);
         }
 
+        #[cfg(not(esp32))]
         if config.scl_main_st_timeout > 23 {
             return Err(ConfigError::TimeoutInvalid);
         }
