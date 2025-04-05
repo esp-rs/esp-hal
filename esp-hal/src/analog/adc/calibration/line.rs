@@ -1,13 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::analog::adc::{
-    AdcCalBasic,
-    AdcCalEfuse,
-    AdcCalScheme,
-    AdcCalSource,
-    AdcConfig,
-    Attenuation,
-    CalibrationAccess,
+    AdcCalBasic, AdcCalEfuse, AdcCalScheme, AdcCalSource, AdcConfig, Attenuation, CalibrationAccess,
 };
 
 /// Marker trait for ADC units which support line fitting
@@ -97,7 +91,7 @@ where
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32s3))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 impl AdcHasLineCal for crate::peripherals::ADC1<'_> {}
 
 #[cfg(any(esp32c3, esp32s3))]

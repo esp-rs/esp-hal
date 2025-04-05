@@ -49,7 +49,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ## Implementation State
 //!
 //!  - [ADC calibration is not implemented for all targets].
@@ -75,15 +75,15 @@ mod implementation;
 #[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Attenuation {
     /// 0dB attenuation
-    _0dB   = 0b00,
+    _0dB = 0b00,
     /// 2.5dB attenuation
     #[cfg(not(esp32c2))]
     _2p5dB = 0b01,
     /// 6dB attenuation
     #[cfg(not(esp32c2))]
-    _6dB   = 0b10,
+    _6dB = 0b10,
     /// 11dB attenuation
-    _11dB  = 0b11,
+    _11dB = 0b11,
 }
 
 /// Calibration source of the ADC.
@@ -219,7 +219,7 @@ impl<ADCI> AdcCalScheme<ADCI> for () {
 }
 
 /// A helper trait to get access to ADC calibration efuses.
-#[cfg(not(any(esp32, esp32s2, esp32h2)))]
+#[cfg(not(any(esp32, esp32s2)))]
 trait AdcCalEfuse {
     /// Get ADC calibration init code
     ///
