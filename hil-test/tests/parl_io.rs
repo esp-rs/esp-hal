@@ -286,7 +286,7 @@ mod tests {
         let clock_out_pin = ClkOutPin::new(clock_tx);
         let mut clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
 
-        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_khz(50)).unwrap();
+        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_khz(20)).unwrap();
 
         let pio_tx = pio
             .tx
@@ -326,13 +326,13 @@ mod tests {
             let received_data = &dma_rx_buf.as_slice()[number_of_invalid_bytes..];
             let successfully_transmitted_data = &dma_tx_buf.as_slice()[..received_data.len()];
 
+            assert_eq!(received_data, successfully_transmitted_data);
+
             // This is unfortunately a flakey test. This can be improved by dropping the
             // frequency or (as a last resort) reducing the number here.
             assert!(received_data.len() > 200);
-
-            assert_eq!(successfully_transmitted_data, received_data);
         } else {
-            assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
+            assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
         }
     }
 
@@ -403,10 +403,10 @@ mod tests {
         let received_data = &dma_rx_buf.as_slice()[number_of_invalid_bytes..];
         let successfully_transmitted_data = &dma_tx_buf.as_slice()[..received_data.len()];
 
+        assert_eq!(received_data, successfully_transmitted_data);
+
         // This is unfortunately a flakey test. This can be improved by dropping the
         // frequency or (as a last resort) reducing the number here.
         assert!(received_data.len() > 200);
-
-        assert_eq!(successfully_transmitted_data, received_data);
     }
 }
