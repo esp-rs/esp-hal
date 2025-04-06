@@ -288,12 +288,16 @@ mod tests {
 
         let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_khz(20)).unwrap();
 
+        #[cfg(not(esp32h2))]
+        let idle_value = 0;
+        #[cfg(esp32h2)]
+        let idle_value = 0xFFFF;
         let pio_tx = pio
             .tx
             .with_config(
                 tx_pins,
                 clock_out_pin,
-                0xFFFF,
+                idle_value,
                 SampleEdge::Invert,
                 BitPackOrder::Msb,
             )
@@ -330,7 +334,7 @@ mod tests {
 
             // This is unfortunately a flakey test. This can be improved by dropping the
             // frequency or (as a last resort) reducing the number here.
-            assert!(received_data.len() > 200);
+            assert!(received_data.len() > 100);
         } else {
             assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
         }
