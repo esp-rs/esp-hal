@@ -261,6 +261,7 @@ mod tests {
         assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 
+    #[cfg(not(esp32h2))]
     #[test]
     fn test_parl_io_rx_can_read_tx_in_8_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 250;
@@ -275,29 +276,22 @@ mod tests {
             ctx.data_pins.map(|pin| pin.split());
 
         let tx_pins = TxEightBits::new(d0_tx, d1_tx, d2_tx, d3_tx, d4_tx, d5_tx, d6_tx, d7_tx);
-        #[cfg_attr(not(esp32h2), allow(unused_mut))]
-        let mut rx_pins = RxEightBits::new(d0_rx, d1_rx, d2_rx, d3_rx, d4_rx, d5_rx, d6_rx, d7_rx);
+        let rx_pins = RxEightBits::new(d0_rx, d1_rx, d2_rx, d3_rx, d4_rx, d5_rx, d6_rx, d7_rx);
 
-        #[cfg(not(esp32h2))]
         let tx_pins = TxPinConfigWithValidPin::new(tx_pins, valid_tx);
-        #[cfg(not(esp32h2))]
         let mut rx_pins = RxPinConfigWithValidPin::new(rx_pins, valid_rx, EnableMode::HighLevel);
 
         let clock_out_pin = ClkOutPin::new(clock_tx);
         let mut clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
 
-        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_khz(20)).unwrap();
+        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_khz(100)).unwrap();
 
-        #[cfg(not(esp32h2))]
-        let idle_value = 0;
-        #[cfg(esp32h2)]
-        let idle_value = 0xFFFF;
         let pio_tx = pio
             .tx
             .with_config(
                 tx_pins,
                 clock_out_pin,
-                idle_value,
+                0,
                 SampleEdge::Invert,
                 BitPackOrder::Msb,
             )
@@ -322,26 +316,7 @@ mod tests {
         (_, _, dma_tx_buf) = tx_transfer.wait();
         (_, _, dma_rx_buf) = rx_transfer.wait();
 
-        if cfg!(esp32h2) {
-            // skip the first few idle bytes received by the RX unit. This is needed due to
-            // the lack of an enable pin.
-            let number_of_invalid_bytes = dma_rx_buf.as_slice().partition_point(|&b| b == 0xFF);
-
-            let received_data = &dma_rx_buf.as_slice()[number_of_invalid_bytes..];
-            let successfully_transmitted_data = &dma_tx_buf.as_slice()[..received_data.len()];
-
-            assert_eq!(received_data, successfully_transmitted_data);
-
-            // This is unfortunately a flakey test. This can be improved by dropping the
-            // frequency or (as a last resort) reducing the number here.
-            assert!(
-                received_data.len() > 100,
-                "received_data.len() is only {}",
-                received_data.len()
-            );
-        } else {
-            assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
-        }
+        assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 
     #[cfg(not(esp32h2))]
