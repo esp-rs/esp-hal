@@ -286,7 +286,7 @@ mod tests {
         let clock_out_pin = ClkOutPin::new(clock_tx);
         let mut clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
 
-        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_khz(20)).unwrap();
+        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_khz(2)).unwrap();
 
         #[cfg(not(esp32h2))]
         let idle_value = 0;
@@ -334,7 +334,11 @@ mod tests {
 
             // This is unfortunately a flakey test. This can be improved by dropping the
             // frequency or (as a last resort) reducing the number here.
-            assert!(received_data.len() > 100);
+            assert!(
+                received_data.len() > 100,
+                "received_data.len() is only {}",
+                received_data.len()
+            );
         } else {
             assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
         }
