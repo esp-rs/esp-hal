@@ -42,6 +42,7 @@
 //! ```
 
 pub use self::fields::*;
+use crate::soc::efuse_field::EfuseField;
 use crate::{analog::adc::Attenuation, peripherals::EFUSE};
 
 mod fields;
@@ -112,7 +113,7 @@ impl Efuse {
     /// Get ADC reference point voltage for specified attenuation in millivolts
     ///
     /// See: <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
-    pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
+    pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> Option<u16> {
         const INPUT_VOUT_MV: [[u16; 4]; 1] = [
             [750, 1000, 1500, 2800], // Calibration V1 coefficients
         ];
@@ -123,18 +124,31 @@ impl Efuse {
         // ESP_EFUSE_ADC_CALIB_VER1     1
         // ESP_EFUSE_ADC_CALIB_VER_MIN  ESP_EFUSE_ADC_CALIB_VER1
         // ESP_EFUSE_ADC_CALIB_VER_MAX  ESP_EFUSE_ADC_CALIB_VER1
-        // if version != 1 {
-        //     return None;
-        // }
+        if version != 1 {
+            return None;
+        }
 
         let mv = INPUT_VOUT_MV[version as usize - 1][atten as usize];
 
-        mv
+        Some(mv)
     }
 
     /// Returns the call code
+    ///
+    /// See: <https://github.com/espressif/esp-idf/blob/17a2461297076481858b7f76482676a521cc727a/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
     pub fn rtc_calib_cal_code(unit: u8, atten: Attenuation) -> Option<u16> {
-        return None;
+        let cal_code: u16 = Self::read_field_le(match atten {
+            Attenuation::_0dB => ADC1_HI_DOUT_ATTEN0,
+            Attenuation::_2p5dB => ADC1_HI_DOUT_ATTEN1,
+            Attenuation::_6dB => ADC1_HI_DOUT_ATTEN2,
+            Attenuation::_11dB => ADC1_HI_DOUT_ATTEN3,
+        });
+        let cal_code: u16 = if atten == Attenuation::_6dB {
+            2970 + cal_code
+        } else {
+            2900 + cal_code
+        };
+        return Some(cal_code);
     }
 
     /// Returns the major hardware revision
