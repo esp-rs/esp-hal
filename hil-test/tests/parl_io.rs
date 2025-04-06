@@ -286,7 +286,7 @@ mod tests {
         let clock_out_pin = ClkOutPin::new(clock_tx);
         let mut clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
 
-        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_khz(2)).unwrap();
+        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_khz(20)).unwrap();
 
         #[cfg(not(esp32h2))]
         let idle_value = 0;
