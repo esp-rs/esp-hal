@@ -1905,12 +1905,12 @@ impl Driver<'_> {
             return Err(Error::FifoExceeded);
         }
 
+        if self.regs().sr().read().rxfifo_cnt().bits() < buffer.len() as u8 {
+            return Err(Error::ExecutionIncomplete);
+        }
+
         // Read bytes from FIFO
         for byte in buffer.iter_mut() {
-            if self.regs().sr().read().rxfifo_cnt() == 0 {
-                return Err(Error::ExecutionIncomplete);
-            }
-
             *byte = read_fifo(self.regs());
         }
 
@@ -2235,7 +2235,7 @@ impl Driver<'_> {
         }
 
         self.start_write_operation(address, bytes, start)?;
-        self.wait_for_completion_blocking(false)?;
+        self.wait_for_completion_blocking(true)?;
 
         if stop {
             self.stop_operation_blocking()?;
@@ -2271,7 +2271,7 @@ impl Driver<'_> {
         }
 
         self.start_read_operation(address, buffer, start, will_continue)?;
-        self.wait_for_completion_blocking(false)?;
+        self.wait_for_completion_blocking(true)?;
         self.read_all_from_fifo(buffer)?;
 
         if stop {
@@ -2360,7 +2360,7 @@ impl Driver<'_> {
         }
 
         self.start_read_operation(address, buffer, start, will_continue)?;
-        self.wait_for_completion(false).await?;
+        self.wait_for_completion(true).await?;
         self.read_all_from_fifo(buffer)?;
 
         if stop {
