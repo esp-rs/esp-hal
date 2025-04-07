@@ -50,6 +50,16 @@ mod tests {
     }
 
     #[test]
+    fn invalid_address_returns_error(mut ctx: Context) {
+        assert_eq!(ctx.i2c.write(0x80, &[]), Err(Error::AddressInvalid));
+        assert_eq!(ctx.i2c.read(0x80, &mut [0; 1]), Err(Error::AddressInvalid));
+        assert_eq!(
+            ctx.i2c.write_read(0x80, &[0x77], &mut [0; 1]),
+            Err(Error::AddressInvalid)
+        );
+    }
+
+    #[test]
     fn empty_write_returns_ack_error_for_unknown_address(mut ctx: Context) {
         // on some chips we can determine the ack-check-failed reason but not on all
         // chips
