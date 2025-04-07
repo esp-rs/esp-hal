@@ -45,6 +45,9 @@ pub struct AdcCalLine<ADCI> {
     /// number with 16 fractional bits.
     gain: u32,
 
+    #[cfg(esp32s2)]
+    offset: i32,
+
     _phantom: PhantomData<ADCI>,
 }
 
@@ -79,9 +82,21 @@ where
         // of it already.
         let gain = mv as u32 * GAIN_SCALE / code as u32;
 
+        use defmt::println;
+        #[cfg(esp32s2)]
+        println!(
+            "code={} mv={} gain={} offset={}",
+            code,
+            mv,
+            gain,
+            ADCI::coeff_b(atten)
+        );
+
         Self {
             basic,
             gain,
+            #[cfg(esp32s2)]
+            offset: ADCI::coeff_b(atten).unwrap_or(0),
             _phantom: PhantomData,
         }
     }
@@ -93,7 +108,21 @@ where
     fn adc_val(&self, val: u16) -> u16 {
         let val = self.basic.adc_val(val);
 
-        (val as u32 * self.gain / GAIN_SCALE) as u16
+        let transformed = val as u32 * self.gain / GAIN_SCALE;
+
+        #[cfg(esp32s2)]
+        let transformed = {
+            use defmt::println;
+            println!(
+                "Tranforming {} + {} into {}",
+                transformed,
+                self.offset,
+                (transformed as i32 + self.offset, 0)
+            );
+            i32::max(transformed as i32 + self.offset, 0)
+        };
+
+        transformed as u16
     }
 }
 

@@ -159,10 +159,41 @@ impl Efuse {
         efuse_val + info.base + Self::rtc_table_get_raw_efuse_value(info.dependency)
     }
 
-    /// -coeff_b (without the scaling) from: <https://github.com/espressif/esp-idf/blob/903af13e847cd301e476d8b16b4ee1c21b30b5c6/components/esp_adc/esp32s2/adc_cali_line_fitting.c#L91>
-    /// Extracted from prepare_calib_data_for(...),
-    /// calculate_characterization_coefficients(...) &
-    /// characterize_using_two_points(...)
+    /// Calculates the coeff_b from the calculate_characterization_coefficient
+    pub fn rtc_calib_coeff_b(adcn: usize, atten: Attenuation) -> Option<i32> {
+        if adcn > 2 || adcn == 0 {
+            return None;
+        }
+        let unit = (adcn - 1) as u8;
+        let (_, calib_version) = Self::block_version();
+        let version_number = calib_version;
+
+        match version_number {
+            1 => {
+                let low = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
+                    version_number,
+                    unit,
+                    atten,
+                    RtcCalibParam::V1VLow,
+                )?);
+                let high = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
+                    version_number,
+                    unit,
+                    atten,
+                    RtcCalibParam::V1VHigh,
+                )?);
+
+                let vhigh = RTC_CALIB_V_HIGH[atten as usize];
+                let vlow = RTC_CALIB_V_LOW;
+                let dx = high - low;
+                Some((vlow * high - vhigh * low) / dx)
+            }
+            2 => Some(0),
+            _ => None,
+        }
+    }
+    /// The value to pass to set_init_code. Only present in version 2 of the
+    /// efuse.
     pub fn rtc_calib_init_code(adcn: usize, atten: Attenuation) -> Option<u16> {
         if adcn > 2 || adcn == 0 {
             return None;
@@ -188,9 +219,11 @@ impl Efuse {
 
                 let vhigh = RTC_CALIB_V_HIGH[atten as usize];
                 let vlow = RTC_CALIB_V_LOW;
-                let dy = vhigh - vlow;
-                let dx = high - low;
-                let intercept = low - vlow * dx / dy;
+                use defmt::println;
+                println!("({}, {}) -> ({}, {})", low, vlow, high, vhigh);
+                let dv = vhigh - vlow;
+
+                let intercept = (vlow * high - vhigh * low) / dv;
                 Some(intercept as u16)
             }
             2 => {

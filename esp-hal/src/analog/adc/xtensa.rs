@@ -502,6 +502,10 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn cal_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_cal_code(1, atten)
     }
+
+    fn coeff_b(atten: Attenuation) -> Option<i32> {
+        Efuse::rtc_calib_coeff_b(1, atten)
+    }
 }
 
 #[cfg(any(esp32s2, esp32s3))]
@@ -516,6 +520,9 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_cal_code(2, atten)
+    }
+    fn coeff_b(atten: Attenuation) -> Option<i32> {
+        Efuse::rtc_calib_coeff_b(2, atten)
     }
 }
 
