@@ -186,6 +186,20 @@ impl Config {
         }
     }
 
+    /// Create an empty configuration
+    pub fn empty() -> Self {
+        Self {
+            device: Device {
+                name: "NULL".to_owned(),
+                arch: Arch::RiscV,
+                cores: Cores::Single,
+                peripherals: Vec::new(),
+                symbols: Vec::new(),
+                memory: Vec::new(),
+            },
+        }
+    }
+
     /// The name of the device.
     pub fn name(&self) -> String {
         self.device.name.clone()
