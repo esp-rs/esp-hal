@@ -79,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed a possible crash when parsing results from a radius server (#2380)
 - Fixed `async fn WifiController::disconnect` hanging forever when awaited if not connected when called (#2392).
+- Fixed building esp-wifi without either `ble` or `wifi` enabled (#3336)
 
 ### Removed
 

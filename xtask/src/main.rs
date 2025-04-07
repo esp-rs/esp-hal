@@ -654,15 +654,15 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         &[
                             "--no-default-features",
                             &format!("--target={}", chip.target()),
-                            &format!("--features={chip},defmt"),
                         ],
+                        &[&format!("{chip},defmt")],
                         args.fix,
                         package.build_on_host(),
                     )?;
                 }
 
                 Package::EspHal => {
-                    let mut features = format!("--features={chip},ci,unstable");
+                    let mut features = format!("{chip},ci,unstable");
 
                     // Cover all esp-hal features where a device is supported
                     if device.contains("usb0") {
@@ -680,7 +680,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     lint_package(
                         chip,
                         &path,
-                        &[&format!("--target={}", chip.target()), &features],
+                        &[&format!("--target={}", chip.target())],
+                        &[&features],
                         args.fix,
                         package.build_on_host(),
                     )?;
@@ -690,10 +691,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     lint_package(
                         chip,
                         &path,
-                        &[
-                            &format!("--target={}", chip.target()),
-                            &format!("--features={chip},executors,defmt,esp-hal/unstable"),
-                        ],
+                        &[&format!("--target={}", chip.target())],
+                        &[&format!("{chip},executors,defmt,esp-hal/unstable")],
                         args.fix,
                         package.build_on_host(),
                     )?;
@@ -701,11 +700,11 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
                 Package::EspIeee802154 => {
                     if device.contains("ieee802154") {
-                        let features = format!("--features={chip},esp-hal/unstable");
                         lint_package(
                             chip,
                             &path,
-                            &[&format!("--target={}", chip.target()), &features],
+                            &[&format!("--target={}", chip.target())],
+                            &[&format!("{chip},esp-hal/unstable")],
                             args.fix,
                             package.build_on_host(),
                         )?;
@@ -716,10 +715,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         lint_package(
                             chip,
                             &path,
-                            &[
-                                &format!("--target={}", chip.lp_target().unwrap()),
-                                &format!("--features={chip},embedded-io"),
-                            ],
+                            &[&format!("--target={}", chip.lp_target().unwrap())],
+                            &[&format!("{chip},embedded-io")],
                             args.fix,
                             package.build_on_host(),
                         )?;
@@ -730,10 +727,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     lint_package(
                         chip,
                         &path,
-                        &[
-                            &format!("--target={}", chip.target()),
-                            &format!("--features={chip},defmt-espflash"),
-                        ],
+                        &[&format!("--target={}", chip.target())],
+                        &[&format!("{chip},defmt-espflash")],
                         args.fix,
                         package.build_on_host(),
                     )?;
@@ -745,6 +740,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             chip,
                             &path,
                             &[&format!("--target={}", chip.target())],
+                            &[""],
                             args.fix,
                             package.build_on_host(),
                         )?;
@@ -755,27 +751,27 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     lint_package(
                         chip,
                         &path,
-                        &[
-                            &format!("--target={}", chip.target()),
-                            &format!("--features={chip},storage,nor-flash,low-level"),
-                        ],
+                        &[&format!("--target={}", chip.target())],
+                        &[&format!("{chip},storage,nor-flash,low-level")],
                         args.fix,
                         package.build_on_host(),
                     )?;
                 }
 
                 Package::EspWifi => {
-                    let mut features =
-                        format!("--features={chip},defmt,esp-hal/unstable,builtin-scheduler");
+                    let minimal_features = format!("{chip},esp-hal/unstable,builtin-scheduler");
+                    let mut all_features = minimal_features.clone();
+
+                    all_features.push_str(",defmt");
 
                     if device.contains("wifi") {
-                        features.push_str(",esp-now,sniffer")
+                        all_features.push_str(",esp-now,sniffer")
                     }
                     if device.contains("bt") {
-                        features.push_str(",ble")
+                        all_features.push_str(",ble")
                     }
                     if device.contains("coex") {
-                        features.push_str(",coex")
+                        all_features.push_str(",coex")
                     }
                     lint_package(
                         chip,
@@ -783,8 +779,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         &[
                             &format!("--target={}", chip.target()),
                             "--no-default-features",
-                            &features,
                         ],
+                        &[&minimal_features, &all_features],
                         args.fix,
                         package.build_on_host(),
                     )?;
@@ -796,6 +792,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             chip,
                             &path,
                             &[&format!("--target={}", chip.target())],
+                            &[""],
                             args.fix,
                             package.build_on_host(),
                         )?
@@ -807,10 +804,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                         lint_package(
                             chip,
                             &path,
-                            &[
-                                &format!("--target={}", chip.target()),
-                                &format!("--features={chip}"),
-                            ],
+                            &[&format!("--target={}", chip.target())],
+                            &[&format!("{chip}")],
                             args.fix,
                             package.build_on_host(),
                         )?
@@ -822,7 +817,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 Package::Examples | Package::HilTest | Package::QaTest => {}
 
                 // By default, no `clippy` arguments are required:
-                _ => lint_package(chip, &path, &[], args.fix, package.build_on_host())?,
+                _ => lint_package(chip, &path, &[], &[], args.fix, package.build_on_host())?,
             }
         }
     }
@@ -834,40 +829,50 @@ fn lint_package(
     chip: &Chip,
     path: &Path,
     args: &[&str],
+    feature_sets: &[&str],
     fix: bool,
     build_on_host: bool,
 ) -> Result<()> {
-    log::info!("Linting package: {} ({})", path.display(), chip);
+    for features in feature_sets {
+        log::info!(
+            "Linting package: {} ({}, features: {})",
+            path.display(),
+            chip,
+            features
+        );
 
-    let builder = CargoArgsBuilder::default().subcommand("clippy");
+        let builder = CargoArgsBuilder::default().subcommand("clippy");
 
-    let mut builder = if chip.is_xtensa() {
-        let builder = if build_on_host {
-            builder
+        let mut builder = if chip.is_xtensa() {
+            let builder = if build_on_host {
+                builder
+            } else {
+                builder.arg("-Zbuild-std=core,alloc")
+            };
+
+            // We only overwrite Xtensas so that externally set nightly/stable toolchains
+            // are not overwritten.
+            builder.toolchain("esp")
         } else {
-            builder.arg("-Zbuild-std=core,alloc")
+            builder
         };
 
-        // We only overwrite Xtensas so that externally set nightly/stable toolchains
-        // are not overwritten.
-        builder.toolchain("esp")
-    } else {
-        builder
-    };
+        for arg in args {
+            builder = builder.arg(arg.to_string());
+        }
 
-    for arg in args {
-        builder = builder.arg(arg.to_string());
+        builder = builder.arg(format!("--features={features}"));
+
+        let builder = if fix {
+            builder.arg("--fix").arg("--lib").arg("--allow-dirty")
+        } else {
+            builder.arg("--").arg("-D").arg("warnings").arg("--no-deps")
+        };
+
+        let cargo_args = builder.build();
+
+        xtask::cargo::run_with_env(&cargo_args, path, [("CI", "1")], false)?;
     }
-
-    let builder = if fix {
-        builder.arg("--fix").arg("--lib").arg("--allow-dirty")
-    } else {
-        builder.arg("--").arg("-D").arg("warnings").arg("--no-deps")
-    };
-
-    let cargo_args = builder.build();
-
-    xtask::cargo::run_with_env(&cargo_args, path, [("CI", "1")], false)?;
 
     Ok(())
 }
