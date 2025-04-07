@@ -363,8 +363,8 @@ pub struct SimpleMem2Mem<'d, Dm: DriverMode> {
 enum State<'d, Dm: DriverMode> {
     Idle(
         Mem2Mem<'d, Dm>,
-        &'static mut [DmaDescriptor],
-        &'static mut [DmaDescriptor],
+        &'d mut [DmaDescriptor],
+        &'d mut [DmaDescriptor],
     ),
     Active(
         Mem2MemRxTransfer<'d, Dm, DmaRxBuf>,
@@ -377,8 +377,8 @@ impl<'d, Dm: DriverMode> SimpleMem2Mem<'d, Dm> {
     /// Creates a new [SimpleMem2Mem].
     pub fn new(
         mem2mem: Mem2Mem<'d, Dm>,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
+        rx_descriptors: &'d mut [DmaDescriptor],
+        tx_descriptors: &'d mut [DmaDescriptor],
         config: BurstConfig,
     ) -> Result<Self, DmaError> {
         if rx_descriptors.is_empty() || tx_descriptors.is_empty() {
@@ -412,6 +412,12 @@ impl<'d, Dm: DriverMode> SimpleMem2Mem<'d, Dm> {
             unsafe { core::slice::from_raw_parts_mut(rx_buffer.as_mut_ptr(), rx_buffer.len()) };
         let tx_buffer =
             unsafe { core::slice::from_raw_parts_mut(tx_buffer.as_ptr() as _, tx_buffer.len()) };
+        let rx_descriptors = unsafe {
+            core::slice::from_raw_parts_mut(rx_descriptors.as_mut_ptr(), rx_descriptors.len())
+        };
+        let tx_descriptors = unsafe {
+            core::slice::from_raw_parts_mut(tx_descriptors.as_mut_ptr(), tx_descriptors.len())
+        };
 
         let dma_tx_buf = unwrap!(
             DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, self.config),
