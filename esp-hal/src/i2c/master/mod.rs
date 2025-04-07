@@ -97,7 +97,7 @@ impl I2cAddress {
         match self {
             I2cAddress::SevenBit(addr) => {
                 if *addr > 0x7F {
-                    return Err(Error::AddressInvalid);
+                    return Err(Error::AddressInvalid(*self));
                 }
             }
         }
@@ -185,7 +185,7 @@ pub enum Error {
     /// Zero length read or write operation.
     ZeroLengthInvalid,
     /// The given address is invalid.
-    AddressInvalid,
+    AddressInvalid(I2cAddress),
 }
 
 /// I2C no acknowledge error reason.
@@ -249,7 +249,9 @@ impl core::fmt::Display for Error {
                 write!(f, "The number of commands issued exceeded the limit")
             }
             Error::ZeroLengthInvalid => write!(f, "Zero length read or write operation"),
-            Error::AddressInvalid => write!(f, "The given address is invalid"),
+            Error::AddressInvalid(address) => {
+                write!(f, "The given address ({:?})is invalid", address)
+            }
         }
     }
 }
