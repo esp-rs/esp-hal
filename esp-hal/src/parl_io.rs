@@ -19,7 +19,7 @@
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::DmaRxBuf;
 //! # use esp_hal::gpio::NoPin;
-//! # use esp_hal::parl_io::{BitPackOrder, ParlIoRxOnly, RxFourBits};
+//! # use esp_hal::parl_io::{BitPackOrder, ParlIoRxOnly, RxConfig, RxFourBits};
 //!
 //! // Initialize DMA buffer and descriptors for data reception
 //! let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
@@ -40,16 +40,19 @@
 //!  let parl_io = ParlIoRxOnly::new(
 //!     peripherals.PARL_IO,
 //!     dma_channel,
-//!     Rate::from_mhz(1),
 //! )?;
+//!
+//! let config = RxConfig::default()
+//!     .with_frequency(Rate::from_mhz(1))
+//!     .with_bit_order(BitPackOrder::Msb)
+//!     .with_timeout_ticks(0xfff);
 //!
 //! let mut parl_io_rx = parl_io
 //!     .rx
 //!     .with_config(
 //!         rx_pins,
 //!         rx_clk_pin,
-//!         BitPackOrder::Msb,
-//!         Some(0xfff),
+//!         config,
 //!     )?;
 //!
 //! // Initialize the buffer and delay
@@ -71,7 +74,7 @@
 #![doc = crate::before_snippet!()]
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::dma_tx_buffer;
-//! # use esp_hal::parl_io::{BitPackOrder, ParlIoTxOnly, TxFourBits, SampleEdge, ClkOutPin, TxPinConfigWithValidPin};
+//! # use esp_hal::parl_io::{BitPackOrder, ParlIoTxOnly, TxFourBits, ClkOutPin, TxConfig, TxPinConfigWithValidPin};
 //!
 //! // Initialize DMA buffer and descriptors for data reception
 //! let mut dma_tx_buf = dma_tx_buffer!(32000).unwrap();
@@ -92,18 +95,19 @@
 //!  let parl_io = ParlIoTxOnly::new(
 //!     peripherals.PARL_IO,
 //!     dma_channel,
-//!     Rate::from_mhz(1),
 //! )?;
 //!
 //! let mut clock_pin = ClkOutPin::new(peripherals.GPIO6);
+//! let config = TxConfig::default()
+//!     .with_frequency(Rate::from_mhz(1))
+//!     .with_bit_order(BitPackOrder::Msb);
+//!
 //! let mut parl_io_tx = parl_io
 //!     .tx
 //!     .with_config(
 //!         pin_conf,
 //!         clock_pin,
-//!         0,
-//!         SampleEdge::Normal,
-//!         BitPackOrder::Msb,
+//!         config,
 //!     )?;
 //!
 //! for i in 0..dma_tx_buf.len() {
@@ -181,8 +185,6 @@ pub enum Error {
     DmaError(DmaError),
     /// Maximum transfer size (32736) exceeded
     MaxDmaTransferSizeExceeded,
-    /// Trying to use an impossible clock rate
-    UnreachableClockRate,
 }
 
 impl From<DmaError> for Error {
@@ -345,6 +347,88 @@ impl EnableMode {
     }
 }
 
+/// PARL_IO RX configuration
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct RxConfig {
+    /// The target frequency.
+    frequency: Rate,
+
+    /// Configures the packing order to pack bits into 1 byte when data
+    /// bus width is 4/2/1 bit.
+    bit_order: BitPackOrder,
+
+    /// RX threshold of a timeout counter.
+    /// When the timeout is triggered, a GDMA ERR EOF signal will be
+    /// generated and sent to the GDMA interface to indicate the end of the
+    /// receiving
+    ///
+    /// In units of AHB clock cycles.
+    timeout_ticks: Option<u16>,
+}
+
+impl Default for RxConfig {
+    fn default() -> Self {
+        Self {
+            frequency: Rate::from_khz(100),
+            bit_order: BitPackOrder::Msb,
+            timeout_ticks: None,
+        }
+    }
+}
+
+/// PARL_IO TX configuration
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct TxConfig {
+    /// The target frequency.
+    frequency: Rate,
+
+    /// Configures the data value on TX bus when in idle state.
+    idle_value: u16,
+
+    /// Configures whether to invert the TX output clock.
+    sample_edge: SampleEdge,
+
+    /// Configures the unpacking order to unpack bits from 1 byte when
+    /// data bus width is 4/2/1 bit.
+    bit_order: BitPackOrder,
+}
+
+impl Default for TxConfig {
+    fn default() -> Self {
+        Self {
+            frequency: Rate::from_khz(100),
+            idle_value: 0,
+            sample_edge: SampleEdge::Normal,
+            bit_order: BitPackOrder::Msb,
+        }
+    }
+}
+
+/// Configuration errors.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ConfigError {
+    /// Trying to use an impossible clock rate
+    UnreachableClockRate,
+}
+
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ConfigError::UnreachableClockRate => {
+                write!(f, "The requested frequency is not supported")
+            }
+        }
+    }
+}
+
 /// Used to configure no pin as clock output
 impl TxClkPin for NoPin {
     fn configure(&mut self) {
@@ -453,12 +537,11 @@ impl<'d, P> ConfigurePins for TxPinConfigWithValidPin<'d, P>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins + 'd,
 {
-    fn configure(&mut self) -> Result<(), Error> {
-        self.tx_pins.configure()?;
+    fn configure(&mut self) {
+        self.tx_pins.configure();
         self.valid_pin.set_to_push_pull_output();
         Instance::tx_valid_pin_signal().connect_to(&self.valid_pin);
         Instance::set_tx_hw_valid_en(true);
-        Ok(())
     }
 }
 
@@ -489,10 +572,9 @@ impl<P> ConfigurePins for TxPinConfigIncludingValidPin<P>
 where
     P: ContainsValidSignalPin + TxPins + ConfigurePins,
 {
-    fn configure(&mut self) -> Result<(), Error> {
-        self.tx_pins.configure()?;
+    fn configure(&mut self) {
+        self.tx_pins.configure();
         Instance::set_tx_hw_valid_en(true);
-        Ok(())
     }
 }
 
@@ -523,14 +605,13 @@ macro_rules! tx_pins {
 
             impl ConfigurePins for $name<'_>
             {
-                fn configure(&mut self) -> Result<(), Error>{
+                fn configure(&mut self) {
                     $(
                         self.[< pin_ $pin:lower >].set_to_push_pull_output();
                         crate::gpio::OutputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
                     private::Instance::set_tx_bit_width( private::WidSel::[< Bits $width >]);
-                    Ok(())
                 }
             }
 
@@ -629,8 +710,8 @@ impl<P> ConfigurePins for RxPinConfigWithValidPin<'_, P>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
 {
-    fn configure(&mut self) -> Result<(), Error> {
-        self.rx_pins.configure()?;
+    fn configure(&mut self) {
+        self.rx_pins.configure();
         self.valid_pin.init_input(crate::gpio::Pull::None);
         Instance::rx_valid_pin_signal().connect_to(&self.valid_pin);
         Instance::set_rx_sw_en(false);
@@ -643,8 +724,6 @@ where
         if let Some(sel) = self.enable_mode.smp_model_sel() {
             Instance::set_rx_sample_mode(sel);
         }
-
-        Ok(())
     }
 }
 
@@ -679,8 +758,8 @@ impl<P> ConfigurePins for RxPinConfigIncludingValidPin<P>
 where
     P: ContainsValidSignalPin + RxPins + ConfigurePins,
 {
-    fn configure(&mut self) -> Result<(), Error> {
-        self.rx_pins.configure()?;
+    fn configure(&mut self) {
+        self.rx_pins.configure();
         Instance::set_rx_sw_en(false);
         if let Some(sel) = self.enable_mode.pulse_submode_sel() {
             Instance::set_rx_pulse_submode_sel(sel);
@@ -691,8 +770,6 @@ where
         if let Some(sel) = self.enable_mode.smp_model_sel() {
             Instance::set_rx_sample_mode(sel);
         }
-
-        Ok(())
     }
 }
 
@@ -723,14 +800,13 @@ macro_rules! rx_pins {
 
             impl ConfigurePins for $name<'_>
             {
-                fn configure(&mut self)  -> Result<(), Error> {
+                fn configure(&mut self) {
                     $(
                         self.[< pin_ $pin:lower >].init_input(crate::gpio::Pull::None);
                         crate::gpio::InputSignal::$signal.connect_to(&self.[< pin_ $pin:lower >]);
                     )+
 
                     private::Instance::set_rx_bit_width( private::WidSel::[< Bits $width >]);
-                    Ok(())
                 }
             }
 
@@ -805,25 +881,22 @@ where
         self,
         mut tx_pins: P,
         mut clk_pin: CP,
-        idle_value: u16,
-        sample_edge: SampleEdge,
-        bit_order: BitPackOrder,
-    ) -> Result<ParlIoTx<'d, Dm>, Error>
+        config: TxConfig,
+    ) -> Result<ParlIoTx<'d, Dm>, ConfigError>
     where
         P: TxPins + ConfigurePins + 'd,
         CP: TxClkPin + 'd,
     {
-        tx_pins.configure()?;
+        tx_pins.configure();
         clk_pin.configure();
 
-        Instance::set_tx_idle_value(idle_value);
-        Instance::set_tx_sample_edge(sample_edge);
-        Instance::set_tx_bit_order(bit_order);
-
-        Ok(ParlIoTx {
+        let mut this = ParlIoTx {
             tx_channel: self.tx_channel,
             _guard: self._guard,
-        })
+        };
+        this.apply_config(&config)?;
+
+        Ok(this)
     }
 }
 
@@ -836,25 +909,22 @@ where
         self,
         mut tx_pins: P,
         mut clk_pin: CP,
-        idle_value: u16,
-        sample_edge: SampleEdge,
-        bit_order: BitPackOrder,
-    ) -> Result<ParlIoTx<'d, Dm>, Error>
+        config: TxConfig,
+    ) -> Result<ParlIoTx<'d, Dm>, ConfigError>
     where
         P: TxPins + ConfigurePins + 'd,
         CP: TxClkPin + 'd,
     {
-        tx_pins.configure()?;
+        tx_pins.configure();
         clk_pin.configure();
 
-        Instance::set_tx_idle_value(idle_value);
-        Instance::set_tx_sample_edge(sample_edge);
-        Instance::set_tx_bit_order(bit_order);
-
-        Ok(ParlIoTx {
+        let mut this = ParlIoTx {
             tx_channel: self.tx_channel,
             _guard: self._guard,
-        })
+        };
+        this.apply_config(&config)?;
+
+        Ok(this)
     }
 }
 
@@ -886,28 +956,29 @@ where
         self,
         mut rx_pins: P,
         mut clk_pin: CP,
-        bit_order: BitPackOrder,
-        timeout_ticks: Option<u16>,
-    ) -> Result<ParlIoRx<'d, Dm>, Error>
+        config: RxConfig,
+    ) -> Result<ParlIoRx<'d, Dm>, ConfigError>
     where
         P: RxPins + ConfigurePins + 'd,
         CP: RxClkPin + 'd,
     {
         let guard = GenericPeripheralGuard::new();
 
-        rx_pins.configure()?;
+        Instance::set_rx_sw_en(true);
+        Instance::set_rx_sample_mode(SampleMode::InternalSoftwareEnable);
+
+        rx_pins.configure();
         clk_pin.configure();
 
-        Instance::set_rx_bit_order(bit_order);
-        Instance::set_rx_timeout_ticks(timeout_ticks);
-
-        Ok(ParlIoRx {
+        let mut this = ParlIoRx {
             rx_channel: self.rx_channel,
             _guard: guard,
-        })
+        };
+        this.apply_config(&config)?;
+
+        Ok(this)
     }
 }
-
 impl<'d, Dm> RxCreator<'d, Dm>
 where
     Dm: DriverMode,
@@ -917,23 +988,25 @@ where
         self,
         mut rx_pins: P,
         mut clk_pin: CP,
-        bit_order: BitPackOrder,
-        timeout_ticks: Option<u16>,
-    ) -> Result<ParlIoRx<'d, Dm>, Error>
+        config: RxConfig,
+    ) -> Result<ParlIoRx<'d, Dm>, ConfigError>
     where
         P: RxPins + ConfigurePins + 'd,
         CP: RxClkPin + 'd,
     {
-        rx_pins.configure()?;
+        Instance::set_rx_sw_en(true);
+        Instance::set_rx_sample_mode(SampleMode::InternalSoftwareEnable);
+
+        rx_pins.configure();
         clk_pin.configure();
 
-        Instance::set_rx_bit_order(bit_order);
-        Instance::set_rx_timeout_ticks(timeout_ticks);
-
-        Ok(ParlIoRx {
+        let mut this = ParlIoRx {
             rx_channel: self.rx_channel,
             _guard: self._guard,
-        })
+        };
+        this.apply_config(&config)?;
+
+        Ok(this)
     }
 }
 
@@ -1058,12 +1131,10 @@ impl<'d> ParlIoFullDuplex<'d, Blocking> {
     pub fn new(
         _parl_io: PARL_IO<'d>,
         dma_channel: impl DmaChannelFor<PARL_IO<'d>>,
-        frequency: Rate,
     ) -> Result<Self, Error> {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
         let dma_channel = Channel::new(dma_channel.degrade());
-        internal_init(frequency)?;
 
         Ok(Self {
             tx: TxCreatorFullDuplex {
@@ -1197,11 +1268,9 @@ impl<'d> ParlIoTxOnly<'d, Blocking> {
     pub fn new(
         _parl_io: PARL_IO<'d>,
         dma_channel: impl TxChannelFor<PARL_IO<'d>>,
-        frequency: Rate,
     ) -> Result<Self, Error> {
         let guard = GenericPeripheralGuard::new();
         let tx_channel = ChannelTx::new(dma_channel.degrade());
-        internal_init(frequency)?;
 
         Ok(Self {
             tx: TxCreator {
@@ -1322,11 +1391,9 @@ impl<'d> ParlIoRxOnly<'d, Blocking> {
     pub fn new(
         _parl_io: PARL_IO<'d>,
         dma_channel: impl RxChannelFor<PARL_IO<'d>>,
-        frequency: Rate,
     ) -> Result<Self, Error> {
         let guard = GenericPeripheralGuard::new();
         let rx_channel = ChannelRx::new(dma_channel.degrade());
-        internal_init(frequency)?;
 
         Ok(Self {
             rx: RxCreator {
@@ -1432,34 +1499,6 @@ impl crate::interrupt::InterruptConfigurable for ParlIoRxOnly<'_, Blocking> {
     }
 }
 
-fn internal_init(frequency: Rate) -> Result<(), Error> {
-    if frequency.as_hz() > 40_000_000 {
-        return Err(Error::UnreachableClockRate);
-    }
-
-    let divider = crate::soc::constants::PARL_IO_SCLK / frequency.as_hz();
-    if divider > 0xffff {
-        return Err(Error::UnreachableClockRate);
-    }
-    let divider = divider as u16;
-
-    PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
-        w.parl_clk_tx_en().set_bit();
-        w.parl_clk_tx_sel().bits(1); // PLL
-        w.parl_clk_tx_div_num().bits(divider)
-    });
-
-    PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
-        w.parl_clk_rx_en().set_bit();
-        w.parl_clk_rx_sel().bits(1); // PLL
-        w.parl_clk_rx_div_num().bits(divider)
-    });
-    Instance::set_rx_sw_en(true);
-    Instance::set_rx_sample_mode(SampleMode::InternalSoftwareEnable);
-
-    Ok(())
-}
-
 impl<'d, Dm> ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
@@ -1509,6 +1548,31 @@ where
             parl_io: ManuallyDrop::new(self),
             buf_view: ManuallyDrop::new(buffer.into_view()),
         })
+    }
+
+    /// Change the bus configuration.
+    pub fn apply_config(&mut self, config: &TxConfig) -> Result<(), ConfigError> {
+        if config.frequency.as_hz() > 40_000_000 {
+            return Err(ConfigError::UnreachableClockRate);
+        }
+
+        let divider = crate::soc::constants::PARL_IO_SCLK / config.frequency.as_hz();
+        if divider > 0xFFFF {
+            return Err(ConfigError::UnreachableClockRate);
+        }
+        let divider = divider as u16;
+
+        PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
+            w.parl_clk_tx_en().set_bit();
+            w.parl_clk_tx_sel().bits(1); // PLL
+            w.parl_clk_tx_div_num().bits(divider)
+        });
+
+        Instance::set_tx_idle_value(config.idle_value);
+        Instance::set_tx_sample_edge(config.sample_edge);
+        Instance::set_tx_bit_order(config.bit_order);
+
+        Ok(())
     }
 }
 
@@ -1647,6 +1711,30 @@ where
             buf_view: ManuallyDrop::new(buffer.into_view()),
             dma_result: None,
         })
+    }
+
+    /// Change the bus configuration.
+    pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
+        if config.frequency.as_hz() > 40_000_000 {
+            return Err(ConfigError::UnreachableClockRate);
+        }
+
+        let divider = crate::soc::constants::PARL_IO_SCLK / config.frequency.as_hz();
+        if divider > 0xffff {
+            return Err(ConfigError::UnreachableClockRate);
+        }
+        let divider = divider as u16;
+
+        PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
+            w.parl_clk_rx_en().set_bit();
+            w.parl_clk_rx_sel().bits(1); // PLL
+            w.parl_clk_rx_div_num().bits(divider)
+        });
+
+        Instance::set_rx_bit_order(config.bit_order);
+        Instance::set_rx_timeout_ticks(config.timeout_ticks);
+
+        Ok(())
     }
 }
 
@@ -1843,7 +1931,7 @@ pub mod asynch {
 }
 
 mod private {
-    use super::{BitPackOrder, Error, SampleEdge};
+    use super::{BitPackOrder, SampleEdge};
     use crate::peripherals::PARL_IO;
 
     pub trait NotContainsValidSignalPin {}
@@ -1863,7 +1951,7 @@ mod private {
     }
 
     pub trait ConfigurePins {
-        fn configure(&mut self) -> Result<(), Error>;
+        fn configure(&mut self);
     }
 
     #[cfg(esp32c6)]

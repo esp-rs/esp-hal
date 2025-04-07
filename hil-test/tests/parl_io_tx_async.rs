@@ -20,6 +20,7 @@ use esp_hal::{
         ClkOutPin,
         ParlIoTxOnly,
         SampleEdge,
+        TxConfig,
         TxEightBits,
         TxPinConfigIncludingValidPin,
     },
@@ -88,13 +89,20 @@ mod tests {
         let pins = TxPinConfigIncludingValidPin::new(pins);
         let clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10))
+        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel)
             .unwrap()
             .into_async();
 
         let mut pio = pio
             .tx
-            .with_config(pins, clock_pin, 0, SampleEdge::Invert, BitPackOrder::Msb)
+            .with_config(
+                pins,
+                clock_pin,
+                TxConfig::default()
+                    .with_frequency(Rate::from_mhz(10))
+                    .with_sample_edge(SampleEdge::Invert)
+                    .with_bit_order(BitPackOrder::Msb),
+            )
             .unwrap();
 
         // use a PCNT unit to count the negitive clock edges only when valid is high
@@ -148,13 +156,20 @@ mod tests {
 
         let clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10))
+        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel)
             .unwrap()
             .into_async();
 
         let mut pio = pio
             .tx
-            .with_config(pins, clock_pin, 0, SampleEdge::Invert, BitPackOrder::Msb)
+            .with_config(
+                pins,
+                clock_pin,
+                TxConfig::default()
+                    .with_frequency(Rate::from_mhz(10))
+                    .with_sample_edge(SampleEdge::Invert)
+                    .with_bit_order(BitPackOrder::Msb),
+            )
             .unwrap();
 
         // use a PCNT unit to count the negitive clock edges only when
