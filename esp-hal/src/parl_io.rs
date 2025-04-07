@@ -46,8 +46,8 @@
 //! let mut parl_io_rx = parl_io
 //!     .rx
 //!     .with_config(
-//!         &mut rx_pins,
-//!         &mut rx_clk_pin,
+//!         rx_pins,
+//!         rx_clk_pin,
 //!         BitPackOrder::Msb,
 //!         Some(0xfff),
 //!     )?;
@@ -99,8 +99,8 @@
 //! let mut parl_io_tx = parl_io
 //!     .tx
 //!     .with_config(
-//!         &mut pin_conf,
-//!         &mut clock_pin,
+//!         pin_conf,
+//!         clock_pin,
 //!         0,
 //!         SampleEdge::Normal,
 //!         BitPackOrder::Msb,
@@ -849,14 +849,14 @@ where
     /// Configure TX to use the given pins and settings
     pub fn with_config<P, CP>(
         self,
-        tx_pins: &'d mut P,
-        clk_pin: &'d mut CP,
+        mut tx_pins: P,
+        mut clk_pin: CP,
         idle_value: u16,
         sample_edge: SampleEdge,
         bit_order: BitPackOrder,
     ) -> Result<ParlIoTx<'d, Dm>, Error>
     where
-        P: TxPins + ConfigurePins,
+        P: TxPins + ConfigurePins + 'd,
         CP: TxClkPin,
     {
         tx_pins.configure()?;
@@ -899,13 +899,13 @@ where
     /// Configure RX to use the given pins and settings
     pub fn with_config<P, CP>(
         self,
-        rx_pins: &'d mut P,
-        clk_pin: &'d mut CP,
+        mut rx_pins: P,
+        mut clk_pin: CP,
         bit_order: BitPackOrder,
         timeout_ticks: Option<u16>,
     ) -> Result<ParlIoRx<'d, Dm>, Error>
     where
-        P: FullDuplex + RxPins + ConfigurePins,
+        P: FullDuplex + RxPins + ConfigurePins + 'd,
         CP: RxClkPin,
     {
         let guard = GenericPeripheralGuard::new();
@@ -930,13 +930,13 @@ where
     /// Configure RX to use the given pins and settings
     pub fn with_config<P, CP>(
         self,
-        rx_pins: &'d mut P,
-        clk_pin: &'d mut CP,
+        mut rx_pins: P,
+        mut clk_pin: CP,
         bit_order: BitPackOrder,
         timeout_ticks: Option<u16>,
     ) -> Result<ParlIoRx<'d, Dm>, Error>
     where
-        P: RxPins + ConfigurePins,
+        P: RxPins + ConfigurePins + 'd,
         CP: RxClkPin,
     {
         rx_pins.configure()?;

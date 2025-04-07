@@ -100,6 +100,22 @@ The affected types in the `gpio::interconnect` module are:
 +     .build(rx_descriptors);
 ```
 
+## PARL IO driver construction no longer asks for references.
+
+```diff
+ let mut parl_io_tx = parl_io
+     .tx
+     .with_config(
+-        &mut pin_conf,
+-        &mut clock_pin,
++        pin_conf,
++        clock_pin,
+         0,
+         SampleEdge::Normal,
+         BitPackOrder::Msb,
+     )?;
+```
+
 ## SPI Slave driver now uses the newer DMA APIs
 
 ```diff
