@@ -9,8 +9,8 @@ use super::{
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{EXTMEM, LPWR, RTC_IO, SENS, SPI0, SPI1, SYSTEM},
-    rom::regi2c_write_mask,
     rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
+    soc::regi2c,
 };
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
@@ -73,13 +73,6 @@ pub const RTC_MEM_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
 /// RTC memory wait cycles.
 pub const RTC_MEM_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
 
-const I2C_BOD_REG: u32 = 0x61;
-const I2C_BOD_REG_HOSTID: u32 = 1;
-
-const I2C_BOD_REG_THRESHOLD: u32 = 0x5;
-const I2C_BOD_REG_THRESHOLD_MSB: u32 = 2;
-const I2C_BOD_REG_THRESHOLD_LSB: u32 = 0;
-
 impl WakeSource for TimerWakeupSource {
     fn apply(
         &self,
@@ -114,7 +107,7 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
+impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
     fn apply(
         &self,
         _rtc: &Rtc<'_>,
@@ -150,7 +143,7 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
     }
 }
 
-impl<P: RtcPin> Drop for Ext0WakeupSource<'_, P> {
+impl<P: RtcPin> Drop for Ext0WakeupSource<P> {
     fn drop(&mut self) {
         // should we have saved the pin configuration first?
         // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
@@ -653,7 +646,7 @@ impl RtcSleepConfig {
                     w.brown_out2_ena().set_bit();
                     w.rst_sel().set_bit()
                 });
-                regi2c_write_mask!(I2C_BOD_REG, I2C_BOD_REG_THRESHOLD, 0);
+                regi2c::I2C_BOD_REG_THRESHOLD.write_field(0);
                 rtc_cntl.brown_out().modify(|_, w| w.ena().clear_bit());
                 rtc_cntl.int_ena().modify(|_, w| w.brown_out().clear_bit());
                 // NOTE: rtc_isr_deregister?

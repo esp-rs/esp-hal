@@ -34,6 +34,11 @@ define_regi2c! {
             field: ADC_SAR_DTEST_RTC(1..0)
         }
     }
+    master: REGI2C_BOD_I2C(0x61, 1) {
+        reg: I2C_BOD_REG5(5) {
+            field: I2C_BOD_REG_THRESHOLD(2..0)
+        }
+    }
 }
 
 pub(crate) fn regi2c_read(block: u8, host_id: u8, reg_add: u8) -> u8 {
