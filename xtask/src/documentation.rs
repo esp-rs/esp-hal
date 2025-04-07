@@ -58,7 +58,7 @@ pub fn build_documentation(
                 _ => vec![Chip::Esp32c6],
             }
         } else {
-            log::warn!("Package '{package}' does not have chip features, ignoring argument");
+            log::debug!("Package '{package}' does not have chip features, ignoring argument");
             vec![]
         };
 
@@ -198,9 +198,11 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     };
 
     let mut features = vec![];
-    if let Some(chip) = chip {
+    if let Some(chip) = &chip {
         features.push(chip.to_string());
         features.extend(apply_feature_rules(&package, Config::for_chip(&chip)));
+    } else {
+        features.extend(apply_feature_rules(&package, &Config::empty()));
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:
@@ -281,6 +283,9 @@ fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
             if config.contains("wifi") && config.contains("ble") {
                 features.push("coex".to_owned());
             }
+        }
+        Package::EspHalProcmacros => {
+            features.push("embassy".to_owned());
         }
         Package::EspHalEmbassy | Package::EspIeee802154 => {
             features.push("esp-hal/unstable".to_owned());
