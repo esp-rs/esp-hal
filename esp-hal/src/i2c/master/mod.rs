@@ -250,7 +250,7 @@ impl core::fmt::Display for Error {
             }
             Error::ZeroLengthInvalid => write!(f, "Zero length read or write operation"),
             Error::AddressInvalid(address) => {
-                write!(f, "The given address ({:?})is invalid", address)
+                write!(f, "The given address ({:?}) is invalid", address)
             }
         }
     }

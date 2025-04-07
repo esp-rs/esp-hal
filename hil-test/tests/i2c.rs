@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_hal::{
-    i2c::master::{AcknowledgeCheckFailedReason, Config, Error, I2c, Operation},
+    i2c::master::{AcknowledgeCheckFailedReason, Config, Error, I2c, I2cAddress, Operation},
     Async,
     Blocking,
 };
@@ -51,11 +51,17 @@ mod tests {
 
     #[test]
     fn invalid_address_returns_error(mut ctx: Context) {
-        assert_eq!(ctx.i2c.write(0x80, &[]), Err(Error::AddressInvalid));
-        assert_eq!(ctx.i2c.read(0x80, &mut [0; 1]), Err(Error::AddressInvalid));
+        assert_eq!(
+            ctx.i2c.write(0x80, &[]),
+            Err(Error::AddressInvalid(I2cAddress::SevenBit(0x80)))
+        );
+        assert_eq!(
+            ctx.i2c.read(0x80, &mut [0; 1]),
+            Err(Error::AddressInvalid(I2cAddress::SevenBit(0x80)))
+        );
         assert_eq!(
             ctx.i2c.write_read(0x80, &[0x77], &mut [0; 1]),
-            Err(Error::AddressInvalid)
+            Err(Error::AddressInvalid(I2cAddress::SevenBit(0x80)))
         );
     }
 
