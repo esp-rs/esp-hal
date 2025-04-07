@@ -857,7 +857,7 @@ where
     ) -> Result<ParlIoTx<'d, Dm>, Error>
     where
         P: TxPins + ConfigurePins + 'd,
-        CP: TxClkPin,
+        CP: TxClkPin + 'd,
     {
         tx_pins.configure()?;
         clk_pin.configure();
@@ -906,7 +906,7 @@ where
     ) -> Result<ParlIoRx<'d, Dm>, Error>
     where
         P: FullDuplex + RxPins + ConfigurePins + 'd,
-        CP: RxClkPin,
+        CP: RxClkPin + 'd,
     {
         let guard = GenericPeripheralGuard::new();
 
@@ -937,7 +937,7 @@ where
     ) -> Result<ParlIoRx<'d, Dm>, Error>
     where
         P: RxPins + ConfigurePins + 'd,
-        CP: RxClkPin,
+        CP: RxClkPin + 'd,
     {
         rx_pins.configure()?;
         clk_pin.configure();
