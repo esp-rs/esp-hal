@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix PCNT counter not keeping the peripheral enabled (#3334)
 - Fixed an issue where inverting a pin via the interconnect matrix was ineffective (#3312)
 - The half-duplex SPI APIs should accept more valid line width combinations (#3325)
+- Passing an invalid seven bit I2C address is now rejected (#3343)
 
 ### Removed
 
