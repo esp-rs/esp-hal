@@ -88,7 +88,7 @@ pub enum I2cAddress {
     /// * `0b0110010_0` or `0x64` for *writes*
     /// * `0b0110010_1` or `0x65` for *reads*
     ///
-    /// Is specified as 0b0011_0010 or 0x32, NOT 0x64 or 0x65.
+    /// The above address is specified as 0b0011_0010 or 0x32, NOT 0x64 or 0x65.
     SevenBit(u8),
 }
 
