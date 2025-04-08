@@ -67,12 +67,25 @@ where
     F: embedded_storage::Storage,
 {
     /// Create a [Ota] instance from the given [FlashRegion]
-    pub fn new(flash: &'a mut FlashRegion<'a, F>) -> Ota<'a, F> {
-        assert!(
-            flash.capacity() == 0x2000,
-            "OTA-data partition must be 0x2000 bytes in size"
-        );
-        Ota { flash }
+    ///
+    /// # Errors
+    /// A [crate::partitions::Error::InvalidPartition] if the given flash region doesn't represent a Data/Ota partition or the size is unexpected
+    pub fn new(flash: &'a mut FlashRegion<'a, F>) -> Result<Ota<'a, F>, crate::partitions::Error> {
+        if flash.capacity() != 0x2000
+            || flash.raw.partition_type()
+                != crate::partitions::PartitionType::Data(
+                    crate::partitions::DataPartitionSubType::Ota,
+                )
+        {
+            return Err(crate::partitions::Error::InvalidPartition {
+                expected_size: 0x2000,
+                expected_type: crate::partitions::PartitionType::Data(
+                    crate::partitions::DataPartitionSubType::Ota,
+                ),
+            });
+        }
+
+        Ok(Ota { flash })
     }
 
     /// Returns the currently active OTA-slot.
