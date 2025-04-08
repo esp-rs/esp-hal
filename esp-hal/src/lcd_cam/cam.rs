@@ -62,7 +62,7 @@ use core::{
 
 use crate::{
     clock::Clocks,
-    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, PeripheralRxChannel, Rx, RxChannelFor},
+    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, PeripheralRxChannel, RxChannelFor},
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,

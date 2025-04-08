@@ -23,8 +23,6 @@ use crate::{
         DmaTxBuf,
         DmaTxBuffer,
         DmaTxInterrupt,
-        Rx,
-        Tx,
     },
     Async,
     Blocking,
