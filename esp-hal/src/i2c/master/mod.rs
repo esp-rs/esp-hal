@@ -79,15 +79,31 @@ const MAX_ITERATIONS: u32 = 1_000_000;
 pub enum I2cAddress {
     /// 7-bit address mode type.
     ///
-    /// Note that 7-bit addresses defined by drivers should be specified in
-    /// **right-aligned** form, e.g. in the range `0x00..=0x7F`.
+    /// Note that 7-bit addresses are specified in **right-aligned** form, e.g.
+    /// in the range `0x00..=0x7F`.
     ///
     /// For example, a device that has the seven bit address of `0b011_0010`,
     /// and therefore is addressed on the wire using:
     ///
     /// * `0b0110010_0` or `0x64` for *writes*
     /// * `0b0110010_1` or `0x65` for *reads*
+    ///
+    /// The above address is specified as 0b0011_0010 or 0x32, NOT 0x64 or 0x65.
     SevenBit(u8),
+}
+
+impl I2cAddress {
+    fn validate(&self) -> Result<(), Error> {
+        match self {
+            I2cAddress::SevenBit(addr) => {
+                if *addr > 0x7F {
+                    return Err(Error::AddressInvalid(*self));
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl From<u8> for I2cAddress {
@@ -168,6 +184,8 @@ pub enum Error {
     CommandNumberExceeded,
     /// Zero length read or write operation.
     ZeroLengthInvalid,
+    /// The given address is invalid.
+    AddressInvalid(I2cAddress),
 }
 
 /// I2C no acknowledge error reason.
@@ -231,6 +249,9 @@ impl core::fmt::Display for Error {
                 write!(f, "The number of commands issued exceeded the limit")
             }
             Error::ZeroLengthInvalid => write!(f, "Zero length read or write operation"),
+            Error::AddressInvalid(address) => {
+                write!(f, "The given address ({:?}) is invalid", address)
+            }
         }
     }
 }
@@ -794,6 +815,8 @@ impl<'d> I2c<'d, Async> {
         address: I2cAddress,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
+        address.validate()?;
+
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
         let mut op_iter = operations
@@ -866,6 +889,8 @@ where
         address: I2cAddress,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
+        address.validate()?;
+
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
         let mut op_iter = operations
@@ -2211,6 +2236,7 @@ impl Driver<'_> {
         bytes: &[u8],
         start: bool,
     ) -> Result<(), Error> {
+        address.validate()?;
         self.reset_fifo();
         self.reset_command_list();
         let cmd_iterator = &mut self.regs().comd_iter();
@@ -2244,6 +2270,7 @@ impl Driver<'_> {
         start: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
+        address.validate()?;
         self.reset_fifo();
         self.reset_command_list();
 
@@ -2275,6 +2302,7 @@ impl Driver<'_> {
         start: bool,
         stop: bool,
     ) -> Result<(), Error> {
+        address.validate()?;
         self.clear_all_interrupts();
 
         // Short circuit for zero length writes without start or end as that would be an
@@ -2311,6 +2339,7 @@ impl Driver<'_> {
         stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
+        address.validate()?;
         self.clear_all_interrupts();
 
         // Short circuit for zero length reads as that would be an invalid operation
@@ -2364,6 +2393,7 @@ impl Driver<'_> {
         start: bool,
         stop: bool,
     ) -> Result<(), Error> {
+        address.validate()?;
         self.clear_all_interrupts();
 
         // Short circuit for zero length writes without start or end as that would be an
@@ -2400,6 +2430,7 @@ impl Driver<'_> {
         stop: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
+        address.validate()?;
         self.clear_all_interrupts();
 
         // Short circuit for zero length reads as that would be an invalid operation
