@@ -1394,6 +1394,55 @@ mod dma {
                 pins: self.pins,
             }
         }
+
+        async fn wait_for_idle_async(&mut self) {
+            if self.rx_transfer_in_progress {
+                _ = DmaRxFuture::new(&mut self.channel.rx).await;
+                self.rx_transfer_in_progress = false;
+            }
+
+            struct Fut(Driver);
+            impl Future for Fut {
+                type Output = ();
+
+                fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                    if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
+                        #[cfg(esp32)]
+                        // Need to poll for done-ness even after interrupt fires.
+                        if self.0.busy() {
+                            cx.waker().wake_by_ref();
+                            return Poll::Pending;
+                        }
+
+                        self.0.clear_interrupts(SpiInterrupt::TransferDone.into());
+                        return Poll::Ready(());
+                    }
+
+                    self.0.state.waker.register(cx.waker());
+                    self.0
+                        .enable_listen(SpiInterrupt::TransferDone.into(), true);
+                    Poll::Pending
+                }
+            }
+            impl Drop for Fut {
+                fn drop(&mut self) {
+                    self.0
+                        .enable_listen(SpiInterrupt::TransferDone.into(), false);
+                }
+            }
+
+            if !self.is_done() {
+                Fut(self.driver()).await;
+            }
+
+            if self.tx_transfer_in_progress {
+                // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
+                if !self.channel.tx.is_done() {
+                    self.channel.tx.stop_transfer();
+                }
+                self.tx_transfer_in_progress = false;
+            }
+        }
     }
 
     impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
@@ -1565,57 +1614,6 @@ mod dma {
                     self.channel.rx.stop_transfer();
                     self.rx_transfer_in_progress = false;
                 }
-            }
-        }
-    }
-
-    impl SpiDma<'_, Async> {
-        async fn wait_for_idle_async(&mut self) {
-            if self.rx_transfer_in_progress {
-                _ = DmaRxFuture::new(&mut self.channel.rx).await;
-                self.rx_transfer_in_progress = false;
-            }
-
-            struct Fut(Driver);
-            impl Future for Fut {
-                type Output = ();
-
-                fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                    if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
-                        #[cfg(esp32)]
-                        // Need to poll for done-ness even after interrupt fires.
-                        if self.0.busy() {
-                            cx.waker().wake_by_ref();
-                            return Poll::Pending;
-                        }
-
-                        self.0.clear_interrupts(SpiInterrupt::TransferDone.into());
-                        return Poll::Ready(());
-                    }
-
-                    self.0.state.waker.register(cx.waker());
-                    self.0
-                        .enable_listen(SpiInterrupt::TransferDone.into(), true);
-                    Poll::Pending
-                }
-            }
-            impl Drop for Fut {
-                fn drop(&mut self) {
-                    self.0
-                        .enable_listen(SpiInterrupt::TransferDone.into(), false);
-                }
-            }
-
-            if !self.is_done() {
-                Fut(self.driver()).await;
-            }
-
-            if self.tx_transfer_in_progress {
-                // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
-                if !self.channel.tx.is_done() {
-                    self.channel.tx.stop_transfer();
-                }
-                self.tx_transfer_in_progress = false;
             }
         }
     }
