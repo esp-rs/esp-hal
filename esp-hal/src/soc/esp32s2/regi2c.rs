@@ -1,6 +1,5 @@
 use crate::{
     peripherals::{I2C_ANA_MST, SYSCON},
-    ram,
     rom::regi2c::{define_regi2c, RawRegI2cField, RegI2cMaster, RegI2cRegister},
 };
 
@@ -153,12 +152,12 @@ define_regi2c! {
         }
     }
 }
-#[ram]
-pub unsafe fn i2c_rtc_enable_block(block: u8) {
+
+pub(crate) fn i2c_rtc_enable_block(block: u8) {
     I2C_ANA_MST::regs().config0().modify(|_, w| unsafe {
         const MAGIC_DEFAULT: u16 = 0x1c40;
         w.magic_ctrl().bits(MAGIC_DEFAULT)
-    }); // 0x1c40 = MAGIC_DEFAULT
+    });
     I2C_ANA_MST::regs().config1().modify(|_, w| unsafe {
         const ALL_MASK_V: u16 = 0x7FFF;
         w.all_mask().bits(ALL_MASK_V)
@@ -185,9 +184,8 @@ pub unsafe fn i2c_rtc_enable_block(block: u8) {
     };
 }
 
-#[ram]
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
-    unsafe { i2c_rtc_enable_block(block) };
+    i2c_rtc_enable_block(block);
 
     I2C_ANA_MST::regs()
         .config2()
@@ -198,9 +196,8 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     I2C_ANA_MST::regs().config2().read().data().bits()
 }
 
-#[ram]
 pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
-    unsafe { i2c_rtc_enable_block(block) };
+    i2c_rtc_enable_block(block);
 
     I2C_ANA_MST::regs().config2().modify(|_, w| unsafe {
         w.slave_id()
