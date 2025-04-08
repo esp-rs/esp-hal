@@ -1679,26 +1679,6 @@ impl Driver<'_> {
         Ok(())
     }
 
-    #[cfg(any(esp32, esp32s2))]
-    async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
-        if buffer.len() > I2C_FIFO_SIZE {
-            return Err(Error::FifoExceeded);
-        }
-
-        self.wait_for_completion(false).await?;
-
-        for byte in buffer.iter_mut() {
-            *byte = read_fifo(self.regs());
-        }
-
-        Ok(())
-    }
-
-    #[cfg(not(any(esp32, esp32s2)))]
-    async fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
-        self.read_all_from_fifo_blocking(buffer)
-    }
-
     /// Configures the I2C peripheral for a write operation.
     /// - `addr` is the address of the slave device.
     /// - `bytes` is the data two be sent.
@@ -1944,47 +1924,18 @@ impl Driver<'_> {
         Ok(())
     }
 
-    #[cfg(not(any(esp32, esp32s2)))]
-    /// Reads all bytes from the RX FIFO.
-    fn read_all_from_fifo_blocking(&self, buffer: &mut [u8]) -> Result<(), Error> {
-        // Read bytes from FIFO
-        // FIXME: Handle case where less data has been provided by the slave than
-        // requested? Or is this prevented from a protocol perspective?
-        for byte in buffer.iter_mut() {
-            loop {
-                self.check_errors()?;
-
-                let reg = self.regs().fifo_st().read();
-                if reg.rxfifo_raddr().bits() != reg.rxfifo_waddr().bits() {
-                    break;
-                }
-            }
-
-            *byte = read_fifo(self.regs());
-        }
-
-        Ok(())
-    }
-
-    #[cfg(any(esp32, esp32s2))]
-    /// Reads all bytes from the RX FIFO.
-    fn read_all_from_fifo_blocking(&self, buffer: &mut [u8]) -> Result<(), Error> {
-        // on ESP32/ESP32-S2 we currently don't support I2C transactions larger than the
-        // FIFO apparently it would be possible by using non-fifo mode
-        // see https://github.com/espressif/arduino-esp32/blob/7e9afe8c5ed7b5bf29624a5cd6e07d431c027b97/cores/esp32/esp32-hal-i2c.c#L615
-
+    /// Reads from RX FIFO into the given buffer.
+    fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
+        // we don't support single I2C reads larger than the FIFO
         if buffer.len() > I2C_FIFO_SIZE {
             return Err(Error::FifoExceeded);
         }
 
-        // wait for completion - then we can just read the data from FIFO
-        // once we change to non-fifo mode to support larger transfers that
-        // won't work anymore
-        self.wait_for_completion_blocking(false)?;
+        if self.regs().sr().read().rxfifo_cnt().bits() < buffer.len() as u8 {
+            return Err(Error::ExecutionIncomplete);
+        }
 
         // Read bytes from FIFO
-        // FIXME: Handle case where less data has been provided by the slave than
-        // requested? Or is this prevented from a protocol perspective?
         for byte in buffer.iter_mut() {
             *byte = read_fifo(self.regs());
         }
@@ -2313,7 +2264,7 @@ impl Driver<'_> {
         }
 
         self.start_write_operation(address, bytes, start)?;
-        self.wait_for_completion_blocking(false)?;
+        self.wait_for_completion_blocking(true)?;
 
         if stop {
             self.stop_operation_blocking()?;
@@ -2350,8 +2301,8 @@ impl Driver<'_> {
         }
 
         self.start_read_operation(address, buffer, start, will_continue)?;
-        self.read_all_from_fifo_blocking(buffer)?;
         self.wait_for_completion_blocking(true)?;
+        self.read_all_from_fifo(buffer)?;
 
         if stop {
             self.stop_operation_blocking()?;
@@ -2441,8 +2392,8 @@ impl Driver<'_> {
         }
 
         self.start_read_operation(address, buffer, start, will_continue)?;
-        self.read_all_from_fifo(buffer).await?;
         self.wait_for_completion(true).await?;
+        self.read_all_from_fifo(buffer)?;
 
         if stop {
             self.stop_operation().await?;
