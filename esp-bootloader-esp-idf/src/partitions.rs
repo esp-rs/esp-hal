@@ -171,6 +171,8 @@ pub enum Error {
     StorageError,
     /// The partition is write protected.
     WriteProtected,
+    /// The partition is invalid.
+    InvalidPartition { expected_size: usize, expected_type: PartitionType },
 }
 
 impl core::error::Error for Error {}
@@ -478,7 +480,7 @@ pub fn read_partition_table<'a>(
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashRegion<'a, F> {
-    raw: &'a PartitionEntry<'a>,
+    pub(crate) raw: &'a PartitionEntry<'a>,
     flash: &'a mut F,
 }
 
