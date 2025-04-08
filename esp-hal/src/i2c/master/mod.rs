@@ -176,12 +176,12 @@ cfg_if::cfg_if! {
 
 /// When the FSM remains unchanged for more than
 #[cfg_attr(esp32s2, doc = "the given amount of bus clock cycles")]
-#[cfg_attr(not(esp32), doc = "the 2^ the given amount of bus clock cycles")]
+#[cfg_attr(not(esp32s2), doc = "the 2^ the given amount of bus clock cycles")]
 /// a timeout will be triggered.
 ///
 /// The default value is
 #[cfg_attr(esp32s2, doc = "0x100")]
-#[cfg_attr(not(esp32), doc = "0x10")]
+#[cfg_attr(not(esp32s2), doc = "0x10")]
 #[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -239,9 +239,7 @@ impl FsmTimeout {
 #[cfg(not(esp32))]
 impl Default for FsmTimeout {
     fn default() -> Self {
-        Self {
-            value: Self::FSM_TIMEOUT_DEFAULT,
-        }
+        Self::new_const::<{ Self::FSM_TIMEOUT_DEFAULT }>()
     }
 }
 
