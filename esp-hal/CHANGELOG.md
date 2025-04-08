@@ -25,9 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpiDma<Async>` now uses the SPI interrupt (instead of DMA) to wait for completion (#3303)
 - I2S driver now takes `DmaDescriptor`s later in construction (#3324)
 - `gpio::interconnect` types now have a lifetime associated with them (#3302)
+- Make `ParlIo` driver construction more consistent (#3345)
 - The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)
 - `Trace` is no longer generic (#3305)
 - Migrate SPI slave driver to newer DMA API (#3326)
+- Migrate DMA memcpy driver to newer DMA API (#3327)
 
 ### Fixed
 
@@ -48,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix PCNT counter not keeping the peripheral enabled (#3334)
 - Fixed an issue where inverting a pin via the interconnect matrix was ineffective (#3312)
 - The half-duplex SPI APIs should accept more valid line width combinations (#3325)
+- PARL_IO: Use correct max transfer size (#3346)
 
 ### Removed
 
