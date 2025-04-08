@@ -2605,6 +2605,7 @@ impl<'a, I> DmaTransferRx<'a, I>
 where
     I: dma_private::DmaSupportRx,
 {
+    #[cfg_attr(esp32c2, allow(dead_code))]
     pub(crate) fn new(instance: &'a mut I) -> Self {
         Self { instance }
     }

@@ -79,10 +79,10 @@ mod tests {
         let rx_pins = RxFourBits::new(d0_rx, d1_rx, d2_rx, d3_rx);
 
         let tx_pins = TxPinConfigWithValidPin::new(tx_pins, valid_tx);
-        let mut rx_pins = RxPinConfigWithValidPin::new(rx_pins, valid_rx, EnableMode::HighLevel);
+        let rx_pins = RxPinConfigWithValidPin::new(rx_pins, valid_rx, EnableMode::HighLevel);
 
         let clock_out_pin = ClkOutPin::new(clock_tx);
-        let mut clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
+        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
 
         let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(40)).unwrap();
 
@@ -98,7 +98,7 @@ mod tests {
             .unwrap();
         let pio_rx = pio
             .rx
-            .with_config(&mut rx_pins, &mut clock_in_pin, BitPackOrder::Lsb, None)
+            .with_config(rx_pins, clock_in_pin, BitPackOrder::Lsb, None)
             .unwrap();
 
         for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {

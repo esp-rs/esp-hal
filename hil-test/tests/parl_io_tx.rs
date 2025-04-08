@@ -86,20 +86,14 @@ mod tests {
             NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin,
             NoPin, NoPin, NoPin, ctx.valid,
         );
-        let mut pins = TxPinConfigIncludingValidPin::new(pins);
-        let mut clock_pin = ClkOutPin::new(ctx.clock);
+        let pins = TxPinConfigIncludingValidPin::new(pins);
+        let clock_pin = ClkOutPin::new(ctx.clock);
 
         let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10)).unwrap();
 
         let mut pio = pio
             .tx
-            .with_config(
-                &mut pins,
-                &mut clock_pin,
-                0,
-                SampleEdge::Invert,
-                BitPackOrder::Msb,
-            )
+            .with_config(pins, clock_pin, 0, SampleEdge::Invert, BitPackOrder::Msb)
             .unwrap(); // TODO: handle error
 
         // use a PCNT unit to count the negative clock edges only when valid is high
@@ -145,26 +139,20 @@ mod tests {
         );
 
         #[cfg(esp32h2)]
-        let mut pins = TxPinConfigIncludingValidPin::new(pins);
+        let pins = TxPinConfigIncludingValidPin::new(pins);
         #[cfg(esp32c6)]
-        let mut pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
+        let pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
 
-        let mut clock_pin = ClkOutPin::new(ctx.clock);
+        let clock_pin = ClkOutPin::new(ctx.clock);
 
         let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10)).unwrap();
 
         let mut pio = pio
             .tx
-            .with_config(
-                &mut pins,
-                &mut clock_pin,
-                0,
-                SampleEdge::Invert,
-                BitPackOrder::Msb,
-            )
+            .with_config(pins, clock_pin, 0, SampleEdge::Invert, BitPackOrder::Msb)
             .unwrap(); // TODO: handle error
 
-        // use a PCNT unit to count the negitive clock edges only when valid is high
+        // use a PCNT unit to count the negative clock edges only when valid is high
         let clock_unit = ctx.pcnt_unit;
         clock_unit.channel0.set_edge_signal(ctx.clock_loopback);
         clock_unit.channel0.set_ctrl_signal(ctx.valid_loopback);

@@ -63,7 +63,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          repository: esp-hal/esp-hal
+          repository: esp-rs/esp-hal
           ref: ${{ matrix.packages.tag }}
 
       - name: Build documentation
