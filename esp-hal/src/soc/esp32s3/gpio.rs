@@ -444,9 +444,6 @@ macro_rules! rtcio_analog {
 
                     let rtcio = $crate::peripherals::[<RTC _IO>]::regs();
 
-                    // disable input
-                    rtcio.$pin_reg.modify(|_,w| w.fun_ie().bit(false));
-
                     // disable output
                     rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << self.rtc_number()) });
 
