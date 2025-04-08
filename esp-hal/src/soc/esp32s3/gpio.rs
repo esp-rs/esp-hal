@@ -396,9 +396,7 @@ pub enum OutputSignal {
 }
 
 macro_rules! rtcio_analog {
-    (
-        $pin_num:expr, $pin_reg:expr, $prefix:pat, $hold:ident
-    ) => {
+    ($pin_num:expr, $pin_reg:expr, $hold:ident) => {
         paste::paste! {
             impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
                 fn rtc_number(&self) -> u8 {
@@ -411,11 +409,11 @@ macro_rules! rtcio_analog {
                     enable_iomux_clk_gate();
 
                     // disable input
-                    $crate::peripherals::RTC_IO::regs()
+                    $crate::peripherals::[<RTC _IO>]::regs()
                         .$pin_reg.modify(|_,w| unsafe {
-                            w.[<$prefix fun_ie>]().bit(input_enable);
-                            w.[<$prefix mux_sel>]().bit(mux);
-                            w.[<$prefix fun_sel>]().bits(func as u8)
+                            w.fun_ie().bit(input_enable);
+                            w.mux_sel().bit(mux);
+                            w.fun_sel().bits(func as u8)
                         });
                 }
 
@@ -428,13 +426,13 @@ macro_rules! rtcio_analog {
 
             impl $crate::gpio::RtcPinWithResistors for $crate::peripherals::[<GPIO $pin_num>]<'_> {
                 fn rtcio_pullup(&self, enable: bool) {
-                    $crate::peripherals::RTC_IO::regs()
-                        .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
+                    $crate::peripherals::[<RTC _IO>]::regs()
+                        .$pin_reg.modify(|_, w| w.rue().bit(enable));
                 }
 
                 fn rtcio_pulldown(&self, enable: bool) {
-                    $crate::peripherals::RTC_IO::regs()
-                        .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
+                    $crate::peripherals::[<RTC _IO>]::regs()
+                        .$pin_reg.modify(|_, w| w.rde().bit(enable));
                 }
             }
 
@@ -444,10 +442,10 @@ macro_rules! rtcio_analog {
                     use $crate::gpio::RtcPin;
                     enable_iomux_clk_gate();
 
-                    let rtcio = $crate::peripherals::RTC_IO::regs();
+                    let rtcio = $crate::peripherals::[<RTC _IO>]::regs();
 
                     // disable input
-                    rtcio.$pin_reg.modify(|_,w| w.[<$prefix fun_ie>]().bit(false));
+                    rtcio.$pin_reg.modify(|_,w| w.fun_ie().bit(false));
 
                     // disable output
                     rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << self.rtc_number()) });
@@ -456,17 +454,17 @@ macro_rules! rtcio_analog {
                     rtcio.pin(self.rtc_number() as usize).modify(|_,w| w.pad_driver().bit(false));
 
                     rtcio.$pin_reg.modify(|_,w| {
-                        w.[<$prefix fun_ie>]().clear_bit();
+                        w.fun_ie().clear_bit();
 
                         // Connect pin to analog / RTC module instead of standard GPIO
-                        w.[<$prefix mux_sel>]().set_bit();
+                        w.mux_sel().set_bit();
 
                         // Select function "RTC function 1" (GPIO) for analog use
-                        unsafe { w.[<$prefix fun_sel>]().bits(0b00) };
+                        unsafe { w.fun_sel().bits(0b00) };
 
                         // Disable pull-up and pull-down resistors on the pin
-                        w.[<$prefix rue>]().bit(false);
-                        w.[<$prefix rde>]().bit(false);
+                        w.rue().bit(false);
+                        w.rde().bit(false);
 
                         w
                     });
@@ -476,37 +474,37 @@ macro_rules! rtcio_analog {
     };
 
     (
-        $( ( $pin_num:expr, $pin_reg:expr, $prefix:pat, $hold:ident ) )+
+        $( ( $pin_num:expr, $pin_reg:expr, $hold:ident ) )+
     ) => {
         $(
-            rtcio_analog!($pin_num, $pin_reg, $prefix, $hold);
+            rtcio_analog!($pin_num, $pin_reg, $hold);
         )+
     };
 }
 
 rtcio_analog! {
-    ( 0, touch_pad(0),   "",     touch_pad0_hold )
-    ( 1, touch_pad(1),   "",     touch_pad1_hold )
-    ( 2, touch_pad(2),   "",     touch_pad2_hold )
-    ( 3, touch_pad(3),   "",     touch_pad3_hold )
-    ( 4, touch_pad(4),   "",     touch_pad4_hold )
-    ( 5, touch_pad(5),   "",     touch_pad5_hold )
-    ( 6, touch_pad(6),   "",     touch_pad6_hold )
-    ( 7, touch_pad(7),   "",     touch_pad7_hold )
-    ( 8, touch_pad(8),   "",     touch_pad8_hold )
-    ( 9, touch_pad(9),   "",     touch_pad9_hold )
-    (10, touch_pad(10),  "",     touch_pad10_hold)
-    (11, touch_pad(11),  "",     touch_pad11_hold)
-    (12, touch_pad(12),  "",     touch_pad12_hold)
-    (13, touch_pad(13),  "",     touch_pad13_hold)
-    (14, touch_pad(14),  "",     touch_pad14_hold)
-    (15, xtal_32p_pad(), x32p_,  x32p_hold       )
-    (16, xtal_32n_pad(), x32n_,  x32n_hold       )
-    (17, pad_dac1(),     pdac1_, pdac1_hold      )
-    (18, pad_dac2(),     pdac2_, pdac2_hold      )
-    (19, rtc_pad19(),    "",     pad19_hold      )
-    (20, rtc_pad20(),    "",     pad20_hold      )
-    (21, rtc_pad21(),    "",     pad21_hold      )
+    ( 0, touch_pad(0),   touch_pad0 )
+    ( 1, touch_pad(1),   touch_pad1 )
+    ( 2, touch_pad(2),   touch_pad2 )
+    ( 3, touch_pad(3),   touch_pad3 )
+    ( 4, touch_pad(4),   touch_pad4 )
+    ( 5, touch_pad(5),   touch_pad5 )
+    ( 6, touch_pad(6),   touch_pad6 )
+    ( 7, touch_pad(7),   touch_pad7 )
+    ( 8, touch_pad(8),   touch_pad8 )
+    ( 9, touch_pad(9),   touch_pad9 )
+    (10, touch_pad(10),  touch_pad10)
+    (11, touch_pad(11),  touch_pad11)
+    (12, touch_pad(12),  touch_pad12)
+    (13, touch_pad(13),  touch_pad13)
+    (14, touch_pad(14),  touch_pad14)
+    (15, xtal_32p_pad(), x32p       )
+    (16, xtal_32n_pad(), x32n       )
+    (17, pad_dac1(),     pdac1      )
+    (18, pad_dac2(),     pdac2      )
+    (19, rtc_pad19(),    pad19      )
+    (20, rtc_pad20(),    pad20      )
+    (21, rtc_pad21(),    pad21      )
 }
 
 // Whilst the S3 is a dual core chip, it shares the enable registers between
