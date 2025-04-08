@@ -278,6 +278,7 @@ enum OpKind {
 ///
 /// Several operations can be combined as part of a transaction.
 #[derive(Debug, PartialEq, Eq, Hash, strum::Display)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Operation<'a> {
     /// Write data from the provided buffer.
     Write(&'a [u8]),
