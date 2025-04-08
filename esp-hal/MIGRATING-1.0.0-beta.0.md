@@ -116,3 +116,16 @@ The affected types in the `gpio::interconnect` module are:
 - let transfer = spi.read(&mut rx_buffer)?;
 + let transfer = spi.read(dma_rx_buf.len(), dma_rx_buf)?;
 ```
+
+## DMA memcpy driver now uses the newer DMA APIs
+
+```diff
+  let mut mem2mem = Mem2Mem::new(
+      peripherals.DMA_CH0,
+      dma_peripheral,
++ ).with_descriptors(
+      rx_descriptors,
+      tx_descriptors,
++     BurstConfig::default(),
+  ).unwrap();
+```
