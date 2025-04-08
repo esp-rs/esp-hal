@@ -48,7 +48,7 @@ use super::{BitOrder, DataMode, DmaError, Error, Mode};
 use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
-    dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer, Rx, Tx},
+    dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer},
     gpio::{
         interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
@@ -1394,6 +1394,55 @@ mod dma {
                 pins: self.pins,
             }
         }
+
+        async fn wait_for_idle_async(&mut self) {
+            if self.rx_transfer_in_progress {
+                _ = DmaRxFuture::new(&mut self.channel.rx).await;
+                self.rx_transfer_in_progress = false;
+            }
+
+            struct Fut(Driver);
+            impl Future for Fut {
+                type Output = ();
+
+                fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                    if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
+                        #[cfg(esp32)]
+                        // Need to poll for done-ness even after interrupt fires.
+                        if self.0.busy() {
+                            cx.waker().wake_by_ref();
+                            return Poll::Pending;
+                        }
+
+                        self.0.clear_interrupts(SpiInterrupt::TransferDone.into());
+                        return Poll::Ready(());
+                    }
+
+                    self.0.state.waker.register(cx.waker());
+                    self.0
+                        .enable_listen(SpiInterrupt::TransferDone.into(), true);
+                    Poll::Pending
+                }
+            }
+            impl Drop for Fut {
+                fn drop(&mut self) {
+                    self.0
+                        .enable_listen(SpiInterrupt::TransferDone.into(), false);
+                }
+            }
+
+            if !self.is_done() {
+                Fut(self.driver()).await;
+            }
+
+            if self.tx_transfer_in_progress {
+                // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
+                if !self.channel.tx.is_done() {
+                    self.channel.tx.stop_transfer();
+                }
+                self.tx_transfer_in_progress = false;
+            }
+        }
     }
 
     impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
@@ -1470,55 +1519,6 @@ mod dma {
             fence(Ordering::Acquire);
         }
 
-        async fn wait_for_idle_async(&mut self) {
-            if self.rx_transfer_in_progress {
-                _ = DmaRxFuture::new(&mut self.channel.rx).await;
-                self.rx_transfer_in_progress = false;
-            }
-
-            struct Fut(Driver);
-            impl Future for Fut {
-                type Output = ();
-
-                fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                    if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
-                        #[cfg(esp32)]
-                        // Need to poll for done-ness even after interrupt fires.
-                        if self.0.busy() {
-                            cx.waker().wake_by_ref();
-                            return Poll::Pending;
-                        }
-
-                        self.0.clear_interrupts(SpiInterrupt::TransferDone.into());
-                        return Poll::Ready(());
-                    }
-
-                    self.0.state.waker.register(cx.waker());
-                    self.0
-                        .enable_listen(SpiInterrupt::TransferDone.into(), true);
-                    Poll::Pending
-                }
-            }
-            impl Drop for Fut {
-                fn drop(&mut self) {
-                    self.0
-                        .enable_listen(SpiInterrupt::TransferDone.into(), false);
-                }
-            }
-
-            if !self.is_done() {
-                Fut(self.driver()).await;
-            }
-
-            if self.tx_transfer_in_progress {
-                // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
-                if !self.channel.tx.is_done() {
-                    self.channel.tx.stop_transfer();
-                }
-                self.tx_transfer_in_progress = false;
-            }
-        }
-
         /// # Safety:
         ///
         /// The caller must ensure to not access the buffer contents while the
@@ -1545,8 +1545,7 @@ mod dma {
                     bytes_to_write,
                     rx_buffer,
                     tx_buffer,
-                    &mut self.channel.rx,
-                    &mut self.channel.tx,
+                    &mut self.channel,
                 )
             }
         }
@@ -1591,8 +1590,7 @@ mod dma {
                     bytes_to_write,
                     &mut EmptyBuf,
                     &mut self.address_buffer,
-                    &mut self.channel.rx,
-                    &mut self.channel.tx,
+                    &mut self.channel,
                 )
             }
         }
@@ -2748,15 +2746,14 @@ impl DmaDriver {
 
     #[allow(clippy::too_many_arguments)]
     #[cfg_attr(place_spi_driver_in_ram, ram)]
-    unsafe fn start_transfer_dma<RX: Rx, TX: Tx>(
+    unsafe fn start_transfer_dma<Dm: DriverMode>(
         &self,
         _full_duplex: bool,
         rx_len: usize,
         tx_len: usize,
         rx_buffer: &mut impl DmaRxBuffer,
         tx_buffer: &mut impl DmaTxBuffer,
-        rx: &mut RX,
-        tx: &mut TX,
+        channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
     ) -> Result<(), Error> {
         #[cfg(esp32s2)]
         {
@@ -2775,8 +2772,10 @@ impl DmaDriver {
         self.enable_dma();
 
         if rx_len > 0 {
-            rx.prepare_transfer(self.dma_peripheral, rx_buffer)
-                .and_then(|_| rx.start_transfer())?;
+            channel
+                .rx
+                .prepare_transfer(self.dma_peripheral, rx_buffer)
+                .and_then(|_| channel.rx.start_transfer())?;
         } else {
             #[cfg(esp32)]
             {
@@ -2793,8 +2792,10 @@ impl DmaDriver {
             }
         }
         if tx_len > 0 {
-            tx.prepare_transfer(self.dma_peripheral, tx_buffer)
-                .and_then(|_| tx.start_transfer())?;
+            channel
+                .tx
+                .prepare_transfer(self.dma_peripheral, tx_buffer)
+                .and_then(|_| channel.tx.start_transfer())?;
         }
 
         #[cfg(gdma)]
@@ -3848,6 +3849,8 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+use crate::dma::{Channel, PeripheralDmaChannel};
 
 impl Future for SpiFuture<'_> {
     type Output = ();

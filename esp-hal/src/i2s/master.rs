@@ -89,8 +89,6 @@ use crate::{
         PeripheralRxChannel,
         PeripheralTxChannel,
         ReadBuffer,
-        Rx,
-        Tx,
         WriteBuffer,
     },
     gpio::interconnect::PeripheralOutput,
@@ -420,6 +418,8 @@ impl<Dm> DmaSupport for I2sTx<'_, Dm>
 where
     Dm: DriverMode,
 {
+    type DriverMode = Dm;
+
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         self.i2s.wait_for_tx_done();
     }
@@ -433,9 +433,9 @@ impl<'d, Dm> DmaSupportTx for I2sTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type TX = ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>;
+    type Channel = PeripheralTxChannel<AnyI2s<'d>>;
 
-    fn tx(&mut self) -> &mut Self::TX {
+    fn tx(&mut self) -> &mut ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>> {
         &mut self.tx_channel
     }
 
@@ -548,6 +548,8 @@ impl<Dm> DmaSupport for I2sRx<'_, Dm>
 where
     Dm: DriverMode,
 {
+    type DriverMode = Dm;
+
     fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
         self.i2s.wait_for_rx_done();
     }
@@ -561,9 +563,9 @@ impl<'d, Dm> DmaSupportRx for I2sRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type RX = ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>;
+    type Channel = PeripheralRxChannel<AnyI2s<'d>>;
 
-    fn rx(&mut self) -> &mut Self::RX {
+    fn rx(&mut self) -> &mut ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>> {
         &mut self.rx_channel
     }
 
@@ -1784,9 +1786,7 @@ pub mod asynch {
             asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
             DmaEligible,
             ReadBuffer,
-            Rx,
             RxCircularState,
-            Tx,
             TxCircularState,
             WriteBuffer,
         },

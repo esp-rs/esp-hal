@@ -243,8 +243,6 @@ pub mod dma {
             DmaRxBuffer,
             DmaTxBuffer,
             PeripheralDmaChannel,
-            Rx,
-            Tx,
         },
         peripherals::AES,
         Blocking,

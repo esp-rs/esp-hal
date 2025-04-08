@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PeripheralInput::connect_input_to_peripheral` and `PeripheralOuptut::{connect_peripheral_to_output, disconnect_from_peripheral_output}` (#3302)
 - `ESP_HAL_CONFIG_CRITICAL_SECTION_IMPL` to allow opting out of the default `critical-section` implementation (#3293)
 - All peripheral singletons (`GpioPin<...>`, `SPIn`, ...) now have a lifetime, as well as `steal`, `reborrow` and `clone_unchecked` methods (#3305)
+- `i2c::master::Operation` now implements `defmt::Format` (#3348)
 
 ### Changed
 
@@ -50,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix PCNT counter not keeping the peripheral enabled (#3334)
 - Fixed an issue where inverting a pin via the interconnect matrix was ineffective (#3312)
 - The half-duplex SPI APIs should accept more valid line width combinations (#3325)
+- Async I2C is doesn't do blocking reads anymore (#3344)
+- Passing an invalid seven bit I2C address is now rejected (#3343)
 - PARL_IO: Use correct max transfer size (#3346)
 
 ### Removed
