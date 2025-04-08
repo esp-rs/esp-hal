@@ -261,6 +261,10 @@ mod tests {
         assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 
+    // This test is disabled on the H2 because in 8-bit mode, there's no external
+    // enable pin to indicate when data is valid. The C6 has the same issue in
+    // 16-bit mode. The test would have to be written differently for it to work
+    // reliably. See https://github.com/esp-rs/esp-hal/pull/3339.
     #[cfg(not(esp32h2))]
     #[test]
     fn test_parl_io_rx_can_read_tx_in_8_bit_mode(ctx: Context) {
