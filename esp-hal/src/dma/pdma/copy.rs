@@ -316,7 +316,7 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
             for interrupt in interrupts.into() {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
-                    // DmaRxInterrupt::ErrorEof => unimplemented!(),
+                    DmaRxInterrupt::ErrorEof => {},
                     DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit_by_one(),
                     DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit_by_one(),
                     DmaRxInterrupt::Done => w.in_done().clear_bit_by_one(),
