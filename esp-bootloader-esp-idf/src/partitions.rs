@@ -172,7 +172,12 @@ pub enum Error {
     /// The partition is write protected.
     WriteProtected,
     /// The partition is invalid.
-    InvalidPartition { expected_size: usize, expected_type: PartitionType },
+    InvalidPartition {
+        expected_size: usize,
+        expected_type: PartitionType,
+    },
+    /// Invalid tate
+    InvalidState,
 }
 
 impl core::error::Error for Error {}
