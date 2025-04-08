@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PeripheralInput::connect_input_to_peripheral` and `PeripheralOuptut::{connect_peripheral_to_output, disconnect_from_peripheral_output}` (#3302)
 - `ESP_HAL_CONFIG_CRITICAL_SECTION_IMPL` to allow opting out of the default `critical-section` implementation (#3293)
 - All peripheral singletons (`GpioPin<...>`, `SPIn`, ...) now have a lifetime, as well as `steal`, `reborrow` and `clone_unchecked` methods (#3305)
+- `i2c::master::Operation` now implements `defmt::Format` (#3348)
 
 ### Changed
 
@@ -25,9 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpiDma<Async>` now uses the SPI interrupt (instead of DMA) to wait for completion (#3303)
 - I2S driver now takes `DmaDescriptor`s later in construction (#3324)
 - `gpio::interconnect` types now have a lifetime associated with them (#3302)
+- Make `ParlIo` driver construction more consistent (#3345)
 - The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)
 - `Trace` is no longer generic (#3305)
 - Migrate SPI slave driver to newer DMA API (#3326)
+- Migrate DMA memcpy driver to newer DMA API (#3327)
 
 ### Fixed
 
@@ -49,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue where inverting a pin via the interconnect matrix was ineffective (#3312)
 - The half-duplex SPI APIs should accept more valid line width combinations (#3325)
 - Async I2C is doesn't do blocking reads anymore (#3344)
+- Passing an invalid seven bit I2C address is now rejected (#3343)
+- PARL_IO: Use correct max transfer size (#3346)
 
 ### Removed
 
