@@ -9,7 +9,7 @@
 use esp_hal::{
     dma::{DmaChannel0, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, NoPin},
+    gpio::NoPin,
     lcd_cam::{
         lcd::i8080::{Command, Config, TxEightBits, TxSixteenBits, I8080},
         BitOrder,
@@ -28,11 +28,11 @@ const DATA_SIZE: usize = 1024 * 10;
 
 #[allow(non_snake_case)]
 struct Pins {
-    pub GPIO8: GpioPin<'static, 8>,
-    pub GPIO11: GpioPin<'static, 11>,
-    pub GPIO12: GpioPin<'static, 12>,
-    pub GPIO16: GpioPin<'static, 16>,
-    pub GPIO17: GpioPin<'static, 17>,
+    pub GPIO8: esp_hal::peripherals::GPIO8<'static>,
+    pub GPIO11: esp_hal::peripherals::GPIO11<'static>,
+    pub GPIO12: esp_hal::peripherals::GPIO12<'static>,
+    pub GPIO16: esp_hal::peripherals::GPIO16<'static>,
+    pub GPIO17: esp_hal::peripherals::GPIO17<'static>,
 }
 
 struct Context<'d> {

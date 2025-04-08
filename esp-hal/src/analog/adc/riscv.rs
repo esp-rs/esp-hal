@@ -438,11 +438,11 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<'_, 0>, 0),
-            (GpioPin<'_, 1>, 1),
-            (GpioPin<'_, 2>, 2),
-            (GpioPin<'_, 3>, 3),
-            (GpioPin<'_, 4>, 4),
+            (GPIO0<'_>, 0),
+            (GPIO1<'_>, 1),
+            (GPIO2<'_>, 2),
+            (GPIO3<'_>, 3),
+            (GPIO4<'_>, 4),
         ]
     }
 }
@@ -451,17 +451,17 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<'_, 0>, 0),
-            (GpioPin<'_, 1>, 1),
-            (GpioPin<'_, 2>, 2),
-            (GpioPin<'_, 3>, 3),
-            (GpioPin<'_, 4>, 4),
+            (GPIO0<'_>, 0),
+            (GPIO1<'_>, 1),
+            (GPIO2<'_>, 2),
+            (GPIO3<'_>, 3),
+            (GPIO4<'_>, 4),
         ]
     }
 
     crate::analog::adc::impl_adc_interface! {
         ADC2 [
-            (GpioPin<'_, 5>, 0),
+            (GPIO5<'_>, 0),
         ]
     }
 }
@@ -470,13 +470,13 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<'_, 0>, 0),
-            (GpioPin<'_, 1>, 1),
-            (GpioPin<'_, 2>, 2),
-            (GpioPin<'_, 3>, 3),
-            (GpioPin<'_, 4>, 4),
-            (GpioPin<'_, 5>, 5),
-            (GpioPin<'_, 6>, 6),
+            (GPIO0<'_>, 0),
+            (GPIO1<'_>, 1),
+            (GPIO2<'_>, 2),
+            (GPIO3<'_>, 3),
+            (GPIO4<'_>, 4),
+            (GPIO5<'_>, 5),
+            (GPIO6<'_>, 6),
         ]
     }
 }
@@ -485,11 +485,11 @@ mod adc_implementation {
 mod adc_implementation {
     crate::analog::adc::impl_adc_interface! {
         ADC1 [
-            (GpioPin<'_, 1>, 0),
-            (GpioPin<'_, 2>, 1),
-            (GpioPin<'_, 3>, 2),
-            (GpioPin<'_, 4>, 3),
-            (GpioPin<'_, 5>, 4),
+            (GPIO1<'_>, 0),
+            (GPIO2<'_>, 1),
+            (GPIO3<'_>, 2),
+            (GPIO4<'_>, 3),
+            (GPIO5<'_>, 4),
         ]
     }
 }

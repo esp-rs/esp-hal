@@ -14,7 +14,7 @@
 //! After initializing the HAL, you can access the individual pins using the
 //! [`crate::Peripherals`] struct. These pins can then be used as general
 //! purpose digital IO using pin drivers, or they can be passed to peripherals
-//! (such as SPI, UART, I2C, etc.), or can be [`GpioPin::split`]
+//! (such as SPI, UART, I2C, etc.), or can be [`split`]
 //! into peripheral signals for advanced use.
 //!
 //! Pin drivers can be created using [`Flex::new`], [`Input::new`] and
@@ -40,7 +40,7 @@
 //! external hardware. The [`interconnect`] module provides tools to achieve
 //! this using GPIO pins.
 //!
-//! To obtain peripheral signals, use the [`GpioPin::split`] method to split a
+//! To obtain peripheral signals, use the [`split`] method to split a
 //! pin into an input and output signal. Alternatively, you may use
 //! [`Flex::split`], [`Flex::into_peripheral_output`],
 //! [`Flex::peripheral_input`], and similar methods to split a pin driver into
@@ -49,6 +49,7 @@
 //!
 //! [embedded-hal]: embedded_hal
 //! [embedded-hal-async]: embedded_hal_async
+//! [`split`]: crate::peripherals::GPIO0::split
 
 use core::fmt::Display;
 
@@ -57,16 +58,11 @@ use procmacros::ram;
 use strum::EnumCount;
 
 #[cfg(any(lp_io, rtc_cntl))]
-use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
+use crate::peripherals::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
     interrupt::{self, InterruptHandler, Priority, DEFAULT_INTERRUPT_HANDLER},
-    peripherals::{
-        gpio::{handle_gpio_input, handle_gpio_output},
-        Interrupt,
-        GPIO,
-        IO_MUX,
-    },
+    peripherals::{handle_gpio_input, handle_gpio_output, Interrupt, GPIO, IO_MUX},
     private::{self, Sealed},
 };
 
@@ -395,7 +391,7 @@ pub trait Pin: Sealed {
 
     /// Type-erase this pin into an [`AnyPin`].
     ///
-    /// This function converts pin singletons (`GpioPin<0>`, …), which are all
+    /// This function converts pin singletons (`GPIO0<'_>`, …), which are all
     /// different types, into the same type. It is useful for creating
     /// arrays of pins, or avoiding generics.
     ///
@@ -602,75 +598,12 @@ impl GpioBank {
     }
 }
 
-/// GPIO pin
-#[non_exhaustive]
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct GpioPin<'lt, const GPIONUM: u8> {
-    _lifetime: core::marker::PhantomData<&'lt mut ()>,
-}
-
 /// Any GPIO pin.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyPin<'lt> {
     pub(crate) pin: u8,
     pub(crate) _lifetime: core::marker::PhantomData<&'lt mut ()>,
-}
-
-impl<'lt, const GPIONUM: u8> GpioPin<'lt, GPIONUM>
-where
-    Self: Pin,
-{
-    /// Create a pin out of thin air.
-    ///
-    /// # Safety
-    ///
-    /// Ensure that only one instance of a pin exists at one time.
-    pub unsafe fn steal() -> Self {
-        Self {
-            _lifetime: core::marker::PhantomData,
-        }
-    }
-
-    /// Unsafely clone the pin.
-    ///
-    /// # Safety
-    ///
-    /// Ensure that only one instance of a pin is in use at one time.
-    pub unsafe fn clone_unchecked(&self) -> Self {
-        GpioPin::steal()
-    }
-
-    /// Create a new GpioPin object that is limited to the lifetime of the
-    /// passed reference.
-    pub fn reborrow(&mut self) -> GpioPin<'_, GPIONUM> {
-        unsafe { self.clone_unchecked() }
-    }
-
-    /// Split the pin into an input and output signal.
-    ///
-    /// Peripheral signals allow connecting peripherals together without using
-    /// external hardware.
-    ///
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// let (rx, tx) = peripherals.GPIO2.split();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[instability::unstable]
-    pub fn split(
-        self,
-    ) -> (
-        interconnect::InputSignal<'lt>,
-        interconnect::OutputSignal<'lt>,
-    ) {
-        // FIXME: we should implement this in the gpio macro for output pins, but we
-        // should also have an input-only alternative for pins that can't be used as
-        // outputs.
-        self.degrade().split()
-    }
 }
 
 /// Workaround to make D+ and D- work on the ESP32-C3 and ESP32-S3, which by
@@ -703,8 +636,6 @@ fn disable_usb_pads(gpionum: u8) {
             });
     }
 }
-
-impl<const GPIONUM: u8> private::Sealed for GpioPin<'_, GPIONUM> {}
 
 pub(crate) fn bind_default_interrupt_handler() {
     // We first check if a handler is set in the vector table.
@@ -875,17 +806,17 @@ macro_rules! if_rtcio_pin {
 #[macro_export]
 macro_rules! io_type {
     (Input, $gpionum:literal) => {
-        impl $crate::gpio::InputPin for $crate::gpio::GpioPin<'_, $gpionum> {}
+        impl $crate::gpio::InputPin for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
     };
     (Output, $gpionum:literal) => {
-        impl $crate::gpio::OutputPin for $crate::gpio::GpioPin<'_, $gpionum> {}
+        impl $crate::gpio::OutputPin for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
     };
     (Analog, $gpionum:literal) => {
         // FIXME: the implementation shouldn't be in the GPIO module
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
         #[cfg(any(doc, feature = "unstable"))]
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<'_, $gpionum> {
+        impl $crate::gpio::AnalogPin for paste::paste!( [<GPIO $gpionum>]<'_> ) {
             /// Configures the pin for analog mode.
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::GPIO;
@@ -923,11 +854,33 @@ macro_rules! gpio {
     ) => {
         paste::paste! {
             $(
+                impl<'d> [< GPIO $gpionum >]<'d> {
+                    /// Split the pin into an input and output signal.
+                    ///
+                    /// Peripheral signals allow connecting peripherals together without using
+                    /// external hardware.
+                    ///
+                    /// ```rust, no_run
+                    #[doc = $crate::before_snippet!()]
+                    /// let (rx, tx) = peripherals.GPIO2.split();
+                    /// # Ok(())
+                    /// # }
+                    /// ```
+                    #[instability::unstable]
+                    pub fn split(self) -> ($crate::gpio::interconnect::InputSignal<'d>, $crate::gpio::interconnect::OutputSignal<'d>) {
+                        use $crate::gpio::Pin;
+                        // FIXME: we should implement this in the gpio macro for output pins, but we
+                        // should also have an input-only alternative for pins that can't be used as
+                        // outputs.
+                        self.degrade().split()
+                    }
+                }
+
                 $(
                     $crate::io_type!($type, $gpionum);
                 )*
 
-                impl $crate::gpio::Pin for $crate::gpio::GpioPin<'_, $gpionum> {
+                impl $crate::gpio::Pin for [<GPIO $gpionum>]<'_> {
                     #[inline(always)]
                     fn number(&self) -> u8 {
                         $gpionum
@@ -960,8 +913,8 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<'lt> From<$crate::gpio::GpioPin<'lt, $gpionum>> for $crate::gpio::AnyPin<'lt> {
-                    fn from(pin: $crate::gpio::GpioPin<'lt, $gpionum>) -> Self {
+                impl<'lt> From<[<GPIO $gpionum>]<'lt>> for $crate::gpio::AnyPin<'lt> {
+                    fn from(pin: [<GPIO $gpionum>]<'lt>) -> Self {
                         $crate::gpio::Pin::degrade(pin)
                     }
                 }
@@ -1020,7 +973,7 @@ macro_rules! gpio {
                         $(
                             $gpionum => $crate::if_output_pin!($($type),* {{
                                 #[allow(unused_mut)]
-                                let mut $inner = unsafe { GpioPin::<'static, $gpionum>::steal() };
+                                let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                 $code
                             }} else {{
                                 panic!("Unsupported")
@@ -1038,7 +991,7 @@ macro_rules! gpio {
                         $(
                             $gpionum => {{
                                 #[allow(unused_mut)]
-                                let mut $inner = unsafe { GpioPin::<'static, $gpionum>::steal() };
+                                let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                 $code
                             }},
                         )+
@@ -1059,7 +1012,7 @@ macro_rules! gpio {
                                 $(
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {{
                                         #[allow(unused_mut)]
-                                        let mut $inner = unsafe { GpioPin::<'static, $gpionum>::steal() };
+                                        let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                         $code
                                     }} else {{
                                         panic!("Unsupported")
@@ -1078,7 +1031,7 @@ macro_rules! gpio {
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {
                                         $crate::if_output_pin!($($type),* {{
                                             #[allow(unused_mut)]
-                                            let mut $inner = unsafe { GpioPin::<'static, $gpionum>::steal() };
+                                            let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                             $code
                                         }} else {{
                                             panic!("Unsupported")
