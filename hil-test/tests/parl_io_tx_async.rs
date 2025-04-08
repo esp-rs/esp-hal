@@ -85,8 +85,8 @@ mod tests {
             NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin,
             NoPin, NoPin, NoPin, ctx.valid,
         );
-        let mut pins = TxPinConfigIncludingValidPin::new(pins);
-        let mut clock_pin = ClkOutPin::new(ctx.clock);
+        let pins = TxPinConfigIncludingValidPin::new(pins);
+        let clock_pin = ClkOutPin::new(ctx.clock);
 
         let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10))
             .unwrap()
@@ -94,13 +94,7 @@ mod tests {
 
         let mut pio = pio
             .tx
-            .with_config(
-                &mut pins,
-                &mut clock_pin,
-                0,
-                SampleEdge::Invert,
-                BitPackOrder::Msb,
-            )
+            .with_config(pins, clock_pin, 0, SampleEdge::Invert, BitPackOrder::Msb)
             .unwrap();
 
         // use a PCNT unit to count the negitive clock edges only when valid is high
@@ -148,11 +142,11 @@ mod tests {
         );
 
         #[cfg(esp32h2)]
-        let mut pins = TxPinConfigIncludingValidPin::new(pins);
+        let pins = TxPinConfigIncludingValidPin::new(pins);
         #[cfg(esp32c6)]
-        let mut pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
+        let pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
 
-        let mut clock_pin = ClkOutPin::new(ctx.clock);
+        let clock_pin = ClkOutPin::new(ctx.clock);
 
         let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10))
             .unwrap()
@@ -160,13 +154,7 @@ mod tests {
 
         let mut pio = pio
             .tx
-            .with_config(
-                &mut pins,
-                &mut clock_pin,
-                0,
-                SampleEdge::Invert,
-                BitPackOrder::Msb,
-            )
+            .with_config(pins, clock_pin, 0, SampleEdge::Invert, BitPackOrder::Msb)
             .unwrap();
 
         // use a PCNT unit to count the negitive clock edges only when
