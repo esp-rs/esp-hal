@@ -53,13 +53,11 @@ use core::{cmp::min, fmt::Debug, marker::PhantomData, sync::atomic::compiler_fen
 
 use enumset::{EnumSet, EnumSetType};
 
-pub use self::buffers::*;
 #[cfg(gdma)]
 pub use self::gdma::*;
-#[cfg(gdma)]
-pub use self::m2m::*;
 #[cfg(pdma)]
 pub use self::pdma::*;
+pub use self::{buffers::*, m2m::*};
 use crate::{
     interrupt::InterruptHandler,
     peripherals::Interrupt,
@@ -373,7 +371,6 @@ unsafe impl Send for DmaDescriptor {}
 mod buffers;
 #[cfg(gdma)]
 mod gdma;
-#[cfg(gdma)]
 mod m2m;
 #[cfg(pdma)]
 mod pdma;

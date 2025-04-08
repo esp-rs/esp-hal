@@ -1,31 +1,23 @@
 //! DMA Mem2Mem Tests
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable
 
 #![no_std]
 #![no_main]
 
 use esp_hal::{
-    dma::{AnyGdmaChannel, DmaChannelConvert, DmaError, Mem2Mem},
+    dma::{DmaError, Mem2Mem},
     dma_buffers,
     dma_descriptors,
+    Blocking,
 };
 use hil_test as _;
 
 const DATA_SIZE: usize = 1024 * 10;
 
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32c2, esp32c6, esp32h2))] {
-        type DmaPeripheralType<'d> = esp_hal::peripherals::MEM2MEM1<'d>;
-    } else {
-        type DmaPeripheralType<'d> = esp_hal::peripherals::SPI2<'d>;
-    }
-}
-
 struct Context {
-    channel: AnyGdmaChannel<'static>,
-    dma_peripheral: DmaPeripheralType<'static>,
+    mem2mem: Mem2Mem<'static, Blocking>,
 }
 
 #[cfg(test)]
@@ -37,27 +29,25 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let dma_channel = peripherals.DMA_CH0;
-
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c6, esp32h2))] {
-                let dma_peripheral = peripherals.MEM2MEM1;
+            if #[cfg(esp32s2)] {
+                let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
+            } else if #[cfg(any(esp32c2, esp32c6, esp32h2))] {
+                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
             } else {
-                let dma_peripheral = peripherals.SPI2;
+                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2);
             }
         }
 
-        Context {
-            channel: dma_channel.degrade(),
-            dma_peripheral,
-        }
+        Context { mem2mem }
     }
 
     #[test]
     fn test_internal_mem2mem(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 
-        let mut mem2mem = Mem2Mem::new(ctx.channel, ctx.dma_peripheral)
+        let mut mem2mem = ctx
+            .mem2mem
             .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
             .unwrap();
 
@@ -74,11 +64,10 @@ mod tests {
     #[test]
     fn test_mem2mem_errors_zero_tx(ctx: Context) {
         let (rx_descriptors, tx_descriptors) = dma_descriptors!(1024, 0);
-        match Mem2Mem::new(ctx.channel, ctx.dma_peripheral).with_descriptors(
-            rx_descriptors,
-            tx_descriptors,
-            Default::default(),
-        ) {
+        match ctx
+            .mem2mem
+            .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
+        {
             Err(DmaError::OutOfDescriptors) => (),
             _ => panic!("Expected OutOfDescriptors"),
         }
@@ -87,11 +76,10 @@ mod tests {
     #[test]
     fn test_mem2mem_errors_zero_rx(ctx: Context) {
         let (rx_descriptors, tx_descriptors) = dma_descriptors!(0, 1024);
-        match Mem2Mem::new(ctx.channel, ctx.dma_peripheral).with_descriptors(
-            rx_descriptors,
-            tx_descriptors,
-            Default::default(),
-        ) {
+        match ctx
+            .mem2mem
+            .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
+        {
             Err(DmaError::OutOfDescriptors) => (),
             _ => panic!("Expected OutOfDescriptors"),
         }
