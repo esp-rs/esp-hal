@@ -28,6 +28,9 @@ mod fmt;
 
 pub mod partitions;
 
+#[cfg(feature = "ota")]
+pub mod ota;
+
 /// ESP-IDF compatible application descriptor
 ///
 /// This gets populated by the [esp_app_desc] macro.
