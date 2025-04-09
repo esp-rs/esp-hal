@@ -29,6 +29,11 @@ use embedded_storage::{ReadStorage, Storage};
 
 use crate::partitions::FlashRegion;
 
+#[link_section = ".espressif.metadata"]
+#[used]
+#[export_name = "bootloader.FEATURE_OTA"]
+static OTA_FEATURE: [u8; 11] = *b"FEATURE=OTA";
+
 static ALGO: Algorithm<u32> = Algorithm {
     width: 32,
     poly: 0x04c11db7,
