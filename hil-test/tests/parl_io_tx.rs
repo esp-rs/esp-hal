@@ -153,7 +153,7 @@ mod tests {
 
         let clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10)).unwrap();
+        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
         let mut pio = pio
             .tx
