@@ -465,7 +465,7 @@ bitfield::bitfield! {
     pub usb, set_usb: 15;
 }
 
-#[cfg(any(esp32, esp32s3))]
+#[cfg(any(esp32, esp32c2, esp32c3, esp32s3))]
 bitfield::bitfield! {
     /// Represents the wakeup triggers.
     #[derive(Default, Clone, Copy)]
