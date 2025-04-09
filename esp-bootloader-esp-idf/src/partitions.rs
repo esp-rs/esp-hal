@@ -21,7 +21,7 @@ const MD5_MAGIC: u16 = 0xebeb;
 
 /// Represents a single partition entry.
 pub struct PartitionEntry<'a> {
-    binary: &'a [u8; RAW_ENTRY_LEN],
+    pub(crate) binary: &'a [u8; RAW_ENTRY_LEN],
 }
 
 impl<'a> PartitionEntry<'a> {
@@ -486,7 +486,7 @@ pub fn read_partition_table<'a>(
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashRegion<'a, F> {
     pub(crate) raw: &'a PartitionEntry<'a>,
-    flash: &'a mut F,
+    pub(crate) flash: &'a mut F,
 }
 
 impl<F> embedded_storage::Region for FlashRegion<'_, F> {
