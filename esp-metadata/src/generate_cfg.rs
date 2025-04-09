@@ -100,7 +100,7 @@ pub enum Chip {
 }
 
 impl Chip {
-    pub fn target(&self) -> &str {
+    pub fn target(&self) -> &'static str {
         use Chip::*;
 
         match self {
@@ -118,7 +118,7 @@ impl Chip {
         matches!(self, Esp32c6 | Esp32s2 | Esp32s3)
     }
 
-    pub fn lp_target(&self) -> Result<&str> {
+    pub fn lp_target(&self) -> Result<&'static str> {
         use Chip::*;
 
         match self {

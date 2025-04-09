@@ -10,7 +10,10 @@ use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
-    apply_feature_rules, cargo::{CargoAction, CargoArgsBuilder}, firmware::Metadata, target_triple, validate_package_chip, Package, Version
+    cargo::{CargoAction, CargoArgsBuilder},
+    firmware::Metadata,
+    Package,
+    Version,
 };
 
 // ----------------------------------------------------------------------------
@@ -249,7 +252,7 @@ fn main() -> Result<()> {
 
 fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:
-    xtask::validate_package_chip(&args.package, &args.chip)?;
+    args.package.validate_package_chip(&args.chip)?;
 
     // If the 'esp-hal' package is specified, what we *really* want is the
     // 'examples' package instead:
@@ -301,7 +304,7 @@ fn build_examples(
     out_path: PathBuf,
 ) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(args.package, &args.chip)?;
+    let target = args.package.target_triple(&args.chip)?;
 
     if examples
         .iter()
@@ -342,7 +345,7 @@ fn build_examples(
 
 fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(args.package, &args.chip)?;
+    let target = args.package.target_triple(&args.chip)?;
 
     // Filter the examples down to only the binary we're interested in, assuming it
     // actually supports the specified chip:
@@ -371,7 +374,7 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
 
 fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(args.package, &args.chip)?;
+    let target = args.package.target_triple(&args.chip)?;
 
     // Filter the examples down to only the binaries we're interested in
     let mut examples: Vec<Metadata> = examples
@@ -447,7 +450,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
 
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(Package::HilTest, &args.chip)?;
+    let target = Package::HilTest.target_triple(&args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
     let mut tests = xtask::firmware::load(&package_path.join("tests"))?
@@ -633,32 +636,35 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     packages.sort();
 
     for package in packages.iter().filter(|p| p.is_published()) {
-        let path = workspace.join(package.to_string());
-
         // Unfortunately each package has its own unique requirements for
         // building, so we need to handle each individually (though there
         // is *some* overlap)
         for chip in &args.chips {
             let device = Config::for_chip(chip);
 
-            if let Err(_) = validate_package_chip(&package, chip) {
+            if let Err(_) = package.validate_package_chip(chip) {
                 continue;
             }
 
-            let mut features = apply_feature_rules(&package, device);
-            if package.has_chip_features() {
-                features.push(device.name())
+            let mut feature_sets = vec![package.feature_rules(device)];
+            if let Some(mut tests) = package.lint_feature_rules(device) {
+                feature_sets.append(&mut tests);
             }
 
-            lint_package(
-                chip,
-                *package,
-                &path,
-                &["--no-default-features"],
-                &features,
-                args.fix,
-                package.build_on_host(),
-            )?;
+            for mut features in feature_sets {
+                if package.has_chip_features() {
+                    features.push(device.name())
+                }
+
+                lint_package(
+                    workspace,
+                    *package,
+                    chip,
+                    &["--no-default-features"],
+                    &features,
+                    args.fix,
+                )?;
+            }
         }
     }
 
@@ -666,13 +672,12 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 }
 
 fn lint_package(
-    chip: &Chip,
+    workspace: &Path,
     package: Package,
-    path: &Path,
+    chip: &Chip,
     args: &[&str],
     features: &[String],
     fix: bool,
-    build_on_host: bool,
 ) -> Result<()> {
     log::info!(
         "Linting package: {} ({}, features: {:?})",
@@ -681,9 +686,11 @@ fn lint_package(
         features
     );
 
+    let path = workspace.join(package.to_string());
+
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
-    let mut builder = if !build_on_host {
+    let mut builder = if !package.build_on_host() {
         builder = builder.arg("-Zbuild-std=core,alloc");
         if chip.is_xtensa() {
             // We only overwrite Xtensas so that externally set nightly/stable toolchains
@@ -691,7 +698,7 @@ fn lint_package(
             builder = builder.toolchain("esp");
         }
 
-        builder.target(if package == Package::EspLpHal { chip.lp_target()? } else { chip.target() })
+        builder.target(package.target_triple(chip)?)
     } else {
         builder
     };
@@ -710,7 +717,7 @@ fn lint_package(
 
     let cargo_args = builder.build();
 
-    xtask::cargo::run_with_env(&cargo_args, path, [("CI", "1")], false)?;
+    xtask::cargo::run_with_env(&cargo_args, &path, [("CI", "1")], false)?;
 
     Ok(())
 }
@@ -802,7 +809,7 @@ fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
 
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
-    let target = target_triple(args.package, &chip)?;
+    let target = args.package.target_triple(&chip)?;
     let features = vec![chip.to_string(), "unstable".to_string()];
 
     // We need `nightly` for building the doc tests, unfortunately:
