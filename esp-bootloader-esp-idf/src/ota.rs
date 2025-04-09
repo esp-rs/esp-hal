@@ -266,6 +266,10 @@ where
     }
 
     /// Set the [OtaImageState] of the currently selected slot.
+    ///
+    /// # Errors
+    /// A [crate::partitions::Error::InvalidState] if the currently selected
+    /// slot is [Slot::None]
     pub fn set_current_ota_state(
         &mut self,
         state: OtaImageState,
@@ -290,6 +294,10 @@ where
     }
 
     /// Get the [OtaImageState] of the currently selected slot.
+    ///
+    /// # Errors
+    /// A [crate::partitions::Error::InvalidState] if the currently selected
+    /// slot is [Slot::None]
     pub fn current_ota_state(&mut self) -> Result<OtaImageState, crate::partitions::Error> {
         match self.current_slot()? {
             Slot::None => Err(crate::partitions::Error::InvalidState),
