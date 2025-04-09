@@ -28,7 +28,7 @@ chrono = { version = "0.4.20", default-features = false, features = ["clock"] }
 esp-config = { version = "0.3.0", path = "../esp-config", features = ["build"] }
 
 [features]
-default = ["validation"]
+default = ["validation", "ota"]
 
 ## Enable MD5 validation of the partition table.
 validation = ["dep:md-5"]

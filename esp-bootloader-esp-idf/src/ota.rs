@@ -18,7 +18,7 @@
 //! OTA support. In that case you need to built the bootloader yourself.
 //!
 //! The general procedure to change the active slot
-//! - read the partition table [crate::partition::read_partition_table]
+//! - read the partition table [crate::partitions::read_partition_table]
 //! - find the Data/Ota partition
 //! - initialize [Ota]
 //! - read the current slot, change the current slot
