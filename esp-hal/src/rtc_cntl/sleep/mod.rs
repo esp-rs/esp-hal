@@ -15,16 +15,17 @@
 //!    * `BT (Bluetooth) wake` - light sleep only
 
 use core::cell::RefCell;
-#[cfg(any(esp32, esp32c3, esp32s3, esp32c6, esp32c2))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2))]
 use core::time::Duration;
 
-#[cfg(any(esp32, esp32s3))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 use crate::gpio::RtcPin as RtcIoWakeupPinType;
 #[cfg(any(esp32c3, esp32c6, esp32c2))]
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
 use crate::rtc_cntl::Rtc;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
+#[cfg_attr(esp32s2, path = "esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 #[cfg_attr(esp32c3, path = "esp32c3.rs")]
 #[cfg_attr(esp32c6, path = "esp32c6.rs")]
@@ -68,13 +69,13 @@ pub enum WakeupLevel {
 /// # }
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
-#[cfg(any(esp32, esp32c3, esp32s3, esp32c6, esp32c2))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2))]
 pub struct TimerWakeupSource {
     /// The duration after which the wake-up event is triggered.
     duration: Duration,
 }
 
-#[cfg(any(esp32, esp32c3, esp32s3, esp32c6, esp32c2))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2))]
 impl TimerWakeupSource {
     /// Creates a new timer wake-up source with the specified duration.
     pub fn new(duration: Duration) -> Self {
@@ -124,7 +125,7 @@ pub enum Error {
 ///
 /// # }
 /// ```
-#[cfg(any(esp32, esp32s3))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 pub struct Ext0WakeupSource<P: RtcIoWakeupPinType> {
     /// The pin used as the wake-up source.
     pin: RefCell<P>,
@@ -132,7 +133,7 @@ pub struct Ext0WakeupSource<P: RtcIoWakeupPinType> {
     level: WakeupLevel,
 }
 
-#[cfg(any(esp32, esp32s3))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 impl<P: RtcIoWakeupPinType> Ext0WakeupSource<P> {
     /// Creates a new external wake-up source (Ext0``) with the specified pin
     /// and wake-up level.
@@ -181,7 +182,7 @@ impl<P: RtcIoWakeupPinType> Ext0WakeupSource<P> {
 ///
 /// # }
 /// ```
-#[cfg(any(esp32, esp32s3))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 pub struct Ext1WakeupSource<'a, 'b> {
     /// A collection of pins used as wake-up sources.
     pins: RefCell<&'a mut [&'b mut dyn RtcIoWakeupPinType]>,
@@ -189,7 +190,7 @@ pub struct Ext1WakeupSource<'a, 'b> {
     level: WakeupLevel,
 }
 
-#[cfg(any(esp32, esp32s3))]
+#[cfg(any(esp32, esp32s2, esp32s3))]
 impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
     /// Creates a new external wake-up source (Ext1) with the specified pins and
     /// wake-up level.
@@ -281,14 +282,14 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// let timer = TimerWakeupSource::new(Duration::from_secs(10));
 #[cfg_attr(any(esp32c3, esp32c2), doc = "let mut pin_0 = peripherals.GPIO2;")]
 #[cfg_attr(any(esp32c3, esp32c2), doc = "let mut pin_1 = peripherals.GPIO3;")]
-#[cfg_attr(esp32s3, doc = "let mut pin_0 = peripherals.GPIO17;")]
-#[cfg_attr(esp32s3, doc = "let mut pin_1 = peripherals.GPIO18;")]
+#[cfg_attr(any(esp32s2, esp32s3), doc = "let mut pin_0 = peripherals.GPIO17;")]
+#[cfg_attr(any(esp32s2, esp32s3), doc = "let mut pin_1 = peripherals.GPIO18;")]
 #[cfg_attr(
     any(esp32c3, esp32c2),
     doc = "let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut ["
 )]
 #[cfg_attr(
-    esp32s3,
+    any(esp32s2, esp32s3),
     doc = "let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut ["
 )]
 ///     (&mut pin_0, WakeupLevel::Low),
@@ -301,14 +302,14 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 ///
 /// # }
 /// ```
-#[cfg(any(esp32c3, esp32s3, esp32c2))]
+#[cfg(any(esp32c3, esp32s2, esp32s3, esp32c2))]
 pub struct RtcioWakeupSource<'a, 'b> {
     pins: RefCell<&'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]>,
 }
 
-#[cfg(any(esp32c3, esp32s3, esp32c2))]
+#[cfg(any(esp32c3, esp32s2, esp32s3, esp32c2))]
 impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
-    /// Creates a new external wake-up source (Ext1).
+    /// Creates a new external GPIO wake-up source.
     pub fn new(pins: &'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]) -> Self {
         Self {
             pins: RefCell::new(pins),
@@ -436,7 +437,35 @@ macro_rules! uart_wakeup_impl {
 uart_wakeup_impl!(0);
 uart_wakeup_impl!(1);
 
-#[cfg(not(pmu))]
+#[cfg(esp32s2)]
+bitfield::bitfield! {
+    /// Represents the wakeup triggers.
+    #[derive(Default, Clone, Copy)]
+    pub struct WakeTriggers(u16);
+    impl Debug;
+    /// EXT0 GPIO wakeup
+    pub ext0, set_ext0: 0;
+    /// EXT1 GPIO wakeup
+    pub ext1, set_ext1: 1;
+    /// GPIO wakeup (l5ght sleep only)
+    pub gpio, set_gpio: 2;
+    /// Timer wakeup
+    pub timer, set_timer: 3;
+    /// WiFi SoC wakeup
+    pub wifi_soc, set_wifi_soc: 5;
+    /// UART0 wakeup (light sleep only)
+    pub uart0, set_uart0: 6;
+    /// UART1 wakeup (light sleep only)
+    pub uart1, set_uart1: 7;
+    /// Touch wakeup
+    pub touch, set_touch: 8;
+    /// ULP-FSM wakeup
+    pub ulp, set_ulp: 11;
+    /// USB wakeup
+    pub usb, set_usb: 15;
+}
+
+#[cfg(any(esp32, esp32c2, esp32c3, esp32s3))]
 bitfield::bitfield! {
     /// Represents the wakeup triggers.
     #[derive(Default, Clone, Copy)]
