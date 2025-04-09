@@ -451,8 +451,8 @@ impl<'d, Dm: DriverMode> SimpleMem2Mem<'d, Dm> {
             core::slice::from_raw_parts_mut(tx_descriptors.as_mut_ptr(), tx_descriptors.len())
         };
 
-        // Note: The ESP32-S2 insists that RX is started before TX. Contrary to the TRM and every
-        // other chip.
+        // Note: The ESP32-S2 insists that RX is started before TX. Contrary to the TRM
+        // and every other chip.
 
         let dma_rx_buf = unwrap!(
             DmaRxBuf::new_with_config(rx_descriptors, rx_buffer, self.config),
