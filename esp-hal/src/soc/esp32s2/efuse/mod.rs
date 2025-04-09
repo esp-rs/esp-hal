@@ -213,10 +213,9 @@ impl Efuse {
         }
     }
 
-    /// Return the calibration voltage in mV. It's only used in the calculation
-    /// of the AdcCalLine::new_cal calibration. There it is assumed that this
-    /// value has already been corrected for the intercept, so we do that
-    /// explicityly here.
+    /// Return the calibration voltage in mV. It's only used as dy in the
+    /// slope calculation of the AdcCalLine::new_cal calibration. Correct it
+    /// to be ready for this calculation.
     pub fn rtc_calib_cal_mv(adcn: usize, atten: Attenuation) -> u16 {
         if adcn > 2 || adcn == 0 {
             return 0;
@@ -239,10 +238,9 @@ impl Efuse {
         }) as u16
     }
 
-    /// Return the adc value for the calibration point. It's only used in the
-    /// calculation of the AdcCalLine::new_cal calibration. There it is
-    /// assumed that this value has already been corrected for the
-    /// intercept, so we do that explicityly here.
+    /// Return the calibration adc value. It's only used as dx in the
+    /// slope calculation of the AdcCalLine::new_cal calibration. Correct it
+    /// to be ready for this calculation.
     pub fn rtc_calib_cal_code(adcn: usize, atten: Attenuation) -> Option<u16> {
         if adcn > 2 || adcn == 0 {
             return None;
