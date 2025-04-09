@@ -9,7 +9,7 @@ use std::{
 use anyhow::{ensure, Context, Result};
 use cargo::CargoAction;
 use clap::ValueEnum;
-use esp_metadata::Chip;
+use esp_metadata::{Chip, Config};
 use strum::{Display, EnumIter, IntoEnumIterator as _};
 
 use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
@@ -548,12 +548,110 @@ pub fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
 
 /// Validate that the specified chip is valid for the specified package.
 pub fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
-    ensure!(
-        *package != Package::EspLpHal || chip.has_lp_core(),
-        "Invalid chip provided for package '{}': '{}'",
-        package,
-        chip
-    );
+    let device = Config::for_chip(chip);
+
+    match package {
+        Package::EspIeee802154 => ensure!(
+            device.contains("ieee802154"),
+            "Invalid chip provided for package '{}': '{}'",
+            package,
+            chip
+        ),
+        Package::EspLpHal => ensure!(
+            chip.has_lp_core(),
+            "Invalid chip provided for package '{}': '{}'",
+            package,
+            chip
+        ),
+        Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => ensure!(
+            chip.is_xtensa(),
+            "Invalid chip provided for package '{}': '{}'",
+            package,
+            chip
+        ),
+        Package::EspRiscvRt => ensure!(
+            chip.is_riscv(),
+            "Invalid chip provided for package '{}': '{}'",
+            package,
+            chip
+        ),
+        _ => {}
+    }
 
     Ok(())
+}
+
+pub fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
+    let mut features = vec![];
+    match package {
+        Package::EspBacktrace => features.push("defmt".to_owned()),
+        Package::EspConfig => features.push("build".to_owned()),
+        Package::EspHal => {
+            features.push("unstable".to_owned());
+            if config.contains("psram") {
+                // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
+                // defaults to `quad`) as it would require a separate build
+                features.push("psram".to_owned())
+            }
+            if config.contains("usb0") {
+                features.push("usb-otg".to_owned());
+            }
+            if config.contains("bt") {
+                features.push("bluetooth".to_owned());
+            }
+        }
+        Package::EspWifi => {
+            features.push("esp-hal/unstable".to_owned());
+            features.push("defmt".to_owned());
+            if config.contains("wifi") {
+                features.push("wifi".to_owned());
+                features.push("esp-now".to_owned());
+                features.push("sniffer".to_owned());
+                features.push("smoltcp/proto-ipv4".to_owned());
+                features.push("smoltcp/proto-ipv6".to_owned());
+            }
+            if config.contains("ble") {
+                features.push("ble".to_owned());
+            }
+            if config.contains("coex") {
+                features.push("coex".to_owned());
+            }
+        }
+        Package::EspHalProcmacros => {
+            features.push("embassy".to_owned());
+        }
+        Package::EspHalEmbassy => {
+            features.push("esp-hal/unstable".to_owned());
+            features.push("defmt".to_owned());
+            features.push("executors".to_owned());
+        }
+        Package::EspIeee802154 => {
+            features.push("defmt".to_owned());
+            features.push("esp-hal/unstable".to_owned());
+        }
+        Package::EspLpHal => {
+            if config.contains("lp_core") {
+                features.push("embedded-io".to_owned());
+            }
+        }
+        Package::EspPrintln => {
+            features.push("auto".to_owned());
+            features.push("defmt-espflash".to_owned());
+        }
+        Package::EspStorage => {
+            features.push("storage".to_owned());
+            features.push("nor-flash".to_owned());
+            features.push("low-level".to_owned());
+        }
+        Package::EspBootloaderEspIdf => {
+            features.push("defmt".to_owned());
+            features.push("validation".to_owned());
+        },
+        Package::EspAlloc => {
+            features.push("defmt".to_owned());
+        }
+        _ => {}
+    }
+
+    features
 }

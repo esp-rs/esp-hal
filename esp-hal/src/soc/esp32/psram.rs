@@ -889,7 +889,7 @@ pub(crate) mod utils {
                 // Enable MOSI
                 spi.user().modify(|_, w| w.usr_mosi().clear_bit());
                 // Load send buffer
-                let len = (p_in_data.tx_data_bit_len + 31) / 32;
+                let len = p_in_data.tx_data_bit_len.div_ceil(32);
                 if !p_tx_val.is_null() {
                     for i in 0..len {
                         spi.w(0)
