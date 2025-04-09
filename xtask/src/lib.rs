@@ -6,7 +6,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
@@ -204,35 +204,19 @@ impl Package {
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
         let device = Config::for_chip(chip);
 
-        match self {
-            Package::EspIeee802154 => ensure!(
-                device.contains("ieee802154"),
-                "Invalid chip provided for package '{}': '{}'",
-                self,
-                chip
-            ),
-            Package::EspLpHal => ensure!(
-                chip.has_lp_core(),
-                "Invalid chip provided for package '{}': '{}'",
-                self,
-                chip
-            ),
-            Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => ensure!(
-                chip.is_xtensa(),
-                "Invalid chip provided for package '{}': '{}'",
-                self,
-                chip
-            ),
-            Package::EspRiscvRt => ensure!(
-                chip.is_riscv(),
-                "Invalid chip provided for package '{}': '{}'",
-                self,
-                chip
-            ),
-            _ => {}
-        }
+        let check = match self {
+            Package::EspIeee802154 => device.contains("ieee802154"),
+            Package::EspLpHal => chip.has_lp_core(),
+            Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => chip.is_xtensa(),
+            Package::EspRiscvRt => chip.is_riscv(),
+            _ => true
+        };
 
-        Ok(())
+        if check {
+            Ok(())
+        } else {
+            Err(anyhow!("Invalid chip provided for package '{}': '{}'", self, chip))
+        }
     }
 }
 
