@@ -41,6 +41,7 @@ crate::peripherals! {
         GPIO <= GPIO,
         GPIO_SD <= GPIO_SD,
         HMAC <= HMAC,
+        I2C_ANA_MST <= I2C_ANA_MST,
         I2S0 <= I2S0 (I2S0),
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
         IO_MUX <= IO_MUX,
@@ -72,6 +73,9 @@ crate::peripherals! {
         USB_WRAP <= USB_WRAP,
         WIFI <= WIFI,
         XTS_AES <= XTS_AES,
+        NRX <= NRX,
+        FE <= FE,
+        FE2 <= FE2,
     ],
     pins: [
         (0, [Input, Output, Analog, RtcIo])

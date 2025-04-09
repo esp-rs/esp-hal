@@ -72,7 +72,7 @@ impl Ext1WakeupSource<'_, '_> {
     }
 
     fn wake_io_reset() {
-        use crate::gpio::{GpioPin, RtcPin};
+        use crate::gpio::RtcPin;
 
         fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
             if wakeup_pins & (1 << pin.number()) != 0 {
@@ -82,14 +82,14 @@ impl Ext1WakeupSource<'_, '_> {
         }
 
         let wakeup_pins = Ext1WakeupSource::wakeup_pins();
-        uninit_pin(unsafe { GpioPin::<0>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<1>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<2>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<3>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<4>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<5>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<6>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<7>::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO0::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO1::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO2::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO3::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO4::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO5::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO6::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO7::steal() }, wakeup_pins);
     }
 }
 

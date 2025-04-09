@@ -4,10 +4,11 @@
 //! The following wiring is assumed for ESP32C3:
 //! - RTC wakeup pin => GPIO2 (low level)
 //! - RTC wakeup pin => GPIO3 (high level)
-//! The following wiring is assumed for ESP32S3:
-//! - RTC wakeup pin => GPIO18 (low level)
+//! The following wiring is assumed for ESP32S2/ESP32S3:
+//! - RTC wakeup pin => GPIO17 (low level)
+//! - RTC wakeup pin => GPIO18 (high level)
 
-//% CHIPS: esp32c3 esp32s3 esp32c2
+//% CHIPS: esp32c3 esp32s2 esp32s3 esp32c2
 
 #![no_std]
 #![no_main]
@@ -57,7 +58,7 @@ fn main() -> ! {
                 (&mut pin2, WakeupLevel::Low),
                 (&mut pin3, WakeupLevel::High),
             ];
-        } else if #[cfg(feature = "esp32s3")] {
+        } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
             let mut pin17 = peripherals.GPIO17;
             let mut pin18 = peripherals.GPIO18;
             let _pin17_input = Input::new(pin17.reborrow(), config);
