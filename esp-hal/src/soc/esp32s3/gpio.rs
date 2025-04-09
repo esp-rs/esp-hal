@@ -37,7 +37,7 @@
 //! `gpio` peripheral to access the appropriate registers.
 
 use crate::{
-    gpio::{AlternateFunction, GpioPin},
+    gpio::AlternateFunction,
     pac::io_mux,
     peripherals::{GPIO, IO_MUX},
 };
@@ -399,18 +399,18 @@ macro_rules! rtcio_analog {
     (
         $pin_num:expr, $pin_reg:expr, $prefix:pat, $hold:ident
     ) => {
-        impl $crate::gpio::RtcPin for GpioPin<'_, $pin_num> {
-            fn rtc_number(&self) -> u8 {
-                $pin_num
-            }
+        paste::paste! {
+            impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
+                fn rtc_number(&self) -> u8 {
+                    $pin_num
+                }
 
-            /// Set the RTC properties of the pin. If `mux` is true then then pin is
-            /// routed to RTC, when false it is routed to IO_MUX.
-            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
-                enable_iomux_clk_gate();
+                /// Set the RTC properties of the pin. If `mux` is true then then pin is
+                /// routed to RTC, when false it is routed to IO_MUX.
+                fn rtc_set_config(&self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+                    enable_iomux_clk_gate();
 
-                // disable input
-                paste::paste!{
+                    // disable input
                     $crate::peripherals::RTC_IO::regs()
                         .$pin_reg.modify(|_,w| unsafe {
                             w.[<$prefix fun_ie>]().bit(input_enable);
@@ -418,41 +418,34 @@ macro_rules! rtcio_analog {
                             w.[<$prefix fun_sel>]().bits(func as u8)
                         });
                 }
-            }
 
-            fn rtcio_pad_hold(&self, enable: bool) {
-                $crate::peripherals::LPWR::regs()
-                    .pad_hold()
-                    .modify(|_, w| w.$hold().bit(enable));
-            }
-        }
-
-        impl $crate::gpio::RtcPinWithResistors for GpioPin<'_, $pin_num>
-        {
-            fn rtcio_pullup(&self, enable: bool) {
-                paste::paste! {
-                    $crate::peripherals::RTC_IO::regs()
-                        .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
+                fn rtcio_pad_hold(&self, enable: bool) {
+                    $crate::peripherals::LPWR::regs()
+                        .pad_hold()
+                        .modify(|_, w| w.$hold().bit(enable));
                 }
             }
 
-            fn rtcio_pulldown(&self, enable: bool) {
-                paste::paste! {
+            impl $crate::gpio::RtcPinWithResistors for $crate::peripherals::[<GPIO $pin_num>]<'_> {
+                fn rtcio_pullup(&self, enable: bool) {
+                    $crate::peripherals::RTC_IO::regs()
+                        .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
+                }
+
+                fn rtcio_pulldown(&self, enable: bool) {
                     $crate::peripherals::RTC_IO::regs()
                         .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
                 }
             }
-        }
 
-        impl $crate::gpio::AnalogPin for GpioPin<'_, $pin_num> {
-            /// Configures the pin for analog mode.
-            fn set_analog(&self, _: $crate::private::Internal) {
-                use $crate::gpio::RtcPin;
-                enable_iomux_clk_gate();
+            impl $crate::gpio::AnalogPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
+                /// Configures the pin for analog mode.
+                fn set_analog(&self, _: $crate::private::Internal) {
+                    use $crate::gpio::RtcPin;
+                    enable_iomux_clk_gate();
 
-                let rtcio = $crate::peripherals::RTC_IO::regs();
+                    let rtcio = $crate::peripherals::RTC_IO::regs();
 
-                paste::paste! {
                     // disable input
                     rtcio.$pin_reg.modify(|_,w| w.[<$prefix fun_ie>]().bit(false));
 
@@ -534,8 +527,8 @@ impl InterruptStatusRegisterAccess {
 }
 
 // implement marker traits on USB pins
-impl crate::otg_fs::UsbDm for GpioPin<'_, 19> {}
-impl crate::otg_fs::UsbDp for GpioPin<'_, 20> {}
+impl crate::otg_fs::UsbDm for crate::peripherals::GPIO19<'_> {}
+impl crate::otg_fs::UsbDp for crate::peripherals::GPIO20<'_> {}
 
 fn enable_iomux_clk_gate() {
     crate::peripherals::SENS::regs()

@@ -58,6 +58,20 @@ If a driver works with multiple peripheral instances, e.g. `SPI`:
 
 ## GPIO changes
 
+### GPIO pins are now consistent with other peripheral singletons
+
+For compatibility with third party libraries, as well as for consistency with other peripherals,
+the GPIO pin types (`GpioPin<N>`) have been replaced by separate `esp_hal::peripherals::GPION<'d>`
+types.
+
+```diff
+-use esp_hal::gpio::GpioPin;
++use esp_hal::peripherals::{GPIO2, GPIO3};
+
+-fn my_function(gpio2: GpioPin<2>, gpio3: GpioPin<3>) {...}
++fn my_function(gpio2: GPIO2<'_>, gpio3: GPIO3<'_>) {...}
+```
+
 ### Interconnect types now have a lifetime
 
 The GPIO interconnect types now have a lifetime. This lifetime prevents them to be live for longer
