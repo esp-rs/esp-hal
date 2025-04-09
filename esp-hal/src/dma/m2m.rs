@@ -451,23 +451,8 @@ impl<'d, Dm: DriverMode> SimpleMem2Mem<'d, Dm> {
             core::slice::from_raw_parts_mut(tx_descriptors.as_mut_ptr(), tx_descriptors.len())
         };
 
-        let dma_tx_buf = unwrap!(
-            DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, self.config),
-            "There's no way to get the descriptors back yet"
-        );
-
-        let tx = match mem2mem.tx.send(dma_tx_buf) {
-            Ok(tx) => tx,
-            Err((err, tx, buf)) => {
-                let (tx_descriptors, _tx_buffer) = buf.split();
-                self.state = State::Idle(
-                    Mem2Mem { rx: mem2mem.rx, tx },
-                    rx_descriptors,
-                    tx_descriptors,
-                );
-                return Err(err);
-            }
-        };
+        // Note: The ESP32-S2 insists that RX is started before TX. Contrary to the TRM and every
+        // other chip.
 
         let dma_rx_buf = unwrap!(
             DmaRxBuf::new_with_config(rx_descriptors, rx_buffer, self.config),
@@ -478,8 +463,26 @@ impl<'d, Dm: DriverMode> SimpleMem2Mem<'d, Dm> {
             Ok(rx) => rx,
             Err((err, rx, buf)) => {
                 let (rx_descriptors, _rx_buffer) = buf.split();
-                let (tx, buf) = tx.stop();
+                self.state = State::Idle(
+                    Mem2Mem { rx, tx: mem2mem.tx },
+                    rx_descriptors,
+                    tx_descriptors,
+                );
+                return Err(err);
+            }
+        };
+
+        let dma_tx_buf = unwrap!(
+            DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, self.config),
+            "There's no way to get the descriptors back yet"
+        );
+
+        let tx = match mem2mem.tx.send(dma_tx_buf) {
+            Ok(tx) => tx,
+            Err((err, tx, buf)) => {
                 let (tx_descriptors, _tx_buffer) = buf.split();
+                let (rx, buf) = rx.stop();
+                let (rx_descriptors, _rx_buffer) = buf.split();
                 self.state = State::Idle(Mem2Mem { rx, tx }, rx_descriptors, tx_descriptors);
                 return Err(err);
             }
