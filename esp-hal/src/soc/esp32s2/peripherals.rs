@@ -33,6 +33,7 @@ crate::peripherals! {
         APB_SARADC <= APB_SARADC,
         DAC1 <= virtual,
         DAC2 <= virtual,
+        COPY_DMA <= COPY_DMA,
         CRYPTO_DMA <= CRYPTO_DMA,
         DEDICATED_GPIO <= DEDICATED_GPIO,
         DS <= DS,
@@ -128,5 +129,6 @@ crate::peripherals! {
         DMA_SPI3: Spi3DmaChannel,
         DMA_I2S0: I2s0DmaChannel,
         DMA_CRYPTO: CryptoDmaChannel,
+        DMA_COPY: CopyDmaChannel,
     ]
 }

@@ -17,10 +17,14 @@ use portable_atomic::AtomicBool;
 use crate::{asynch::AtomicWaker, dma::*, handler, interrupt::Priority, peripherals::Interrupt};
 
 #[cfg(esp32s2)]
+mod copy;
+#[cfg(esp32s2)]
 mod crypto;
 mod i2s;
 mod spi;
 
+#[cfg(esp32s2)]
+pub use copy::*;
 #[cfg(esp32s2)]
 pub use crypto::*;
 pub use i2s::*;
@@ -163,6 +167,18 @@ pub(super) fn init_dma(_cs: CriticalSection<'_>) {
         DPORT::regs()
             .spi_dma_chan_sel()
             .modify(|_, w| unsafe { w.spi2_dma_chan_sel().bits(1).spi3_dma_chan_sel().bits(2) });
+    }
+
+    #[cfg(esp32s2)]
+    {
+        // This is the only DMA channel on the S2 that needs to be enabled this way
+        // (using its own registers). Ideally this should be enabled only when
+        // the DMA channel is in use but we don't have a good mechanism for that
+        // yet. For now, we shall just turn in on forever once any DMA channel is used.
+
+        use crate::peripherals::COPY_DMA;
+
+        COPY_DMA::regs().conf().modify(|_, w| w.clk_en().set_bit());
     }
 }
 

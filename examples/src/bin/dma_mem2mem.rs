@@ -1,7 +1,7 @@
 //! Uses DMA to copy memory to memory.
 
 //% FEATURES: esp-hal/log esp-hal/unstable
-//% CHIPS: esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
+//% CHIPS: esp32s2 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
@@ -29,18 +29,20 @@ fn main() -> ! {
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 
     cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
-            let dma_peripheral = peripherals.SPI2;
+        if #[cfg(feature = "esp32s2")] {
+            let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
+        } else if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
+            let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2);
         } else {
-            let dma_peripheral = peripherals.MEM2MEM1;
+            let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
         }
     }
 
-    let mut mem2mem = Mem2Mem::new(peripherals.DMA_CH0, dma_peripheral)
+    let mut mem2mem = mem2mem
         .with_descriptors(rx_descriptors, tx_descriptors, BurstConfig::default())
         .unwrap();
 
-    for i in 0..core::mem::size_of_val(tx_buffer) {
+    for i in 0..size_of_val(tx_buffer) {
         tx_buffer[i] = (i % 256) as u8;
     }
 
@@ -52,7 +54,7 @@ fn main() -> ! {
             dma_wait.wait().unwrap();
             info!("Transfer completed, comparing buffer");
             let mut error = false;
-            for i in 0..core::mem::size_of_val(tx_buffer) {
+            for i in 0..size_of_val(tx_buffer) {
                 if rx_buffer[i] != tx_buffer[i] {
                     error!(
                         "Error: tx_buffer[{}] = {}, rx_buffer[{}] = {}",
