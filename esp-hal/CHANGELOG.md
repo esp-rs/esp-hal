@@ -16,7 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ESP_HAL_CONFIG_CRITICAL_SECTION_IMPL` to allow opting out of the default `critical-section` implementation (#3293)
 - All peripheral singletons (`GpioPin<...>`, `SPIn`, ...) now have a lifetime, as well as `steal`, `reborrow` and `clone_unchecked` methods (#3305)
 - `i2c::master::Operation` now implements `defmt::Format` (#3348)
-- ESP32-S2: Support for light-/deep-sleep(#375) 
 - ESP32-S2: Support for light-/deep-sleep (#3341) 
 - Add DMA memcpy support to the S2 (#3352)
 
@@ -63,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `Peripheral` trait and `PeripheralRef` struct have been removed (#3302, #3305)
 - Removed the inherent `degrade` method from peripheral singletons. (#3305)
+- Removed the `FullDuplex` trait from the PARL_IO driver. (#3339)
 
 ## v1.0.0-beta.0
 

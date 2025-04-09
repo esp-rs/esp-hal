@@ -583,12 +583,6 @@ tx_pins!(
     P15 = PARL_TX_DATA15
 );
 
-impl FullDuplex for TxOneBit<'_> {}
-impl FullDuplex for TxTwoBits<'_> {}
-impl FullDuplex for TxFourBits<'_> {}
-impl FullDuplex for TxEightBits<'_> {}
-impl FullDuplex for TxPinConfigWithValidPin<'_, TxFourBits<'_>> {}
-
 impl NotContainsValidSignalPin for TxOneBit<'_> {}
 impl NotContainsValidSignalPin for TxTwoBits<'_> {}
 impl NotContainsValidSignalPin for TxFourBits<'_> {}
@@ -789,12 +783,6 @@ rx_pins!(
     P15 = PARL_RX_DATA15
 );
 
-impl FullDuplex for RxOneBit<'_> {}
-impl FullDuplex for RxTwoBits<'_> {}
-impl FullDuplex for RxFourBits<'_> {}
-impl FullDuplex for RxEightBits<'_> {}
-impl FullDuplex for RxPinConfigWithValidPin<'_, RxFourBits<'_>> {}
-
 impl NotContainsValidSignalPin for RxOneBit<'_> {}
 impl NotContainsValidSignalPin for RxTwoBits<'_> {}
 impl NotContainsValidSignalPin for RxFourBits<'_> {}
@@ -822,7 +810,7 @@ where
         bit_order: BitPackOrder,
     ) -> Result<ParlIoTx<'d, Dm>, Error>
     where
-        P: FullDuplex + TxPins + ConfigurePins + 'd,
+        P: TxPins + ConfigurePins + 'd,
         CP: TxClkPin + 'd,
     {
         tx_pins.configure()?;
@@ -902,7 +890,7 @@ where
         timeout_ticks: Option<u16>,
     ) -> Result<ParlIoRx<'d, Dm>, Error>
     where
-        P: FullDuplex + RxPins + ConfigurePins + 'd,
+        P: RxPins + ConfigurePins + 'd,
         CP: RxClkPin + 'd,
     {
         let guard = GenericPeripheralGuard::new();
@@ -1857,8 +1845,6 @@ pub mod asynch {
 mod private {
     use super::{BitPackOrder, Error, SampleEdge};
     use crate::peripherals::PARL_IO;
-
-    pub trait FullDuplex {}
 
     pub trait NotContainsValidSignalPin {}
 
