@@ -29,6 +29,8 @@ use embedded_storage::{ReadStorage, Storage};
 
 use crate::partitions::FlashRegion;
 
+// We run tests on the host which happens to be MacOS machines and mach-o doesn't like `link-sections`this way
+#[cfg(not(target_os = "macos"))]
 #[link_section = ".espressif.metadata"]
 #[used]
 #[export_name = "bootloader.FEATURE_OTA"]
@@ -47,9 +49,6 @@ static ALGO: Algorithm<u32> = Algorithm {
 
 const SLOT0_DATA_OFFSET: u32 = 0x0000;
 const SLOT1_DATA_OFFSET: u32 = 0x1000;
-
-#[cfg(target_endian = "big")]
-compile_error!("This code assumes to be running on a little-endian platform.");
 
 /// Representation of the current OTA slot.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::FromRepr)]
