@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support reading partition tables and conveniently read/write partition content (#3316)
 
+- OTA-DATA partition support (#3354)
+
 ### Changed
 
 ### Fixed
