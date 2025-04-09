@@ -35,7 +35,7 @@
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 use crate::{
-    gpio::{AlternateFunction, GpioPin},
+    gpio::AlternateFunction,
     pac::io_mux,
     peripherals::{GPIO, IO_MUX},
 };
@@ -177,7 +177,7 @@ pub enum OutputSignal {
 macro_rules! rtc_pins {
     ( $( $pin_num:expr )+ ) => {
         $(
-            impl $crate::gpio::RtcPin for GpioPin<'_, $pin_num> {
+            impl $crate::gpio::RtcPin for paste::paste!($crate::peripherals::[<GPIO $pin_num>]<'_>) {
                 unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                     let gpio_wakeup = $crate::peripherals::LPWR::regs().cntl_gpio_wakeup();
                     paste::paste! {
@@ -193,25 +193,22 @@ macro_rules! rtc_pins {
                     }
                 }
             }
+
+            impl crate::gpio::RtcPinWithResistors for paste::paste!($crate::peripherals::[<GPIO $pin_num>]<'_>) {
+                fn rtcio_pullup(&self, enable: bool) {
+                    IO_MUX::regs()
+                        .gpio($pin_num)
+                        .modify(|_, w| w.fun_wpu().bit(enable));
+                }
+
+                fn rtcio_pulldown(&self, enable: bool) {
+                    IO_MUX::regs()
+                        .gpio($pin_num)
+                        .modify(|_, w| w.fun_wpd().bit(enable));
+                }
+            }
         )+
     };
-}
-
-impl<const N: u8> crate::gpio::RtcPinWithResistors for GpioPin<'_, N>
-where
-    Self: crate::gpio::RtcPin,
-{
-    fn rtcio_pullup(&self, enable: bool) {
-        IO_MUX::regs()
-            .gpio(N as usize)
-            .modify(|_, w| w.fun_wpu().bit(enable));
-    }
-
-    fn rtcio_pulldown(&self, enable: bool) {
-        IO_MUX::regs()
-            .gpio(N as usize)
-            .modify(|_, w| w.fun_wpd().bit(enable));
-    }
 }
 
 rtc_pins! {

@@ -43,7 +43,7 @@
 use core::mem::transmute;
 
 use crate::{
-    gpio::{AlternateFunction, GpioPin},
+    gpio::AlternateFunction,
     pac::io_mux,
     peripherals::{GPIO, IO_MUX},
     system::Cpu,
@@ -535,16 +535,16 @@ macro_rules! rtcio_analog {
     (
         $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
     ) => {
-        impl $crate::gpio::RtcPin for $crate::gpio::GpioPin<'_, $pin_num> {
-            fn rtc_number(&self) -> u8 {
-                $rtc_pin
-            }
+        paste::paste! {
+            impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
+                fn rtc_number(&self) -> u8 {
+                    $rtc_pin
+                }
 
-            /// Set the RTC properties of the pin. If `mux` is true then then pin is
-            /// routed to RTC, when false it is routed to IO_MUX.
-            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
-                // disable input
-                paste::paste!{
+                /// Set the RTC properties of the pin. If `mux` is true then then pin is
+                /// routed to RTC, when false it is routed to IO_MUX.
+                fn rtc_set_config(&self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
+                    // disable input
                     $crate::peripherals::RTC_IO::regs()
                         .$pin_reg.modify(|_,w| unsafe {
                             w.[<$prefix fun_ie>]().bit(input_enable);
@@ -552,42 +552,36 @@ macro_rules! rtcio_analog {
                             w.[<$prefix fun_sel>]().bits(func as u8)
                         });
                 }
+
+                fn rtcio_pad_hold(&self, enable: bool) {
+                    $crate::peripherals::LPWR::regs()
+                        .hold_force()
+                        .modify(|_, w| w.$hold().bit(enable));
+                }
             }
 
-            fn rtcio_pad_hold(&self, enable: bool) {
-                $crate::peripherals::LPWR::regs()
-                    .hold_force()
-                    .modify(|_, w| w.$hold().bit(enable));
-            }
-        }
-
-        $(
-            // FIXME: replace with $(ignore($rue)) once stable
-            $crate::ignore!($rue);
-            impl $crate::gpio::RtcPinWithResistors for $crate::gpio::GpioPin<'_, $pin_num> {
-                fn rtcio_pullup(&self, enable: bool) {
-                    paste::paste! {
+            $(
+                // FIXME: replace with $(ignore($rue)) once stable
+                $crate::ignore!($rue);
+                impl $crate::gpio::RtcPinWithResistors for $crate::peripherals::[<GPIO $pin_num>]<'_> {
+                    fn rtcio_pullup(&self, enable: bool) {
                         $crate::peripherals::RTC_IO::regs()
                             .$pin_reg.modify(|_, w| w.[< $prefix rue >]().bit(enable));
                     }
-                }
 
-                fn rtcio_pulldown(&self, enable: bool) {
-                    paste::paste! {
+                    fn rtcio_pulldown(&self, enable: bool) {
                         $crate::peripherals::RTC_IO::regs()
                             .$pin_reg.modify(|_, w| w.[< $prefix rde >]().bit(enable));
                     }
                 }
-            }
-        )?
+            )?
 
-        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<'_, $pin_num> {
-            /// Configures the pin for analog mode.
-            fn set_analog(&self, _: $crate::private::Internal) {
-                use $crate::gpio::RtcPin;
-                let rtcio = $crate::peripherals::RTC_IO::regs();
+            impl $crate::gpio::AnalogPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
+                /// Configures the pin for analog mode.
+                fn set_analog(&self, _: $crate::private::Internal) {
+                    use $crate::gpio::RtcPin;
+                    let rtcio = $crate::peripherals::RTC_IO::regs();
 
-                paste::paste! {
                     // disable input
                     rtcio.$pin_reg.modify(|_,w| w.[<$prefix fun_ie>]().bit(false));
 
@@ -683,7 +677,7 @@ macro_rules! touch {
         )+
     ) => {
         $(
-        impl $crate::gpio::TouchPin for GpioPin<'_, $pin_num> {
+        impl $crate::gpio::TouchPin for paste::paste!($crate::peripherals::[<GPIO $pin_num>]<'_>) {
             fn set_touch(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::{GPIO, RTC_IO, SENS};
                 use $crate::gpio::RtcPin;
