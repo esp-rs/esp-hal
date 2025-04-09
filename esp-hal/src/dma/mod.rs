@@ -3098,31 +3098,11 @@ pub(crate) mod asynch {
             return;
         }
 
-        if rx.pending_interrupts().is_disjoint(
-            DmaRxInterrupt::DescriptorError
-                | DmaRxInterrupt::DescriptorEmpty
-                | DmaRxInterrupt::ErrorEof,
-        ) {
-            rx.unlisten(
-                DmaRxInterrupt::DescriptorError
-                    | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof
-                    | DmaRxInterrupt::SuccessfulEof
-                    | DmaRxInterrupt::Done,
-            );
-            rx.waker().wake()
-        }
+        let pending = rx.pending_interrupts();
+        let enabled = rx.is_listening();
 
-        if rx
-            .pending_interrupts()
-            .contains(DmaRxInterrupt::SuccessfulEof)
-        {
-            rx.unlisten(DmaRxInterrupt::SuccessfulEof);
-            rx.waker().wake()
-        }
-
-        if rx.pending_interrupts().contains(DmaRxInterrupt::Done) {
-            rx.unlisten(DmaRxInterrupt::Done);
+        if !pending.is_disjoint(enabled) {
+            rx.unlisten(EnumSet::all());
             rx.waker().wake()
         }
     }
@@ -3134,25 +3114,12 @@ pub(crate) mod asynch {
             return;
         }
 
-        if tx
-            .pending_interrupts()
-            .contains(DmaTxInterrupt::DescriptorError)
-        {
-            tx.unlisten(
-                DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof | DmaTxInterrupt::Done,
-            );
-            tx.waker().wake()
-        }
+        let pending = tx.pending_interrupts();
+        let enabled = tx.is_listening();
 
-        if tx.pending_interrupts().contains(DmaTxInterrupt::TotalEof)
-            && tx.is_listening().contains(DmaTxInterrupt::TotalEof)
-        {
-            tx.unlisten(DmaTxInterrupt::TotalEof);
-            tx.waker().wake()
-        }
+        if !pending.is_disjoint(enabled) {
+            tx.unlisten(EnumSet::all());
 
-        if tx.pending_interrupts().contains(DmaTxInterrupt::Done) {
-            tx.unlisten(DmaTxInterrupt::Done);
             tx.waker().wake()
         }
     }
