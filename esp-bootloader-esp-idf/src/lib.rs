@@ -28,8 +28,7 @@ mod fmt;
 
 pub mod partitions;
 
-// thank you, OSX/mach-o
-#[cfg(all(feature = "ota", target_os = "none"))]
+#[cfg(feature = "ota")]
 pub mod ota;
 
 /// ESP-IDF compatible application descriptor
