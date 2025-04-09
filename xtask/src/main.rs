@@ -691,10 +691,10 @@ fn lint_package(
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
     let mut builder = if !package.build_on_host() {
-        builder = builder.arg("-Zbuild-std=core,alloc");
         if chip.is_xtensa() {
             // We only overwrite Xtensas so that externally set nightly/stable toolchains
             // are not overwritten.
+            builder = builder.arg("-Zbuild-std=core,alloc");
             builder = builder.toolchain("esp");
         }
 
