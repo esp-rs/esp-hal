@@ -200,40 +200,16 @@ impl Efuse {
         let (_, calib_version) = Self::block_version();
         let version_number = calib_version;
 
-        match version_number {
-            1 => {
-                let low = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
-                    version_number,
-                    unit,
-                    atten,
-                    RtcCalibParam::V1VLow,
-                )?);
-                let high = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
-                    version_number,
-                    unit,
-                    atten,
-                    RtcCalibParam::V1VHigh,
-                )?);
-
-                let vhigh = RTC_CALIB_V_HIGH[atten as usize];
-                let vlow = RTC_CALIB_V_LOW;
-                use defmt::println;
-                println!("({}, {}) -> ({}, {})", low, vlow, high, vhigh);
-                let dv = vhigh - vlow;
-
-                let intercept = (vlow * high - vhigh * low) / dv;
-                Some(intercept as u16)
-            }
-            2 => {
-                let icode = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
-                    version_number,
-                    unit,
-                    atten,
-                    RtcCalibParam::V2VInit,
-                )?);
-                Some(icode as u16)
-            }
-            _ => None,
+        if version_number == 2 {
+            let icode = Self::rtc_table_get_parsed_efuse_value(Self::rtc_table_get_tag(
+                version_number,
+                unit,
+                atten,
+                RtcCalibParam::V2VInit,
+            )?);
+            Some(icode as u16)
+        } else {
+            None
         }
     }
 
@@ -248,7 +224,7 @@ impl Efuse {
         let _unit = (adcn - 1) as u8;
 
         let index = atten as usize;
-        if index >= 4 {
+        if index >= RTC_CALIB_V_HIGH.len() {
             return 0;
         }
 
