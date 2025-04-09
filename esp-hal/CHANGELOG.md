@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Trace` is no longer generic (#3305)
 - Migrate SPI slave driver to newer DMA API (#3326)
 - Migrate DMA memcpy driver to newer DMA API (#3327)
+- I2C checks ST_TOUT / MAIN_ST_TOUT where available (#3333)
 
 ### Fixed
 
