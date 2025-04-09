@@ -96,6 +96,144 @@ impl Package {
 
         matches!(self, EspBuild | EspConfig | EspMetadata)
     }
+
+    /// Given a device config, return the features which should be enabled for
+    /// this package.
+    pub fn feature_rules(&self, config: &Config) -> Vec<String> {
+        let mut features = vec![];
+        match self {
+            Package::EspBacktrace => features.push("defmt".to_owned()),
+            Package::EspConfig => features.push("build".to_owned()),
+            Package::EspHal => {
+                features.push("unstable".to_owned());
+                if config.contains("psram") {
+                    // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
+                    // defaults to `quad`) as it would require a separate build
+                    features.push("psram".to_owned())
+                }
+                if config.contains("usb0") {
+                    features.push("usb-otg".to_owned());
+                }
+                if config.contains("bt") {
+                    features.push("bluetooth".to_owned());
+                }
+            }
+            Package::EspWifi => {
+                features.push("esp-hal/unstable".to_owned());
+                features.push("defmt".to_owned());
+                if config.contains("wifi") {
+                    features.push("wifi".to_owned());
+                    features.push("esp-now".to_owned());
+                    features.push("sniffer".to_owned());
+                    features.push("smoltcp/proto-ipv4".to_owned());
+                    features.push("smoltcp/proto-ipv6".to_owned());
+                }
+                if config.contains("ble") {
+                    features.push("ble".to_owned());
+                }
+                if config.contains("coex") {
+                    features.push("coex".to_owned());
+                }
+            }
+            Package::EspHalProcmacros => {
+                features.push("embassy".to_owned());
+            }
+            Package::EspHalEmbassy => {
+                features.push("esp-hal/unstable".to_owned());
+                features.push("defmt".to_owned());
+                features.push("executors".to_owned());
+            }
+            Package::EspIeee802154 => {
+                features.push("defmt".to_owned());
+                features.push("esp-hal/unstable".to_owned());
+            }
+            Package::EspLpHal => {
+                if config.contains("lp_core") {
+                    features.push("embedded-io".to_owned());
+                }
+            }
+            Package::EspPrintln => {
+                features.push("auto".to_owned());
+                features.push("defmt-espflash".to_owned());
+            }
+            Package::EspStorage => {
+                features.push("storage".to_owned());
+                features.push("nor-flash".to_owned());
+                features.push("low-level".to_owned());
+            }
+            Package::EspBootloaderEspIdf => {
+                features.push("defmt".to_owned());
+                features.push("validation".to_owned());
+            }
+            Package::EspAlloc => {
+                features.push("defmt".to_owned());
+            }
+            _ => {}
+        }
+
+        features
+    }
+
+    /// Additional feature rules to test subsets of features for a package.
+    pub fn lint_feature_rules(&self, _config: &Config) -> Option<Vec<Vec<String>>> {
+        let mut cases = Vec::new();
+        match self {
+            Package::EspWifi => {
+                // minimal set of features that when enabled _should_ still compile
+                cases.push(vec![
+                    "esp-hal/unstable".to_owned(),
+                    "builtin-scheduler".to_owned(),
+                ]);
+
+                Some(cases)
+            }
+            _ => None,
+        }
+    }
+
+    /// Return the target triple for a given package/chip pair.
+    pub fn target_triple(&self, chip: &Chip) -> Result<&'static str> {
+        if *self == Package::EspLpHal {
+            chip.lp_target()
+        } else {
+            Ok(chip.target())
+        }
+    }
+
+    /// Validate that the specified chip is valid for the specified package.
+    pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
+        let device = Config::for_chip(chip);
+
+        match self {
+            Package::EspIeee802154 => ensure!(
+                device.contains("ieee802154"),
+                "Invalid chip provided for package '{}': '{}'",
+                self,
+                chip
+            ),
+            Package::EspLpHal => ensure!(
+                chip.has_lp_core(),
+                "Invalid chip provided for package '{}': '{}'",
+                self,
+                chip
+            ),
+            Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => ensure!(
+                chip.is_xtensa(),
+                "Invalid chip provided for package '{}': '{}'",
+                self,
+                chip
+            ),
+            Package::EspRiscvRt => ensure!(
+                chip.is_riscv(),
+                "Invalid chip provided for package '{}': '{}'",
+                self,
+                chip
+            ),
+            _ => {}
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, Display, ValueEnum)]
@@ -535,123 +673,4 @@ pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Ver
 /// Make the path "Windows"-safe
 pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
-}
-
-/// Return the target triple for a given package/chip pair.
-pub fn target_triple(package: Package, chip: &Chip) -> Result<&str> {
-    if package == Package::EspLpHal {
-        chip.lp_target()
-    } else {
-        Ok(chip.target())
-    }
-}
-
-/// Validate that the specified chip is valid for the specified package.
-pub fn validate_package_chip(package: &Package, chip: &Chip) -> Result<()> {
-    let device = Config::for_chip(chip);
-
-    match package {
-        Package::EspIeee802154 => ensure!(
-            device.contains("ieee802154"),
-            "Invalid chip provided for package '{}': '{}'",
-            package,
-            chip
-        ),
-        Package::EspLpHal => ensure!(
-            chip.has_lp_core(),
-            "Invalid chip provided for package '{}': '{}'",
-            package,
-            chip
-        ),
-        Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => ensure!(
-            chip.is_xtensa(),
-            "Invalid chip provided for package '{}': '{}'",
-            package,
-            chip
-        ),
-        Package::EspRiscvRt => ensure!(
-            chip.is_riscv(),
-            "Invalid chip provided for package '{}': '{}'",
-            package,
-            chip
-        ),
-        _ => {}
-    }
-
-    Ok(())
-}
-
-pub fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
-    let mut features = vec![];
-    match package {
-        Package::EspBacktrace => features.push("defmt".to_owned()),
-        Package::EspConfig => features.push("build".to_owned()),
-        Package::EspHal => {
-            features.push("unstable".to_owned());
-            if config.contains("psram") {
-                // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
-                // defaults to `quad`) as it would require a separate build
-                features.push("psram".to_owned())
-            }
-            if config.contains("usb0") {
-                features.push("usb-otg".to_owned());
-            }
-            if config.contains("bt") {
-                features.push("bluetooth".to_owned());
-            }
-        }
-        Package::EspWifi => {
-            features.push("esp-hal/unstable".to_owned());
-            features.push("defmt".to_owned());
-            if config.contains("wifi") {
-                features.push("wifi".to_owned());
-                features.push("esp-now".to_owned());
-                features.push("sniffer".to_owned());
-                features.push("smoltcp/proto-ipv4".to_owned());
-                features.push("smoltcp/proto-ipv6".to_owned());
-            }
-            if config.contains("ble") {
-                features.push("ble".to_owned());
-            }
-            if config.contains("coex") {
-                features.push("coex".to_owned());
-            }
-        }
-        Package::EspHalProcmacros => {
-            features.push("embassy".to_owned());
-        }
-        Package::EspHalEmbassy => {
-            features.push("esp-hal/unstable".to_owned());
-            features.push("defmt".to_owned());
-            features.push("executors".to_owned());
-        }
-        Package::EspIeee802154 => {
-            features.push("defmt".to_owned());
-            features.push("esp-hal/unstable".to_owned());
-        }
-        Package::EspLpHal => {
-            if config.contains("lp_core") {
-                features.push("embedded-io".to_owned());
-            }
-        }
-        Package::EspPrintln => {
-            features.push("auto".to_owned());
-            features.push("defmt-espflash".to_owned());
-        }
-        Package::EspStorage => {
-            features.push("storage".to_owned());
-            features.push("nor-flash".to_owned());
-            features.push("low-level".to_owned());
-        }
-        Package::EspBootloaderEspIdf => {
-            features.push("defmt".to_owned());
-            features.push("validation".to_owned());
-        },
-        Package::EspAlloc => {
-            features.push("defmt".to_owned());
-        }
-        _ => {}
-    }
-
-    features
 }

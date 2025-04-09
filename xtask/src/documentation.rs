@@ -13,7 +13,7 @@ use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{apply_feature_rules, cargo::CargoArgsBuilder, Chip, Package};
+use crate::{cargo::CargoArgsBuilder, Chip, Package};
 
 // ----------------------------------------------------------------------------
 // Build Documentation
@@ -97,7 +97,7 @@ fn build_documentation_for_package(
 
     // Ensure that the package/chip combination provided are valid:
     if let Some(chip) = chip {
-        if let Err(err) = crate::validate_package_chip(package, &chip) {
+        if let Err(err) = package.validate_package_chip(&chip) {
             log::warn!("{err}");
             return Ok(());
         }
@@ -192,7 +192,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     // Determine the appropriate build target for the given package and chip,
     // if we're able to:
     let target = if let Some(ref chip) = chip {
-        Some(crate::target_triple(package, chip)?)
+        Some(package.target_triple(chip)?)
     } else {
         None
     };
@@ -200,9 +200,9 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     let mut features = vec![];
     if let Some(chip) = &chip {
         features.push(chip.to_string());
-        features.extend(apply_feature_rules(&package, Config::for_chip(&chip)));
+        features.extend(package.feature_rules(Config::for_chip(&chip)));
     } else {
-        features.extend(apply_feature_rules(&package, &Config::empty()));
+        features.extend(package.feature_rules(&Config::empty()));
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:
@@ -414,7 +414,7 @@ fn generate_documentation_meta_for_package(
 
     for chip in chips {
         // Ensure that the package/chip combination provided are valid:
-        crate::validate_package_chip(&package, chip)?;
+        package.validate_package_chip(chip)?;
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:
