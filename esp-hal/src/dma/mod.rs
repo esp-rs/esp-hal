@@ -2641,65 +2641,6 @@ where
     }
 }
 
-/// DMA transaction for TX+RX transfers
-///
-/// # Safety
-///
-/// Never use [core::mem::forget] on an in-progress transfer
-#[non_exhaustive]
-#[must_use]
-pub struct DmaTransferRxTx<'a, I>
-where
-    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-{
-    instance: &'a mut I,
-}
-
-impl<'a, I> DmaTransferRxTx<'a, I>
-where
-    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-{
-    #[allow(dead_code)]
-    pub(crate) fn new(instance: &'a mut I) -> Self {
-        Self { instance }
-    }
-
-    /// Wait for the transfer to finish.
-    pub fn wait(self) -> Result<(), DmaError> {
-        self.instance.peripheral_wait_dma(true, true);
-
-        if self
-            .instance
-            .tx()
-            .pending_out_interrupts()
-            .contains(DmaTxInterrupt::DescriptorError)
-            || self
-                .instance
-                .rx()
-                .pending_in_interrupts()
-                .contains(DmaRxInterrupt::DescriptorError)
-        {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Check if the transfer is finished.
-    pub fn is_done(&mut self) -> bool {
-        self.instance.tx().is_done() && self.instance.rx().is_done()
-    }
-}
-
-impl<I> Drop for DmaTransferRxTx<'_, I>
-where
-    I: dma_private::DmaSupportTx + dma_private::DmaSupportRx,
-{
-    fn drop(&mut self) {
-        self.instance.peripheral_wait_dma(true, true);
-    }
-}
-
 /// DMA transaction for TX only circular transfers
 ///
 /// # Safety
