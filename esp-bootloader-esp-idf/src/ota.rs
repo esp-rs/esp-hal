@@ -29,7 +29,7 @@ use embedded_storage::{ReadStorage, Storage};
 
 use crate::partitions::FlashRegion;
 
-#[cfg_attr(not(test), link_section = ".espressif.metadata")]
+#[link_section = ".espressif.metadata"]
 #[used]
 #[export_name = "bootloader.FEATURE_OTA"]
 static OTA_FEATURE: [u8; 11] = *b"FEATURE=OTA";
