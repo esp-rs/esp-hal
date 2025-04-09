@@ -200,7 +200,9 @@ impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        regi2c::ADC_SAR1_DREF.write_field(enable as u8);
+        // For enable value 4, see <https://github.com/espressif/esp-idf/blob/a25e7ab59ed197817d4a78e139220b2707481f67/components/hal/esp32s3/include/hal/adc_ll.h#L812>
+        // For disable value 1, see <https://github.com/espressif/esp-idf/blob/a25e7ab59ed197817d4a78e139220b2707481f67/components/bootloader_support/src/bootloader_random_esp32s2.c#L81>
+        regi2c::ADC_SAR1_DREF.write_field(if enable { 4 } else { 1 });
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
@@ -303,7 +305,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        regi2c::ADC_SAR2_DREF.write_field(enable as u8);
+        regi2c::ADC_SAR2_DREF.write_field(if enable { 4 } else { 1 });
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {

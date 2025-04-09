@@ -93,7 +93,6 @@ impl Efuse {
     pub fn block_version() -> (u8, u8) {
         // See <https://github.com/espressif/esp-idf/blob/a45d713b03fd96d8805d1cc116f02a4415b360c7/components/hal/esp32s2/include/hal/efuse_ll.h#L65-73>
         (
-            // TODO: Check BE/LE
             Self::read_field_le::<u8>(BLK_VERSION_MAJOR),
             Self::read_field_le::<u8>(BLK_VERSION_MINOR),
         )
@@ -143,7 +142,6 @@ impl Efuse {
             }
         }
         let info = &RAW_MAP[tag];
-        // TODO: Check BE/LE
         let val = Self::read_field_le(EfuseField::new(info.block, info.begin_bit, info.length));
         signed_bit_to_int(val, info.length)
     }
