@@ -13,7 +13,7 @@ use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{cargo::CargoArgsBuilder, Chip, Package};
+use crate::{apply_feature_rules, cargo::CargoArgsBuilder, Chip, Package};
 
 // ----------------------------------------------------------------------------
 // Build Documentation
@@ -249,51 +249,6 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     docs_path = docs_path.join("doc");
 
     Ok(crate::windows_safe_path(&docs_path))
-}
-
-fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
-    let chip_name = &config.name();
-
-    let mut features = vec![];
-    match package {
-        Package::EspBacktrace => features.push("defmt".to_owned()),
-        Package::EspConfig => features.push("build".to_owned()),
-        Package::EspHal => {
-            features.push("unstable".to_owned());
-            features.push("ci".to_owned());
-            match chip_name.as_str() {
-                "esp32" => features.push("psram".to_owned()),
-                "esp32s2" => features.push("psram".to_owned()),
-                "esp32s3" => features.push("psram".to_owned()),
-                _ => {}
-            };
-        }
-        Package::EspWifi => {
-            features.push("esp-hal/unstable".to_owned());
-            if config.contains("wifi") {
-                features.push("wifi".to_owned());
-                features.push("esp-now".to_owned());
-                features.push("sniffer".to_owned());
-                features.push("smoltcp/proto-ipv4".to_owned());
-                features.push("smoltcp/proto-ipv6".to_owned());
-            }
-            if config.contains("ble") {
-                features.push("ble".to_owned());
-            }
-            if config.contains("wifi") && config.contains("ble") {
-                features.push("coex".to_owned());
-            }
-        }
-        Package::EspHalProcmacros => {
-            features.push("embassy".to_owned());
-        }
-        Package::EspHalEmbassy | Package::EspIeee802154 => {
-            features.push("esp-hal/unstable".to_owned());
-        },
-        _ => {}
-    }
-
-    features
 }
 
 fn patch_documentation_index_for_package(

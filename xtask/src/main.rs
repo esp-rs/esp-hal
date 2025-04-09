@@ -7,14 +7,10 @@ use std::{
 
 use anyhow::{bail, ensure, Context as _, Result};
 use clap::{Args, Parser};
-use esp_metadata::{Arch, Chip, Config};
+use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
-    cargo::{CargoAction, CargoArgsBuilder},
-    firmware::Metadata,
-    target_triple,
-    Package,
-    Version,
+    apply_feature_rules, cargo::{CargoAction, CargoArgsBuilder}, firmware::Metadata, target_triple, validate_package_chip, Package, Version
 };
 
 // ----------------------------------------------------------------------------
@@ -636,189 +632,33 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     let mut packages = args.packages;
     packages.sort();
 
-    for package in packages {
+    for package in packages.iter().filter(|p| p.is_published()) {
         let path = workspace.join(package.to_string());
 
         // Unfortunately each package has its own unique requirements for
         // building, so we need to handle each individually (though there
         // is *some* overlap)
-
         for chip in &args.chips {
             let device = Config::for_chip(chip);
 
-            match package {
-                Package::EspBacktrace => {
-                    lint_package(
-                        chip,
-                        &path,
-                        &[
-                            "--no-default-features",
-                            &format!("--target={}", chip.target()),
-                        ],
-                        &[&format!("{chip},defmt")],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::EspHal => {
-                    let mut features = format!("{chip},ci,unstable");
-
-                    // Cover all esp-hal features where a device is supported
-                    if device.contains("usb0") {
-                        features.push_str(",usb-otg")
-                    }
-                    if device.contains("bt") {
-                        features.push_str(",bluetooth")
-                    }
-                    if device.contains("psram") {
-                        // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
-                        // defaults to `quad`) as it would require a separate build
-                        features.push_str(",psram")
-                    }
-
-                    lint_package(
-                        chip,
-                        &path,
-                        &[&format!("--target={}", chip.target())],
-                        &[&features],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::EspHalEmbassy => {
-                    lint_package(
-                        chip,
-                        &path,
-                        &[&format!("--target={}", chip.target())],
-                        &[&format!("{chip},executors,defmt,esp-hal/unstable")],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::EspIeee802154 => {
-                    if device.contains("ieee802154") {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.target())],
-                            &[&format!("{chip},defmt,esp-hal/unstable")],
-                            args.fix,
-                            package.build_on_host(),
-                        )?;
-                    }
-                }
-                Package::EspLpHal => {
-                    if device.contains("lp_core") {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.lp_target().unwrap())],
-                            &[&format!("{chip},embedded-io")],
-                            args.fix,
-                            package.build_on_host(),
-                        )?;
-                    }
-                }
-
-                Package::EspPrintln => {
-                    lint_package(
-                        chip,
-                        &path,
-                        &[&format!("--target={}", chip.target())],
-                        &[&format!("{chip},defmt-espflash")],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::EspRiscvRt => {
-                    if matches!(device.arch(), Arch::RiscV) {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.target())],
-                            &[""],
-                            args.fix,
-                            package.build_on_host(),
-                        )?;
-                    }
-                }
-
-                Package::EspStorage => {
-                    lint_package(
-                        chip,
-                        &path,
-                        &[&format!("--target={}", chip.target())],
-                        &[&format!("{chip},storage,nor-flash,low-level")],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::EspWifi => {
-                    let minimal_features = format!("{chip},esp-hal/unstable,builtin-scheduler");
-                    let mut all_features = minimal_features.clone();
-
-                    all_features.push_str(",defmt");
-
-                    if device.contains("wifi") {
-                        all_features.push_str(",esp-now,sniffer")
-                    }
-                    if device.contains("bt") {
-                        all_features.push_str(",ble")
-                    }
-                    if device.contains("coex") {
-                        all_features.push_str(",coex")
-                    }
-                    lint_package(
-                        chip,
-                        &path,
-                        &[
-                            &format!("--target={}", chip.target()),
-                            "--no-default-features",
-                        ],
-                        &[&minimal_features, &all_features],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::XtensaLx => {
-                    if matches!(device.arch(), Arch::Xtensa) {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.target())],
-                            &[""],
-                            args.fix,
-                            package.build_on_host(),
-                        )?
-                    }
-                }
-
-                Package::XtensaLxRt => {
-                    if matches!(device.arch(), Arch::Xtensa) {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.target())],
-                            &[&format!("{chip}")],
-                            args.fix,
-                            package.build_on_host(),
-                        )?
-                    }
-                }
-
-                // We will *not* check the following packages with `clippy`; this
-                // may or may not change in the future:
-                Package::Examples | Package::HilTest | Package::QaTest => {}
-
-                // By default, no `clippy` arguments are required:
-                _ => lint_package(chip, &path, &[], &[], args.fix, package.build_on_host())?,
+            if let Err(_) = validate_package_chip(&package, chip) {
+                continue;
             }
+
+            let mut features = apply_feature_rules(&package, device);
+            if package.has_chip_features() {
+                features.push(device.name())
+            }
+
+            lint_package(
+                chip,
+                *package,
+                &path,
+                &["--no-default-features"],
+                &features,
+                args.fix,
+                package.build_on_host(),
+            )?;
         }
     }
 
@@ -827,52 +667,50 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
 fn lint_package(
     chip: &Chip,
+    package: Package,
     path: &Path,
     args: &[&str],
-    feature_sets: &[&str],
+    features: &[String],
     fix: bool,
     build_on_host: bool,
 ) -> Result<()> {
-    for features in feature_sets {
-        log::info!(
-            "Linting package: {} ({}, features: {})",
-            path.display(),
-            chip,
-            features
-        );
+    log::info!(
+        "Linting package: {} ({}, features: {:?})",
+        package,
+        chip,
+        features
+    );
 
-        let builder = CargoArgsBuilder::default().subcommand("clippy");
+    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
-        let mut builder = if chip.is_xtensa() {
-            let builder = if build_on_host {
-                builder
-            } else {
-                builder.arg("-Zbuild-std=core,alloc")
-            };
-
+    let mut builder = if !build_on_host {
+        builder = builder.arg("-Zbuild-std=core,alloc");
+        if chip.is_xtensa() {
             // We only overwrite Xtensas so that externally set nightly/stable toolchains
             // are not overwritten.
-            builder.toolchain("esp")
-        } else {
-            builder
-        };
-
-        for arg in args {
-            builder = builder.arg(arg.to_string());
+            builder = builder.toolchain("esp");
         }
 
-        builder = builder.arg(format!("--features={features}"));
+        builder.target(if package == Package::EspLpHal { chip.lp_target()? } else { chip.target() })
+    } else {
+        builder
+    };
 
-        let builder = if fix {
-            builder.arg("--fix").arg("--lib").arg("--allow-dirty")
-        } else {
-            builder.arg("--").arg("-D").arg("warnings").arg("--no-deps")
-        };
-
-        let cargo_args = builder.build();
-
-        xtask::cargo::run_with_env(&cargo_args, path, [("CI", "1")], false)?;
+    for arg in args {
+        builder = builder.arg(arg.to_string());
     }
+
+    builder = builder.arg(format!("--features={}", features.join(",")));
+
+    let builder = if fix {
+        builder.arg("--fix").arg("--lib").arg("--allow-dirty")
+    } else {
+        builder.arg("--").arg("-D").arg("warnings").arg("--no-deps")
+    };
+
+    let cargo_args = builder.build();
+
+    xtask::cargo::run_with_env(&cargo_args, path, [("CI", "1")], false)?;
 
     Ok(())
 }
