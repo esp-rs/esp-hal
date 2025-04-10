@@ -24,7 +24,6 @@
 //! - read the current slot, change the current slot
 //!
 //! For more details see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html>
-use crc::{Algorithm, Crc};
 use embedded_storage::{ReadStorage, Storage};
 
 use crate::partitions::FlashRegion;
@@ -36,17 +35,6 @@ use crate::partitions::FlashRegion;
 #[used]
 #[export_name = "bootloader.FEATURE_OTA"]
 static OTA_FEATURE: [u8; 11] = *b"FEATURE=OTA";
-
-static ALGO: Algorithm<u32> = Algorithm {
-    width: 32,
-    poly: 0x04c11db7,
-    init: 0,
-    refin: true,
-    refout: true,
-    xorout: 0xffffffff,
-    check: 0,
-    residue: 0,
-};
 
 const SLOT0_DATA_OFFSET: u32 = 0x0000;
 const SLOT1_DATA_OFFSET: u32 = 0x1000;
@@ -243,10 +231,8 @@ where
             }
         };
 
-        let crc = Crc::<u32>::new(&ALGO);
-        let mut digest = crc.digest();
-        digest.update(&new_seq.to_le_bytes());
-        let checksum = digest.finalize();
+        let crc = crate::crypto::Crc32::new();
+        let checksum = crc.crc(&new_seq.to_le_bytes());
 
         if slot == Slot::Slot0 {
             let mut buffer = OtaSelectEntry::default();
