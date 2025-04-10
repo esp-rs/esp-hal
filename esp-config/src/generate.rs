@@ -4,11 +4,15 @@ use std::{
     fmt::{self, Write as _},
     fs,
     io::Write,
-    ops::Range,
     path::PathBuf,
 };
 
 use serde::Serialize;
+
+use crate::generate::{validator::Validator, value::Value};
+
+pub(crate) mod validator;
+pub(crate) mod value;
 
 const DOC_TABLE_HEADER: &str = r#"
 | Name | Description | Default value | Allowed value |
@@ -53,245 +57,6 @@ impl fmt::Display for Error {
             Error::Parse(message) => write!(f, "{message}"),
             Error::Validation(message) => write!(f, "{message}"),
         }
-    }
-}
-
-/// Supported configuration value types.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub enum Value {
-    /// Booleans.
-    Bool(bool),
-    /// Integers.
-    Integer(i128),
-    /// Strings.
-    String(String),
-}
-
-// TODO: Do we want to handle negative values for non-decimal values?
-impl Value {
-    fn parse_in_place(&mut self, s: &str) -> Result<(), Error> {
-        *self = match self {
-            Value::Bool(_) => match s {
-                "true" => Value::Bool(true),
-                "false" => Value::Bool(false),
-                _ => {
-                    return Err(Error::parse(format!(
-                        "Expected 'true' or 'false', found: '{s}'"
-                    )))
-                }
-            },
-            Value::Integer(_) => {
-                let inner = match s.as_bytes() {
-                    [b'0', b'x', ..] => i128::from_str_radix(&s[2..], 16),
-                    [b'0', b'o', ..] => i128::from_str_radix(&s[2..], 8),
-                    [b'0', b'b', ..] => i128::from_str_radix(&s[2..], 2),
-                    _ => i128::from_str_radix(&s, 10),
-                }
-                .map_err(|_| Error::parse(format!("Expected valid intger value, found: '{s}'")))?;
-
-                Value::Integer(inner)
-            }
-            Value::String(_) => Value::String(s.into()),
-        };
-
-        Ok(())
-    }
-
-    /// Convert the value to a [bool].
-    pub fn as_bool(&self) -> bool {
-        match self {
-            Value::Bool(value) => *value,
-            _ => panic!("attempted to convert non-bool value to a bool"),
-        }
-    }
-
-    /// Convert the value to an [i128].
-    pub fn as_integer(&self) -> i128 {
-        match self {
-            Value::Integer(value) => *value,
-            _ => panic!("attempted to convert non-integer value to an integer"),
-        }
-    }
-
-    /// Convert the value to a [String].
-    pub fn as_string(&self) -> String {
-        match self {
-            Value::String(value) => value.to_owned(),
-            _ => panic!("attempted to convert non-string value to a string"),
-        }
-    }
-
-    /// Is the value a bool?
-    pub fn is_bool(&self) -> bool {
-        matches!(self, Value::Bool(_))
-    }
-
-    /// Is the value an integer?
-    pub fn is_integer(&self) -> bool {
-        matches!(self, Value::Integer(_))
-    }
-
-    /// Is the value a string?
-    pub fn is_string(&self) -> bool {
-        matches!(self, Value::String(_))
-    }
-}
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Value::Bool(b) => write!(f, "{b}"),
-            Value::Integer(i) => write!(f, "{i}"),
-            Value::String(s) => write!(f, "{s}"),
-        }
-    }
-}
-
-/// Configuration value validation functions.
-#[derive(Serialize)]
-pub enum Validator {
-    /// Only allow negative integers, i.e. any values less than 0.
-    NegativeInteger,
-    /// Only allow non-negative integers, i.e. any values greater than or equal
-    /// to 0.
-    NonNegativeInteger,
-    /// Only allow positive integers, i.e. any values greater than to 0.
-    PositiveInteger,
-    /// Ensure that an integer value falls within the specified range.
-    IntegerInRange(Range<i128>),
-    /// String-Enumeration. Only allows one of the given Strings.
-    Enumeration(Vec<String>),
-    /// A custom validation function to run against any supported value type.
-    #[serde(serialize_with = "serialize_custom")]
-    #[serde(untagged)]
-    Custom(Box<dyn Fn(&Value) -> Result<(), Error>>),
-}
-
-fn serialize_custom<S>(
-    _: &Box<dyn Fn(&Value) -> Result<(), Error>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    serializer.serialize_str("Custom")
-}
-
-impl Validator {
-    fn validate(&self, value: &Value) -> Result<(), Error> {
-        match self {
-            Validator::NegativeInteger => negative_integer(value)?,
-            Validator::NonNegativeInteger => non_negative_integer(value)?,
-            Validator::PositiveInteger => positive_integer(value)?,
-            Validator::IntegerInRange(range) => integer_in_range(range, value)?,
-            Validator::Enumeration(values) => enumeration(values, value)?,
-            Validator::Custom(validator_fn) => validator_fn(value)?,
-        }
-
-        Ok(())
-    }
-
-    fn description(&self) -> Option<String> {
-        match self {
-            Validator::NegativeInteger => Some(String::from("Negative integer")),
-            Validator::NonNegativeInteger => Some(String::from("Positive integer or 0")),
-            Validator::PositiveInteger => Some(String::from("Positive integer")),
-            Validator::IntegerInRange(range) => {
-                Some(format!("Integer in range {}..{}", range.start, range.end))
-            }
-            Validator::Enumeration(values) => Some(format!("Any of {:?}", values)),
-            Validator::Custom(_) => None,
-        }
-    }
-
-    fn emit_cargo_extras<W: Write>(&self, stdout: &mut W, config_key: &str) {
-        match self {
-            Validator::Enumeration(values) => {
-                let config_key = snake_case(config_key);
-                for value in values {
-                    writeln!(
-                        stdout,
-                        "cargo:rustc-check-cfg=cfg({config_key}_{})",
-                        snake_case(value)
-                    )
-                    .ok();
-                }
-            }
-            _ => (),
-        }
-    }
-}
-
-fn enumeration(values: &Vec<String>, value: &Value) -> Result<(), Error> {
-    if let Value::String(value) = value {
-        if !values.contains(value) {
-            return Err(Error::validation(format!(
-                "Expected one of {:?}, found '{}'",
-                values, value
-            )));
-        }
-
-        Ok(())
-    } else {
-        return Err(Error::parse(
-            "Validator::Enumeration can only be used with string values",
-        ));
-    }
-}
-
-fn negative_integer(value: &Value) -> Result<(), Error> {
-    if !value.is_integer() {
-        return Err(Error::validation(
-            "Validator::NegativeInteger can only be used with integer values",
-        ));
-    } else if value.as_integer() >= 0 {
-        return Err(Error::validation(format!(
-            "Expected negative integer, found '{}'",
-            value.as_integer()
-        )));
-    }
-
-    Ok(())
-}
-
-fn non_negative_integer(value: &Value) -> Result<(), Error> {
-    if !value.is_integer() {
-        return Err(Error::validation(
-            "Validator::NonNegativeInteger can only be used with integer values",
-        ));
-    } else if value.as_integer() < 0 {
-        return Err(Error::validation(format!(
-            "Expected non-negative integer, found '{}'",
-            value.as_integer()
-        )));
-    }
-
-    Ok(())
-}
-
-fn positive_integer(value: &Value) -> Result<(), Error> {
-    if !value.is_integer() {
-        return Err(Error::validation(
-            "Validator::PositiveInteger can only be used with integer values",
-        ));
-    } else if value.as_integer() <= 0 {
-        return Err(Error::validation(format!(
-            "Expected positive integer, found '{}'",
-            value.as_integer()
-        )));
-    }
-
-    Ok(())
-}
-
-fn integer_in_range(range: &Range<i128>, value: &Value) -> Result<(), Error> {
-    if !value.is_integer() || !range.contains(&value.as_integer()) {
-        Err(Error::validation(format!(
-            "Value '{}' does not fall within range '{:?}'",
-            value, range
-        )))
-    } else {
-        Ok(())
     }
 }
 
@@ -382,7 +147,8 @@ pub fn generate_config_internal<W: Write>(
 
     if emit_md_tables {
         let file_name = snake_case(crate_name);
-        write_config_tables(&file_name, doc_table, selected_config);
+        write_out_file(format!("{file_name}_config_table.md"), doc_table);
+        write_out_file(format!("{file_name}_selected_config.md"), selected_config);
     }
 
     configs
@@ -410,15 +176,15 @@ fn write_config_json(
             screaming_snake_case(&item.0)
         );
         let val = match selected_config.get(&option_name) {
-            Some(val) => val.clone(),
-            None => item.2.clone(),
+            Some(val) => val,
+            None => &item.2,
         };
 
         to_write.push(Item {
             name: item.0.to_string(),
             description: item.1.to_string(),
             default_value: item.2.clone(),
-            actual_value: val,
+            actual_value: val.clone(),
             constraint: &item.3,
         })
     }
@@ -426,12 +192,7 @@ fn write_config_json(
     #[cfg(not(test))]
     {
         let json = serde_json::to_string(&to_write).unwrap();
-        let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-        let out_file = out_dir
-            .join(format!("{crate_name}_config_data.json"))
-            .display()
-            .to_string();
-        fs::write(out_file, json).unwrap();
+        write_out_file(format!("{crate_name}_config_data.json"), json);
     }
 }
 
@@ -567,20 +328,10 @@ fn emit_configuration<W: Write>(
     }
 }
 
-fn write_config_tables(prefix: &str, doc_table: String, selected_config: String) {
+fn write_out_file(file_name: String, json: String) {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-
-    let out_file = out_dir
-        .join(format!("{prefix}_config_table.md"))
-        .display()
-        .to_string();
-    fs::write(out_file, doc_table).unwrap();
-
-    let out_file = out_dir
-        .join(format!("{prefix}_selected_config.md"))
-        .display()
-        .to_string();
-    fs::write(out_file, selected_config).unwrap();
+    let out_file = out_dir.join(file_name);
+    fs::write(out_file, json).unwrap();
 }
 
 fn snake_case(name: &str) -> String {
@@ -600,6 +351,7 @@ fn screaming_snake_case(name: &str) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::generate::{validator::Validator, value::Value};
 
     #[test]
     fn value_number_formats() {
