@@ -1,7 +1,7 @@
 use std::{error::Error as StdError, str::FromStr};
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, ConfigOption, Error, Stability, Validator, Value};
+use esp_config::{generate_config, ConfigOption, Stability, Validator, Value};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn StdError>> {
@@ -53,37 +53,26 @@ fn main() -> Result<(), Box<dyn StdError>> {
             },
             ConfigOption {
                 name: "timer-queue",
-                description: "<p>The flavour of the timer queue provided by this crate. Accepts \
-                one of `single-integrated`, `multiple-integrated` or `generic`. Integrated queues \
-                require the `executors` feature to be enabled.</p><p>If you use embassy-executor, \
-                the `single-integrated` queue is recommended for ease of use, while the \
-                `multiple-integrated` queue is recommended for performance. The \
+                description: "The flavour of the timer queue provided by this crate. Integrated \
+                queues require the `executors` feature to be enabled.</p><p>If you use \
+                embassy-executor, the `single-integrated` queue is recommended for ease of use, \
+                while the `multiple-integrated` queue is recommended for performance. The \
                 `multiple-integrated` option needs one timer per executor.</p><p>The `generic` \
-                queue allows using embassy-time without the embassy executors.</p>",
+                queue allows using embassy-time without the embassy executors.",
                 default_value: Value::String(if cfg!(feature = "executors") {
                     String::from("single-integrated")
                 } else {
                     String::from("generic")
                 }),
-                constraint: Some(Validator::Custom(Box::new(|value| {
-                    let Value::String(string) = value else {
-                        return Err(Error::Validation(String::from("Expected a string")));
-                    };
-
-                    if !cfg!(feature = "executors") {
-                        if string.as_str() != "generic" {
-                            return Err(Error::Validation(format!("Expected 'generic' because the `executors` feature is not enabled. Found {string}")));
-                        }
-                        return Ok(());
-                    }
-
-                    match string.as_str() {
-                        "single-integrated" => Ok(()), // preferred for ease of use
-                        "multiple-integrated" => Ok(()), // preferred for performance
-                        "generic" => Ok(()), // allows using embassy-time without the embassy executors
-                        _ => Err(Error::Validation(format!("Expected 'single-integrated', 'multiple-integrated' or 'generic', found {string}")))
-                    }
-                }))),
+                constraint: Some(if cfg!(feature = "executors") {
+                    Validator::Enumeration(vec![
+                        String::from("generic"),
+                        String::from("single-integrated"),
+                        String::from("multiple-integrated"),
+                    ])
+                } else {
+                    Validator::Enumeration(vec![String::from("generic")])
+                }),
                 stability: Stability::Unstable,
             },
             ConfigOption {
