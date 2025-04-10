@@ -17,5 +17,6 @@ fn main() {
             stability: Stability::Unstable,
         }],
         true,
+        true,
     );
 }

@@ -68,101 +68,125 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     // emit config
-    let cfg = generate_config("esp_hal", &[
-        ConfigOption {
-            name: "place-spi-driver-in-ram",
-            description: "Places the SPI driver in RAM for better performance",
-            default_value: Value::Bool(false),
-            constraint: None,
-            stability: Stability::Stable("1.0.0-beta.0"),
-        },
-        ConfigOption {
-            name: "place-switch-tables-in-ram",
-            description: "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
-            default_value: Value::Bool(true),
-            constraint: None,
-            stability: Stability::Stable("1.0.0-beta.0"),
-        },
-        ConfigOption {
-            name: "place-anon-in-ram",
-            description: "Places anonymous symbols into RAM - resulting in better performance at the cost of significant more RAM consumption. Best to be combined with `place-switch-tables-in-ram`.",
-            default_value: Value::Bool(false),
-            constraint: None,
-            stability: Stability::Stable("1.0.0-beta.0"),
-        },
-        // Ideally, we should be able to set any clock frequency for any chip. However, currently
-        // only the 32 and C2 implements any sort of configurability, and the rest have a fixed
-        // clock frequeny.
-        // TODO: only show this configuration for chips that have multiple valid options.
-        ConfigOption {
-            name: "xtal-frequency",
-            description: "The frequency of the crystal oscillator, in MHz. Set to `auto` to automatically detect the frequency. `auto` may not be able to identify the clock frequency in some cases. Also, configuring a specific frequency may increase performance slightly.",
-            default_value: Value::String(match device_name {
-                "esp32" | "esp32c2" => String::from("auto"),
-                // The rest has only one option
-                "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => String::from("40"),
-                "esp32h2" => String::from("32"),
-                _ => unreachable!(),
-            }),
-            constraint:Some(Validator::Enumeration(match device_name {
-                "esp32" | "esp32c2" => vec![String::from("auto"), String::from("26"), String::from("40")],
-                // The rest has only one option
-                "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => vec![String::from("40")],
-                "esp32h2" => vec![String::from("32")],
-                _ => unreachable!(),
-            })),
-            stability: Stability::Unstable,
-        },
-        // ideally we should only offer this for ESP32 but the config system doesn't
-        // support per target configs, yet
-        ConfigOption {
-            name: "spi-address-workaround",
-            description: "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
-            default_value: Value::Bool(true),
-            constraint: None,
-            stability: Stability::Stable("1.0.0-beta.0"),
-        },
-        // ideally we should only offer this for ESP32-C6/ESP32-H2 but the config system doesn't support per target configs, yet
-        ConfigOption {
-            name: "flip-link",
-            description: "(ESP32-C6/ESP32-H2 only): Move the stack to start of RAM to get zero-cost stack overflow protection.",
-            default_value: Value::Bool(false),
-            constraint: None,
-            stability: Stability::Stable("1.0.0-beta.0"),
-        },
-        // ideally we should only offer this for ESP32, ESP32-S2 and `octal` only for ESP32-S3 but the config system doesn't support per target configs, yet
-        ConfigOption {
-            name: "psram-mode",
-            description: "(ESP32, ESP32-S2 and ESP32-S3 only, `octal` is only supported for ESP32-S3) SPIRAM chip mode",
-            default_value: Value::String(String::from("quad")),
-            constraint: Some(Validator::Enumeration(
-                vec![String::from("quad"), String::from("octal")]
-            )),
-            stability: Stability::Stable("1.0.0-beta.0"),
-        },
-        // Rust's stack smashing protection configuration
-        ConfigOption {
-            name: "stack-guard-offset",
-            description: "The stack guard variable will be placed this many bytes from the stack's end.",
-            default_value: Value::Integer(4096),
-            constraint: None,
-            stability: Stability::Stable("1.0.0-beta.0"),
-        },
-        ConfigOption {
-            name: "stack-guard-value",
-            description: "The value to be written to the stack guard variable.",
-            default_value: Value::Integer(0xDEED_BAAD),
-            constraint: None,
-            stability: Stability::Stable("1.0.0-beta.0"),
-        },
-        ConfigOption {
-            name: "impl-critical-section",
-            description: "Provide a `critical-section` implementation. Note that if disabled, you will need to provide a `critical-section` implementation which is using `critical-section/restore-state-u32`.",
-            default_value: Value::Bool(true),
-            constraint: None,
-            stability: Stability::Stable("1.0.0-beta.0"),
-        },
-    ], true);
+    let cfg = generate_config(
+        "esp_hal",
+        &[
+            ConfigOption {
+                name: "place-spi-driver-in-ram",
+                description: "Places the SPI driver in RAM for better performance",
+                default_value: Value::Bool(false),
+                constraint: None,
+                stability: Stability::Stable("1.0.0-beta.0"),
+            },
+            ConfigOption {
+                name: "place-switch-tables-in-ram",
+                description: "Places switch-tables, some lookup tables and constants related to \
+                interrupt handling into RAM - resulting in better performance but slightly more \
+                RAM consumption.",
+                default_value: Value::Bool(true),
+                constraint: None,
+                stability: Stability::Stable("1.0.0-beta.0"),
+            },
+            ConfigOption {
+                name: "place-anon-in-ram",
+                description: "Places anonymous symbols into RAM - resulting in better performance \
+                at the cost of significant more RAM consumption. Best to be combined with \
+                `place-switch-tables-in-ram`.",
+                default_value: Value::Bool(false),
+                constraint: None,
+                stability: Stability::Stable("1.0.0-beta.0"),
+            },
+            // Ideally, we should be able to set any clock frequency for any chip. However,
+            // currently only the 32 and C2 implements any sort of configurability, and
+            // the rest have a fixed clock frequeny.
+            // TODO: only show this configuration for chips that have multiple valid options.
+            ConfigOption {
+                name: "xtal-frequency",
+                description: "The frequency of the crystal oscillator, in MHz. Set to `auto` to \
+                automatically detect the frequency. `auto` may not be able to identify the clock \
+                frequency in some cases. Also, configuring a specific frequency may increase \
+                performance slightly.",
+                default_value: Value::String(match device_name {
+                    "esp32" | "esp32c2" => String::from("auto"),
+                    // The rest has only one option
+                    "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => String::from("40"),
+                    "esp32h2" => String::from("32"),
+                    _ => unreachable!(),
+                }),
+                constraint: Some(Validator::Enumeration(match device_name {
+                    "esp32" | "esp32c2" => {
+                        vec![String::from("auto"), String::from("26"), String::from("40")]
+                    }
+                    // The rest has only one option
+                    "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => vec![String::from("40")],
+                    "esp32h2" => vec![String::from("32")],
+                    _ => unreachable!(),
+                })),
+                stability: Stability::Unstable,
+            },
+            // ideally we should only offer this for ESP32 but the config system doesn't
+            // support per target configs, yet
+            ConfigOption {
+                name: "spi-address-workaround",
+                description: "(ESP32 only) Enables a workaround for the issue where SPI in \
+                half-duplex mode incorrectly transmits the address on a single line if the \
+                data buffer is empty.",
+                default_value: Value::Bool(true),
+                constraint: None,
+                stability: Stability::Stable("1.0.0-beta.0"),
+            },
+            // ideally we should only offer this for ESP32-C6/ESP32-H2 but the config system
+            // doesn't support per target configs, yet
+            ConfigOption {
+                name: "flip-link",
+                description: "(ESP32-C6/ESP32-H2 only): Move the stack to start of RAM to get \
+                zero-cost stack overflow protection.",
+                default_value: Value::Bool(false),
+                constraint: None,
+                stability: Stability::Stable("1.0.0-beta.0"),
+            },
+            // ideally we should only offer this for ESP32, ESP32-S2 and `octal` only for ESP32-S3
+            // but the config system doesn't support per target configs, yet
+            ConfigOption {
+                name: "psram-mode",
+                description: "(ESP32, ESP32-S2 and ESP32-S3 only, `octal` is only supported for \
+                ESP32-S3) SPIRAM chip mode",
+                default_value: Value::String(String::from("quad")),
+                constraint: Some(Validator::Enumeration(vec![
+                    String::from("quad"),
+                    String::from("octal"),
+                ])),
+                stability: Stability::Stable("1.0.0-beta.0"),
+            },
+            // Rust's stack smashing protection configuration
+            ConfigOption {
+                name: "stack-guard-offset",
+                description: "The stack guard variable will be placed this many bytes from \
+                the stack's end.",
+                default_value: Value::Integer(4096),
+                constraint: None,
+                stability: Stability::Stable("1.0.0-beta.0"),
+            },
+            ConfigOption {
+                name: "stack-guard-value",
+                description: "The value to be written to the stack guard variable.",
+                default_value: Value::Integer(0xDEED_BAAD),
+                constraint: None,
+                stability: Stability::Stable("1.0.0-beta.0"),
+            },
+            ConfigOption {
+                name: "impl-critical-section",
+                description: "Provide a `critical-section` implementation. Note that if disabled, \
+                you will need to provide a `critical-section` implementation which is \
+                using `restore-state-u32`.",
+                default_value: Value::Bool(true),
+                constraint: None,
+                stability: Stability::Stable("1.0.0-beta.0"),
+            },
+        ],
+        cfg!(feature = "unstable"),
+        true,
+    );
 
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:

@@ -254,7 +254,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 stability: Stability::Unstable,
             },
         ],
-        true
+        true,
+        true,
     );
 
     Ok(())

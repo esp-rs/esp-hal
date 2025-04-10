@@ -51,6 +51,10 @@ impl fmt::Display for Error {
 /// that match the given prefix. It will then attempt to parse the [`Value`] and
 /// run any validators which have been specified.
 ///
+/// [`Stability::Unstable`] features will only be enabled if the `unstable`
+/// feature is enabled in the dependant crate. If the `unstable` feature is not
+/// enabled, setting these options will result in a build error.
+///
 /// Once the config has been parsed, this function will emit `snake_case` cfg's
 /// _without_ the prefix which can be used in the dependant crate. After that,
 /// it will create a markdown table in the `OUT_DIR` under the name
@@ -66,9 +70,10 @@ impl fmt::Display for Error {
 pub fn generate_config(
     crate_name: &str,
     config: &[ConfigOption],
+    enable_unstable: bool,
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
-    let configs = generate_config_internal(std::io::stdout(), crate_name, config);
+    let configs = generate_config_internal(std::io::stdout(), crate_name, config, enable_unstable);
 
     if emit_md_tables {
         let file_name = snake_case(crate_name);
@@ -93,6 +98,7 @@ pub fn generate_config_internal<'a>(
     mut stdout: impl Write,
     crate_name: &str,
     config: &'a [ConfigOption],
+    enable_unstable: bool,
 ) -> Vec<(String, &'a ConfigOption, Value)> {
     // Only rebuild if `build.rs` changed. Otherwise, Cargo will rebuild if any
     // other file changed.
@@ -105,7 +111,7 @@ pub fn generate_config_internal<'a>(
     let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
 
     let mut configs = create_config(&prefix, config);
-    capture_from_env(&prefix, &mut configs);
+    capture_from_env(&prefix, &mut configs, enable_unstable);
 
     for (_, option, value) in configs.iter() {
         if let Some(ref validator) = option.constraint {
@@ -228,6 +234,10 @@ impl ConfigOption {
     fn cfg_name(&self) -> String {
         snake_case(self.name)
     }
+
+    fn is_stable(&self) -> bool {
+        matches!(self.stability, Stability::Stable(_))
+    }
 }
 
 fn create_config<'a>(
@@ -243,17 +253,27 @@ fn create_config<'a>(
     configs
 }
 
-fn capture_from_env(prefix: &str, configs: &mut Vec<(String, &ConfigOption, Value)>) {
+fn capture_from_env(
+    prefix: &str,
+    configs: &mut Vec<(String, &ConfigOption, Value)>,
+    enable_unstable: bool,
+) {
     let mut unknown = Vec::new();
     let mut failed = Vec::new();
+    let mut unstable = Vec::new();
 
     // Try and capture input from the environment:
     for (var, value) in env::vars() {
         if var.starts_with(prefix) {
-            let Some((_, _, cfg)) = configs.iter_mut().find(|(k, _, _)| k == &var) else {
+            let Some((_, option, cfg)) = configs.iter_mut().find(|(k, _, _)| k == &var) else {
                 unknown.push(var);
                 continue;
             };
+
+            if !enable_unstable && !option.is_stable() {
+                unstable.push(var);
+                continue;
+            }
 
             if let Err(e) = cfg.parse_in_place(&value) {
                 failed.push(format!("{var}: {e}"));
@@ -263,6 +283,13 @@ fn capture_from_env(prefix: &str, configs: &mut Vec<(String, &ConfigOption, Valu
 
     if !failed.is_empty() {
         panic!("Invalid configuration options detected: {:?}", failed);
+    }
+
+    if !unstable.is_empty() {
+        panic!(
+            "The following configuration options are unstable: {:?}",
+            unstable
+        );
     }
 
     if !unknown.is_empty() {
@@ -410,6 +437,7 @@ mod test {
                         },
                     ],
                     false,
+                    false,
                 );
 
                 // some values have changed
@@ -481,6 +509,7 @@ mod test {
                         },
                     ],
                     false,
+                    false,
                 )
             },
         );
@@ -506,6 +535,7 @@ mod test {
                     stability: Stability::Stable("testing"),
                 }],
                 false,
+                false,
             )
         });
     }
@@ -523,6 +553,7 @@ mod test {
                     constraint: Some(Validator::PositiveInteger),
                     stability: Stability::Stable("testing"),
                 }],
+                false,
                 false,
             )
         });
@@ -549,6 +580,7 @@ mod test {
                     stability: Stability::Stable("testing"),
                 }],
                 false,
+                false,
             )
         });
     }
@@ -572,6 +604,7 @@ mod test {
                         stability: Stability::Stable("testing"),
                     }],
                     false,
+                    false,
                 );
             },
         );
@@ -591,6 +624,7 @@ mod test {
                     stability: Stability::Stable("testing"),
                 }],
                 false,
+                false,
             );
         });
     }
@@ -609,6 +643,7 @@ mod test {
                         constraint: None,
                         stability: Stability::Stable("testing"),
                     }],
+                    false,
                     false,
                 );
             },
@@ -632,6 +667,7 @@ mod test {
                     ])),
                     stability: Stability::Stable("testing"),
                 }],
+                false,
             );
         });
 
@@ -667,7 +703,7 @@ mod test {
         ];
         let configs =
             temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
-                generate_config_internal(&mut stdout, "esp-test", &config)
+                generate_config_internal(&mut stdout, "esp-test", &config, false)
             });
 
         let json_output = config_json(&configs, true);
@@ -707,5 +743,28 @@ mod test {
 ]"#,
             json_output
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn unstable_option_panics_unless_enabled() {
+        let mut stdout = Vec::new();
+        temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
+            generate_config_internal(
+                &mut stdout,
+                "esp-test",
+                &[ConfigOption {
+                    name: "some-key",
+                    description: "NA",
+                    default_value: Value::String("variant-0".to_string()),
+                    constraint: Some(Validator::Enumeration(vec![
+                        "variant-0".to_string(),
+                        "variant-1".to_string(),
+                    ])),
+                    stability: Stability::Unstable,
+                }],
+                false,
+            );
+        });
     }
 }
