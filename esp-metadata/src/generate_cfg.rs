@@ -190,7 +190,7 @@ impl Config {
     pub fn empty() -> Self {
         Self {
             device: Device {
-                name: "NULL".to_owned(),
+                name: "".to_owned(),
                 arch: Arch::RiscV,
                 cores: Cores::Single,
                 peripherals: Vec::new(),

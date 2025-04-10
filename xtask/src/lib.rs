@@ -175,8 +175,9 @@ impl Package {
     }
 
     /// Additional feature rules to test subsets of features for a package.
-    pub fn lint_feature_rules(&self, _config: &Config) -> Option<Vec<Vec<String>>> {
+    pub fn lint_feature_rules(&self, _config: &Config) -> Vec<Vec<String>> {
         let mut cases = Vec::new();
+
         match self {
             Package::EspWifi => {
                 // minimal set of features that when enabled _should_ still compile
@@ -184,11 +185,11 @@ impl Package {
                     "esp-hal/unstable".to_owned(),
                     "builtin-scheduler".to_owned(),
                 ]);
-
-                Some(cases)
             }
-            _ => None,
+            _ => {}
         }
+
+        cases
     }
 
     /// Return the target triple for a given package/chip pair.
@@ -207,15 +208,21 @@ impl Package {
         let check = match self {
             Package::EspIeee802154 => device.contains("ieee802154"),
             Package::EspLpHal => chip.has_lp_core(),
-            Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => chip.is_xtensa(),
+            Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => {
+                chip.is_xtensa()
+            }
             Package::EspRiscvRt => chip.is_riscv(),
-            _ => true
+            _ => true,
         };
 
         if check {
             Ok(())
         } else {
-            Err(anyhow!("Invalid chip provided for package '{}': '{}'", self, chip))
+            Err(anyhow!(
+                "Invalid chip provided for package '{}': '{}'",
+                self,
+                chip
+            ))
         }
     }
 }
