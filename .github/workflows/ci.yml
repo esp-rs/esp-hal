@@ -136,7 +136,10 @@ jobs:
       # Verify the MSRV for all chips by running a lint session
       - name: msrv RISCV (esp-hal)
         run: |
-          cargo xtask lint-packages
+          cargo +stable xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2
+      - name: msrv Xtensa (esp-hal)
+        run: |
+          cargo +esp xtask lint-packages --chips esp32,esp32s2,esp32s3
 
   # --------------------------------------------------------------------------
   # Format
