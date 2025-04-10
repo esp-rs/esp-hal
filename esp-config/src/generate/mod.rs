@@ -76,7 +76,7 @@ pub fn generate_config(
         let mut doc_table = String::from(markdown::DOC_TABLE_HEADER);
         let mut selected_config = String::from(markdown::SELECTED_TABLE_HEADER);
 
-        for (name, (option, value)) in configs.iter() {
+        for (name, option, value) in configs.iter() {
             markdown::write_doc_table_line(&mut doc_table, &name, option);
             markdown::write_summary_table_line(&mut selected_config, &name, value);
         }
@@ -86,14 +86,14 @@ pub fn generate_config(
     }
 
     // Remove the ConfigOptions from the output
-    configs.into_iter().map(|(k, (_, v))| (k, v)).collect()
+    configs.into_iter().map(|(k, _, v)| (k, v)).collect()
 }
 
 pub fn generate_config_internal<'a>(
     mut stdout: impl Write,
     crate_name: &str,
     config: &'a [ConfigOption],
-) -> HashMap<String, (&'a ConfigOption, Value)> {
+) -> Vec<(String, &'a ConfigOption, Value)> {
     // Only rebuild if `build.rs` changed. Otherwise, Cargo will rebuild if any
     // other file changed.
     writeln!(stdout, "cargo:rerun-if-changed=build.rs").ok();
@@ -107,7 +107,7 @@ pub fn generate_config_internal<'a>(
     let mut configs = create_config(&mut stdout, &prefix, config);
     capture_from_env(&prefix, &mut configs);
 
-    for (option, value) in configs.values() {
+    for (_, option, value) in configs.iter() {
         if let Some(ref validator) = option.constraint {
             validator.validate(value).unwrap();
         }
@@ -124,7 +124,7 @@ pub fn generate_config_internal<'a>(
     configs
 }
 
-fn config_json(config: &HashMap<String, (&ConfigOption, Value)>, pretty: bool) -> String {
+fn config_json(config: &[(String, &ConfigOption, Value)], pretty: bool) -> String {
     #[derive(Serialize)]
     struct Item<'a> {
         #[serde(flatten)]
@@ -133,7 +133,7 @@ fn config_json(config: &HashMap<String, (&ConfigOption, Value)>, pretty: bool) -
     }
 
     let mut to_write = Vec::new();
-    for (option, value) in config.values() {
+    for (_, option, value) in config.iter() {
         to_write.push(Item {
             actual_value: value.clone(),
             option,
@@ -220,28 +220,28 @@ fn create_config<'a>(
     mut stdout: impl Write,
     prefix: &str,
     config: &'a [ConfigOption],
-) -> HashMap<String, (&'a ConfigOption, Value)> {
-    let mut configs = HashMap::new();
+) -> Vec<(String, &'a ConfigOption, Value)> {
+    let mut configs = Vec::with_capacity(config.len());
 
     for option in config {
         let name = option.env_var(prefix);
         // Rebuild if config environment variable changed:
         writeln!(stdout, "cargo:rerun-if-env-changed={}", name).ok();
 
-        configs.insert(name, (option, option.default_value.clone()));
+        configs.push((name, option, option.default_value.clone()));
     }
 
     configs
 }
 
-fn capture_from_env(prefix: &str, configs: &mut HashMap<String, (&ConfigOption, Value)>) {
+fn capture_from_env(prefix: &str, configs: &mut Vec<(String, &ConfigOption, Value)>) {
     let mut unknown = Vec::new();
     let mut failed = Vec::new();
 
     // Try and capture input from the environment:
     for (var, value) in env::vars() {
         if var.starts_with(prefix) {
-            let Some((_, cfg)) = configs.get_mut(&var) else {
+            let Some((_, _, cfg)) = configs.iter_mut().find(|(k, _, _)| k == &var) else {
                 unknown.push(var);
                 continue;
             };
@@ -261,8 +261,8 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, (&ConfigOption, 
     }
 }
 
-fn emit_configuration(mut stdout: impl Write, configs: &HashMap<String, (&ConfigOption, Value)>) {
-    for (name, (option, value)) in configs.iter() {
+fn emit_configuration(mut stdout: impl Write, configs: &[(String, &ConfigOption, Value)]) {
+    for (name, option, value) in configs.iter() {
         let cfg_name = option.cfg_name();
         writeln!(stdout, "cargo:rustc-check-cfg=cfg({cfg_name})").ok();
 
@@ -278,11 +278,9 @@ fn emit_configuration(mut stdout: impl Write, configs: &HashMap<String, (&Config
 
         // Values that haven't been seen will be output here with the default value:
         writeln!(stdout, "cargo:rustc-env={}={}", name, value).ok();
-    }
 
-    for (option, _) in configs.values() {
         if let Some(validator) = option.constraint.as_ref() {
-            validator.emit_cargo_extras(&mut stdout, &option.cfg_name());
+            validator.emit_cargo_extras(&mut stdout, &cfg_name);
         }
     }
 }
