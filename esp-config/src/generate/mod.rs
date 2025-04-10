@@ -69,14 +69,17 @@ pub fn generate_config(
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
     generate_config_internal(std::io::stdout(), crate_name, config, emit_md_tables)
+        .into_iter()
+        .map(|(k, (_, v))| (k, v))
+        .collect()
 }
 
-pub fn generate_config_internal(
+pub fn generate_config_internal<'a>(
     mut stdout: impl Write,
     crate_name: &str,
-    config: &[ConfigOption],
+    config: &'a [ConfigOption],
     emit_md_tables: bool,
-) -> HashMap<String, Value> {
+) -> HashMap<String, (&'a ConfigOption, Value)> {
     // Only rebuild if `build.rs` changed. Otherwise, Cargo will rebuild if any
     // other file changed.
     writeln!(stdout, "cargo:rerun-if-changed=build.rs").ok();
@@ -90,49 +93,20 @@ pub fn generate_config_internal(
     // Ensure that the prefix is `SCREAMING_SNAKE_CASE`:
     let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
 
-    // Build a lookup table for any provided validators; we must prefix the
-    // name of the config and transform it to SCREAMING_SNAKE_CASE so that
-    // it matches the keys in the hash table produced by `create_config`.
-    let config_validators = config
-        .iter()
-        .flat_map(|option| {
-            option.constraint.as_ref().map(|validator| {
-                let name = format!("{prefix}{}", screaming_snake_case(option.name));
-                (name, validator)
-            })
-        })
-        .collect::<HashMap<_, _>>();
-
     let mut configs = create_config(&mut stdout, &prefix, config, &mut doc_table);
     capture_from_env(&prefix, &mut configs);
 
-    for (name, value) in configs.iter() {
-        if let Some(validator) = config_validators.get(name) {
+    for (option, value) in configs.values() {
+        if let Some(ref validator) = option.constraint {
             validator.validate(value).unwrap();
         }
     }
 
-    let validators = config
-        .iter()
-        .filter_map(|option| {
-            option
-                .constraint
-                .as_ref()
-                .map(|validator| (snake_case(option.name), validator))
-        })
-        .collect::<HashMap<_, _>>();
-
-    emit_configuration(
-        &mut stdout,
-        &prefix,
-        &configs,
-        &validators,
-        &mut selected_config,
-    );
+    emit_configuration(&mut stdout, &configs, &mut selected_config);
 
     #[cfg(not(test))]
     {
-        let config_json = config_json(snake_case(crate_name), config, &configs);
+        let config_json = config_json(&configs);
         write_out_file(format!("{crate_name}_config_data.json"), config_json);
     }
 
@@ -145,11 +119,7 @@ pub fn generate_config_internal(
     configs
 }
 
-fn config_json(
-    crate_name: String,
-    config: &[ConfigOption],
-    selected_config: &HashMap<String, Value>,
-) -> String {
+fn config_json(config: &HashMap<String, (&ConfigOption, Value)>) -> String {
     #[derive(Serialize)]
     struct Item<'a> {
         #[serde(flatten)]
@@ -158,20 +128,10 @@ fn config_json(
     }
 
     let mut to_write = Vec::new();
-    for item in config.iter() {
-        let option_name = format!(
-            "{}_CONFIG_{}",
-            screaming_snake_case(&crate_name),
-            screaming_snake_case(&item.name)
-        );
-        let val = match selected_config.get(&option_name) {
-            Some(val) => val,
-            None => &item.default_value,
-        };
-
+    for (option, value) in config.values() {
         to_write.push(Item {
-            actual_value: val.clone(),
-            option: item,
+            actual_value: value.clone(),
+            option,
         })
     }
 
@@ -241,14 +201,18 @@ impl ConfigOption {
     fn env_var(&self, prefix: &str) -> String {
         format!("{}{}", prefix, screaming_snake_case(self.name))
     }
+
+    fn cfg_name(&self) -> String {
+        snake_case(self.name)
+    }
 }
 
-fn create_config(
+fn create_config<'a>(
     mut stdout: impl Write,
     prefix: &str,
-    config: &[ConfigOption],
+    config: &'a [ConfigOption],
     doc_table: &mut String,
-) -> HashMap<String, Value> {
+) -> HashMap<String, (&'a ConfigOption, Value)> {
     let mut configs = HashMap::new();
 
     for option in config {
@@ -259,20 +223,20 @@ fn create_config(
         // Rebuild if config environment variable changed:
         writeln!(stdout, "cargo:rerun-if-env-changed={}", name).ok();
 
-        configs.insert(name, option.default_value.clone());
+        configs.insert(name, (option, option.default_value.clone()));
     }
 
     configs
 }
 
-fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
+fn capture_from_env(prefix: &str, configs: &mut HashMap<String, (&ConfigOption, Value)>) {
     let mut unknown = Vec::new();
     let mut failed = Vec::new();
 
     // Try and capture input from the environment:
     for (var, value) in env::vars() {
         if var.starts_with(prefix) {
-            let Some(cfg) = configs.get_mut(&var) else {
+            let Some((_, cfg)) = configs.get_mut(&var) else {
                 unknown.push(var);
                 continue;
             };
@@ -294,13 +258,11 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
 
 fn emit_configuration(
     mut stdout: impl Write,
-    prefix: &str,
-    configs: &HashMap<String, Value>,
-    validators: &HashMap<String, &Validator>,
+    configs: &HashMap<String, (&ConfigOption, Value)>,
     selected_config: &mut String,
 ) {
-    for (name, value) in configs.iter() {
-        let cfg_name = snake_case(name.trim_start_matches(prefix));
+    for (name, (option, value)) in configs.iter() {
+        let cfg_name = option.cfg_name();
         writeln!(stdout, "cargo:rustc-check-cfg=cfg({cfg_name})").ok();
 
         if let Value::Bool(true) = value {
@@ -308,7 +270,7 @@ fn emit_configuration(
         }
 
         if let Value::String(value) = value {
-            if let Some(Validator::Enumeration(_)) = validators.get(&cfg_name) {
+            if let Some(Validator::Enumeration(_)) = option.constraint.as_ref() {
                 writeln!(stdout, "cargo:rustc-cfg={}_{}", cfg_name, snake_case(value)).ok();
             }
         }
@@ -318,8 +280,10 @@ fn emit_configuration(
         markdown::write_summary_table_line(&mut *selected_config, &name, value);
     }
 
-    for (name, validator) in validators {
-        validator.emit_cargo_extras(&mut stdout, &name);
+    for (option, _) in configs.values() {
+        if let Some(validator) = option.constraint.as_ref() {
+            validator.emit_cargo_extras(&mut stdout, &option.cfg_name());
+        }
     }
 }
 
@@ -671,7 +635,7 @@ mod test {
                 generate_config_internal(&mut stdout, "esp-test", &config, false)
             });
 
-        let json_output = config_json(snake_case("esp-test"), &config, &configs);
+        let json_output = config_json(&configs);
         assert_eq!(
             r#"[{"name":"some-key","description":"NA","default_value":{"String":"variant-0"},"constraint":{"Enumeration":["variant-0","variant-1"]},"actual_value":{"String":"variant-0"}}]"#,
             json_output

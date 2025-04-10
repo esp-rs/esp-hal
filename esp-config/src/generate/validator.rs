@@ -65,7 +65,6 @@ impl Validator {
     pub(crate) fn emit_cargo_extras(&self, mut stdout: impl Write, config_key: &str) {
         match self {
             Validator::Enumeration(values) => {
-                let config_key = snake_case(config_key);
                 for value in values {
                     writeln!(
                         stdout,
