@@ -17,9 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ESP_HAL_CONFIG_CRITICAL_SECTION_IMPL` to allow opting out of the default `critical-section` implementation (#3293)
 - All peripheral singletons (`GpioPin<...>`, `SPIn`, ...) now have a lifetime, as well as `steal`, `reborrow` and `clone_unchecked` methods (#3305)
 - `i2c::master::Operation` now implements `defmt::Format` (#3348)
-- ESP32-S2: Support for light-/deep-sleep (#3341) 
-- Add DMA memcpy support to the S2 (#3352)
 - ESP32-S2: Support for light-/deep-sleep (#3341)
+- Add DMA memcpy support to the S2 (#3352)
+- Some config options can now only be set when the `unstable` feature in enabled (#3365)
 
 ### Changed
 
@@ -342,7 +342,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Camera` and `I8080` drivers' constructors now only accepts blocking-mode DMA channels. (#2519)
 - Many peripherals are now disabled by default and also get disabled when the driver is dropped (#2544)
 - Updated embassy-time to v0.4 (#2701)
-
 - Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 - UART: `read_byte` and `write_byte` made private. (#2915)
 
