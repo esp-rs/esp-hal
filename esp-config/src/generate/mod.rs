@@ -117,14 +117,14 @@ pub fn generate_config_internal<'a>(
 
     #[cfg(not(test))]
     {
-        let config_json = config_json(&configs);
+        let config_json = config_json(&configs, false);
         write_out_file(format!("{crate_name}_config_data.json"), config_json);
     }
 
     configs
 }
 
-fn config_json(config: &HashMap<String, (&ConfigOption, Value)>) -> String {
+fn config_json(config: &HashMap<String, (&ConfigOption, Value)>, pretty: bool) -> String {
     #[derive(Serialize)]
     struct Item<'a> {
         #[serde(flatten)]
@@ -140,7 +140,11 @@ fn config_json(config: &HashMap<String, (&ConfigOption, Value)>) -> String {
         })
     }
 
-    serde_json::to_string(&to_write).unwrap()
+    if pretty {
+        serde_json::to_string_pretty(&to_write).unwrap()
+    } else {
+        serde_json::to_string(&to_write).unwrap()
+    }
 }
 
 // A work-around for https://github.com/rust-lang/cargo/issues/10358
@@ -630,9 +634,26 @@ mod test {
                 generate_config_internal(&mut stdout, "esp-test", &config)
             });
 
-        let json_output = config_json(&configs);
-        assert_eq!(
-            r#"[{"name":"some-key","description":"NA","default_value":{"String":"variant-0"},"constraint":{"Enumeration":["variant-0","variant-1"]},"actual_value":{"String":"variant-0"}}]"#,
+        let json_output = config_json(&configs, true);
+        pretty_assertions::assert_eq!(
+            r#"[
+  {
+    "name": "some-key",
+    "description": "NA",
+    "default_value": {
+      "String": "variant-0"
+    },
+    "constraint": {
+      "Enumeration": [
+        "variant-0",
+        "variant-1"
+      ]
+    },
+    "actual_value": {
+      "String": "variant-0"
+    }
+  }
+]"#,
             json_output
         );
     }
