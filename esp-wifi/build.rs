@@ -1,7 +1,7 @@
 use std::{error::Error, str::FromStr};
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, Validator, Value};
+use esp_config::{generate_config, ConfigOption, Validator, Value};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -99,128 +99,138 @@ fn main() -> Result<(), Box<dyn Error>> {
     generate_config(
         "esp_wifi",
         &[
-            ("rx_queue_size", "Size of the RX queue in frames", Value::Integer(5), Some(Validator::PositiveInteger)),
-            ("tx_queue_size", "Size of the TX queue in frames", Value::Integer(3), Some(Validator::PositiveInteger)),
-            (
-                "static_rx_buf_num",
-                "WiFi static RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(10),
-                None
-            ),
-            (
-                "dynamic_rx_buf_num",
-                "WiFi dynamic RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(32),
-                None
-            ),
-            (
-                "static_tx_buf_num",
-                "WiFi static TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(0),
-                None
-            ),
-            (
-                "dynamic_tx_buf_num",
-                "WiFi dynamic TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(32),
-                None
-            ),
-            (
-                "ampdu_rx_enable",
-                "WiFi AMPDU RX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Bool(true),
-                None
-            ),
-            (
-                "ampdu_tx_enable",
-                "WiFi AMPDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Bool(true),
-                None
-            ),
-            (
-                "amsdu_tx_enable",
-                "WiFi AMSDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Bool(false),
-                None
-            ),
-            (
-                "rx_ba_win",
-                "WiFi Block Ack RX window size. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(6),
-                None
-            ),
-            (
-                "max_burst_size",
-                "See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)",
-                Value::Integer(1),
-                None
-            ),
-            (
-                "country_code",
-                "Country code. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
-                Value::String("CN".to_owned()),
-                None
-            ),
-            (
-                "country_code_operating_class",
-                "If not 0: Operating Class table number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
-                Value::Integer(0),
-                None
-            ),
-            (
-                "mtu",
-                "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)",
-                Value::Integer(1492),
-                None
-            ),
-            (
-                "tick_rate_hz",
-                "Tick rate of the internal task scheduler in hertz",
-                Value::Integer(100),
-                None
-            ),
-            (
-                "listen_interval",
-                "Interval for station to listen to beacon from AP. The unit of listen interval is one beacon interval. For example, if beacon interval is 100 ms and listen interval is 3, the interval for station to listen to beacon is 300 ms",
-                Value::Integer(3),
-                None
-            ),
-            (
-                "beacon_timeout",
-                "For Station, If the station does not receive a beacon frame from the connected SoftAP during the  inactive time, disconnect from SoftAP. Default 6s. Range 6-30",
-                Value::Integer(6),
-                None
-            ),
-            (
-                "ap_beacon_timeout",
-                "For SoftAP, If the SoftAP doesn't receive any data from the connected STA during inactive time, the SoftAP will force deauth the STA. Default is 300s",
-                Value::Integer(300),
-                None
-            ),
-            (
-                "failure_retry_cnt",
-                "Number of connection retries station will do before moving to next AP. scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config. Note: Enabling this may cause connection time to increase incase best AP doesn't behave properly. Defaults to 1",
-                Value::Integer(1),
-                None
-            ),
-            (
-                "scan_method",
-                "0 = WIFI_FAST_SCAN, 1 = WIFI_ALL_CHANNEL_SCAN, defaults to 0",
-                Value::Integer(0),
-                None
-            ),
-            (
-                "dump_packets",
-                "Dump packets via an info log statement",
-                Value::Bool(false),
-                None
-            ),
-            (
-                "phy_enable_usb",
-                "Keeps USB running when using WiFi. This allows debugging and log messages via USB Serial JTAG. Turn off for best WiFi performance.",
-                Value::Bool(true),
-                None
-            ),
+            ConfigOption {
+                name: "rx_queue_size",
+                description: "Size of the RX queue in frames",
+                default_value: Value::Integer(5),
+                constraint: Some(Validator::PositiveInteger)
+            },
+            ConfigOption {
+                name: "tx_queue_size",
+                description: "Size of the TX queue in frames",
+                default_value: Value::Integer(3),
+                constraint: Some(Validator::PositiveInteger)
+            },
+            ConfigOption {
+                name: "static_rx_buf_num",
+                description: "WiFi static RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                default_value: Value::Integer(10),
+                constraint: None
+            },
+            ConfigOption {
+                name: "dynamic_rx_buf_num",
+                description: "WiFi dynamic RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                default_value: Value::Integer(32),
+                constraint: None
+            },
+            ConfigOption {
+                name: "static_tx_buf_num",
+                description: "WiFi static TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                default_value: Value::Integer(0),
+                constraint: None
+            },
+            ConfigOption {
+                name: "dynamic_tx_buf_num",
+                description: "WiFi dynamic TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                default_value: Value::Integer(32),
+                constraint: None
+            },
+            ConfigOption {
+                name: "ampdu_rx_enable",
+                description: "WiFi AMPDU RX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                default_value: Value::Bool(true),
+                constraint: None
+            },
+            ConfigOption {
+                name: "ampdu_tx_enable",
+                description: "WiFi AMPDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                default_value: Value::Bool(true),
+                constraint: None
+            },
+            ConfigOption {
+                name: "amsdu_tx_enable",
+                description: "WiFi AMSDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                default_value: Value::Bool(false),
+                constraint: None
+            },
+            ConfigOption {
+                name: "rx_ba_win",
+                description: "WiFi Block Ack RX window size. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                default_value: Value::Integer(6),
+                constraint: None
+            },
+            ConfigOption {
+                name: "max_burst_size",
+                description: "See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)",
+                default_value: Value::Integer(1),
+                constraint: None
+            },
+            ConfigOption {
+                name: "country_code",
+                description: "Country code. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
+                default_value: Value::String("CN".to_owned()),
+                constraint: None
+            },
+            ConfigOption {
+                name: "country_code_operating_class",
+                description: "If not 0: Operating Class table number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
+                default_value: Value::Integer(0),
+                constraint: None
+            },
+            ConfigOption {
+                name: "mtu",
+                description: "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)",
+                default_value: Value::Integer(1492),
+                constraint: None
+            },
+            ConfigOption {
+                name: "tick_rate_hz",
+                description: "Tick rate of the internal task scheduler in hertz",
+                default_value: Value::Integer(100),
+                constraint: None
+            },
+            ConfigOption {
+                name: "listen_interval",
+                description: "Interval for station to listen to beacon from AP. The unit of listen interval is one beacon interval. For example, if beacon interval is 100 ms and listen interval is 3, the interval for station to listen to beacon is 300 ms",
+                default_value: Value::Integer(3),
+                constraint: None
+            },
+            ConfigOption {
+                name: "beacon_timeout",
+                description: "For Station, If the station does not receive a beacon frame from the connected SoftAP during the  inactive time, disconnect from SoftAP. Default 6s. Range 6-30",
+                default_value: Value::Integer(6),
+                constraint: None
+            },
+            ConfigOption {
+                name: "ap_beacon_timeout",
+                description: "For SoftAP, If the SoftAP doesn't receive any data from the connected STA during inactive time, the SoftAP will force deauth the STA. Default is 300s",
+                default_value: Value::Integer(300),
+                constraint: None
+            },
+            ConfigOption {
+                name: "failure_retry_cnt",
+                description: "Number of connection retries station will do before moving to next AP. scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config. Note: Enabling this may cause connection time to increase incase best AP doesn't behave properly. Defaults to 1",
+                default_value: Value::Integer(1),
+                constraint: None
+            },
+            ConfigOption {
+                name: "scan_method",
+                description: "0 = WIFI_FAST_SCAN, 1 = WIFI_ALL_CHANNEL_SCAN, defaults to 0",
+                default_value: Value::Integer(0),
+                constraint: None
+            },
+            ConfigOption {
+                name: "dump_packets",
+                description: "Dump packets via an info log statement",
+                default_value: Value::Bool(false),
+                constraint: None
+            },
+            ConfigOption {
+                name: "phy_enable_usb",
+                description: "Keeps USB running when using WiFi. This allows debugging and log messages via USB Serial JTAG. Turn off for best WiFi performance.",
+                default_value: Value::Bool(true),
+                constraint: None
+            },
         ],
         true
     );

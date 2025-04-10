@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ConfigOption` struct (#3362)
+
 ### Changed
+
+- `generate_config` now takes a slice of `ConfigOption`s instead of tuples. (#3362)
 
 ### Fixed
 

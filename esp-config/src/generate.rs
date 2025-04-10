@@ -65,7 +65,7 @@ impl fmt::Display for Error {
 /// Unknown keys with the supplied prefix will cause this function to panic.
 pub fn generate_config(
     crate_name: &str,
-    config: &[(&str, &str, Value, Option<Validator>)],
+    config: &[ConfigOption],
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
     generate_config_internal(std::io::stdout(), crate_name, config, emit_md_tables)
@@ -74,7 +74,7 @@ pub fn generate_config(
 pub fn generate_config_internal(
     mut stdout: impl Write,
     crate_name: &str,
-    config: &[(&str, &str, Value, Option<Validator>)],
+    config: &[ConfigOption],
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
     // Only rebuild if `build.rs` changed. Otherwise, Cargo will rebuild if any
@@ -95,9 +95,9 @@ pub fn generate_config_internal(
     // it matches the keys in the hash table produced by `create_config`.
     let config_validators = config
         .iter()
-        .flat_map(|(name, _description, _default, validator)| {
-            validator.as_ref().map(|validator| {
-                let name = format!("{prefix}{}", screaming_snake_case(name));
+        .flat_map(|option| {
+            option.constraint.as_ref().map(|validator| {
+                let name = format!("{prefix}{}", screaming_snake_case(option.name));
                 (name, validator)
             })
         })
@@ -114,10 +114,11 @@ pub fn generate_config_internal(
 
     let validators = config
         .iter()
-        .filter_map(|(name, _, _, validator)| {
-            validator
+        .filter_map(|option| {
+            option
+                .constraint
                 .as_ref()
-                .map(|validator| (snake_case(name), validator))
+                .map(|validator| (snake_case(option.name), validator))
         })
         .collect::<HashMap<_, _>>();
 
@@ -129,7 +130,11 @@ pub fn generate_config_internal(
         &mut selected_config,
     );
 
-    write_config_json(snake_case(crate_name), config, &configs);
+    #[cfg(not(test))]
+    {
+        let config_json = config_json(snake_case(crate_name), config, &configs);
+        write_out_file(format!("{crate_name}_config_data.json"), config_json);
+    }
 
     if emit_md_tables {
         let file_name = snake_case(crate_name);
@@ -140,46 +145,37 @@ pub fn generate_config_internal(
     configs
 }
 
-fn write_config_json(
+fn config_json(
     crate_name: String,
-    config: &[(&str, &str, Value, Option<Validator>)],
+    config: &[ConfigOption],
     selected_config: &HashMap<String, Value>,
-) {
+) -> String {
     #[derive(Serialize)]
     struct Item<'a> {
-        name: String,
-        description: String,
-        default_value: Value,
+        #[serde(flatten)]
+        option: &'a ConfigOption,
         actual_value: Value,
-        constraint: &'a Option<Validator>,
     }
 
-    let mut to_write: Vec<Item<'_>> = Vec::new();
+    let mut to_write = Vec::new();
     for item in config.iter() {
         let option_name = format!(
             "{}_CONFIG_{}",
             screaming_snake_case(&crate_name),
-            screaming_snake_case(&item.0)
+            screaming_snake_case(&item.name)
         );
         let val = match selected_config.get(&option_name) {
             Some(val) => val,
-            None => &item.2,
+            None => &item.default_value,
         };
 
         to_write.push(Item {
-            name: item.0.to_string(),
-            description: item.1.to_string(),
-            default_value: item.2.clone(),
             actual_value: val.clone(),
-            constraint: &item.3,
+            option: item,
         })
     }
 
-    #[cfg(not(test))]
-    {
-        let json = serde_json::to_string(&to_write).unwrap();
-        write_out_file(format!("{crate_name}_config_data.json"), json);
-    }
+    serde_json::to_string(&to_write).unwrap()
 }
 
 // A work-around for https://github.com/rust-lang/cargo/issues/10358
@@ -219,17 +215,45 @@ fn env_change_work_around(mut stdout: impl Write) {
     }
 }
 
+/// A configuration option.
+#[derive(Serialize)]
+pub struct ConfigOption {
+    /// The name of the configuration option.
+    ///
+    /// The associated environment variable has the format of
+    /// `<PREFIX>_CONFIG_<NAME>`.
+    pub name: &'static str,
+
+    /// The description of the configuration option.
+    ///
+    /// The description will be included in the generated markdown
+    /// documentation.
+    pub description: &'static str,
+
+    /// The default value of the configuration option.
+    pub default_value: Value,
+
+    /// An optional validator for the configuration option.
+    pub constraint: Option<Validator>,
+}
+
 fn create_config(
     mut stdout: impl Write,
     prefix: &str,
-    config: &[(&str, &str, Value, Option<Validator>)],
+    config: &[ConfigOption],
     doc_table: &mut String,
 ) -> HashMap<String, Value> {
     let mut configs = HashMap::new();
 
-    for (name, description, default, validator) in config {
+    for ConfigOption {
+        name,
+        description,
+        default_value,
+        constraint,
+    } in config
+    {
         let name = format!("{prefix}{}", screaming_snake_case(name));
-        let allowed_values = if let Some(validator) = validator {
+        let allowed_values = if let Some(validator) = constraint {
             validator.description()
         } else {
             None
@@ -241,14 +265,14 @@ fn create_config(
             &mut *doc_table,
             &name,
             description,
-            &default,
+            &default_value,
             &allowed_values,
         );
 
         // Rebuild if config environment variable changed:
         writeln!(stdout, "cargo:rerun-if-env-changed={name}").ok();
 
-        configs.insert(name, default.clone());
+        configs.insert(name, default_value.clone());
     }
 
     configs
@@ -376,18 +400,48 @@ mod test {
                 let configs = generate_config(
                     "esp-test",
                     &[
-                        ("number", "NA", Value::Integer(999), None),
-                        ("number_signed", "NA", Value::Integer(-777), None),
-                        ("string", "NA", Value::String("Demo".to_string()), None),
-                        ("bool", "NA", Value::Bool(false), None),
-                        ("number_default", "NA", Value::Integer(999), None),
-                        (
-                            "string_default",
-                            "NA",
-                            Value::String("Demo".to_string()),
-                            None,
-                        ),
-                        ("bool_default", "NA", Value::Bool(false), None),
+                        ConfigOption {
+                            name: "number",
+                            description: "NA",
+                            default_value: Value::Integer(999),
+                            constraint: None,
+                        },
+                        ConfigOption {
+                            name: "number_signed",
+                            description: "NA",
+                            default_value: Value::Integer(-777),
+                            constraint: None,
+                        },
+                        ConfigOption {
+                            name: "string",
+                            description: "NA",
+                            default_value: Value::String("Demo".to_string()),
+                            constraint: None,
+                        },
+                        ConfigOption {
+                            name: "bool",
+                            description: "NA",
+                            default_value: Value::Bool(false),
+                            constraint: None,
+                        },
+                        ConfigOption {
+                            name: "number_default",
+                            description: "NA",
+                            default_value: Value::Integer(999),
+                            constraint: None,
+                        },
+                        ConfigOption {
+                            name: "string_default",
+                            description: "NA",
+                            default_value: Value::String("Demo".to_string()),
+                            constraint: None,
+                        },
+                        ConfigOption {
+                            name: "bool_default",
+                            description: "NA",
+                            default_value: Value::Bool(false),
+                            constraint: None,
+                        },
                     ],
                     false,
                 );
@@ -431,30 +485,30 @@ mod test {
                 generate_config(
                     "esp-test",
                     &[
-                        (
-                            "positive_number",
-                            "NA",
-                            Value::Integer(-1),
-                            Some(Validator::PositiveInteger),
-                        ),
-                        (
-                            "negative_number",
-                            "NA",
-                            Value::Integer(1),
-                            Some(Validator::NegativeInteger),
-                        ),
-                        (
-                            "non_negative_number",
-                            "NA",
-                            Value::Integer(-1),
-                            Some(Validator::NonNegativeInteger),
-                        ),
-                        (
-                            "range",
-                            "NA",
-                            Value::Integer(0),
-                            Some(Validator::IntegerInRange(5..10)),
-                        ),
+                        ConfigOption {
+                            name: "positive_number",
+                            description: "NA",
+                            default_value: Value::Integer(-1),
+                            constraint: Some(Validator::PositiveInteger),
+                        },
+                        ConfigOption {
+                            name: "negative_number",
+                            description: "NA",
+                            default_value: Value::Integer(1),
+                            constraint: Some(Validator::NegativeInteger),
+                        },
+                        ConfigOption {
+                            name: "non_negative_number",
+                            description: "NA",
+                            default_value: Value::Integer(-1),
+                            constraint: Some(Validator::NonNegativeInteger),
+                        },
+                        ConfigOption {
+                            name: "range",
+                            description: "NA",
+                            default_value: Value::Integer(0),
+                            constraint: Some(Validator::IntegerInRange(5..10)),
+                        },
                     ],
                     false,
                 )
@@ -467,11 +521,11 @@ mod test {
         temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("13"))], || {
             generate_config(
                 "esp-test",
-                &[(
-                    "number",
-                    "NA",
-                    Value::Integer(-1),
-                    Some(Validator::Custom(Box::new(|value| {
+                &[ConfigOption {
+                    name: "number",
+                    description: "NA",
+                    default_value: Value::Integer(-1),
+                    constraint: Some(Validator::Custom(Box::new(|value| {
                         let range = 10..20;
                         if !value.is_integer() || !range.contains(&value.as_integer()) {
                             Err(Error::validation("value does not fall within range"))
@@ -479,7 +533,7 @@ mod test {
                             Ok(())
                         }
                     }))),
-                )],
+                }],
                 false,
             )
         });
@@ -491,12 +545,12 @@ mod test {
         temp_env::with_vars([("ESP_TEST_CONFIG_POSITIVE_NUMBER", Some("-99"))], || {
             generate_config(
                 "esp-test",
-                &[(
-                    "positive_number",
-                    "NA",
-                    Value::Integer(-1),
-                    Some(Validator::PositiveInteger),
-                )],
+                &[ConfigOption {
+                    name: "positive_number",
+                    description: "NA",
+                    default_value: Value::Integer(-1),
+                    constraint: Some(Validator::PositiveInteger),
+                }],
                 false,
             )
         });
@@ -508,11 +562,11 @@ mod test {
         temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("37"))], || {
             generate_config(
                 "esp-test",
-                &[(
-                    "number",
-                    "NA",
-                    Value::Integer(-1),
-                    Some(Validator::Custom(Box::new(|value| {
+                &[ConfigOption {
+                    name: "number",
+                    description: "NA",
+                    default_value: Value::Integer(-1),
+                    constraint: Some(Validator::Custom(Box::new(|value| {
                         let range = 10..20;
                         if !value.is_integer() || !range.contains(&value.as_integer()) {
                             Err(Error::validation("value does not fall within range"))
@@ -520,7 +574,7 @@ mod test {
                             Ok(())
                         }
                     }))),
-                )],
+                }],
                 false,
             )
         });
@@ -537,7 +591,12 @@ mod test {
             || {
                 generate_config(
                     "esp-test",
-                    &[("number", "NA", Value::Integer(999), None)],
+                    &[ConfigOption {
+                        name: "number",
+                        description: "NA",
+                        default_value: Value::Integer(999),
+                        constraint: None,
+                    }],
                     false,
                 );
             },
@@ -550,7 +609,12 @@ mod test {
         temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("Hello world"))], || {
             generate_config(
                 "esp-test",
-                &[("number", "NA", Value::Integer(999), None)],
+                &[ConfigOption {
+                    name: "number",
+                    description: "NA",
+                    default_value: Value::Integer(999),
+                    constraint: None,
+                }],
                 false,
             );
         });
@@ -563,7 +627,12 @@ mod test {
             || {
                 generate_config(
                     "esp-test",
-                    &[("number", "NA", Value::Integer(999), None)],
+                    &[ConfigOption {
+                        name: "number",
+                        description: "NA",
+                        default_value: Value::Integer(999),
+                        constraint: None,
+                    }],
                     false,
                 );
             },
@@ -577,15 +646,15 @@ mod test {
             generate_config_internal(
                 &mut stdout,
                 "esp-test",
-                &[(
-                    "some-key",
-                    "NA",
-                    Value::String("variant-0".to_string()),
-                    Some(Validator::Enumeration(vec![
+                &[ConfigOption {
+                    name: "some-key",
+                    description: "NA",
+                    default_value: Value::String("variant-0".to_string()),
+                    constraint: Some(Validator::Enumeration(vec![
                         "variant-0".to_string(),
                         "variant-1".to_string(),
                     ])),
-                )],
+                }],
                 false,
             );
         });
