@@ -21,8 +21,8 @@ pub(crate) fn write_doc_table_line(mut table: impl Write, name: &str, option: &C
 
     writeln!(
         table,
-        "|**{}**|{}|{}|{}",
-        name, option.description, option.default_value, allowed_values
+        "|**{}**| <p>{}</p><p>{}</p> | {} | {}",
+        name, option.description, option.stability, option.default_value, allowed_values
     )
     .unwrap();
 }

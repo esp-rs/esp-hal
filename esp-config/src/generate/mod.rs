@@ -1,3 +1,4 @@
+use core::fmt::Display;
 use std::{collections::HashMap, env, fmt, fs, io::Write, path::PathBuf};
 
 use serde::Serialize;
@@ -199,6 +200,15 @@ pub enum Stability {
     /// Stable options contain the first version in which they were
     /// stabilized.
     Stable(&'static str),
+}
+
+impl Display for Stability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Stability::Unstable => write!(f, "⚠️ Unstable"),
+            Stability::Stable(version) => write!(f, "Stable since {version}"),
+        }
+    }
 }
 
 /// A configuration option.
