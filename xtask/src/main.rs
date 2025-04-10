@@ -646,10 +646,11 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 continue;
             }
 
-            let mut feature_sets = vec![package.feature_rules(device)];
-            if let Some(mut tests) = package.lint_feature_rules(device) {
-                feature_sets.append(&mut tests);
-            }
+            let feature_sets = [
+                vec![package.feature_rules(device)], // initially test all features
+                package.lint_feature_rules(device), // add separate test cases
+            ]
+            .concat();
 
             for mut features in feature_sets {
                 if package.has_chip_features() {
