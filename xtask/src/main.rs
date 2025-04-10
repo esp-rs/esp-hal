@@ -164,7 +164,7 @@ struct LintPackagesArgs {
     packages: Vec<Package>,
 
     /// Lint for a specific chip
-    #[arg(long, value_enum, default_values_t = Chip::iter())]
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
     chips: Vec<Chip>,
 
     /// Automatically apply fixes
