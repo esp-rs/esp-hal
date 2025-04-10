@@ -58,7 +58,7 @@ impl Validator {
                 Some(format!("Integer in range {}..{}", range.start, range.end))
             }
             Validator::Enumeration(values) => Some(format!(
-                "One of: <ul>{}</ul>",
+                "One of: <ul style=\"display: inline-block; text-align: left\">{}</ul>",
                 values
                     .iter()
                     .map(|v| format!("<li>{}</li>", v))

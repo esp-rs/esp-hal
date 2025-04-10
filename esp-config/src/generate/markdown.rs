@@ -4,7 +4,7 @@ use crate::{ConfigOption, Value};
 
 pub(crate) const DOC_TABLE_HEADER: &str = r#"
 | Name | Description | Default&nbsp;value | Allowed&nbsp;value |
-|------|-------------|---------------|---------------|
+|------|-------------|--------------------|--------------------|
 "#;
 
 pub(crate) const SELECTED_TABLE_HEADER: &str = r#"
@@ -21,7 +21,7 @@ pub(crate) fn write_doc_table_line(mut table: impl Write, name: &str, option: &C
 
     writeln!(
         table,
-        "| {key} | <p>{description}</p><p>{stability}</p> | {default} | {allowed}",
+        "| {key} | <p>{description}</p><p>{stability}</p> | <center>{default}</center> | <center>{allowed}</center>",
         description = option.description,
         key = name,
         stability = option.stability,
