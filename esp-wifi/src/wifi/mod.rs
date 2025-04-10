@@ -36,6 +36,7 @@ use esp_wifi_sys::include::{
     esp_eap_fast_config,
     esp_wifi_sta_enterprise_enable,
     wifi_pkt_rx_ctrl_t,
+    wifi_ps_type_t_WIFI_PS_NONE,
     wifi_scan_channel_bitmap_t,
     WIFI_PROTOCOL_11AX,
     WIFI_PROTOCOL_11B,
@@ -2615,6 +2616,10 @@ pub fn new<'d>(
             };
             esp_wifi_result!(esp_wifi_set_country(&country))?;
         }
+
+        esp_wifi_result!(unsafe {
+            esp_wifi_sys::include::esp_wifi_set_ps(wifi_ps_type_t_WIFI_PS_NONE)
+        })?;
     }
     Ok((
         WifiController {
