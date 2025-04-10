@@ -12,9 +12,7 @@ pub(crate) const SELECTED_TABLE_HEADER: &str = r#"
 |------|----------------|
 "#;
 
-pub(crate) fn write_doc_table_line(mut table: impl Write, prefix: &str, option: &ConfigOption) {
-    let name = option.env_var(prefix);
-
+pub(crate) fn write_doc_table_line(mut table: impl Write, name: &str, option: &ConfigOption) {
     let allowed_values = option
         .constraint
         .as_ref()

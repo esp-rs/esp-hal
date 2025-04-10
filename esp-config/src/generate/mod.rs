@@ -68,17 +68,31 @@ pub fn generate_config(
     config: &[ConfigOption],
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
-    generate_config_internal(std::io::stdout(), crate_name, config, emit_md_tables)
-        .into_iter()
-        .map(|(k, (_, v))| (k, v))
-        .collect()
+    let configs = generate_config_internal(std::io::stdout(), crate_name, config);
+
+    if emit_md_tables {
+        let file_name = snake_case(crate_name);
+
+        let mut doc_table = String::from(markdown::DOC_TABLE_HEADER);
+        let mut selected_config = String::from(markdown::SELECTED_TABLE_HEADER);
+
+        for (name, (option, value)) in configs.iter() {
+            markdown::write_doc_table_line(&mut doc_table, &name, option);
+            markdown::write_summary_table_line(&mut selected_config, &name, value);
+        }
+
+        write_out_file(format!("{file_name}_config_table.md"), doc_table);
+        write_out_file(format!("{file_name}_selected_config.md"), selected_config);
+    }
+
+    // Remove the ConfigOptions from the output
+    configs.into_iter().map(|(k, (_, v))| (k, v)).collect()
 }
 
 pub fn generate_config_internal<'a>(
     mut stdout: impl Write,
     crate_name: &str,
     config: &'a [ConfigOption],
-    emit_md_tables: bool,
 ) -> HashMap<String, (&'a ConfigOption, Value)> {
     // Only rebuild if `build.rs` changed. Otherwise, Cargo will rebuild if any
     // other file changed.
@@ -87,13 +101,10 @@ pub fn generate_config_internal<'a>(
     #[cfg(not(test))]
     env_change_work_around(&mut stdout);
 
-    let mut doc_table = String::from(markdown::DOC_TABLE_HEADER);
-    let mut selected_config = String::from(markdown::SELECTED_TABLE_HEADER);
-
     // Ensure that the prefix is `SCREAMING_SNAKE_CASE`:
     let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
 
-    let mut configs = create_config(&mut stdout, &prefix, config, &mut doc_table);
+    let mut configs = create_config(&mut stdout, &prefix, config);
     capture_from_env(&prefix, &mut configs);
 
     for (option, value) in configs.values() {
@@ -102,18 +113,12 @@ pub fn generate_config_internal<'a>(
         }
     }
 
-    emit_configuration(&mut stdout, &configs, &mut selected_config);
+    emit_configuration(&mut stdout, &configs);
 
     #[cfg(not(test))]
     {
         let config_json = config_json(&configs);
         write_out_file(format!("{crate_name}_config_data.json"), config_json);
-    }
-
-    if emit_md_tables {
-        let file_name = snake_case(crate_name);
-        write_out_file(format!("{file_name}_config_table.md"), doc_table);
-        write_out_file(format!("{file_name}_selected_config.md"), selected_config);
     }
 
     configs
@@ -211,14 +216,10 @@ fn create_config<'a>(
     mut stdout: impl Write,
     prefix: &str,
     config: &'a [ConfigOption],
-    doc_table: &mut String,
 ) -> HashMap<String, (&'a ConfigOption, Value)> {
     let mut configs = HashMap::new();
 
     for option in config {
-        // Write documentation table line:
-        markdown::write_doc_table_line(&mut *doc_table, prefix, &option);
-
         let name = option.env_var(prefix);
         // Rebuild if config environment variable changed:
         writeln!(stdout, "cargo:rerun-if-env-changed={}", name).ok();
@@ -256,11 +257,7 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, (&ConfigOption, 
     }
 }
 
-fn emit_configuration(
-    mut stdout: impl Write,
-    configs: &HashMap<String, (&ConfigOption, Value)>,
-    selected_config: &mut String,
-) {
+fn emit_configuration(mut stdout: impl Write, configs: &HashMap<String, (&ConfigOption, Value)>) {
     for (name, (option, value)) in configs.iter() {
         let cfg_name = option.cfg_name();
         writeln!(stdout, "cargo:rustc-check-cfg=cfg({cfg_name})").ok();
@@ -277,7 +274,6 @@ fn emit_configuration(
 
         // Values that haven't been seen will be output here with the default value:
         writeln!(stdout, "cargo:rustc-env={}={}", name, value).ok();
-        markdown::write_summary_table_line(&mut *selected_config, &name, value);
     }
 
     for (option, _) in configs.values() {
@@ -606,7 +602,6 @@ mod test {
                         "variant-1".to_string(),
                     ])),
                 }],
-                false,
             );
         });
 
@@ -632,7 +627,7 @@ mod test {
         }];
         let configs =
             temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
-                generate_config_internal(&mut stdout, "esp-test", &config, false)
+                generate_config_internal(&mut stdout, "esp-test", &config)
             });
 
         let json_output = config_json(&configs);
