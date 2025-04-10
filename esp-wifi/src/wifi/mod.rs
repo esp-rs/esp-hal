@@ -1501,23 +1501,6 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
                 crate::CONFIG.beacon_timeout
             ))?;
         };
-
-        let mut cntry_code = [0u8; 3];
-        cntry_code[..crate::CONFIG.country_code.len()]
-            .copy_from_slice(crate::CONFIG.country_code.as_bytes());
-        cntry_code[2] = crate::CONFIG.country_code_operating_class;
-
-        #[allow(clippy::useless_transmute)]
-        let country = wifi_country_t {
-            // FIXME once we bumped the MSRV accordingly (see https://github.com/esp-rs/esp-hal/pull/3027#discussion_r1944718266)
-            #[allow(clippy::useless_transmute)]
-            cc: core::mem::transmute::<[u8; 3], [core::ffi::c_char; 3]>(cntry_code),
-            schan: 1,
-            nchan: 13,
-            max_tx_power: 20,
-            policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
-        };
-        esp_wifi_result!(esp_wifi_set_country(&country))?;
     }
 
     Ok(())
@@ -2613,6 +2596,25 @@ pub fn new<'d>(
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     if !inited.wifi() {
         crate::wifi::wifi_init()?;
+
+        let mut cntry_code = [0u8; 3];
+        cntry_code[..crate::CONFIG.country_code.len()]
+            .copy_from_slice(crate::CONFIG.country_code.as_bytes());
+        cntry_code[2] = crate::CONFIG.country_code_operating_class;
+
+        #[allow(clippy::useless_transmute)]
+        unsafe {
+            let country = wifi_country_t {
+                // FIXME once we bumped the MSRV accordingly (see https://github.com/esp-rs/esp-hal/pull/3027#discussion_r1944718266)
+                #[allow(clippy::useless_transmute)]
+                cc: core::mem::transmute::<[u8; 3], [core::ffi::c_char; 3]>(cntry_code),
+                schan: 1,
+                nchan: 13,
+                max_tx_power: 20,
+                policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
+            };
+            esp_wifi_result!(esp_wifi_set_country(&country))?;
+        }
     }
     Ok((
         WifiController {
@@ -2824,21 +2826,20 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
         match conf {
-            Configuration::None => (),
-            Configuration::Client(config) => {
-                apply_sta_config(config)?;
-            }
-            Configuration::AccessPoint(config) => {
-                apply_ap_config(config)?;
-            }
+            Configuration::None => Ok::<(), WifiError>(()),
+            Configuration::Client(config) => apply_sta_config(config),
+            Configuration::AccessPoint(config) => apply_ap_config(config),
             Configuration::Mixed(sta_config, ap_config) => {
-                apply_ap_config(ap_config)?;
-                apply_sta_config(sta_config)?;
+                apply_ap_config(ap_config).and_then(|()| apply_sta_config(sta_config))
             }
-            Configuration::EapClient(config) => {
-                apply_sta_eap_config(config)?;
-            }
-        };
+            Configuration::EapClient(config) => apply_sta_eap_config(config),
+        }
+        .inspect_err(|_| {
+            // we/the driver might have applied a partial configuration
+            // so we better disable AP/STA just in case the caller ignores the error we
+            // return here - they will run into futher errors this way
+            unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
+        })?;
 
         Ok(())
     }
