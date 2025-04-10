@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2S driver now takes `DmaDescriptor`s later in construction (#3324)
 - `gpio::interconnect` types now have a lifetime associated with them (#3302)
 - Make `ParlIo` driver construction more consistent (#3345)
+- `ParlIo` driver now uses a config struct (#3359)
 - The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)
 - `Trace` is no longer generic (#3305)
 - Migrate SPI slave driver to newer DMA API (#3326)

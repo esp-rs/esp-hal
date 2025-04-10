@@ -114,7 +114,9 @@ The affected types in the `gpio::interconnect` module are:
 +     .build(rx_descriptors);
 ```
 
-## PARL IO driver construction no longer asks for references.
+## PARL IO driver changes
+
+### Construction no longer asks for references
 
 ```diff
  let mut parl_io_tx = parl_io
@@ -127,6 +129,42 @@ The affected types in the `gpio::interconnect` module are:
          0,
          SampleEdge::Normal,
          BitPackOrder::Msb,
+     )?;
+```
+
+### Construction options are passed via config
+
+```diff
++let config = RxConfig::default()
++                 .with_frequency(Rate::from_mhz(20))
++                 .with_bit_order(BitPackOrder::Msb);
+
+ let mut parl_io_rx = parl_io
+     .rx
+     .with_config(
+         pin_conf,
+         clock_pin,
+-        BitPackOrder::Msb,
+-        None,
++        config,
+     )?;
+```
+
+```diff
++let config = TxConfig::default()
++                 .with_frequency(Rate::from_mhz(20))
++                 .with_sample_edge(SampleEdge::Normal)
++                 .with_bit_order(BitPackOrder::Msb);
+
+ let mut parl_io_tx = parl_io
+     .tx
+     .with_config(
+         pin_conf,
+         clock_pin,
+-        0,
+-        SampleEdge::Normal,
+-        BitPackOrder::Msb,
++        config,
      )?;
 ```
 
