@@ -79,11 +79,14 @@ pub fn generate_config(
     if emit_md_tables {
         let file_name = snake_case(crate_name);
 
-        let mut doc_table = String::from(markdown::DOC_TABLE_HEADER);
+        let mut doc_table = markdown::DOC_TABLE_HEADER.replace(
+            "{prefix}",
+            format!("{}_CONFIG_*", screaming_snake_case(crate_name)).as_str(),
+        );
         let mut selected_config = String::from(markdown::SELECTED_TABLE_HEADER);
 
         for (name, option, value) in configs.iter() {
-            markdown::write_doc_table_line(&mut doc_table, &name, option);
+            markdown::write_doc_table_line(&mut doc_table, name, option);
             markdown::write_summary_table_line(&mut selected_config, &name, value);
         }
 
