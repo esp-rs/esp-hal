@@ -332,23 +332,20 @@ impl Clocks {
 #[cfg(esp32)]
 impl Clocks {
     fn measure_xtal_frequency() -> XtalClock {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
+        #[cfg(xtal_frequency_auto)]
+        {
             if RtcClock::estimate_xtal_frequency() > 33 {
                 XtalClock::_40M
             } else {
                 XtalClock::_26M
             }
-        } else {
-            const {
-                let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");
-                match frequency_conf.as_bytes() {
-                    b"auto" => XtalClock::Other(0), // Can't be `unreachable!` due to const eval.
-                    b"26" => XtalClock::_26M,
-                    b"40" => XtalClock::_40M,
-                    _ => XtalClock::Other(esp_config::esp_config_int_parse!(u32, frequency_conf)),
-                }
-            }
         }
+
+        #[cfg(xtal_frequency_26)]
+        return XtalClock::_26M;
+
+        #[cfg(xtal_frequency_40)]
+        return XtalClock::_40M;
     }
 
     /// Configure the CPU clock speed.
@@ -384,23 +381,20 @@ impl Clocks {
 #[cfg(esp32c2)]
 impl Clocks {
     fn measure_xtal_frequency() -> XtalClock {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
+        #[cfg(xtal_frequency_auto)]
+        {
             if RtcClock::estimate_xtal_frequency() > 33 {
                 XtalClock::_40M
             } else {
                 XtalClock::_26M
             }
-        } else {
-            const {
-                let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");
-                match frequency_conf.as_bytes() {
-                    b"auto" => XtalClock::Other(0), // Can't be `unreachable!` due to const eval.
-                    b"26" => XtalClock::_26M,
-                    b"40" => XtalClock::_40M,
-                    _ => XtalClock::Other(esp_config::esp_config_int_parse!(u32, frequency_conf)),
-                }
-            }
         }
+
+        #[cfg(xtal_frequency_26)]
+        return XtalClock::_26M;
+
+        #[cfg(xtal_frequency_40)]
+        return XtalClock::_40M;
     }
 
     /// Configure the CPU clock speed.
