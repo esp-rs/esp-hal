@@ -104,7 +104,7 @@ pub fn generate_config_internal<'a>(
     // Ensure that the prefix is `SCREAMING_SNAKE_CASE`:
     let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
 
-    let mut configs = create_config(&mut stdout, &prefix, config);
+    let mut configs = create_config(&prefix, config);
     capture_from_env(&prefix, &mut configs);
 
     for (_, option, value) in configs.iter() {
@@ -217,18 +217,13 @@ impl ConfigOption {
 }
 
 fn create_config<'a>(
-    mut stdout: impl Write,
     prefix: &str,
     config: &'a [ConfigOption],
 ) -> Vec<(String, &'a ConfigOption, Value)> {
     let mut configs = Vec::with_capacity(config.len());
 
     for option in config {
-        let name = option.env_var(prefix);
-        // Rebuild if config environment variable changed:
-        writeln!(stdout, "cargo:rerun-if-env-changed={}", name).ok();
-
-        configs.push((name, option, option.default_value.clone()));
+        configs.push((option.env_var(prefix), option, option.default_value.clone()));
     }
 
     configs
@@ -262,25 +257,26 @@ fn capture_from_env(prefix: &str, configs: &mut Vec<(String, &ConfigOption, Valu
 }
 
 fn emit_configuration(mut stdout: impl Write, configs: &[(String, &ConfigOption, Value)]) {
-    for (name, option, value) in configs.iter() {
+    for (env_var_name, option, value) in configs.iter() {
         let cfg_name = option.cfg_name();
+
+        // Output the raw configuration as an env var. Values that haven't been seen
+        // will be output here with the default value. Also trigger a rebuild if config
+        // environment variable changed.
+        writeln!(stdout, "cargo:rustc-env={}={}", env_var_name, value).ok();
+        writeln!(stdout, "cargo:rerun-if-env-changed={}", env_var_name).ok();
+
+        // Emit known config symbol:
         writeln!(stdout, "cargo:rustc-check-cfg=cfg({cfg_name})").ok();
 
+        // Emit specially-handled values:
         if let Value::Bool(true) = value {
             writeln!(stdout, "cargo:rustc-cfg={cfg_name}").ok();
         }
 
-        if let Value::String(value) = value {
-            if let Some(Validator::Enumeration(_)) = option.constraint.as_ref() {
-                writeln!(stdout, "cargo:rustc-cfg={}_{}", cfg_name, snake_case(value)).ok();
-            }
-        }
-
-        // Values that haven't been seen will be output here with the default value:
-        writeln!(stdout, "cargo:rustc-env={}={}", name, value).ok();
-
+        // Emit extra symbols based on the validator (e.g. enumerated values):
         if let Some(validator) = option.constraint.as_ref() {
-            validator.emit_cargo_extras(&mut stdout, &cfg_name);
+            validator.emit_cargo_extras(&mut stdout, &cfg_name, value);
         }
     }
 }

@@ -62,17 +62,29 @@ impl Validator {
         }
     }
 
-    pub(crate) fn emit_cargo_extras(&self, mut stdout: impl Write, config_key: &str) {
+    pub(crate) fn emit_cargo_extras(
+        &self,
+        mut stdout: impl Write,
+        config_key: &str,
+        actual_value: &Value,
+    ) {
         match self {
             Validator::Enumeration(values) => {
-                for value in values {
+                for possible_value in values {
                     writeln!(
                         stdout,
                         "cargo:rustc-check-cfg=cfg({config_key}_{})",
-                        snake_case(value)
+                        snake_case(possible_value)
                     )
                     .ok();
                 }
+
+                writeln!(
+                    stdout,
+                    "cargo:rustc-cfg={config_key}_{}",
+                    snake_case(&actual_value.to_string())
+                )
+                .ok();
             }
             _ => (),
         }
