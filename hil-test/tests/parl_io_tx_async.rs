@@ -18,7 +18,7 @@ use esp_hal::{
     parl_io::{
         BitPackOrder,
         ClkOutPin,
-        ParlIoTxOnly,
+        ParlIo,
         SampleEdge,
         TxConfig,
         TxEightBits,
@@ -89,7 +89,7 @@ mod tests {
         let pins = TxPinConfigIncludingValidPin::new(pins);
         let clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel)
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel)
             .unwrap()
             .into_async();
 
@@ -156,7 +156,7 @@ mod tests {
 
         let clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel)
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel)
             .unwrap()
             .into_async();
 

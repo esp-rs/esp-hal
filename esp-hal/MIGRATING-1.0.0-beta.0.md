@@ -116,6 +116,15 @@ The affected types in the `gpio::interconnect` module are:
 
 ## PARL IO driver changes
 
+### `ParlIoFullDuplex`, `ParlIoTxOnly` and `ParlIoRxOnly` have been merged into `ParlIo`
+
+```diff
+- let parl_io = ParlIoFullDuplex::new(peripherals.PARL_IO, dma_channel)?;
+- let parl_io = ParlIoTxOnly::new(peripherals.PARL_IO, dma_channel)?;
+- let parl_io = ParlIoRxOnly::new(peripherals.PARL_IO, dma_channel)?;
++ let parl_io = ParlIo::new(peripherals.PARL_IO, dma_channel)?;
+```
+
 ### Construction no longer asks for references
 
 ```diff
